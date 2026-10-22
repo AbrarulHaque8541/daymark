@@ -69,11 +69,14 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             File ciphertextFile = new File(attachmentsDirectory, attachmentId + ".enc");
             byte[] goodCiphertext = readFile(ciphertextFile);
 
-            String displayName = "test-doc.bin";
-            AttachmentRef reference = new AttachmentRef(attachmentId, displayName, "application/octet-stream", plaintext.length);
+            String displayName = "test-doc.txt";
+            AttachmentRef reference = new AttachmentRef(attachmentId, displayName, "text/plain", plaintext.length);
             Task task = new Task(taskId, "Streaming Error Test Task", null, "medium", false,
                     "2026-10-22T12:00:00Z", "2026-10-22T12:00:00Z", Collections.singletonList(reference));
             EncryptedTaskStore taskStore = new EncryptedTaskStore(context);
+            if (!taskStore.load().isEmpty()) {
+                throw new AssertionError("Isolated task fixture must start empty.");
+            }
             taskStore.save(Collections.singletonList(task));
 
             String authority = context.getPackageName() + ".attachments";
@@ -103,51 +106,24 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             // 2. Truncated ciphertext causes reader IOException instead of clean EOF.
             byte[] truncatedCiphertext = Arrays.copyOf(goodCiphertext, goodCiphertext.length / 2);
             writeFile(ciphertextFile, truncatedCiphertext);
-            ParcelFileDescriptor pipe2 = provider.openFile(uri, "r");
-            boolean truncatedFailedWithError = false;
-            try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(pipe2)) {
-                readAll(input);
-            } catch (IOException expected) {
-                truncatedFailedWithError = true;
-            }
+            assertReadFails(provider, uri, "Truncated ciphertext");
             assertions++;
-            if (!truncatedFailedWithError) {
-                throw new AssertionError("Truncated ciphertext was received as clean EOF instead of reader IOException.");
-            }
 
             // 3. Corrupted payload ciphertext causes reader IOException instead of clean EOF.
             byte[] corruptedCiphertext = goodCiphertext.clone();
             corruptedCiphertext[goodCiphertext.length / 2] ^= 0xFF;
             writeFile(ciphertextFile, corruptedCiphertext);
-            ParcelFileDescriptor pipe3 = provider.openFile(uri, "r");
-            boolean corruptFailedWithError = false;
-            try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(pipe3)) {
-                readAll(input);
-            } catch (IOException expected) {
-                corruptFailedWithError = true;
-            }
+            assertReadFails(provider, uri, "Corrupted ciphertext");
             assertions++;
-            if (!corruptFailedWithError) {
-                throw new AssertionError("Corrupted ciphertext was received as clean EOF instead of reader IOException.");
-            }
 
             // 4. Authentication / AES-GCM tag failure causes reader IOException instead of clean EOF.
             byte[] tamperedTagCiphertext = goodCiphertext.clone();
             tamperedTagCiphertext[goodCiphertext.length - 1] ^= 0x01;
             writeFile(ciphertextFile, tamperedTagCiphertext);
-            ParcelFileDescriptor pipe4 = provider.openFile(uri, "r");
-            boolean tagFailedWithError = false;
-            try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(pipe4)) {
-                readAll(input);
-            } catch (IOException expected) {
-                tagFailedWithError = true;
-            }
+            assertReadFails(provider, uri, "AES-GCM tag failure");
             assertions++;
-            if (!tagFailedWithError) {
-                throw new AssertionError("AES-GCM tag failure was received as clean EOF instead of reader IOException.");
-            }
 
-            // 5. Reader early cancellation / pipe closure is handled gracefully by writer.
+            // 5. Cancellation smoke check only; this does not assert writer termination.
             writeFile(ciphertextFile, goodCiphertext);
             ParcelFileDescriptor pipe5 = provider.openFile(uri, "r");
             try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(pipe5)) {
@@ -158,14 +134,28 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
                     throw new AssertionError("Reader early cancellation test failed to read initial bytes.");
                 }
             }
-            Thread.sleep(100); // Allow writer thread to react to broken pipe.
-            assertions++;
 
         } finally {
             deleteTree(root);
         }
 
         return assertions;
+    }
+
+    private static void assertReadFails(AttachmentContentProvider provider, Uri uri, String label)
+            throws Exception {
+        // A rejected open or an exception only during close is not a read failure.
+        try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(provider.openFile(uri, "r"))) {
+            boolean readFailed = false;
+            try {
+                readAll(input);
+            } catch (IOException expected) {
+                readFailed = true;
+            }
+            if (!readFailed) {
+                throw new AssertionError(label + " was received as clean EOF instead of reader IOException.");
+            }
+        }
     }
 
     private static byte[] readAll(InputStream input) throws IOException {
