@@ -31,7 +31,8 @@ test('window.open from each attached webview is routed to a tab and denied as a 
 });
 
 test('each new browser window installs popup routing before loading its UI', () => {
-  const source = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8')
+    .replace(/\r\n?/g, '\n');
   const start = source.indexOf('function createMainWindow() {');
   const end = source.indexOf('\n}\n', start);
   assert.notEqual(start, -1, 'createMainWindow should exist');
