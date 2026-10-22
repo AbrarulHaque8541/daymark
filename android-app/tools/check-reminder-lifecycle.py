@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Guard at-least-once in-app reminder presentation across Activity lifecycle failures."""
+"""Guard at-least-once in-app reminder presentation across Activity lifecycle failures.
+Also guard stale posted notification cleanup and receiver validation."""
 from pathlib import Path
 import sys
 
@@ -22,4 +23,27 @@ assert "advanceRepeatingTasksWithoutReminders();" in method, "passive repeating 
 assert "TaskLogic.advanceRepeat(current, zone, shownAt)" in listener, "a shown repeating reminder must advance to the next occurrence"
 assert "TaskReminderScheduler.rescheduleAll(this, tasks);" in activity, "OS alarms must be rescheduled from the activity after task changes"
 assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity.this);" in activity, "notification permission must be requested only when a reminder is enabled"
-print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open")
+
+# Guard stale posted notification cleanup in scheduler
+scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
+assert "NOTIFICATION_PREFERENCES" in scheduler, "scheduler must track notification IDs"
+assert "cancelNotification(context, notificationManager, taskId, requestCode)" in scheduler, "scheduler must cancel notifications for deleted/completed tasks"
+assert "notificationManager.cancel(requestCode)" in scheduler, "scheduler must call NotificationManager.cancel"
+assert "notifications.edit().remove(taskId).apply()" in scheduler, "scheduler must clean up notification tracking on cancel"
+assert "SharedPreferences notifications = context.getSharedPreferences(NOTIFICATION_PREFERENCES, Context.MODE_PRIVATE)" in scheduler, "scheduler must load notification preferences"
+
+# Guard receiver validation of stale intents
+receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java").read_text(encoding="utf-8")
+assert "String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);" in receiver, "receiver must extract task ID from intent"
+assert "String fireInstant = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);" in receiver, "receiver must extract fire instant from intent"
+assert "if (notificationId == 0 || taskId == null || title == null || title.trim().isEmpty() || fireInstant == null)" in receiver, "receiver must validate all required extras"
+assert "isReminderStillValid(context, taskId, fireInstant)" in receiver, "receiver must validate reminder is still valid"
+assert "getCurrentTaskTitle(context, taskId)" in receiver, "receiver must fetch current task title"
+assert "EncryptedTaskStore store = new EncryptedTaskStore(context);" in receiver, "receiver must load tasks to validate"
+assert "if (task.completed)" in receiver, "receiver must reject completed tasks"
+assert "if (task.reminderLeadMinutes == null || task.dueDate == null)" in receiver, "receiver must reject tasks without reminder"
+assert "if (fireInstant.equals(task.reminderShownFire))" in receiver, "receiver must reject already-shown reminders"
+assert "Instant.parse(fireInstant)" in receiver, "receiver must parse fire instant for validation"
+assert "TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault())" in receiver, "receiver must re-compute expected fire instant"
+
+print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, stale notification cleanup, receiver validation")

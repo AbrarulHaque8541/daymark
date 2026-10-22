@@ -40,6 +40,8 @@ final class TaskReminderScheduler {
     static final String CHANNEL_ID = "daymark_task_reminders";
     private static final String CODE_PREFERENCES = "daymark.reminder.codes.v1";
     private static final String CODE_COUNTER_KEY = "next_request_code";
+    private static final String NOTIFICATION_PREFERENCES = "daymark.reminder.notifications.v1";
+    private static final String NOTIFICATION_ID_KEY = "notification_id";
     private static final int FIRST_REQUEST_CODE = 44000;
     private static final int REQUEST_NOTIFICATION_PERMISSION = 44021;
     private static final String CHANNEL_SOUND_KEY = "channel_sound_uri";
@@ -58,34 +60,46 @@ final class TaskReminderScheduler {
                 REQUEST_NOTIFICATION_PERMISSION);
     }
 
-    /** Cancels stale alarms and reschedules every open task that has a reminder. */
+    /** Cancels stale alarms and posted notifications, and reschedules every open task that has a reminder. */
     static void rescheduleAll(Context context, List<Task> tasks) {
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (alarmManager == null) {
             Log.w(LOG_TAG, "AlarmManager is unavailable; reminders stay in-app only.");
             return;
         }
         ensureChannel(context);
         SharedPreferences codes = context.getSharedPreferences(CODE_PREFERENCES, Context.MODE_PRIVATE);
+        SharedPreferences notifications = context.getSharedPreferences(NOTIFICATION_PREFERENCES, Context.MODE_PRIVATE);
         Set<String> liveIds = new HashSet<>();
         for (Task task : tasks) liveIds.add(task.id);
         Map<String, ?> known = new HashMap<>(codes.getAll());
+        Map<String, ?> knownNotifications = new HashMap<>(notifications.getAll());
+        
+        // Cancel alarms and notifications for deleted tasks
         for (Map.Entry<String, ?> entry : known.entrySet()) {
-            String key = entry.getKey();
-            if (CODE_COUNTER_KEY.equals(key)) continue;
-            int requestCode = Integer.parseInt(String.valueOf(entry.getValue()));
-            if (!liveIds.contains(key)) {
-                cancelAlarm(context, alarmManager, key, requestCode);
-                codes.edit().remove(key).apply();
+            String taskId = entry.getKey();
+            if (CODE_COUNTER_KEY.equals(taskId)) continue;
+            if (!liveIds.contains(taskId)) {
+                int requestCode = Integer.parseInt(String.valueOf(entry.getValue()));
+                cancelAlarm(context, alarmManager, taskId, requestCode);
+                cancelNotification(context, notificationManager, taskId, requestCode);
+                codes.edit().remove(taskId).apply();
+                notifications.edit().remove(taskId).apply();
             }
         }
+        
+        // Cancel alarms and notifications for tasks that no longer need reminders
         for (Task task : tasks) {
             Object assigned = known.get(task.id);
             boolean needsAlarm = !task.completed && task.reminderLeadMinutes != null
                     && task.dueDate != null;
             if (!needsAlarm && assigned != null) {
-                cancelAlarm(context, alarmManager, task.id, Integer.parseInt(String.valueOf(assigned)));
+                int requestCode = Integer.parseInt(String.valueOf(assigned));
+                cancelAlarm(context, alarmManager, task.id, requestCode);
+                cancelNotification(context, notificationManager, task.id, requestCode);
                 codes.edit().remove(task.id).apply();
+                notifications.edit().remove(task.id).apply();
             } else if (needsAlarm) {
                 schedule(context, alarmManager, task);
             }
@@ -99,6 +113,8 @@ final class TaskReminderScheduler {
         if (fireText.equals(task.reminderShownFire)) return; // already presented for this occurrence
         if (!fire.isAfter(Instant.now())) return; // past occurrences stay with the in-app dialog flow
         int requestCode = requestCodeFor(context, task.id);
+        SharedPreferences notifications = context.getSharedPreferences(NOTIFICATION_PREFERENCES, Context.MODE_PRIVATE);
+        notifications.edit().putInt(task.id, requestCode).apply();
         alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire.toEpochMilli(),
                 pendingIntent(context, task, fireText, requestCode));
     }
@@ -111,6 +127,15 @@ final class TaskReminderScheduler {
             alarmManager.cancel(pending);
             pending.cancel();
         }
+    }
+
+    /** Cancels a posted notification for a task if it exists. */
+    static void cancelNotification(Context context, NotificationManager notificationManager, String taskId, int requestCode) {
+        if (notificationManager == null) {
+            Log.w(LOG_TAG, "NotificationManager is unavailable; cannot cancel notification.");
+            return;
+        }
+        notificationManager.cancel(requestCode);
     }
 
     private static PendingIntent pendingIntent(Context context, Task task, String fireText, int requestCode) {
@@ -129,7 +154,7 @@ final class TaskReminderScheduler {
     }
 
     /** Stable, collision-free per-task request code; old ids are pruned on reschedule. */
-    private static int requestCodeFor(Context context, String taskId) {
+    static int requestCodeFor(Context context, String taskId) {
         SharedPreferences codes = context.getSharedPreferences(CODE_PREFERENCES, Context.MODE_PRIVATE);
         String existing = codes.getString(taskId, null);
         if (existing != null) return Integer.parseInt(existing);
@@ -137,6 +162,13 @@ final class TaskReminderScheduler {
         codes.edit().putString(taskId, String.valueOf(next))
                 .putInt(CODE_COUNTER_KEY, next + 1).apply();
         return next;
+    }
+
+    /** Returns the notification ID (request code) for a given task, or null if not found. */
+    static Integer getNotificationId(Context context, String taskId) {
+        SharedPreferences notifications = context.getSharedPreferences(NOTIFICATION_PREFERENCES, Context.MODE_PRIVATE);
+        if (!notifications.contains(taskId)) return null;
+        return notifications.getInt(taskId, -1);
     }
 
     /** Stores the user-chosen sound; the channel is recreated so the change takes effect. */
