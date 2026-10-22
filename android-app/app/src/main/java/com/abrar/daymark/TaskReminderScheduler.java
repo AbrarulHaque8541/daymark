@@ -77,31 +77,45 @@ final class TaskReminderScheduler {
         Map<String, ?> known = new HashMap<>(codes.getAll());
         Map<String, ?> knownNotifications = new HashMap<>(notifications.getAll());
         
-        // Cancel alarms and notifications for deleted tasks
+        // Cancel alarms for deleted tasks using the alarm-code index.
         for (Map.Entry<String, ?> entry : known.entrySet()) {
             String taskId = entry.getKey();
             if (CODE_COUNTER_KEY.equals(taskId)) continue;
             if (!liveIds.contains(taskId)) {
                 int requestCode = Integer.parseInt(String.valueOf(entry.getValue()));
                 cancelAlarm(context, alarmManager, taskId, requestCode);
-                cancelNotification(context, notificationManager, taskId, requestCode);
                 codes.edit().remove(taskId).apply();
+            }
+        }
+        // Clean notification records independently: the two preference indexes can
+        // become inconsistent after interrupted writes or an older app version.
+        for (Map.Entry<String, ?> entry : knownNotifications.entrySet()) {
+            String taskId = entry.getKey();
+            if (!liveIds.contains(taskId)) {
+                int notificationId = Integer.parseInt(String.valueOf(entry.getValue()));
+                cancelNotification(context, notificationManager, taskId, notificationId);
                 notifications.edit().remove(taskId).apply();
             }
         }
-        
-        // Cancel alarms and notifications for tasks that no longer need reminders
+
+        // Cancel alarms and notifications for tasks that no longer need reminders.
         for (Task task : tasks) {
             Object assigned = known.get(task.id);
+            Object storedNotificationId = knownNotifications.get(task.id);
             boolean needsAlarm = !task.completed && task.reminderLeadMinutes != null
                     && task.dueDate != null;
-            if (!needsAlarm && assigned != null) {
-                int requestCode = Integer.parseInt(String.valueOf(assigned));
-                cancelAlarm(context, alarmManager, task.id, requestCode);
-                cancelNotification(context, notificationManager, task.id, requestCode);
-                codes.edit().remove(task.id).apply();
-                notifications.edit().remove(task.id).apply();
-            } else if (needsAlarm) {
+            if (!needsAlarm) {
+                if (assigned != null) {
+                    int requestCode = Integer.parseInt(String.valueOf(assigned));
+                    cancelAlarm(context, alarmManager, task.id, requestCode);
+                    codes.edit().remove(task.id).apply();
+                }
+                if (storedNotificationId != null) {
+                    int notificationId = Integer.parseInt(String.valueOf(storedNotificationId));
+                    cancelNotification(context, notificationManager, task.id, notificationId);
+                    notifications.edit().remove(task.id).apply();
+                }
+            } else {
                 reconcilePostedNotification(context, notificationManager, notifications, task);
                 schedule(context, alarmManager, task);
             }
