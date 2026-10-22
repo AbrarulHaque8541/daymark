@@ -14,6 +14,7 @@ import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
 
 import java.time.Instant;
@@ -101,8 +102,51 @@ final class TaskReminderScheduler {
                 codes.edit().remove(task.id).apply();
                 notifications.edit().remove(task.id).apply();
             } else if (needsAlarm) {
+                reconcilePostedNotification(context, notificationManager, notifications, task);
                 schedule(context, alarmManager, task);
             }
+        }
+    }
+
+    /**
+     * Reconcile an already-visible notification against the current task occurrence.
+     * A changed occurrence invalidates the old notification; a title-only edit refreshes it.
+     */
+    private static void reconcilePostedNotification(Context context,
+            NotificationManager notificationManager, SharedPreferences notifications, Task task) {
+        if (notificationManager == null || Build.VERSION.SDK_INT < 23) return;
+        Object storedId = notifications.getAll().get(task.id);
+        if (storedId == null) return;
+        int notificationId;
+        try {
+            notificationId = Integer.parseInt(String.valueOf(storedId));
+        } catch (NumberFormatException invalidId) {
+            Log.w(LOG_TAG, "Invalid stored notification ID for task " + task.id, invalidId);
+            return;
+        }
+        StatusBarNotification[] active = notificationManager.getActiveNotifications();
+        for (StatusBarNotification posted : active) {
+            if (posted.getId() != notificationId) continue;
+            android.app.Notification existing = posted.getNotification();
+            android.os.Bundle extras = existing == null ? null : existing.extras;
+            String postedTaskId = extras == null ? null
+                    : extras.getString(TaskReminderReceiver.EXTRA_TASK_ID);
+            String postedFire = extras == null ? null
+                    : extras.getString(TaskReminderReceiver.EXTRA_FIRE_INSTANT);
+            String postedTitle = extras == null ? null
+                    : extras.getString(android.app.Notification.EXTRA_TITLE);
+            Instant currentFire = TaskLogic.reminderFireInstant(task, ZoneId.systemDefault());
+            String currentFireText = currentFire == null ? null : currentFire.toString();
+            // Older notifications without lifecycle metadata cannot be safely trusted.
+            if (!task.id.equals(postedTaskId) || currentFireText == null
+                    || !currentFireText.equals(postedFire)) {
+                notificationManager.cancel(notificationId);
+                Log.i(LOG_TAG, "Canceled stale posted notification for task " + task.id);
+            } else if (!task.title.equals(postedTitle)) {
+                TaskReminderReceiver.refreshPostedNotification(context, notificationId, task, currentFireText);
+                Log.i(LOG_TAG, "Refreshed posted notification title for task " + task.id);
+            }
+            return;
         }
     }
 
