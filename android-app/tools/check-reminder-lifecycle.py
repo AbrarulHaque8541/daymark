@@ -55,6 +55,7 @@ assert "reconcilePostedNotification(context, notificationManager, notifications,
 assert "notificationManager.getActiveNotifications()" in scheduler, "scheduler must inspect active notifications"
 assert "!currentFireText.equals(postedFire)" in scheduler, "changed due occurrence must invalidate old notification"
 assert "currentFireText.equals(task.reminderShownFire)" in scheduler, "scheduler must cancel the OS notification once the in-app reminder is marked shown"
+assert 'notifications.edit().remove(task.id).apply();' in scheduler, "scheduler must remove the notification tracking record after canceling a stale posted notification"
 assert "TaskReminderReceiver.refreshPostedNotification(context, notificationId, task, currentFireText)" in scheduler, "title-only edits must refresh existing notification"
 
 print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, stale notification cleanup, receiver validation")
