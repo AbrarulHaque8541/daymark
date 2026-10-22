@@ -62,20 +62,53 @@ public final class AttachmentContentProvider extends ContentProvider {
                 || attachmentStore == null || !attachmentStore.exists(reference.id)) {
             throw new FileNotFoundException("The attachment is no longer available.");
         }
-        return openPipeHelper(uri, reference.mimeType, null, binding,
+        return openReliablePipeHelper(uri, reference.mimeType, null, binding,
                 (pipe, ignoredUri, ignoredType, ignoredOptions, attachment) -> {
-                    try (InputStream input = attachmentStore.openDecrypted(attachment.taskId,
-                            attachment.reference.id);
-                         OutputStream output = new ParcelFileDescriptor.AutoCloseOutputStream(pipe)) {
-                        byte[] buffer = new byte[32 * 1024];
-                        int count;
-                        while ((count = input.read(buffer)) != -1) {
-                            if (count > 0) output.write(buffer, 0, count);
+                    OutputStream output = null;
+                    try {
+                        InputStream input = attachmentStore.openDecrypted(attachment.taskId, attachment.reference.id);
+                        try {
+                            output = new ParcelFileDescriptor.AutoCloseOutputStream(pipe);
+                            byte[] buffer = new byte[32 * 1024];
+                            int count;
+                            while ((count = input.read(buffer)) != -1) {
+                                if (count > 0) output.write(buffer, 0, count);
+                            }
+                        } finally {
+                            input.close();
                         }
-                    } catch (IOException ignored) {
-                        try { pipe.close(); } catch (IOException closeIgnored) { }
+                        if (output != null) {
+                            output.flush();
+                            output.close();
+                        }
+                    } catch (Exception failure) {
+                        try {
+                            pipe.closeWithError("Attachment streaming failed");
+                        } catch (IOException ignored) {
+                        }
                     }
                 });
+    }
+
+    private static <T> ParcelFileDescriptor openReliablePipeHelper(Uri uri, String mimeType, Bundle opts,
+                                                                   T args, PipeDataWriter<T> func)
+            throws FileNotFoundException {
+        ParcelFileDescriptor[] fds = null;
+        try {
+            fds = ParcelFileDescriptor.createReliablePipe();
+            final ParcelFileDescriptor readSide = fds[0];
+            final ParcelFileDescriptor writeSide = fds[1];
+            new Thread(() -> {
+                func.writeDataToPipe(writeSide, uri, mimeType, opts, args);
+            }, "DaymarkAttachmentPipeWriter").start();
+            return readSide;
+        } catch (Exception e) {
+            if (fds != null) {
+                try { fds[0].close(); } catch (IOException ignored) {}
+                try { fds[1].close(); } catch (IOException ignored) {}
+            }
+            throw new FileNotFoundException("Could not create reliable attachment pipe.");
+        }
     }
 
     @Override
