@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const logic = require('../task-logic.js');
 
 const TODAY = '2026-10-05';
@@ -171,4 +173,21 @@ test('search also matches notes and same-date tasks order by due time', () => {
   ];
   assert.deepEqual(logic.getFilteredTasks(timed, 'all', '', TODAY).map((item) => item.id),
     ['early', 'late', 'untimed']);
+});
+
+test('shared task date contract matches the Java host implementation fixture', () => {
+  const fixturePath = path.join(__dirname, '..', 'contracts', 'task-date-validation.tsv');
+  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
+  let cases = 0;
+  for (const [index, line] of lines.entries()) {
+    if (!line || line.startsWith('#')) continue;
+    const columns = line.split('\t');
+    assert.equal(columns.length, 2, `date fixture line ${index + 1} must have two columns`);
+    assert.ok(columns[1] === 'true' || columns[1] === 'false',
+      `date fixture line ${index + 1} must use a strict boolean`);
+    assert.equal(logic.isDateOnly(columns[0]), columns[1] === 'true',
+      `JavaScript date validation must match shared fixture line ${index + 1}`);
+    cases += 1;
+  }
+  assert.equal(cases, 9, 'shared date contract must include all nine cases');
 });

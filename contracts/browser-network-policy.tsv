@@ -1,0 +1,5 @@
+# saved_online_choice	saved_explicit_consent	expected_online_opt_in	expected_remote_loads	expected_block_webview_loads
+false	false	false	false	true
+true	false	false	false	true
+false	true	false	false	true
+true	true	true	true	false

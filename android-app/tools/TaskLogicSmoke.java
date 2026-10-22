@@ -1,5 +1,10 @@
 package com.abrar.daymark;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -15,8 +20,9 @@ public final class TaskLogicSmoke {
 
     private TaskLogicSmoke() { }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         datesAreStrictAndDateOnly();
+        if (args.length > 0) sharedDateContract(Path.of(args[0]));
         CRUDKeepsStableIdentityAndTimestamps();
         templatesValidateAndCreateFreshTasks();
         templateListsRejectDuplicatesAndExcess();
@@ -36,6 +42,28 @@ public final class TaskLogicSmoke {
         check(!TaskLogic.isDateOnly("2026-02-29"), "impossible date rejected");
         check(!TaskLogic.isDateOnly("2026-2-09"), "non-padded date rejected");
         check(TaskLogic.isValid(task("1", "Review", "0001-01-01", "high", false, 1)), "year 0001 supported");
+    }
+
+    private static void sharedDateContract(Path fixture) throws IOException {
+        int cases = 0;
+        try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
+            String line;
+            int lineNumber = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\\t", -1);
+                check(fields.length == 2, "date contract fixture line " + lineNumber + " has two columns");
+                boolean expected;
+                if ("true".equals(fields[1])) expected = true;
+                else if ("false".equals(fields[1])) expected = false;
+                else throw new AssertionError("invalid expected boolean at date contract fixture line " + lineNumber);
+                check(TaskLogic.isDateOnly(fields[0]) == expected,
+                        "Android date validation matches shared fixture line " + lineNumber);
+                cases++;
+            }
+        }
+        check(cases == 9, "shared date contract fixture contains all nine cases");
     }
 
     private static void CRUDKeepsStableIdentityAndTimestamps() {
