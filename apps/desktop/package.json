@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/rules.test.js"
+    "test": "node --test test/rules.test.js test/webview-popup-policy.test.js"
   },
   "devDependencies": {
     "electron": "^33.4.0"

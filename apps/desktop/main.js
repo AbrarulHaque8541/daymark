@@ -3,6 +3,7 @@
 const { app, session, BrowserWindow } = require('electron');
 const path = require('path');
 const { isAllowedInsecure, isTrackerUrl } = require('./lib/rules');
+const { installWebviewPopupPolicy } = require('./lib/webview-popup-policy');
 
 let mainWindow = null;
 
@@ -17,6 +18,9 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+  installWebviewPopupPolicy(mainWindow.webContents, (url) => {
+    if (mainWindow) mainWindow.webContents.send('open-tab-request', url);
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('closed', () => {
@@ -68,16 +72,6 @@ app.whenReady().then(() => {
   });
 
   createMainWindow();
-
-  // Target=_blank / window.open inside a tab opens as a new browser tab.
-  app.on('browser-window-created', (_event, win) => {
-    win.webContents.on('did-attach-webview', (_e, webContents) => {
-      webContents.setWindowOpenHandler(({ url }) => {
-        if (mainWindow) mainWindow.webContents.send('open-tab-request', url);
-        return { action: 'deny' };
-      });
-    });
-  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
