@@ -59,6 +59,15 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             return;
         }
         
+        Integer expectedNotificationId = TaskReminderScheduler.getNotificationId(context, taskId);
+        if (expectedNotificationId == null || expectedNotificationId != notificationId) {
+            Log.i("DaymarkReminder", "Reminder alarm ID no longer matches the task's current notification ID; notification suppressed.");
+            NotificationManager manager =
+                    (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) manager.cancel(notificationId);
+            return;
+        }
+
         refreshPostedNotification(context, notificationId, currentTask, fireInstant);
     }
 
