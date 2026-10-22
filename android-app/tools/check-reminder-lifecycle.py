@@ -27,7 +27,7 @@ assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity
 # Guard stale posted notification cleanup in scheduler
 scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
 assert "NOTIFICATION_PREFERENCES" in scheduler, "scheduler must track notification IDs"
-assert "cancelNotification(context, notificationManager, taskId, requestCode)" in scheduler, "scheduler must cancel notifications for deleted/completed tasks"
+assert "cancelNotification(context, notificationManager, taskId, notificationId)" in scheduler, "scheduler must cancel notifications using the independently tracked notification ID"
 assert "notificationManager.cancel(requestCode)" in scheduler, "scheduler must call NotificationManager.cancel"
 assert "notifications.edit().remove(taskId).apply()" in scheduler, "scheduler must clean up notification tracking on cancel"
 assert "for (Map.Entry<String, ?> entry : knownNotifications.entrySet())" in scheduler, "scheduler must independently clean orphaned notification records even when the alarm-code index is missing"
