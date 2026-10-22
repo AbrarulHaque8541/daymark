@@ -37,13 +37,21 @@ receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.jav
 assert "String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);" in receiver, "receiver must extract task ID from intent"
 assert "String fireInstant = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);" in receiver, "receiver must extract fire instant from intent"
 assert "if (notificationId == 0 || taskId == null || title == null || title.trim().isEmpty() || fireInstant == null)" in receiver, "receiver must validate all required extras"
-assert "isReminderStillValid(context, taskId, fireInstant)" in receiver, "receiver must validate reminder is still valid"
-assert "getCurrentTaskTitle(context, taskId)" in receiver, "receiver must fetch current task title"
+assert "findValidReminderTask(context, taskId, fireInstant)" in receiver, "receiver must validate and load the current task in one read"
+assert "Task currentTask = findValidReminderTask(context, taskId, fireInstant);" in receiver, "receiver must fail closed if current state cannot be verified"
+assert "refreshPostedNotification(context, notificationId, currentTask, fireInstant)" in receiver, "receiver must post current task title and lifecycle metadata"
+assert "setOnlyAlertOnce(true)" in receiver, "metadata-only notification refresh must not re-alert"
 assert "EncryptedTaskStore store = new EncryptedTaskStore(context);" in receiver, "receiver must load tasks to validate"
 assert "if (task.completed)" in receiver, "receiver must reject completed tasks"
 assert "if (task.reminderLeadMinutes == null || task.dueDate == null)" in receiver, "receiver must reject tasks without reminder"
 assert "if (fireInstant.equals(task.reminderShownFire))" in receiver, "receiver must reject already-shown reminders"
 assert "Instant.parse(fireInstant)" in receiver, "receiver must parse fire instant for validation"
 assert "TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault())" in receiver, "receiver must re-compute expected fire instant"
+
+# Guard reconciliation of already-posted OS notifications on every task reschedule
+assert "reconcilePostedNotification(context, notificationManager, notifications, task)" in scheduler, "scheduler must reconcile posted notifications before scheduling"
+assert "notificationManager.getActiveNotifications()" in scheduler, "scheduler must inspect active notifications"
+assert "!currentFireText.equals(postedFire)" in scheduler, "changed due occurrence must invalidate old notification"
+assert "TaskReminderReceiver.refreshPostedNotification(context, notificationId, task, currentFireText)" in scheduler, "title-only edits must refresh existing notification"
 
 print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, stale notification cleanup, receiver validation")
