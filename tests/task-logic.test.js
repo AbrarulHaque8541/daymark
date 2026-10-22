@@ -177,11 +177,11 @@ test('search also matches notes and same-date tasks order by due time', () => {
 
 test('shared task date contract matches the Java host implementation fixture', () => {
   const fixturePath = path.join(__dirname, '..', 'contracts', 'task-date-validation.tsv');
-  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\\r?\\n/);
+  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
   let cases = 0;
   for (const [index, line] of lines.entries()) {
     if (!line || line.startsWith('#')) continue;
-    const columns = line.split('\\t');
+    const columns = line.split('\t');
     assert.equal(columns.length, 2, `date fixture line ${index + 1} must have two columns`);
     assert.ok(columns[1] === 'true' || columns[1] === 'false',
       `date fixture line ${index + 1} must use a strict boolean`);
