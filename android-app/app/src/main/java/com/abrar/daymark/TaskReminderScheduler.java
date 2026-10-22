@@ -165,6 +165,7 @@ final class TaskReminderScheduler {
                     || currentFireText.equals(task.reminderShownFire)
                     || !currentFireText.equals(postedFire)) {
                 notificationManager.cancel(notificationId);
+                notifications.edit().remove(task.id).apply();
                 Log.i(LOG_TAG, "Canceled stale posted notification for task " + task.id);
             } else if (!task.title.equals(postedTitle)) {
                 TaskReminderReceiver.refreshPostedNotification(context, notificationId, task, currentFireText);
