@@ -58,7 +58,6 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             Log.i("DaymarkReminder", "Stale or unverifiable reminder for task " + taskId + "; notification suppressed.");
             return;
         }
-        String currentTitle = currentTask.title;
         
         refreshPostedNotification(context, notificationId, currentTask, fireInstant);
     }
