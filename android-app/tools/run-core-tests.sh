@@ -64,7 +64,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserDiagnosticsSmoke.java" \
   "$ROOT/tools/ExtensionPackageParserSmoke.java" \
   "$ROOT/tools/CosmeticFilterToCssSmoke.java"
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NaturalLanguageTaskParseSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskListRenderGateSmoke
