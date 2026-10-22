@@ -60,21 +60,7 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         }
         String currentTitle = currentTask.title;
         
-        NotificationManager notificationManager =
-                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager == null) return;
-        TaskReminderScheduler.ensureChannel(context);
-        PendingIntent open = PendingIntent.getActivity(context, notificationId,
-                new Intent(context, MainActivity.class),
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
-                .setContentTitle(currentTitle)
-                .setContentText("Task reminder. Tap to open Daymark.")
-                .setContentIntent(open)
-                .setAutoCancel(true)
-                .build();
-        notificationManager.notify(notificationId, notification);
+        refreshPostedNotification(context, notificationId, currentTask, fireInstant);
     }
 
     /**
@@ -101,6 +87,32 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             Log.w("DaymarkReminder", "Failed to validate reminder for task " + taskId, e);
             return null; // fail closed when encrypted task state cannot be verified
         }
+    }
+
+    /** Posts or refreshes a task notification without re-alerting on metadata-only edits. */
+    static void refreshPostedNotification(Context context, int notificationId, Task task, String fireInstant) {
+        if (task == null || task.title == null || task.title.trim().isEmpty()) return;
+        if (Build.VERSION.SDK_INT >= 33
+                && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) return;
+        NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) return;
+        TaskReminderScheduler.ensureChannel(context);
+        PendingIntent open = PendingIntent.getActivity(context, notificationId,
+                new Intent(context, MainActivity.class),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(task.title)
+                .setContentText("Task reminder. Tap to open Daymark.")
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .build();
+        notification.extras.putString(EXTRA_TASK_ID, task.id);
+        notification.extras.putString(EXTRA_FIRE_INSTANT, fireInstant);
+        notificationManager.notify(notificationId, notification);
     }
 
     private void rescheduleAfterBoot(Context context) {
