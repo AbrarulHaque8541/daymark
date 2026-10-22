@@ -217,6 +217,12 @@ jobs:
           # branch fixes (ICU-safe [{].*?[}] patterns in GitHubReleaseClient); cold-launching
           # that immutable APK can never pass on any current Android. Verify the published
           # asset's download integrity only, then cold-launch the current PR debug APK.
+          # Reuse this job's booted disposable emulator; no new image, job, secrets, or permissions.
+          # Build/install the matching app/test pair before cold-launch installs this same rebuilt APK.
+          # Do not clear data, uninstall, or change signing to hide an incompatible-install failure.
+          serial="$("$adb" get-serialno | tr -d '\r')"
+          case "$serial" in emulator-*) ;; *) fail "attachment regression requires the scratch emulator" ;; esac
+          sh android-app/tools/run-attachment-streaming-instrumentation.sh "$serial" || fail "attachment streaming regression on API 29 failed"
           PATH="$ANDROID_HOME/platform-tools:$PATH" bash android-app/tools/cold-launch-apk.sh "current PR debug APK on API 29" "$debug_apk" || fail "cold-launch of current PR debug APK on API 29 failed"
           kill "$emu_pid" 2>/dev/null || true
           echo "API29 GATE: ALL PASS"

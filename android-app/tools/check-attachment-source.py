@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import pathlib
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -63,7 +64,12 @@ assert "renameTo(destination)" in blob and ".pending" in blob
 assert '"Open with another app"' in main and "Intent.ACTION_VIEW" in main
 assert "Intent.createChooser(view" in main and "FLAG_GRANT_READ_URI_PERMISSION" in main
 assert "isSafeToOpenExternally" in logic and "UNSAFE_EXTENSIONS" in logic
-assert "openPipeHelper" in provider and "openDecrypted(attachment.taskId" in provider
+assert not re.search(r"\bopenPipeHelper\s*\(", provider), \
+    "legacy openPipeHelper silently turns attachment failures into clean EOF"
+assert "openReliablePipeHelper(" in provider and "ParcelFileDescriptor.createReliablePipe()" in provider, \
+    "attachment streaming requires a reliable pipe"
+assert "closeWithError(" in provider, "attachment streaming failures must signal the PFD-aware reader"
+assert "openDecrypted(attachment.taskId" in provider
 assert 'if (!"r".equals(mode))' in provider
 assert "findBinding(uri)" in provider and "new AttachmentBinding(task.id, reference)" in provider, \
     "provider must resolve the owning task for IDs referenced by encrypted task metadata"
