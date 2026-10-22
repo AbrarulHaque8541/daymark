@@ -32,6 +32,7 @@ assert "notificationManager.cancel(requestCode)" in scheduler, "scheduler must c
 assert "notifications.edit().remove(taskId).apply()" in scheduler, "scheduler must clean up notification tracking on cancel"
 assert "for (Map.Entry<String, ?> entry : knownNotifications.entrySet())" in scheduler, "scheduler must independently clean orphaned notification records even when the alarm-code index is missing"
 assert "Object storedNotificationId = knownNotifications.get(task.id);" in scheduler, "scheduler must clean notifications when a task no longer needs reminders even if its alarm-code index is missing"
+assert "storedNotificationId != null && (assigned == null" in scheduler, "scheduler must cancel an old notification before replacing a missing or mismatched alarm-code index"
 assert "SharedPreferences notifications = context.getSharedPreferences(NOTIFICATION_PREFERENCES, Context.MODE_PRIVATE)" in scheduler, "scheduler must load notification preferences"
 
 # Guard receiver validation of stale intents
