@@ -27,9 +27,15 @@ watchdog_start = source.find("private void scheduleBrowserLoadWatchdog(String ad
 watchdog_end = source.find("private void cancelBrowserLoadWatchdog()", watchdog_start)
 assert watchdog_start >= 0 and watchdog_end > watchdog_start, "bounded watchdog implementation must exist"
 watchdog = source[watchdog_start:watchdog_end]
+assert "BROWSER_LOAD_WATCHDOG_MS = 15_000L" in source, "watchdog must use the required 15-second deadline"
 assert "browserSelfHealingPolicy.shouldRecover(address)" in watchdog, (
     "automatic retry must remain bounded by the recovery policy"
 )
+assert "browserWebView.stopLoading();" in watchdog, "watchdog exhaustion must cancel the stalled WebView load"
 assert "browserLoadFailed = true;" in watchdog, "watchdog exhaustion must expose retryable failure state"
+assert "Load Timeout: Check WebView version or Retry" in watchdog, "timeout must expose the required user guidance"
+assert "browserRetryButton" in source and 'compactButton("Retry"' in source, (
+    "timeout/error states must expose a dedicated Retry button"
+)
 
-print("PASS browser watchdog lifecycle: page-start re-arms finish timeout; automatic recovery remains bounded")
+print("PASS browser watchdog lifecycle: 15-second bounded timeout, cancellation, and Retry control")

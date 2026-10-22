@@ -11,6 +11,7 @@ import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -180,6 +181,9 @@ final class DaymarkWebView extends WebView {
             @SuppressWarnings("deprecation")
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                Log.e("DaymarkWebView", "onReceivedError code=" + errorCode
+                        + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl)
+                        + " description=" + (description == null ? "" : description));
                 if (!networkPolicy.allowsRemoteLoads()) {
                     listener.onOfflineNavigationBlocked();
                     return;
@@ -194,6 +198,10 @@ final class DaymarkWebView extends WebView {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (!request.isForMainFrame()) return;
+                Log.e("DaymarkWebView", "onReceivedError code=" + error.getErrorCode()
+                        + " origin=" + BrowserLogPolicy.redactedOrigin(request.getUrl().toString())
+                        + " description=" + (error.getDescription() == null
+                        ? "" : error.getDescription().toString()));
                 if (!networkPolicy.allowsRemoteLoads()) {
                     listener.onOfflineNavigationBlocked();
                     return;
@@ -208,6 +216,15 @@ final class DaymarkWebView extends WebView {
             }
 
             @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                            WebResourceResponse errorResponse) {
+                if (!request.isForMainFrame()) return;
+                int statusCode = errorResponse == null ? -1 : errorResponse.getStatusCode();
+                Log.e("DaymarkWebView", "onReceivedHttpError status=" + statusCode
+                        + " origin=" + BrowserLogPolicy.redactedOrigin(request.getUrl().toString()));
+            }
+
+            @Override
             public void onFormResubmission(WebView view, android.os.Message dontResend, android.os.Message resend) {
                 // Never silently re-POST form data; avoids accidental duplicate submissions.
                 if (dontResend != null) dontResend.sendToTarget();
@@ -215,6 +232,9 @@ final class DaymarkWebView extends WebView {
 
             @Override
             public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                Log.e("DaymarkWebView", "onRenderProcessGone origin="
+                        + BrowserLogPolicy.redactedOrigin(view.getUrl())
+                        + " didCrash=" + (detail != null && detail.didCrash()));
                 listener.onRendererGone();
                 return true;
             }
