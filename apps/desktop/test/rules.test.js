@@ -45,7 +45,8 @@ test('explicit http is kept for localhost', () => {
 });
 
 test('garbage input throws for a clear UI error', () => {
-  assert.throws(() => rules.httpsUpgradeUrl('ht!tp://|||'));
+  assert.throws(() => rules.httpsUpgradeUrl('https://[')); // unbalanced IPv6 bracket
+  assert.throws(() => rules.httpsUpgradeUrl('http://:::not-a-host'));
   assert.equal(rules.httpsUpgradeUrl('   '), null);
 });
 
