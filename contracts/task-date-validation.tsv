@@ -1,0 +1,10 @@
+# date_only_value	expected_valid
+2024-02-29	true
+2026-02-29	false
+0001-01-01	true
+0099-12-31	true
+2026-13-01	false
+2026-1-01	false
+2026-02-30	false
+0000-01-01	false
+	false
