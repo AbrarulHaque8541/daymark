@@ -1,12 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <!-- Defense in depth: keep preferences, WebView data, and future app data local. -->
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
         <exclude domain="file" path="tasks.enc" />
         <exclude domain="file" path="tasks.enc.bak" />
         <exclude domain="file" path="tasks.enc.new" />
         <exclude domain="file" path="tasks.enc.tmp" />
     </cloud-backup>
     <device-transfer>
+        <!-- Some OEMs transfer app data despite allowBackup=false; cover each domain explicitly. -->
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
         <exclude domain="file" path="tasks.enc" />
         <exclude domain="file" path="tasks.enc.bak" />
         <exclude domain="file" path="tasks.enc.new" />

@@ -38,6 +38,7 @@ policies = []
 for section_name in ("cloud-backup", "device-transfer"):
     section = modern.find(section_name)
     assert section is not None, f"missing {section_name} rules"
+    assert not section.findall("include"), f"{section_name} must not opt data into automatic backup"
     exclusions = {
         (element.get("domain"), element.get("path"))
         for element in section.findall("exclude")
@@ -49,6 +50,7 @@ for section_name in ("cloud-backup", "device-transfer"):
 
 legacy = ET.parse(ROOT / "app/src/main/res/xml/full_backup_content.xml").getroot()
 assert legacy.tag == "full-backup-content"
+assert not legacy.findall("include"), "legacy rules must not opt data into automatic backup"
 legacy_exclusions = {
     (element.get("domain"), element.get("path"))
     for element in legacy.findall("exclude")
@@ -57,6 +59,32 @@ assert expected <= legacy_exclusions, (
     "legacy backup rules must exclude encrypted task data and all AtomicFile/legacy temp artifacts"
 )
 policies.append(("legacy-backup", legacy_exclusions))
+
+# Android treats these as distinct backup domains; do not rely on root alone.
+# Include device-protected and app-specific external storage even if unused today.
+domains = {
+    "root", "file", "database", "sharedpref", "external",
+    "device_root", "device_file", "device_database", "device_sharedpref",
+}
+required_domain_exclusions = {(domain, ".") for domain in domains}
+
+
+def assert_all_domains_excluded(policy_name, exclusions):
+    missing = required_domain_exclusions - exclusions
+    assert not missing, f"{policy_name} must exclude entire app-data domains: {sorted(missing)}"
+
+
+negative_cases = 0
+for policy_name, exclusions in policies:
+    assert_all_domains_excluded(policy_name, exclusions)
+    # Each missing whole-domain exclusion must fail, including sharedpref when root remains.
+    for required in sorted(required_domain_exclusions):
+        try:
+            assert_all_domains_excluded(policy_name, exclusions - {required})
+        except AssertionError:
+            negative_cases += 1
+        else:
+            raise AssertionError(f"backup guard accepted missing {required} in {policy_name}")
 
 # AtomicFile may leave a recoverable prior snapshot in .bak and an interrupted staged write in .new.
 # Simulate those artifacts being offered for backup/transfer, and ensure no policy copies them off-device.
@@ -73,3 +101,4 @@ for policy_name, exclusions in policies:
 
 print("PASS Android backup policy: task ciphertext, AtomicFile .bak/.new, and legacy temp artifacts excluded from cloud, device transfer, and legacy backup")
 print("PASS interrupted AtomicFile regression: recoverable .bak and staged .new artifacts are not copied off-device")
+print(f"PASS full-domain backup exclusions: {len(domains)} domains across {len(policies)} policies; {negative_cases} missing-domain negative cases")

@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
+    <!-- Automatic backup is disabled; these rules are an additional data-minimization boundary. -->
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
     <exclude domain="file" path="tasks.enc" />
     <exclude domain="file" path="tasks.enc.bak" />
     <exclude domain="file" path="tasks.enc.new" />
