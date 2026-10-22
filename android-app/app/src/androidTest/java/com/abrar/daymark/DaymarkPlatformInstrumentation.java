@@ -56,6 +56,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             attachmentProviderPipeAndAndroidCrypto();
             portableImportUriJournalPreservesRecreationAndCleansOrphans();
             portableBackupRekeysAndReconcilesProcessDeath();
+            reminderNotificationLifecycleUsesCurrentTaskState();
             result.putString("result", "passed");
             result.putInt("assertions", assertions);
             finish(Activity.RESULT_OK, result);
@@ -65,6 +66,66 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             result.putString("failure", stackTrace(failure));
             finish(Activity.RESULT_CANCELED, result);
         }
+    }
+
+    private void reminderNotificationLifecycleUsesCurrentTaskState() throws Exception {
+        Context context = getTargetContext();
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            check(context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    "notification lifecycle test requires POST_NOTIFICATIONS grant");
+        }
+        android.app.NotificationManager manager =
+                (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        check(manager != null, "NotificationManager is available");
+        Task task = TaskLogic.create("Reminder original", "2099-12-01", "high",
+                null, null, 60, null);
+        java.time.Instant fire = TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault());
+        check(fire != null, "future reminder fire instant is computed");
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(task));
+        Integer notificationId = TaskReminderScheduler.getNotificationId(context, task.id);
+        check(notificationId != null && notificationId > 0, "scheduler stores a notification ID");
+
+        TaskReminderScheduler.ensureChannel(context);
+        android.app.Notification notification = new android.app.Notification.Builder(
+                context, TaskReminderScheduler.CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(task.title)
+                .setContentText("Instrumentation reminder")
+                .build();
+        notification.extras.putString(TaskReminderReceiver.EXTRA_TASK_ID, task.id);
+        notification.extras.putString(TaskReminderReceiver.EXTRA_FIRE_INSTANT, fire.toString());
+        manager.notify(notificationId, notification);
+        check(hasActiveNotification(manager, notificationId),
+                "synthetic reminder notification is active before reconciliation");
+
+        Task renamed = task.withDetails("Reminder updated", task.dueDate, task.priority,
+                java.time.Instant.now().toString());
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
+        android.app.Notification refreshed = activeNotification(manager, notificationId);
+        check(refreshed != null && renamed.title.equals(
+                        refreshed.extras.getString(android.app.Notification.EXTRA_TITLE)),
+                "title-only task edit refreshes the active reminder notification");
+
+        Task shown = renamed.withReminderShown(fire.toString(), java.time.Instant.now().toString());
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(shown));
+        check(!hasActiveNotification(manager, notificationId),
+                "notification is canceled after the in-app reminder is marked shown");
+        check(TaskReminderScheduler.getNotificationId(context, task.id) == null,
+                "canceled stale notification tracking is removed");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+    }
+
+    private static boolean hasActiveNotification(android.app.NotificationManager manager, int id) {
+        return activeNotification(manager, id) != null;
+    }
+
+    private static android.app.Notification activeNotification(
+            android.app.NotificationManager manager, int id) {
+        for (android.service.notification.StatusBarNotification posted : manager.getActiveNotifications()) {
+            if (posted.getId() == id) return posted.getNotification();
+        }
+        return null;
     }
 
     private void importLegacySnapshotRoundTripAndRollback() throws Exception {
