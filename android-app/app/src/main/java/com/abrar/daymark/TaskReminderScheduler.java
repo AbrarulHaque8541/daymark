@@ -162,6 +162,7 @@ final class TaskReminderScheduler {
             String currentFireText = currentFire == null ? null : currentFire.toString();
             // Older notifications without lifecycle metadata cannot be safely trusted.
             if (!task.id.equals(postedTaskId) || currentFireText == null
+                    || currentFireText.equals(task.reminderShownFire)
                     || !currentFireText.equals(postedFire)) {
                 notificationManager.cancel(notificationId);
                 Log.i(LOG_TAG, "Canceled stale posted notification for task " + task.id);
