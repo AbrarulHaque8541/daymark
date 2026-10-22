@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -36,8 +37,10 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
 
     private void showReminder(Context context, Intent intent) {
         int notificationId = intent == null ? 0 : intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
+        String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);
         String title = intent == null ? null : intent.getStringExtra(EXTRA_TASK_TITLE);
-        if (notificationId == 0 || title == null || title.trim().isEmpty()) {
+        String fireInstant = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);
+        if (notificationId == 0 || taskId == null || title == null || title.trim().isEmpty() || fireInstant == null) {
             Log.w("DaymarkReminder", "A reminder alarm fired without usable details; no notification is shown.");
             return;
         }
@@ -47,6 +50,59 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             Log.i("DaymarkReminder", "Notification permission is denied; the reminder stays in the in-app dialog.");
             return;
         }
+        
+        // Load and validate the task once. Never fall back to an alarm's stale title
+        // if current encrypted task state cannot be read.
+        Task currentTask = findValidReminderTask(context, taskId, fireInstant);
+        if (currentTask == null || currentTask.title == null || currentTask.title.trim().isEmpty()) {
+            Log.i("DaymarkReminder", "Stale or unverifiable reminder for task " + taskId + "; notification suppressed.");
+            return;
+        }
+        
+        Integer expectedNotificationId = TaskReminderScheduler.getNotificationId(context, taskId);
+        if (expectedNotificationId == null || expectedNotificationId != notificationId) {
+            Log.i("DaymarkReminder", "Reminder alarm ID no longer matches the task's current notification ID; notification suppressed.");
+            NotificationManager manager =
+                    (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) manager.cancel(notificationId);
+            return;
+        }
+
+        refreshPostedNotification(context, notificationId, currentTask, fireInstant);
+    }
+
+    /**
+     * Returns the current task only when the alarm still matches its live reminder state.
+     * A null result means the task is deleted, completed, changed, already shown, or unreadable.
+     */
+    private Task findValidReminderTask(Context context, String taskId, String fireInstant) {
+        try {
+            EncryptedTaskStore store = new EncryptedTaskStore(context);
+            List<Task> tasks = store.load();
+            for (Task task : tasks) {
+                if (!task.id.equals(taskId)) continue;
+                if (task.completed || task.reminderLeadMinutes == null || task.dueDate == null) {
+                    return null;
+                }
+                if (fireInstant.equals(task.reminderShownFire)) return null;
+                Instant fire = Instant.parse(fireInstant);
+                Instant expectedFire = TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault());
+                if (expectedFire == null || !fire.equals(expectedFire)) return null;
+                return task;
+            }
+            return null; // deleted task
+        } catch (Exception e) {
+            Log.w("DaymarkReminder", "Failed to validate reminder for task " + taskId, e);
+            return null; // fail closed when encrypted task state cannot be verified
+        }
+    }
+
+    /** Posts or refreshes a task notification without re-alerting on metadata-only edits. */
+    static void refreshPostedNotification(Context context, int notificationId, Task task, String fireInstant) {
+        if (task == null || task.title == null || task.title.trim().isEmpty()) return;
+        if (Build.VERSION.SDK_INT >= 33
+                && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) return;
         NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager == null) return;
@@ -56,11 +112,14 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
-                .setContentTitle(title)
+                .setContentTitle(task.title)
                 .setContentText("Task reminder. Tap to open Daymark.")
                 .setContentIntent(open)
                 .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
                 .build();
+        notification.extras.putString(EXTRA_TASK_ID, task.id);
+        notification.extras.putString(EXTRA_FIRE_INSTANT, fireInstant);
         notificationManager.notify(notificationId, notification);
     }
 
