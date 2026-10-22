@@ -1,5 +1,8 @@
 package com.abrar.daymark;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -26,6 +29,7 @@ public final class ExtensionPackageParserSmoke {
         webExtensionManifestTranslatesContentScriptsOnly();
         webExtensionManifestWithoutContentScriptsIsRejected();
         webExtensionMatchScopesFailClosed();
+        webExtensionRuleLimitsFailClosed();
         importedIdsAreStableAndCollisionResistant();
         documentStartImportsNormalizeToHonestTiming();
         archiveImportSkipsTraversalEntriesAndUnsupportedFiles();
@@ -188,6 +192,122 @@ public final class ExtensionPackageParserSmoke {
             check(rootOnly.matches.contains("https://example.com/"), "a root-only path is a valid explicit scope");
         } catch (IllegalArgumentException unexpected) {
             throw new AssertionError("valid restricted scopes must import: " + unexpected, unexpected);
+        }
+    }
+
+    private static void webExtensionRuleLimitsFailClosed() throws Exception {
+        JSONArray scripts = new JSONArray();
+        for (int i = 0; i < 32; i++) {
+            JSONObject item = scopeEntry(patterns(0, 1), patterns(0, 1));
+            if (i == 31) {
+                item.put("run_at", "document_start");
+                item.put("js", new JSONArray().put("script.js"));
+            }
+            scripts.put(item);
+        }
+        for (BrowserExtension ext : importBoth(scripts)) {
+            check(ext.warnings.contains("document_start run timing is not supported"),
+                    "exactly 32 content_scripts are accepted and the final entry is processed");
+        }
+        check(ExtensionPackageParser.parseWebExtensionArchive(zipArchive(limitManifest(scripts), false))
+                        .js.contains("console.log('packaged');"),
+                "the 32nd content script's archived code is preserved");
+        scripts.put(scopeEntry(patterns(0, 1), patterns(0, 1)));
+        expectLimitRejected(scripts, "32 content_scripts limit");
+        JSONArray skippedTail = new JSONArray();
+        for (int i = 0; i < 32; i++) skippedTail.put(scopeEntry(patterns(0, 1), patterns(0, 1)));
+        skippedTail.put("not an object");
+        expectLimitRejected(skippedTail, "32 content_scripts limit");
+
+        for (BrowserExtension ext : importBoth(new JSONArray().put(scopeEntry(patterns(0, 32), patterns(0, 32))))) {
+            check(ext.matches.size() == 32 && ext.excludes.size() == 32,
+                    "exactly 32 patterns in each entry list remain accepted independently");
+            check(ext.matches.contains("https://scope31.example/*")
+                            && ext.excludes.contains("https://scope31.example/*"),
+                    "the 32nd match and exclusion are never truncated");
+        }
+        expectLimitRejected(new JSONArray().put(scopeEntry(patterns(0, 33), patterns(0, 1))),
+                "matches exceeds the 32 patterns per entry limit");
+        expectLimitRejected(new JSONArray().put(scopeEntry(patterns(0, 1), patterns(0, 33))),
+                "exclude_matches exceeds the 32 patterns per entry limit");
+        // The array cap applies before deduplication, including a bad pattern beyond the old cap.
+        JSONArray badTail = patterns(0, 32).put("http://unsupported.example/*");
+        expectLimitRejected(new JSONArray().put(scopeEntry(badTail, patterns(0, 1))),
+                "matches exceeds the 32 patterns per entry limit");
+        expectLimitRejected(new JSONArray().put(scopeEntry(patterns(0, 1), badTail)),
+                "exclude_matches exceeds the 32 patterns per entry limit");
+        JSONArray repeated = new JSONArray();
+        for (int i = 0; i < 32; i++) repeated.put("https://repeat.example/*");
+        for (BrowserExtension ext : importBoth(new JSONArray().put(scopeEntry(repeated, repeated)))) {
+            check(ext.matches.size() == 1 && ext.excludes.size() == 1,
+                    "32 repeated patterns are accepted and deduplicated");
+        }
+        repeated.put("https://repeat.example/*");
+        expectLimitRejected(new JSONArray().put(scopeEntry(repeated, patterns(0, 1))),
+                "matches exceeds the 32 patterns per entry limit");
+        expectLimitRejected(new JSONArray().put(scopeEntry(patterns(0, 1), repeated)),
+                "exclude_matches exceeds the 32 patterns per entry limit");
+
+        JSONArray split = new JSONArray()
+                .put(scopeEntry(patterns(0, 16), patterns(0, 16)))
+                .put(scopeEntry(patterns(16, 16), patterns(16, 16)));
+        for (BrowserExtension ext : importBoth(split)) {
+            check(ext.matches.size() == 32 && ext.excludes.size() == 32,
+                    "exactly 32 unique aggregated matches and excludes are accepted");
+            check(ext.matches.contains("https://scope31.example/*")
+                            && ext.excludes.contains("https://scope31.example/*"),
+                    "split-entry aggregate scopes preserve their last match and exclusion");
+        }
+        expectLimitRejected(new JSONArray()
+                        .put(scopeEntry(patterns(0, 16), patterns(0, 16)))
+                        .put(scopeEntry(patterns(16, 17), patterns(16, 16))),
+                "32 unique aggregated matches rules limit");
+        expectLimitRejected(new JSONArray()
+                        .put(scopeEntry(patterns(0, 16), patterns(0, 16)))
+                        .put(scopeEntry(patterns(16, 16), patterns(16, 17))),
+                "32 unique aggregated exclude_matches rules limit");
+
+        JSONArray duplicateEntries = new JSONArray();
+        for (int i = 0; i < 32; i++) duplicateEntries.put(scopeEntry(patterns(0, 32), patterns(0, 32)));
+        for (BrowserExtension ext : importBoth(duplicateEntries)) {
+            check(ext.matches.size() == 32 && ext.excludes.size() == 32,
+                    "aggregate caps count unique rules, not duplicates across entries");
+        }
+    }
+
+    private static JSONArray patterns(int start, int count) throws Exception {
+        JSONArray values = new JSONArray();
+        for (int i = start; i < start + count; i++) values.put("https://scope" + i + ".example/*");
+        return values;
+    }
+
+    private static JSONObject scopeEntry(JSONArray matches, JSONArray excludes) throws Exception {
+        return new JSONObject().put("matches", matches).put("exclude_matches", excludes);
+    }
+
+    private static String limitManifest(JSONArray scripts) throws Exception {
+        return new JSONObject().put("name", "Rule limits").put("content_scripts", scripts).toString();
+    }
+
+    private static BrowserExtension[] importBoth(JSONArray scripts) throws Exception {
+        String manifest = limitManifest(scripts);
+        return new BrowserExtension[] {
+                ExtensionPackageParser.parseWebExtensionManifest(manifest),
+                ExtensionPackageParser.parseWebExtensionArchive(zipArchive(manifest, false))
+        };
+    }
+
+    private static void expectLimitRejected(JSONArray scripts, String reason) throws Exception {
+        String manifest = limitManifest(scripts);
+        byte[] archive = zipArchive(manifest, false);
+        for (boolean archived : new boolean[] {false, true}) {
+            try {
+                if (archived) ExtensionPackageParser.parseWebExtensionArchive(archive);
+                else ExtensionPackageParser.parseWebExtensionManifest(manifest);
+                throw new AssertionError("over-limit " + (archived ? "archive" : "manifest") + " accepted: " + reason);
+            } catch (IllegalArgumentException expected) {
+                check(expected.getMessage().contains(reason), "specific limit rejection: " + reason);
+            }
         }
     }
 

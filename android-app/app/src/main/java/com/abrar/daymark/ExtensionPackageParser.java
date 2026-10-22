@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
 /** Parses Daymark JSON packs and a minimal userscript header subset (@grant none only). */
 final class ExtensionPackageParser {
     private static final int MAX_PACK_CHARS = 200_000;
+    private static final int MAX_CONTENT_SCRIPTS = 32;
+    private static final int MAX_MATCH_PATTERNS = 32;
     /** Total decompressed budget across every archive entry, including skipped file types (issue #190). */
     private static final long MAX_ARCHIVE_DECOMPRESSED_BYTES = 4L * 1024 * 1024;
     /** Decompressed budget for a single archive entry, including skipped file types (issue #190). */
@@ -153,6 +155,9 @@ final class ExtensionPackageParser {
         if (scripts == null || scripts.length() == 0) {
             throw new IllegalArgumentException("No content_scripts found. This extension needs APIs or UI Daymark cannot execute.");
         }
+        if (scripts.length() > MAX_CONTENT_SCRIPTS) {
+            throw new IllegalArgumentException("Extension manifest exceeds the 32 content_scripts limit.");
+        }
         List<String> matches = new ArrayList<>();
         List<String> excludes = new ArrayList<>();
         StringBuilder css = new StringBuilder();
@@ -161,7 +166,7 @@ final class ExtensionPackageParser {
         String runAt = "document_end";
         boolean requestedStartTiming = false;
         StringBuilder warnings = new StringBuilder("Imported in Daymark compatibility mode; only page-local content scripts are supported.");
-        for (int i = 0; i < scripts.length() && i < 32; i++) {
+        for (int i = 0; i < scripts.length(); i++) {
             JSONObject item = scripts.optJSONObject(i);
             if (item == null) continue;
             List<String> entryMatches = readValidatedPatterns(item.optJSONArray("matches"), "matches");
@@ -169,12 +174,8 @@ final class ExtensionPackageParser {
             if (entryMatches.isEmpty()) throw new IllegalArgumentException(
                     "Content script declares no valid match rules; Daymark fails closed instead of"
                             + " running imported code on all sites.");
-            for (String pattern : entryMatches) {
-                if (matches.size() < 32 && !matches.contains(pattern)) matches.add(pattern);
-            }
-            for (String pattern : entryExcludes) {
-                if (excludes.size() < 32 && !excludes.contains(pattern)) excludes.add(pattern);
-            }
+            addUniquePatterns(matches, entryMatches, "matches");
+            addUniquePatterns(excludes, entryExcludes, "exclude_matches");
             String itemRunAt = item.optString("run_at", "document_idle").toLowerCase(Locale.ROOT);
             if (itemRunAt.contains("start")) requestedStartTiming = true;
             appendFiles(css, item.optJSONArray("css"), files, "CSS", warnings);
@@ -208,7 +209,11 @@ final class ExtensionPackageParser {
     private static List<String> readValidatedPatterns(JSONArray values, String field) {
         List<String> out = new ArrayList<>();
         if (values == null) return out;
-        for (int i = 0; i < values.length() && out.size() < 32; i++) {
+        // Bound the declared array before deduplication so overflow is never hidden by repeats.
+        if (values.length() > MAX_MATCH_PATTERNS) {
+            throw new IllegalArgumentException("Content script " + field + " exceeds the 32 patterns per entry limit.");
+        }
+        for (int i = 0; i < values.length(); i++) {
             String value = values.optString(i, "").trim();
             if (value.isEmpty()) throw new IllegalArgumentException(
                     "Content script " + field + " contains an empty pattern; invalid match scope fails closed.");
@@ -218,6 +223,16 @@ final class ExtensionPackageParser {
             if (!out.contains(value)) out.add(value);
         }
         return out;
+    }
+
+    /** Keep each aggregate scope list intact or reject the entire import, never drop exclusions. */
+    private static void addUniquePatterns(List<String> target, List<String> patterns, String field) {
+        for (String pattern : patterns) {
+            if (!target.contains(pattern)) target.add(pattern);
+            if (target.size() > MAX_MATCH_PATTERNS) {
+                throw new IllegalArgumentException("Extension manifest exceeds the 32 unique aggregated " + field + " rules limit.");
+            }
+        }
     }
 
     static boolean isSupportedMatchPattern(String value) {
