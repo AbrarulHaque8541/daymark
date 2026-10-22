@@ -54,6 +54,7 @@ assert "TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault())" i
 assert "reconcilePostedNotification(context, notificationManager, notifications, task)" in scheduler, "scheduler must reconcile posted notifications before scheduling"
 assert "notificationManager.getActiveNotifications()" in scheduler, "scheduler must inspect active notifications"
 assert "!currentFireText.equals(postedFire)" in scheduler, "changed due occurrence must invalidate old notification"
+assert "currentFireText.equals(task.reminderShownFire)" in scheduler, "scheduler must cancel the OS notification once the in-app reminder is marked shown"
 assert "TaskReminderReceiver.refreshPostedNotification(context, notificationId, task, currentFireText)" in scheduler, "title-only edits must refresh existing notification"
 
 print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, stale notification cleanup, receiver validation")
