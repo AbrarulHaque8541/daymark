@@ -63,7 +63,7 @@ assert "renameTo(destination)" in blob and ".pending" in blob
 assert '"Open with another app"' in main and "Intent.ACTION_VIEW" in main
 assert "Intent.createChooser(view" in main and "FLAG_GRANT_READ_URI_PERMISSION" in main
 assert "isSafeToOpenExternally" in logic and "UNSAFE_EXTENSIONS" in logic
-assert "openPipeHelper" in provider and "openDecrypted(attachment.taskId" in provider
+assert ("openPipeHelper" in provider or "openReliablePipeHelper" in provider) and "openDecrypted(attachment.taskId" in provider
 assert 'if (!"r".equals(mode))' in provider
 assert "findBinding(uri)" in provider and "new AttachmentBinding(task.id, reference)" in provider, \
     "provider must resolve the owning task for IDs referenced by encrypted task metadata"
