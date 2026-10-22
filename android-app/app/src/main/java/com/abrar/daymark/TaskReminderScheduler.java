@@ -116,6 +116,15 @@ final class TaskReminderScheduler {
                     notifications.edit().remove(task.id).apply();
                 }
             } else {
+                // The alarm-code and notification-ID indexes can diverge after an interrupted
+                // write or older version. Do not overwrite the notification index while leaving
+                // an older active notification behind under a different ID.
+                if (storedNotificationId != null && (assigned == null
+                        || !String.valueOf(assigned).equals(String.valueOf(storedNotificationId)))) {
+                    int staleNotificationId = Integer.parseInt(String.valueOf(storedNotificationId));
+                    cancelNotification(context, notificationManager, task.id, staleNotificationId);
+                    notifications.edit().remove(task.id).apply();
+                }
                 reconcilePostedNotification(context, notificationManager, notifications, task);
                 schedule(context, alarmManager, task);
             }
