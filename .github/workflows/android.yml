@@ -146,6 +146,8 @@ jobs:
           debug_apk="android-app/app/build/outputs/apk/githubSideload/debug/app-githubSideload-debug.apk"
           test -s "$debug_apk" || fail "debug APK missing: $debug_apk"
           PATH="$ANDROID_HOME/platform-tools:$PATH" bash android-app/tools/cold-launch-apk.sh "current PR debug APK on API 36" "$debug_apk" || fail "cold-launch of current PR debug APK on API 36 failed"
+          serial="$("$adb" get-serialno | tr -d '\r')"
+          PATH="$ANDROID_HOME/platform-tools:$PATH" sh android-app/tools/run-reminder-lifecycle-instrumentation.sh "$serial" || fail "Android platform/reminder lifecycle instrumentation failed on API 36"
           kill "$emu_pid" 2>/dev/null || true
           echo "API36 GATE: ALL PASS"
 
