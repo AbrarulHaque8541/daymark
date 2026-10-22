@@ -25,6 +25,12 @@ assert "if (browserPageLoading" in on_resume and "scheduleBrowserLoadWatchdog(la
 )
 
 assert "private boolean browserPageLoading;" in source, "loading state must be tracked across lifecycle"
+assert "browserWebView.saveState(browserState);" in source, "WebView state must be saved during Activity recreation"
+assert "browserWebView.restoreState(pendingBrowserWebViewState)" in source, "WebView state must be restored when available"
+assert "BROWSER_LAST_URL_KEY" in source and "persistLastBrowserAddress();" in source, (
+    "validated last URL fallback must be persisted locally"
+)
+assert "restoreBrowserSessionOrLastUrl();" in on_resume, "resume must use state/URL restoration"
 page_started = source.find("@Override public void onPageStarted(String url)")
 page_finished = source.find("@Override public void onPageFinished(String url)", page_started)
 load_error = source.find("@Override public void onLoadError(int errorCode", page_finished)

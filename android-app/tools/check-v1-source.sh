@@ -19,6 +19,8 @@ python3 ./tools/check-attachment-source.py "$ROOT"
 python3 ./tools/check-browser-catalog.py "$ROOT"
 python3 ./tools/check-browser-load-watchdog.py "$ROOT"
 python3 ./tools/check-browser-session-lifecycle.py "$ROOT"
+python3 ./tools/check-browser-error-diagnostics.py "$ROOT"
+python3 ./tools/check-cold-start-recovery.py "$ROOT"
 python3 ./tools/check-extension-trust-confirmation.py "$ROOT"
 python3 ./tools/check-browser-image-policy.py "$ROOT"
 python3 ./tools/check-extension-import-hardening.py "$ROOT"
@@ -539,8 +541,8 @@ assert "mainHandler.postDelayed(browserStatusHideRunnable, 3500L)" in activity, 
     "non-error browser feedback must auto-dismiss"
 assert "browserStatus.animate().alpha(0f).setDuration(180L)" in activity, \
     "browser status must fade out instead of abruptly occupying the viewport"
-assert 'message.contains("Tap this message to retry")' in activity, \
-    "actionable failed-navigation status must remain available for retry"
+assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")' in activity, \
+    "actionable failed-navigation status must remain available through the dedicated Retry button"
 
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares

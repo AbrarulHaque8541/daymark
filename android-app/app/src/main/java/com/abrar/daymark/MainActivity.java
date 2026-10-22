@@ -131,6 +131,9 @@ public final class MainActivity extends Activity {
     private static final String BROWSER_BLOCK_IMAGES_KEY = "block_network_images";
     private static final String BROWSER_DESKTOP_DEFAULT_KEY = "desktop_site_default";
     private static final String BROWSER_DISCLOSURE_ACK_KEY = "browser_disclosure_acknowledged_v1";
+    private static final String BROWSER_LAST_URL_KEY = "last_validated_url";
+    private static final String STATE_BROWSER_WEBVIEW = "state_browser_webview";
+    private static final String STATE_BROWSER_LAST_URL = "state_browser_last_url";
 
     private final List<Task> tasks = new ArrayList<>();
     private final List<Task> lastSavedTasks = new ArrayList<>();
@@ -299,6 +302,7 @@ public final class MainActivity extends Activity {
     private Spinner searchEngineSpinner;
     private CheckBox browserOnlineToggle;
     private TextView browserStatus;
+    private Button browserRetryButton;
     private Runnable browserStatusHideRunnable;
     private View browserProviderRow;
     private TextView browserPrivacyButton;
@@ -309,10 +313,12 @@ public final class MainActivity extends Activity {
     private Runnable browserLoadWatchdog;
     private boolean browserLoadFailed;
     private boolean browserPageLoading;
+    private Bundle pendingBrowserWebViewState;
+    private long browserNavigationGeneration;
     private final BrowserSelfHealingPolicy browserSelfHealingPolicy = new BrowserSelfHealingPolicy();
     private final BrowserDiagnostics browserDiagnostics = new BrowserDiagnostics();
     private static final String BROWSER_LOG_TAG = "DaymarkBrowser";
-    private static final long BROWSER_LOAD_WATCHDOG_MS = 20000L;
+    private static final long BROWSER_LOAD_WATCHDOG_MS = 15_000L;
 
     private static final String STARTUP_CRASH_LOG_NAME = "startup-crash-log.txt";
     private static final int STARTUP_CRASH_REPORT_MAX_CHARS = 12000;
@@ -407,18 +413,28 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        installStartupCrashCapture();
-        SharedPreferences preferences = getApplicationContext()
-                .getSharedPreferences(PREFERENCES, MODE_PRIVATE);
-        themeMode = Math.max(THEME_SYSTEM, Math.min(THEME_DARK, preferences.getInt(THEME_KEY, THEME_SYSTEM)));
-        powerMode = preferences.getBoolean(POWER_MODE_KEY, false);
-        textSizeMode = Math.max(0, Math.min(2, preferences.getInt(TEXT_SIZE_KEY, 1)));
-        textScale = TextScalePolicy.combined(
-                textSizeMode == 0 ? 0.9f : textSizeMode == 2 ? 1.25f : 1.0f,
-                getResources().getConfiguration().fontScale);
-        highContrast = preferences.getBoolean(HIGH_CONTRAST_KEY, false);
-        setTheme(themeResource(themeMode));
+        Throwable preStartupFailure = null;
+        try {
+            installStartupCrashCapture();
+            SharedPreferences preferences = getApplicationContext()
+                    .getSharedPreferences(PREFERENCES, MODE_PRIVATE);
+            themeMode = Math.max(THEME_SYSTEM, Math.min(THEME_DARK, preferences.getInt(THEME_KEY, THEME_SYSTEM)));
+            powerMode = preferences.getBoolean(POWER_MODE_KEY, false);
+            textSizeMode = Math.max(0, Math.min(2, preferences.getInt(TEXT_SIZE_KEY, 1)));
+            textScale = TextScalePolicy.combined(
+                    textSizeMode == 0 ? 0.9f : textSizeMode == 2 ? 1.25f : 1.0f,
+                    getResources().getConfiguration().fontScale);
+            highContrast = preferences.getBoolean(HIGH_CONTRAST_KEY, false);
+            setTheme(themeResource(themeMode));
+        } catch (Throwable failure) {
+            preStartupFailure = failure;
+        }
         super.onCreate(savedInstanceState);
+        if (preStartupFailure != null) {
+            Log.e("Daymark-ColdStart", "Crash details", preStartupFailure);
+            showStartupFailureScreen(preStartupFailure);
+            return;
+        }
         try {
             showPendingStartupCrashReportIfAny();
             GitHubApkDownloader.cleanupPartialDownloads(getApplicationContext());
@@ -454,8 +470,11 @@ public final class MainActivity extends Activity {
                     }
                 }
                 webMode = WebModeState.restore(savedInstanceState.getBoolean(STATE_WEB_MODE, false));
+                pendingBrowserWebViewState = savedInstanceState.getBundle(STATE_BROWSER_WEBVIEW);
+                lastBrowserAddress = savedInstanceState.getString(STATE_BROWSER_LAST_URL);
             }
             browserPreferences = getSharedPreferences(BROWSER_PREFERENCES, MODE_PRIVATE);
+            if (lastBrowserAddress == null) lastBrowserAddress = readPersistedBrowserAddress();
             searchEngine = BrowserAddress.SearchEngine.fromName(
                     browserPreferences.getString(SEARCH_ENGINE_KEY, BrowserAddress.SearchEngine.DUCKDUCKGO.name()));
             browserNetworkPolicy = new BrowserNetworkPolicy(readBrowserOnlinePreference());
@@ -469,24 +488,28 @@ public final class MainActivity extends Activity {
             handleShareInIntent(getIntent());
             handleShortcutIntent(getIntent());
         } catch (Throwable startupFailure) {
-            Log.e("DaymarkStartup", "cold start failed", startupFailure);
+            Log.e("Daymark-ColdStart", "Crash details", startupFailure);
             showStartupFailureScreen(startupFailure);
         }
     }
 
-    /** Keeps the process open with the real error instead of an instant close. */
+    /** Keeps the process open with a safe, actionable error instead of an instant close. */
     private void showStartupFailureScreen(Throwable startupFailure) {
-        java.io.StringWriter stackWriter = new java.io.StringWriter();
-        startupFailure.printStackTrace(new java.io.PrintWriter(stackWriter));
-        String report = "Daymark could not finish opening.\n\n" + stackWriter;
-        ScrollView scroll = new ScrollView(this);
-        TextView message = new TextView(this);
-        int pad = Math.round(18 * getResources().getDisplayMetrics().density);
-        message.setPadding(pad, pad, pad, pad);
-        message.setText(report);
-        message.setTextIsSelectable(true);
-        scroll.addView(message);
-        setContentView(scroll);
+        try {
+            new AlertDialog.Builder(this)
+                    .setTitle("Daymark could not start")
+                    .setMessage("App initialization failed. Please restart the app or clear app data if the problem continues.")
+                    .setPositiveButton("Close", null)
+                    .setCancelable(false)
+                    .show();
+        } catch (Throwable dialogFailure) {
+            Log.e("Daymark-ColdStart", "Unable to show startup error dialog", dialogFailure);
+            TextView message = new TextView(this);
+            message.setText("App initialization failed. Please restart or clear app data.");
+            int pad = Math.round(18 * getResources().getDisplayMetrics().density);
+            message.setPadding(pad, pad, pad, pad);
+            setContentView(message);
+        }
     }
 
     @Override
@@ -709,6 +732,7 @@ public final class MainActivity extends Activity {
     protected void onPause() {
         if (browserWebView != null) {
             if (browserWebView.getUrl() != null) lastBrowserAddress = browserWebView.getUrl();
+            persistLastBrowserAddress();
             cancelBrowserLoadWatchdog();
             Log.i(BROWSER_LOG_TAG, "backgrounded; pausing WebView session: "
                     + BrowserLogPolicy.redactedOrigin(lastBrowserAddress));
@@ -795,6 +819,23 @@ public final class MainActivity extends Activity {
         if (pendingSaveTransaction != null) {
             outState.putSerializable(PENDING_SAVE_STATE_KEY, pendingSaveTransaction);
         }
+        if (browserWebView != null) {
+            try {
+                Bundle browserState = new Bundle();
+                browserWebView.saveState(browserState);
+                outState.putBundle(STATE_BROWSER_WEBVIEW, browserState);
+                String currentUrl = browserWebView.getUrl();
+                if (BrowserAddress.isAllowedWebUrl(currentUrl)) {
+                    lastBrowserAddress = currentUrl;
+                }
+            } catch (RuntimeException stateFailure) {
+                Log.w(BROWSER_LOG_TAG, "WebView state could not be saved; URL fallback will be used", stateFailure);
+            }
+        }
+        if (BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) {
+            outState.putString(STATE_BROWSER_LAST_URL, lastBrowserAddress);
+            persistLastBrowserAddress();
+        }
         super.onSaveInstanceState(outState);
     }
 
@@ -821,12 +862,9 @@ public final class MainActivity extends Activity {
                     && BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) {
                 scheduleBrowserLoadWatchdog(lastBrowserAddress);
             }
-        } else if (webMode && lastBrowserAddress != null
-                && browserNetworkPolicy != null && browserNetworkPolicy.allowsRemoteLoads()) {
-            final String restoreAddress = lastBrowserAddress;
-            Log.i(BROWSER_LOG_TAG, "resumed; restoring last page: "
-                    + BrowserLogPolicy.redactedOrigin(restoreAddress));
-            postActivityCallback(() -> navigateBrowserTo(restoreAddress));
+        } else if (webMode && browserNetworkPolicy != null
+                && browserNetworkPolicy.allowsRemoteLoads()) {
+            restoreBrowserSessionOrLastUrl();
         }
         if (!updateTransferRunning && !verifiedSaveRunning && pendingSaveTransaction == null
                 && pendingVerifiedApk == null
@@ -1677,12 +1715,19 @@ public final class MainActivity extends Activity {
         browserStatus.setVisibility(View.GONE);
         browserStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         browserStatus.setOnClickListener(view -> {
-            if (!webMode || !browserLoadFailed || lastBrowserAddress == null) return;
-            Log.i(BROWSER_LOG_TAG, "retry requested via status tap: "
+            if (browserRetryButton != null) browserRetryButton.performClick();
+        });
+        panel.addView(browserStatus, bottomMargin(dp(2)));
+        browserRetryButton = compactButton("Retry", true);
+        browserRetryButton.setContentDescription("Retry loading the current HTTPS page");
+        browserRetryButton.setVisibility(View.GONE);
+        browserRetryButton.setOnClickListener(view -> {
+            if (!webMode || !browserLoadFailed || !BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) return;
+            Log.i(BROWSER_LOG_TAG, "retry requested: "
                     + BrowserLogPolicy.redactedOrigin(lastBrowserAddress));
             navigateBrowserTo(lastBrowserAddress);
         });
-        panel.addView(browserStatus, bottomMargin(dp(4)));
+        panel.addView(browserRetryButton, bottomMargin(dp(4)));
 
         // Reader mode remains available from the browser overflow menu; never reserve a banner row.
         browserReaderActionRow = new LinearLayout(this);
@@ -1715,10 +1760,11 @@ public final class MainActivity extends Activity {
         browserStatus.animate().alpha(1f).setDuration(150L).start();
 
         // Keep actionable terminal failures visible so the user can tap to retry.
-        boolean needsManualRetry = message != null
-                && (message.contains("Tap this message to retry")
-                || message.contains("did not open after one automatic recovery")
-                || message.contains("Automatic recovery was limited"));
+        boolean needsManualRetry = browserLoadFailed && message != null
+                && (message.contains("retry") || message.contains("Retry")
+                || message.contains("try again") || message.contains("Timeout"));
+        if (browserRetryButton != null) browserRetryButton.setVisibility(
+                needsManualRetry ? View.VISIBLE : View.GONE);
         if (needsManualRetry) return;
 
         browserStatusHideRunnable = () -> {
@@ -2062,6 +2108,7 @@ public final class MainActivity extends Activity {
         lastBrowserAddress = address;
         browserLoadFailed = false;
         browserPageLoading = true;
+        browserNavigationGeneration++;
         Log.i(BROWSER_LOG_TAG, "load requested: " + BrowserLogPolicy.redactedOrigin(address));
         browserDiagnostics.record(System.currentTimeMillis(), "load requested", address, null);
         browserWebView.loadUrl(address);
@@ -2069,10 +2116,58 @@ public final class MainActivity extends Activity {
         syncBrowserButtons();
     }
 
+    private String readPersistedBrowserAddress() {
+        String saved = browserPreferences.getString(BROWSER_LAST_URL_KEY, null);
+        if (BrowserAddress.isAllowedWebUrl(saved)) return saved;
+        if (saved != null) browserPreferences.edit().remove(BROWSER_LAST_URL_KEY).apply();
+        return null;
+    }
+
+    private void persistLastBrowserAddress() {
+        if (browserPreferences == null) return;
+        if (BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) {
+            browserPreferences.edit().putString(BROWSER_LAST_URL_KEY, lastBrowserAddress).apply();
+        }
+    }
+
+    private void restoreBrowserSessionOrLastUrl() {
+        if (pendingBrowserWebViewState == null && !BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) return;
+        if (!ensureBrowserWebView()) return;
+        browserHomeView.setVisibility(View.GONE);
+        if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
+        if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.GONE);
+        browserWebView.setVisibility(View.VISIBLE);
+        boolean restored = false;
+        if (pendingBrowserWebViewState != null) {
+            try {
+                restored = browserWebView.restoreState(pendingBrowserWebViewState) != null;
+            } catch (RuntimeException restoreFailure) {
+                Log.w(BROWSER_LOG_TAG, "WebView state restore failed; using URL fallback", restoreFailure);
+            }
+            pendingBrowserWebViewState = null;
+        }
+        if (restored && BrowserAddress.isAllowedWebUrl(browserWebView.getUrl())) {
+            lastBrowserAddress = browserWebView.getUrl();
+            browserPageLoading = true;
+            browserLoadFailed = false;
+            persistLastBrowserAddress();
+            scheduleBrowserLoadWatchdog(lastBrowserAddress);
+            showBrowserStatus("Restored previous page. Website content may contact its own or third-party endpoints.");
+            return;
+        }
+        if (BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) {
+            final String restoreAddress = lastBrowserAddress;
+            Log.i(BROWSER_LOG_TAG, "resumed; restoring last page: "
+                    + BrowserLogPolicy.redactedOrigin(restoreAddress));
+            navigateBrowserTo(restoreAddress);
+        }
+    }
+
     private void scheduleBrowserLoadWatchdog(String address) {
         cancelBrowserLoadWatchdog();
+        final long loadGeneration = browserNavigationGeneration;
         browserLoadWatchdog = activityCallbackGate.guard(() -> {
-            if (!isActivityCallbackCurrent()) return;
+            if (!isActivityCallbackCurrent() || loadGeneration != browserNavigationGeneration) return;
             browserLoadWatchdog = null;
             Log.e(BROWSER_LOG_TAG, "page did not finish within timeout: "
                     + BrowserLogPolicy.redactedOrigin(address));
@@ -2097,9 +2192,10 @@ public final class MainActivity extends Activity {
             }
             StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
             browserDiagnostics.record(System.currentTimeMillis(), "watchdog exhausted; automatic retry budget spent", address, null);
+            if (browserWebView != null) browserWebView.stopLoading();
             browserPageLoading = false;
             browserLoadFailed = true;
-            showBrowserStatus("The page did not open after one automatic recovery attempt. Tap this message to retry.");
+            showBrowserStatus("Load Timeout: Check WebView version or Retry");
         });
         mainHandler.postDelayed(browserLoadWatchdog, BROWSER_LOAD_WATCHDOG_MS);
     }
@@ -2294,7 +2390,8 @@ public final class MainActivity extends Activity {
                 if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
                 StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
                 browserDiagnostics.record(System.currentTimeMillis(), "renderer gone; automatic recovery budget spent", lastBrowserAddress, null);
-                showBrowserStatus("The page stopped unexpectedly. Automatic recovery was limited; return to browser home and try again.");
+                browserLoadFailed = true;
+                showBrowserStatus("The page stopped unexpectedly. Automatic recovery was limited; tap Retry to try again.");
             }
         });
         targetRef[0] = browserWebView;
@@ -7993,8 +8090,6 @@ public final class MainActivity extends Activity {
         }
     }
 }
-
-
 
 
 
