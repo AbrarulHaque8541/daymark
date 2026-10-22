@@ -28,6 +28,5 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: npm
       - name: Run shared product contract fixtures
         run: npm test
