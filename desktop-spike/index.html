@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f6f2">
+  <meta name="description" content="Experimental Daymark desktop task workspace UI. Uses in-memory synthetic data only.">
+  <title>Daymark — desktop UI spike</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./task-core.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Workspace">
+      <a class="brand" href="#main" aria-label="Daymark workspace home">
+        <span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>daymark</span>
+        <span class="experiment">SPIKE</span>
+      </a>
+      <div class="side-note">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>Personal workspace</span>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="avatar" aria-hidden="true">D</div>
+        <div><strong>Desktop concept</strong><small>Local session only</small></div>
+      </div>
+    </aside>
+
+    <main id="main" class="main">
+      <header class="topbar">
+        <span class="eyebrow">DAYMARK / WORKSPACE</span>
+        <span class="privacy-pill"><span aria-hidden="true">●</span> Memory-only demo</span>
+      </header>
+
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">A CLEARER WAY TO WORK</p>
+          <h1 id="page-title">Make room for<br><em>what matters.</em></h1>
+          <p class="intro-copy">A small desktop workspace experiment. Calm, focused, and built around your next step.</p>
+        </div>
+        <div class="summary" aria-live="polite" aria-atomic="true">
+          <span class="summary-number" id="open-count">0</span>
+          <span class="summary-label">open tasks</span>
+          <span class="summary-line"><span id="done-count">0</span> completed</span>
+        </div>
+      </section>
+
+      <section class="composer panel" aria-labelledby="composer-title">
+        <div class="section-head">
+          <div><p class="eyebrow">CAPTURE</p><h2 id="composer-title">What needs your attention?</h2></div>
+          <span class="shortcut">Enter ↵</span>
+        </div>
+        <form id="task-form">
+          <label class="sr-only" for="task-title">Task title</label>
+          <input id="task-title" name="title" maxlength="160" autocomplete="off" placeholder="Add a task… e.g. Review project notes" required>
+          <button class="primary" type="submit">Add task <span aria-hidden="true">＋</span></button>
+        </form>
+        <p class="helper">Prototype data stays in memory and disappears when you refresh. Please use synthetic tasks only.</p>
+      </section>
+
+      <section class="task-section" aria-labelledby="tasks-title">
+        <div class="section-head task-head">
+          <div><p class="eyebrow">YOUR LIST</p><h2 id="tasks-title">Tasks</h2></div>
+          <div class="filters" role="group" aria-label="Filter tasks">
+            <button type="button" class="filter active" data-filter="open" aria-pressed="true">Open</button>
+            <button type="button" class="filter" data-filter="all" aria-pressed="false">All</button>
+            <button type="button" class="filter" data-filter="done" aria-pressed="false">Completed</button>
+          </div>
+        </div>
+        <div id="task-list" class="task-list" aria-live="polite" aria-relevant="additions removals text"></div>
+        <div id="empty-state" class="empty-state">
+          <div class="empty-symbol" aria-hidden="true">✓</div>
+          <h3>Clear space for a fresh start.</h3>
+          <p>Add a task above. Keep this prototype data fictional.</p>
+        </div>
+        <p id="status-message" class="sr-only" role="status" aria-live="polite"></p>
+      </section>
+
+      <footer><span>EXPERIMENTAL · UI ONLY</span><span>No network · No persistent storage</span></footer>
+    </main>
+  </div>
+</body>
+</html>
