@@ -75,7 +75,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserLogPolicySmoke
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserNetworkPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserNetworkPolicySmoke "$ROOT/../contracts/browser-network-policy.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserMediaPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserTabPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserSettingsPolicySmoke
