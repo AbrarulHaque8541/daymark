@@ -51,17 +51,14 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             return;
         }
         
-        // Validate the task still exists and the reminder is still valid
-        if (!isReminderStillValid(context, taskId, fireInstant)) {
-            Log.i("DaymarkReminder", "Stale reminder alarm for task " + taskId + "; notification suppressed.");
+        // Load and validate the task once. Never fall back to an alarm's stale title
+        // if current encrypted task state cannot be read.
+        Task currentTask = findValidReminderTask(context, taskId, fireInstant);
+        if (currentTask == null || currentTask.title == null || currentTask.title.trim().isEmpty()) {
+            Log.i("DaymarkReminder", "Stale or unverifiable reminder for task " + taskId + "; notification suppressed.");
             return;
         }
-        
-        // Update the notification with the current task title
-        String currentTitle = getCurrentTaskTitle(context, taskId);
-        if (currentTitle == null || currentTitle.isEmpty()) {
-            currentTitle = title; // Fall back to intent title if task not found
-        }
+        String currentTitle = currentTask.title;
         
         NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -81,59 +78,28 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     }
 
     /**
-     * Validates that the reminder is still valid for the current task state.
-     * Returns false if the task was deleted, completed, or had its reminder removed.
+     * Returns the current task only when the alarm still matches its live reminder state.
+     * A null result means the task is deleted, completed, changed, already shown, or unreadable.
      */
-    private boolean isReminderStillValid(Context context, String taskId, String fireInstant) {
+    private Task findValidReminderTask(Context context, String taskId, String fireInstant) {
         try {
             EncryptedTaskStore store = new EncryptedTaskStore(context);
             List<Task> tasks = store.load();
             for (Task task : tasks) {
-                if (task.id.equals(taskId)) {
-                    // Task exists - check if it still needs a reminder
-                    if (task.completed) {
-                        return false; // Task was completed
-                    }
-                    if (task.reminderLeadMinutes == null || task.dueDate == null) {
-                        return false; // Reminder was removed or due date cleared
-                    }
-                    // Check if this is the same occurrence (not already shown)
-                    if (fireInstant.equals(task.reminderShownFire)) {
-                        return false; // Already shown for this occurrence
-                    }
-                    // Validate the fire instant matches the current task state
-                    Instant fire = Instant.parse(fireInstant);
-                    Instant expectedFire = TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault());
-                    if (expectedFire == null || !fire.equals(expectedFire)) {
-                        return false; // Due date or time changed
-                    }
-                    return true;
+                if (!task.id.equals(taskId)) continue;
+                if (task.completed || task.reminderLeadMinutes == null || task.dueDate == null) {
+                    return null;
                 }
+                if (fireInstant.equals(task.reminderShownFire)) return null;
+                Instant fire = Instant.parse(fireInstant);
+                Instant expectedFire = TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault());
+                if (expectedFire == null || !fire.equals(expectedFire)) return null;
+                return task;
             }
-            // Task not found - was deleted
-            return false;
+            return null; // deleted task
         } catch (Exception e) {
             Log.w("DaymarkReminder", "Failed to validate reminder for task " + taskId, e);
-            return false;
-        }
-    }
-
-    /**
-     * Gets the current title for a task, or null if not found.
-     */
-    private String getCurrentTaskTitle(Context context, String taskId) {
-        try {
-            EncryptedTaskStore store = new EncryptedTaskStore(context);
-            List<Task> tasks = store.load();
-            for (Task task : tasks) {
-                if (task.id.equals(taskId)) {
-                    return task.title;
-                }
-            }
-            return null;
-        } catch (Exception e) {
-            Log.w("DaymarkReminder", "Failed to get current title for task " + taskId, e);
-            return null;
+            return null; // fail closed when encrypted task state cannot be verified
         }
     }
 
