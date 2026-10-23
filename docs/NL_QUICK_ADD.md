@@ -20,3 +20,17 @@ Work by: ChatGPT
 Model: GPT-6
 Tooling: GitHub MCP tools
 Timestamp (UTC): 2026-10-13T14:07:28.373Z
+
+## Update — 2026-10-23
+
+- Relative phrases: `pay rent in 3 days` → due in three days; `review in 2 weeks` → due in two weeks; `file taxes day after tomorrow` → due in two days.
+- `next <weekday>` now advances one additional week beyond the nearest upcoming occurrence, so `Monday` and `next Monday` are no longer identical. `plan sprint next Monday` run on Sunday 2026-10-11 is due 2026-10-19.
+- A boundary preposition left behind by a consumed date/time token is removed from the title: `buy milk tomorrow at 5pm` → `buy milk`, `dentist on monday` → `dentist`, `at 6am gym` → `gym`.
+- Inner prepositions and date-free text are preserved: `water the plants at home tomorrow` keeps `at home`; `look at the stars` is unchanged.
+
+---
+Work by: Qoder (Qoder desktop agent)
+Model: not disclosed by runtime
+Tooling: Bash, git, OpenJDK 17, Node.js, Android Gradle Plugin 8.12.2
+Timestamp (UTC): 2026-10-23T09:22:00Z
+

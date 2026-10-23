@@ -1,5 +1,6 @@
 package com.abrar.daymark;
 
+import java.net.IDN;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.io.UnsupportedEncodingException;
@@ -102,7 +103,7 @@ final class BrowserAddress {
             throw new IllegalArgumentException("This web address is too long.");
         }
         try {
-            URI uri = new URI(candidate);
+            URI uri = new URI(toAsciiHostUrl(candidate));
             String scheme = uri.getScheme();
             if ("http".equalsIgnoreCase(scheme)) {
                 throw new IllegalArgumentException("HTTP is blocked. Use HTTPS; a per-site HTTP exception requires a separate explicit request.");
@@ -110,8 +111,12 @@ final class BrowserAddress {
             if (scheme == null || !"https".equalsIgnoreCase(scheme)) {
                 throw new IllegalArgumentException("Only HTTPS pages are supported. A per-site HTTP exception requires a separate explicit request.");
             }
-            if (uri.getHost() == null || uri.getHost().trim().isEmpty() || uri.getRawUserInfo() != null) {
+            if (uri.getRawUserInfo() != null) {
                 throw new IllegalArgumentException("Enter a valid web address without embedded credentials.");
+            }
+            String host = uri.getHost();
+            if (host == null || host.trim().isEmpty()) {
+                throw new IllegalArgumentException("Enter a valid web address with a host name.");
             }
             int port = uri.getPort();
             if (port == 0 || port > 65535) {
@@ -144,7 +149,73 @@ final class BrowserAddress {
         if (value.indexOf('@') >= 0 || value.chars().anyMatch(Character::isWhitespace)) return false;
         int delimiter = firstOf(value, '/', '?', '#');
         String hostPart = delimiter < 0 ? value : value.substring(0, delimiter);
-        return BARE_DOMAIN.matcher(value).matches() && hostPart.toLowerCase(Locale.ROOT).contains(".");
+        if (!isAscii(hostPart)) {
+            int colon = hostPart.lastIndexOf(':');
+            String bareHost = colon < 0 ? hostPart : hostPart.substring(0, colon);
+            String asciiHost = idnToAscii(bareHost);
+            if (asciiHost == null) return false;
+            hostPart = asciiHost + (colon < 0 ? "" : hostPart.substring(colon));
+        }
+        return BARE_DOMAIN.matcher(hostPart).matches() && hostPart.toLowerCase(Locale.ROOT).contains(".");
+    }
+
+    /**
+     * Turns the authority's host into ASCII (punycode) before {@link URI} parsing, so
+     * non-Latin addresses such as "मेरा-साइट.in" or "例え.jp" are navigable instead of
+     * being rejected as invalid. The address bar then shows the punycode form, which is
+     * the honest, unambiguous representation of an internationalized domain.
+     *
+     * <p>Returns the input unchanged when the authority is already ASCII, carries
+     * userinfo (that is rejected later with its own message), or is an IPv6 literal.
+     */
+    private static String toAsciiHostUrl(String candidate) {
+        int schemeEnd = candidate.indexOf("://");
+        if (schemeEnd < 0) return candidate;
+        int authorityStart = schemeEnd + 3;
+        int authorityEnd = candidate.length();
+        for (int i = authorityStart; i < candidate.length(); i++) {
+            char ch = candidate.charAt(i);
+            if (ch == '/' || ch == '?' || ch == '#') {
+                authorityEnd = i;
+                break;
+            }
+        }
+        String authority = candidate.substring(authorityStart, authorityEnd);
+        if (authority.isEmpty() || authority.startsWith("[")) return candidate;
+        String userInfo = "";
+        String hostAndPort = authority;
+        int at = authority.lastIndexOf('@');
+        if (at >= 0) {
+            userInfo = authority.substring(0, at + 1);
+            hostAndPort = authority.substring(at + 1);
+        }
+        int colon = hostAndPort.lastIndexOf(':');
+        String host = colon < 0 ? hostAndPort : hostAndPort.substring(0, colon);
+        if (isAscii(host)) return candidate;
+        String asciiHost = idnToAscii(host);
+        if (asciiHost == null || asciiHost.isEmpty()) {
+            throw new IllegalArgumentException("Enter a valid web address.");
+        }
+        String portPart = colon < 0 ? "" : hostAndPort.substring(colon);
+        return candidate.substring(0, authorityStart) + userInfo + asciiHost + portPart
+                + candidate.substring(authorityEnd);
+    }
+
+    /** Punycode form of a host, or null when the label sequence is not a valid IDN. */
+    private static String idnToAscii(String host) {
+        try {
+            String ascii = IDN.toASCII(host, IDN.ALLOW_UNASSIGNED);
+            return ascii == null || ascii.isEmpty() ? null : ascii;
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
+    }
+
+    private static boolean isAscii(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) > 0x7F) return false;
+        }
+        return true;
     }
 
     private static int firstOf(String value, char... chars) {

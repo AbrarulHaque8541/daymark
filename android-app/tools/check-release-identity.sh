@@ -28,7 +28,7 @@ require_literal "$GRADLE" 'targetSdk = 36' 'targetSdk must stay on API 36'
 code="$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' "$GRADLE" | head -1)"
 name="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' "$GRADLE" | head -1)"
 [[ -n "$code" && -n "$name" ]] || fail 'versionCode/versionName missing'
-[[ "$code" -ge 11 ]] || fail "versionCode $code < 11 (must remain monotonic after published v1.3/versionCode 10)"
+[[ "$code" -ge 12 ]] || fail "versionCode $code < 12 (must remain monotonic after v1.5/versionCode 12; draft v1.4/versionCode 11 was never published)"
 
 require_literal "$UPDATER" 'ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580' 'UpdaterPublisherConfig must pin production signer SHA-256'
 
