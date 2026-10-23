@@ -33,7 +33,41 @@ public final class NaturalLanguageTaskParseSmoke {
         parsed = NaturalLanguageTaskParse.parse("call clinic 12am", today);
         check("00:00".equals(parsed.dueTime), "midnight normalization");
         check("2026-10-11".equals(parsed.dueDate), "time-only defaults to today");
-        System.out.println("PASS NaturalLanguageTaskParseSmoke (16 assertions)");
+
+        parsed = NaturalLanguageTaskParse.parse("buy milk tomorrow at 5pm", today);
+        check("buy milk".equals(parsed.title), "trailing preposition removed: " + parsed.title);
+        parsed = NaturalLanguageTaskParse.parse("submit report on friday 10am", today);
+        check("submit report".equals(parsed.title), "date preposition removed: " + parsed.title);
+        parsed = NaturalLanguageTaskParse.parse("dentist on monday", today);
+        check("dentist".equals(parsed.title), "bare weekday preposition removed: " + parsed.title);
+        parsed = NaturalLanguageTaskParse.parse("at 6am gym", today);
+        check("gym".equals(parsed.title), "leading preposition removed: " + parsed.title);
+        parsed = NaturalLanguageTaskParse.parse("water the plants at home tomorrow", today);
+        check("water the plants at home".equals(parsed.title), "inner preposition kept: " + parsed.title);
+        parsed = NaturalLanguageTaskParse.parse("look at the stars", today);
+        check("look at the stars".equals(parsed.title), "text without a date is untouched: " + parsed.title);
+
+        parsed = NaturalLanguageTaskParse.parse("pay rent in 3 days", today);
+        check("pay rent".equals(parsed.title), "relative title: " + parsed.title);
+        check("2026-10-14".equals(parsed.dueDate), "in N days: " + parsed.dueDate);
+        parsed = NaturalLanguageTaskParse.parse("review in 2 weeks", today);
+        check("2026-10-25".equals(parsed.dueDate), "in N weeks: " + parsed.dueDate);
+        parsed = NaturalLanguageTaskParse.parse("login 3 days", today);
+        check(parsed.dueDate == null, "no relative date without 'in': " + parsed.dueDate);
+
+        parsed = NaturalLanguageTaskParse.parse("file taxes day after tomorrow", today);
+        check("file taxes".equals(parsed.title), "day-after title: " + parsed.title);
+        check("2026-10-13".equals(parsed.dueDate), "day after tomorrow: " + parsed.dueDate);
+
+        parsed = NaturalLanguageTaskParse.parse("plan sprint next Monday", today);
+        check("plan sprint".equals(parsed.title), "next-weekday title: " + parsed.title);
+        check("2026-10-19".equals(parsed.dueDate), "next Monday is one week after the nearest Monday: "
+                + parsed.dueDate);
+        parsed = NaturalLanguageTaskParse.parse("retro next mon", today);
+        check("2026-10-19".equals(parsed.dueDate), "next weekday abbreviation: " + parsed.dueDate);
+        parsed = NaturalLanguageTaskParse.parse("standup Monday", today);
+        check("2026-10-12".equals(parsed.dueDate), "plain Monday unchanged: " + parsed.dueDate);
+        System.out.println("PASS NaturalLanguageTaskParseSmoke (32 assertions)");
     }
 
     private static void check(boolean condition, String message) {

@@ -26,8 +26,8 @@ android {
         testInstrumentationRunner = "com.abrar.daymark.DaymarkPlatformInstrumentation"
         // Owner-approved fresh app identity; previous app installations remain separate.
         // Keep versionCode monotonic even though the displayed version restarts.
-        versionCode = 11
-        versionName = "1.4"
+        versionCode = 12
+        versionName = "1.5"
     }
 
     signingConfigs {

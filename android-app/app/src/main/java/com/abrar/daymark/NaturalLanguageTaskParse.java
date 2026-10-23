@@ -36,6 +36,10 @@ final class NaturalLanguageTaskParse {
     private static final Pattern PRIORITY = Pattern.compile("(?i)\\b(high|urgent|important|medium|med|low)\\b");
     private static final Pattern WEEKDAY = Pattern.compile(
             "(?i)\\b(next\\s+)?(monday|mon|tuesday|tue|wednesday|wed|thursday|thu|friday|fri|saturday|sat|sunday|sun)\\b");
+    private static final Pattern RELATIVE_DAYS = Pattern.compile("(?i)\\bin\\s+(\\d{1,2})\\s+(day|days|week|weeks)\\b");
+    /** Prepositions left dangling once the date/time they introduced has been extracted. */
+    private static final Pattern ORPHAN_LEADING = Pattern.compile("(?i)^(?:at|on|by|for)\\b[\\s,.:;-]*");
+    private static final Pattern ORPHAN_TRAILING = Pattern.compile("(?i)[\\s,.:;-]*\\b(?:at|on|by|for)$");
 
     private NaturalLanguageTaskParse() { }
 
@@ -90,21 +94,33 @@ final class NaturalLanguageTaskParse {
 
         String dueDate = null;
         Matcher weekday = WEEKDAY.matcher(working);
+        Matcher relative = RELATIVE_DAYS.matcher(working);
         String lower = working.toLowerCase(Locale.ROOT);
         if (containsWord(lower, "today")) {
             dueDate = today.toString();
             working = removeWord(working, "(?i)\\btoday\\b");
+        } else if (containsWord(lower, "day after tomorrow")) {
+            dueDate = today.plusDays(2).toString();
+            working = removeWord(working, "(?i)\\bday\\s+after\\s+tomorrow\\b");
         } else if (containsWord(lower, "tomorrow")) {
             dueDate = today.plusDays(1).toString();
             working = removeWord(working, "(?i)\\btomorrow\\b");
         } else if (containsWord(lower, "next week")) {
             dueDate = today.plusWeeks(1).toString();
             working = removeWord(working, "(?i)\\bnext\\s+week\\b");
+        } else if (relative.find()) {
+            int amount = Integer.parseInt(relative.group(1));
+            boolean weeks = relative.group(2).toLowerCase(Locale.ROOT).startsWith("week");
+            dueDate = (weeks ? today.plusWeeks(amount) : today.plusDays(amount)).toString();
+            working = working.substring(0, relative.start()) + " " + working.substring(relative.end());
         } else if (weekday.find()) {
             String dayToken = weekday.group(2).toLowerCase(Locale.ROOT);
             DayOfWeek target = dayOfWeek(dayToken);
             long days = (target.getValue() - today.getDayOfWeek().getValue() + 7) % 7;
             if (days == 0) days = 7;
+            // "next Monday" means the Monday of the following week, not merely the
+            // nearest Monday; without this, "Monday" and "next Monday" were identical.
+            if (weekday.group(1) != null) days += 7;
             dueDate = today.plusDays(days).toString();
             working = working.substring(0, weekday.start()) + " " + working.substring(weekday.end());
         }
@@ -112,7 +128,20 @@ final class NaturalLanguageTaskParse {
 
         String title = working.replaceAll("\\s+", " ")
                 .replaceAll("^[,.:;\\-]+|[,.:;\\-]+$", "").trim();
+        if (dueDate != null || dueTime != null) title = stripOrphanedConnectors(title);
         return new Result(title, dueDate, dueTime, priority, new ArrayList<>(tags));
+    }
+
+    /**
+     * Removes a boundary "at/on/by/for" left behind after its date or time token was
+     * consumed, so "Buy milk tomorrow at 5pm" becomes "Buy milk" rather than
+     * "Buy milk at". Only boundary words are touched; "Water the plants at home
+     * tomorrow" keeps its "at home".
+     */
+    private static String stripOrphanedConnectors(String title) {
+        String cleaned = ORPHAN_LEADING.matcher(title).replaceAll("");
+        cleaned = ORPHAN_TRAILING.matcher(cleaned).replaceAll("").trim();
+        return cleaned;
     }
 
     private static boolean containsWord(String value, String word) {

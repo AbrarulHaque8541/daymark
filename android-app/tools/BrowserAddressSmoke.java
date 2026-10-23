@@ -48,6 +48,25 @@ public final class BrowserAddressSmoke {
         assert BrowserAddress.resolveInput("example.com:8443", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://example.com:8443");
 
+        // Internationalized (non-ASCII) hosts must navigate instead of being rejected or
+        // mistaken for a search: the address bar shows the punycode form, which is the
+        // unambiguous representation a browser can actually load.
+        assert BrowserAddress.resolveInput("münchen.de", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://xn--mnchen-3ya.de");
+        assert BrowserAddress.resolveInput("https://münchen.de/straße", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://xn--mnchen-3ya.de/stra%C3%9Fe");
+        assert BrowserAddress.resolveInput("例え.jp/path", BrowserAddress.SearchEngine.GOOGLE)
+                .equals("https://xn--r8jz45g.jp/path");
+        assert BrowserAddress.resolveInput("मेरा-साइट.in", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .startsWith("https://xn--");
+        assert BrowserAddress.resolveInput("münchen.de:8443/x", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://xn--mnchen-3ya.de:8443/x");
+        assert BrowserAddress.isAllowedWebUrl("https://例え.jp/खबर");
+        assert BrowserAddress.isAllowedWebUrl("https://münchen.de");
+        assert !BrowserAddress.isAllowedWebUrl("https://user:pass@例え.jp");
+        assert !BrowserAddress.isAllowedWebUrl("https://exa mple.com");
+        assert !BrowserAddress.isAllowedWebUrl("münchen.de@evil.example");
+
         String history = BrowserHistory.add("", "https://example.com/first");
         history = BrowserHistory.add(history, "https://example.com/second?item=2");
         List<String> sites = BrowserHistory.decode(history);
