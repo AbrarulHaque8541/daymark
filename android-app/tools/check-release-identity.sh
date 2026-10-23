@@ -45,6 +45,10 @@ require_literal "$RELEASE_ASSETS" '[[ "$target_sdk" == "36" ]]' 'release asset A
 
 require_literal "$PRODUCTION" '--draft --verify-tag' 'production workflow must create a draft release for physical-device acceptance'
 require_literal "$PRODUCTION" '.draft == true' 'production workflow must verify draft status before finishing'
+if grep -Fq -- 'releases/tags/$TAG' "$PRODUCTION"; then
+  fail "production workflow must resolve drafts from the releases list; /releases/tags returns 404 for draft releases"
+fi
+require_literal "$PRODUCTION" 'releases?per_page=100' 'production workflow must resolve draft releases from the releases list'
 if grep -Fq -- '--latest' "$PRODUCTION"; then
   fail "production workflow must not automatically publish or mark a release latest"
 fi
