@@ -14,6 +14,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentLogic.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ActivityCallbackGate.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollThemeColor.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/ScrollChromeReserve.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Task.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NaturalLanguageTaskParse.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
@@ -46,6 +47,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubApkDownloader.java" \
   "$ROOT/tools/TaskLogicSmoke.java" \
   "$ROOT/tools/ScrollThemeColorSmoke.java" \
+  "$ROOT/tools/ScrollChromeReserveSmoke.java" \
   "$ROOT/tools/NaturalLanguageTaskParseSmoke.java" \
   "$ROOT/tools/TaskListRenderGateSmoke.java" \
   "$ROOT/tools/TaskSnapshotCodecSmoke.java" \
@@ -66,6 +68,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/CosmeticFilterToCssSmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollChromeReserveSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NaturalLanguageTaskParseSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskListRenderGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSnapshotCodecSmoke
