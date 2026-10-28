@@ -13,8 +13,27 @@ public final class UpdaterCore {
     public static final String APPLICATION_ID = "com.abrar.daymark";
     public static final long CHECK_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L;
     public static final long MAX_APK_BYTES = 100L * 1024L * 1024L;
+    /**
+     * Version scheme accepted from the release publisher: major.minor, with an optional patch.
+     * This must stay identical to the tag pattern the production release workflow accepts
+     * (^v[0-9]+\.[0-9]+(\.[0-9]+)?$), because the publisher's scheme is what Gradle's
+     * versionName actually produces. A stricter consumer-side pattern rejects every published
+     * release and silently disables the update channel.
+     */
+    public static final String VERSION_PATTERN = "[0-9]+\\.[0-9]+(?:\\.[0-9]+)?";
+    public static final String TAG_PATTERN = "v" + VERSION_PATTERN;
     private static final String RELEASE_ASSET_PREFIX =
             "/AbrarulHaque8541/daymark/releases/download/";
+
+    /** True when a release tag matches the publisher's version scheme. */
+    public static boolean isValidTag(String value) {
+        return value != null && value.matches(TAG_PATTERN);
+    }
+
+    /** True when a display version name matches the publisher's version scheme. */
+    public static boolean isValidVersionName(String value) {
+        return value != null && value.matches(VERSION_PATTERN);
+    }
 
     private UpdaterCore() { }
 
@@ -306,8 +325,8 @@ public final class UpdaterCore {
     }
 
     public static void validateRelease(Release release) throws UpdateException {
-        if (release == null || release.tag == null || !release.tag.matches("v?[0-9]+\\.[0-9]+\\.[0-9]+")
-                || release.versionName == null || !release.versionName.matches("[0-9]+\\.[0-9]+\\.[0-9]+")
+        if (release == null || !isValidTag(release.tag)
+                || !isValidVersionName(release.versionName)
                 || !release.versionName.equals(release.tag.startsWith("v") ? release.tag.substring(1) : release.tag)
                 || release.name == null || release.name.trim().isEmpty()
                 || release.notes == null
