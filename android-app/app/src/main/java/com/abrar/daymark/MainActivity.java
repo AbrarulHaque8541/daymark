@@ -4498,18 +4498,37 @@ public final class MainActivity extends Activity {
                 dp(hidden ? 12 : 18), dp(hidden ? 6 : 8));
 
         sharedComposer.animate().cancel();
+        // dp(8) mirrors the composer's bottom margin in buildRoot(); a GONE view drops both.
+        int reserve = ScrollChromeReserve.reserveFor(sharedComposer.getHeight(), dp(8), dp(48));
         if (hidden) {
             sharedComposer.setVisibility(View.VISIBLE);
-            sharedComposer.animate().translationY(-Math.max(sharedComposer.getHeight(), dp(48)))
+            sharedComposer.animate().translationY(-reserve)
                     .alpha(0f).setDuration(180L).withEndAction(() -> {
-                        if (taskChromeHidden && !webMode) sharedComposer.setVisibility(View.GONE);
+                        if (taskChromeHidden && !webMode) {
+                            sharedComposer.setVisibility(View.GONE);
+                            // The weighted ScrollView grows by exactly this much once the composer
+                            // leaves the layout. Reserve the same space as bottom padding in the
+                            // same pass, or the shorter scroll range re-clamps the offset and the
+                            // list jumps upward while the reader is still dragging.
+                            setTaskScrollReserve(reserve);
+                        }
                     }).start();
         } else {
+            setTaskScrollReserve(0);
             sharedComposer.setVisibility(View.VISIBLE);
-            sharedComposer.setTranslationY(-Math.max(sharedComposer.getHeight(), dp(48)));
+            sharedComposer.setTranslationY(-reserve);
             sharedComposer.setAlpha(0f);
             sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L).start();
         }
+    }
+
+    /** Applies the task list's bottom reserve so hiding the composer never moves the content. */
+    private void setTaskScrollReserve(int reservePx) {
+        if (taskScrollView == null) return;
+        int wanted = Math.max(reservePx, 0);
+        if (!ScrollChromeReserve.changesReserve(taskScrollView.getPaddingBottom(), wanted)) return;
+        taskScrollView.setPadding(taskScrollView.getPaddingLeft(), taskScrollView.getPaddingTop(),
+                taskScrollView.getPaddingRight(), wanted);
     }
 
     private void syncModeUi() {
