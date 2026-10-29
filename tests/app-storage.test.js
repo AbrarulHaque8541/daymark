@@ -75,7 +75,8 @@ function bootApp({ savedValue, failBackup = false }) {
     localStorage,
     window,
     clearTimeout() {},
-    setTimeout: () => 1
+    setTimeout: () => 1,
+    setInterval: () => 1
   }, { filename: 'app.js' });
 
   return { elements, storedValues };
@@ -96,4 +97,31 @@ test('backup failure is reported honestly and leaves the original entry untouche
   assert.equal(storedValues.has(BACKUP_KEY), false);
   assert.equal(storedValues.get(STORAGE_KEY), corruptData);
   assert.match(elements.get('#toast').textContent, /could not create a recovery backup/);
+});
+
+
+test('simultaneous reminders are summarized in one toast instead of overwriting each other', () => {
+  const now = new Date();
+  const fireTime = new Date(now.getTime() - 60_000);
+  const dueDate = logic.localDateString(fireTime);
+  const dueTime = `${String(fireTime.getHours()).padStart(2, '0')}:${String(fireTime.getMinutes()).padStart(2, '0')}`;
+  const timestamp = now.toISOString();
+  const tasks = ['First reminder', 'Second reminder'].map((title, index) => ({
+    id: `reminder-${index}`,
+    title,
+    dueDate,
+    dueTime,
+    priority: 'medium',
+    completed: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    reminderLeadMinutes: 0
+  }));
+  const { elements, storedValues } = bootApp({ savedValue: JSON.stringify(tasks) });
+
+  const toast = elements.get('#toast').textContent;
+  assert.match(toast, /First reminder/);
+  assert.match(toast, /Second reminder/);
+  const savedTasks = JSON.parse(storedValues.get(STORAGE_KEY));
+  assert.equal(savedTasks.filter((task) => typeof task.reminderShownFire === 'string').length, 2);
 });
