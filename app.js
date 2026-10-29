@@ -5,7 +5,7 @@
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
-  const state = { tasks: [], filter: 'all', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null };
+  const state = { tasks: [], filter: 'all', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, previousOpenCount: null, editSubtasks: [] };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -123,11 +123,23 @@
     return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(year, month - 1, day));
   }
 
+  function formatTime(value) {
+    if (!logic.isTimeOnly(value)) return '';
+    const [hour, minute] = value.split(':').map(Number);
+    return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(2026, 0, 1, hour, minute));
+  }
+
+  function dueSuffix(task) {
+    const timeText = formatTime(task.dueTime);
+    return timeText ? ` · ${timeText}` : '';
+  }
+
   function getDueText(task, today) {
+    const suffix = dueSuffix(task);
     if (!task.dueDate) return 'No due date';
-    if (task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)}`;
-    if (task.dueDate === today) return 'Due today';
-    return `Due ${formatDate(task.dueDate)}`;
+    if (task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)}${suffix}`;
+    if (task.dueDate === today) return `Due today${suffix}`;
+    return `Due ${formatDate(task.dueDate)}${suffix}`;
   }
 
   function getDueClass(task, today) {
@@ -142,18 +154,35 @@
       calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
       edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
       trash: '<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/>',
-      check: '<path d="m4 12 5 5L20 6"/>'
+      check: '<path d="m4 12 5 5L20 6"/>',
+      clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      note: '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/>',
+      steps: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2m-3 6 1 1 2-2m-3 6 1 1 2-2"/>'
     };
     return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
   }
 
+  function subtaskSummary(task) {
+    if (!Array.isArray(task.subtasks) || task.subtasks.length === 0) return null;
+    const done = task.subtasks.filter((subtask) => subtask.done).length;
+    return { done, total: task.subtasks.length };
+  }
+
   function taskMarkup(task, today) {
     const completionLabel = task.completed ? `Mark “${escapeHTML(task.title)}” incomplete` : `Complete “${escapeHTML(task.title)}”`;
+    const tags = Array.isArray(task.tags) && task.tags.length
+      ? `<span class="tag-pills">${task.tags.map((tag) => `<button class="tag-pill" type="button" data-action="tag" data-tag="${escapeHTML(tag)}" aria-label="Search tasks tagged ${escapeHTML(tag)}" title="Search #${escapeHTML(tag)}">#${escapeHTML(tag)}</button>`).join('')}</span>` : '';
+    const hasNotes = typeof task.notes === 'string' && task.notes.trim().length > 0;
+    const notesChip = hasNotes ? `<button class="task-chip notes-chip" type="button" data-action="edit" aria-label="Edit task notes" title="Has notes">${icon('note')}</button>` : '';
+    const summary = subtaskSummary(task);
+    const subtaskChip = summary
+      ? `<button class="task-chip subtask-chip${summary.done === summary.total ? ' is-all-done' : ''}" type="button" data-action="edit" aria-label="Edit subtasks (${summary.done} of ${summary.total} done)" title="Subtasks: ${summary.done}/${summary.total}">${icon('steps')} ${summary.done}/${summary.total}</button>`
+      : '';
     return `<article class="task-row${task.completed ? ' is-complete' : ''}" data-task-id="${escapeHTML(task.id)}">
       <button class="complete-button" type="button" data-action="toggle" aria-label="${completionLabel}" aria-pressed="${task.completed}">${icon('check')}</button>
       <div class="task-main">
         <span class="task-title" title="${escapeHTML(task.title)}">${escapeHTML(task.title)}</span>
-        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span></div>
+        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${notesChip}${subtaskChip}</div>
       </div>
       <div class="task-actions">
         <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}">${icon('edit')}</button>
@@ -172,7 +201,14 @@
     const completedTasks = state.tasks.filter((task) => task.completed);
     const hasQuery = Boolean(state.query.trim());
 
-    $('#open-count').textContent = String(openTasks.length);
+    const openCountElement = $('#open-count');
+    if (state.previousOpenCount !== null && state.previousOpenCount !== openTasks.length) {
+      openCountElement.classList.remove('is-bumped');
+      void openCountElement.offsetWidth; // Restart the bump animation.
+      openCountElement.classList.add('is-bumped');
+    }
+    state.previousOpenCount = openTasks.length;
+    openCountElement.textContent = String(openTasks.length);
     $('#count-all').textContent = String(state.tasks.length);
     $('#count-today').textContent = String(todayTasks.length);
     $('#count-upcoming').textContent = String(upcomingTasks.length);
@@ -285,10 +321,22 @@
     titleInput.removeAttribute('aria-invalid');
     const now = new Date().toISOString();
     const dueDateValue = $('#new-due-date').value;
-    state.tasks.push({ id: makeId(), title, dueDate: logic.isDateOnly(dueDateValue) ? dueDateValue : null, priority: readPriority($('#new-priority')), completed: false, createdAt: now, updatedAt: now });
+    const hasDate = logic.isDateOnly(dueDateValue);
+    const dueTimeValue = $('#new-due-time').value;
+    state.tasks.push({
+      id: makeId(),
+      title,
+      dueDate: hasDate ? dueDateValue : null,
+      dueTime: hasDate && logic.isTimeOnly(dueTimeValue) ? dueTimeValue : null,
+      priority: readPriority($('#new-priority')),
+      completed: false,
+      createdAt: now,
+      updatedAt: now
+    });
     const saved = persistTasks();
     form.reset();
     $('#new-priority').value = 'medium';
+    $('#new-due-time').disabled = true;
     state.filter = 'all';
     state.query = '';
     $('#task-search').value = '';
@@ -301,8 +349,21 @@
     $('#edit-id').value = task.id;
     $('#edit-title').value = task.title;
     $('#edit-due-date').value = task.dueDate || '';
+    $('#edit-due-time').disabled = !task.dueDate;
+    $('#edit-due-time').value = task.dueTime && logic.isTimeOnly(task.dueTime) ? task.dueTime : '';
     $('#edit-priority').value = task.priority;
+    $('#edit-tags').value = Array.isArray(task.tags) ? task.tags.join(', ') : '';
+    $('#edit-notes').value = typeof task.notes === 'string' ? task.notes : '';
     $('#edit-error').hidden = true;
+    $('#edit-title').removeAttribute('aria-invalid');
+    state.editSubtasks = Array.isArray(task.subtasks)
+      ? task.subtasks.filter((subtask) => subtask && typeof subtask.id === 'string'
+        && typeof subtask.title === 'string' && subtask.title.trim().length > 0
+        && typeof subtask.done === 'boolean')
+        .slice(0, logic.MAX_SUBTASKS)
+        .map((subtask) => ({ id: subtask.id, title: subtask.title.trim().slice(0, logic.MAX_SUBTASK_TITLE), done: subtask.done }))
+      : [];
+    renderSubtaskEditor();
     const dialog = $('#edit-dialog');
     if (typeof dialog.showModal === 'function') dialog.showModal();
     else dialog.setAttribute('open', '');
@@ -315,14 +376,54 @@
     else dialog.removeAttribute('open');
   }
 
+  function renderSubtaskEditor() {
+    const list = $('#subtask-list');
+    if (!state.editSubtasks.length) {
+      list.innerHTML = '<p class="subtask-empty">No steps yet. Break the task down if it helps.</p>';
+      return;
+    }
+    list.innerHTML = state.editSubtasks.map((subtask, index) => `<div class="subtask-row${subtask.done ? ' is-done' : ''}">
+      <button class="subtask-check" type="button" data-subtask-toggle="${index}" aria-pressed="${subtask.done}" aria-label="Mark “${escapeHTML(subtask.title)}” ${subtask.done ? 'incomplete' : 'complete'}">${icon('check')}</button>
+      <span class="subtask-title">${escapeHTML(subtask.title)}</span>
+      <button class="subtask-remove" type="button" data-subtask-remove="${index}" aria-label="Remove step “${escapeHTML(subtask.title)}”">×</button>
+    </div>`).join('');
+  }
+
+  function addSubtaskFromInput() {
+    const input = $('#new-subtask');
+    const title = input.value.trim();
+    if (!title) return;
+    if (state.editSubtasks.length >= logic.MAX_SUBTASKS) {
+      showToast(`A task can have at most ${logic.MAX_SUBTASKS} steps.`);
+      return;
+    }
+    state.editSubtasks.push({ id: makeId(), title: title.slice(0, logic.MAX_SUBTASK_TITLE), done: false });
+    input.value = '';
+    renderSubtaskEditor();
+    input.focus();
+  }
+
+  function showEditError(message) {
+    const error = $('#edit-error');
+    error.textContent = message;
+    error.hidden = false;
+  }
+
   function saveEdit(event) {
     event.preventDefault();
     const titleInput = $('#edit-title');
     const title = titleInput.value.trim();
     if (!title) {
-      $('#edit-error').hidden = false;
+      showEditError('Please enter a task title.');
       titleInput.setAttribute('aria-invalid', 'true');
       titleInput.focus();
+      return;
+    }
+    let tags = [];
+    try {
+      tags = logic.normalizeTags($('#edit-tags').value.split(/[,\s]+/));
+    } catch (error) {
+      showEditError(error.message || 'Tags are malformed.');
       return;
     }
     titleInput.removeAttribute('aria-invalid');
@@ -331,7 +432,17 @@
     task.title = title;
     const dueDateValue = $('#edit-due-date').value;
     task.dueDate = logic.isDateOnly(dueDateValue) ? dueDateValue : null;
+    const dueTimeValue = $('#edit-due-time').value;
+    task.dueTime = task.dueDate && logic.isTimeOnly(dueTimeValue) ? dueTimeValue : null;
     task.priority = readPriority($('#edit-priority'));
+    const notes = $('#edit-notes').value;
+    task.notes = notes.trim() ? notes : undefined;
+    task.tags = tags.length ? tags : null;
+    if (state.editSubtasks.length) {
+      task.subtasks = state.editSubtasks.map((subtask) => ({ id: subtask.id, title: subtask.title, done: subtask.done }));
+    } else {
+      delete task.subtasks;
+    }
     task.updatedAt = new Date().toISOString();
     const saved = persistTasks();
     render();
@@ -353,6 +464,11 @@
       showSaveResult(saved, task.completed ? 'Task completed.' : 'Task reopened.');
     } else if (button.dataset.action === 'edit') {
       openEditor(task);
+    } else if (button.dataset.action === 'tag') {
+      state.query = button.dataset.tag;
+      $('#task-search').value = button.dataset.tag;
+      render();
+      $('#task-search').focus();
     } else if (button.dataset.action === 'delete') {
       const deletedIndex = state.tasks.findIndex((item) => item.id === task.id);
       const [deletedTask] = state.tasks.splice(deletedIndex, 1);
@@ -374,6 +490,36 @@
     }
   }
 
+  function isTextField(target) {
+    return Boolean(target && typeof target === 'object'
+      && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
+        || target.isContentEditable));
+  }
+
+  function handleShortcut(event) {
+    if (event.defaultPrevented) return;
+    const search = $('#task-search');
+    if (event.key === 'Escape' && event.target === search) {
+      if (search.value) clearSearch();
+      else search.blur();
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (isTextField(event.target)) return;
+    if (event.key === '/') {
+      event.preventDefault();
+      search.focus();
+    } else if (event.key === 'n' && !$('#edit-dialog').open) {
+      event.preventDefault();
+      $('#new-title').focus();
+    }
+  }
+
+  function syncTimeInput(dateInput, timeInput) {
+    timeInput.disabled = !logic.isDateOnly(dateInput.value);
+    if (timeInput.disabled) timeInput.value = '';
+  }
+
   function setUp() {
     state.tasks = loadTasks();
     render();
@@ -382,6 +528,7 @@
       $('#add-error').hidden = true;
       $('#new-title').removeAttribute('aria-invalid');
     });
+    $('#new-due-date').addEventListener('input', (event) => syncTimeInput(event.currentTarget, $('#new-due-time')));
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
       render();
@@ -398,12 +545,37 @@
       $('#edit-error').hidden = true;
       $('#edit-title').removeAttribute('aria-invalid');
     });
+    $('#edit-due-date').addEventListener('input', (event) => syncTimeInput(event.currentTarget, $('#edit-due-time')));
+    $('#add-subtask').addEventListener('click', addSubtaskFromInput);
+    $('#new-subtask').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addSubtaskFromInput();
+      }
+    });
+    $('#subtask-list').addEventListener('click', (event) => {
+      const toggle = event.target.closest('[data-subtask-toggle]');
+      if (toggle) {
+        const subtask = state.editSubtasks[Number(toggle.dataset.subtaskToggle)];
+        if (subtask) {
+          subtask.done = !subtask.done;
+          renderSubtaskEditor();
+        }
+        return;
+      }
+      const remove = event.target.closest('[data-subtask-remove]');
+      if (remove) {
+        state.editSubtasks.splice(Number(remove.dataset.subtaskRemove), 1);
+        renderSubtaskEditor();
+      }
+    });
     document.querySelector('.close-dialog').addEventListener('click', closeEditor);
     document.querySelector('.cancel-edit').addEventListener('click', closeEditor);
     $('#toast-action').addEventListener('click', runToastAction);
     $('#edit-dialog').addEventListener('click', (event) => {
       if (event.target === $('#edit-dialog')) closeEditor();
     });
+    document.addEventListener('keydown', handleShortcut);
     window.addEventListener('storage', (event) => {
       if (event.key === STORAGE_KEY || event.key === null) {
         state.tasks = loadTasks();

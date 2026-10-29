@@ -55,6 +55,8 @@
           <input id="new-title" name="title" type="text" maxlength="160" placeholder="What needs your attention?" autocomplete="off" aria-describedby="add-error" required>
           <label class="sr-only" for="new-due-date">Due date (optional)</label>
           <input id="new-due-date" name="dueDate" type="date" aria-label="Due date (optional)">
+          <label class="sr-only" for="new-due-time">Due time (optional)</label>
+          <input id="new-due-time" name="dueTime" type="time" aria-label="Due time (optional)" disabled>
           <label class="sr-only" for="new-priority">Priority</label>
           <select id="new-priority" name="priority" aria-label="Priority">
             <option value="medium">Medium priority</option>
@@ -64,6 +66,7 @@
           <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
         </form>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
+        <p class="composer-hint">Tip: press <kbd>N</kbd> to add a task, <kbd>/</kbd> to search your list.</p>
       </section>
 
       <div class="content-grid">
@@ -113,7 +116,22 @@
       <input id="edit-title" name="title" type="text" maxlength="160" aria-describedby="edit-error" required>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-due-date">Due date <span>(optional)</span></label><input id="edit-due-date" name="dueDate" type="date"></div>
+        <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
+      </div>
+      <div class="dialog-fields">
         <div><label class="field-label" for="edit-priority">Priority</label><select id="edit-priority" name="priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+        <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
+      </div>
+      <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
+      <textarea id="edit-notes" name="notes" rows="3" maxlength="4000" placeholder="Add details, links, or context…"></textarea>
+      <div class="subtask-editor">
+        <label class="field-label" for="new-subtask">Steps <span id="subtask-count-label">(optional, up to 20)</span></label>
+        <div class="subtask-list" id="subtask-list"></div>
+        <div class="subtask-add-row">
+          <label class="sr-only" for="new-subtask">Add a step</label>
+          <input id="new-subtask" type="text" maxlength="120" placeholder="Add a step…" autocomplete="off">
+          <button class="button button-quiet subtask-add-button" id="add-subtask" type="button">Add step</button>
+        </div>
       </div>
       <p class="form-error" id="edit-error" role="alert" hidden>Please enter a task title.</p>
       <div class="dialog-actions"><button class="button button-quiet cancel-edit" type="button">Cancel</button><button class="button button-primary" type="submit">Save changes</button></div>
