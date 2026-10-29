@@ -96,6 +96,9 @@ public final class PressSurfaceSmoke {
         check(clamped < PressSurface.PREFERRED_ALPHA,
                 "the dark-theme row must be clamped below the preferred overlay; if this fails the "
                         + "clamp is dead code and a blanket tint is being shipped instead");
+        check(clamped == 31,
+                "PressSurface's javadoc documents the dark row settling at 12.2 % (31/255) for "
+                        + "4.55:1; if the palette or the clamp moved, update the prose and this pin");
         check(ratioOf(darkRow.label, PressSurface.composite(darkRow.fill,
                 PressSurface.overlayRgb(true), PressSurface.PREFERRED_ALPHA))
                 < PressSurface.MINIMUM_RATIO,

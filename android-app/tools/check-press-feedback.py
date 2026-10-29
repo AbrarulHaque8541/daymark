@@ -6,7 +6,8 @@ was the only appearance it ever had: tapping a task row, a settings row or a bro
 no confirmation at all. The obvious remedies each break a guard this repository already has, so
 this file pins the resolutions rather than only the result:
 
-1. A blanket Material-style 15 % state layer pushes the weakest label/surface pair below the 4.5:1
+1. A blanket Material-style 15 % state layer is not safe with this palette: the dark theme's
+   muted-on-surface row rests at 6.50:1 and lands at 4.15:1 under that overlay, below the 4.5:1
    ratio check-accessibility-contrast.py promises. The tint is therefore clamped per surface by
    PressSurface, and PressSurfaceSmoke asserts the invariant over all real palette pairs.
 2. A pressed look keyed on state_selected would leave a selected-but-idle row permanently pressed,

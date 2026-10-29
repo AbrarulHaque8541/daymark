@@ -8079,8 +8079,9 @@ public final class MainActivity extends Activity {
      *
      * <p>The pressed appearance brightens the border to the accent and tints the fill by as much as
      * {@code labelColor} can absorb without dropping below the palette's 4.5:1 guarantee — see
-     * {@link PressSurface}. Surfaces carrying a low-contrast label (for example a muted subtitle on
-     * a card) keep their exact fill and are distinguished by the border alone.
+     * {@link PressSurface}. The clamp is live, not theoretical: the dark theme's muted task row is
+     * reduced from the preferred 15&nbsp;% overlay to 12.2&nbsp;%, and a surface with no headroom at
+     * all would keep its exact fill and be distinguished by the border alone.
      *
      * @param fillColor  resting fill of the surface
      * @param radiusDp   corner radius shared with {@link #shape(int, int, int)}

@@ -6,13 +6,17 @@ package com.abrar.daymark;
  * <p>Every card, row and button in this app is a flat {@code GradientDrawable}, so a touch
  * previously produced no visible confirmation at all. The obvious fix — a fixed 15&nbsp;% state
  * layer over the pressed surface — is not safe here: the palette guarantees at least 4.5:1 for
- * each label/surface pair and a blanket overlay consumes that headroom. {@code muted} labels on
- * light surfaces sit at 5.5:1 to 6.0:1, and a 15&nbsp;% tint pushes them under 4.5:1, trading a
- * accessibility win for a contrast regression the repository guards against.
+ * each label/surface pair, and a press overlay consumes that headroom. Measured against the real
+ * palette, {@code muted} on the dark theme's {@code surface} rests at 6.50:1 and a 15&nbsp;% white
+ * overlay drags it to 4.15:1 — below the ratio the repository guards. On {@code surfaceAlt} the
+ * same overlay lands at 3.62:1. A press state that only appears while a finger is down would
+ * therefore be the exact moment the app stops meeting its contrast promise.
  *
  * <p>So the tint is sized per surface: the preferred alpha is reduced until the pressed fill still
- * clears the minimum ratio for the label drawn on it. A surface with no headroom keeps its exact
- * color and relies on the stroke change instead, which cannot affect text contrast.
+ * clears the minimum ratio for the label drawn on it. The dark row above settles at 12.2&nbsp;%
+ * (4.55:1), while the light-theme row keeps almost the whole overlay. A surface with no headroom
+ * at all keeps its exact color and relies on the stroke change instead, which cannot affect text
+ * contrast. {@code PressSurfaceSmoke} pins these cases over every real palette pair.
  *
  * <p>Pure integer arithmetic with no {@code android.graphics} dependency, so the host smoke suite
  * can assert the invariant for every real palette pair.
