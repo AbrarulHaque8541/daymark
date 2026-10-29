@@ -653,6 +653,7 @@
     // on-page message while this tab is open, never as OS notifications.
     const now = new Date();
     const grace = 12 * 60 * 60 * 1000;
+    const dueTitles = [];
     let changed = false;
     for (const task of state.tasks) {
       const fire = scheduledFireTime(task);
@@ -662,8 +663,18 @@
       if (task.reminderShownFire === stamp) continue;
       task.reminderShownFire = stamp;
       task.updatedAt = new Date().toISOString();
+      dueTitles.push(task.title);
       changed = true;
-      showToast(`Reminder: “${task.title}” is due.`, {
+    }
+    // One toast per check avoids overwriting earlier reminders when several
+    // tasks become due together. Show a short list and make the remainder count explicit.
+    if (dueTitles.length) {
+      const visibleTitles = dueTitles.slice(0, 3).map((title) => `“${title}”`).join(', ');
+      const moreCount = dueTitles.length - Math.min(dueTitles.length, 3);
+      const message = dueTitles.length === 1
+        ? `Reminder: ${visibleTitles} is due.`
+        : `Reminders due: ${visibleTitles}${moreCount ? `, and ${moreCount} more` : ''}.`;
+      showToast(message, {
         label: 'View list',
         run: () => {
           state.filter = 'all';
