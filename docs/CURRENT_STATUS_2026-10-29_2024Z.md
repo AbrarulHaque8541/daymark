@@ -18,10 +18,10 @@ Time-sensitive record for the Android press-feedback / motion branch. Verified l
 ## This branch
 
 - Branch `feat/android-press-feedback-motion-20261029`, based on `05ac4201` (no rebase needed;
-  `main` had not moved at capture). Commits in order: `89117023` the feature, `9605f9e`
-  measurement-prose corrections, `5842f7a` + `7768ec0` status docs, `9d8f43e` the `SwipeTaskRow`
-  pressed-state fix, `eb3e44c` the multi-label contrast clamp. Check the PR for the exact current
-  head and its CI, because this file cannot name a SHA that has not been pushed yet.
+  `main` had not moved at capture). Source commits in order: `89117023` the feature, `9605f9e`
+  measurement-prose corrections, `9d8f43e` the `SwipeTaskRow` pressed-state fix, `eb3e44c` the
+  multi-label contrast clamp. Everything after `eb3e44c` (`060bbe7` and later) is this status file
+  only and changes no code. Verify the live PR for the current head before merging.
 - Scope, per the owner's selection: **motion + press feedback only**. No touch-target/a11y
   rework, no component dedup, no new features, no version bump, no tag.
 - Behaviour added:
@@ -72,14 +72,17 @@ guard suite reported 106 `PASS` lines and exit 0 on the re-run.
   and the installed SDK `aapt2` is an x86-64 ELF, so resource linking cannot execute here. The
   `javac` gate above proves source and flavor compilation only; it does not prove resources link,
   dex output, signing, or installability. CI (below) is what actually builds them.
-- **NOT RUN:** physical-device behaviour. That remains the owner's gate (issue #160).
-- CI — **PASS** on `5842f7a88c9f1164e33ba12f2740d0ac46a18e96` and on
-  `7768ec0bec7f516e8e4ef3d4240fca7a1df2c182`, all three `pull_request` runs each, including
-  [Android CI](https://github.com/AbrarulHaque8541/daymark/actions/runs/40952840403) (the real
-  Gradle + `aapt2` build this host cannot run), Cross-platform contract tests, and Android
-  device-test release assets. Those two heads **predate** the `setPressed` and multi-label-clamp
-  commits, so they are not evidence for the current head — re-read the checks on the exact PR head
-  before merging.
+- CI — **PASS** on `060bbe7125fdfb87fce0fc3a0f12ba4b2bc5f8b7`, all three `pull_request` workflows:
+  [Android CI 40955533411](https://github.com/AbrarulHaque8541/daymark/actions/runs/40955533411),
+  [Cross-platform contract tests 40955533389](https://github.com/AbrarulHaque8541/daymark/actions/runs/40955533389),
+  [Android device-test release assets 40955533594](https://github.com/AbrarulHaque8541/daymark/actions/runs/40955533594).
+  `mergeable: true`, `mergeable_state: clean`. The `build` job did more than typecheck:
+  `Build and verify debug variants` (both flavors link and assemble — impossible on this host),
+  plus cold-launch of the current debug APK on API 36 and API 29 emulators. Earlier heads
+  `5842f7a` and `7768ec0` were also green but predate the `setPressed` and multi-label commits.
+- **NOT TESTED:** any press interaction. A cold launch starts the app; it does not touch a row, so
+  the emulator gates say nothing about the press tint, the accent border, the eased chrome motion
+  or the haptic kinds. Those need the owner's device (issue #160).
 - **NOT TESTED:** physical device. Press tint visibility, accent-border readability, haptic
   strength and the eased chrome motion are all rendered-behaviour claims; none was observed on a
   phone, and the emulator cold-launch gates in the release workflow do not cover them. The owner
@@ -102,3 +105,6 @@ Work by: Qoder (Qoder desktop agent)
 Model: not disclosed by runtime
 Tooling: Bash, git, GitHub REST API via a local helper (token read from ~/.git-credentials, never printed), OpenJDK 17 javac, Android platform android.jar API 36, Python 3
 Timestamp (UTC): 2026-10-29T20:24:11Z
+Last updated (UTC): 2026-10-29T21:25:52Z — added the `setPressed` fix, the multi-label clamp and the
+exact-head CI results; the repository-state section above was captured at 20:24:11Z and re-checked
+at 21:25:52Z (`main` was still `05ac4201`).
