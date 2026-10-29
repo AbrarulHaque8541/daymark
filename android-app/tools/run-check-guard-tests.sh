@@ -63,6 +63,7 @@ expect_fail_after_removal check-press-feedback.py "setInterpolator(MOTION_ENTER)
 expect_fail_after_removal check-press-feedback.py "android.R.attr.state_focused"
 expect_fail_after_removal check-press-feedback.py "PressSurface.pressedFill(labelColor"
 expect_fail_after_removal check-press-feedback.py "hapticToggle(button, checked);"
+expect_fail_after_removal check-press-feedback.py "android.view.MotionEvent.ACTION_DOWN) setPressed(true);"
 expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"

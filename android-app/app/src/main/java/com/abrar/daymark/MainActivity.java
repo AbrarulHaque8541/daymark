@@ -5255,6 +5255,14 @@ public final class MainActivity extends Activity {
         }
 
         @Override public boolean onTouchEvent(android.view.MotionEvent event) {
+            // This row owns its gesture instead of delegating to View's default touch handling,
+            // so the pressed state has to be driven explicitly. Without these two calls the row
+            // never enters its press drawable and the background feedback is dead on touch.
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) setPressed(true);
+            else if (event.getAction() == android.view.MotionEvent.ACTION_UP
+                    || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
+                setPressed(false);
+            }
             if (event.getAction() == android.view.MotionEvent.ACTION_UP && horizontalSwipe && !consumedSwipe) {
                 float dx = event.getX() - downX;
                 if (Math.abs(dx) > dp(48)) {

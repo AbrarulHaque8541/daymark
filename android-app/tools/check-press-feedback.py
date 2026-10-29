@@ -134,6 +134,15 @@ check("haptic(this, HapticFeedbackConstants.REJECT);" in swipe,
       "a swipe that cannot be stored must say so, while the encrypted store is unavailable")
 check("if (listener != null && canEdit()) {" in swipe,
       "the swipe's editability gate must not be weakened by the haptic change")
+# The row overrides onTouchEvent and never calls super, so View's default press handling does not
+# run: the pressed state must be driven by hand or the row's press background is dead on touch.
+check("if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) setPressed(true);" in swipe,
+      "SwipeTaskRow must set the pressed state itself; super.onTouchEvent is never called here")
+check("setPressed(false);" in swipe,
+      "SwipeTaskRow must clear the pressed state on up and cancel")
+check("return super.onTouchEvent(event);" not in swipe,
+      "delegating to View would double-handle the gesture this row owns; keep the explicit "
+      "pressed-state calls and update this guard deliberately if that ever changes")
 
 # --- 5. Motion easing: curves present, no second animator-scale application --------------------
 check("import android.view.animation.DecelerateInterpolator;" in ACTIVITY,
