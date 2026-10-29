@@ -12,11 +12,12 @@ package com.abrar.daymark;
  * same overlay lands at 3.62:1. A press state that only appears while a finger is down would
  * therefore be the exact moment the app stops meeting its contrast promise.
  *
- * <p>So the tint is sized per surface: the preferred alpha is reduced until the pressed fill still
- * clears the minimum ratio for the label drawn on it. The dark row above settles at 12.2&nbsp;%
- * (4.55:1), while the light-theme row keeps almost the whole overlay. A surface with no headroom
- * at all keeps its exact color and relies on the stroke change instead, which cannot affect text
- * contrast. {@code PressSurfaceSmoke} pins these cases over every real palette pair.
+ * <p>So the tint is sized per surface and per every label that surface draws: the preferred alpha
+ * is reduced until the pressed fill still clears the minimum ratio for all of them. The dark row
+ * above settles at 12.2&nbsp;% (4.55:1), while the light-theme row keeps almost the whole overlay.
+ * A surface with no headroom at all keeps its exact color and relies on the stroke change instead,
+ * which cannot affect text contrast. {@code PressSurfaceSmoke} pins these cases over every real
+ * label set in the palette.
  *
  * <p>Pure integer arithmetic with no {@code android.graphics} dependency, so the host smoke suite
  * can assert the invariant for every real palette pair.
@@ -90,11 +91,30 @@ public final class PressSurface {
     }
 
     /**
-     * The pressed fill for a surface: {@code fillRgb} tinted by as much overlay as the weakest
-     * label on it can absorb. Never returns a color that fails {@code MINIMUM_RATIO} for
-     * {@code labelRgb}.
+     * The same clamp measured against every label a surface draws. A row is not tinted for its
+     * title alone: an overdue task renders the same row in {@code danger}, and a today task in
+     * {@code warning}, so the binding constraint is whichever of those loses contrast first.
+     * Clamping only for the resting {@code muted} label leaves an overdue row at 4.37:1 in the dark
+     * high-contrast theme and 4.05:1 in the light theme — both under the guarded minimum.
      */
-    public static int pressedFill(int labelRgb, int fillRgb, boolean darkTheme, int preferredAlpha) {
+    public static int safeAlpha(int[] labelRgb, int fillRgb, int overlayRgb, int preferredAlpha,
+            double minimumRatio) {
+        int allowed = preferredAlpha <= 0 ? 0
+                : safeAlpha(labelRgb[0], fillRgb, overlayRgb, preferredAlpha, minimumRatio);
+        for (int i = 1; i < labelRgb.length; i++) {
+            allowed = Math.min(allowed,
+                    safeAlpha(labelRgb[i], fillRgb, overlayRgb, preferredAlpha, minimumRatio));
+        }
+        return Math.max(allowed, 0);
+    }
+
+    /**
+     * The pressed fill for a surface: {@code fillRgb} tinted by as much overlay as the weakest of
+     * {@code labelRgb} can absorb. Never returns a color that fails {@code MINIMUM_RATIO} for any
+     * of those labels.
+     */
+    public static int pressedFill(int[] labelRgb, int fillRgb, boolean darkTheme,
+            int preferredAlpha) {
         int ink = overlayRgb(darkTheme);
         int alpha = safeAlpha(labelRgb, fillRgb & 0xFFFFFF, ink, preferredAlpha, MINIMUM_RATIO);
         return composite(fillRgb & 0xFFFFFF, ink, alpha);
@@ -102,9 +122,9 @@ public final class PressSurface {
 
     /**
      * True when the press state must be carried by the stroke alone, because even the smallest
-     * visible tint would break the resting label's contrast.
+     * visible tint would break one of the resting labels' contrast.
      */
-    public static boolean tintIsInvisible(int labelRgb, int fillRgb, boolean darkTheme,
+    public static boolean tintIsInvisible(int[] labelRgb, int fillRgb, boolean darkTheme,
             int preferredAlpha) {
         return safeAlpha(labelRgb, fillRgb & 0xFFFFFF, overlayRgb(darkTheme), preferredAlpha,
                 MINIMUM_RATIO) <= 0;

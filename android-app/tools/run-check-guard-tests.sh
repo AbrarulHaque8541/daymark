@@ -61,9 +61,11 @@ expect_fail_after_removal check-silent-catch.py "StartupDiagnostics.record("
 # Press feedback, haptics and easing must fail closed if the wiring is removed (issue #160 UI work).
 expect_fail_after_removal check-press-feedback.py "setInterpolator(MOTION_ENTER)"
 expect_fail_after_removal check-press-feedback.py "android.R.attr.state_focused"
-expect_fail_after_removal check-press-feedback.py "PressSurface.pressedFill(labelColor"
+expect_fail_after_removal check-press-feedback.py "PressSurface.pressedFill(labelColors"
 expect_fail_after_removal check-press-feedback.py "hapticToggle(button, checked);"
 expect_fail_after_removal check-press-feedback.py "android.view.MotionEvent.ACTION_DOWN) setPressed(true);"
+expect_fail_after_removal check-press-feedback.py "palette.text, palette.muted, palette.warning, palette.danger"
+expect_fail_after_removal check-press-feedback.py "int... labelColors"
 expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"

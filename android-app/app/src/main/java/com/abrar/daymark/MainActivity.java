@@ -5090,7 +5090,8 @@ public final class MainActivity extends Activity {
         });
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(6), dp(7), dp(6), dp(7));
-        row.setBackground(pressable(palette.surface, 20, palette.line, palette.muted));
+        row.setBackground(pressable(palette.surface, 20, palette.line,
+                palette.text, palette.muted, palette.warning, palette.danger));
         row.setElevation(dp(1));
         row.setContentDescription("Task: " + task.title
                 + ". Swipe right to toggle completion; swipe left for task actions.");
@@ -7377,7 +7378,8 @@ public final class MainActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(12), dp(10), dp(12), dp(10));
-        row.setBackground(pressable(palette.surface, 16, palette.line, palette.muted));
+        row.setBackground(pressable(palette.surface, 16, palette.line,
+                palette.text, palette.muted));
         row.setClickable(true);
         row.setFocusable(true);
         row.setContentDescription(title + ". " + subtitle);
@@ -8086,18 +8088,20 @@ public final class MainActivity extends Activity {
      * looked identical under a finger, so a tap produced no visible confirmation.
      *
      * <p>The pressed appearance brightens the border to the accent and tints the fill by as much as
-     * {@code labelColor} can absorb without dropping below the palette's 4.5:1 guarantee — see
-     * {@link PressSurface}. The clamp is live, not theoretical: the dark theme's muted task row is
-     * reduced from the preferred 15&nbsp;% overlay to 12.2&nbsp;%, and a surface with no headroom at
-     * all would keep its exact fill and be distinguished by the border alone.
+     * every label drawn on this surface can absorb without dropping below the palette's 4.5:1
+     * guarantee — see {@link PressSurface}. The clamp is live, not theoretical: the dark theme's
+     * muted task row is reduced from the preferred 15&nbsp;% overlay to 12.2&nbsp;%, and a surface
+     * with no headroom at all would keep its exact fill and be distinguished by the border alone.
      *
-     * @param fillColor  resting fill of the surface
-     * @param radiusDp   corner radius shared with {@link #shape(int, int, int)}
+     * @param fillColor   resting fill of the surface
+     * @param radiusDp    corner radius shared with {@link #shape(int, int, int)}
      * @param strokeColor resting border color
-     * @param labelColor  the weakest text color drawn on this surface
+     * @param labelColors every text color actually drawn on this surface; the weakest binds, so a
+     *                    row that can render an overdue task in {@code danger} must list it too
      */
-    private StateListDrawable pressable(int fillColor, int radiusDp, int strokeColor, int labelColor) {
-        int pressedFill = PressSurface.pressedFill(labelColor, fillColor, palette.dark,
+    private StateListDrawable pressable(int fillColor, int radiusDp, int strokeColor,
+            int... labelColors) {
+        int pressedFill = PressSurface.pressedFill(labelColors, fillColor, palette.dark,
                 highContrast ? PressSurface.HIGH_CONTRAST_ALPHA : PressSurface.PREFERRED_ALPHA);
         StateListDrawable states = new StateListDrawable();
         // Pressed and focused share the active appearance: focus is the same confirmation for a

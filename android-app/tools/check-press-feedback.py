@@ -55,16 +55,20 @@ check("public final class PressSurface" in press_surface, "PressSurface must rem
 for constant in ("PREFERRED_ALPHA = 0x26", "HIGH_CONTRAST_ALPHA = 0x40", "MINIMUM_RATIO = 4.5"):
     check(constant in press_surface,
           f"PressSurface must keep the documented contrast contract: {constant}")
-check("public static int pressedFill(" in press_surface,
-      "the activity resolves the pressed color through PressSurface.pressedFill")
+check("public static int pressedFill(int[] labelRgb" in press_surface,
+      "the activity resolves the pressed color through the multi-label PressSurface.pressedFill")
+check("public static int safeAlpha(int[] labelRgb" in press_surface,
+      "PressSurface must keep the array clamp that takes every label a surface draws")
 
 # --- 2. The activity builds a real pressed state, clamped for contrast -------------------------
 check("import android.graphics.drawable.StateListDrawable;" in ACTIVITY,
       "press feedback requires StateListDrawable backgrounds")
-check("private StateListDrawable pressable(" in ACTIVITY,
+check("private StateListDrawable pressable(int fillColor, int radiusDp, int strokeColor," in ACTIVITY,
       "the single press-background helper is missing")
 pressable = region("private StateListDrawable pressable(", "private LinearLayout.LayoutParams",
                    "pressable()")
+check("int... labelColors" in pressable,
+      "a surface draws more than one label color, so the clamp must take them all")
 check("android.R.attr.state_pressed" in pressable, "the pressed state must exist")
 check("android.R.attr.state_focused" in pressable,
       "keyboard and D-pad focus must get the same confirmation as touch")
@@ -86,12 +90,20 @@ for marker, who in (
     ("button.setBackground(pressable(palette.accentSoft, 22, palette.line, palette.accent));",
      "plainButton"),
     ("button.setBackground(pressable(fillColor, 9, palette.line, labelColor));", "compactButton"),
-    ("row.setBackground(pressable(palette.surface, 20, palette.line, palette.muted));",
+    ("row.setBackground(pressable(palette.surface, 20, palette.line,\n"
+     "                palette.text, palette.muted, palette.warning, palette.danger));",
      "buildTaskRow"),
-    ("row.setBackground(pressable(palette.surface, 16, palette.line, palette.muted));",
+    ("row.setBackground(pressable(palette.surface, 16, palette.line,\n"
+     "                palette.text, palette.muted));",
      "addSettingsRow"),
 ):
     check(marker in ACTIVITY, f"{who} lost its press background")
+check("palette.warning, palette.danger" in ACTIVITY,
+      "the task row can render a today task in warning and an overdue task in danger, so the "
+      "press clamp must be measured against those too, not just the resting muted label")
+check("row.setBackground(pressable(palette.surface, 20, palette.line, palette.muted));"
+      not in ACTIVITY,
+      "a single-label clamp on the task row is the regression PressSurfaceSmoke pins against")
 check(ACTIVITY.count("button.setBackground(pressable(palette.surfaceAlt, 22, palette.line,"
                     " palette.accent));") == 3,
       "all three browser chrome / shortcut button sites must keep a press background")
