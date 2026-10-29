@@ -43,6 +43,7 @@ public final class GitHubTransportSmoke {
         parserConvertsSignedLongBoundariesExactly();
         parserIgnoresOnlyWellFormedUnstableReleaseFlags();
         parserRejectsMalformedOrAmbiguousMetadata();
+        parserAcceptsThePublishedVersionScheme();
         releaseClientConstrainsRequestAndClassifiesResponses();
         releaseClientRejectsRedirectAndOversizedBody();
         downloaderFollowsOnlyValidatedRedirectsAndCopiesExactBytes();
@@ -67,9 +68,9 @@ public final class GitHubTransportSmoke {
                 "{\"applicationId\":\"com.abrar.daymark\",\"versionCode\":2,\"minSdkVersion\":26,"
                         + "\"signerCertificateSha256\":\"" + SIGNER + "\"}", APK.length,
                 "sha256:" + sha256(APK), assetUrl(), false));
-        check("v1.2.3".equals(release.tag), "release tag is parsed from GitHub JSON");
-        check("1.2.3".equals(release.versionName), "version name is derived from the validated tag");
-        check("Daymark 1.2.3".equals(release.name), "release name is parsed");
+        check("v1.5".equals(release.tag), "release tag is parsed from GitHub JSON");
+        check("1.5".equals(release.versionName), "version name is derived from the validated tag");
+        check("Daymark v1.5".equals(release.name), "release name is parsed");
         check("Critical fixes and offline reliability.".equals(release.notes), "machine metadata is removed from visible notes");
         check(release.versionCode == 2L && release.minSdkVersion == 26, "typed publisher integers are parsed");
         check(release.apkSizeBytes == APK.length, "asset byte count is parsed");
@@ -141,8 +142,48 @@ public final class GitHubTransportSmoke {
                         "sha256:" + sha256(APK), assetUrl(), false)), "malformed publisher JSON is rejected");
         expectFailure(UpdaterCore.Failure.INVALID_METADATA,
                 () -> GitHubReleaseClient.parseRelease(fixture(false, false, publisher, APK.length,
-                        "sha256:" + sha256(APK), assetUrl(), false).replace("v1.2.3", "v1.2")),
-                "non-semver release tag is rejected");
+                        "sha256:" + sha256(APK), assetUrl(), false).replace("\"v1.5\"", "\"v1.x\"")),
+                "non-numeric release tag is rejected");
+        expectFailure(UpdaterCore.Failure.INVALID_METADATA,
+                () -> GitHubReleaseClient.parseRelease(fixture(false, false, publisher, APK.length,
+                        "sha256:" + sha256(APK), assetUrl(), false).replace("\"v1.5\"", "\"1.5\"")),
+                "release tag without the v prefix is rejected");
+    }
+
+    /**
+     * The production release workflow publishes tags as v&lt;major&gt;.&lt;minor&gt; with an optional
+     * patch, because that is what Gradle's versionName produces. The updater must accept exactly
+     * that scheme; a stricter consumer-side pattern rejects every published release and silently
+     * disables the update channel.
+     */
+    private static void parserAcceptsThePublishedVersionScheme() throws Exception {
+        String publisher = "{\"applicationId\":\"com.abrar.daymark\",\"versionCode\":2,\"minSdkVersion\":26,"
+                + "\"signerCertificateSha256\":\"" + SIGNER + "\"}";
+        for (String tag : new String[] {"v1.0", "v1.5", "v2.0", "v1.5.0", "v10.20.30"}) {
+            String body = fixture(false, false, publisher, APK.length, "sha256:" + sha256(APK),
+                    assetUrl(), false).replace("\"v1.5\"", "\"" + tag + "\"");
+            UpdaterCore.Release release = GitHubReleaseClient.parseRelease(body);
+            check(tag.equals(release.tag), "published version scheme accepts tag " + tag);
+            check(tag.substring(1).equals(release.versionName),
+                    "published version scheme derives version name from tag " + tag);
+        }
+        for (String tag : new String[] {"v1", "v1.", "v1.5.1.2", "v1.5-rc1", "vX.Y", "1.5"}) {
+            String body = fixture(false, false, publisher, APK.length, "sha256:" + sha256(APK),
+                    assetUrl(), false).replace("\"v1.5\"", "\"" + tag + "\"");
+            boolean rejected = false;
+            try {
+                GitHubReleaseClient.parseRelease(body);
+            } catch (UpdaterCore.UpdateException failure) {
+                rejected = failure.failure == UpdaterCore.Failure.INVALID_METADATA;
+            }
+            check(rejected, "malformed version tag is rejected: " + tag);
+        }
+        check(UpdaterCore.isValidVersionName("1.5"), "version scheme accepts a published two-part version");
+        check(UpdaterCore.isValidVersionName("1.5.0"), "version scheme accepts a three-part version");
+        check(!UpdaterCore.isValidVersionName("1"), "version scheme rejects a single component");
+        check(!UpdaterCore.isValidVersionName("1.5-rc1"), "version scheme rejects a pre-release suffix");
+        check(UpdaterCore.isValidTag("v1.5"), "tag scheme accepts a published two-part tag");
+        check(!UpdaterCore.isValidTag("1.5"), "tag scheme requires the v prefix");
     }
 
     private static void releaseClientConstrainsRequestAndClassifiesResponses() throws Exception {
@@ -156,7 +197,7 @@ public final class GitHubTransportSmoke {
             return success;
         });
         UpdaterCore.Release parsed = client.fetchLatestStable();
-        check(parsed != null && parsed.tag.equals("v1.2.3"), "metadata client returns parsed latest stable release");
+        check(parsed != null && parsed.tag.equals("v1.5"), "metadata client returns parsed latest stable release");
         check(requested.equals(Arrays.asList(GitHubReleaseClient.RELEASES_ENDPOINT)), "metadata client uses only the fixed endpoint");
         check("GET".equals(success.getRequestMethod()), "metadata request uses GET");
         check(!success.getInstanceFollowRedirects(), "metadata redirects are not followed automatically");
@@ -600,7 +641,7 @@ public final class GitHubTransportSmoke {
     }
 
     private static UpdaterCore.Release validRelease() {
-        return new UpdaterCore.Release("v1.2.3", "1.2.3", "Daymark 1.2.3", "Notes",
+        return new UpdaterCore.Release("v1.5", "1.5", "Daymark v1.5", "Notes",
                 UpdaterCore.APPLICATION_ID, 2L, 26, APK.length, sha256(APK), SIGNER,
                 assetUrl(), false, false);
     }
@@ -608,16 +649,16 @@ public final class GitHubTransportSmoke {
     private static String fixture(boolean draft, boolean prerelease, String publisherJson,
             int size, String digest, String asset, boolean duplicateApk) {
         String notes = "<!-- daymark-updater-v1\n" + publisherJson + "\n-->\nCritical fixes and offline reliability.";
-        String assetEntry = "{\"name\":\"Daymark-v1.2.3.apk\",\"size\":" + size
+        String assetEntry = "{\"name\":\"Daymark-v1.5-githubSideload.apk\",\"size\":" + size
                 + ",\"digest\":" + quote(digest) + ",\"browser_download_url\":" + quote(asset) + "}";
         String assets = duplicateApk ? "[" + assetEntry + "," + assetEntry + "]" : "[" + assetEntry + "]";
         return "{\"draft\":" + draft + ",\"prerelease\":" + prerelease
-                + ",\"tag_name\":\"v1.2.3\",\"name\":\"Daymark 1.2.3\",\"body\":"
+                + ",\"tag_name\":\"v1.5\",\"name\":\"Daymark v1.5\",\"body\":"
                 + quote(notes) + ",\"assets\":" + assets + "}";
     }
 
     private static String assetUrl() {
-        return "https://github.com/AbrarulHaque8541/daymark/releases/download/v1.2.3/Daymark-v1.2.3.apk";
+        return "https://github.com/AbrarulHaque8541/daymark/releases/download/v1.5/Daymark-v1.5-githubSideload.apk";
     }
 
     private static String quote(String value) {

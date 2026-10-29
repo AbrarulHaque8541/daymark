@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Check that production releases emit the metadata required by Daymark's updater."""
 from pathlib import Path
+import re
 import sys
 
 root = Path(sys.argv[1])
 workflow = (root.parent / ".github/workflows/android-production-release.yml").read_text(encoding="utf-8")
 client = (root / "app/src/main/java/com/abrar/daymark/updater/GitHubReleaseClient.java").read_text(encoding="utf-8")
+core = (root / "app/src/main/java/com/abrar/daymark/updater/UpdaterCore.java").read_text(encoding="utf-8")
 for marker in (
     'echo "<!-- daymark-updater-v1"',
     '"applicationId":"com.abrar.daymark"',
@@ -53,4 +55,35 @@ assert '.draft == true' in workflow, "workflow must verify draft status before f
 assert '--latest' not in workflow, "workflow must not auto-publish or mark the draft as latest"
 assert 'Draft release is ready and is NOT public.' in workflow, "owner-device acceptance must precede public publication"
 assert (root / "tools/cold-launch-apk.sh").is_file(), "cold-launch helper script is missing"
+
+# The publisher and the updater must accept the same version scheme.
+#
+# The production workflow publishes a tag of v<major>.<minor> with an optional patch, because that
+# is what Gradle's versionName produces. The updater consumed exactly that release feed, but its
+# validator demanded a strict three-part semantic version, so every published release was rejected
+# as invalid metadata and the update channel never worked. The two sides are now compared
+# directly so they cannot drift apart again unnoticed.
+workflow_tag_match = re.search(r'\[\[ "\$tag" =~ (\^.*\$) \]\]', workflow)
+assert workflow_tag_match, "production release workflow must validate the release tag against a version scheme"
+publisher_pattern = workflow_tag_match.group(1)
+
+core_pattern_match = re.search(r'public static final String VERSION_PATTERN = "([^"]+)"', core)
+assert core_pattern_match, "UpdaterCore must declare a single shared VERSION_PATTERN"
+consumer_pattern = core_pattern_match.group(1).replace("\\\\", "\\")
+
+publisher_regex = re.compile(publisher_pattern)
+consumer_regex = re.compile("^v" + consumer_pattern + "$")
+
+published_tags = ["v1.0", "v1.5", "v2.0", "v1.5.0", "v10.20.30"]
+for tag in published_tags:
+    assert publisher_regex.match(tag), f"publisher must accept the published tag {tag}"
+    assert consumer_regex.match(tag), (
+        f"the updater rejects the published tag {tag} that the release workflow publishes; "
+        "the update channel would be disabled for every release"
+    )
+for tag in ["v1", "v1.5-rc1", "vX.Y", "1.5", "v1.5.1.2"]:
+    assert not consumer_regex.match(tag), f"the updater must reject the malformed tag {tag}"
+    assert not publisher_regex.match(tag), f"the publisher must reject the malformed tag {tag}"
+
 print("PASS: updater metadata, APK integrity, safe warning guidance, single-APK publication, and API-29/API-36 cold-launch gates")
+print("PASS: publisher and updater accept the same release version scheme")

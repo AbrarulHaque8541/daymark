@@ -18,7 +18,7 @@ public final class PendingSaveTransaction implements Serializable {
 
     public PendingSaveTransaction(UpdaterCore.Release release, String token) {
         if (release == null || UpdaterCore.normalizeSha256(release.apkSha256) == null
-                || release.versionName == null || !release.versionName.matches("[0-9]+\\.[0-9]+\\.[0-9]+")
+                || !UpdaterCore.isValidVersionName(release.versionName)
                 || token == null || !token.matches(TOKEN_PATTERN)) {
             throw new IllegalArgumentException("A valid release and unique picker transaction token are required.");
         }

@@ -168,7 +168,7 @@ public final class SafApkSaver {
     /** Exact reserved title used to safely identify and clean a stale returned picker URI. */
     public static boolean isReservedPendingPickerName(String name) {
         return name != null && name.matches(
-                "Daymark-v[0-9]+\\.[0-9]+\\.[0-9]+\\.apk\\.daymark-pending-[a-f0-9]{32}\\.tmp");
+                "Daymark-v" + UpdaterCore.VERSION_PATTERN + "\\.apk\\.daymark-pending-[a-f0-9]{32}\\.tmp");
     }
 
     private static void bestEffortDelete(Document destination) {
