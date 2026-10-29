@@ -17,11 +17,11 @@ Time-sensitive record for the Android press-feedback / motion branch. Verified l
 
 ## This branch
 
-- Branch `feat/android-press-feedback-motion-20261029`, code commit
-  `89117023acf31d810619bcfc1f67df1fe9722f01`, based on `05ac4201` (no rebase needed; `main` had not
-  moved at capture). Later commits on the branch are the documentation/measurement corrections in
-  `9605f9e` and this status file; they change no behaviour. Check the PR for the exact current head
-  and its CI, because this file cannot name a SHA that has not been pushed yet.
+- Branch `feat/android-press-feedback-motion-20261029`, based on `05ac4201` (no rebase needed;
+  `main` had not moved at capture). Commits: `89117023` the feature, `9605f9e` measurement-prose
+  corrections, `5842f7a` + this file for status docs, `9d8f43e` the `SwipeTaskRow` pressed-state
+  fix. Check the PR for the exact current head and its CI, because this file cannot name a SHA that
+  has not been pushed yet.
 - Scope, per the owner's selection: **motion + press feedback only**. No touch-target/a11y
   rework, no component dedup, no new features, no version bump, no tag.
 - Behaviour added:
@@ -39,16 +39,20 @@ Time-sensitive record for the Android press-feedback / motion branch. Verified l
     workspace-switch animators. No animator-scale handling was added: the framework already scales
     `ViewPropertyAnimator`, and reading `Settings.Global.ANIMATOR_DURATION_SCALE` here would
     double-apply it.
+  - `SwipeTaskRow.onTouchEvent` now drives `setPressed(...)` itself. That override returns `true`
+    for every action and never calls `super`, so `STATE_PRESSED` was never set and the row's new
+    press background would have been dead under a finger while working for focus. Found by reading
+    the gesture code after the first commit, not by a device test.
 
 ## Checks actually run
 
 Run on `89117023` and re-run on the `9605f9e` tree (docs-only delta, no behaviour change) — the
 guard suite reported 106 `PASS` lines and exit 0 on the re-run.
 
-- `sh android-app/tools/check-v1-source.sh` — **PASS** (whole suite, including
-  `check-press-feedback.py` 57 assertions, `bottom navigation` 29 assertions, and
+- `sh android-app/tools/check-v1-source.sh` — **PASS** (whole suite, exit 0, 106 `PASS` lines,
+  including `check-press-feedback.py` 60 assertions, `bottom navigation` 29 assertions, and
   `palette contrast … minimum 4.87:1`).
-- `sh android-app/tools/run-check-guard-tests.sh` — **PASS**, including five new
+- `sh android-app/tools/run-check-guard-tests.sh` — **PASS**, including six new
   `expect_fail_after_removal` mutations proving `check-press-feedback.py` fails closed.
 - `sh android-app/tools/run-core-tests.sh` — **PASS**; `PressSurfaceSmoke` reports
   `PASS press surface smoke (28 palette pairs)`.
@@ -58,12 +62,18 @@ guard suite reported 106 `PASS` lines and exit 0 on the re-run.
 
 ## Not run / not tested — read before treating any of this as release evidence
 
-- **NOT RUN:** `./gradlew assembleDebug`, lint, and any APK/AAB build. This host is arm64 and the
-  installed SDK `aapt2` is an x86-64 ELF, so resource linking cannot execute here. The `javac`
-  gate above proves source and flavor compilation only; it does not prove resources link, dex
-  output, signing, or installability.
-- **NOT RUN:** CI on this head. It runs only after the branch is pushed; re-read the exact-head
-  check results before merging.
+- **NOT RUN locally:** `./gradlew assembleDebug`, lint, and any APK/AAB build — this host is arm64
+  and the installed SDK `aapt2` is an x86-64 ELF, so resource linking cannot execute here. The
+  `javac` gate above proves source and flavor compilation only; it does not prove resources link,
+  dex output, signing, or installability. CI (below) is what actually builds them.
+- **NOT RUN:** physical-device behaviour. That remains the owner's gate (issue #160).
+- CI on `5842f7a88c9f1164e33ba12f2740d0ac46a18e96` — **PASS**, all three `pull_request` runs:
+  [Android CI](https://github.com/AbrarulHaque8541/daymark/actions/runs/40951061163) (the real
+  Gradle + `aapt2` build this host cannot run),
+  [Cross-platform contract tests](https://github.com/AbrarulHaque8541/daymark/actions/runs/40951061123),
+  [Android device-test release assets](https://github.com/AbrarulHaque8541/daymark/actions/runs/40951061132).
+  The `setPressed` fix landed after that head, so a green run here does **not** cover the newer
+  head: re-read the checks on the exact PR head before merging.
 - **NOT TESTED:** physical device. Press tint visibility, accent-border readability, haptic
   strength and the eased chrome motion are all rendered-behaviour claims; none was observed on a
   phone, and the emulator cold-launch gates in the release workflow do not cover them. The owner
