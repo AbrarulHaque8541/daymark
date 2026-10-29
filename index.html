@@ -57,6 +57,14 @@
           <input id="new-due-date" name="dueDate" type="date" aria-label="Due date (optional)">
           <label class="sr-only" for="new-due-time">Due time (optional)</label>
           <input id="new-due-time" name="dueTime" type="time" aria-label="Due time (optional)" disabled>
+          <label class="sr-only" for="new-reminder">Reminder (optional)</label>
+          <select id="new-reminder" name="reminder" aria-label="Reminder (optional)" disabled>
+            <option value="">No reminder</option>
+            <option value="0">Remind at due time</option>
+            <option value="30">30 min before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+          </select>
           <label class="sr-only" for="new-priority">Priority</label>
           <select id="new-priority" name="priority" aria-label="Priority">
             <option value="medium">Medium priority</option>
@@ -66,25 +74,32 @@
           <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
         </form>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
-        <p class="composer-hint">Tip: press <kbd>N</kbd> to add a task, <kbd>/</kbd> to search your list.</p>
+        <p class="composer-hint">Tip: press <kbd>N</kbd> to add a task, <kbd>/</kbd> to search. Add <kbd>#tags</kbd> in the title to tag it.</p>
       </section>
 
       <div class="content-grid">
         <section class="tasks-panel" aria-labelledby="tasks-heading">
           <div class="section-heading">
             <div><p class="eyebrow">YOUR LIST</p><h2 id="tasks-heading">Tasks</h2></div>
-            <span class="task-total" id="visible-count">0 tasks</span>
+            <div class="section-heading-tools">
+              <span class="task-total" id="visible-count">0 tasks</span>
+              <button class="clear-completed" id="clear-completed" type="button" hidden>Clear completed</button>
+            </div>
           </div>
           <nav class="filters" aria-label="Filter tasks">
             <button type="button" class="filter-button is-active" data-filter="all" aria-pressed="true">All <span id="count-all">0</span></button>
             <button type="button" class="filter-button" data-filter="today" aria-pressed="false">Today <span id="count-today">0</span></button>
             <button type="button" class="filter-button" data-filter="upcoming" aria-pressed="false">Upcoming <span id="count-upcoming">0</span></button>
+            <button type="button" class="filter-button" data-filter="overdue" aria-pressed="false">Overdue <span id="count-overdue">0</span></button>
             <button type="button" class="filter-button" data-filter="completed" aria-pressed="false">Completed <span id="count-completed">0</span></button>
           </nav>
           <div class="task-tools">
             <label class="sr-only" for="task-search">Search tasks by title</label>
             <input id="task-search" type="search" placeholder="Search your tasks…" autocomplete="off" aria-describedby="visible-count">
-            <button class="clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
+            <button class="tool-button clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
+            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks from a backup file">Import</button>
+            <input id="import-file" type="file" accept="application/json,.json" hidden>
           </div>
           <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text"></div>
           <div class="empty-state" id="empty-state" hidden>
@@ -119,8 +134,12 @@
         <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
       </div>
       <div class="dialog-fields">
+        <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">At due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
         <div><label class="field-label" for="edit-priority">Priority</label><select id="edit-priority" name="priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+      </div>
+      <div class="dialog-fields">
         <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
+        <div class="reminder-note"><p>Reminders show as a message on this page while it is open.</p></div>
       </div>
       <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
       <textarea id="edit-notes" name="notes" rows="3" maxlength="4000" placeholder="Add details, links, or context…"></textarea>

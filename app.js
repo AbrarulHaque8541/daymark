@@ -5,7 +5,7 @@
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
-  const state = { tasks: [], filter: 'all', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, previousOpenCount: null, editSubtasks: [] };
+  const state = { tasks: [], filter: 'all', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [] };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -117,6 +117,30 @@
     return PRIORITIES.includes(input.value) ? input.value : 'medium';
   }
 
+  function readReminderLead(select) {
+    if (!select || select.disabled || select.value === '') return null;
+    const lead = Number(select.value);
+    return logic.isReminderLead(lead) ? lead : null;
+  }
+
+  function parseQuickTags(title) {
+    // Quick tagging from the composer, matching the Android app's #tag quick add:
+    // pull "#tag" tokens out of the title and store them as real tags.
+    const found = [];
+    const text = title.replace(/(^|\s)#([a-z0-9][a-z0-9_-]{0,23})(?=\s|$)/gi, (match, space, tag) => {
+      found.push(tag.toLowerCase());
+      return ' ';
+    }).replace(/\s+/g, ' ').trim();
+    if (!found.length) return { title, tags: null };
+    try {
+      const tags = logic.normalizeTags(found);
+      return tags.length ? { title: text, tags } : { title: text, tags: null };
+    } catch (error) {
+      // Malformed or too many tags: keep the title exactly as typed, without tags.
+      return { title, tags: null };
+    }
+  }
+
   function formatDate(dateString) {
     if (!logic.isDateOnly(dateString)) return '';
     const [year, month, day] = dateString.split('-').map(Number);
@@ -156,6 +180,7 @@
       trash: '<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/>',
       check: '<path d="m4 12 5 5L20 6"/>',
       clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      bell: '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
       note: '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/>',
       steps: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2m-3 6 1 1 2-2m-3 6 1 1 2-2"/>'
     };
@@ -178,11 +203,15 @@
     const subtaskChip = summary
       ? `<button class="task-chip subtask-chip${summary.done === summary.total ? ' is-all-done' : ''}" type="button" data-action="edit" aria-label="Edit subtasks (${summary.done} of ${summary.total} done)" title="Subtasks: ${summary.done}/${summary.total}">${icon('steps')} ${summary.done}/${summary.total}</button>`
       : '';
+    const hasReminder = logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null;
+    const reminderChip = hasReminder
+      ? `<span class="task-chip reminder-chip" title="${task.reminderLeadMinutes === 0 ? 'Reminder at due time' : `Reminder ${task.reminderLeadMinutes === 1440 ? '1 day' : task.reminderLeadMinutes === 60 ? '1 hour' : '30 min'} before`}">${icon('bell')}</span>`
+      : '';
     return `<article class="task-row${task.completed ? ' is-complete' : ''}" data-task-id="${escapeHTML(task.id)}">
       <button class="complete-button" type="button" data-action="toggle" aria-label="${completionLabel}" aria-pressed="${task.completed}">${icon('check')}</button>
       <div class="task-main">
         <span class="task-title" title="${escapeHTML(task.title)}">${escapeHTML(task.title)}</span>
-        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${notesChip}${subtaskChip}</div>
+        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${reminderChip}${notesChip}${subtaskChip}</div>
       </div>
       <div class="task-actions">
         <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}">${icon('edit')}</button>
@@ -191,10 +220,26 @@
     </article>`;
   }
 
+  function matchesSubtaskTitle(task, normalizedQuery) {
+    return Array.isArray(task.subtasks) && task.subtasks.some((subtask) => subtask && typeof subtask.title === 'string'
+      && subtask.title.toLowerCase().includes(normalizedQuery));
+  }
+
   function render() {
     const today = logic.localDateString();
     state.currentDay = today;
-    const filteredTasks = logic.getFilteredTasks(state.tasks, state.filter, state.query, today);
+    const overdueTasks = state.tasks.filter((task) => !task.completed && task.dueDate !== null && task.dueDate < today);
+    const source = state.filter === 'overdue' ? overdueTasks : state.tasks;
+    const effectiveFilter = state.filter === 'overdue' ? 'all' : state.filter;
+    let filteredTasks = logic.getFilteredTasks(source, effectiveFilter, state.query, today);
+    const normalizedQuery = String(state.query || '').trim().toLowerCase();
+    if (normalizedQuery) {
+      // task-logic search covers title, notes and tags; extend it here so step
+      // titles match too without touching the shared, tested logic module.
+      const knownIds = new Set(filteredTasks.map((task) => task.id));
+      const extra = source.filter((task) => !knownIds.has(task.id) && matchesSubtaskTitle(task, normalizedQuery));
+      if (extra.length) filteredTasks = logic.getFilteredTasks(filteredTasks.concat(extra), effectiveFilter, '', today);
+    }
     const openTasks = state.tasks.filter((task) => !task.completed);
     const todayTasks = state.tasks.filter((task) => task.dueDate === today);
     const upcomingTasks = state.tasks.filter((task) => task.dueDate !== null && task.dueDate > today);
@@ -212,10 +257,12 @@
     $('#count-all').textContent = String(state.tasks.length);
     $('#count-today').textContent = String(todayTasks.length);
     $('#count-upcoming').textContent = String(upcomingTasks.length);
+    $('#count-overdue').textContent = String(overdueTasks.length);
     $('#count-completed').textContent = String(completedTasks.length);
     $('#visible-count').textContent = hasQuery
       ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
+    $('#clear-completed').hidden = completedTasks.length === 0;
     $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
 
     document.querySelectorAll('.filter-button').forEach((button) => {
@@ -235,6 +282,9 @@
     } else if (empty && state.filter === 'completed') {
       $('#empty-title').textContent = 'Nothing completed yet';
       $('#empty-copy').textContent = 'Finished tasks will be collected here for an easy review.';
+    } else if (empty && state.filter === 'overdue') {
+      $('#empty-title').textContent = 'Nothing overdue';
+      $('#empty-copy').textContent = 'You are fully caught up on past-due tasks. Nice work.';
     } else if (empty && state.tasks.length > 0) {
       const labels = {
         all: ['All caught up', 'Nothing on your list just now. Add a task whenever something comes to mind.'],
@@ -309,9 +359,9 @@
     event.preventDefault();
     const form = event.currentTarget;
     const titleInput = $('#new-title');
-    const title = titleInput.value.trim();
+    const rawTitle = titleInput.value.trim();
     const error = $('#add-error');
-    if (!title) {
+    if (!rawTitle) {
       error.hidden = false;
       titleInput.setAttribute('aria-invalid', 'true');
       titleInput.focus();
@@ -319,11 +369,19 @@
     }
     error.hidden = true;
     titleInput.removeAttribute('aria-invalid');
+    const { title, tags } = parseQuickTags(rawTitle);
+    if (!title) {
+      error.hidden = false;
+      titleInput.setAttribute('aria-invalid', 'true');
+      titleInput.focus();
+      return;
+    }
     const now = new Date().toISOString();
     const dueDateValue = $('#new-due-date').value;
     const hasDate = logic.isDateOnly(dueDateValue);
     const dueTimeValue = $('#new-due-time').value;
-    state.tasks.push({
+    const reminderLead = readReminderLead($('#new-reminder'));
+    const task = {
       id: makeId(),
       title,
       dueDate: hasDate ? dueDateValue : null,
@@ -332,17 +390,22 @@
       completed: false,
       createdAt: now,
       updatedAt: now
-    });
+    };
+    if (tags) task.tags = tags;
+    if (hasDate && reminderLead !== null) task.reminderLeadMinutes = reminderLead;
+    state.tasks.push(task);
     const saved = persistTasks();
     form.reset();
     $('#new-priority').value = 'medium';
     $('#new-due-time').disabled = true;
+    $('#new-reminder').disabled = true;
+    $('#new-reminder').value = '';
     state.filter = 'all';
     state.query = '';
     $('#task-search').value = '';
     render();
     titleInput.focus();
-    showSaveResult(saved, 'Task added to your list.');
+    showSaveResult(saved, tags ? 'Task added and tagged.' : 'Task added to your list.');
   }
 
   function openEditor(task) {
@@ -351,6 +414,10 @@
     $('#edit-due-date').value = task.dueDate || '';
     $('#edit-due-time').disabled = !task.dueDate;
     $('#edit-due-time').value = task.dueTime && logic.isTimeOnly(task.dueTime) ? task.dueTime : '';
+    const reminderSelect = $('#edit-reminder');
+    reminderSelect.disabled = !task.dueDate;
+    reminderSelect.value = logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null
+      ? String(task.reminderLeadMinutes) : '';
     $('#edit-priority').value = task.priority;
     $('#edit-tags').value = Array.isArray(task.tags) ? task.tags.join(', ') : '';
     $('#edit-notes').value = typeof task.notes === 'string' ? task.notes : '';
@@ -434,6 +501,13 @@
     task.dueDate = logic.isDateOnly(dueDateValue) ? dueDateValue : null;
     const dueTimeValue = $('#edit-due-time').value;
     task.dueTime = task.dueDate && logic.isTimeOnly(dueTimeValue) ? dueTimeValue : null;
+    const reminderLead = readReminderLead($('#edit-reminder'));
+    if (task.dueDate && reminderLead !== null) {
+      task.reminderLeadMinutes = reminderLead;
+    } else {
+      delete task.reminderLeadMinutes;
+      delete task.reminderShownFire;
+    }
     task.priority = readPriority($('#edit-priority'));
     const notes = $('#edit-notes').value;
     task.notes = notes.trim() ? notes : undefined;
@@ -490,6 +564,119 @@
     }
   }
 
+  function clearCompleted() {
+    const removed = state.tasks.filter((task) => task.completed);
+    if (!removed.length) return;
+    state.tasks = state.tasks.filter((task) => !task.completed);
+    const saved = persistTasks();
+    render();
+    showToast(saved ? `Cleared ${removed.length} completed task${removed.length === 1 ? '' : 's'}.` : 'Cleared for this session. Saving failed.', {
+      label: 'Undo',
+      run: () => {
+        state.tasks = state.tasks.concat(removed);
+        const restored = persistTasks();
+        render();
+        showSaveResult(restored, 'Completed tasks restored.');
+      }
+    });
+  }
+
+  function exportTasks() {
+    // Portable local backup: same spirit as the Android app's encrypted backups,
+    // scoped to what a static web page can honestly do — a JSON file you keep.
+    try {
+      if (typeof document.createElement !== 'function') throw new Error('unsupported');
+      const payload = JSON.stringify(state.tasks, null, 2);
+      const link = document.createElement('a');
+      link.href = `data:application/json;charset=utf-8,${encodeURIComponent(payload)}`;
+      link.download = `daymark-backup-${logic.localDateString()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast(`Backup downloaded (${state.tasks.length} task${state.tasks.length === 1 ? '' : 's'}).`);
+    } catch (error) {
+      showToast('Export is not available in this browser.');
+    }
+  }
+
+  function applyImportedText(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      showToast('That file is not valid JSON. Nothing was changed.');
+      return;
+    }
+    const validated = logic.validateStoredTasks(parsed);
+    const existingIds = new Set(state.tasks.map((task) => task.id));
+    const incoming = validated.tasks.filter((task) => !existingIds.has(task.id));
+    const duplicates = validated.tasks.length - incoming.length;
+    if (!incoming.length) {
+      showToast(duplicates
+        ? 'Every task in that file already exists. Nothing was changed.'
+        : 'No valid tasks were found in that file. Nothing was changed.');
+      return;
+    }
+    state.tasks = state.tasks.concat(incoming);
+    const saved = persistTasks();
+    render();
+    const parts = [`${incoming.length} restored`];
+    if (duplicates) parts.push(`${duplicates} duplicate${duplicates === 1 ? '' : 's'} kept as your version`);
+    if (validated.rejectedCount > 0) parts.push(`${validated.rejectedCount} skipped as invalid`);
+    showToast(saved ? `Import finished — ${parts.join(', ')}.` : 'Import finished, but saving to this browser failed.');
+  }
+
+  function importTasks(file) {
+    if (typeof FileReader === 'undefined') {
+      showToast('Import is not available in this browser.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => applyImportedText(String(reader.result || ''));
+    reader.onerror = () => showToast('That backup file could not be read.');
+    reader.readAsText(file);
+  }
+
+  function scheduledFireTime(task) {
+    if (task.completed || !logic.isDateOnly(task.dueDate)) return null;
+    const lead = task.reminderLeadMinutes;
+    if (!logic.isReminderLead(lead) || lead === null) return null;
+    const [hour, minute] = logic.isTimeOnly(task.dueTime) ? task.dueTime.split(':').map(Number) : [9, 0];
+    const [year, month, day] = task.dueDate.split('-').map(Number);
+    const fire = new Date(year, month - 1, day, hour, minute);
+    fire.setMinutes(fire.getMinutes() - lead);
+    return fire;
+  }
+
+  function checkReminders() {
+    // Reminders are honest about what a web page can do: they appear as an
+    // on-page message while this tab is open, never as OS notifications.
+    const now = new Date();
+    const grace = 12 * 60 * 60 * 1000;
+    let changed = false;
+    for (const task of state.tasks) {
+      const fire = scheduledFireTime(task);
+      if (!fire) continue;
+      if (now < fire || (now - fire) > grace) continue;
+      const stamp = fire.toISOString();
+      if (task.reminderShownFire === stamp) continue;
+      task.reminderShownFire = stamp;
+      task.updatedAt = new Date().toISOString();
+      changed = true;
+      showToast(`Reminder: “${task.title}” is due.`, {
+        label: 'View list',
+        run: () => {
+          state.filter = 'all';
+          render();
+        }
+      });
+    }
+    if (changed) {
+      persistTasks();
+      render();
+    }
+  }
+
   function isTextField(target) {
     return Boolean(target && typeof target === 'object'
       && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
@@ -499,6 +686,10 @@
   function handleShortcut(event) {
     if (event.defaultPrevented) return;
     const search = $('#task-search');
+    if (event.key === 'Escape' && $('#edit-dialog').open) {
+      closeEditor();
+      return;
+    }
     if (event.key === 'Escape' && event.target === search) {
       if (search.value) clearSearch();
       else search.blur();
@@ -515,9 +706,14 @@
     }
   }
 
-  function syncTimeInput(dateInput, timeInput) {
-    timeInput.disabled = !logic.isDateOnly(dateInput.value);
+  function syncDueInputs(dateInput, timeInput, reminderSelect) {
+    const hasDate = logic.isDateOnly(dateInput.value);
+    timeInput.disabled = !hasDate;
     if (timeInput.disabled) timeInput.value = '';
+    if (reminderSelect) {
+      reminderSelect.disabled = !hasDate;
+      if (reminderSelect.disabled) reminderSelect.value = '';
+    }
   }
 
   function setUp() {
@@ -528,13 +724,21 @@
       $('#add-error').hidden = true;
       $('#new-title').removeAttribute('aria-invalid');
     });
-    $('#new-due-date').addEventListener('input', (event) => syncTimeInput(event.currentTarget, $('#new-due-time')));
+    $('#new-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#new-due-time'), $('#new-reminder')));
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
       render();
     });
     $('#clear-search').addEventListener('click', clearSearch);
     $('#empty-clear-search').addEventListener('click', clearSearch);
+    $('#clear-completed').addEventListener('click', clearCompleted);
+    $('#export-tasks').addEventListener('click', exportTasks);
+    $('#import-tasks').addEventListener('click', () => $('#import-file').click());
+    $('#import-file').addEventListener('change', (event) => {
+      const file = event.currentTarget.files && event.currentTarget.files[0];
+      event.currentTarget.value = '';
+      if (file) importTasks(file);
+    });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
       render();
@@ -545,7 +749,7 @@
       $('#edit-error').hidden = true;
       $('#edit-title').removeAttribute('aria-invalid');
     });
-    $('#edit-due-date').addEventListener('input', (event) => syncTimeInput(event.currentTarget, $('#edit-due-time')));
+    $('#edit-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#edit-due-time'), $('#edit-reminder')));
     $('#add-subtask').addEventListener('click', addSubtaskFromInput);
     $('#new-subtask').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -587,6 +791,10 @@
       if (!document.hidden) refreshIfLocalDayChanged();
     });
     scheduleNextDayRefresh();
+    if (typeof setInterval === 'function') {
+      state.reminderTimer = setInterval(checkReminders, 30000);
+      checkReminders();
+    }
   }
 
   setUp();
