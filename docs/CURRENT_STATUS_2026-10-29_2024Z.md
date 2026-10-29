@@ -19,7 +19,9 @@ Time-sensitive record for the Android press-feedback / motion branch. Verified l
 
 - Branch `feat/android-press-feedback-motion-20261029`, code commit
   `89117023acf31d810619bcfc1f67df1fe9722f01`, based on `05ac4201` (no rebase needed; `main` had not
-  moved at capture). The only later commit on the branch is this docs file.
+  moved at capture). Later commits on the branch are the documentation/measurement corrections in
+  `9605f9e` and this status file; they change no behaviour. Check the PR for the exact current head
+  and its CI, because this file cannot name a SHA that has not been pushed yet.
 - Scope, per the owner's selection: **motion + press feedback only**. No touch-target/a11y
   rework, no component dedup, no new features, no version bump, no tag.
 - Behaviour added:
@@ -38,7 +40,10 @@ Time-sensitive record for the Android press-feedback / motion branch. Verified l
     `ViewPropertyAnimator`, and reading `Settings.Global.ANIMATOR_DURATION_SCALE` here would
     double-apply it.
 
-## Checks actually run on head `89117023`
+## Checks actually run
+
+Run on `89117023` and re-run on the `9605f9e` tree (docs-only delta, no behaviour change) — the
+guard suite reported 106 `PASS` lines and exit 0 on the re-run.
 
 - `sh android-app/tools/check-v1-source.sh` — **PASS** (whole suite, including
   `check-press-feedback.py` 57 assertions, `bottom navigation` 29 assertions, and
