@@ -58,12 +58,18 @@ else
 fi
 expect_fail_after_removal check-web-mode-state.py "STATE_WEB_MODE"
 expect_fail_after_removal check-silent-catch.py "StartupDiagnostics.record("
+# Press feedback, haptics and easing must fail closed if the wiring is removed (issue #160 UI work).
+expect_fail_after_removal check-press-feedback.py "setInterpolator(MOTION_ENTER)"
+expect_fail_after_removal check-press-feedback.py "android.R.attr.state_focused"
+expect_fail_after_removal check-press-feedback.py "PressSurface.pressedFill(labelColor"
+expect_fail_after_removal check-press-feedback.py "hapticToggle(button, checked);"
+expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "openReliablePipeHelper(" "$PROVIDER" "$ROOT"
 
-for checker in check-text-scale.py check-window-insets.py check-web-mode-state.py check-silent-catch.py; do
+for checker in check-text-scale.py check-window-insets.py check-web-mode-state.py check-silent-catch.py check-press-feedback.py; do
   python3 "$ROOT/tools/$checker" >/dev/null
   echo "PASS meta: $checker passes on current source"
 done

@@ -20,6 +20,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -33,11 +34,15 @@ import android.text.InputFilter;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
@@ -134,6 +139,13 @@ public final class MainActivity extends Activity {
     private static final String BROWSER_LAST_URL_KEY = "last_validated_url";
     private static final String STATE_BROWSER_WEBVIEW = "state_browser_webview";
     private static final String STATE_BROWSER_LAST_URL = "state_browser_last_url";
+
+    // Chrome that leaves the viewport accelerates away; chrome that arrives decelerates into
+    // place. These chrome moves are short (a few tens of dp), so a linear ramp reads as a
+    // mechanical slide rather than an object settling. The system animator scale still divides
+    // the duration and these curves, so reduced-motion settings keep working unchanged.
+    private static final Interpolator MOTION_ENTER = new DecelerateInterpolator(1.6f);
+    private static final Interpolator MOTION_EXIT = new AccelerateInterpolator(1.4f);
 
     private final List<Task> tasks = new ArrayList<>();
     private final List<Task> lastSavedTasks = new ArrayList<>();
@@ -1668,7 +1680,7 @@ public final class MainActivity extends Activity {
             button.setMinimumHeight(dp(38));
             button.setTextSize(12 * textScale);
             button.setPadding(dp(10), 0, dp(10), 0);
-            button.setBackground(shape(palette.surfaceAlt, 22, palette.line));
+            button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
             params.setMargins(0, 0, dp(4), 0);
@@ -1930,7 +1942,7 @@ public final class MainActivity extends Activity {
         button.setMinimumHeight(dp(34));
         button.setTextSize(11 * textScale);
         button.setPadding(dp(9), 0, dp(9), 0);
-        button.setBackground(shape(palette.surfaceAlt, 22, palette.line));
+        button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
         button.setContentDescription("Search the current query with " + engine.label);
         button.setOnClickListener(view -> {
             if (!webMode) return;
@@ -1974,7 +1986,7 @@ public final class MainActivity extends Activity {
         button.setMinimumHeight(dp(34));
         button.setTextSize(11 * textScale);
         button.setPadding(dp(9), 0, dp(9), 0);
-        button.setBackground(shape(palette.surfaceAlt, 22, palette.line));
+        button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
         button.setContentDescription("Ask " + entry.label + " with the current search, or open its website if no question is entered");
         button.setOnClickListener(view -> {
             if (!webMode) return;
@@ -2222,14 +2234,15 @@ public final class MainActivity extends Activity {
             if (hidden) {
                 view.setVisibility(View.VISIBLE);
                 view.animate().translationY(hiddenOffset)
-                        .alpha(0f).setDuration(160L).withEndAction(() -> {
+                        .alpha(0f).setDuration(160L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
                             if (browserChromeHidden && webMode) view.setVisibility(View.GONE);
                         }).start();
             } else {
                 view.setVisibility(View.VISIBLE);
                 view.setTranslationY(hiddenOffset);
                 view.setAlpha(0f);
-                view.animate().translationY(0f).alpha(1f).setDuration(190L).start();
+                view.animate().translationY(0f).alpha(1f).setDuration(190L)
+                        .setInterpolator(MOTION_ENTER).start();
             }
         }
     }
@@ -4477,15 +4490,17 @@ public final class MainActivity extends Activity {
         if (topBarBrand != null) {
             topBarBrand.animate().cancel();
             if (hidden) {
-                topBarBrand.animate().alpha(0f).setDuration(120L).withEndAction(() -> {
-                    if (taskChromeHidden && !webMode && topBarBrand != null) {
-                        topBarBrand.setVisibility(View.GONE);
-                    }
-                }).start();
+                topBarBrand.animate().alpha(0f).setDuration(120L).setInterpolator(MOTION_EXIT)
+                        .withEndAction(() -> {
+                            if (taskChromeHidden && !webMode && topBarBrand != null) {
+                                topBarBrand.setVisibility(View.GONE);
+                            }
+                        }).start();
             } else {
                 topBarBrand.setVisibility(View.VISIBLE);
                 topBarBrand.setAlpha(0f);
-                topBarBrand.animate().alpha(1f).setDuration(180L).start();
+                topBarBrand.animate().alpha(1f).setDuration(180L)
+                        .setInterpolator(MOTION_ENTER).start();
             }
         }
         if (topBarMark != null && topBarMark.getLayoutParams() instanceof LinearLayout.LayoutParams) {
@@ -4503,7 +4518,7 @@ public final class MainActivity extends Activity {
         if (hidden) {
             sharedComposer.setVisibility(View.VISIBLE);
             sharedComposer.animate().translationY(-reserve)
-                    .alpha(0f).setDuration(180L).withEndAction(() -> {
+                    .alpha(0f).setDuration(180L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
                         if (taskChromeHidden && !webMode) {
                             sharedComposer.setVisibility(View.GONE);
                             // The weighted ScrollView grows by exactly this much once the composer
@@ -4518,7 +4533,8 @@ public final class MainActivity extends Activity {
             sharedComposer.setVisibility(View.VISIBLE);
             sharedComposer.setTranslationY(-reserve);
             sharedComposer.setAlpha(0f);
-            sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L).start();
+            sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L)
+                    .setInterpolator(MOTION_ENTER).start();
         }
     }
 
@@ -4589,7 +4605,7 @@ public final class MainActivity extends Activity {
         target.setAlpha(0f);
         target.setTranslationY(enteringWeb ? dp(10) : -dp(6));
         target.animate().alpha(1f).translationY(0f)
-                .setDuration(180L).start();
+                .setDuration(180L).setInterpolator(MOTION_ENTER).start();
     }
 
     private void setBrowserOnlineEnabled(boolean enabled) {
@@ -4990,6 +5006,7 @@ public final class MainActivity extends Activity {
             quickCaptureInput.setError("Type a task first");
             captureFeedback.setText("Type a task in the box above, or choose Add with a date or priority.");
             quickCaptureInput.requestFocus();
+            haptic(quickCaptureInput, HapticFeedbackConstants.REJECT);
             return;
         }
         SmartTaskDraft draft = parseSmartTaskDraft(rawTitle);
@@ -4998,6 +5015,7 @@ public final class MainActivity extends Activity {
             quickCaptureInput.setError("Type a task first");
             captureFeedback.setText("Type a task in the box above, or choose Add with a date or priority.");
             quickCaptureInput.requestFocus();
+            haptic(quickCaptureInput, HapticFeedbackConstants.REJECT);
             return;
         }
         try {
@@ -5005,6 +5023,7 @@ public final class MainActivity extends Activity {
             quickCaptureInput.setText("");
             quickCaptureInput.setError(null);
             captureFeedback.setText("Task added" + (draft.dueDate == null ? "" : " with " + dueLabelForDate(draft.dueDate)) + " and " + draft.priority + " priority. Tap Edit for more options.");
+            haptic(quickCaptureInput, HapticFeedbackConstants.CONFIRM);
             render();
             saveTasksAsync();
             showToast("Task added.");
@@ -5071,7 +5090,7 @@ public final class MainActivity extends Activity {
         });
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(6), dp(7), dp(6), dp(7));
-        row.setBackground(shape(palette.surface, 20, palette.line));
+        row.setBackground(pressable(palette.surface, 20, palette.line, palette.muted));
         row.setElevation(dp(1));
         row.setContentDescription("Task: " + task.title
                 + ". Swipe right to toggle completion; swipe left for task actions.");
@@ -5168,6 +5187,7 @@ public final class MainActivity extends Activity {
 
         checkBox.setOnCheckedChangeListener((button, checked) -> {
             if (!canEdit() || checked == task.completed) return;
+            hapticToggle(button, checked);
             replaceTask(TaskLogic.toggleCompleted(task));
             render();
             saveTasksAsync();
@@ -5239,7 +5259,14 @@ public final class MainActivity extends Activity {
                 float dx = event.getX() - downX;
                 if (Math.abs(dx) > dp(48)) {
                     consumedSwipe = true;
-                    if (listener != null && canEdit()) listener.accept(dx > 0 ? 1 : -1);
+                    if (listener != null && canEdit()) {
+                        haptic(this, HapticFeedbackConstants.CONFIRM);
+                        listener.accept(dx > 0 ? 1 : -1);
+                    } else if (listener != null) {
+                        // A swipe that cannot be stored has to say so. Without this the row snaps
+                        // back with no explanation while the encrypted task store is unavailable.
+                        haptic(this, HapticFeedbackConstants.REJECT);
+                    }
                 }
                 performClick();
                 return true;
@@ -6605,6 +6632,7 @@ public final class MainActivity extends Activity {
         pendingAttachmentCleanupExpired = false;
         undoMessage.setText("Task deleted.");
         undoBar.setVisibility(View.VISIBLE);
+        haptic(undoButton, HapticFeedbackConstants.CONFIRM);
         // Bring focus to Undo so screen-reader and keyboard users can act on the
         // seven-second recovery window without having to find the control.
         undoButton.requestFocus();
@@ -6640,6 +6668,9 @@ public final class MainActivity extends Activity {
         pendingAttachmentCleanupSaved = false;
         pendingAttachmentCleanupExpired = false;
         pendingDeletedTask = null;
+        // Buzz before the bar disappears: the button the user just tapped must still be the
+        // visible, attached view carrying the confirmation.
+        haptic(undoButton, HapticFeedbackConstants.CONFIRM);
         hideUndoBar();
         render();
         saveTasksAsync();
@@ -7338,7 +7369,7 @@ public final class MainActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(12), dp(10), dp(12), dp(10));
-        row.setBackground(shape(palette.surface, 16, palette.line));
+        row.setBackground(pressable(palette.surface, 16, palette.line, palette.muted));
         row.setClickable(true);
         row.setFocusable(true);
         row.setContentDescription(title + ". " + subtitle);
@@ -7981,7 +8012,8 @@ public final class MainActivity extends Activity {
         button.setTextColor(palette.dark ? palette.background : Color.WHITE);
         button.setMinHeight(dp(50));
         button.setMinimumHeight(dp(50));
-        button.setBackground(shape(palette.accent, 22, palette.accent));
+        button.setBackground(pressable(palette.accent, 22, palette.accent,
+                palette.dark ? palette.background : Color.WHITE));
         return button;
     }
 
@@ -7994,7 +8026,7 @@ public final class MainActivity extends Activity {
         button.setMinHeight(dp(48));
         button.setMinimumHeight(dp(48));
         button.setPadding(dp(8), 0, dp(8), 0);
-        button.setBackground(shape(palette.accentSoft, 22, palette.line));
+        button.setBackground(pressable(palette.accentSoft, 22, palette.line, palette.accent));
         return button;
     }
 
@@ -8007,8 +8039,10 @@ public final class MainActivity extends Activity {
         button.setMinimumHeight(dp(48));
         button.setMinimumWidth(dp(60));
         button.setPadding(dp(5), 0, dp(5), 0);
-        button.setTextColor(danger ? palette.danger : palette.accent);
-        button.setBackground(shape(danger ? palette.dangerSoft : palette.surfaceAlt, 9, palette.line));
+        int labelColor = danger ? palette.danger : palette.accent;
+        int fillColor = danger ? palette.dangerSoft : palette.surfaceAlt;
+        button.setTextColor(labelColor);
+        button.setBackground(pressable(fillColor, 9, palette.line, labelColor));
         return button;
     }
 
@@ -8036,6 +8070,57 @@ public final class MainActivity extends Activity {
         drawable.setCornerRadius(dp(radiusDp));
         drawable.setStroke(dp(1), stroke);
         return drawable;
+    }
+
+    /**
+     * Background for a surface the user can actually act on: the resting appearance plus a press
+     * state. Before this, every tappable card and button was a flat {@link GradientDrawable} that
+     * looked identical under a finger, so a tap produced no visible confirmation.
+     *
+     * <p>The pressed appearance brightens the border to the accent and tints the fill by as much as
+     * {@code labelColor} can absorb without dropping below the palette's 4.5:1 guarantee — see
+     * {@link PressSurface}. Surfaces carrying a low-contrast label (for example a muted subtitle on
+     * a card) keep their exact fill and are distinguished by the border alone.
+     *
+     * @param fillColor  resting fill of the surface
+     * @param radiusDp   corner radius shared with {@link #shape(int, int, int)}
+     * @param strokeColor resting border color
+     * @param labelColor  the weakest text color drawn on this surface
+     */
+    private StateListDrawable pressable(int fillColor, int radiusDp, int strokeColor, int labelColor) {
+        int pressedFill = PressSurface.pressedFill(labelColor, fillColor, palette.dark,
+                highContrast ? PressSurface.HIGH_CONTRAST_ALPHA : PressSurface.PREFERRED_ALPHA);
+        StateListDrawable states = new StateListDrawable();
+        // Pressed and focused share the active appearance: focus is the same confirmation for a
+        // keyboard or D-pad user. state_selected is deliberately absent — a selected-but-idle row
+        // would otherwise sit in its pressed look permanently.
+        int[] active = { android.R.attr.state_pressed, android.R.attr.state_focused };
+        for (int state : active) {
+            states.addState(new int[] { state }, shape(pressedFill, radiusDp, palette.accent));
+        }
+        states.addState(new int[] {}, shape(fillColor, radiusDp, strokeColor));
+        return states;
+    }
+
+    /**
+     * Touch confirmation for actions that commit, toggle, or refuse a change to saved data. The
+     * framework applies the device's own touch-feedback setting, so this stays silent when the user
+     * has disabled haptics.
+     *
+     * <p>The semantic kinds only exist from API 29 and {@code minSdk} is 26, so older releases fall
+     * back to {@link HapticFeedbackConstants#LONG_PRESS} — the oldest non-deprecated constant that
+     * still reads as a deliberate confirmation rather than a keypress.
+     */
+    private void haptic(View source, int modernKind) {
+        if (source == null) return;
+        source.performHapticFeedback(Build.VERSION.SDK_INT >= 29
+                ? modernKind : HapticFeedbackConstants.LONG_PRESS);
+    }
+
+    /** Completion is a switch, so it gets the switch kinds rather than a generic click. */
+    private void hapticToggle(View source, boolean nowCompleted) {
+        haptic(source, nowCompleted
+                ? HapticFeedbackConstants.TOGGLE_ON : HapticFeedbackConstants.TOGGLE_OFF);
     }
 
     private LinearLayout.LayoutParams bottomMargin(int value) {
