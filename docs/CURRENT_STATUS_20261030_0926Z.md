@@ -26,7 +26,7 @@
 2. Add task-page start/pause/resume/finish controls and wire timer persistence, notification updates/cancellation and permission UX. The engine/store/notification adapter are foundations, not an end-to-end UI.
 3. Responsive Tasks Home and focus-panel integration are blocked by #346 ownership of `MainActivity.java`. The current task list is still a vertical list.
 4. After #352 lands, rebase/retarget #354 onto current main and rerun all required exact-head checks.
-5. Physical Android 16 OEM chip behavior, Android 8–15 rendering, notification permission denial, process death/reboot, real reminder actions, responsive layouts, TalkBack and owner-device data preservation remain NOT TESTED.
+5. AndroidKeyStore/AtomicFile runtime round-trip for the new focus-session adapter, physical Android 16 OEM chip behavior, Android 8–15 rendering, notification permission denial, process death/reboot, real reminder actions, responsive layouts, TalkBack and owner-device data preservation remain NOT TESTED.
 6. No APK/AAB publication, merge, tag, version bump, signing change or release authorization occurred.
 
 ---
