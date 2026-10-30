@@ -27,7 +27,7 @@ public final class TaskFocusTimerSmoke {
         TaskFocusTimer resumed = paused.resume(30_000);
         check(resumed.elapsedMsAt(32_500) == 8_000, "resume continues from the accumulated elapsed time");
         TaskFocusTimer finished = resumed.finish(35_000);
-        check(finished.isFinished() && finished.elapsedMsAt(99_000) == 13_000,
+        check(finished.isFinished() && finished.elapsedMsAt(99_000) == 10_500,
                 "finished stopwatch is frozen");
         check(finished.taskId().equals("task-1"), "timer retains task identity");
         check(!finished.isCountdown(), "stopwatch does not pretend to have bounded progress");
@@ -72,15 +72,15 @@ public final class TaskFocusTimerSmoke {
     private static void rebootRestoreUsesBoundedWallClockDelta() {
         TaskFocusTimer timer = TaskFocusTimer.start("task-4", TaskFocusTimer.Mode.STOPWATCH, 0, 1_000);
         TaskFocusTimer.SavedState saved = timer.save(61_000, 10_000_000, 8);
-        TaskFocusTimer restored = TaskFocusTimer.restore(saved, 500, 13_000_000, 9);
+        TaskFocusTimer restored = TaskFocusTimer.restore(saved, 500, 10_180_000, 9);
         check(restored.isRunning(), "known reboot keeps a running stopwatch active");
-        check(restored.elapsedMsAt(500) == 181_000,
+        check(restored.elapsedMsAt(500) == 240_000,
                 "reboot downtime is included using wall time when boot count changes");
 
         TaskFocusTimer.SavedState longGap = timer.save(61_000, 10_000_000, 8);
         TaskFocusTimer bounded = TaskFocusTimer.restore(longGap, 500,
                 10_000_000 + TaskFocusTimer.MAX_REBOOT_GAP_MS * 2, 9);
-        check(bounded.elapsedMsAt(500) == 61_000 + TaskFocusTimer.MAX_REBOOT_GAP_MS,
+        check(bounded.elapsedMsAt(500) == 60_000 + TaskFocusTimer.MAX_REBOOT_GAP_MS,
                 "reboot wall-clock jumps are bounded");
     }
 
