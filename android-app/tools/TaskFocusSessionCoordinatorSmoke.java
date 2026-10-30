@@ -348,7 +348,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         if (!condition) throw new AssertionError(message);
     }
 
-    private static void expectIllegalState(Runnable action, String message) {
+    private static void expectIllegalState(ThrowingAction action, String message) throws Exception {
         assertions++;
         try {
             action.run();
