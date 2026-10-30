@@ -51,7 +51,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-boot-timeout: 600
+          working-directory: android-app
           script: |
-            cd android-app
             chmod +x gradlew
             ./gradlew --no-daemon connectedGithubSideloadDebugAndroidTest
