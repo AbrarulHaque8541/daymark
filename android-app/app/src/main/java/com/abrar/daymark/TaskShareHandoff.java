@@ -27,7 +27,7 @@ final class TaskShareHandoff {
     static Intent createAttachmentIntent(String authority, Task task,
                                           List<AttachmentRef> selected,
                                           AndroidAttachmentStore store) {
-        if (authority == null || authority.trim().isEmpty() || authority.contains("/")
+        if (authority == null || authority.trim().isEmpty() || !authority.matches("[A-Za-z0-9_.]+")
                 || task == null || selected == null || selected.isEmpty()
                 || selected.size() > AttachmentLogic.MAX_PER_TASK || store == null) {
             throw new IllegalArgumentException("Select one or more valid task attachments.");
@@ -72,7 +72,7 @@ final class TaskShareHandoff {
     private static AttachmentRef findOwnedAttachment(Task task, AttachmentRef selected) {
         if (selected == null || task.attachments == null) return null;
         for (AttachmentRef owned : task.attachments) {
-            if (owned != null && owned.id.equals(selected.id)
+            if (AttachmentLogic.isValid(owned) && owned.id.equals(selected.id)
                     && owned.displayName.equals(selected.displayName)
                     && owned.mimeType.equals(selected.mimeType)
                     && owned.sizeBytes == selected.sizeBytes) return owned;
