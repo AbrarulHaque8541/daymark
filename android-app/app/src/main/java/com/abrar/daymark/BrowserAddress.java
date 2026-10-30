@@ -89,7 +89,7 @@ final class BrowserAddress {
         if (value.length() > MAX_INPUT_LENGTH) {
             throw new IllegalArgumentException("Web searches and addresses can be at most 2048 characters.");
         }
-        if (looksLikeBareDomain(value)) return requireAllowedWebUrl("https://" + value);
+        if (looksLikeBareDomain(value)) return requireAllowedWebUrl(BrowserHttpPolicy.resolveBareDomain(value));
         if (SCHEME.matcher(value).find()) return requireAllowedWebUrl(value);
         return (engine == null ? SearchEngine.DUCKDUCKGO : engine).searchUrl(value);
     }
@@ -105,11 +105,15 @@ final class BrowserAddress {
         try {
             URI uri = new URI(toAsciiHostUrl(candidate));
             String scheme = uri.getScheme();
-            if ("http".equalsIgnoreCase(scheme)) {
-                throw new IllegalArgumentException("HTTP is blocked. Use HTTPS; a per-site HTTP exception requires a separate explicit request.");
-            }
-            if (scheme == null || !"https".equalsIgnoreCase(scheme)) {
-                throw new IllegalArgumentException("Only HTTPS pages are supported. A per-site HTTP exception requires a separate explicit request.");
+            // HTTP and HTTPS are both allowed in the browser (BrowserHttpPolicy.ALLOW_HTTP).
+            // HTTP pages are labelled "Not encrypted" in the UI via BrowserHttpPolicy.securityLabel().
+            // Updater and other app network clients remain HTTPS-only (separate code path).
+            if (!BrowserHttpPolicy.isAllowedWebScheme(candidate)) {
+                if ("http".equalsIgnoreCase(scheme)) {
+                    // unreachable when ALLOW_HTTP=true, but kept for policy-toggle safety
+                    throw new IllegalArgumentException("HTTP is currently blocked. Use HTTPS.");
+                }
+                throw new IllegalArgumentException("Only HTTP and HTTPS pages are supported in the browser.");
             }
             if (uri.getRawUserInfo() != null) {
                 throw new IllegalArgumentException("Enter a valid web address without embedded credentials.");
@@ -120,13 +124,13 @@ final class BrowserAddress {
             }
             int port = uri.getPort();
             if (port == 0 || port > 65535) {
-                throw new IllegalArgumentException("Enter a valid HTTPS port between 1 and 65535.");
+                throw new IllegalArgumentException("Enter a valid port between 1 and 65535.");
             }
             return uri.normalize().toASCIIString();
         } catch (IllegalArgumentException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new IllegalArgumentException("Enter a valid HTTPS web address.");
+            throw new IllegalArgumentException("Enter a valid web address.");
         }
     }
 
@@ -168,15 +172,6 @@ final class BrowserAddress {
         return BARE_DOMAIN.matcher(hostPart).matches() && hostPart.toLowerCase(Locale.ROOT).contains(".");
     }
 
-    /**
-     * Turns the authority's host into ASCII (punycode) before {@link URI} parsing, so
-     * non-Latin addresses such as "मेरा-साइट.in" or "例え.jp" are navigable instead of
-     * being rejected as invalid. The address bar then shows the punycode form, which is
-     * the honest, unambiguous representation of an internationalized domain.
-     *
-     * <p>Returns the input unchanged when the authority is already ASCII, carries
-     * userinfo (that is rejected later with its own message), or is an IPv6 literal.
-     */
     private static String toAsciiHostUrl(String candidate) {
         int schemeEnd = candidate.indexOf("://");
         if (schemeEnd < 0) return candidate;
@@ -210,7 +205,6 @@ final class BrowserAddress {
                 + candidate.substring(authorityEnd);
     }
 
-    /** Punycode form of a host, or null when the label sequence is not a valid IDN. */
     private static String idnToAscii(String host) {
         try {
             String ascii = IDN.toASCII(host, IDN.ALLOW_UNASSIGNED);
