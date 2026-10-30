@@ -23,6 +23,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Task.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NaturalLanguageTaskParse.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskDuePresets.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskTemplate.java" \
@@ -52,6 +53,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubReleaseClient.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubApkDownloader.java" \
   "$ROOT/tools/TaskLogicSmoke.java" \
+  "$ROOT/tools/ReminderSchedulePolicySmoke.java" \
   "$ROOT/tools/ScrollThemeColorSmoke.java" \
   "$ROOT/tools/ScrollChromeReserveSmoke.java" \
   "$ROOT/tools/PressSurfaceSmoke.java" \
@@ -68,6 +70,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/UpdaterSmoke.java" \
   "$ROOT/tools/GitHubTransportSmoke.java" \
   "$ROOT/tools/BrowserAddressSmoke.java" \
+  "$ROOT/tools/BrowserExternalLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserLogPolicySmoke.java" \
   "$ROOT/tools/BrowserNetworkPolicySmoke.java" \
   "$ROOT/tools/BrowserMediaPolicySmoke.java" \
@@ -80,6 +83,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserCookieImportSmoke.java" \
   "$ROOT/tools/CosmeticFilterToCssSmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollChromeReserveSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.PressSurfaceSmoke
@@ -95,6 +99,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExtensionSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExternalLinkPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserLogPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserNetworkPolicySmoke "$ROOT/../contracts/browser-network-policy.tsv"

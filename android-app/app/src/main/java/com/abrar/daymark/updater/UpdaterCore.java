@@ -43,6 +43,7 @@ public final class UpdaterCore {
         NETWORK_POLICY,
         HTTP,
         INVALID_METADATA,
+        INCOMPATIBLE_INSTALL,
         DOWNLOAD,
         CANCELLED,
         APK_MISMATCH,
@@ -178,7 +179,8 @@ public final class UpdaterCore {
     public static CheckResult check(ReleaseClient client, String installedApplicationId,
             long installedVersionCode) throws UpdateException {
         if (!APPLICATION_ID.equals(installedApplicationId)) {
-            throw invalid("Running package ID is not the Daymark application ID.");
+            throw new UpdateException(Failure.INCOMPATIBLE_INSTALL,
+                    "This installed Daymark package is not update-compatible with the current release channel. Keep this app installed; do not uninstall it to update.");
         }
         final Release release = client.fetchLatestStable();
         if (release == null || release.draft || release.prerelease) return CheckResult.noUpdate();
