@@ -1,5 +1,3 @@
-package com.abrar.daymark;
-
 /** Host smoke tests for origin-only browser Logcat redaction. */
 public final class BrowserLogPolicySmoke {
     public static void main(String[] args) {
@@ -14,7 +12,7 @@ public final class BrowserLogPolicySmoke {
         assert BrowserLogPolicy.redactedOrigin("https://example.com:8443/path?q=secret")
                 .equals("https://example.com:8443");
         assert BrowserLogPolicy.redactedOrigin("http://example.com/path?q=secret")
-                .equals("(no HTTPS origin)") : "insecure origins must not enter browser diagnostics";
+                .equals("http://example.com") : "HTTP origins must be redacted to origin-only form";
         assert BrowserLogPolicy.redactedOrigin(null).equals("(no HTTPS origin)");
         assert BrowserLogPolicy.redactedOrigin("not a URL with private search text")
                 .equals("(no HTTPS origin)");
