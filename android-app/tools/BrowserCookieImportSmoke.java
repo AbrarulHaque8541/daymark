@@ -61,8 +61,10 @@ public final class BrowserCookieImportSmoke {
                 .cookies.isEmpty();
         assert BrowserCookieImport.parse("example.com\tFALSE\t/\tFALSE\t0\tbad;name\tv")
                 .cookies.isEmpty();
-        assert BrowserCookieImport.parse(".example.com\tFALSE\t/\tFALSE\t0\tn\tv")
-                .cookies.isEmpty();
+        BrowserCookieImport.ParseResult dottedHostOnly = BrowserCookieImport.parse(
+                ".example.com\tFALSE\t/\tFALSE\t0\tn\tv");
+        assert dottedHostOnly.cookies.size() == 1;
+        assert !dottedHostOnly.cookies.get(0).includeSubdomains;
         assert BrowserCookieImport.parse("example.com\tFALSE\t/\tFALSE\t253402300800\tn\tv")
                 .cookies.isEmpty();
 
