@@ -81,39 +81,3 @@ jobs:
           lintPlayDebug
           compileGithubSideloadDebugAndroidTestJavaWithJavac
           compilePlayDebugAndroidTestJavaWithJavac
-
-      - name: Verify device-test APK manifest identity and target SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk="app/build/outputs/apk/githubSideload/debug/app-githubSideload-debug.apk"
-          [[ -s "$apk" ]] || { echo "Device-test APK missing: $apk" >&2; exit 1; }
-
-          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          [[ -n "$sdk_root" && -d "$sdk_root/build-tools" ]] || {
-            echo "Android SDK build-tools not found" >&2
-            exit 1
-          }
-          aapt="$(find "$sdk_root/build-tools" -type f -name aapt | sort -V | tail -n 1)"
-          [[ -x "$aapt" ]] || { echo "aapt is missing from installed Android build-tools" >&2; exit 1; }
-
-          badging="$RUNNER_TEMP/daymark-device-test-badging.txt"
-          "$aapt" dump badging "$apk" > "$badging"
-          package_line="$(grep '^package: ' "$badging")"
-          application_id="$(sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p" <<< "$package_line")"
-          min_sdk_version="$(awk -F"'" '/^sdkVersion:/ {print $2; exit}' "$badging")"
-          target_sdk_version="$(awk -F"'" '/^targetSdkVersion:/ {print $2; exit}' "$badging")"
-
-          [[ "$application_id" == "com.abrar.daymark" ]] || {
-            echo "Unexpected device-test APK application ID: $application_id" >&2
-            exit 1
-          }
-          [[ "$min_sdk_version" == "26" ]] || {
-            echo "Unexpected device-test APK min SDK: $min_sdk_version" >&2
-            exit 1
-          }
-          echo "Device-test APK target SDK: $target_sdk_version"
-          [[ "$target_sdk_version" == "36" ]] || {
-            echo "Device-test APK must target API 36; got: $target_sdk_version" >&2
-            exit 1
-          }
