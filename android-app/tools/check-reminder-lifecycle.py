@@ -1,54 +1,107 @@
 #!/usr/bin/env python3
-"""Guard at-least-once in-app reminder presentation across Activity lifecycle failures."""
+"""Guard reminder delivery, snooze durability, notification reconciliation and instrumentation startup."""
 from pathlib import Path
 import sys
 
 root = Path(sys.argv[1])
 activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+instrumentation = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java").read_text(encoding="utf-8")
+receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java").read_text(encoding="utf-8")
+scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
+policy = (root / "app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java").read_text(encoding="utf-8")
+core_runner = (root / "tools/run-core-tests.sh").read_text(encoding="utf-8")
+
+# The custom Instrumentation must explicitly start its worker thread from onCreate.
+assert "public void onCreate(Bundle arguments)" in instrumentation
+assert "super.onCreate(arguments);" in instrumentation
+assert 'marker("instrumentation onCreate; dispatching start()");' in instrumentation
+assert "start();" in instrumentation.split("public void onCreate(Bundle arguments)", 1)[1].split("public void onStart()", 1)[0]
+
+# In-app reminder is consumed only after the dialog is actually visible.
 method = activity.split("private void checkDueReminders()", 1)[1].split(
     "private void showTaskActions", 1
 )[0]
-assert "reminderDialog.setOnShowListener" in method, "shown marker must be deferred until the dialog is visible"
+assert "reminderDialog.setOnShowListener" in method
 listener = method.split("reminderDialog.setOnShowListener", 1)[1].split("try {", 1)[0]
-assert "replaceTask(current.withReminderShown" in listener, "only a shown reminder may be marked as shown"
-assert "if (changed) saveTasksAsync()" in listener, "shown state must be persisted after display"
-assert "replaceTask(task.withReminderShown" not in method, "do not consume reminders before attempting display"
-assert "reminderDialog.show()" in method, "the due reminder dialog must still be displayed"
-assert "Reminder could not be shown. It will be retried the next time you open Daymark." in method, \
-    "failed presentation must tell the user the reminder remains eligible for retry"
-assert "TaskLogic.reminderFireInstant(current, zone)" in listener, "re-check current task state before marking shown"
-assert "rescheduleTaskReminders();" in method, "opening the app must reschedule OS notification alarms"
-assert "advanceRepeatingTasksWithoutReminders();" in method, "passive repeating tasks must roll forward without a reminder dialog"
-assert "TaskLogic.advanceRepeat(current, zone, shownAt)" in listener, "a shown repeating reminder must advance to the next occurrence"
-assert "TaskReminderScheduler.rescheduleAll(this, tasks);" in activity, "OS alarms must be rescheduled from the activity after task changes"
-assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity.this);" in activity, "notification permission must be requested only when a reminder is enabled"
+assert "replaceTask(current.withReminderShown" in listener
+assert "if (changed) saveTasksAsync()" in listener
+assert "replaceTask(task.withReminderShown" not in method
+assert "reminderDialog.show()" in method
+assert "Reminder could not be shown. It will be retried the next time you open Daymark." in method
+assert "TaskLogic.reminderFireInstant(current, zone)" in listener
+assert "rescheduleTaskReminders();" in method
+assert "advanceRepeatingTasksWithoutReminders();" in method
+assert "TaskLogic.advanceRepeat(current, zone, shownAt)" in listener
+assert "TaskReminderScheduler.rescheduleAll(this, tasks);" in activity
+assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity.this);" in activity
 
-# Snooze must only re-arm the existing alarm slot; touching the encrypted store from the
-# receiver would race the open activity's snapshot writes.
-receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java").read_text(encoding="utf-8")
-scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
-assert 'static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";' in receiver, \
-    "the snooze action needs a stable name"
-assert "if (ACTION_SNOOZE.equals(action)) {" in receiver, "the receiver must branch on the snooze action"
-assert ".setAction(ACTION_SNOOZE)" in receiver, "the snooze PendingIntent must carry the snooze action"
-assert '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' in receiver, \
-    "the notification must offer the snooze action"
-assert "PendingIntent.FLAG_IMMUTABLE" in receiver, "notification PendingIntents must be immutable"
-assert "static final int SNOOZE_MINUTES = 10;" in scheduler, "snooze delay must be ten minutes"
-assert "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt," in scheduler, \
-    "snooze must use the same inexact alarm API as reminders, not exact alarms"
-snooze_method = receiver.split("private void snoozeReminder", 1)[1].split(
-    "private void rescheduleAfterBoot", 1
+# Snooze is a durable override tied to one exact base occurrence, not a fire-time mismatch.
+assert 'static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";' in receiver
+assert "if (ACTION_SNOOZE.equals(action)) {" in receiver
+assert ".setAction(ACTION_SNOOZE)" in receiver
+assert 'static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";' in receiver
+assert "if (ACTION_DISMISS.equals(action))" in receiver
+assert 'new Notification.BigTextStyle()' in receiver
+assert "Notification.VISIBILITY_PRIVATE" in receiver
+assert "Notification.CATEGORY_REMINDER" in receiver
+assert '"Dismiss", dismiss' in receiver
+assert "expectedId != notificationId" in receiver
+assert "private void dismissReminder(Context context, Intent intent)" in receiver
+assert "notificationManager.cancel(notificationId)" not in receiver.split("private void dismissReminder", 1)[1].split("private void snoozeReminder", 1)[0],     "dismiss must validate the task's canonical ID before clearing a notification"
+assert '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' in receiver
+assert "PendingIntent.FLAG_IMMUTABLE" in receiver
+assert "static final int SNOOZE_MINUTES = 10;" in scheduler
+assert "ReminderSchedulePolicy.encodeSnooze(baseFireText, snoozeFire)" in scheduler
+assert "preferences.edit().putString(key, record).commit()" in scheduler
+assert "ReminderSchedulePolicy.scheduledFire(" in scheduler
+assert "ReminderSchedulePolicy.acceptsFire(" in receiver
+assert "ReminderSchedulePolicy.isSnoozedFire(" in receiver
+assert "TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire)" in receiver
+show_method = receiver.split("private void showReminder", 1)[1].split(
+    "private Task findValidReminderTask", 1
 )[0]
-assert "notificationManager.cancel(notificationId);" in snooze_method, \
-    "snoozing must clear the fired notification first"
-assert "TaskReminderScheduler.snooze(context, notificationId, taskId, title);" in snooze_method, \
-    "snoozing must re-arm the alarm slot"
-assert "EncryptedTaskStore" not in snooze_method, \
-    "the snooze path must not write the task store from a BroadcastReceiver"
-snooze_scheduler = scheduler.split("static void snooze(", 1)[1].split("static void rescheduleAll", 1)[0]
-assert "PendingIntent.getBroadcast(context, requestCode, intent," in snooze_scheduler, \
-    "snooze must reuse the task's request code so a later cancel or reschedule replaces it"
-assert "PendingIntent.FLAG_UPDATE_CURRENT" in snooze_scheduler, \
-    "snooze must replace the fired alarm instead of adding a second one"
-print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, snooze re-arms only the alarm slot")
+assert "String title =" not in show_method, "alarm extras must not override or gate on the current encrypted task title"
+assert "currentTask.title" in show_method
+assert "putExtra(EXTRA_FIRE_INSTANT, fireInstant)" in receiver
+snooze_method = receiver.split("private void snoozeReminder", 1)[1].split(
+    "private void cancelNotification", 1
+)[0]
+assert "findValidReminderTask(context, taskId, baseFire)" in snooze_method
+assert "TaskReminderScheduler.getNotificationId(context, taskId)" in snooze_method
+assert "if (TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire))" in snooze_method
+assert "notificationManager.cancel(notificationId);" not in snooze_method,     "a visible notification must remain if its snooze alarm could not be persisted/armed"
+
+# One canonical request-code index owns both alarms and notification IDs; no mirrored index.
+assert 'private static final String CODE_PREFERENCES = "daymark.reminder.codes.v1";' in scheduler
+assert "NOTIFICATION_PREFERENCES" not in scheduler
+assert "static Integer getNotificationId(Context context, String taskId)" in scheduler
+assert "codes.getAll().get(taskId)" in scheduler
+assert "private static Integer parsePositiveId(Object value)" in scheduler
+assert "reconcileActiveNotifications(context, alarmManager, notificationManager, codes, known, liveTasks);" in scheduler
+assert "manager.getActiveNotifications()" in scheduler
+assert "baseFireText.equals(postedFire)" in scheduler
+assert "manager.cancel(posted.getId())" in scheduler
+assert "cancelAlarm(context, alarmManager, taskId, posted.getId())" in scheduler
+assert "known.put(taskId, String.valueOf(posted.getId()))" in scheduler,     "valid active notifications must recover a lost request-code index"
+assert "TaskReminderReceiver.refreshPostedNotification(" in scheduler
+assert "if (alarmManager == null)" in scheduler
+assert "AlarmManager is unavailable; in-app reminder remains available." in scheduler
+assert "private static final String SNOOZE_KEY_PREFIX = \"snooze.\";" in scheduler
+assert "for (String key : reminderPreferences.getAll().keySet())" in scheduler
+assert "liveTasks.containsKey(key.substring(SNOOZE_KEY_PREFIX.length()))" in scheduler
+assert "valid active notification recovers a lost canonical ID index" in instrumentation
+
+# Policy is independently compiled and executed in the canonical host test suite.
+assert "ReminderSchedulePolicy.java" in core_runner
+assert "ReminderSchedulePolicySmoke.java" in core_runner
+assert "com.abrar.daymark.ReminderSchedulePolicySmoke" in core_runner
+assert "postTestReminder(manager, context, notificationId, task, fire.toString())" in instrumentation
+assert "valid active notification recovers a lost canonical ID index" in instrumentation
+assert "TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString())" in instrumentation
+assert "app rescheduling preserves a valid snooze instead of overwriting it" in instrumentation
+assert "due-date edit invalidates the previous occurrence's snooze" in instrumentation
+assert "deleted task even when its ID index is missing" in instrumentation
+assert "malformed request-code preference is repaired without aborting other reminders" in instrumentation
+assert "notification reconciliation still runs when AlarmManager is unavailable" in instrumentation
+
+print("PASS reminder lifecycle guards: visible-only consumption, runner startup, canonical IDs, stale-notification recovery, durable occurrence-bound snooze and host regression coverage")

@@ -111,6 +111,21 @@ final class DaymarkWebView extends WebView {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (request == null || request.getUrl() == null) return true;
                 String url = request.getUrl().toString();
+                String scheme = request.getUrl().getScheme();
+                if (BrowserAddress.shouldHandOffExternalScheme(request.isForMainFrame(),
+                        request.hasGesture(), scheme)) {
+                    try {
+                        android.content.Intent external = new android.content.Intent(
+                                android.content.Intent.ACTION_VIEW, request.getUrl());
+                        external.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
+                        external.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                        view.getContext().startActivity(external);
+                    } catch (android.content.ActivityNotFoundException
+                             | SecurityException unavailable) {
+                        listener.onNavigationBlocked(url);
+                    }
+                    return true;
+                }
                 if ("daymark-download".equalsIgnoreCase(request.getUrl().getScheme())) {
                     String mediaUrl = request.getUrl().getQueryParameter("url");
                     if (BrowserMediaPolicy.allowsHandoff(networkPolicy.allowsRemoteLoads(),
