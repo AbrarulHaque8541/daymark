@@ -11,6 +11,8 @@ for marker in (
     "Intent.ACTION_OPEN_DOCUMENT",
     "Intent.CATEGORY_OPENABLE",
     "Intent.FLAG_GRANT_READ_URI_PERMISSION",
+    '"content".equalsIgnoreCase(selectedUri.getScheme())',
+    "selectedUri.getAuthority()",
     "activity.getContentResolver().openInputStream",
     "openInputStream(selectedUri)",
     "Thread worker = new Thread(() ->",
