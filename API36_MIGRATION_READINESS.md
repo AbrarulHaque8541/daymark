@@ -1,32 +1,35 @@
 # Android 16 / API 36 target and release readiness
 
-> **Checked 2026-10-16 against current `main` (v1.3 published; PR #322 merged).** Current main uses application ID/namespace `com.abrar.daymark`, `versionName = 1.3`, `versionCode = 10`, `compileSdk = 36`, and `targetSdk = 35`, with AGP 8.12.2 and Gradle 8.13. Published v1.3 (versionCode 10) also targets API 35. This release-integrity change (superseding PR #310) sets `versionName = 1.4`, `versionCode = 11`, and `targetSdk = 36` with API-29/API-36 cold-launch gates; its exact-head CI is pending and physical-device acceptance remains **NOT TESTED / NOT COMPLETE**.
-
-## Repository-name transition
-
-The repository rename is complete: the canonical GitHub slug is `AbrarulHaque8541/daymark`. Historical snapshots that still refer to `AbrarulHaque8541/ai-personal-task-assistant` should be treated as dated records, not current navigation guidance.
+> **Checked 2026-10-26 against live `main` and GitHub release metadata.** Current `main` is `cac2d7524491a3fce488e57b5cf810dc7b5c5017`. The Android app uses application ID/namespace `com.abrar.daymark`, `versionName = 1.5`, `versionCode = 12`, `compileSdk = 36`, and `targetSdk = 36`, with AGP 8.12.2 and Gradle 8.13. API 36 is already the current source target; physical-device acceptance is still **NOT TESTED**.
 
 ## Google Play target policy
 
-Google Play's [target API requirement](https://developer.android.com/google/play/requirements/target-sdk) says that, starting 2026-08-31, ordinary mobile new apps and app updates must target API 36 or higher, subject to stated category exceptions. This is a Play-submission requirement, not a blanket requirement for local builds or GitHub sideloading. Current main and published v1.2 still target API 35, below the ordinary API-36 threshold. PR #310 proposes target 36, but until its exact-head checks and owner-device acceptance pass, do not claim Play or production release readiness.
+Google Play's [target API requirement](https://developer.android.com/google/play/requirements/target-sdk) says that, starting 2026-08-31, ordinary mobile new apps and app updates must target API 36 or higher, subject to stated category exceptions. This is a Play-submission requirement, not a blanket requirement for local builds or GitHub sideloading. Current source and the latest published release both target API 36.
 
-## Source and workflow evidence
+## Android developer verification and direct distribution
 
-- PR [#261](https://github.com/AbrarulHaque8541/daymark/pull/261) moved source to API 36 and aligned predictive Back handling; current Gradle `compileSdk` is 36, while main still targets API 35; PR #310 proposes the targetSdk 36 migration and API-29/API-36 cold-launch gates.
-- PR [#280](https://github.com/AbrarulHaque8541/daymark/pull/280) updated the toolchain to AGP 8.12.2 and Gradle 8.13. The earlier AGP 8.8.2 / Gradle 8.10.2 warning is historical, not a current-main limitation.
-- PR [#290](https://github.com/AbrarulHaque8541/daymark/pull/290) added API 36 SDK provisioning and target-SDK assertions to release workflows. Exact-head Android CI [run 38409504613](https://github.com/AbrarulHaque8541/daymark/actions/runs/38409504613) and device-test APK verification [run 38409505263](https://github.com/AbrarulHaque8541/daymark/actions/runs/38409505263) passed; production publishing was skipped.
-- Current-main commit `a36bf7467b5cbe4c0b5162cec68412680447c33d`, which includes merged PR [#297](https://github.com/AbrarulHaque8541/daymark/pull/297), passed its Android build check [run 38438713728](https://github.com/AbrarulHaque8541/daymark/actions/runs/38438713728). A CI build/device-test APK is not a signed production release or a physical-device test.
+Android's [developer-verification rollout](https://developer.android.com/developer-verification) began 2026-09-30 for apps installed from participating stores in Brazil, Indonesia, Singapore, and Thailand on certified Android 7+ devices; Google says global expansion is planned for 2027. Its [FAQ](https://developer.android.com/developer-verification/guides/faq) explicitly says direct sideloads and stores outside the initial list are not in that initial enforcement phase, while recommending preparation before the global rollout. The current Daymark path is a direct GitHub APK download, so this is a **future distribution gate, not an immediate block on v1.5**.
+
+Before wider distribution as the global rollout approaches, the owner should review Google's [Android Developer Console guide](https://developer.android.com/developer-verification/guides/android-developer-console) for identity verification and registration of `com.abrar.daymark` plus the existing production signing-certificate SHA-256. The [open-source app guide](https://developer.android.com/developer-verification/guides/open-source-app-registration) has a specific repository distribution path; do not assume its exception covers direct GitHub downloads. No account was registered, personal identity information was collected, signer was changed, or installer flow was tested in this review.
+
+## Current source and release evidence
+
+- Current `main` is `cac2d7524491a3fce488e57b5cf810dc7b5c5017`; it includes the release-draft lookup fix from [PR #337](https://github.com/AbrarulHaque8541/daymark/pull/337). The Android CI [run 39934982721](https://github.com/AbrarulHaque8541/daymark/actions/runs/39934982721) and cross-platform contract [run 39934982786](https://github.com/AbrarulHaque8541/daymark/actions/runs/39934982786) passed on this exact commit.
+- The latest published production release is [v1.5](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.5), published 2026-10-23. Its tag points to `ca6453374c46a1449c8bbec09a27a218d127d8e4`, before the later PR #337 workflow fix. Its only APK asset is `Daymark-v1.5-githubSideload.apk` (253,936 bytes; SHA-256 `496280987fc910d3a9dde9e4ecac79c5f9286b6c2a88f2f18df75e45d9702bc8`). The release metadata records package `com.abrar.daymark`, version 1.5/code 12, min SDK 26, target SDK 36, and the pinned production signer.
+- Production workflow [run 39932829832](https://github.com/AbrarulHaque8541/daymark/actions/runs/39932829832) ended **FAIL** in its final draft-release verification: the draft was created, but the workflow used an endpoint that does not return draft releases. The artifact was independently verified and v1.5 was published separately; merged PR #337 fixes the lookup for future runs. Do not describe that workflow run itself as fully passing.
+- The v1.4 release remains a draft; v1.5 is the latest published release. Verify the live Releases page before any later publication claim.
 
 ## Gates still open
 
-- [Issue #257](https://github.com/AbrarulHaque8541/daymark/issues/257) remains open as the release-readiness tracker. Before any production release, verify the exact signed artifact's application ID, version name/code, min SDK, target SDK 36, pinned signer, updater metadata, workflow run, and attached release assets. Production publication requires the exact-version tag workflow and owner authorization.
-As of 2026-10-16, the latest published release is [v1.3](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.3). It uses `com.abrar.daymark` and targets API 35; it is not an API 36 production build. The next API 36 candidate (`versionName = 1.4`, `versionCode = 11`) has no published tag until this change merges with green exact-head CI and the owner authorizes the `v1.4` tag. Do not infer publication from current Gradle values or CI artifacts.
-- Open [issue #160](https://github.com/AbrarulHaque8541/daymark/issues/160) tracks the device/emulator acceptance matrix. Open [#221](https://github.com/AbrarulHaque8541/daymark/issues/221) tracks the reported blank WebView viewport, and [#222](https://github.com/AbrarulHaque8541/daymark/issues/222) tracks browser UX acceptance. API 36 Back, WebView rendering/lifecycle, tabs, fullscreen, keyboard/insets, edge-to-edge, accessibility, storage/backup, reminders, and install/update behavior remain **NOT TESTED** until recorded against an identified device/build/APK.
+- [Issue #160](https://github.com/AbrarulHaque8541/daymark/issues/160) tracks the Android runtime acceptance matrix. [Issue #221](https://github.com/AbrarulHaque8541/daymark/issues/221) tracks a reported WebView blank-viewport failure. Browser rendering/lifecycle, edge-to-edge, predictive Back, keyboard/insets, accessibility, storage/backup, reminders, and install/update behavior remain **NOT TESTED on an owner physical device** unless separately recorded there.
+- API-29/API-36 CI or emulator checks do not establish physical-device behavior. Record device model, Android API, WebView provider/version when relevant, build SHA, APK SHA, scenario, and result for each runtime check.
 
-Record device model, Android API, Android System WebView provider/version, build SHA, APK SHA, scenario, and result for every runtime check. Do not label source checks, host tests, CI builds, or generated APK artifacts as device acceptance.
+## Historical context
+
+The 2026-10-16 status in the previous version of this document described `targetSdk = 35`, published v1.3, and a proposed v1.4 migration. Those statements were accurate only for that dated snapshot and are superseded by the current source and published v1.5 described above.
 
 ---
-Work by: Vibe
-Model: GLM (glm-5-latest-short)
-Tooling: GitHub MCP tools
-Timestamp (UTC): 2026-10-16T15:15:06Z
+Work by: Cue
+Model: not disclosed by runtime
+Tooling: Git, GitHub CLI, official Android developer sources
+Timestamp (UTC): 2026-10-26T03:51:30Z

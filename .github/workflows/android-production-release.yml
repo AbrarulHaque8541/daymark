@@ -175,6 +175,7 @@ jobs:
           echo "apk_name=$apk_name" >> "$GITHUB_OUTPUT"
           echo "aab_name=$aab_name" >> "$GITHUB_OUTPUT"
           echo "apk_sha=$(sha256sum "release-artifacts/$apk_name" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "apk_size=$apk_bytes" >> "$GITHUB_OUTPUT"
           echo "aab_sha=$(sha256sum "release-artifacts/$aab_name" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Enable KVM acceleration for emulator cold-launch gates
@@ -315,6 +316,7 @@ jobs:
           APK_NAME: ${{ steps.verify.outputs.apk_name }}
           AAB_NAME: ${{ steps.verify.outputs.aab_name }}
           APK_SHA: ${{ steps.verify.outputs.apk_sha }}
+          APK_SIZE: ${{ steps.verify.outputs.apk_size }}
           AAB_SHA: ${{ steps.verify.outputs.aab_sha }}
         shell: bash
         working-directory: android-app
@@ -368,6 +370,12 @@ jobs:
             grep -Fq "\"versionCode\":$VERSION_CODE" <<<"$actual_body" || { echo "::error::Draft metadata has wrong/missing versionCode."; exit 1; }
             grep -Fq "\"minSdkVersion\":$MIN_SDK_VERSION" <<<"$actual_body" || { echo "::error::Draft metadata has wrong/missing minSdkVersion."; exit 1; }
             grep -Fq "\"signerCertificateSha256\":\"$SIGNER_SHA256\"" <<<"$actual_body" || { echo "::error::Draft metadata has wrong/missing signer fingerprint."; exit 1; }
+            jq -e --arg name "$APK_NAME" --arg digest "sha256:$APK_SHA" --argjson size "$APK_SIZE" \
+              '([.assets[] | select(.name | endswith(".apk"))] | length) == 1 and ([.assets[] | select(.name == $name and .state == "uploaded" and .digest == $digest and .size == $size)] | length) == 1' \
+              "$release_json" >/dev/null || {
+                echo "::error::Draft release must expose exactly one uploaded APK with the exact SHA-256 digest and byte size expected by the updater."
+                exit 1
+              }
             mkdir -p "$RUNNER_TEMP/draft-verify"
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$APK_NAME" --dir "$RUNNER_TEMP/draft-verify"
             downloaded="$RUNNER_TEMP/draft-verify/$APK_NAME"
