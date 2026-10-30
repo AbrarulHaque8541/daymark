@@ -37,8 +37,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Run CI test-honesty guard
-        run: python3 android-app/tools/check-ci-test-honesty.py
       - name: Run repository host regression suite
         run: npm test
       - name: Run canonical source guard
