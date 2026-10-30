@@ -64,4 +64,9 @@ assert read_thread_start < read_call < read_thread_end, "selected SAF document m
 assert "readThread.start()" in FLOW
 assert "Cookie values are hidden" in FLOW
 assert "SameSite metadata" in FLOW
+assert "private boolean importCancelled;" in FLOW
+assert "if (importCancelled || pendingIndex >= pendingCookies.size())" in FLOW, "cancellation must stop scheduling additional cookie writes"
+assert "if (!wasCancelled && listener != null)" in FLOW, "cancelled import must not notify a stale host listener"
+assert "if (wasCancelled || activity.isFinishing() || activity.isDestroyed()) return;" in FLOW, "cancelled import must not show a completion dialog"
+assert "CookieManager cannot cancel a write already submitted." in FLOW
 print("PASS browser cookie import SAF guard: explicit user-picked URI, bounded strict UTF-8 read, no persistent grant/broad storage permission/private-app scan, domain selection and second confirmation")
