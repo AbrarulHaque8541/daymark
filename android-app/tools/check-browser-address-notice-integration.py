@@ -30,6 +30,9 @@ assert "Daymark only opens HTTPS pages" in main
 assert "Certificate errors are " in main and "cancelled and never bypassed." in main
 assert "handler.cancel();" in webview and "handler.proceed();" not in webview
 assert "void dispose()" in view and "disposed = true;" in view
-assert "private static final long INLINE_TIMEOUT_MS = 5000L;" in view
+assert "private static final long INFO_INLINE_TIMEOUT_MS = 1000L;" in view
+assert "private static final long WARNING_INLINE_TIMEOUT_MS = 5000L;" in view
+assert "notice.severity == BrowserAddressNotice.Severity.INFO" in view
+assert "mainHandler.postDelayed(timeoutRunnable, timeoutMs);" in view
 
 print("PASS live address notice integration: real blocked-navigation/load/SSL events, explicit retry only, site-info action, critical notice resolution and view disposal")
