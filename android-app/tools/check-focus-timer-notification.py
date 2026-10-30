@@ -5,6 +5,8 @@ import sys
 root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
 main = root / "app/src/main"
 source = (main / "java/com/abrar/daymark/TaskFocusTimerNotification.java").read_text(encoding="utf-8")
+store = (main / "java/com/abrar/daymark/TaskFocusTimerStore.java").read_text(encoding="utf-8")
+codec = (main / "java/com/abrar/daymark/TaskFocusTimerSnapshotCodec.java").read_text(encoding="utf-8")
 manifest = (main / "AndroidManifest.xml").read_text(encoding="utf-8")
 
 checks = [
@@ -28,6 +30,14 @@ checks = [
      "notifications are skipped when permission or app-level notification access is unavailable"),
     ("setCustomContentView" not in source and "setColorized(true)" not in source,
      "Live Update eligibility is not invalidated by custom views or colorized notifications"),
+    ('"focus-session.enc"' in store and '"daymark.focus-timer.aes-gcm.v1"' in store and "new EncryptedBlobStore" in store,
+     "focus session uses a dedicated AES-GCM encrypted file and key alias"),
+    ("tasks.enc" not in store and "EncryptedTaskStore" not in store and "TaskSnapshotCodec" not in store,
+     "focus session persistence is isolated from the encrypted task snapshot"),
+    ("TaskFocusTimerSnapshotCodec.encode" in store and "TaskFocusTimerSnapshotCodec.restore" in store,
+     "focus store persists and restores the monotonic timer snapshot"),
+    ("MAX_PAYLOAD_BYTES" in codec and "requireEnd(in)" in codec,
+     "focus snapshot codec is bounded and rejects trailing data"),
 ]
 for ok, message in checks:
     if not ok:
