@@ -98,6 +98,8 @@ assert "valid active notification recovers a lost canonical ID index" in instrum
 
 # Policy is independently compiled and executed in the canonical host test suite.
 assert "ReminderSchedulePolicy.java" in core_runner
+assert "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," in scheduler
+assert "setExact(" not in scheduler, "reminders must remain inexact and must not require exact-alarm access"
 assert "ReminderSchedulePolicySmoke.java" in core_runner
 assert "com.abrar.daymark.ReminderSchedulePolicySmoke" in core_runner
 assert "postTestReminder(manager, context, notificationId, task, fire.toString())" in instrumentation
