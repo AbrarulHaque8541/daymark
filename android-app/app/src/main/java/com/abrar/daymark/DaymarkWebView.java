@@ -41,10 +41,28 @@ final class DaymarkWebView extends WebView {
         android.content.Intent appLink = new android.content.Intent(
                 android.content.Intent.ACTION_VIEW, uri);
         appLink.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
-        android.content.pm.ResolveInfo resolved = view.getContext().getPackageManager()
-                .resolveActivity(appLink, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
-        if (resolved == null || resolved.activityInfo == null || resolved.handleAllWebDataURI) {
-            return false; // No verified/specific app handler; leave the URL in Daymark.
+        android.content.pm.PackageManager packageManager = view.getContext().getPackageManager();
+        android.content.pm.ResolveInfo resolved = packageManager.resolveActivity(appLink,
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+                        | android.content.pm.PackageManager.GET_RESOLVED_FILTER);
+        if (resolved == null || resolved.activityInfo == null || resolved.filter == null
+                || !resolved.isDefault || resolved.filter.countDataAuthorities() == 0) {
+            return false; // No default handler with an explicit host filter; keep the URL in Daymark.
+        }
+        boolean specificHost = false;
+        for (int i = 0; i < resolved.filter.countDataAuthorities(); i++) {
+            android.content.IntentFilter.AuthorityEntry authority =
+                    resolved.filter.getDataAuthority(i);
+            String filterHost = authority == null ? null : authority.getHost();
+            if (filterHost == null || filterHost.startsWith("*")) continue;
+            if (filterHost.equalsIgnoreCase(uri.getHost())
+                    && authority.match(uri) != android.content.IntentFilter.NO_MATCH_DATA) {
+                specificHost = true;
+                break;
+            }
+        }
+        if (!specificHost) {
+            return false; // Generic browser/wildcard filters never count as a verified App Link.
         }
         try {
             view.getContext().startActivity(appLink);
