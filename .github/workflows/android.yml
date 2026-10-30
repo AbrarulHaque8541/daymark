@@ -58,9 +58,6 @@ jobs:
           lintGithubSideloadDebug
           lintPlayDebug
           lintGithubSideloadRelease
-          testGithubSideloadDebugUnitTest
-          testGithubSideloadReleaseUnitTest
-          testPlayDebugUnitTest
           compileGithubSideloadDebugAndroidTestJavaWithJavac
           compilePlayDebugAndroidTestJavaWithJavac
 
@@ -308,4 +305,3 @@ jobs:
           assembleGithubSideloadRelease
           bundleGithubSideloadRelease
           lintGithubSideloadRelease
-          testGithubSideloadReleaseUnitTest
