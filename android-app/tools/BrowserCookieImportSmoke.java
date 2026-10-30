@@ -10,7 +10,7 @@ public final class BrowserCookieImportSmoke {
         BrowserCookieImport.ParseResult parsed = BrowserCookieImport.parse(export);
         assert parsed.recognizedFormat;
         assert parsed.cookies.size() == 2 : parsed.cookies.size();
-        assert parsed.rejectedLines.size() == 2 : parsed.rejectedLines.size();
+        assert parsed.rejectedLineCount == 2 : parsed.rejectedLineCount;
 
         BrowserCookieImport.Cookie first = parsed.cookies.get(0);
         assert "example.com".equals(first.domain);
@@ -29,18 +29,73 @@ public final class BrowserCookieImportSmoke {
         assert second.isSessionCookie();
         assert !second.isExpired(Long.MAX_VALUE);
 
+        BrowserCookieImport.ParseResult headerless = BrowserCookieImport.parse(
+                "host.example.com\tFALSE\t/\tFALSE\t0\tname\tvalue=1");
+        assert headerless.recognizedFormat;
+        assert headerless.cookies.size() == 1;
+
         BrowserCookieImport.ParseResult unrecognized =
                 BrowserCookieImport.parse("not a cookie export");
         assert !unrecognized.recognizedFormat;
         assert unrecognized.cookies.isEmpty();
         assert BrowserCookieImport.parse(null).cookies.isEmpty();
-        assert BrowserCookieImport.parse("x".repeat(BrowserCookieImport.MAX_FILE_CHARS + 1))
-                .cookies.isEmpty();
+        assert BrowserCookieImport.parse(null).inputTruncated;
+        BrowserCookieImport.ParseResult oversizedFile = BrowserCookieImport.parse(
+                "x".repeat(BrowserCookieImport.MAX_FILE_CHARS + 1));
+        assert oversizedFile.cookies.isEmpty();
+        assert oversizedFile.inputTruncated;
 
         String tooLargeValue = "x".repeat(BrowserCookieImport.MAX_VALUE_CHARS + 1);
-        String oversized = "# Netscape HTTP Cookie File\n"
-                + "example.com\tFALSE\t/\tFALSE\t0\tname\t" + tooLargeValue;
-        assert BrowserCookieImport.parse(oversized).cookies.isEmpty();
-        System.out.println("PASS browser cookie import parser: Netscape format, HttpOnly, flags, expiry, bounds and malformed-line rejection");
+        assert BrowserCookieImport.parse("# Netscape HTTP Cookie File\n"
+                + "example.com\tFALSE\t/\tFALSE\t0\tname\t" + tooLargeValue)
+                .cookies.isEmpty();
+
+        String[] unsafeValues = {"x; Secure", "x,Domain=evil.test",
+                "value with space", "café", "x" + ((char) 34) + "y",
+                "x" + ((char) 92) + "y"};
+        for (String value : unsafeValues) {
+            BrowserCookieImport.ParseResult unsafe = BrowserCookieImport.parse(
+                    "example.com\tFALSE\t/\tFALSE\t0\tname\t" + value);
+            assert unsafe.cookies.isEmpty() : value;
+            assert unsafe.rejectedLineCount == 1 : value;
+        }
+
+        assert BrowserCookieImport.parse("example.com\tFALSE\t/; Secure\tFALSE\t0\tn\tv")
+                .cookies.isEmpty();
+        assert BrowserCookieImport.parse("example.com\tFALSE\t/\tFALSE\t0\tbad;name\tv")
+                .cookies.isEmpty();
+        BrowserCookieImport.ParseResult dottedHostOnly = BrowserCookieImport.parse(
+                ".example.com\tFALSE\t/\tFALSE\t0\tn\tv");
+        assert dottedHostOnly.cookies.size() == 1;
+        assert !dottedHostOnly.cookies.get(0).includeSubdomains;
+        assert BrowserCookieImport.parse("example.com\tFALSE\t/\tFALSE\t253402300800\tn\tv")
+                .cookies.isEmpty();
+
+        BrowserCookieImport.ParseResult tooManyLines =
+                BrowserCookieImport.parse("\n".repeat(BrowserCookieImport.MAX_LINES + 1));
+        assert tooManyLines.rejectedLineCount == 1;
+        assert tooManyLines.rejectedLines.get(0).reason == BrowserCookieImport.Rejection.TOO_MANY_LINES;
+        assert tooManyLines.inputTruncated;
+
+        StringBuilder manyBadRows = new StringBuilder();
+        for (int i = 0; i < BrowserCookieImport.MAX_REJECTED_LINES_RETAINED + 20; i++) {
+            manyBadRows.append("not-a-cookie-row\n");
+        }
+        BrowserCookieImport.ParseResult boundedRejections =
+                BrowserCookieImport.parse(manyBadRows.toString());
+        assert boundedRejections.rejectedLineCount == BrowserCookieImport.MAX_REJECTED_LINES_RETAINED + 20;
+        assert boundedRejections.rejectedLines.size() == BrowserCookieImport.MAX_REJECTED_LINES_RETAINED;
+        assert boundedRejections.rejectionListTruncated;
+        assert !boundedRejections.inputTruncated;
+
+        String validRow = "host.example.com\tFALSE\t/\tFALSE\t0\tn\tv\n";
+        StringBuilder manyCookies = new StringBuilder();
+        for (int i = 0; i < BrowserCookieImport.MAX_COOKIES + 1; i++) manyCookies.append(validRow);
+        BrowserCookieImport.ParseResult boundedCookies = BrowserCookieImport.parse(manyCookies.toString());
+        assert boundedCookies.cookies.size() == BrowserCookieImport.MAX_COOKIES;
+        assert boundedCookies.rejectedLines.get(0).reason == BrowserCookieImport.Rejection.TOO_MANY_COOKIES;
+        assert boundedCookies.inputTruncated;
+
+        System.out.println("PASS browser cookie import parser: headerless Netscape, HttpOnly, strict cookie-octet, flags, expiry, line/cookie/rejection bounds and malformed-line rejection");
     }
 }
