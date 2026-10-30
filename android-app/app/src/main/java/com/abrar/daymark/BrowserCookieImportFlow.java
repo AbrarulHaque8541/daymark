@@ -59,6 +59,10 @@ public final class BrowserCookieImportFlow {
     private List<BrowserCookieImport.Cookie> pendingCookies = Collections.emptyList();
     private AlertDialog activeDialog;
     private ProgressDialog progressDialog;
+    private volatile InputStream activeReadStream;
+    private Thread readThread;
+    private boolean reading;
+    private int readGeneration;
     private int pendingIndex;
     private int importedCount;
     private int rejectedCount;
@@ -75,7 +79,7 @@ public final class BrowserCookieImportFlow {
     /** Call only in response to a visible user action, such as a future browser settings row. */
     @SuppressWarnings("deprecation")
     public void start() {
-        if (importing || (activeDialog != null && activeDialog.isShowing())) return;
+        if (importing || reading || (activeDialog != null && activeDialog.isShowing())) return;
         Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         picker.addCategory(Intent.CATEGORY_OPENABLE);
         picker.setType("*/*");
@@ -94,74 +98,146 @@ public final class BrowserCookieImportFlow {
     public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode != REQUEST_CODE) return false;
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+            if (reading || readThread != null) cancelRead();
             clearSensitiveState();
             return true;
         }
+        if (reading || readThread != null) cancelRead();
 
+        final Uri selectedUri = data.getData();
+        final int generation = ++readGeneration;
+        reading = true;
         try {
-            String text = readSelectedFile(data.getData());
-            try {
-                parsed = BrowserCookieImport.parse(text);
-            } finally {
-                text = null;
-            }
-            if (parsed.inputTruncated) {
-                clearSensitiveState();
-                showMessage("Export exceeds safe limits",
-                        "The file exceeded the parser's size, line or cookie limit. Split the export "
-                                + "into smaller files and try again. No cookies were imported.");
-                return true;
-            }
-            if (!parsed.recognizedFormat || parsed.isEmpty()) {
-                clearSensitiveState();
-                showMessage("Unsupported cookie export",
-                        "Choose a valid Netscape cookies.txt export. No cookies were imported.");
-                return true;
-            }
+            showProgressDialog("Reading the selected document…");
+            Thread worker = new Thread(() -> {
+                BrowserCookieImport.ParseResult parsedResult = null;
+                BrowserCookieImportPolicy.Preview previewResult = null;
+                boolean readFailed = false;
+                try {
+                    String text = readSelectedFile(selectedUri);
+                    try {
+                        parsedResult = BrowserCookieImport.parse(text);
+                    } finally {
+                        text = null;
+                    }
+                    if (!parsedResult.inputTruncated && parsedResult.recognizedFormat
+                            && !parsedResult.isEmpty()) {
+                        previewResult = BrowserCookieImportPolicy.createPreview(
+                                parsedResult, System.currentTimeMillis() / 1000L);
+                    }
+                } catch (IOException | RuntimeException failure) {
+                    readFailed = true;
+                }
 
-            long now = System.currentTimeMillis() / 1000L;
-            preview = BrowserCookieImportPolicy.createPreview(parsed, now);
-            if (preview.tooManyDomains) {
-                clearSensitiveState();
-                showMessage("Export is too broad",
-                        "This file contains more than "
-                                + BrowserCookieImportPolicy.MAX_PREVIEW_DOMAINS
-                                + " distinct domains. Split the export and review smaller files.");
-                return true;
-            }
-            if (preview.importableCookieCount == 0) {
-                String reason = "No importable cookies were found.";
-                if (preview.expiredCookieCount > 0) {
-                    reason += " " + preview.expiredCookieCount + " expired cookies were skipped.";
-                }
-                if (preview.prefixRejectedCookieCount > 0) {
-                    reason += " " + preview.prefixRejectedCookieCount
-                            + " cookies failed __Secure-/__Host- prefix rules.";
-                }
-                clearSensitiveState();
-                showMessage("Nothing to import", reason);
-                return true;
-            }
-            showPreview();
-        } catch (IOException | RuntimeException failure) {
+                final BrowserCookieImport.ParseResult completedParsed = parsedResult;
+                final BrowserCookieImportPolicy.Preview completedPreview = previewResult;
+                final boolean failed = readFailed;
+                mainHandler.post(() -> {
+                    if (generation != readGeneration) return;
+                    reading = false;
+                    readThread = null;
+                    dismissProgressDialog();
+                    if (activity.isFinishing() || activity.isDestroyed()) {
+                        clearSensitiveState();
+                        return;
+                    }
+                    if (failed || completedParsed == null) {
+                        clearSensitiveState();
+                        showMessage("Could not read cookie export",
+                                "The selected document could not be read as a bounded UTF-8 text export. "
+                                        + "No cookies were imported.");
+                        return;
+                    }
+                    parsed = completedParsed;
+                    preview = completedPreview;
+                    showParsedPreview();
+                });
+            }, "DaymarkCookieImportRead");
+            readThread = worker;
+            readThread.start();
+        } catch (RuntimeException startFailure) {
+            reading = false;
+            readThread = null;
+            dismissProgressDialog();
             clearSensitiveState();
             showMessage("Could not read cookie export",
-                    "The selected document could not be read as a bounded UTF-8 text export. "
-                            + "No cookies were imported.");
+                    "The selected document could not be read. No cookies were imported.");
         }
         return true;
     }
 
-    /** Release in-memory references when the host abandons this flow. */
-    public void cancel() {
-        if (activeDialog != null) {
-            try {
-                activeDialog.dismiss();
-            } catch (RuntimeException ignored) {
-                // The host may already be finishing.
-            }
-            activeDialog = null;
+    private void showParsedPreview() {
+        if (parsed.inputTruncated) {
+            clearSensitiveState();
+            showMessage("Export exceeds safe limits",
+                    "The file exceeded the parser's size, line or cookie limit. Split the export "
+                            + "into smaller files and try again. No cookies were imported.");
+            return;
         }
+        if (!parsed.recognizedFormat || parsed.isEmpty()) {
+            clearSensitiveState();
+            showMessage("Unsupported cookie export",
+                    "Choose a valid Netscape cookies.txt export. No cookies were imported.");
+            return;
+        }
+        if (preview == null) {
+            clearSensitiveState();
+            showMessage("Could not review cookie export",
+                    "The selected document could not be safely previewed. No cookies were imported.");
+            return;
+        }
+        if (preview.tooManyDomains) {
+            clearSensitiveState();
+            showMessage("Export is too broad",
+                    "This file contains more than "
+                            + BrowserCookieImportPolicy.MAX_PREVIEW_DOMAINS
+                            + " distinct domains. Split the export and review smaller files.");
+            return;
+        }
+        if (preview.importableCookieCount == 0) {
+            String reason = "No importable cookies were found.";
+            if (preview.expiredCookieCount > 0) {
+                reason += " " + preview.expiredCookieCount + " expired cookies were skipped.";
+            }
+            if (preview.prefixRejectedCookieCount > 0) {
+                reason += " " + preview.prefixRejectedCookieCount
+                        + " cookies failed __Secure-/__Host- prefix rules.";
+            }
+            clearSensitiveState();
+            showMessage("Nothing to import", reason);
+            return;
+        }
+        showPreview();
+    }
+
+    private void cancelRead() {
+        readGeneration++;
+        reading = false;
+        Thread worker = readThread;
+        readThread = null;
+        if (worker != null) worker.interrupt();
+        InputStream stream = activeReadStream;
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+                // Closing the provider stream is best-effort cancellation.
+            }
+        }
+        dismissProgressDialog();
+    }
+
+    private void showProgressDialog(String message) {
+        dismissProgressDialog();
+        progressDialog = new ProgressDialog(activity);
+        progressDialog.setTitle("Cookie import");
+        progressDialog.setMessage(message);
+        progressDialog.setIndeterminate(true);
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+    }
+
+    private void dismissProgressDialog() {
         if (progressDialog != null) {
             try {
                 progressDialog.dismiss();
@@ -170,36 +246,62 @@ public final class BrowserCookieImportFlow {
             }
             progressDialog = null;
         }
+    }
+
+    /** Release in-memory references when the host abandons this flow. */
+    public void cancel() {
+        if (reading || readThread != null) cancelRead();
+        if (activeDialog != null) {
+            try {
+                activeDialog.dismiss();
+            } catch (RuntimeException ignored) {
+                // The host may already be finishing.
+            }
+            activeDialog = null;
+        }
+        dismissProgressDialog();
         if (!importing) clearSensitiveState();
     }
 
     private String readSelectedFile(Uri selectedUri) throws IOException {
         byte[] bytes = new byte[MAX_FILE_BYTES + 1];
-        try (InputStream input = activity.getContentResolver().openInputStream(selectedUri)) {
-            if (input == null) throw new IOException("Selected document could not be opened.");
-            int total = 0;
-            while (total < bytes.length) {
-                int count = input.read(bytes, total, bytes.length - total);
-                if (count < 0) break;
-                if (count == 0) {
-                    int single = input.read();
-                    if (single < 0) break;
-                    bytes[total++] = (byte) single;
-                } else {
-                    total += count;
+        InputStream opened = null;
+        try {
+            opened = activity.getContentResolver().openInputStream(selectedUri);
+            if (opened == null) throw new IOException("Selected document could not be opened.");
+            activeReadStream = opened;
+            InputStream stream = opened;
+            try (InputStream input = stream) {
+                int total = 0;
+                while (total < bytes.length) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new IOException("Cookie export read was cancelled.");
+                    }
+                    int count = input.read(bytes, total, bytes.length - total);
+                    if (count < 0) break;
+                    if (count == 0) {
+                        int single = input.read();
+                        if (single < 0) break;
+                        bytes[total++] = (byte) single;
+                    } else {
+                        total += count;
+                    }
                 }
-            }
-            if (total > MAX_FILE_BYTES) throw new IOException("Selected document exceeds the size limit.");
+                if (total > MAX_FILE_BYTES) {
+                    throw new IOException("Selected document exceeds the size limit.");
+                }
 
-            CharBuffer decoded = StandardCharsets.UTF_8.newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes, 0, total));
-            String text = decoded.toString();
-            return text.startsWith("\uFEFF") ? text.substring(1) : text;
+                CharBuffer decoded = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes, 0, total));
+                String text = decoded.toString();
+                return text.startsWith("\\uFEFF") ? text.substring(1) : text;
+            }
         } catch (CharacterCodingException invalidUtf8) {
             throw new IOException("Selected document is not valid UTF-8.", invalidUtf8);
         } finally {
+            if (opened != null && activeReadStream == opened) activeReadStream = null;
             Arrays.fill(bytes, (byte) 0);
         }
     }
@@ -339,12 +441,7 @@ public final class BrowserCookieImportFlow {
         flushFailed = false;
         importing = true;
         try {
-            progressDialog = new ProgressDialog(activity);
-            progressDialog.setTitle("Importing cookies");
-            progressDialog.setMessage("Writing only the domains you selected…");
-            progressDialog.setIndeterminate(true);
-            progressDialog.setCancelable(false);
-            progressDialog.show();
+            showProgressDialog("Writing only the domains you selected…");
             applyNextCookie(CookieManager.getInstance());
         } catch (RuntimeException unavailable) {
             rejectedCount = pendingCookies.size();
@@ -396,14 +493,7 @@ public final class BrowserCookieImportFlow {
     private void finishImport(boolean flushAttempted, boolean flushSucceeded) {
         flushFailed = flushAttempted && !flushSucceeded;
         importing = false;
-        if (progressDialog != null) {
-            try {
-                progressDialog.dismiss();
-            } catch (RuntimeException ignored) {
-                // The host may already be finishing.
-            }
-            progressDialog = null;
-        }
+        dismissProgressDialog();
 
         int imported = importedCount;
         int webViewRejected = rejectedCount;
