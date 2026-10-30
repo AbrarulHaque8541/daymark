@@ -33,6 +33,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         void onPause();
         void onResume();
         void onStop();
+        void onChooseTask();
     }
 
     private static final int BG = 0xFF07121D;
@@ -69,6 +70,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private boolean finalTicksEnabled;
     private boolean finishSoundPlayed;
     private boolean closed;
+    private TextView dailySummary;
 
     TaskFocusTimerPanel(Context context, Listener listener) {
         super(context);
@@ -91,6 +93,9 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         taskName.setGravity(Gravity.CENTER);
         taskName.setPadding(dp(16), dp(10), dp(16), dp(10));
         taskName.setBackground(round(SURFACE_HI, 22));
+        taskName.setClickable(true);
+        taskName.setFocusable(true);
+        taskName.setOnClickListener(v -> { sounds.onSelection(); listener.onChooseTask(); });
         LayoutParams taskLp = wrapWrap();
         taskLp.gravity = Gravity.CENTER_HORIZONTAL;
         taskLp.topMargin = dp(16);
@@ -182,6 +187,13 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         soundHeadingLp.topMargin = dp(22);
         addView(soundHeading, soundHeadingLp);
 
+        dailySummary = label("TODAY  ·  0m focus  ·  0 sessions", 12, MUTED, true);
+        dailySummary.setPadding(dp(14), dp(15), dp(14), dp(15));
+        dailySummary.setBackground(round(SURFACE, 18));
+        LayoutParams summaryLp = matchWrap();
+        summaryLp.topMargin = dp(14);
+        addView(dailySummary, summaryLp);
+
         soundToggle = settingRow("Soft interaction sounds", false);
         tickToggle = settingRow("Final 10-second ticks", false);
         LayoutParams settingLp = matchWrap();
@@ -211,6 +223,12 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     void setTaskLabel(String value) {
         taskLabel = value == null || value.trim().isEmpty() ? "Choose a task" : value.trim();
         taskName.setText(taskLabel + "  ›");
+    }
+
+    void setDailySummary(long focusDurationMs, int sessionCount) {
+        long minutes = Math.max(0L, focusDurationMs / 60_000L);
+        int safeSessions = Math.max(0, sessionCount);
+        dailySummary.setText("TODAY  ·  " + minutes + "m focus  ·  " + safeSessions + " sessions");
     }
 
     void setSoundEnabled(boolean enabled) {
@@ -254,7 +272,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         boolean running = value != null && value.isRunning();
         boolean paused = value != null && value.isPaused();
         primaryAction.setText(running ? "Ⅱ   Pause" : paused ? "▶   Resume" : "▶   Start focus");
-        primaryAction.setEnabled(value == null || !value.isFinished());
+        primaryAction.setEnabled(true);
         stopAction.setEnabled(active);
         stopAction.setAlpha(active ? 1f : 0.55f);
         modeStopwatch.setEnabled(!active);
