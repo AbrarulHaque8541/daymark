@@ -24,9 +24,8 @@ required_sound = [
 for token in required_sound:
     assert token in sound, f"Focus Timer soundscape missing contract: {token}"
 
-assert "private boolean soundEnabled;" in panel
+assert "private boolean soundEnabled = true;" in panel
 assert "private boolean finalTicksEnabled;" in panel
-assert "private boolean soundEnabled = true" not in panel
 assert "startTone" not in panel, "UI must route sounds through the soundscape"
 assert "while (" not in sound and "Thread.sleep" not in sound, "Sound must not use a looping/blocking playback loop"
 assert "RECORD_AUDIO" not in sound and "MODIFY_AUDIO_SETTINGS" not in sound, "Sound effects must not request microphone/audio-control permissions"
