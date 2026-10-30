@@ -33,6 +33,18 @@ public final class BrowserAddressSmoke {
         rejects("file:///etc/passwd");
         rejects("content://com.example/private");
         rejects("intent://open");
+        for (String scheme : new String[]{"tg", "telegram", "mailto", "tel", "sms",
+                "smsto", "geo", "market", "whatsapp", "TG"}) {
+            assert BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
+        }
+        for (String scheme : new String[]{"http", "https", "intent", "javascript",
+                "file", "content", "data", "ftp", null}) {
+            assert !BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
+        }
+        assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "tg");
+        assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "tg");
+        assert !BrowserAddress.shouldHandOffExternalScheme(true, true, null);
+
         assert !BrowserAddress.isAllowedWebUrl("data:text/html,hello");
         assert !BrowserAddress.isAllowedWebUrl("http://example.com/");
         assert !BrowserAddress.isAllowedWebUrl("http://example.com/after-redirect");
