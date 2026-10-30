@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Guard at-least-once in-app reminder presentation across Activity lifecycle failures."""
+"""Guard at-least-once in-app reminder presentation across Activity lifecycle failures.
+Also guard stale posted notification cleanup and receiver validation."""
 from pathlib import Path
 import sys
 
@@ -51,4 +52,38 @@ assert "PendingIntent.getBroadcast(context, requestCode, intent," in snooze_sche
     "snooze must reuse the task's request code so a later cancel or reschedule replaces it"
 assert "PendingIntent.FLAG_UPDATE_CURRENT" in snooze_scheduler, \
     "snooze must replace the fired alarm instead of adding a second one"
-print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, snooze re-arms only the alarm slot")
+# Guard stale posted notification cleanup in scheduler
+scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
+assert "NOTIFICATION_PREFERENCES" in scheduler, "scheduler must track notification IDs"
+assert "cancelNotification(context, notificationManager, taskId, notificationId)" in scheduler, "scheduler must cancel notifications using the independently tracked notification ID"
+assert "notificationManager.cancel(requestCode)" in scheduler, "scheduler must call NotificationManager.cancel"
+assert "notifications.edit().remove(taskId).apply()" in scheduler, "scheduler must clean up notification tracking on cancel"
+assert "for (Map.Entry<String, ?> entry : knownNotifications.entrySet())" in scheduler, "scheduler must independently clean orphaned notification records even when the alarm-code index is missing"
+assert "Object storedNotificationId = knownNotifications.get(task.id);" in scheduler, "scheduler must clean notifications when a task no longer needs reminders even if its alarm-code index is missing"
+assert "storedNotificationId != null && (assigned == null" in scheduler, "scheduler must cancel an old notification before replacing a missing or mismatched alarm-code index"
+assert "SharedPreferences notifications = context.getSharedPreferences(NOTIFICATION_PREFERENCES, Context.MODE_PRIVATE)" in scheduler, "scheduler must load notification preferences"
+
+# Guard receiver validation of stale intents
+receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java").read_text(encoding="utf-8")
+assert "String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);" in receiver, "receiver must extract task ID from intent"
+assert "String fireInstant = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);" in receiver, "receiver must extract fire instant from intent"
+assert "if (notificationId == 0 || taskId == null || title == null || title.trim().isEmpty() || fireInstant == null)" in receiver, "receiver must validate all required extras"
+assert "findValidReminderTask(context, taskId, fireInstant)" in receiver, "receiver must validate and load the current task in one read"
+assert "Task currentTask = findValidReminderTask(context, taskId, fireInstant);" in receiver, "receiver must fail closed if current state cannot be verified"
+assert "refreshPostedNotification(context, notificationId, currentTask, fireInstant)" in receiver, "receiver must post current task title and lifecycle metadata"
+assert "setOnlyAlertOnce(true)" in receiver, "metadata-only notification refresh must not re-alert"
+assert "EncryptedTaskStore store = new EncryptedTaskStore(context);" in receiver, "receiver must load tasks to validate"
+assert "if (task.completed || task.reminderLeadMinutes == null || task.dueDate == null)" in receiver, "receiver must reject completed tasks and tasks without reminders"
+assert "if (fireInstant.equals(task.reminderShownFire))" in receiver, "receiver must reject already-shown reminders"
+assert "Instant.parse(fireInstant)" in receiver, "receiver must parse fire instant for validation"
+assert "TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault())" in receiver, "receiver must re-compute expected fire instant"
+
+# Guard reconciliation of already-posted OS notifications on every task reschedule
+assert "reconcilePostedNotification(context, notificationManager, notifications, task)" in scheduler, "scheduler must reconcile posted notifications before scheduling"
+assert "notificationManager.getActiveNotifications()" in scheduler, "scheduler must inspect active notifications"
+assert "!currentFireText.equals(postedFire)" in scheduler, "changed due occurrence must invalidate old notification"
+assert "currentFireText.equals(task.reminderShownFire)" in scheduler, "scheduler must cancel the OS notification once the in-app reminder is marked shown"
+assert 'notifications.edit().remove(task.id).apply();' in scheduler, "scheduler must remove the notification tracking record after canceling a stale posted notification"
+assert "TaskReminderReceiver.refreshPostedNotification(context, notificationId, task, currentFireText)" in scheduler, "title-only edits must refresh existing notification"
+
+print("PASS reminder lifecycle source checks: mark-after-show, revalidate task, persist only visible reminders, retry disclosure, reschedule OS alarms on app open, snooze re-arms only the alarm slot, stale notification cleanup, receiver validation")
