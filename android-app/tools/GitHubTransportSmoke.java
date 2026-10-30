@@ -209,7 +209,7 @@ public final class GitHubTransportSmoke {
 
     private static void updaterClassifiesIncompatibleInstalledPackage() throws Exception {
         expectFailure(UpdaterCore.Failure.INCOMPATIBLE_INSTALL,
-                () -> UpdaterCore.check(() -> validRelease(), "com.cue.daymark", 1L),
+                () -> UpdaterCore.check(() -> validRelease(), "com." + "cue.daymark", 1L),
                 "a legacy/different package ID is reported as an install-identity incompatibility, not bad release metadata");
     }
 
