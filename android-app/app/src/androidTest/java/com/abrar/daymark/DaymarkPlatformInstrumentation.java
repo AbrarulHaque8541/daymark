@@ -301,7 +301,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             legacyStore.save(imported); // Ordinary task saves must preserve already-saved templates.
             byte[] migratedJson = loadRawEncryptedSnapshot(snapshotFile, keys);
             JSONObject migrated = new JSONObject(new String(migratedJson, StandardCharsets.UTF_8));
-            check(migrated.optInt("version", -1) == 3, "the first successful save migrates to template-capable schema v3");
+            check(migrated.optInt("version", -1) == TaskSnapshotCodec.CURRENT_VERSION, "the first successful save migrates to the current template-capable schema");
             check(migrated.optJSONArray("templates") != null && migrated.optJSONArray("templates").length() == 1,
                     "schema-v3 encrypted snapshot contains the saved template");
             EncryptedTaskStore reloadedStore = new EncryptedTaskStore(snapshotFile, keys);
@@ -330,8 +330,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "schema-v2 attachment snapshots remain readable without invented templates");
             v2Store.saveSnapshot(v2Store.load(), Collections.singletonList(savedTemplate));
             check(new JSONObject(new String(loadRawEncryptedSnapshot(v2File, keys), StandardCharsets.UTF_8))
-                            .optInt("version", -1) == 3,
-                    "the schema-v2 attachment snapshot migrates to v3 on a successful template save");
+                            .optInt("version", -1) == TaskSnapshotCodec.CURRENT_VERSION,
+                    "the schema-v2 attachment snapshot migrates to the current schema on a successful template save");
 
             File corruptSchemaFile = new File(root, "corrupt-schema.enc");
             byte[] malformedJson = ("{\"version\":1,\"tasks\":[{\"id\":\"2e8cae89-3dd4-43e3-82d4-51a8df643501\","
