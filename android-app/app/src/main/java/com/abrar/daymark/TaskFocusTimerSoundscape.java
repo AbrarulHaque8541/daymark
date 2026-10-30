@@ -16,11 +16,12 @@ final class TaskFocusTimerSoundscape implements AutoCloseable {
     private boolean finalTicksEnabled;
     private int lastTickSecond = -1;
     private boolean finishedTonePlayed;
+    private boolean released;
 
     TaskFocusTimerSoundscape() { }
 
     private void ensureToneGenerator() {
-        if (toneGenerator != null || !enabled) return;
+        if (toneGenerator != null || !enabled || released) return;
         try {
             toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, VOLUME);
         } catch (RuntimeException unavailable) {
@@ -72,7 +73,7 @@ final class TaskFocusTimerSoundscape implements AutoCloseable {
     }
 
     private void play(int tone, int durationMs) {
-        if (!enabled) return;
+        if (!enabled || released) return;
         ensureToneGenerator();
         if (toneGenerator == null) return;
         try {
@@ -84,6 +85,8 @@ final class TaskFocusTimerSoundscape implements AutoCloseable {
 
     @Override
     public void close() {
+        if (released) return;
+        released = true;
         if (toneGenerator == null) return;
         try {
             toneGenerator.release();
