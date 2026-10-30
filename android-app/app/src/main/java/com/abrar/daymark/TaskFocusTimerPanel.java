@@ -173,6 +173,9 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         LayoutParams stopLp = new LayoutParams(0, dp(58), 1);
         stopLp.leftMargin = dp(10);
         actions.addView(stopAction, stopLp);
+        primaryAction.setContentDescription("Start, pause, or resume focus timer");
+        stopAction.setContentDescription("Finish focus session");
+        timeValue.setContentDescription("Focus timer value");
         primaryAction.setOnClickListener(v -> performPrimaryAction());
         stopAction.setOnClickListener(v -> {
             if (timer != null && !timer.isFinished()) {
@@ -344,12 +347,15 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         input.setSingleLine(true);
         input.setHint("Minutes (1–1440)");
         input.setText(String.valueOf(Math.max(1, selectedDurationMs / 60_000L)));
-        new AlertDialog.Builder(getContext())
+        AlertDialog dialog = new AlertDialog.Builder(getContext())
                 .setTitle("Custom focus duration")
                 .setMessage("Choose between 1 minute and 24 hours.")
                 .setView(input)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Apply", (dialog, which) -> {
+                .setPositiveButton("Apply", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
                     try {
                         long minutes = Long.parseLong(input.getText().toString().trim());
                         if (minutes < 1 || minutes > 1440) throw new NumberFormatException();
@@ -357,10 +363,12 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                         sounds.onSelection();
                         rebuildPresets();
                         render(null, 0);
+                        dialog.dismiss();
                     } catch (NumberFormatException invalid) {
                         input.setError("Enter 1–1440 minutes");
                     }
-                }).show();
+                }));
+        dialog.show();
     }
 
     private TextView settingRow(String text, boolean selected) {
