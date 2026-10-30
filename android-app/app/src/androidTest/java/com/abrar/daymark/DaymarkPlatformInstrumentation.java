@@ -190,6 +190,32 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
         check(!hasActiveNotification(manager, deletedId),
                 "posted notification is removed for a deleted task even when its ID index is missing");
+
+        Task malformedIndex = TaskLogic.create("Malformed reminder index", "2099-12-04",
+                "high", null, null, 60, null);
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().putString(malformedIndex.id, "not-a-positive-id").commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(malformedIndex));
+        Integer repairedId = TaskReminderScheduler.getNotificationId(context, malformedIndex.id);
+        check(repairedId != null && repairedId > 0,
+                "malformed request-code preference is repaired without aborting other reminders");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+
+        Task orphanNotificationTask = TaskLogic.create("Orphan notification", "2099-12-05",
+                "high", null, null, null, null);
+        int orphanNotificationId = 990001;
+        postTestReminder(manager, context, orphanNotificationId, orphanNotificationTask,
+                "2099-12-04T00:00:00Z");
+        Context noAlarmManager = new ContextWrapper(context) {
+            @Override
+            public Object getSystemService(String name) {
+                if (Context.ALARM_SERVICE.equals(name)) return null;
+                return super.getSystemService(name);
+            }
+        };
+        TaskReminderScheduler.rescheduleAll(noAlarmManager, Collections.emptyList());
+        check(!hasActiveNotification(manager, orphanNotificationId),
+                "notification reconciliation still runs when AlarmManager is unavailable");
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
     }
 
