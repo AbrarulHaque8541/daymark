@@ -30,6 +30,14 @@ scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.j
 assert 'static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";' in receiver, \
     "the snooze action needs a stable name"
 assert "if (ACTION_SNOOZE.equals(action)) {" in receiver, "the receiver must branch on the snooze action"
+assert 'static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";' in receiver, "the dismiss action needs a stable name"
+assert "if (ACTION_DISMISS.equals(action)) {" in receiver, "the receiver must branch on the dismiss action"
+assert ".setAction(ACTION_DISMISS)" in receiver, "the dismiss PendingIntent must carry the dismiss action"
+assert '"Dismiss", dismiss' in receiver, "the expanded reminder must expose a dismiss quick action"
+assert "new Notification.BigTextStyle()" in receiver, "the reminder must provide expanded notification content"
+dismiss_method = receiver.split("private void dismissReminder", 1)[1].split("private void snoozeReminder", 1)[0]
+assert "notificationManager.cancel(notificationId);" in dismiss_method, "dismiss must clear only the visible notification"
+assert "EncryptedTaskStore" not in dismiss_method and "TaskReminderScheduler" not in dismiss_method, "dismiss must not mutate task data or reminder schedules"
 assert ".setAction(ACTION_SNOOZE)" in receiver, "the snooze PendingIntent must carry the snooze action"
 assert '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' in receiver, \
     "the notification must offer the snooze action"
