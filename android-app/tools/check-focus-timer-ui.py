@@ -43,5 +43,8 @@ for fixed_accent in ["0xFF12617A", "0xFF54368F", "0xFF27D5F2", "0xFF9B70FF"]:
 assert "while (" not in sound and "Thread.sleep" not in sound, "Sound must not use a looping/blocking playback loop"
 assert "RECORD_AUDIO" not in sound and "MODIFY_AUDIO_SETTINGS" not in sound, "Sound effects must not request microphone/audio-control permissions"
 assert "onChooseTask" in panel and "listener.onChooseTask()" in panel
+assert "if (closed) return;" in panel, "disposed panel must ignore render and public state updates"
+assert "if (!closed && timer != null && !timer.isFinished())" in panel, "disposed panel must not dispatch Finish"
+assert "private boolean released;" in sound and "|| released" in sound, "released soundscape must never recreate audio resources"
 
 print("PASS focus timer UI/sound source guard")
