@@ -55,6 +55,7 @@ final class BrowserAddressNoticeView extends LinearLayout {
     private SiteInfoListener siteInfoListener;
     private int maxInlineWidthPx;
     private boolean disposed;
+    private boolean detached;
 
     BrowserAddressNoticeView(Context context) {
         this(context, null);
@@ -197,12 +198,23 @@ final class BrowserAddressNoticeView extends LinearLayout {
                 state.collapsePanel();
             }
             renderInline(false);
-            if (isAttachedToWindow()) scheduleTimeoutIfNeeded();
+            if (!detached && isAttachedToWindow()) scheduleTimeoutIfNeeded();
         });
 
         int gravity = getLayoutDirection() == View.LAYOUT_DIRECTION_RTL
                 ? Gravity.END : Gravity.START;
-        panel.showAsDropDown(indicatorTarget, 0, dp(4), gravity);
+        try {
+            panel.showAsDropDown(indicatorTarget, 0, dp(4), gravity);
+        } catch (RuntimeException windowUnavailable) {
+            PopupWindow failedPanel = panel;
+            panel = null;
+            if (failedPanel.isShowing()) failedPanel.dismiss();
+            if (state.presentation() == BrowserAddressNotice.Presentation.PANEL) {
+                state.collapsePanel();
+            }
+            renderInline(false);
+            scheduleTimeoutIfNeeded();
+        }
     }
 
     private LinearLayout buildPanelContent(BrowserAddressNotice.Notice notice) {
@@ -325,7 +337,7 @@ final class BrowserAddressNoticeView extends LinearLayout {
 
     private void scheduleTimeoutIfNeeded() {
         BrowserAddressNotice.Notice notice = state.current();
-        if (disposed || notice == null
+        if (disposed || detached || notice == null
                 || notice.severity == BrowserAddressNotice.Severity.CRITICAL
                 || state.presentation() != BrowserAddressNotice.Presentation.INLINE) return;
         cancelTimeout();
@@ -352,8 +364,10 @@ final class BrowserAddressNoticeView extends LinearLayout {
     }
 
     private int panelWidthPx() {
-        int available = getResources().getDisplayMetrics().widthPixels - dp(24);
-        return Math.max(dp(200), Math.min(dp(320), available));
+        int windowWidth = getRootView().getWidth();
+        if (windowWidth <= 0) windowWidth = getResources().getDisplayMetrics().widthPixels;
+        int available = windowWidth - dp(24);
+        return available > 0 ? Math.min(dp(320), available) : dp(240);
     }
 
     private GradientDrawable circleBackground() {
@@ -406,11 +420,13 @@ final class BrowserAddressNoticeView extends LinearLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        detached = false;
         if (!disposed) scheduleTimeoutIfNeeded();
     }
 
     @Override
     protected void onDetachedFromWindow() {
+        detached = true;
         cancelTimeout();
         if (labelAnimator != null) {
             labelAnimator.cancel();
