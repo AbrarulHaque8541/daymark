@@ -25,12 +25,17 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     static final String EXTRA_FIRE_INSTANT = "daymark.extra.fire_instant";
     /** Sent by the notification's Snooze action; the distinct action keeps its PendingIntent separate. */
     static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";
+    static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";
 
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent == null || intent.getAction() == null ? "" : intent.getAction();
         if (ACTION_SNOOZE.equals(action)) {
             snoozeReminder(context, intent);
+            return;
+        }
+        if (ACTION_DISMISS.equals(action)) {
+            dismissReminder(context, intent);
             return;
         }
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)
@@ -68,17 +73,44 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                         .putExtra(EXTRA_TASK_ID, intent.getStringExtra(EXTRA_TASK_ID))
                         .putExtra(EXTRA_TASK_TITLE, title),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent dismiss = PendingIntent.getBroadcast(context, notificationId + 100000,
+                new Intent(context, TaskReminderReceiver.class)
+                        .setAction(ACTION_DISMISS)
+                        .putExtra(EXTRA_NOTIFICATION_ID, notificationId),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle(title)
-                .setContentText("Task reminder. Tap to open Daymark.")
+                .setContentText("Reminder due · Tap to open Daymark")
+                .setStyle(new Notification.BigTextStyle()
+                        .bigText("It's time for this task. Open Daymark to review the details, "
+                                + "or snooze the reminder for " + TaskReminderScheduler.SNOOZE_MINUTES
+                                + " minutes."))
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
                 .setContentIntent(open)
                 .addAction(new Notification.Action.Builder(
-                        Icon.createWithResource(context, android.R.drawable.ic_popup_reminder),
+                        Icon.createWithResource(context, android.R.drawable.ic_lock_idle_alarm),
                         "Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min", snooze).build())
+                .addAction(new Notification.Action.Builder(
+                        Icon.createWithResource(context, android.R.drawable.ic_menu_close_clear_cancel),
+                        "Dismiss", dismiss).build())
+                .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .build();
         notificationManager.notify(notificationId, notification);
+    }
+
+    /** Dismiss only clears this notification; it does not alter the task or its schedule. */
+    private void dismissReminder(Context context, Intent intent) {
+        int notificationId = intent == null ? 0 : intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
+        if (notificationId <= 0) {
+            Log.w("DaymarkReminder", "A dismiss action arrived without a notification id.");
+            return;
+        }
+        NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) notificationManager.cancel(notificationId);
     }
 
     /**
