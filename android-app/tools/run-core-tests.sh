@@ -42,6 +42,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserSelfHealingPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDiagnostics.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserCookieImport.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/CosmeticFilterToCss.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterCore.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterRecoveryStore.java" \
@@ -76,6 +77,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserSelfHealingPolicySmoke.java" \
   "$ROOT/tools/BrowserDiagnosticsSmoke.java" \
   "$ROOT/tools/ExtensionPackageParserSmoke.java" \
+  "$ROOT/tools/BrowserCookieImportSmoke.java" \
   "$ROOT/tools/CosmeticFilterToCssSmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
@@ -103,4 +105,5 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserViewportPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserSelfHealingPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDiagnosticsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ExtensionPackageParserSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserCookieImportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CosmeticFilterToCssSmoke
