@@ -11,6 +11,9 @@ required_panel = [
     "setDailySummary", "setSoundEnabled", "setFinalTicksEnabled",
     "showCustomDuration", "ProgressRing", "ValueAnimator",
     "primaryAction.setEnabled(true)",
+    "int background, int surface, int surfaceAlt, int text, int muted",
+    "int accent, int accentSoft, int warning",
+    "ACCENT_SOFT",
 ]
 for token in required_panel:
     assert token in panel, f"Focus Timer panel missing contract: {token}"
@@ -27,6 +30,8 @@ for token in required_sound:
 assert "private boolean soundEnabled = true;" in panel
 assert "private boolean finalTicksEnabled;" in panel
 assert "startTone" not in panel, "UI must route sounds through the soundscape"
+for fixed_accent in ["0xFF12617A", "0xFF54368F", "0xFF27D5F2", "0xFF9B70FF"]:
+    assert fixed_accent not in panel, f"Focus Timer must not hardcode a separate palette: {fixed_accent}"
 assert "while (" not in sound and "Thread.sleep" not in sound, "Sound must not use a looping/blocking playback loop"
 assert "RECORD_AUDIO" not in sound and "MODIFY_AUDIO_SETTINGS" not in sound, "Sound effects must not request microphone/audio-control permissions"
 assert "onChooseTask" in panel and "listener.onChooseTask()" in panel
