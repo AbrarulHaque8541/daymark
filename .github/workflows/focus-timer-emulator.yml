@@ -12,6 +12,7 @@ on:
       - "android-app/app/build.gradle.kts"
       - "android-app/tools/check-v1-source.sh"
       - "android-app/tools/run-core-tests.sh"
+  workflow_dispatch:
 
 permissions:
   contents: read
