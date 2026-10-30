@@ -147,6 +147,14 @@ final class TaskReminderScheduler {
         for (Task task : tasks) {
             if (task != null && task.id != null) liveTasks.put(task.id, task);
         }
+        SharedPreferences reminderPreferences =
+                context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE);
+        for (String key : reminderPreferences.getAll().keySet()) {
+            if (key.startsWith(SNOOZE_KEY_PREFIX)
+                    && !liveTasks.containsKey(key.substring(SNOOZE_KEY_PREFIX.length()))) {
+                reminderPreferences.edit().remove(key).apply();
+            }
+        }
 
         // Reconcile active app-owned reminder notifications first. This also recovers a missing
         // request-code entry from a valid notification's task ID and notification ID.
