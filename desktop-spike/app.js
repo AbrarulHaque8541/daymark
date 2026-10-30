@@ -1,7 +1,8 @@
 (() => {
   'use strict';
   const core = window.DaymarkTaskCore;
-  if (!core) return;
+  const capabilityPolicy = window.DaymarkDeviceCapabilityPolicy;
+  if (!core || !capabilityPolicy) return;
 
   let tasks = [];
   let activeFilter = 'open';
@@ -15,6 +16,47 @@
   const doneCount = document.getElementById('done-count');
   const status = document.getElementById('status-message');
   const filterButtons = Array.from(document.querySelectorAll('[data-filter]'));
+  const surfaceMode = document.getElementById('surface-mode');
+
+  // Browser APIs expose input/display affordances, not reliable hardware identity.
+  // Classify the current interaction surface; never claim native OS or wearable support.
+  function detectSurfaceProfile() {
+    const width = document.documentElement.clientWidth || window.innerWidth || 320;
+    const media = (query) => typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+    const finePointer = media('(pointer: fine)');
+    const coarsePointer = media('(pointer: coarse)');
+    const touchPoints = Number.isFinite(navigator.maxTouchPoints) ? navigator.maxTouchPoints : 0;
+    const surface = finePointer && media('(hover: hover)') ? 'desktop' : width >= 600 ? 'tablet' : 'phone';
+    const display = width >= 900 ? 'full' : width >= 600 ? 'compact' : 'glance';
+    const inputs = [];
+    if (finePointer) inputs.push('pointer');
+    if (coarsePointer || touchPoints > 0) inputs.push('touch');
+    const profile = capabilityPolicy.createDeviceCapabilityProfile({
+      surface,
+      display,
+      inputs,
+      features: ['task-capture', 'task-review']
+    });
+    document.documentElement.dataset.daymarkSurface = surface;
+    document.documentElement.dataset.daymarkDisplay = display;
+    if (surfaceMode) surfaceMode.textContent = `${surface} · ${display} view`;
+    const canCapture = profile.actions.includes('capture-task');
+    const submit = form.querySelector('button[type="submit"]');
+    input.disabled = !canCapture;
+    submit.disabled = !canCapture;
+    if (!canCapture) announce('This input mode is read-only. Connect a supported touch or pointer input to add tasks.');
+    return profile;
+  }
+
+  let surfaceProfile = detectSurfaceProfile();
+  let resizeFrame = null;
+  window.addEventListener('resize', () => {
+    if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+    resizeFrame = window.requestAnimationFrame(() => {
+      resizeFrame = null;
+      surfaceProfile = detectSurfaceProfile();
+    });
+  }, { passive: true });
 
   function announce(message) { status.textContent = message; }
 
