@@ -79,7 +79,7 @@ expect_fail_after_removal check-task-ux.py "ShareIntake.parse("
 expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())"
 # Reminder snooze must only re-arm the alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' "$RECEIVER" "$ROOT"
-expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt," "$SCHEDULER" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"
 # Site history search and single-site removal must fail closed.
 python3 "$ROOT/tools/check-browser-history.py" "$ROOT" >/dev/null
 echo "PASS meta: check-browser-history.py passes on current source"
