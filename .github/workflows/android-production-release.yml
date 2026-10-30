@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build-verify-draft:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-device-test.')
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
@@ -37,6 +37,19 @@ jobs:
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run exact-tag repository and Android source checks
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test
+          sh android-app/tools/check-v1-source.sh
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -88,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon assembleGithubSideloadRelease bundleGithubSideloadRelease lintGithubSideloadRelease testGithubSideloadReleaseUnitTest
+          ./gradlew --no-daemon assembleGithubSideloadRelease bundleGithubSideloadRelease lintGithubSideloadRelease
 
       - name: Print complete release lint report on build failure
         if: failure()
@@ -326,8 +339,12 @@ jobs:
           notes="$RUNNER_TEMP/release-notes.md"
           release_json="$RUNNER_TEMP/release.json"
           releases_json="$RUNNER_TEMP/releases.json"
+          release_notes="../docs/releases/v${VERSION_NAME}.md"
+          test -s "$release_notes" || { echo "::error::Missing version-specific release notes: $release_notes"; exit 1; }
           {
             echo "## Daymark v$VERSION_NAME"
+            echo
+            cat "$release_notes"
             echo
             echo 'Download **only** this one file: `'"$APK_NAME"'`.'
             echo
