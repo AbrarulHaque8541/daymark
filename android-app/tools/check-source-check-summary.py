@@ -3,7 +3,7 @@
 
 The audit found the final `print("PASS ...")` block repeated several lines
 verbatim and still claimed "no permissions/network" for a manifest that declares
-INTERNET for the HTTPS-only browser — a stale summary contradicting the
+INTERNET for the HTTP+HTTPS browser — a stale summary contradicting the
 assertions above it. This guard fails if a duplicate summary line returns or if
 the block again claims the app declares no network permission.
 """
@@ -31,7 +31,7 @@ for stale in ("no permissions/network", "no permissions, network"):
     check(not any(stale in line for line in summaries),
           f"the summary must not claim the app declares no network permission: {stale}")
 
-check(any("INTERNET for the HTTPS-only browser" in line for line in summaries),
+check(any("INTERNET for the HTTP+HTTPS browser" in line for line in summaries),
       "the summary must state the real INTERNET permission for the browser")
 
 print(f"PASS source-check summary: {checks} assertions (no duplicate or stale summary lines)")
