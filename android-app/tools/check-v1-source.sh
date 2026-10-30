@@ -27,6 +27,7 @@ python3 ./tools/check-extension-import-hardening.py "$ROOT"
 python3 ./tools/check-browser-tab-settings.py "$ROOT"
 python3 ./tools/check-browser-downloads.py "$ROOT"
 python3 ./tools/check-reminder-lifecycle.py "$ROOT"
+python3 ./tools/check-focus-timer-notification.py "$ROOT"
 python3 ./tools/check-reader-mode.py "$ROOT"
 python3 ./tools/check-find-in-page.py "$ROOT"
 python3 ./tools/check-browser-downloads-entry.py "$ROOT"
@@ -64,6 +65,7 @@ permission_names = lambda manifest_root: {item.get(android_name) for item in man
 assert permission_names(manifest) == {
     "android.permission.INTERNET",
     "android.permission.POST_NOTIFICATIONS",
+    "android.permission.POST_PROMOTED_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.VIBRATE",
 }, "shared manifest declares INTERNET for the HTTPS-only browser plus notification/boot/vibrate for task reminders"
@@ -551,7 +553,7 @@ assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")
 # verbatim and still claimed "no permissions/network" for a manifest that declares
 # INTERNET for the HTTPS-only browser (issue #45) — a stale summary that contradicted
 # the assertions above it.
-print("PASS manifest/permissions: main declares INTERNET for the HTTPS-only browser plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for task reminders; Play adds none; GitHub sideload adds ACCESS_NETWORK_STATE; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
+print("PASS manifest/permissions: main declares INTERNET for the HTTPS-only browser plus POST_NOTIFICATIONS/POST_PROMOTED_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for task reminders; Play adds none; GitHub sideload adds ACCESS_NETWORK_STATE; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
 print("PASS permission policy: manifest-backed browser status plus a notification permission prompt only when a reminder is enabled; no other runtime permission prompt code")
 print("PASS encrypted task-store policy: writer and reader share invalid/duplicate-task rejection")
 print("PASS lifecycle policy: task/storage/attachment/browser callbacks are suppressed after Activity destruction")
