@@ -24,7 +24,9 @@ function detectWebSurfaceProfile(policy, environment) {
 
   const surface = finePointer && hover ? 'desktop' : width >= 600 ? 'tablet' : 'phone';
   const display = width >= 900 ? 'full' : width >= 600 ? 'compact' : 'glance';
-  const inputs = [];
+  // HTML text controls support keyboard and IME input even when browsers cannot report
+  // whether a physical keyboard is attached. This is an input channel, not a hardware claim.
+  const inputs = ['keyboard'];
   if (finePointer) inputs.push('pointer');
   if (coarsePointer || touchPoints > 0) inputs.push('touch');
   const profile = policy.createDeviceCapabilityProfile({
