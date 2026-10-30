@@ -62,8 +62,8 @@ final class TaskFocusSessionController {
 
     /** Pauses a running session and removes its ongoing notification. */
     synchronized TaskFocusTimer pause(TaskFocusTimer timer) throws Exception {
-        requireCurrent(timer, TaskFocusTimer.Status.RUNNING);
-        TaskFocusTimer paused = timer.pause(clock.elapsedRealtimeMs());
+        TaskFocusTimer current = requireCurrent(timer, TaskFocusTimer.Status.RUNNING);
+        TaskFocusTimer paused = current.pause(clock.elapsedRealtimeMs());
         persist(paused);
         notifications.cancel();
         return paused;
@@ -71,9 +71,9 @@ final class TaskFocusSessionController {
 
     /** Resumes only a paused session after an explicit user Resume action. */
     synchronized TaskFocusTimer resume(TaskFocusTimer timer, String taskTitle) throws Exception {
-        requireCurrent(timer, TaskFocusTimer.Status.PAUSED);
+        TaskFocusTimer current = requireCurrent(timer, TaskFocusTimer.Status.PAUSED);
         long now = clock.elapsedRealtimeMs();
-        TaskFocusTimer running = timer.resume(now);
+        TaskFocusTimer running = current.resume(now);
         persist(running);
         publishIfRunning(running, taskTitle, now);
         return running;
@@ -118,7 +118,7 @@ final class TaskFocusSessionController {
                 || persisted.isFinished()) {
             throw new IllegalStateException("The focus session is no longer active.");
         }
-        TaskFocusTimer finished = timer.finish(clock.elapsedRealtimeMs());
+        TaskFocusTimer finished = persisted.finish(clock.elapsedRealtimeMs());
         store.clear(clock.elapsedRealtimeMs(), clock.wallClockMs(), clock.bootCount());
         notifications.cancel();
         return finished;
@@ -128,7 +128,7 @@ final class TaskFocusSessionController {
         return store.load(clock.elapsedRealtimeMs(), clock.wallClockMs(), clock.bootCount());
     }
 
-    private void requireCurrent(TaskFocusTimer timer, TaskFocusTimer.Status expected)
+    private TaskFocusTimer requireCurrent(TaskFocusTimer timer, TaskFocusTimer.Status expected)
             throws Exception {
         requireTimer(timer);
         TaskFocusTimer persisted = loadCurrent();
@@ -136,6 +136,7 @@ final class TaskFocusSessionController {
                 || persisted.status() != expected) {
             throw new IllegalStateException("The saved focus session changed; restore it before acting.");
         }
+        return persisted;
     }
 
     private void persist(TaskFocusTimer timer) throws Exception {
