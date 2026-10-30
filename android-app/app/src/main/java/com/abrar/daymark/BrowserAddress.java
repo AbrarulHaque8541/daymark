@@ -130,6 +130,15 @@ final class BrowserAddress {
         }
     }
 
+    static boolean shouldHandOffExternalScheme(boolean mainFrame, boolean userGesture, String scheme) {
+        if (!mainFrame || !userGesture || scheme == null) return false;
+        switch (scheme.toLowerCase(Locale.ROOT)) {
+            case "tg": case "telegram": case "mailto": case "tel": case "sms":
+            case "smsto": case "geo": case "market": case "whatsapp": return true;
+            default: return false;
+        }
+    }
+
     static boolean isLikelyWebAddress(String value) {
         if (value == null) return false;
         String candidate = value.trim();
