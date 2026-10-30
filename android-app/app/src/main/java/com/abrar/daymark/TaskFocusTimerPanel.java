@@ -263,7 +263,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         if (value == null) {
             timeValue.setText(selectedMode == TaskFocusTimer.Mode.STOPWATCH ? "00:00:00" : format(selectedDurationMs));
             statusLabel.setText(selectedMode == TaskFocusTimer.Mode.STOPWATCH ? "READY WHEN YOU ARE" : "TARGET DURATION");
-            progressRing.setProgress(0f, selectedMode == TaskFocusTimer.Mode.COUNTDOWN ? VIOLET : CYAN);
+            progressRing.setProgress(0f, ACCENT);
         } else {
             long elapsed = value.elapsedMsAt(nowElapsedRealtimeMs);
             long shown = value.isCountdown() ? value.remainingMsAt(nowElapsedRealtimeMs) : elapsed;
@@ -325,7 +325,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private TextView modeButton(String text, boolean selected) {
         TextView view = label(text, 13, selected ? TEXT : MUTED, true);
         view.setGravity(Gravity.CENTER);
-        view.setBackground(round(selected ? 0xFF12617A : SURFACE, 18));
+        view.setBackground(round(selected ? ACCENT_SOFT : SURFACE, 18));
         return view;
     }
 
@@ -336,7 +336,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                     selectedDurationMs == minutes * 60_000L ? TEXT : MUTED, true);
             preset.setGravity(Gravity.CENTER);
             preset.setBackground(round(selectedDurationMs == minutes * 60_000L
-                    ? 0xFF54368F : SURFACE_HI, 16));
+                    ? ACCENT_SOFT : SURFACE_HI, 16));
             LayoutParams lp = new LayoutParams(0, dp(62), 1);
             if (presetRow.getChildCount() > 0) lp.leftMargin = dp(6);
             presetRow.addView(preset, lp);
