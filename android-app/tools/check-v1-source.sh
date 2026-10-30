@@ -1,4 +1,3 @@
-cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
 sh ./tools/run-browser-address-notice-tests.sh
@@ -250,7 +249,7 @@ assert "daymark-download://media?url=" in activity, "in-player download button m
 assert "window.location.href='daymark-download://media?url='" in activity, "overlay click must use a bounded custom-scheme handoff rather than a fake HTML download"
 assert "onMediaDownloadRequested(String url)" in webview and "request.hasGesture()" in webview, "media handoff must require a user gesture"
 assert "BrowserMediaPolicy.allowsHandoff" in webview and "BrowserAddress.isAllowedWebUrl(mediaUrl)" in media_policy, "media handoff must centralize HTTPS validation"
-for expected in ("offline mode must block media handoff", "media handoff must require a user gesture", "cleartext media must be rejected"):
+for expected in ("offline mode must block media handoff", "media handoff must require a user gesture", "HTTP media URLs are allowed alongside HTTPS"):
     assert expected in media_smoke, f"missing executable media-policy regression: {expected}"
 assert "BrowserTabPolicy.MAX_TABS = 6" in tab_policy or "MAX_TABS = 6" in tab_policy, "browser tabs must have a memory-conscious limit"
 for expected in ("tab count must be bounded", "closing the last tab should leave no selection", "selection must remain within the remaining tab list"):
