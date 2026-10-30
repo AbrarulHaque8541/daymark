@@ -39,6 +39,15 @@ assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity
 assert 'static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";' in receiver
 assert "if (ACTION_SNOOZE.equals(action)) {" in receiver
 assert ".setAction(ACTION_SNOOZE)" in receiver
+assert 'static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";' in receiver
+assert "if (ACTION_DISMISS.equals(action))" in receiver
+assert 'new Notification.BigTextStyle()' in receiver
+assert "Notification.VISIBILITY_PRIVATE" in receiver
+assert "Notification.CATEGORY_REMINDER" in receiver
+assert '"Dismiss", dismiss' in receiver
+assert "expectedId != notificationId" in receiver
+assert "private void dismissReminder(Context context, Intent intent)" in receiver
+assert "notificationManager.cancel(notificationId)" not in receiver.split("private void dismissReminder", 1)[1].split("private void snoozeReminder", 1)[0],     "dismiss must validate the task's canonical ID before clearing a notification"
 assert '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' in receiver
 assert "PendingIntent.FLAG_IMMUTABLE" in receiver
 assert "static final int SNOOZE_MINUTES = 10;" in scheduler
@@ -73,6 +82,9 @@ assert "TaskReminderReceiver.refreshPostedNotification(" in scheduler
 assert "if (alarmManager == null)" in scheduler
 assert "AlarmManager is unavailable; in-app reminder remains available." in scheduler
 assert "private static final String SNOOZE_KEY_PREFIX = \"snooze.\";" in scheduler
+assert "for (String key : reminderPreferences.getAll().keySet())" in scheduler
+assert "liveTasks.containsKey(key.substring(SNOOZE_KEY_PREFIX.length()))" in scheduler
+assert "valid active notification recovers a lost canonical ID index" in instrumentation
 
 # Policy is independently compiled and executed in the canonical host test suite.
 assert "ReminderSchedulePolicy.java" in core_runner
