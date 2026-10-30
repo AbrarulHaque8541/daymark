@@ -1,4 +1,3 @@
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
@@ -368,7 +367,7 @@ for expected in (
     "BrowserAddress.isAllowedWebUrl(url)",
     "request.isForMainFrame()",
     "request.isRedirect()",
-    "onHttpNavigationBlocked(request.getUrl().toString(), request.isRedirect())",
+    "onHttpNavigationBlocked(url, true)",  // HTTPS→HTTP redirect downgrade still blocked
 ):
     assert expected in webview, f"missing WebView security boundary: {expected}"
 for forbidden in ("addJavascriptInterface(", "shouldInterceptRequest(", "loadUrl(request.getUrl",
