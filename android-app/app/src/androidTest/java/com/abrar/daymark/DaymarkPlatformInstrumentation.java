@@ -117,14 +117,25 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         android.app.NotificationManager manager =
                 (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         check(manager != null, "NotificationManager is available");
-        Task task = TaskLogic.create("Reminder original", "2099-12-01", "high",
+        Task scheduledTask = TaskLogic.create("Reminder original", "2099-12-01", "high",
                 null, null, 60, null);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(scheduledTask));
+        Integer allocatedId = TaskReminderScheduler.getNotificationId(context, scheduledTask.id);
+        check(allocatedId != null && allocatedId > 0,
+                "scheduler allocates a canonical request code for a future reminder");
+
+        // Simulate the notification after its base alarm has fired. A real snooze timestamp
+        // is now+10m, so the base occurrence must be at or before now.
+        Task task = scheduledTask.withDetails(scheduledTask.title, "2026-10-29",
+                scheduledTask.priority, java.time.Instant.now().toString());
         java.time.ZoneId zone = java.time.ZoneId.systemDefault();
         java.time.Instant fire = ReminderSchedulePolicy.baseFire(task, zone);
-        check(fire != null, "future reminder fire instant is computed");
+        check(fire != null && !fire.isAfter(java.time.Instant.now()),
+                "simulated posted reminder represents an already-fired base occurrence");
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(task));
         Integer notificationId = TaskReminderScheduler.getNotificationId(context, task.id);
-        check(notificationId != null && notificationId > 0, "scheduler stores the canonical request code");
+        check(notificationId != null && notificationId.equals(allocatedId),
+                "fired reminder retains its canonical request code");
 
         TaskReminderScheduler.ensureChannel(context);
         postTestReminder(manager, context, notificationId, task, fire.toString());
