@@ -49,8 +49,19 @@ set -e
 cat /tmp/daymark-reminder-instrumentation.log
 if [ "$STATUS" -ne 0 ]; then
   echo "FAIL platform instrumentation command exit: $STATUS" >&2
+  echo "--- instrumentation phase markers (DaymarkInstr / DaymarkReminder):" >&2
+  "$ADB" -s "$MODE" logcat -d -s DaymarkInstr:V DaymarkReminder:V 2>/dev/null >&2 || true
   echo "--- process state at failure:" >&2
   "$ADB" -s "$MODE" shell ps -A 2>/dev/null | grep daymark >&2 || true
+  PID=$("$ADB" -s "$MODE" shell pidof com.abrar.daymark 2>/dev/null | tr -d '\r' || true)
+  PID=$(echo "$PID" | tr -d ' ')
+  if [ -n "$PID" ]; then
+    echo "--- thread stacks for com.abrar.daymark (pid $PID):" >&2
+    "$ADB" -s "$MODE" root >/dev/null 2>&1 || true
+    "$ADB" -s "$MODE" wait-for-device >/dev/null 2>&1 || true
+    "$ADB" -s "$MODE" shell debuggerd -j "$PID" >&2 2>/dev/null || \
+      "$ADB" -s "$MODE" shell debuggerd -b "$PID" >&2 2>/dev/null || true
+  fi
   echo "--- recent device log:" >&2
   "$ADB" -s "$MODE" logcat -d -t 200 2>/dev/null | tail -n 100 >&2 || true
   exit "$STATUS"

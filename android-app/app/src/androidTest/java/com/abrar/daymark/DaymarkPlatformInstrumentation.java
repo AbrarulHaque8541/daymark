@@ -46,26 +46,42 @@ import javax.crypto.spec.SecretKeySpec;
 /** Platform-only instrumentation; intentionally uses no JUnit/AndroidX test dependency. */
 public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private static final String TASK_ID = "instrumentation-task-v1";
+    private static final String LOG_TAG = "DaymarkInstr";
     private int assertions;
 
     @Override
     public void onStart() {
         Bundle result = new Bundle();
         try {
-            importLegacySnapshotRoundTripAndRollback();
-            attachmentProviderPipeAndAndroidCrypto();
-            portableImportUriJournalPreservesRecreationAndCleansOrphans();
-            portableBackupRekeysAndReconcilesProcessDeath();
-            reminderNotificationLifecycleUsesCurrentTaskState();
+            android.util.Log.i(LOG_TAG, "instrumentation starting on SDK " + android.os.Build.VERSION.SDK_INT);
+            runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
+            runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
+            runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
+            runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
+            runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
+            android.util.Log.i(LOG_TAG, "all phases passed; " + assertions + " assertions");
             result.putString("result", "passed");
             result.putInt("assertions", assertions);
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
+            android.util.Log.e(LOG_TAG, "instrumentation failed after " + assertions + " assertions", failure);
             result.putString("result", "failed");
             result.putInt("assertions", assertions);
             result.putString("failure", stackTrace(failure));
             finish(Activity.RESULT_CANCELED, result);
         }
+    }
+
+    /** Logs a progress marker before and after each phase so CI can localize any hang. */
+    private void runPhase(String name, PhaseAction action) throws Exception {
+        android.util.Log.i(LOG_TAG, "PHASE " + name + ": start");
+        action.run();
+        android.util.Log.i(LOG_TAG, "PHASE " + name + ": ok (" + assertions + " assertions so far)");
+    }
+
+    @FunctionalInterface
+    private interface PhaseAction {
+        void run() throws Exception;
     }
 
     private void reminderNotificationLifecycleUsesCurrentTaskState() throws Exception {
@@ -783,3 +799,4 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         InputStream open() throws IOException;
     }
 }
+
