@@ -1,9 +1,9 @@
 # Daymark multi-device architecture and support matrix
 
 **Status:** Architecture proposal / implementation not yet complete. This document is not a compatibility claim.
-**Baseline inspected:** `main` at `76277adba7ad26521f60b7a4da408bb31f5f48ce`.
+**Baseline inspected:** `main` at `67d08db5b13fc4da73c2c0dfbe59a1c574dd69c2`.
 **Owner direction:** Make Daymark useful across device classes and operating systems, including constrained and display-less companions, while preserving the current Android product.
-**Last updated:** 2026-10-30T18:55:05.347Z
+**Last updated:** 2026-10-30T19:18:00Z
 
 ## 1. Product principle
 
@@ -22,7 +22,7 @@ The full product should adapt to:
 
 | Area | Current source state |
 |---|---|
-| Android app | Native Java Activity + Android System WebView |
+| Android app | Native Java Activity + Android System WebView; task-linked focus timer and notifications are now on main after PR #382 |
 | Android identity | applicationId and namespace `com.abrar.daymark` — immutable without owner approval |
 | Android range | minSdk 26 (Android 8.0+), targetSdk 36 in inspected source |
 | Storage | Local encrypted task/attachment stores and encrypted portable backup; no account or mandatory cloud sync |
