@@ -1,0 +1,582 @@
+package com.abrar.daymark;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
+import android.content.ActivityNotFoundException;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.webkit.CookieManager;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * User-initiated SAF cookie import flow, kept separate from the host screen until its current
+ * owners finish their work. The host starts this flow from an explicit user action and forwards
+ * onActivityResult(requestCode, resultCode, data) to this instance.
+ *
+ * <p>Only the URI returned by ACTION_OPEN_DOCUMENT is read. The provider grant is temporary:
+ * this class never takes a persistable grant, stores the URI, scans other apps, or logs values.
+ */
+public final class BrowserCookieImportFlow {
+    public static final int REQUEST_CODE = 7820;
+    private static final int MAX_FILE_BYTES = 2 * 1024 * 1024;
+    private static final int MAX_COOKIE_NAMES_PER_DOMAIN = 8;
+
+    public interface Listener {
+        void onCookieImportFinished(int imported, int rejected, int expired);
+    }
+
+    private final Activity activity;
+    private final Listener listener;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Set<String> selectedDomains = new LinkedHashSet<>();
+
+    private BrowserCookieImport.ParseResult parsed;
+    private BrowserCookieImportPolicy.Preview preview;
+    private List<BrowserCookieImport.Cookie> pendingCookies = Collections.emptyList();
+    private AlertDialog activeDialog;
+    private ProgressDialog progressDialog;
+    private volatile InputStream activeReadStream;
+    private Thread readThread;
+    private boolean reading;
+    private int readGeneration;
+    private int pendingIndex;
+    private int importedCount;
+    private int rejectedCount;
+    private int expiredDuringImport;
+    private boolean importing;
+    private boolean importCancelled;
+    private boolean flushFailed;
+
+    public BrowserCookieImportFlow(Activity activity, Listener listener) {
+        if (activity == null) throw new IllegalArgumentException("Activity is required.");
+        this.activity = activity;
+        this.listener = listener;
+    }
+
+    /** Call only in response to a visible user action, such as a future browser settings row. */
+    @SuppressWarnings("deprecation")
+    public void start() {
+        if (importing || reading || (activeDialog != null && activeDialog.isShowing())) return;
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        picker.addCategory(Intent.CATEGORY_OPENABLE);
+        picker.setType("*/*");
+        picker.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"text/plain", "application/octet-stream"});
+        picker.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
+        picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            activity.startActivityForResult(picker, REQUEST_CODE);
+        } catch (ActivityNotFoundException unavailable) {
+            showToast("No document picker is available on this device.");
+        }
+    }
+
+    /** Forward the host Activity result here; returns false for unrelated request codes. */
+    public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode != REQUEST_CODE) return false;
+        if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+            if (reading || readThread != null) cancelRead();
+            clearSensitiveState();
+            return true;
+        }
+        if (reading || readThread != null) cancelRead();
+
+        final Uri selectedUri = data.getData();
+        // ACTION_OPEN_DOCUMENT must return a provider-backed content URI. Reject file:// and
+        // other URI schemes rather than broadening the import surface beyond SAF.
+        if (!"content".equalsIgnoreCase(selectedUri.getScheme())
+                || selectedUri.getAuthority() == null
+                || selectedUri.getAuthority().isEmpty()) {
+            clearSensitiveState();
+            showMessage("Unsupported document source",
+                    "Choose a document from the system document picker. No cookies were imported.");
+            return true;
+        }
+        final int generation = ++readGeneration;
+        reading = true;
+        try {
+            showProgressDialog("Reading the selected document…");
+            Thread worker = new Thread(() -> {
+                BrowserCookieImport.ParseResult parsedResult = null;
+                BrowserCookieImportPolicy.Preview previewResult = null;
+                boolean readFailed = false;
+                try {
+                    String text = readSelectedFile(selectedUri);
+                    try {
+                        parsedResult = BrowserCookieImport.parse(text);
+                    } finally {
+                        text = null;
+                    }
+                    if (!parsedResult.inputTruncated && parsedResult.recognizedFormat
+                            && !parsedResult.isEmpty()) {
+                        previewResult = BrowserCookieImportPolicy.createPreview(
+                                parsedResult, System.currentTimeMillis() / 1000L);
+                    }
+                } catch (IOException | RuntimeException failure) {
+                    readFailed = true;
+                }
+
+                final BrowserCookieImport.ParseResult completedParsed = parsedResult;
+                final BrowserCookieImportPolicy.Preview completedPreview = previewResult;
+                final boolean failed = readFailed;
+                mainHandler.post(() -> {
+                    if (generation != readGeneration) return;
+                    reading = false;
+                    readThread = null;
+                    dismissProgressDialog();
+                    if (activity.isFinishing() || activity.isDestroyed()) {
+                        clearSensitiveState();
+                        return;
+                    }
+                    if (failed || completedParsed == null) {
+                        clearSensitiveState();
+                        showMessage("Could not read cookie export",
+                                "The selected document could not be read as a bounded UTF-8 text export. "
+                                        + "No cookies were imported.");
+                        return;
+                    }
+                    parsed = completedParsed;
+                    preview = completedPreview;
+                    showParsedPreview();
+                });
+            }, "DaymarkCookieImportRead");
+            readThread = worker;
+            readThread.start();
+        } catch (RuntimeException startFailure) {
+            reading = false;
+            readThread = null;
+            dismissProgressDialog();
+            clearSensitiveState();
+            showMessage("Could not read cookie export",
+                    "The selected document could not be read. No cookies were imported.");
+        }
+        return true;
+    }
+
+    private void showParsedPreview() {
+        if (parsed.inputTruncated) {
+            clearSensitiveState();
+            showMessage("Export exceeds safe limits",
+                    "The file exceeded the parser's size, line or cookie limit. Split the export "
+                            + "into smaller files and try again. No cookies were imported.");
+            return;
+        }
+        if (!parsed.recognizedFormat || parsed.isEmpty()) {
+            clearSensitiveState();
+            showMessage("Unsupported cookie export",
+                    "Choose a valid Netscape cookies.txt export. No cookies were imported.");
+            return;
+        }
+        if (preview == null) {
+            clearSensitiveState();
+            showMessage("Could not review cookie export",
+                    "The selected document could not be safely previewed. No cookies were imported.");
+            return;
+        }
+        if (preview.tooManyDomains) {
+            clearSensitiveState();
+            showMessage("Export is too broad",
+                    "This file contains more than "
+                            + BrowserCookieImportPolicy.MAX_PREVIEW_DOMAINS
+                            + " distinct domains. Split the export and review smaller files.");
+            return;
+        }
+        if (preview.importableCookieCount == 0) {
+            String reason = "No importable cookies were found.";
+            if (preview.expiredCookieCount > 0) {
+                reason += " " + preview.expiredCookieCount + " expired cookies were skipped.";
+            }
+            if (preview.prefixRejectedCookieCount > 0) {
+                reason += " " + preview.prefixRejectedCookieCount
+                        + " cookies failed __Secure-/__Host- prefix rules.";
+            }
+            clearSensitiveState();
+            showMessage("Nothing to import", reason);
+            return;
+        }
+        showPreview();
+    }
+
+    private void cancelRead() {
+        readGeneration++;
+        reading = false;
+        Thread worker = readThread;
+        readThread = null;
+        if (worker != null) worker.interrupt();
+        InputStream stream = activeReadStream;
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+                // Closing the provider stream is best-effort cancellation.
+            }
+        }
+        dismissProgressDialog();
+    }
+
+    private void showProgressDialog(String message) {
+        dismissProgressDialog();
+        progressDialog = new ProgressDialog(activity);
+        progressDialog.setTitle("Cookie import");
+        progressDialog.setMessage(message);
+        progressDialog.setIndeterminate(true);
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+    }
+
+    private void dismissProgressDialog() {
+        if (progressDialog != null) {
+            try {
+                progressDialog.dismiss();
+            } catch (RuntimeException ignored) {
+                // The host may already be finishing.
+            }
+            progressDialog = null;
+        }
+    }
+
+    /** Release in-memory references when the host abandons this flow. */
+    public void cancel() {
+        if (reading || readThread != null) cancelRead();
+        if (activeDialog != null) {
+            try {
+                activeDialog.dismiss();
+            } catch (RuntimeException ignored) {
+                // The host may already be finishing.
+            }
+            activeDialog = null;
+        }
+        dismissProgressDialog();
+        if (importing) {
+            // CookieManager cannot cancel a write already submitted. Let that one callback settle,
+            // then stop scheduling further cookies and flush the partial result.
+            importCancelled = true;
+            pendingCookies = Collections.emptyList();
+            return;
+        }
+        clearSensitiveState();
+    }
+
+    private String readSelectedFile(Uri selectedUri) throws IOException {
+        byte[] bytes = new byte[MAX_FILE_BYTES + 1];
+        InputStream opened = null;
+        try {
+            opened = activity.getContentResolver().openInputStream(selectedUri);
+            if (opened == null) throw new IOException("Selected document could not be opened.");
+            activeReadStream = opened;
+            InputStream stream = opened;
+            try (InputStream input = stream) {
+                int total = 0;
+                while (total < bytes.length) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new IOException("Cookie export read was cancelled.");
+                    }
+                    int count = input.read(bytes, total, bytes.length - total);
+                    if (count < 0) break;
+                    if (count == 0) {
+                        int single = input.read();
+                        if (single < 0) break;
+                        bytes[total++] = (byte) single;
+                    } else {
+                        total += count;
+                    }
+                }
+                if (total > MAX_FILE_BYTES) {
+                    throw new IOException("Selected document exceeds the size limit.");
+                }
+
+                CharBuffer decoded = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes, 0, total));
+                String text = decoded.toString();
+                return text.startsWith("\uFEFF") ? text.substring(1) : text;
+            }
+        } catch (CharacterCodingException invalidUtf8) {
+            throw new IOException("Selected document is not valid UTF-8.", invalidUtf8);
+        } finally {
+            if (opened != null && activeReadStream == opened) activeReadStream = null;
+            Arrays.fill(bytes, (byte) 0);
+        }
+    }
+
+    private void showPreview() {
+        ScrollView scroll = new ScrollView(activity);
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(18);
+        content.setPadding(padding, padding, padding, padding);
+        scroll.addView(content, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        addText(content, "Review the domains and cookie metadata before continuing.", 16, true);
+        addText(content, "Cookie values are hidden. Expired cookies and cookies that violate "
+                + "__Secure-/__Host- prefix rules are excluded. Netscape exports do not preserve "
+                + "SameSite metadata.", 14, false);
+
+        StringBuilder counts = new StringBuilder();
+        counts.append(preview.importableCookieCount).append(" importable · ")
+                .append(preview.expiredCookieCount).append(" expired · ")
+                .append(preview.prefixRejectedCookieCount).append(" prefix-rejected · ")
+                .append(preview.rejectedLineCount).append(" malformed rows");
+        if (preview.rejectionListTruncated) counts.append(" (details capped)");
+        addText(content, counts.toString(), 14, true);
+
+        for (BrowserCookieImportPolicy.DomainPreview domain : preview.domains) {
+            CheckBox choice = new CheckBox(activity);
+            choice.setText(domain.domain + " · " + domain.cookies.size() + " cookies");
+            choice.setPadding(0, dp(8), 0, dp(2));
+            choice.setOnCheckedChangeListener((button, checked) -> {
+                if (checked) selectedDomains.add(domain.domain);
+                else selectedDomains.remove(domain.domain);
+                if (activeDialog != null && activeDialog.isShowing()) {
+                    activeDialog.getButton(DialogInterface.BUTTON_POSITIVE)
+                            .setEnabled(!selectedDomains.isEmpty());
+                }
+            });
+            content.addView(choice);
+
+            StringBuilder details = new StringBuilder();
+            details.append(domain.secureCount).append(" Secure · ")
+                    .append(domain.httpOnlyCount).append(" HttpOnly · ")
+                    .append(domain.sessionCount).append(" session");
+            int shown = Math.min(MAX_COOKIE_NAMES_PER_DOMAIN, domain.cookies.size());
+            for (int i = 0; i < shown; i++) {
+                BrowserCookieImport.Cookie cookie = domain.cookies.get(i);
+                details.append("\n• ").append(cookie.name).append("  ").append(cookie.path);
+                if (cookie.secure) details.append("  Secure");
+                if (cookie.httpOnly) details.append("  HttpOnly");
+            }
+            if (domain.cookies.size() > shown) {
+                details.append("\n• +").append(domain.cookies.size() - shown)
+                        .append(" more cookie names");
+            }
+            addText(content, details.toString(), 13, false);
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle("Cookie import preview")
+                .setView(scroll)
+                .setNegativeButton("Cancel", (ignored, which) -> clearSensitiveState())
+                .setPositiveButton("Review import", null)
+                .create();
+        activeDialog = dialog;
+        dialog.setOnCancelListener(ignored -> clearSensitiveState());
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(false);
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(view -> {
+                if (selectedDomains.isEmpty()) return;
+                dialog.dismiss();
+                activeDialog = null;
+                showConfirmation();
+            });
+        });
+        dialog.show();
+    }
+
+    private void showConfirmation() {
+        List<BrowserCookieImport.Cookie> selected =
+                BrowserCookieImportPolicy.selectCookies(preview, selectedDomains);
+        if (selected.isEmpty()) {
+            clearSensitiveState();
+            showMessage("No domains selected", "Select at least one domain to continue.");
+            return;
+        }
+
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(18);
+        content.setPadding(padding, padding, padding, padding);
+        StringBuilder domains = new StringBuilder();
+        int shown = 0;
+        for (String domain : selectedDomains) {
+            if (shown++ > 0) domains.append(", ");
+            if (shown > 8) {
+                domains.append("and ").append(selectedDomains.size() - 8).append(" more");
+                break;
+            }
+            domains.append(domain);
+        }
+        addText(content, "Add " + selected.size() + " cookies for " + domains
+                + " to Daymark's WebView cookie store? Imported cookies are sign-in credentials "
+                + "and may grant access to the listed websites. A matching existing cookie may "
+                + "be replaced. They remain until they expire or browser site data is cleared.", 15, false);
+        CheckBox acknowledgement = new CheckBox(activity);
+        acknowledgement.setText("I understand these cookies are session credentials.");
+        content.addView(acknowledgement);
+
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle("Confirm cookie import")
+                .setView(content)
+                .setNegativeButton("Cancel", (ignored, which) -> clearSensitiveState())
+                .setPositiveButton("Import selected", null)
+                .create();
+        activeDialog = dialog;
+        dialog.setOnCancelListener(ignored -> clearSensitiveState());
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(false);
+            acknowledgement.setOnCheckedChangeListener((button, checked) ->
+                    dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(checked));
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(view -> {
+                dialog.dismiss();
+                activeDialog = null;
+                beginImport(selected);
+            });
+        });
+        dialog.show();
+    }
+
+    private void beginImport(List<BrowserCookieImport.Cookie> selected) {
+        pendingCookies = new ArrayList<>(selected);
+        pendingIndex = 0;
+        importedCount = 0;
+        rejectedCount = 0;
+        expiredDuringImport = 0;
+        flushFailed = false;
+        importing = true;
+        importCancelled = false;
+        try {
+            showProgressDialog("Writing only the domains you selected…");
+            applyNextCookie(CookieManager.getInstance());
+        } catch (RuntimeException unavailable) {
+            rejectedCount = pendingCookies.size();
+            finishImport(false, false);
+        }
+    }
+
+    private void applyNextCookie(CookieManager cookieManager) {
+        if (importCancelled || pendingIndex >= pendingCookies.size()) {
+            try {
+                Thread flushThread = new Thread(() -> {
+                    boolean flushed = true;
+                    try {
+                        cookieManager.flush();
+                    } catch (RuntimeException flushFailure) {
+                        flushed = false;
+                    }
+                    boolean flushResult = flushed;
+                    mainHandler.post(() -> finishImport(true, flushResult));
+                }, "DaymarkCookieImportFlush");
+                flushThread.start();
+            } catch (RuntimeException threadFailure) {
+                finishImport(true, false);
+            }
+            return;
+        }
+
+        BrowserCookieImport.Cookie cookie = pendingCookies.get(pendingIndex++);
+        long now = System.currentTimeMillis() / 1000L;
+        String header = BrowserCookieImportPolicy.buildSetCookieHeader(cookie, now);
+        if (header == null) {
+            expiredDuringImport++;
+            mainHandler.post(() -> applyNextCookie(cookieManager));
+            return;
+        }
+
+        try {
+            cookieManager.setCookie(BrowserCookieImportPolicy.targetUrl(cookie), header, accepted -> {
+                if (Boolean.TRUE.equals(accepted)) importedCount++;
+                else rejectedCount++;
+                mainHandler.post(() -> applyNextCookie(cookieManager));
+            });
+        } catch (RuntimeException rejectedCookie) {
+            rejectedCount++;
+            mainHandler.post(() -> applyNextCookie(cookieManager));
+        }
+    }
+
+    private void finishImport(boolean flushAttempted, boolean flushSucceeded) {
+        boolean wasCancelled = importCancelled;
+        flushFailed = flushAttempted && !flushSucceeded;
+        importing = false;
+        dismissProgressDialog();
+
+        int imported = importedCount;
+        int webViewRejected = rejectedCount;
+        int malformedRows = preview == null ? 0 : preview.rejectedLineCount;
+        int prefixRejected = preview == null ? 0 : preview.prefixRejectedCookieCount;
+        int rejected = webViewRejected + malformedRows + prefixRejected;
+        int expired = preview == null ? expiredDuringImport
+                : preview.expiredCookieCount + expiredDuringImport;
+        boolean storeFlushFailed = flushFailed;
+        if (!wasCancelled && listener != null) {
+            try {
+                listener.onCookieImportFinished(imported, rejected, expired);
+            } catch (RuntimeException ignored) {
+                // A host callback must not interrupt cleanup of in-memory cookie values.
+            }
+        }
+        clearSensitiveState();
+        if (wasCancelled || activity.isFinishing() || activity.isDestroyed()) return;
+
+        String message = "Imported: " + imported + "\nRejected by WebView: " + webViewRejected
+                + "\nMalformed rows skipped: " + malformedRows
+                + "\nPrefix-rule violations skipped: " + prefixRejected
+                + "\nExpired/skipped: " + expired;
+        if (storeFlushFailed) message += "\n\nThe WebView cookie store could not confirm a flush.";
+        message += "\n\nCookie values were not displayed or written to logs.";
+        showMessage("Cookie import result", message);
+    }
+
+    private void addText(LinearLayout parent, String text, int sizeSp, boolean bold) {
+        TextView view = new TextView(activity);
+        view.setText(text);
+        view.setTextSize(sizeSp);
+        if (bold) view.setTypeface(view.getTypeface(), android.graphics.Typeface.BOLD);
+        view.setPadding(0, dp(5), 0, dp(7));
+        parent.addView(view, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    private int dp(int value) {
+        return Math.round(value * activity.getResources().getDisplayMetrics().density);
+    }
+
+    private void showToast(String message) {
+        if (!activity.isFinishing() && !activity.isDestroyed()) {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showMessage(String title, String message) {
+        if (activity.isFinishing() || activity.isDestroyed()) return;
+        new AlertDialog.Builder(activity)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void clearSensitiveState() {
+        parsed = null;
+        preview = null;
+        selectedDomains.clear();
+        pendingCookies = Collections.emptyList();
+        pendingIndex = 0;
+        activeDialog = null;
+    }
+}
