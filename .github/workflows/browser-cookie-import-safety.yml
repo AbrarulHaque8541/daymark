@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: browser-cookie-import-safety-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   cookie-import-safety:
     runs-on: ubuntu-24.04
