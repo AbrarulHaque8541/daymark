@@ -78,5 +78,11 @@ assert "private static final String SNOOZE_KEY_PREFIX = \"snooze.\";" in schedul
 assert "ReminderSchedulePolicy.java" in core_runner
 assert "ReminderSchedulePolicySmoke.java" in core_runner
 assert "com.abrar.daymark.ReminderSchedulePolicySmoke" in core_runner
+assert "postTestReminder(manager, context, notificationId, task, fire.toString())" in instrumentation
+assert "valid active notification recovers a lost canonical ID index" in instrumentation
+assert "TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString())" in instrumentation
+assert "app rescheduling preserves a valid snooze instead of overwriting it" in instrumentation
+assert "due-date edit invalidates the previous occurrence's snooze" in instrumentation
+assert "deleted task even when its ID index is missing" in instrumentation
 
 print("PASS reminder lifecycle guards: visible-only consumption, runner startup, canonical IDs, stale-notification recovery, durable occurrence-bound snooze and host regression coverage")
