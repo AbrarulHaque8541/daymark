@@ -144,7 +144,31 @@ public final class BrowserAddressSmoke {
         assert BrowserHistory.decode(history).get(0).equals(
                 "https://site" + (BrowserHistory.MAX_ENTRIES + 4) + ".example.com");
 
-        System.out.println("PASS browser address/site-history smoke tests: search engines, HTTPS validation, origin-only persistence, secret redaction, legacy migration, reopen, dedup, ports, and clear");
+        String searchable = BrowserHistory.add("", "https://alpha.example");
+        searchable = BrowserHistory.add(searchable, "https://beta.example:8443");
+        searchable = BrowserHistory.add(searchable, "https://gamma.example");
+        List<String> entries = BrowserHistory.decode(searchable);
+        assert entries.size() == 3 : entries;
+        assert BrowserHistory.filter(entries, "").size() == 3 : "a blank filter keeps every entry";
+        assert BrowserHistory.filter(entries, "   ").size() == 3 : "whitespace is a blank filter";
+        assert BrowserHistory.filter(entries, "BETA").equals(
+                java.util.List.of("https://beta.example:8443")) : "filtering is case-insensitive";
+        assert BrowserHistory.filter(entries, "8443").size() == 1 : "ports are searchable";
+        assert BrowserHistory.filter(entries, "nothing").isEmpty() : "no match yields nothing";
+        assert BrowserHistory.filter(null, "alpha").isEmpty() : "a null list is safe";
+        assert BrowserHistory.filter(entries, null).size() == 3 : "a null query is a blank filter";
+
+        String pruned = BrowserHistory.remove(searchable, "https://beta.example:8443/history");
+        List<String> prunedEntries = BrowserHistory.decode(pruned);
+        assert prunedEntries.size() == 2 : prunedEntries;
+        assert !prunedEntries.contains("https://beta.example:8443") : "the forgotten site is gone";
+        assert prunedEntries.get(0).equals("https://gamma.example") : "other entries keep their order";
+        assert BrowserHistory.remove(searchable, "http://insecure.example").equals(searchable)
+                : "an unusable URL must not change history";
+        assert BrowserHistory.remove(searchable, null).equals(searchable)
+                : "a null URL must not change history";
+
+        System.out.println("PASS browser address/site-history smoke tests: search engines, HTTPS validation, origin-only persistence, secret redaction, legacy migration, reopen, dedup, ports, search, single-site forget, and clear");
     }
 
     private static void rejects(String value) {

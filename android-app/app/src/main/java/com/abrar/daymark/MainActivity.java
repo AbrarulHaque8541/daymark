@@ -20,6 +20,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -30,14 +31,24 @@ import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.text.Editable;
 import android.text.InputFilter;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.TextPaint;
 import android.text.TextWatcher;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
+import android.text.style.TypefaceSpan;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
@@ -135,6 +146,13 @@ public final class MainActivity extends Activity {
     private static final String STATE_BROWSER_WEBVIEW = "state_browser_webview";
     private static final String STATE_BROWSER_LAST_URL = "state_browser_last_url";
 
+    // Chrome that leaves the viewport accelerates away; chrome that arrives decelerates into
+    // place. These chrome moves are short (a few tens of dp), so a linear ramp reads as a
+    // mechanical slide rather than an object settling. The system animator scale still divides
+    // the duration and these curves, so reduced-motion settings keep working unchanged.
+    private static final Interpolator MOTION_ENTER = new DecelerateInterpolator(1.6f);
+    private static final Interpolator MOTION_EXIT = new AccelerateInterpolator(1.4f);
+
     private final List<Task> tasks = new ArrayList<>();
     private final List<Task> lastSavedTasks = new ArrayList<>();
     private final List<TaskTemplate> taskTemplates = new ArrayList<>();
@@ -212,6 +230,8 @@ public final class MainActivity extends Activity {
     private ExtensionRuntime extensionRuntime;
     private String activeFilter = TaskLogic.FILTER_ALL;
     private String searchQuery = "";
+    /** Exact tag chip selected under the search field; empty means no tag filter. */
+    private String activeTag = "";
     private Task pendingDeletedTask;
     private int pendingDeletedIndex;
     private Task pendingAttachmentCleanupTask;
@@ -245,6 +265,8 @@ public final class MainActivity extends Activity {
     private TextView captureFeedback;
     private EditText searchInput;
     private TextView searchClear;
+    private HorizontalScrollView tagFilterScroll;
+    private LinearLayout tagFilterRow;
     private View suggestionCard;
     private View filterControlView;
     private View searchControlView;
@@ -589,19 +611,36 @@ public final class MainActivity extends Activity {
         }
     }
 
-    // Android Share target: ACTION_SEND plain text becomes the task draft so the
-    // user can review it in the full editor before any task is created.
+    // Android share target: shared text becomes the task draft so the user can
+    // review it before any task is created. Multi-line or over-long text opens the
+    // full editor, whose title field is capped at 160 characters.
     private void handleShareInIntent(Intent intent) {
-        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
-        if (!"text/plain".equals(intent.getType())) return;
-        CharSequence shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
-        String text = shared == null ? "" : shared.toString().trim();
-        if (text.isEmpty()) return;
-        if (text.length() > 2048) text = text.substring(0, 2048);
+        if (intent == null) return;
+        CharSequence shared;
+        if (Intent.ACTION_SEND.equals(intent.getAction()) && "text/plain".equals(intent.getType())) {
+            shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+        } else if (Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())
+                && "text/plain".equals(intent.getType())) {
+            shared = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
+        } else {
+            return;
+        }
+        ShareIntake.Draft draft = ShareIntake.parse(
+                intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT), shared);
+        // Consume the extras so a rotation or re-entry cannot overwrite the draft.
+        intent.removeExtra(Intent.EXTRA_TEXT);
+        intent.removeExtra(Intent.EXTRA_PROCESS_TEXT);
+        intent.removeExtra(Intent.EXTRA_SUBJECT);
+        if (draft.isEmpty()) return;
         setWebMode(false);
-        taskDraft = text;
-        quickCaptureInput.setText(text);
-        quickCaptureInput.setSelection(Math.min(text.length(), 2048));
+        if (draft.openEditor) {
+            showTaskEditor(null, draft.title, draft.notes);
+            showToast("Shared text is in the task editor. Review it, then save.");
+            return;
+        }
+        taskDraft = draft.title;
+        quickCaptureInput.setText(draft.title);
+        quickCaptureInput.setSelection(Math.min(draft.title.length(), ShareIntake.MAX_QUICK_ADD));
         quickCaptureInput.requestFocus();
         showToast("Shared text is in your task draft. Review it, then add the task.");
     }
@@ -689,6 +728,68 @@ public final class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         handleDaymarkBackNavigation();
+    }
+
+    /**
+     * Hardware-keyboard entry point. Only unmodified single chords are considered, and the
+     * mapping lives in {@link KeyShortcuts} so it can be tested without an Activity. Dialogs own
+     * their own window, so Escape still closes an open dialog first; this only sees keys the
+     * Activity itself would handle.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            int shortcut = KeyShortcuts.actionFor(event.getKeyCode(), event.isCtrlPressed(),
+                    event.isShiftPressed(), event.isAltPressed(), webMode);
+            if (shortcut != KeyShortcuts.NONE && handleShortcut(shortcut)) return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private boolean handleShortcut(int shortcut) {
+        switch (shortcut) {
+            case KeyShortcuts.QUICK_ADD:
+                setWebMode(false);
+                if (quickCaptureInput == null) return false;
+                quickCaptureInput.requestFocus();
+                return true;
+            case KeyShortcuts.SEARCH:
+                if (searchInput == null || storageLoading || storageLoadFailed) return false;
+                searchInput.requestFocus();
+                return true;
+            case KeyShortcuts.FIND_IN_PAGE:
+                showFindInPageDialog();
+                return true;
+            case KeyShortcuts.NEW_TAB:
+                requestNewBrowserTab();
+                return true;
+            case KeyShortcuts.CLOSE_TAB:
+                closeCurrentBrowserTab();
+                return true;
+            case KeyShortcuts.RELOAD_PAGE:
+                if (browserWebView == null) return false;
+                browserWebView.reload();
+                return true;
+            case KeyShortcuts.COMMAND_PALETTE:
+                showCommandPalette();
+                return true;
+            case KeyShortcuts.ADDRESS_BAR:
+                if (browserAddressInput == null) return false;
+                browserAddressInput.requestFocus();
+                browserAddressInput.selectAll();
+                return true;
+            case KeyShortcuts.CLEAR_SEARCH:
+                if (webMode || searchInput == null) return false;
+                if (searchQuery.isEmpty() && activeTag.isEmpty()) return false;
+                searchInput.setText("");
+                searchQuery = "";
+                activeTag = "";
+                // render() also repaints the chip row, whose selected state just changed.
+                render();
+                return true;
+            default:
+                return false;
+        }
     }
 
     private void registerDaymarkBackCallback() {
@@ -1668,7 +1769,7 @@ public final class MainActivity extends Activity {
             button.setMinimumHeight(dp(38));
             button.setTextSize(12 * textScale);
             button.setPadding(dp(10), 0, dp(10), 0);
-            button.setBackground(shape(palette.surfaceAlt, 22, palette.line));
+            button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
             params.setMargins(0, 0, dp(4), 0);
@@ -1930,7 +2031,7 @@ public final class MainActivity extends Activity {
         button.setMinimumHeight(dp(34));
         button.setTextSize(11 * textScale);
         button.setPadding(dp(9), 0, dp(9), 0);
-        button.setBackground(shape(palette.surfaceAlt, 22, palette.line));
+        button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
         button.setContentDescription("Search the current query with " + engine.label);
         button.setOnClickListener(view -> {
             if (!webMode) return;
@@ -1974,7 +2075,7 @@ public final class MainActivity extends Activity {
         button.setMinimumHeight(dp(34));
         button.setTextSize(11 * textScale);
         button.setPadding(dp(9), 0, dp(9), 0);
-        button.setBackground(shape(palette.surfaceAlt, 22, palette.line));
+        button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
         button.setContentDescription("Ask " + entry.label + " with the current search, or open its website if no question is entered");
         button.setOnClickListener(view -> {
             if (!webMode) return;
@@ -2222,14 +2323,15 @@ public final class MainActivity extends Activity {
             if (hidden) {
                 view.setVisibility(View.VISIBLE);
                 view.animate().translationY(hiddenOffset)
-                        .alpha(0f).setDuration(160L).withEndAction(() -> {
+                        .alpha(0f).setDuration(160L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
                             if (browserChromeHidden && webMode) view.setVisibility(View.GONE);
                         }).start();
             } else {
                 view.setVisibility(View.VISIBLE);
                 view.setTranslationY(hiddenOffset);
                 view.setAlpha(0f);
-                view.animate().translationY(0f).alpha(1f).setDuration(190L).start();
+                view.animate().translationY(0f).alpha(1f).setDuration(190L)
+                        .setInterpolator(MOTION_ENTER).start();
             }
         }
     }
@@ -3980,21 +4082,85 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void refreshHistoryDialogList(List<String> history, String query,
+            ArrayAdapter<String> adapter, List<Integer> matchedIndices) {
+        adapter.setNotifyOnChange(false);
+        adapter.clear();
+        matchedIndices.clear();
+        if (history.isEmpty()) {
+            adapter.add("No recent sites");
+        } else {
+            for (String entry : BrowserHistory.filter(history, query)) {
+                matchedIndices.add(history.indexOf(entry));
+                adapter.add(entry);
+            }
+            if (adapter.getCount() == 0) adapter.add("No saved sites match this filter");
+        }
+        adapter.notifyDataSetChanged();
+    }
+
     private void showBrowserHistoryDialog() {
         sanitizeStoredBrowserHistory();
-        List<String> history = BrowserHistory.decode(browserPreferences.getString(BROWSER_HISTORY_KEY, ""));
-        String[] entries = history.isEmpty() ? new String[] { "No recent sites" }
-                : history.toArray(new String[0]);
+        final List<String> history = BrowserHistory.decode(
+                browserPreferences.getString(BROWSER_HISTORY_KEY, ""));
+        final List<Integer> matchedIndices = new ArrayList<>();
+        final ArrayAdapter<String> adapter =
+                new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        EditText filterInput = new EditText(this);
+        filterInput.setHint("Filter saved sites");
+        filterInput.setSingleLine(true);
+        filterInput.setContentDescription("Filter site history by address");
+        filterInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(Editable s) {
+                refreshHistoryDialogList(history, s.toString(), adapter, matchedIndices);
+            }
+        });
+        refreshHistoryDialogList(history, "", adapter, matchedIndices);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(16), dp(4), dp(16), 0);
+        container.addView(filterInput);
+        ListView historyList = new ListView(this);
+        historyList.setAdapter(adapter);
+        historyList.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        container.addView(historyList);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Site history (HTTPS origins only)")
-                .setItems(entries, (whichDialog, selected) -> {
-                    if (selected < 0 || selected >= history.size()) return;
-                    quickCaptureInput.setText(history.get(selected));
-                    navigateBrowserTo(history.get(selected));
-                })
+                .setView(container)
                 .setNeutralButton("Clear site history & data", null)
                 .setPositiveButton("Close", null)
                 .create();
+        historyList.setOnItemClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= matchedIndices.size()) return;
+            String url = history.get(matchedIndices.get(position));
+            dialog.dismiss();
+            quickCaptureInput.setText(url);
+            navigateBrowserTo(url);
+        });
+        historyList.setOnItemLongClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= matchedIndices.size()) return false;
+            String url = history.get(matchedIndices.get(position));
+            new AlertDialog.Builder(this)
+                    .setTitle("Forget this site?")
+                    .setMessage(url + " will be removed from Daymark's site history. Cookies and "
+                            + "stored site data are not changed; use Clear site history & data for that.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Forget", (confirm, which) -> {
+                        String updated = BrowserHistory.remove(
+                                browserPreferences.getString(BROWSER_HISTORY_KEY, ""), url);
+                        browserPreferences.edit()
+                                .putString(BROWSER_HISTORY_KEY, updated).apply();
+                        history.clear();
+                        history.addAll(BrowserHistory.decode(updated));
+                        refreshHistoryDialogList(history, filterInput.getText().toString(),
+                                adapter, matchedIndices);
+                    })
+                    .show();
+            return true;
+        });
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
                 .setOnClickListener(view -> {
                     dialog.dismiss();
@@ -4176,6 +4342,14 @@ public final class MainActivity extends Activity {
         searchControlView = searchRow;
         searchRow.setVisibility(View.GONE);
         content.addView(searchRow, bottomMargin(dp(11)));
+
+        tagFilterRow = new LinearLayout(this);
+        tagFilterRow.setOrientation(LinearLayout.HORIZONTAL);
+        tagFilterScroll = new HorizontalScrollView(this);
+        tagFilterScroll.setHorizontalScrollBarEnabled(false);
+        tagFilterScroll.addView(tagFilterRow);
+        tagFilterScroll.setVisibility(View.GONE);
+        content.addView(tagFilterScroll, bottomMargin(dp(9)));
 
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) { }
@@ -4458,6 +4632,7 @@ public final class MainActivity extends Activity {
             powerOnly.setVisibility(powerMode ? View.VISIBLE : View.GONE);
         }
         renderFilters(today);
+        renderTagFilters();
         renderTaskList(today);
         renderTaskCount(today);
         renderSuggestions(today);
@@ -4477,15 +4652,17 @@ public final class MainActivity extends Activity {
         if (topBarBrand != null) {
             topBarBrand.animate().cancel();
             if (hidden) {
-                topBarBrand.animate().alpha(0f).setDuration(120L).withEndAction(() -> {
-                    if (taskChromeHidden && !webMode && topBarBrand != null) {
-                        topBarBrand.setVisibility(View.GONE);
-                    }
-                }).start();
+                topBarBrand.animate().alpha(0f).setDuration(120L).setInterpolator(MOTION_EXIT)
+                        .withEndAction(() -> {
+                            if (taskChromeHidden && !webMode && topBarBrand != null) {
+                                topBarBrand.setVisibility(View.GONE);
+                            }
+                        }).start();
             } else {
                 topBarBrand.setVisibility(View.VISIBLE);
                 topBarBrand.setAlpha(0f);
-                topBarBrand.animate().alpha(1f).setDuration(180L).start();
+                topBarBrand.animate().alpha(1f).setDuration(180L)
+                        .setInterpolator(MOTION_ENTER).start();
             }
         }
         if (topBarMark != null && topBarMark.getLayoutParams() instanceof LinearLayout.LayoutParams) {
@@ -4503,7 +4680,7 @@ public final class MainActivity extends Activity {
         if (hidden) {
             sharedComposer.setVisibility(View.VISIBLE);
             sharedComposer.animate().translationY(-reserve)
-                    .alpha(0f).setDuration(180L).withEndAction(() -> {
+                    .alpha(0f).setDuration(180L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
                         if (taskChromeHidden && !webMode) {
                             sharedComposer.setVisibility(View.GONE);
                             // The weighted ScrollView grows by exactly this much once the composer
@@ -4518,7 +4695,8 @@ public final class MainActivity extends Activity {
             sharedComposer.setVisibility(View.VISIBLE);
             sharedComposer.setTranslationY(-reserve);
             sharedComposer.setAlpha(0f);
-            sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L).start();
+            sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L)
+                    .setInterpolator(MOTION_ENTER).start();
         }
     }
 
@@ -4589,7 +4767,7 @@ public final class MainActivity extends Activity {
         target.setAlpha(0f);
         target.setTranslationY(enteringWeb ? dp(10) : -dp(6));
         target.animate().alpha(1f).translationY(0f)
-                .setDuration(180L).start();
+                .setDuration(180L).setInterpolator(MOTION_ENTER).start();
     }
 
     private void setBrowserOnlineEnabled(boolean enabled) {
@@ -4852,6 +5030,56 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Chips for the tags actually present in the store, so a filter never points at a tag no task
+     * carries. Selecting one narrows the list to that exact tag; the chip row stays out of the way
+     * in the compact layout and whenever there is nothing to filter.
+     */
+    private void renderTagFilters() {
+        if (tagFilterRow == null || tagFilterScroll == null) return;
+        List<String> tags = TaskLogic.availableTags(tasks);
+        if (!activeTag.isEmpty() && !tags.contains(activeTag)) activeTag = "";
+        boolean show = powerMode && !webMode && !storageLoading && !storageLoadFailed
+                && !tags.isEmpty();
+        tagFilterScroll.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) {
+            if (tagFilterRow.getChildCount() > 0) tagFilterRow.removeAllViews();
+            return;
+        }
+        tagFilterRow.removeAllViews();
+        for (String tag : tags) {
+            boolean selected = tag.equals(activeTag);
+            Button chip = tagChip(tag, selected);
+            chip.setOnClickListener(view -> {
+                activeTag = selected ? "" : tag;
+                render();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+            params.rightMargin = dp(6);
+            tagFilterRow.addView(chip, params);
+        }
+    }
+
+    private Button tagChip(String tag, boolean selected) {
+        Button chip = new Button(this);
+        chip.setAllCaps(false);
+        chip.setText("#" + tag);
+        chip.setTextSize(11 * textScale);
+        chip.setMinHeight(dp(44));
+        chip.setMinimumHeight(dp(44));
+        chip.setMinimumWidth(dp(44));
+        chip.setPadding(dp(10), 0, dp(10), 0);
+        chip.setTextColor(selected ? palette.accent : palette.muted);
+        chip.setBackground(pressable(selected ? palette.accentSoft : palette.surfaceAlt, 22,
+                selected ? palette.accent : palette.line,
+                selected ? palette.accent : palette.muted));
+        chip.setContentDescription(selected
+                ? "Tag " + tag + ", selected. Filtering the list to this tag."
+                : "Filter the list by tag " + tag);
+        return chip;
+    }
+
     /** Splits a comma-separated editor tags field; normalization happens in TaskLogic. */
     private List<String> parseEditorTags(String raw) {
         List<String> tags = new ArrayList<>();
@@ -4914,8 +5142,10 @@ public final class MainActivity extends Activity {
         }
         String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
-        List<Task> visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, today);
-        if (!taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, visible, storageSaveFailed)) {
+        String selectedTag = powerMode ? activeTag : "";
+        List<Task> visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today);
+        if (!taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, selectedTag,
+                visible, storageSaveFailed)) {
             return;
         }
         taskList.removeAllViews();
@@ -4931,6 +5161,9 @@ public final class MainActivity extends Activity {
             } else if (!selectedQuery.trim().isEmpty()) {
                 emptyTitle.setText("No matching tasks");
                 emptyCopy.setText("Try another search or clear the field above.");
+            } else if (!selectedTag.isEmpty()) {
+                emptyTitle.setText("No tasks tagged #" + selectedTag);
+                emptyCopy.setText("Tap the selected tag chip again to show every task.");
             } else if (TaskLogic.FILTER_COMPLETED.equals(selectedFilter)) {
                 emptyTitle.setText("No tasks done yet");
                 emptyCopy.setText("Tasks you finish will appear here.");
@@ -4967,10 +5200,12 @@ public final class MainActivity extends Activity {
         }
         String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
-        int visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, today).size();
-        taskCount.setText(selectedQuery.trim().isEmpty()
-                ? visible + (visible == 1 ? " task" : " tasks")
-                : visible + (visible == 1 ? " match" : " matches"));
+        String selectedTag = powerMode ? activeTag : "";
+        int visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today).size();
+        boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty();
+        taskCount.setText(narrowed
+                ? visible + (visible == 1 ? " match" : " matches")
+                : visible + (visible == 1 ? " task" : " tasks"));
         searchClear.setVisibility(searchQuery.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
@@ -4990,6 +5225,7 @@ public final class MainActivity extends Activity {
             quickCaptureInput.setError("Type a task first");
             captureFeedback.setText("Type a task in the box above, or choose Add with a date or priority.");
             quickCaptureInput.requestFocus();
+            haptic(quickCaptureInput, HapticFeedbackConstants.REJECT);
             return;
         }
         SmartTaskDraft draft = parseSmartTaskDraft(rawTitle);
@@ -4998,6 +5234,7 @@ public final class MainActivity extends Activity {
             quickCaptureInput.setError("Type a task first");
             captureFeedback.setText("Type a task in the box above, or choose Add with a date or priority.");
             quickCaptureInput.requestFocus();
+            haptic(quickCaptureInput, HapticFeedbackConstants.REJECT);
             return;
         }
         try {
@@ -5005,6 +5242,7 @@ public final class MainActivity extends Activity {
             quickCaptureInput.setText("");
             quickCaptureInput.setError(null);
             captureFeedback.setText("Task added" + (draft.dueDate == null ? "" : " with " + dueLabelForDate(draft.dueDate)) + " and " + draft.priority + " priority. Tap Edit for more options.");
+            haptic(quickCaptureInput, HapticFeedbackConstants.CONFIRM);
             render();
             saveTasksAsync();
             showToast("Task added.");
@@ -5071,7 +5309,8 @@ public final class MainActivity extends Activity {
         });
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(6), dp(7), dp(6), dp(7));
-        row.setBackground(shape(palette.surface, 20, palette.line));
+        row.setBackground(pressable(palette.surface, 20, palette.line,
+                palette.text, palette.muted, palette.warning, palette.danger));
         row.setElevation(dp(1));
         row.setContentDescription("Task: " + task.title
                 + ". Swipe right to toggle completion; swipe left for task actions.");
@@ -5168,6 +5407,7 @@ public final class MainActivity extends Activity {
 
         checkBox.setOnCheckedChangeListener((button, checked) -> {
             if (!canEdit() || checked == task.completed) return;
+            hapticToggle(button, checked);
             replaceTask(TaskLogic.toggleCompleted(task));
             render();
             saveTasksAsync();
@@ -5235,11 +5475,26 @@ public final class MainActivity extends Activity {
         }
 
         @Override public boolean onTouchEvent(android.view.MotionEvent event) {
+            // This row owns its gesture instead of delegating to View's default touch handling,
+            // so the pressed state has to be driven explicitly. Without these two calls the row
+            // never enters its press drawable and the background feedback is dead on touch.
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) setPressed(true);
+            else if (event.getAction() == android.view.MotionEvent.ACTION_UP
+                    || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
+                setPressed(false);
+            }
             if (event.getAction() == android.view.MotionEvent.ACTION_UP && horizontalSwipe && !consumedSwipe) {
                 float dx = event.getX() - downX;
                 if (Math.abs(dx) > dp(48)) {
                     consumedSwipe = true;
-                    if (listener != null && canEdit()) listener.accept(dx > 0 ? 1 : -1);
+                    if (listener != null && canEdit()) {
+                        haptic(this, HapticFeedbackConstants.CONFIRM);
+                        listener.accept(dx > 0 ? 1 : -1);
+                    } else if (listener != null) {
+                        // A swipe that cannot be stored has to say so. Without this the row snaps
+                        // back with no explanation while the encrypted task store is unavailable.
+                        haptic(this, HapticFeedbackConstants.REJECT);
+                    }
                 }
                 performClick();
                 return true;
@@ -5519,7 +5774,19 @@ public final class MainActivity extends Activity {
 
     private void showNotesDialog(Task task) {
         if (task == null) return;
-        TextView notes = text(task.notes, 14, palette.text, Typeface.NORMAL);
+        List<NoteFormat.Span> spans = NoteFormat.spans(task.notes);
+        TextView notes = text("", 14, palette.text, Typeface.NORMAL);
+        // A tapped link navigates behind this dialog, so the dialog has to close first or the
+        // browser change would be invisible under it.
+        final AlertDialog[] holder = new AlertDialog[1];
+        notes.setText(formatNote(task.notes, spans,
+                () -> { if (holder[0] != null) holder[0].dismiss(); }));
+        for (NoteFormat.Span span : spans) {
+            if (span.kind == NoteFormat.Kind.LINK) {
+                notes.setMovementMethod(LinkMovementMethod.getInstance());
+                break;
+            }
+        }
         notes.setLineSpacing(dp(2), 1f);
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -5528,11 +5795,56 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(18), dp(8), dp(18), dp(8));
         content.addView(notes);
         scroll.addView(content);
-        new AlertDialog.Builder(this)
+        holder[0] = new AlertDialog.Builder(this)
                 .setTitle("Note · " + task.title)
                 .setView(scroll)
                 .setPositiveButton("Done", null)
                 .show();
+    }
+
+    /**
+     * Applies {@link NoteFormat} to a note: inline code in the monospace family, HTTPS links
+     * underlined in the accent color and tappable. The note text itself is never interpreted as
+     * HTML or Markdown, so a stored note cannot inject markup into the dialog.
+     */
+    private CharSequence formatNote(String raw, List<NoteFormat.Span> spans, Runnable beforeOpen) {
+        if (spans.isEmpty()) return raw;
+        SpannableString styled = new SpannableString(raw);
+        for (NoteFormat.Span span : spans) {
+            if (span.kind == NoteFormat.Kind.CODE) {
+                styled.setSpan(new TypefaceSpan("monospace"), span.start, span.end,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else if (span.target != null) {
+                final String target = span.target;
+                styled.setSpan(new ClickableSpan() {
+                    @Override public void onClick(View widget) {
+                        beforeOpen.run();
+                        openNoteLink(target);
+                    }
+
+                    @Override public void updateDrawState(TextPaint paint) {
+                        super.updateDrawState(paint);
+                        paint.setColor(palette.accent);
+                        paint.setUnderlineText(true);
+                    }
+                }, span.start, span.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return styled;
+    }
+
+    /** Opens a note's link in the in-app browser, which enforces the same HTTPS-only policy. */
+    private void openNoteLink(String url) {
+        if (url == null || !BrowserAddress.isAllowedWebUrl(url)) {
+            showToast("Only HTTPS links can be opened from a note.");
+            return;
+        }
+        setWebMode(true);
+        if (!browserNetworkPolicy.allowsRemoteLoads()) {
+            confirmBrowserOnlineAccess(() -> loadBrowserAddress(url));
+            return;
+        }
+        loadBrowserAddress(url);
     }
 
     private void showAttachmentManager(Task task) {
@@ -5991,25 +6303,32 @@ public final class MainActivity extends Activity {
     }
 
     private void showTaskEditor(Task editing) {
-        showTaskEditor(editing, "", editing == null ? null : editing.dueDate,
+        showTaskEditor(editing, "", "", editing == null ? null : editing.dueDate,
                 editing == null ? "medium" : editing.priority, null, false);
     }
 
     private void showTaskEditor(Task editing, String draftTitle) {
-        showTaskEditor(editing, draftTitle, editing == null ? null : editing.dueDate,
+        showTaskEditor(editing, draftTitle, "", editing == null ? null : editing.dueDate,
+                editing == null ? "medium" : editing.priority, null, false);
+    }
+
+    /** Opens the editor with a title and notes prefilled, used by the share intake. */
+    private void showTaskEditor(Task editing, String draftTitle, String draftNotes) {
+        showTaskEditor(editing, draftTitle, draftNotes, editing == null ? null : editing.dueDate,
                 editing == null ? "medium" : editing.priority, null, false);
     }
 
     private void showTaskEditorFromTemplate(TaskTemplate template) {
-        showTaskEditor(null, template.title, template.dueDate, template.priority, template, false);
+        showTaskEditor(null, template.title, "", template.dueDate, template.priority, template, false);
     }
 
     private void showNewTemplateEditor() {
-        showTaskEditor(null, "", null, "medium", null, true);
+        showTaskEditor(null, "", "", null, "medium", null, true);
     }
 
-    private void showTaskEditor(Task editing, String draftTitle, String initialDueDate,
-                                String initialPriority, TaskTemplate sourceTemplate, boolean templateOnly) {
+    private void showTaskEditor(Task editing, String draftTitle, String draftNotes,
+                                String initialDueDate, String initialPriority,
+                                TaskTemplate sourceTemplate, boolean templateOnly) {
         if (webMode) return;
         if (!canEdit()) {
             showToast("Encrypted task storage is unavailable; edits are paused.");
@@ -6049,6 +6368,7 @@ public final class MainActivity extends Activity {
         notesInput.setMinLines(2);
         notesInput.setGravity(Gravity.TOP | Gravity.START);
         if (editing != null) notesInput.setText(editing.notes);
+        else if (draftNotes != null && !draftNotes.trim().isEmpty()) notesInput.setText(draftNotes);
 
         EditText tagsInput = new EditText(this);
         tagsInput.setSingleLine(true);
@@ -6605,6 +6925,7 @@ public final class MainActivity extends Activity {
         pendingAttachmentCleanupExpired = false;
         undoMessage.setText("Task deleted.");
         undoBar.setVisibility(View.VISIBLE);
+        haptic(undoButton, HapticFeedbackConstants.CONFIRM);
         // Bring focus to Undo so screen-reader and keyboard users can act on the
         // seven-second recovery window without having to find the control.
         undoButton.requestFocus();
@@ -6640,6 +6961,9 @@ public final class MainActivity extends Activity {
         pendingAttachmentCleanupSaved = false;
         pendingAttachmentCleanupExpired = false;
         pendingDeletedTask = null;
+        // Buzz before the bar disappears: the button the user just tapped must still be the
+        // visible, attached view carrying the confirmation.
+        haptic(undoButton, HapticFeedbackConstants.CONFIRM);
         hideUndoBar();
         render();
         saveTasksAsync();
@@ -7308,6 +7632,8 @@ public final class MainActivity extends Activity {
                 () -> showTaskTemplatesDialog());
 
         addSettingsSection(content, "POWER FEATURES");
+        addSettingsRow(content, "Keyboard shortcuts", "Physical keyboard and Chromebook chords",
+                () -> showKeyboardShortcutsDialog());
         addSettingsRow(content, "Check for updates", "Check the signed sideload release channel",
                 () -> checkForUpdates(true));
 
@@ -7333,12 +7659,130 @@ public final class MainActivity extends Activity {
         parent.addView(heading);
     }
 
+    /**
+     * One field that searches tasks and runs the few global commands, so a keyboard user never
+     * has to leave the home row. Results are ranked by {@link CommandPalette} and bounded; the
+     * fixed commands only appear while the query is empty.
+     */
+    private void showCommandPalette() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(8), dp(18), dp(4));
+
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setTextSize(15 * textScale);
+        input.setHint("Search tasks or run a command");
+        input.setContentDescription("Command palette search");
+        input.setBackground(shape(palette.surfaceAlt, 14, palette.line));
+        input.setPadding(dp(12), dp(8), dp(12), dp(8));
+        content.addView(input, bottomMargin(dp(8)));
+
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(results);
+        content.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(320)));
+
+        final AlertDialog[] holder = new AlertDialog[1];
+        Runnable refresh = () -> {
+            results.removeAllViews();
+            String query = input.getText() == null ? "" : input.getText().toString();
+            List<Task> matches = CommandPalette.matchingTasks(tasks, query,
+                    CommandPalette.MAX_RESULTS);
+            for (Task task : matches) {
+                String detail = (task.completed ? "Completed · " : "") + dueLabelForDate(task.dueDate);
+                addSettingsRow(results, task.title, detail, () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    showTaskEditor(task);
+                });
+            }
+            if (query.trim().isEmpty()) {
+                addSettingsRow(results, "New task", "Open the full editor", () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    showTaskEditor(null);
+                });
+                addSettingsRow(results, "Open settings", "Appearance, data and power features", () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    showSettingsDialog();
+                });
+                addSettingsRow(results, "Open browser", "Switch to the Web workspace", () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    setWebMode(true);
+                });
+            }
+            if (results.getChildCount() == 0) {
+                TextView empty = text("No matching tasks.", 12, palette.muted, Typeface.NORMAL);
+                empty.setPadding(dp(4), dp(12), dp(4), dp(12));
+                results.addView(empty);
+            }
+        };
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { refresh.run(); }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        refresh.run();
+        holder[0] = new AlertDialog.Builder(this)
+                .setTitle("Commands")
+                .setView(content)
+                .setNegativeButton("Close", null)
+                .show();
+        input.requestFocus();
+    }
+
+    /** Lists the chords {@link KeyShortcuts} actually handles, so they are discoverable. */
+    private void showKeyboardShortcutsDialog() {
+        String[][] shortcuts = {
+                { "Ctrl + Shift + P", "Open the command palette" },
+                { "Ctrl + K", "Jump to quick add" },
+                { "Ctrl + F", "Find a task, or search the page in the browser" },
+                { "Ctrl + L", "Jump to task search, or to the browser address bar" },
+                { "Ctrl + T", "Open a new browser tab" },
+                { "Ctrl + W", "Close the current browser tab" },
+                { "Ctrl + R", "Reload the current page" },
+                { "Esc", "Clear the search and tag filter" },
+        };
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(8), dp(18), dp(8));
+        TextView intro = text("These work with a physical keyboard or a Chromebook. "
+                + "Browser chords only act while the Web workspace is open.", 12,
+                palette.muted, Typeface.NORMAL);
+        intro.setLineSpacing(dp(2), 1f);
+        content.addView(intro, bottomMargin(dp(10)));
+        for (String[] shortcut : shortcuts) {
+            LinearLayout row = horizontalCard(palette.surface);
+            row.setPadding(dp(12), dp(10), dp(12), dp(10));
+            row.setContentDescription(shortcut[0] + ". " + shortcut[1]);
+            TextView chord = text(shortcut[0], 13, palette.accent, Typeface.BOLD);
+            chord.setMinWidth(dp(96));
+            row.addView(chord, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            TextView meaning = text(shortcut[1], 12, palette.text, Typeface.NORMAL);
+            LinearLayout.LayoutParams meaningParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            meaningParams.leftMargin = dp(10);
+            row.addView(meaning, meaningParams);
+            content.addView(row, bottomMargin(dp(6)));
+        }
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        new AlertDialog.Builder(this)
+                .setTitle("Keyboard shortcuts")
+                .setView(scroll)
+                .setPositiveButton("Done", null)
+                .show();
+    }
+
     private void addSettingsRow(LinearLayout parent, String title, String subtitle, Runnable action) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(12), dp(10), dp(12), dp(10));
-        row.setBackground(shape(palette.surface, 16, palette.line));
+        row.setBackground(pressable(palette.surface, 16, palette.line,
+                palette.text, palette.muted));
         row.setClickable(true);
         row.setFocusable(true);
         row.setContentDescription(title + ". " + subtitle);
@@ -7981,7 +8425,8 @@ public final class MainActivity extends Activity {
         button.setTextColor(palette.dark ? palette.background : Color.WHITE);
         button.setMinHeight(dp(50));
         button.setMinimumHeight(dp(50));
-        button.setBackground(shape(palette.accent, 22, palette.accent));
+        button.setBackground(pressable(palette.accent, 22, palette.accent,
+                palette.dark ? palette.background : Color.WHITE));
         return button;
     }
 
@@ -7994,7 +8439,7 @@ public final class MainActivity extends Activity {
         button.setMinHeight(dp(48));
         button.setMinimumHeight(dp(48));
         button.setPadding(dp(8), 0, dp(8), 0);
-        button.setBackground(shape(palette.accentSoft, 22, palette.line));
+        button.setBackground(pressable(palette.accentSoft, 22, palette.line, palette.accent));
         return button;
     }
 
@@ -8007,8 +8452,10 @@ public final class MainActivity extends Activity {
         button.setMinimumHeight(dp(48));
         button.setMinimumWidth(dp(60));
         button.setPadding(dp(5), 0, dp(5), 0);
-        button.setTextColor(danger ? palette.danger : palette.accent);
-        button.setBackground(shape(danger ? palette.dangerSoft : palette.surfaceAlt, 9, palette.line));
+        int labelColor = danger ? palette.danger : palette.accent;
+        int fillColor = danger ? palette.dangerSoft : palette.surfaceAlt;
+        button.setTextColor(labelColor);
+        button.setBackground(pressable(fillColor, 9, palette.line, labelColor));
         return button;
     }
 
@@ -8036,6 +8483,60 @@ public final class MainActivity extends Activity {
         drawable.setCornerRadius(dp(radiusDp));
         drawable.setStroke(dp(1), stroke);
         return drawable;
+    }
+
+    /**
+     * Background for a surface the user can actually act on: the resting appearance plus a press
+     * state. Before this, every tappable card and button was a flat {@link GradientDrawable} that
+     * looked identical under a finger, so a tap produced no visible confirmation.
+     *
+     * <p>The pressed appearance brightens the border to the accent and tints the fill by as much as
+     * every label drawn on this surface can absorb without dropping below the palette's 4.5:1
+     * guarantee — see {@link PressSurface}. The clamp is live, not theoretical: the dark theme's
+     * muted task row is reduced from the preferred 15&nbsp;% overlay to 12.2&nbsp;%, and a surface
+     * with no headroom at all would keep its exact fill and be distinguished by the border alone.
+     *
+     * @param fillColor   resting fill of the surface
+     * @param radiusDp    corner radius shared with {@link #shape(int, int, int)}
+     * @param strokeColor resting border color
+     * @param labelColors every text color actually drawn on this surface; the weakest binds, so a
+     *                    row that can render an overdue task in {@code danger} must list it too
+     */
+    private StateListDrawable pressable(int fillColor, int radiusDp, int strokeColor,
+            int... labelColors) {
+        int pressedFill = PressSurface.pressedFill(labelColors, fillColor, palette.dark,
+                highContrast ? PressSurface.HIGH_CONTRAST_ALPHA : PressSurface.PREFERRED_ALPHA);
+        StateListDrawable states = new StateListDrawable();
+        // Pressed and focused share the active appearance: focus is the same confirmation for a
+        // keyboard or D-pad user. state_selected is deliberately absent — a selected-but-idle row
+        // would otherwise sit in its pressed look permanently.
+        int[] active = { android.R.attr.state_pressed, android.R.attr.state_focused };
+        for (int state : active) {
+            states.addState(new int[] { state }, shape(pressedFill, radiusDp, palette.accent));
+        }
+        states.addState(new int[] {}, shape(fillColor, radiusDp, strokeColor));
+        return states;
+    }
+
+    /**
+     * Touch confirmation for actions that commit, toggle, or refuse a change to saved data. The
+     * framework applies the device's own touch-feedback setting, so this stays silent when the user
+     * has disabled haptics.
+     *
+     * <p>The semantic kinds only exist from API 29 and {@code minSdk} is 26, so older releases fall
+     * back to {@link HapticFeedbackConstants#LONG_PRESS} — the oldest non-deprecated constant that
+     * still reads as a deliberate confirmation rather than a keypress.
+     */
+    private void haptic(View source, int modernKind) {
+        if (source == null) return;
+        source.performHapticFeedback(Build.VERSION.SDK_INT >= 29
+                ? modernKind : HapticFeedbackConstants.LONG_PRESS);
+    }
+
+    /** Completion is a switch, so it gets the switch kinds rather than a generic click. */
+    private void hapticToggle(View source, boolean nowCompleted) {
+        haptic(source, nowCompleted
+                ? HapticFeedbackConstants.TOGGLE_ON : HapticFeedbackConstants.TOGGLE_OFF);
     }
 
     private LinearLayout.LayoutParams bottomMargin(int value) {

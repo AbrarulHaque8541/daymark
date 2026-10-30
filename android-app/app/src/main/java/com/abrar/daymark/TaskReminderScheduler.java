@@ -47,6 +47,35 @@ final class TaskReminderScheduler {
 
     private TaskReminderScheduler() { }
 
+    /** Deferral applied by the notification's Snooze action. */
+    static final int SNOOZE_MINUTES = 10;
+
+    /**
+     * Re-arms the reminder's existing alarm slot {@link #SNOOZE_MINUTES} from now.
+     *
+     * <p>The PendingIntent identity matches the one {@link #schedule} created for the task, so
+     * this replaces the fired alarm rather than adding a second one: a later reschedule or a
+     * completed task cancels the snoozed reminder through the same request code.
+     */
+    static void snooze(Context context, int requestCode, String taskId, String title) {
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null || requestCode <= 0
+                || title == null || title.trim().isEmpty()) {
+            Log.w(LOG_TAG, "Snooze could not be scheduled; the alarm slot or reminder details are missing.");
+            return;
+        }
+        ensureChannel(context);
+        long fireAt = System.currentTimeMillis() + SNOOZE_MINUTES * 60_000L;
+        Intent intent = reminderIntent(context, taskId == null ? "" : taskId);
+        intent.putExtra(TaskReminderReceiver.EXTRA_NOTIFICATION_ID, requestCode);
+        intent.putExtra(TaskReminderReceiver.EXTRA_TASK_TITLE, title);
+        intent.putExtra(TaskReminderReceiver.EXTRA_FIRE_INSTANT,
+                Instant.ofEpochMilli(fireAt).toString());
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt,
+                PendingIntent.getBroadcast(context, requestCode, intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+    }
+
     /** POST_NOTIFICATIONS (Android 13+) is requested only when the user enables a reminder. */
     static void requestNotificationPermissionIfNeeded(Activity activity) {
         if (activity == null || Build.VERSION.SDK_INT < 33) return;

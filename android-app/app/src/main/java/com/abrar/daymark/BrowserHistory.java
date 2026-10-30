@@ -107,4 +107,26 @@ final class BrowserHistory {
     static String clear() {
         return "";
     }
+
+    /** Case-insensitive substring match over saved origins; a blank query keeps every entry. */
+    static List<String> filter(List<String> entries, String query) {
+        List<String> result = new ArrayList<>();
+        if (entries == null) return result;
+        String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        for (String entry : entries) {
+            if (entry == null) continue;
+            if (needle.isEmpty() || entry.toLowerCase(Locale.ROOT).contains(needle)) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    /** Removes exactly one saved origin, leaving every other entry in order. */
+    static String remove(String serialized, String address) {
+        String origin = sanitizeUrl(address);
+        List<String> entries = decode(serialized);
+        if (origin != null) entries.remove(origin);
+        return encode(entries);
+    }
 }
