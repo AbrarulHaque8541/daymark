@@ -19,6 +19,7 @@
 - Lock-screen content is private; notification posting checks app-level and Android 13+ permission state.
 - Focus session is stored separately in `focus-session.enc` using AES-GCM/Android Keystore. It stores no task title and does not modify the encrypted task snapshot. Same-boot restore uses monotonic time; known reboot gaps are capped at seven days; unknown boot identity pauses safely; expired countdowns finish.
 - Exact-head workflow #14: 16 source assertions PASS, 21 snapshot host assertions PASS, both distribution debug builds PASS, both lint variants PASS: https://github.com/AbrarulHaque8541/daymark/actions/runs/41032809377
+- Canonical `sh android-app/tools/check-v1-source.sh` was NOT RUN: PR #349 owns that shared guard, whose inline exact manifest permission allowlist still excludes `POST_PROMOTED_NOTIFICATIONS`. A coordination comment was posted to #349; do not merge #354 until the canonical allowlist is reconciled and rerun.
 
 ## Remaining work / blockers
 1. Reconcile #351 BigText + Dismiss with #353 stale-notification cleanup and Snooze.
