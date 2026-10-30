@@ -31,6 +31,7 @@ for token in required_sound:
 assert "private boolean soundEnabled;" in panel
 assert "track.setColor(SURFACE_HI);" in panel, "progress track must use the injected Daymark palette"
 assert "activeAnimator.cancel()" in panel, "progress animation must cancel superseded animations"
+assert "LAYER_TYPE_SOFTWARE" not in panel, "timer ring must not force software rendering"
 assert "private boolean finalTicksEnabled;" in panel
 assert "startTone" not in panel, "UI must route sounds through the soundscape"
 for fixed_accent in ["0xFF12617A", "0xFF54368F", "0xFF27D5F2", "0xFF9B70FF"]:
