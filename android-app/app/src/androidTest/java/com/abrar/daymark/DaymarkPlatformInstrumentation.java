@@ -50,6 +50,13 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private int assertions;
 
     @Override
+    public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        marker("instrumentation onCreate; dispatching start()");
+        start();
+    }
+
+    @Override
     public void onStart() {
         Bundle result = new Bundle();
         try {
