@@ -73,8 +73,10 @@ assert permission_names(manifest) == {
 }, "shared manifest declares INTERNET for the HTTP+HTTPS browser plus notification/boot/vibrate for task reminders"
 assert permission_names(play_manifest) == set(), "Play flavor must not declare permissions"
 assert permission_names(sideload_manifest) == {
-    "android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"
-}, "GitHub sideload may declare only network and connectivity-state permissions"
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.POST_PROMOTED_NOTIFICATIONS",
+}, "GitHub sideload may declare only network/connectivity plus optional Android 16 Live Update promotion"
 assert app.get("{http://schemas.android.com/apk/res/android}allowBackup") == "false", "backup must stay disabled"
 assert app.get("{http://schemas.android.com/apk/res/android}usesCleartextTraffic") == "false", "cleartext must stay disabled"
 assert not list(app.findall("service")), "V1 must not add services"
@@ -553,9 +555,9 @@ assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")
 
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
-# INTERNET for the HTTPS-only browser (issue #45) — a stale summary that contradicted
+# INTERNET for the HTTP+HTTPS browser (issue #45) — a stale summary that contradicted
 # the assertions above it.
-print("PASS manifest/permissions: main declares INTERNET for the HTTP+HTTPS browser plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for task reminders; Play adds none; GitHub sideload adds ACCESS_NETWORK_STATE; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
+print("PASS manifest/permissions: main declares INTERNET for the HTTP+HTTPS browser plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
 print("PASS permission policy: manifest-backed browser status plus a notification permission prompt only when a reminder is enabled; no other runtime permission prompt code")
 print("PASS encrypted task-store policy: writer and reader share invalid/duplicate-task rejection")
 print("PASS lifecycle policy: task/storage/attachment/browser callbacks are suppressed after Activity destruction")
@@ -570,3 +572,8 @@ print("PASS accessibility/localization source checks: scalable text, labeled con
 PY
 python3 "$ROOT/tools/check-accessibility-contrast.py"
 python3 "$ROOT/tools/check-source-check-summary.py"
+
+python3 "$ROOT/tools/check-focus-timer-notification.py" "$ROOT"
+python3 "$ROOT/tools/check-focus-timer-ui.py"
+python3 "$ROOT/tools/check-merged-manifests.py" "$ROOT"
+python3 "$ROOT/tools/check-ci-test-honesty.py" "$ROOT/.."
