@@ -7,6 +7,10 @@ on:
       - "android-app/app/src/main/AndroidManifest.xml"
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerNotification.java"
       - "android-app/tools/check-focus-timer-notification.py"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerSnapshotCodec.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerStore.java"
+      - "android-app/tools/TaskFocusTimerSnapshotSmoke.java"
+      - "android-app/tools/run-focus-timer-persistence-tests.sh"
       - "android-app/tools/check-merged-manifests.py"
 
 permissions:
@@ -32,6 +36,7 @@ jobs:
       - name: Verify Live Update and manifest policy
         run: |
           python3 tools/check-focus-timer-notification.py "$PWD"
+          sh tools/run-focus-timer-persistence-tests.sh
           python3 tools/check-merged-manifests.py "$PWD"
       - name: Compile both distribution variants and lint
         run: >-
