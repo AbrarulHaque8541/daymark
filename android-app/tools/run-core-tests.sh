@@ -46,6 +46,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserCookieImport.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/CosmeticFilterToCss.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/TasksHomeLayoutPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterCore.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterRecoveryStore.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/PendingSaveTransaction.java" \
@@ -82,7 +83,8 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserDiagnosticsSmoke.java" \
   "$ROOT/tools/ExtensionPackageParserSmoke.java" \
   "$ROOT/tools/BrowserCookieImportSmoke.java" \
-  "$ROOT/tools/CosmeticFilterToCssSmoke.java"
+  "$ROOT/tools/CosmeticFilterToCssSmoke.java" \
+  "$ROOT/tools/TasksHomeLayoutPolicySmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
@@ -113,3 +115,9 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDiagnosticsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ExtensionPackageParserSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserCookieImportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CosmeticFilterToCssSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TasksHomeLayoutPolicySmoke
+
+# Focus timer engine, lifecycle coordinator and encrypted snapshot codec.
+sh "$ROOT/tools/run-focus-timer-tests.sh"
+sh "$ROOT/tools/run-focus-session-coordinator-tests.sh"
+sh "$ROOT/tools/run-focus-timer-persistence-tests.sh"
