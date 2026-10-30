@@ -56,6 +56,12 @@ public final class TaskFocusTimerSnapshotSmoke {
         TaskFocusTimer safe = TaskFocusTimerSnapshotCodec.restore(unknown, 10, 99_000_000, -1);
         check(safe.isPaused(), "unknown boot identity restores paused");
         check(safe.elapsedMsAt(10) == 60_000, "unknown boot does not invent elapsed time");
+
+        byte[] longGap = TaskFocusTimerSnapshotCodec.encode(timer, 60_000, 10_000_000, 8);
+        TaskFocusTimer capped = TaskFocusTimerSnapshotCodec.restore(
+                longGap, 500, 10_000_000 + 20L * 24L * 60L * 60L * 1000L, 9);
+        check(capped.elapsedMsAt(500) == 60_000 + TaskFocusTimer.MAX_REBOOT_GAP_MS,
+                "reboot wall-clock recovery is capped at seven days");
     }
 
     private static void pausedAndFinishedRestore() throws Exception {
@@ -87,6 +93,11 @@ public final class TaskFocusTimerSnapshotSmoke {
         badMagic[0] = 'X';
         expectIOException(() -> TaskFocusTimerSnapshotCodec.restore(badMagic, 0, 0, -1),
                 "unknown magic rejected");
+        byte[] badMode = TaskFocusTimerSnapshotCodec.encode(
+                TaskFocusTimer.start("task-6", TaskFocusTimer.Mode.STOPWATCH, 0, 0), 0, 0, -1);
+        badMode[8 + "task-6".getBytes(java.nio.charset.StandardCharsets.UTF_8).length] = 99;
+        expectIOException(() -> TaskFocusTimerSnapshotCodec.restore(badMode, 0, 0, -1),
+                "unknown wire mode rejected");
     }
 
     private static void invalidClocksAreRejected() throws Exception {
