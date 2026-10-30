@@ -66,6 +66,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
             runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
             runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
+            runPhase("focus-timer-keystore-notification-lifecycle", this::focusTimerKeystoreAndNotificationLifecycle);
             marker("all phases passed; " + assertions + " assertions");
             result.putString("result", "passed");
             result.putInt("assertions", assertions);
@@ -271,6 +272,105 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(awaitNotificationState(manager, orphanNotificationId, false),
                 "notification reconciliation still runs when AlarmManager is unavailable");
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+    }
+
+    private void focusTimerKeystoreAndNotificationLifecycle() throws Exception {
+        Context base = getTargetContext();
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            getUiAutomation().grantRuntimePermission(
+                    base.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
+            check(base.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                            == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    "focus notification instrumentation has POST_NOTIFICATIONS granted");
+        }
+
+        android.app.NotificationManager manager =
+                (android.app.NotificationManager) base.getSystemService(Context.NOTIFICATION_SERVICE);
+        check(manager != null && manager.areNotificationsEnabled(),
+                "focus notification manager is available and app notifications are enabled");
+
+        File root = makeTestDirectory("focus-timer-runtime");
+        Context isolated = new IsolatedContext(base, root);
+        final int notificationId = 0x44464F43;
+        final String taskId = "focus-instrumentation-" + UUID.randomUUID();
+        Task task = new Task(taskId, "Focus instrumentation task", null, "medium", false,
+                "2026-10-30T18:00:00Z", "2026-10-30T18:00:00Z");
+        try {
+            EncryptedTaskStore taskStore = new EncryptedTaskStore(isolated);
+            taskStore.save(Collections.singletonList(task));
+            File taskSnapshot = new File(isolated.getFilesDir(), "tasks.enc");
+            byte[] taskBytesBefore = readFile(taskSnapshot);
+
+            TaskFocusSessionRuntime runtime = new TaskFocusSessionRuntime(isolated);
+            check(runtime.restoreAfterProcessStart(Collections.singletonList(task)) == null,
+                    "first focus runtime starts with no saved session and does not auto-start");
+            TaskFocusSessionCoordinator.Snapshot started = runtime.startFromUserAction(
+                    task.id, task.title, TaskFocusTimer.Mode.COUNTDOWN, 60_000L);
+            check(started != null && started.isRunning(),
+                    "explicit Start creates a running task-linked countdown");
+            check(started.notificationPublished,
+                    "running focus session publishes only after its encrypted save succeeds");
+
+            File focusFile = new File(isolated.getFilesDir(), "focus-session.enc");
+            check(focusFile.isFile() && focusFile.length() > 32,
+                    "focus session is committed to its own encrypted file");
+            byte[] encryptedFocus = readFile(focusFile);
+            check(!new String(encryptedFocus, StandardCharsets.ISO_8859_1).contains(taskId),
+                    "focus-session ciphertext does not expose the task ID in plaintext");
+            check(Arrays.equals(taskBytesBefore, readFile(taskSnapshot)),
+                    "focus-session persistence leaves the encrypted task snapshot byte-for-byte unchanged");
+
+            android.app.NotificationChannel channel =
+                    manager.getNotificationChannel(TaskFocusTimerNotification.CHANNEL_ID);
+            check(channel != null
+                            && channel.getImportance() == android.app.NotificationManager.IMPORTANCE_LOW,
+                    "focus progress channel exists at low importance");
+            android.app.Notification posted = awaitNotificationTitle(
+                    manager, notificationId, task.title);
+            check(posted != null && posted.isOngoing()
+                            && android.app.Notification.CATEGORY_PROGRESS.equals(posted.category),
+                    "explicit countdown posts a private ongoing progress notification");
+
+            // A second runtime instance exercises the same restore boundary used after process recreation.
+            TaskFocusSessionRuntime restoredRuntime = new TaskFocusSessionRuntime(isolated);
+            TaskFocusSessionCoordinator.Snapshot restored =
+                    restoredRuntime.restoreAfterProcessStart(Collections.singletonList(task));
+            check(restored != null && restored.isRunning() && restored.restored,
+                    "a still-existing task restores its persisted running focus session");
+            check(awaitNotificationState(manager, notificationId, true),
+                    "restoring an eligible running session republishes its progress notification");
+
+            TaskFocusSessionCoordinator.Snapshot paused = restoredRuntime.pauseFromUserAction();
+            check(paused != null && paused.isPaused(),
+                    "Pause durably changes the focus session to PAUSED");
+            check(awaitNotificationState(manager, notificationId, false),
+                    "Pause removes the ongoing notification");
+            TaskFocusSessionCoordinator.Snapshot resumed =
+                    restoredRuntime.resumeFromUserAction(task.title);
+            check(resumed != null && resumed.isRunning(),
+                    "Resume restores monotonic running state");
+            check(awaitNotificationState(manager, notificationId, true),
+                    "Resume republishes the ongoing notification");
+            TaskFocusSessionCoordinator.Snapshot finished = restoredRuntime.finishFromUserAction();
+            check(finished != null && finished.isFinished(),
+                    "Finish durably ends the focus session without completing the task");
+            check(awaitNotificationState(manager, notificationId, false),
+                    "Finish cancels only the focus notification");
+            check(taskStore.load().size() == 1 && taskStore.load().get(0).id.equals(task.id),
+                    "focus timer lifecycle preserves the original task record");
+
+            TaskFocusSessionRuntime deletedTaskRuntime = new TaskFocusSessionRuntime(isolated);
+            check(deletedTaskRuntime.restoreAfterProcessStart(Collections.emptyList()) == null,
+                    "restore with a deleted/missing task clears only the stale focus session");
+            check(new TaskFocusTimerStore(isolated).load(
+                            android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis(), -1) == null,
+                    "deleted-task reconciliation leaves no active focus session");
+            check(Arrays.equals(taskBytesBefore, readFile(taskSnapshot)),
+                    "restore/deletion reconciliation still leaves tasks.enc byte-for-byte unchanged");
+        } finally {
+            manager.cancel(notificationId);
+            deleteTree(root);
+        }
     }
 
     private static void postTestReminder(android.app.NotificationManager manager,
