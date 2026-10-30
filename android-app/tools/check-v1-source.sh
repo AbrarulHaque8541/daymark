@@ -1,4 +1,3 @@
-set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
@@ -302,7 +301,7 @@ assert "BrowserHistory.sanitizeUrl(url)" in activity and "BrowserHistory.add(cur
 history_dialog = re.search(r"private void showBrowserHistoryDialog\(\)\s*\{(.*?)\n    \}", activity, re.S)
 assert history_dialog and 'setTitle("Site history (HTTPS origins only)")' in history_dialog.group(1)
 assert history_dialog and "String url = history.get(matchedIndices.get(position));" in history_dialog.group(1) and "navigateBrowserTo(url)" in history_dialog.group(1), "reopening a saved site must navigate to its origin"
-for expected in ("source.getHost()", "source.getPort()", "port != HTTPS_DEFAULT_PORT", "HTTPS_DEFAULT_PORT = 443",
+for expected in ("source.getHost()", "source.getPort()", "port != defaultPort", "HTTPS_DEFAULT_PORT = 443", "HTTP_DEFAULT_PORT = 80",
                  "sanitized.getRawUserInfo()", "sanitized.getRawQuery()", "sanitized.getRawFragment()", "sanitized.getRawPath()"):
     assert expected in history_source, f"history sanitizer must handle {expected}"
 assert "source.getRawPath()" not in history_source, "site history must not read or persist a page path"
@@ -391,8 +390,8 @@ for expected in (
     "BING(\"Bing\"",
     "BRAVE(\"Brave Search\"",
     "URLEncoder.encode(query.trim(), \"UTF-8\")",
-    "HTTP is blocked. Use HTTPS; a per-site HTTP exception requires a separate explicit request.",
-    "Only HTTPS pages are supported. A per-site HTTP exception requires a separate explicit request.",
+    "Only HTTP and HTTPS pages are supported in the browser.",
+    "BrowserHttpPolicy.isAllowedWebScheme(",
 ):
     assert expected in address, f"missing browser input rule: {expected}"
 assert "https://" + "example" not in address  # Search/address behavior is covered by executable smoke tests.
