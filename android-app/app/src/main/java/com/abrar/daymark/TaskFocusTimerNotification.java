@@ -21,6 +21,7 @@ import java.util.Locale;
 final class TaskFocusTimerNotification {
     static final String CHANNEL_ID = "daymark_focus_sessions";
     private static final int PROGRESS_MAX = 1000;
+    private static final String EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing";
 
     private TaskFocusTimerNotification() { }
 
@@ -131,7 +132,7 @@ final class TaskFocusTimerNotification {
                     .setStyledByProgress(true);
             if (countdown) style.setProgress(Math.max(0, Math.min(100, progress / 10)));
             builder.setStyle(style);
-            builder.setRequestPromotedOngoing(true);
+            builder.getExtras().putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true);
         }
     }
 }
