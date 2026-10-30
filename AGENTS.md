@@ -14,12 +14,12 @@ This document contains **durable rules and invariants**, not a live project dash
 
 ## 2. Durable project constraints
 
-1. Daymark is a local-first Android task app with an HTTPS-only embedded System WebView.
+1. Daymark is a local-first Android task app with an embedded System WebView that supports both HTTP and HTTPS. HTTP pages are labeled "Not encrypted" in the UI via `BrowserHttpPolicy.securityLabel()`. Bare domains typed without a scheme resolve to HTTPS. The in-app updater and all non-browser network clients remain HTTPS-only.
 2. The owner-approved installed application ID and Gradle namespace are `com.abrar.daymark`. All current source packages/paths, manifests, tests, scripts, CI and current documentation must use that identity. Do not reintroduce the retired package namespace in current tracked content. Do not change the approved identity without explicit owner approval. Historical commits and published releases are not rewritten.
    - When an issue, PR, handoff, or audit states a different application ID, verify `android-app/app/build.gradle.kts` and the live manifest before acting; source/build identity wins over stale issue text.
 3. Preserve the production signer pin `ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580` and existing GitHub signing secrets. Never ask the owner to send keystore files/passwords; never print or commit secrets; never embed write tokens in the APK. A signing-key or signer-pin change requires explicit owner approval and verified continuity.
 4. Keep `versionCode` monotonic. A production tag must exactly equal `v` + the current `versionName`; do not hardcode a specific release version as a permanent rule.
-5. Never silently delete, reset, or corrupt user task data on an error. No analytics/ad SDKs. No broad JavaScript bridge to untrusted pages. Preserve HTTPS-only browsing and explicit online-consent behavior.
+5. Never silently delete, reset, or corrupt user task data on an error. No analytics/ad SDKs. No broad JavaScript bridge to untrusted pages. Preserve HTTP+HTTPS browsing with "Not encrypted" labeling for plain HTTP, HTTPS-only updater, and explicit online-consent behavior.
 6. System WebView is not a full Chrome/Firefox extension engine. Do not promise APIs or network-blocking capabilities the app does not implement.
 7. Preserve existing features when editing shared files, especially `MainActivity.java`. Inspect current `main` before applying an old patch or replacing a file. Resolve conflicts by preserving both behaviours and adding regression coverage.
 8. Prefer maintained, stable Android/platform technologies. Weigh security, privacy, supported API levels, lifecycle/support quality, and migration cost. Upgrade for a concrete benefit, not novelty alone; document material trade-offs.
@@ -62,7 +62,7 @@ Do not copy another agent's identity, invent model details, reuse an old timesta
 - For shared-file conflicts, inspect both implementations and current `main`; preserve existing behavior and test the combined result.
 - **`MainActivity.java` is a shared, source-guarded file:** no two agents may edit it in overlapping open PRs/branches. Before proposing changes to it, check open PRs and coordinate in the existing issue; land one focused change at a time and re-run the full source-guard suite (`sh android-app/tools/check-v1-source.sh`) on the exact head.
 - Ask independent agents for review on risky package, manifest, signing, release-workflow, security, or data-storage changes.
-- Do not treat a comment saying “working on it” as evidence. Request concrete changed files, head SHA, test results, and workflow links.
+- Do not treat a comment saying "working on it" as evidence. Request concrete changed files, head SHA, test results, and workflow links.
 - A PR exists only after GitHub returns a real PR number/URL. Do not claim a PR, merge, release, or CI pass that did not happen.
 - Do not let independent agents make overlapping `MainActivity.java` changes in separate active PRs. Agree on one canonical branch/PR or land changes sequentially, then rebase and re-run checks on the combined head.
 
@@ -94,7 +94,7 @@ Release rules:
 | Project plan | `PROJECT_PLAN.md` |
 
 ---
-Work by: ChatGPT
-Model: GPT-6
-Tooling: GitHub MCP tools
-Timestamp (UTC): 2026-10-13T13:55:43Z
+Work by: Vibe
+Model: Mistral Large 4
+Tooling: GitHub connector (push_files)
+Timestamp (UTC): 2026-10-30T14:05:00Z
