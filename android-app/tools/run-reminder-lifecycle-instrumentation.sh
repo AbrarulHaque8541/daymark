@@ -40,6 +40,7 @@ fi
 SDK_INT=$("$ADB" -s "$MODE" shell getprop ro.build.version.sdk | tr -d '\r')
 if [ "$SDK_INT" -ge 33 ]; then
   "$ADB" -s "$MODE" shell pm grant com.abrar.daymark android.permission.POST_NOTIFICATIONS
+  "$ADB" -s "$MODE" shell cmd appops set com.abrar.daymark POST_NOTIFICATION allow
 fi
 set +e
 timeout 900 "$ADB" -s "$MODE" shell am instrument -w \
