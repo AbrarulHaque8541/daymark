@@ -20,7 +20,7 @@ import android.security.keystore.KeyProperties;
 /**
  * Stores one active focus session in its own AES-GCM/AtomicFile blob.
  *
- * This file is deliberately separate from tasks.enc. A corrupt or unavailable focus-session
+ * This file is deliberately separate from the encrypted task snapshot. A corrupt or unavailable focus-session
  * record cannot overwrite, migrate, or prevent access to the user's task snapshot.
  */
 final class TaskFocusTimerStore {
@@ -57,7 +57,7 @@ final class TaskFocusTimerStore {
               long nowWallClockMs, int bootCount) throws Exception {
         synchronized (FILE_ACCESS_LOCK) {
             // Verify the currently committed blob before replacing it. A corrupt or concurrently
-            // changed focus file fails closed and never touches tasks.enc.
+            // changed focus file fails closed and never touches the encrypted task snapshot.
             encryptedStore.load();
             byte[] snapshot = TaskFocusTimerSnapshotCodec.encode(
                     timer, nowElapsedRealtimeMs, nowWallClockMs, bootCount);
