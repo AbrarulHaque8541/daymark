@@ -111,9 +111,9 @@ public final class TaskFocusTimerSmoke {
         expectIllegalState(() -> running.resume(1), "running timer cannot be resumed twice");
         TaskFocusTimer paused = running.pause(1);
         expectIllegalState(() -> paused.pause(2), "paused timer cannot be paused twice");
-        expectIllegalState(() -> paused.finish(-1), "invalid finish clock rejected");
         check(paused.finish(2).isFinished(), "paused timer can be finished");
-        expectIllegalState(() -> paused.resume(-1), "negative monotonic time rejected on resume");
+        expectIllegalArgument(() -> paused.resume(-1), "negative monotonic time rejected on resume");
+        expectIllegalArgument(() -> running.finish(-1), "negative monotonic time rejected when finishing a running timer");
         expectIllegalArgument(() -> running.save(-1, 1, 1), "negative save clock rejected");
     }
 
