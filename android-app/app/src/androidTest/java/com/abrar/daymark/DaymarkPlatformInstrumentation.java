@@ -201,6 +201,21 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 "malformed request-code preference is repaired without aborting other reminders");
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
 
+        Task malformedPreferenceTask = TaskLogic.create("Malformed reminder preferences",
+                "2099-12-05", "high", null, null, 60, null);
+        context.getSharedPreferences("daymark.reminders.v1", Context.MODE_PRIVATE)
+                .edit().putInt("snooze." + malformedPreferenceTask.id, 42).commit();
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().putString("next_request_code", "not-an-integer").commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(malformedPreferenceTask));
+        check(TaskReminderScheduler.snoozeRecord(context, malformedPreferenceTask.id) == null,
+                "wrong-typed snooze preference is discarded without aborting reconciliation");
+        Integer counterRecoveredId =
+                TaskReminderScheduler.getNotificationId(context, malformedPreferenceTask.id);
+        check(counterRecoveredId != null && counterRecoveredId > 0,
+                "wrong-typed request-code counter is reset and a fresh ID is allocated");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+
         Task orphanNotificationTask = TaskLogic.create("Orphan notification", "2099-12-05",
                 "high", null, null, null, null);
         int orphanNotificationId = 990001;
