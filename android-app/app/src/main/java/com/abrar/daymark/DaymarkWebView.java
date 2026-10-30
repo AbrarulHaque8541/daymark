@@ -125,6 +125,7 @@ final class DaymarkWebView extends WebView {
     }
 
     private final ExtensionRuntime extensionRuntime;
+    private final BrowserNetworkPolicy networkPolicy;
     private final Listener listener;
 
     boolean isShowingCustomView() {
@@ -146,6 +147,7 @@ final class DaymarkWebView extends WebView {
     DaymarkWebView(Activity activity, BrowserNetworkPolicy networkPolicy,
                    boolean safeBrowsingEnabled, Listener listener) {
         super(activity);
+        this.networkPolicy = networkPolicy;
         this.listener = listener;
         this.extensionRuntime = ExtensionRuntime.create(activity);
         try {
