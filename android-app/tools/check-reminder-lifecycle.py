@@ -57,6 +57,11 @@ assert "ReminderSchedulePolicy.scheduledFire(" in scheduler
 assert "ReminderSchedulePolicy.acceptsFire(" in receiver
 assert "ReminderSchedulePolicy.isSnoozedFire(" in receiver
 assert "TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire)" in receiver
+show_method = receiver.split("private void showReminder", 1)[1].split(
+    "private Task findValidReminderTask", 1
+)[0]
+assert "String title =" not in show_method, "alarm extras must not override or gate on the current encrypted task title"
+assert "currentTask.title" in show_method
 assert "putExtra(EXTRA_FIRE_INSTANT, fireInstant)" in receiver
 snooze_method = receiver.split("private void snoozeReminder", 1)[1].split(
     "private void cancelNotification", 1
