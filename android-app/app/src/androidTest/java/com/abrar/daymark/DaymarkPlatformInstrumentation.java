@@ -190,6 +190,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         java.time.Instant movedFire = ReminderSchedulePolicy.baseFire(moved, zone);
         check(movedFire != null, "edited reminder has a new occurrence");
         postTestReminder(manager, context, notificationId, moved, movedFire.toString());
+        check(awaitNotificationState(manager, notificationId, true),
+                "edited-task notification is active before completion reconciliation");
         Task completed = TaskLogic.toggleCompleted(moved);
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(completed));
         check(awaitNotificationState(manager, notificationId, false),
@@ -204,6 +206,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         Integer deletedId = TaskReminderScheduler.getNotificationId(context, deleted.id);
         check(deletedId != null, "deleted-task fixture has a scheduled reminder ID");
         postTestReminder(manager, context, deletedId, deleted, deletedFire.toString());
+        check(awaitNotificationState(manager, deletedId, true),
+                "deleted-task notification is active before its ID index is lost");
         context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
                 .edit().remove(deleted.id).commit();
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
@@ -240,6 +244,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         int orphanNotificationId = 990001;
         postTestReminder(manager, context, orphanNotificationId, orphanNotificationTask,
                 "2099-12-04T00:00:00Z");
+        check(awaitNotificationState(manager, orphanNotificationId, true),
+                "orphan notification is active before AlarmManager-less reconciliation");
         Context noAlarmManager = new ContextWrapper(context) {
             @Override
             public Object getSystemService(String name) {
