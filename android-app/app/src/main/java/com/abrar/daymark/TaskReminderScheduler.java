@@ -96,7 +96,6 @@ final class TaskReminderScheduler {
 
         Intent intent = reminderIntent(context, task.id);
         intent.putExtra(TaskReminderReceiver.EXTRA_NOTIFICATION_ID, notificationId);
-        intent.putExtra(TaskReminderReceiver.EXTRA_TASK_TITLE, task.title);
         intent.putExtra(TaskReminderReceiver.EXTRA_FIRE_INSTANT, snoozeFire.toString());
         try {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli(),
@@ -309,16 +308,6 @@ final class TaskReminderScheduler {
         }
     }
 
-    private static void schedule(Context context, AlarmManager alarmManager, Task task) {
-        Instant nextFire = ReminderSchedulePolicy.scheduledFire(
-                task, ZoneId.systemDefault(), snoozeRecord(context, task.id));
-        if (nextFire == null) return;
-        if (!nextFire.isAfter(Instant.now())) return;
-        int requestCode = requestCodeFor(context, task.id);
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextFire.toEpochMilli(),
-                pendingIntent(context, task, nextFire.toString(), requestCode));
-    }
-
     private static void cancelAlarm(Context context, AlarmManager alarmManager,
             String taskId, int requestCode) {
         PendingIntent pending = PendingIntent.getBroadcast(context, requestCode,
@@ -334,7 +323,6 @@ final class TaskReminderScheduler {
             String fireText, int requestCode) {
         Intent intent = reminderIntent(context, task.id);
         intent.putExtra(TaskReminderReceiver.EXTRA_NOTIFICATION_ID, requestCode);
-        intent.putExtra(TaskReminderReceiver.EXTRA_TASK_TITLE, task.title);
         intent.putExtra(TaskReminderReceiver.EXTRA_FIRE_INSTANT, fireText);
         return PendingIntent.getBroadcast(context, requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
