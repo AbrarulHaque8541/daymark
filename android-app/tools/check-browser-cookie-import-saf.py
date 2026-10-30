@@ -6,6 +6,7 @@ FLOW = (ROOT / "app/src/main/java/com/abrar/daymark/BrowserCookieImportFlow.java
 PARSER = (ROOT / "app/src/main/java/com/abrar/daymark/BrowserCookieImport.java").read_text(encoding="utf-8")
 POLICY = (ROOT / "app/src/main/java/com/abrar/daymark/BrowserCookieImportPolicy.java").read_text(encoding="utf-8")
 MANIFEST = (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+WORKFLOW = (ROOT.parent / ".github/workflows/browser-cookie-import-safety.yml").read_text(encoding="utf-8")
 
 for marker in (
     "Intent.ACTION_OPEN_DOCUMENT",
@@ -62,6 +63,8 @@ assert "isValidValue" in PARSER and "c == ';'" in PARSER
 assert "MAX_REJECTED_LINES_RETAINED" in PARSER and "MAX_LINES" in PARSER
 assert "hasValidPrefixSemantics" in POLICY
 assert "selectedDomains" in FLOW
+assert "testGithubSideloadDebugUnitTest" not in WORKFLOW
+assert "testPlayDebugUnitTest" not in WORKFLOW
 read_thread_start = FLOW.index("Thread worker = new Thread(() ->")
 read_call = FLOW.index("readSelectedFile(selectedUri)")
 read_thread_end = FLOW.index('}, "DaymarkCookieImportRead");', read_thread_start)
