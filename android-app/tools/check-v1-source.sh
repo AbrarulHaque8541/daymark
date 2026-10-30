@@ -568,3 +568,4 @@ print("PASS accessibility/localization source checks: scalable text, labeled con
 PY
 python3 "$ROOT/tools/check-accessibility-contrast.py"
 python3 "$ROOT/tools/check-source-check-summary.py"
+python3 "$ROOT/tools/check-ci-test-honesty.py" "$ROOT"
