@@ -50,9 +50,8 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     private void showReminder(Context context, Intent intent) {
         int notificationId = intent == null ? 0 : intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
         String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);
-        String title = intent == null ? null : intent.getStringExtra(EXTRA_TASK_TITLE);
         String fireInstant = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);
-        if (notificationId == 0 || taskId == null || title == null || title.trim().isEmpty() || fireInstant == null) {
+        if (notificationId <= 0 || taskId == null || fireInstant == null) {
             Log.w("DaymarkReminder", "A reminder alarm fired without usable details; no notification is shown.");
             return;
         }
