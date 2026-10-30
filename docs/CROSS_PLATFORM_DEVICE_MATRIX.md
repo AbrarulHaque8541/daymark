@@ -105,6 +105,8 @@ The first platform-neutral implementation lives in `shared-core/` as Java 17 sou
 
 The cross-platform contract workflow now compiles and executes this slice on Ubuntu and Windows using Java 17. The smoke suite covers phone, watch, ring/display-less, car, e-ink and desktop policy behavior, plus immutable snapshots and invalid profiles.
 
+A single TSV contract at `contracts/device-capability-policy.tsv` is now consumed by both the Java 17 shared-core smoke test and the Node test suite for the JavaScript adapter. This prevents the two implementations from quietly drifting on the same device scenarios. The existing experimental browser desktop spike also loads the shared JavaScript policy and uses real browser pointer/touch and viewport signals to label its current interaction surface and gate task capture; it explicitly does not infer a native OS, wearable, ring, or car integration.
+
 **Boundary:** this is an executable shared-core proof, not yet wired into the Android UI or a shipped multi-platform app. Platform adapters, real device capability discovery, iOS/desktop/watch shells, vendor ring integrations, and physical-device validation remain outstanding. Do not label any new platform supported based on this policy alone.
 
 ## 6. Technology evaluation — no framework selected yet
