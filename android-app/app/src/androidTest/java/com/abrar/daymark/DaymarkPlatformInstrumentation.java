@@ -328,7 +328,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "focus progress channel exists at low importance");
             android.app.Notification posted = awaitNotificationTitle(
                     manager, notificationId, task.title);
-            check(posted != null && posted.isOngoing()
+            check(posted != null && (posted.flags & android.app.Notification.FLAG_ONGOING_EVENT) != 0
                             && android.app.Notification.CATEGORY_PROGRESS.equals(posted.category),
                     "explicit countdown posts a private ongoing progress notification");
 
