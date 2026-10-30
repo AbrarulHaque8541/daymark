@@ -7529,6 +7529,8 @@ public final class MainActivity extends Activity {
                 () -> showTaskTemplatesDialog());
 
         addSettingsSection(content, "POWER FEATURES");
+        addSettingsRow(content, "Keyboard shortcuts", "Physical keyboard and Chromebook chords",
+                () -> showKeyboardShortcutsDialog());
         addSettingsRow(content, "Check for updates", "Check the signed sideload release channel",
                 () -> checkForUpdates(true));
 
@@ -7552,6 +7554,48 @@ public final class MainActivity extends Activity {
         heading.setLetterSpacing(0.12f);
         heading.setPadding(dp(3), dp(12), dp(3), dp(5));
         parent.addView(heading);
+    }
+
+    /** Lists the chords {@link KeyShortcuts} actually handles, so they are discoverable. */
+    private void showKeyboardShortcutsDialog() {
+        String[][] shortcuts = {
+                { "Ctrl + K", "Jump to quick add" },
+                { "Ctrl + F", "Find a task, or search the page in the browser" },
+                { "Ctrl + T", "Open a new browser tab" },
+                { "Ctrl + W", "Close the current browser tab" },
+                { "Ctrl + R", "Reload the current page" },
+                { "Esc", "Clear the search and tag filter" },
+        };
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(8), dp(18), dp(8));
+        TextView intro = text("These work with a physical keyboard or a Chromebook. "
+                + "Browser chords only act while the Web workspace is open.", 12,
+                palette.muted, Typeface.NORMAL);
+        intro.setLineSpacing(dp(2), 1f);
+        content.addView(intro, bottomMargin(dp(10)));
+        for (String[] shortcut : shortcuts) {
+            LinearLayout row = horizontalCard(palette.surface);
+            row.setPadding(dp(12), dp(10), dp(12), dp(10));
+            row.setContentDescription(shortcut[0] + ". " + shortcut[1]);
+            TextView chord = text(shortcut[0], 13, palette.accent, Typeface.BOLD);
+            chord.setMinWidth(dp(96));
+            row.addView(chord, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            TextView meaning = text(shortcut[1], 12, palette.text, Typeface.NORMAL);
+            LinearLayout.LayoutParams meaningParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            meaningParams.leftMargin = dp(10);
+            row.addView(meaning, meaningParams);
+            content.addView(row, bottomMargin(dp(6)));
+        }
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        new AlertDialog.Builder(this)
+                .setTitle("Keyboard shortcuts")
+                .setView(scroll)
+                .setPositiveButton("Done", null)
+                .show();
     }
 
     private void addSettingsRow(LinearLayout parent, String title, String subtitle, Runnable action) {

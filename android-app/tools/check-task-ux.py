@@ -175,6 +175,18 @@ check("case KeyShortcuts.CLEAR_SEARCH:" in handled, "Escape case missing")
 clear = handled.split("case KeyShortcuts.CLEAR_SEARCH:", 1)[1]
 check("activeTag = \"\";" in clear, "Escape must clear the tag as well as the query")
 
+for constant in ("KEY_K", "KEY_F", "KEY_T", "KEY_W", "KEY_R", "KEY_ESCAPE"):
+    check(f"static final int {constant} = " in keys, f"{constant} missing")
+
+check('addSettingsRow(content, "Keyboard shortcuts"' in ACTIVITY,
+      "shortcuts must be discoverable from Settings")
+shortcut_dialog = region("private void showKeyboardShortcutsDialog", "private void addSettingsRow",
+                         "keyboard shortcut dialog")
+for chord in ("Ctrl + K", "Ctrl + F", "Ctrl + T", "Ctrl + W", "Ctrl + R", "Esc"):
+    check(f'{{ "{chord}"' in shortcut_dialog, f"{chord} must be listed in the dialog")
+check('row.setContentDescription(shortcut[0] + ". " + shortcut[1]);' in shortcut_dialog,
+      "each shortcut row needs an accessible description")
+
 # --- 4. Registration -----------------------------------------------------------------------
 
 for smoke in (NOTE_SMOKE, KEYS_SMOKE, TAG_SMOKE):

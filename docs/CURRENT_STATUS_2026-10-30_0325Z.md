@@ -37,10 +37,12 @@ Three gaps documented in [`TASK_BROWSER_PAGE_GAPS.md`](TASK_BROWSER_PAGE_GAPS.md
 3. **Hardware keyboard shortcuts.** New pure `KeyShortcuts` maps Ctrl+K (quick add), Ctrl+F
    (task search, or find-in-page in the browser), Ctrl+T/Ctrl+W/Ctrl+R (browser only) and Escape
    (clear a narrowing search and tag). Only the first `ACTION_DOWN` of an unmodified Ctrl chord
-   is claimed; unmapped keys and Alt/Shift chords reach the system untouched.
+   is claimed; unmapped keys and Alt/Shift chords reach the system untouched. Settings →
+   POWER FEATURES → **Keyboard shortcuts** lists the exact chords the code handles, so the
+   feature is discoverable without reading the release notes.
 
 Supporting work: `TaskFilterSmoke` (20 assertions), `NoteFormatSmoke` (45), `KeyShortcutsSmoke`
-(23), and `check-task-ux.py` (81 assertions) with five `expect_fail_after_removal` mutations
+(23), and `check-task-ux.py` (95 assertions) with five `expect_fail_after_removal` mutations
 proving it fails closed.
 
 ## Checks actually run
