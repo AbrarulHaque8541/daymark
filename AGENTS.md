@@ -23,6 +23,7 @@ This document contains **durable rules and invariants**, not a live project dash
 6. System WebView is not a full Chrome/Firefox extension engine. Do not promise APIs or network-blocking capabilities the app does not implement.
 7. Preserve existing features when editing shared files, especially `MainActivity.java`. Inspect current `main` before applying an old patch or replacing a file. Resolve conflicts by preserving both behaviours and adding regression coverage.
 8. Prefer maintained, stable Android/platform technologies. Weigh security, privacy, supported API levels, lifecycle/support quality, and migration cost. Upgrade for a concrete benefit, not novelty alone; document material trade-offs.
+9. **Technology-agnostic implementation:** no programming language, runtime, framework, compiler, or tool is forbidden by default. Names in examples are illustrative, not exhaustive or mandatory. Choose the best evidence-backed option for each component; profile and benchmark before performance rewrites, account for security/ABI/build/maintenance costs, and preserve all product/release invariants. Follow [Technology-agnostic engineering policy](docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md).
 
 ## 3. Mandatory agent workflow
 
@@ -92,6 +93,8 @@ Release rules:
 | Published builds | Live [GitHub Releases](https://github.com/AbrarulHaque8541/daymark/releases) |
 | Signing configuration/policy | `RELEASE_SIGNING.md` |
 | Project plan | `PROJECT_PLAN.md` |
+| Language/runtime/tooling decisions | [Technology-agnostic engineering policy](docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md) |
+| Independent Mistral Vibe review prompt | [Mistral Vibe engineering prompt](docs/MISTRAL_VIBE_ENGINEERING_PROMPT.md) |
 
 ---
 Work by: Vibe

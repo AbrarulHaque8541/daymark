@@ -1,6 +1,6 @@
 # Android V1 design notes
 
-The native Android project remains separate from the parent web prototype. It is a single-user Java Activity with Android platform APIs only. The task store is app-private encrypted file storage with no remote task service or third-party runtime dependency. The optional GitHub sideload updater is flavor-gated and has a narrow network permission scope; it does not upload task data.
+The native Android project remains separate from the parent web prototype. The current baseline is a single-user Java Activity using Android platform APIs. This is a description of the implementation at the time of writing, not a requirement to use Java forever or a restriction on other languages. Future components may use any suitable language/runtime when evidence shows a net improvement; follow the repository [technology-agnostic engineering policy](../docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md). The task store is app-private encrypted file storage with no remote task service or third-party runtime dependency. The optional GitHub sideload updater is flavor-gated and has a narrow network permission scope; it does not upload task data.
 
 ## Attached brief: requirement disposition
 

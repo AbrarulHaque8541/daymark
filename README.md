@@ -3,7 +3,7 @@
 **Daymark** is a local-first Android task assistant with an HTTPS-only embedded browser, encrypted local task storage, attachments, portable encrypted backups, and a lightweight page-local extension system.
 
 - **Android application ID:** `com.abrar.daymark` (owner-approved fresh identity; previous app installations remain separate)
-- **Architecture:** native Java Activity + Android System WebView; no third-party runtime dependencies
+- **Current implementation:** Java-based Android Activity + Android System WebView; no third-party runtime dependencies in the current baseline. This describes the code today, not a restriction on future engineering choices.
 - **Task data:** encrypted on-device; no account, cloud task sync, analytics, or telemetry
 - **Source version:** see `android-app/app/build.gradle.kts` (`versionName` / `versionCode`)
 
@@ -38,11 +38,12 @@
 
 ## Agents & contributors
 
-Read **[AGENTS.md](AGENTS.md)** and **[RELEASE_SIGNING.md](RELEASE_SIGNING.md)** first. Then read the [agent status index](docs/AGENT_STATUS.md) and verify its linked snapshot against live GitHub.
+Read **[AGENTS.md](AGENTS.md)**, **[RELEASE_SIGNING.md](RELEASE_SIGNING.md)**, and the [technology-agnostic engineering policy](docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md) first. Any suitable language or tool may be used when it is the best evidence-backed choice; language examples are not an allowlist. Then read the [agent status index](docs/AGENT_STATUS.md) and verify its linked snapshot against live GitHub.
 
 - Production signing secrets are already in GitHub Actions — **do not ask the owner for keystore files**.
 - Push a tag exactly matching `v` + the source `versionName` on `main` to trigger signed-artifact checks. The workflow must create a draft only; test the exact draft APK SHA-256 on the owner device and manually publish the draft only after acceptance.
 - Verify live Releases, Issues, PRs, and Actions instead of trusting old “candidate” sentences in dated audits.
+- For independent review, use the [Mistral Vibe engineering prompt](docs/MISTRAL_VIBE_ENGINEERING_PROMPT.md); it is a review aid, not a substitute for repository rules or tests.
 
 ## Build and test
 
