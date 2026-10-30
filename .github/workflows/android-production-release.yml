@@ -51,6 +51,15 @@ jobs:
         with:
           packages: 'platforms;android-36 build-tools;35.0.0'
 
+      - name: Run source and host regression checks before signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh ./tools/check-v1-source.sh
+          sh ./tools/run-storage-recovery-tests.sh
+          sh ./tools/run-updater-picker-routing-tests.sh
+          python3 ./tools/check-ci-test-honesty.py "$GITHUB_WORKSPACE"
+
       - name: Validate signing secrets
         shell: bash
         env:
@@ -88,7 +97,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon assembleGithubSideloadRelease bundleGithubSideloadRelease lintGithubSideloadRelease testGithubSideloadReleaseUnitTest
+          ./gradlew --no-daemon assembleGithubSideloadRelease bundleGithubSideloadRelease lintGithubSideloadRelease
 
       - name: Print complete release lint report on build failure
         if: failure()
