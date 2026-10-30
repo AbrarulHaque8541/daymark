@@ -136,10 +136,20 @@ final class BrowserAddress {
 
     static boolean shouldHandOffExternalScheme(boolean mainFrame, boolean userGesture, String scheme) {
         if (!mainFrame || !userGesture || scheme == null) return false;
-        switch (scheme.toLowerCase(Locale.ROOT)) {
-            case "tg": case "telegram": case "mailto": case "tel": case "sms":
-            case "smsto": case "geo": case "market": case "whatsapp": return true;
-            default: return false;
+        String normalized = scheme.trim().toLowerCase(Locale.ROOT);
+        if (!Pattern.matches("^[a-z][a-z0-9+.-]*$", normalized)) return false;
+        // Web navigation stays in Daymark. These schemes expose local resources, script
+        // execution, internal WebView surfaces, or privileged arbitrary Intent payloads.
+        switch (normalized) {
+            case "http": case "https": case "javascript": case "vbscript":
+            case "file": case "content": case "data": case "blob": case "about":
+            case "intent": case "daymark-download": case "chrome": case "chrome-extension":
+            case "devtools": case "view-source":
+                return false;
+            default:
+                // Any other syntactically valid URI scheme may be offered to Android's
+                // ACTION_VIEW resolver. The OS must still find a handler; no package is guessed.
+                return true;
         }
     }
 
