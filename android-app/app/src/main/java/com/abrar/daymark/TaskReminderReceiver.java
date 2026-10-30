@@ -22,7 +22,6 @@ import java.util.List;
 public final class TaskReminderReceiver extends BroadcastReceiver {
     static final String EXTRA_NOTIFICATION_ID = "daymark.extra.notification_id";
     static final String EXTRA_TASK_ID = "daymark.extra.task_id";
-    static final String EXTRA_TASK_TITLE = "daymark.extra.task_title";
     static final String EXTRA_FIRE_INSTANT = "daymark.extra.fire_instant";
     /** Sent by the notification's Snooze action; the distinct action keeps its PendingIntent separate. */
     static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";
@@ -137,7 +136,6 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                         .setAction(ACTION_SNOOZE)
                         .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
                         .putExtra(EXTRA_TASK_ID, task.id)
-                        .putExtra(EXTRA_TASK_TITLE, task.title)
                         .putExtra(EXTRA_FIRE_INSTANT, fireInstant),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent dismiss = PendingIntent.getBroadcast(context, notificationId,
@@ -168,7 +166,12 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                 .build();
         notification.extras.putString(EXTRA_TASK_ID, task.id);
         notification.extras.putString(EXTRA_FIRE_INSTANT, fireInstant);
-        notificationManager.notify(notificationId, notification);
+        try {
+            notificationManager.notify(notificationId, notification);
+        } catch (RuntimeException notifyFailure) {
+            Log.w("DaymarkReminder", "Could not publish reminder notification for task " + task.id,
+                    notifyFailure);
+        }
     }
 
     /** Dismiss clears only this visible notification; task state and its schedule are unchanged. */
@@ -215,7 +218,13 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     private void cancelNotification(Context context, int notificationId) {
         NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null) manager.cancel(notificationId);
+        if (manager == null) return;
+        try {
+            manager.cancel(notificationId);
+        } catch (RuntimeException cancelFailure) {
+            Log.w("DaymarkReminder", "Could not cancel reminder notification " + notificationId,
+                    cancelFailure);
+        }
     }
 
     private void rescheduleAfterBoot(Context context) {

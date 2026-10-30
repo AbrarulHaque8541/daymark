@@ -117,24 +117,43 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         android.app.NotificationManager manager =
                 (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         check(manager != null, "NotificationManager is available");
-        Task task = TaskLogic.create("Reminder original", "2099-12-01", "high",
+        Task scheduledTask = TaskLogic.create("Reminder original", "2099-12-01", "high",
                 null, null, 60, null);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(scheduledTask));
+        Integer allocatedId = TaskReminderScheduler.getNotificationId(context, scheduledTask.id);
+        check(allocatedId != null && allocatedId > 0,
+                "scheduler allocates a canonical request code for a future reminder");
+
+        // Simulate the notification after its base alarm has fired. A real snooze timestamp
+        // is now+10m, so the base occurrence must be at or before now.
+        Task task = scheduledTask.withDetails(scheduledTask.title, "2026-10-29",
+                scheduledTask.priority, java.time.Instant.now().toString());
         java.time.ZoneId zone = java.time.ZoneId.systemDefault();
         java.time.Instant fire = ReminderSchedulePolicy.baseFire(task, zone);
-        check(fire != null, "future reminder fire instant is computed");
+        check(fire != null && !fire.isAfter(java.time.Instant.now()),
+                "simulated posted reminder represents an already-fired base occurrence");
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(task));
         Integer notificationId = TaskReminderScheduler.getNotificationId(context, task.id);
-        check(notificationId != null && notificationId > 0, "scheduler stores the canonical request code");
+        check(notificationId != null && notificationId.equals(allocatedId),
+                "fired reminder retains its canonical request code");
 
         TaskReminderScheduler.ensureChannel(context);
+        check(manager.areNotificationsEnabled(),
+                "app-level notifications are enabled on the scratch emulator");
+        android.app.NotificationChannel reminderChannel =
+                manager.getNotificationChannel(TaskReminderScheduler.CHANNEL_ID);
+        check(reminderChannel != null
+                        && reminderChannel.getImportance() != android.app.NotificationManager.IMPORTANCE_NONE,
+                "reminder notification channel exists and is enabled");
         postTestReminder(manager, context, notificationId, task, fire.toString());
-        check(hasActiveNotification(manager, notificationId),
-                "synthetic reminder notification is active before reconciliation");
+        check(awaitNotificationState(manager, notificationId, true),
+                "synthetic reminder notification becomes active before reconciliation");
 
         Task renamed = task.withDetails("Reminder updated", task.dueDate, task.priority,
                 java.time.Instant.now().toString());
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
-        android.app.Notification refreshed = activeNotification(manager, notificationId);
+        android.app.Notification refreshed = awaitNotificationTitle(
+                manager, notificationId, renamed.title);
         check(refreshed != null && renamed.title.equals(
                         refreshed.extras.getString(android.app.Notification.EXTRA_TITLE)),
                 "title-only task edit refreshes the active reminder notification");
@@ -145,8 +164,22 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
         check(notificationId.equals(TaskReminderScheduler.getNotificationId(context, task.id)),
                 "valid active notification recovers a lost canonical ID index");
-        check(hasActiveNotification(manager, notificationId),
+        check(awaitNotificationState(manager, notificationId, true),
                 "index recovery preserves the matching active notification");
+
+        android.content.Intent dismissIntent = new android.content.Intent(
+                context, TaskReminderReceiver.class)
+                .setAction(TaskReminderReceiver.ACTION_DISMISS)
+                .putExtra(TaskReminderReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                .putExtra(TaskReminderReceiver.EXTRA_TASK_ID, renamed.id);
+        new TaskReminderReceiver().onReceive(context, dismissIntent);
+        check(awaitNotificationState(manager, notificationId, false),
+                "Dismiss action removes only the visible reminder notification");
+        check(notificationId.equals(TaskReminderScheduler.getNotificationId(context, renamed.id)),
+                "Dismiss leaves the task's canonical reminder identity intact");
+        postTestReminder(manager, context, notificationId, renamed, fire.toString());
+        check(awaitNotificationState(manager, notificationId, true),
+                "notification can be posted again after Dismiss without changing the task");
 
         check(TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString()),
                 "current notification can persist and arm a snooze");
@@ -165,15 +198,17 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(moved));
         check(TaskReminderScheduler.snoozeRecord(context, task.id) == null,
                 "due-date edit invalidates the previous occurrence's snooze");
-        check(!hasActiveNotification(manager, notificationId),
+        check(awaitNotificationState(manager, notificationId, false),
                 "old occurrence notification is removed after due-date edit");
 
         java.time.Instant movedFire = ReminderSchedulePolicy.baseFire(moved, zone);
         check(movedFire != null, "edited reminder has a new occurrence");
         postTestReminder(manager, context, notificationId, moved, movedFire.toString());
+        check(awaitNotificationState(manager, notificationId, true),
+                "edited-task notification is active before completion reconciliation");
         Task completed = TaskLogic.toggleCompleted(moved);
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(completed));
-        check(!hasActiveNotification(manager, notificationId),
+        check(awaitNotificationState(manager, notificationId, false),
                 "notification is canceled when its task is completed");
         check(TaskReminderScheduler.getNotificationId(context, task.id) == null,
                 "completed task releases its canonical reminder ID");
@@ -185,10 +220,12 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         Integer deletedId = TaskReminderScheduler.getNotificationId(context, deleted.id);
         check(deletedId != null, "deleted-task fixture has a scheduled reminder ID");
         postTestReminder(manager, context, deletedId, deleted, deletedFire.toString());
+        check(awaitNotificationState(manager, deletedId, true),
+                "deleted-task notification is active before its ID index is lost");
         context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
                 .edit().remove(deleted.id).commit();
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
-        check(!hasActiveNotification(manager, deletedId),
+        check(awaitNotificationState(manager, deletedId, false),
                 "posted notification is removed for a deleted task even when its ID index is missing");
 
         Task malformedIndex = TaskLogic.create("Malformed reminder index", "2099-12-04",
@@ -201,11 +238,28 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 "malformed request-code preference is repaired without aborting other reminders");
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
 
+        Task malformedPreferenceTask = TaskLogic.create("Malformed reminder preferences",
+                "2099-12-05", "high", null, null, 60, null);
+        context.getSharedPreferences("daymark.reminders.v1", Context.MODE_PRIVATE)
+                .edit().putInt("snooze." + malformedPreferenceTask.id, 42).commit();
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().putString("next_request_code", "not-an-integer").commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(malformedPreferenceTask));
+        check(TaskReminderScheduler.snoozeRecord(context, malformedPreferenceTask.id) == null,
+                "wrong-typed snooze preference is discarded without aborting reconciliation");
+        Integer counterRecoveredId =
+                TaskReminderScheduler.getNotificationId(context, malformedPreferenceTask.id);
+        check(counterRecoveredId != null && counterRecoveredId > 0,
+                "wrong-typed request-code counter is reset and a fresh ID is allocated");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+
         Task orphanNotificationTask = TaskLogic.create("Orphan notification", "2099-12-05",
                 "high", null, null, null, null);
         int orphanNotificationId = 990001;
         postTestReminder(manager, context, orphanNotificationId, orphanNotificationTask,
                 "2099-12-04T00:00:00Z");
+        check(awaitNotificationState(manager, orphanNotificationId, true),
+                "orphan notification is active before AlarmManager-less reconciliation");
         Context noAlarmManager = new ContextWrapper(context) {
             @Override
             public Object getSystemService(String name) {
@@ -214,7 +268,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         };
         TaskReminderScheduler.rescheduleAll(noAlarmManager, Collections.emptyList());
-        check(!hasActiveNotification(manager, orphanNotificationId),
+        check(awaitNotificationState(manager, orphanNotificationId, false),
                 "notification reconciliation still runs when AlarmManager is unavailable");
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
     }
@@ -235,6 +289,28 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private static boolean hasActiveNotification(android.app.NotificationManager manager, int id) {
         return activeNotification(manager, id) != null;
+    }
+
+    private static boolean awaitNotificationState(android.app.NotificationManager manager,
+            int id, boolean expectedActive) throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            if (hasActiveNotification(manager, id) == expectedActive) return true;
+            Thread.sleep(100L);
+        }
+        return hasActiveNotification(manager, id) == expectedActive;
+    }
+
+    private static android.app.Notification awaitNotificationTitle(
+            android.app.NotificationManager manager, int id, String expectedTitle)
+            throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            android.app.Notification notification = activeNotification(manager, id);
+            if (notification != null && notification.extras != null
+                    && expectedTitle.equals(notification.extras.getString(
+                            android.app.Notification.EXTRA_TITLE))) return notification;
+            Thread.sleep(100L);
+        }
+        return activeNotification(manager, id);
     }
 
     private static android.app.Notification activeNotification(
@@ -275,7 +351,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             legacyStore.save(imported); // Ordinary task saves must preserve already-saved templates.
             byte[] migratedJson = loadRawEncryptedSnapshot(snapshotFile, keys);
             JSONObject migrated = new JSONObject(new String(migratedJson, StandardCharsets.UTF_8));
-            check(migrated.optInt("version", -1) == 3, "the first successful save migrates to template-capable schema v3");
+            check(migrated.optInt("version", -1) == TaskSnapshotCodec.CURRENT_VERSION, "the first successful save migrates to the current template-capable schema");
             check(migrated.optJSONArray("templates") != null && migrated.optJSONArray("templates").length() == 1,
                     "schema-v3 encrypted snapshot contains the saved template");
             EncryptedTaskStore reloadedStore = new EncryptedTaskStore(snapshotFile, keys);
@@ -304,8 +380,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "schema-v2 attachment snapshots remain readable without invented templates");
             v2Store.saveSnapshot(v2Store.load(), Collections.singletonList(savedTemplate));
             check(new JSONObject(new String(loadRawEncryptedSnapshot(v2File, keys), StandardCharsets.UTF_8))
-                            .optInt("version", -1) == 3,
-                    "the schema-v2 attachment snapshot migrates to v3 on a successful template save");
+                            .optInt("version", -1) == TaskSnapshotCodec.CURRENT_VERSION,
+                    "the schema-v2 attachment snapshot migrates to the current schema on a successful template save");
 
             File corruptSchemaFile = new File(root, "corrupt-schema.enc");
             byte[] malformedJson = ("{\"version\":1,\"tasks\":[{\"id\":\"2e8cae89-3dd4-43e3-82d4-51a8df643501\","

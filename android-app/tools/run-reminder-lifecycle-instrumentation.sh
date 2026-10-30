@@ -40,6 +40,7 @@ fi
 SDK_INT=$("$ADB" -s "$MODE" shell getprop ro.build.version.sdk | tr -d '\r')
 if [ "$SDK_INT" -ge 33 ]; then
   "$ADB" -s "$MODE" shell pm grant com.abrar.daymark android.permission.POST_NOTIFICATIONS
+  "$ADB" -s "$MODE" shell cmd appops set com.abrar.daymark POST_NOTIFICATION allow
 fi
 set +e
 timeout 900 "$ADB" -s "$MODE" shell am instrument -w \
@@ -47,8 +48,12 @@ timeout 900 "$ADB" -s "$MODE" shell am instrument -w \
 STATUS=$?
 set -e
 cat /tmp/daymark-reminder-instrumentation.log
-if [ "$STATUS" -ne 0 ]; then
-  echo "FAIL platform instrumentation command exit: $STATUS" >&2
+if [ "$STATUS" -ne 0 ] \
+    || ! grep -q '^INSTRUMENTATION_RESULT: result=passed' /tmp/daymark-reminder-instrumentation.log \
+    || ! grep -q '^INSTRUMENTATION_CODE: -1' /tmp/daymark-reminder-instrumentation.log; then
+  FAIL_STATUS=$STATUS
+  [ "$FAIL_STATUS" -ne 0 ] || FAIL_STATUS=1
+  echo "FAIL platform instrumentation (am instrument exit: $STATUS; result marker missing or failed)" >&2
   echo "--- process state at failure:" >&2
   "$ADB" -s "$MODE" shell ps -A 2>/dev/null | grep daymark >&2 || true
   PID=$("$ADB" -s "$MODE" shell pidof com.abrar.daymark 2>/dev/null | tr -d '\r' || true)
@@ -67,11 +72,12 @@ if [ "$STATUS" -ne 0 ]; then
     echo "--- threads running daymark code:" >&2
     grep -B 2 -A 14 'at com\.abrar\.daymark\.' "$STACKS" 2>/dev/null | head -n 200 >&2 || true
   fi
+  echo "--- notification permission/channel diagnostics:" >&2
+  "$ADB" -s "$MODE" shell dumpsys notification --noredact 2>/dev/null \
+    | grep -n -C 3 'com.abrar.daymark\|daymark_task_reminders' | tail -n 120 >&2 || true
   echo "--- instrumentation phase markers (run-as file + logcat):" >&2
   "$ADB" -s "$MODE" shell run-as com.abrar.daymark cat files/instrumentation-phases.log 2>/dev/null >&2 || true
-  "$ADB" -s "$MODE" logcat -d -s DaymarkInstr:V DaymarkReminder:V 2>/dev/null | tail -n 40 >&2 || true
-  exit "$STATUS"
+  "$ADB" -s "$MODE" logcat -d -s DaymarkInstr:V DaymarkReminder:V 2>/dev/null | tail -n 60 >&2 || true
+  exit "$FAIL_STATUS"
 fi
-grep -q '^INSTRUMENTATION_RESULT: result=passed' /tmp/daymark-reminder-instrumentation.log
-grep -q '^INSTRUMENTATION_CODE: -1' /tmp/daymark-reminder-instrumentation.log
 echo "PASS: Android platform instrumentation, including reminder notification reconciliation."
