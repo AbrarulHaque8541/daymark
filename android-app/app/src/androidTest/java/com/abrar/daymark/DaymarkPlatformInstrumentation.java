@@ -61,6 +61,14 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         Bundle result = new Bundle();
         try {
             marker("instrumentation starting on SDK " + android.os.Build.VERSION.SDK_INT);
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                getUiAutomation().grantRuntimePermission(
+                        getTargetContext().getPackageName(),
+                        android.Manifest.permission.POST_NOTIFICATIONS);
+                check(getTargetContext().checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                                == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                        "platform instrumentation grants POST_NOTIFICATIONS before notification phases");
+            }
             runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
             runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
@@ -278,8 +286,6 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private void focusTimerKeystoreAndNotificationLifecycle() throws Exception {
         Context base = getTargetContext();
         if (android.os.Build.VERSION.SDK_INT >= 33) {
-            getUiAutomation().grantRuntimePermission(
-                    base.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
             check(base.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                             == android.content.pm.PackageManager.PERMISSION_GRANTED,
                     "focus notification instrumentation has POST_NOTIFICATIONS granted");
@@ -298,6 +304,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 "2026-10-30T18:00:00Z", "2026-10-30T18:00:00Z");
         try {
             EncryptedTaskStore taskStore = new EncryptedTaskStore(isolated);
+            check(taskStore.load().isEmpty(), "isolated task store is verified empty before the test task is saved");
             taskStore.save(Collections.singletonList(task));
             File taskSnapshot = new File(isolated.getFilesDir(), "tasks.enc");
             byte[] taskBytesBefore = readFile(taskSnapshot);
