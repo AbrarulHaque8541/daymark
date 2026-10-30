@@ -64,6 +64,7 @@ public final class BrowserCookieImportFlow {
     private int rejectedCount;
     private int expiredDuringImport;
     private boolean importing;
+    private boolean flushFailed;
 
     public BrowserCookieImportFlow(Activity activity, Listener listener) {
         if (activity == null) throw new IllegalArgumentException("Activity is required.");
@@ -312,6 +313,7 @@ public final class BrowserCookieImportFlow {
         importedCount = 0;
         rejectedCount = 0;
         expiredDuringImport = 0;
+        flushFailed = false;
         importing = true;
         try {
             progressDialog = new ProgressDialog(activity);
@@ -322,6 +324,7 @@ public final class BrowserCookieImportFlow {
             progressDialog.show();
             applyNextCookie(CookieManager.getInstance());
         } catch (RuntimeException unavailable) {
+            rejectedCount = pendingCookies.size();
             finishImport(false);
         }
     }
@@ -358,7 +361,7 @@ public final class BrowserCookieImportFlow {
             try {
                 CookieManager.getInstance().flush();
             } catch (RuntimeException ignored) {
-                rejectedCount++;
+                flushFailed = true;
             }
         }
         importing = false;
@@ -416,5 +419,6 @@ public final class BrowserCookieImportFlow {
         selectedDomains.clear();
         pendingCookies = Collections.emptyList();
         pendingIndex = 0;
+        activeDialog = null;
     }
 }
