@@ -46,7 +46,7 @@ assert focus_notification.is_file(), "focus timer notification adapter is missin
 focus_source = focus_notification.read_text(encoding="utf-8")
 assert "Build.VERSION.SDK_INT >= 36" in focus_source, "Live Update API must be gated to API 36+"
 assert "canPostPromotedNotifications()" in focus_source, "promotion must respect the user's Live Update setting"
-assert "Notification.ProgressStyle" in focus_source and "setRequestPromotedOngoing(true)" in focus_source, "API 36 must request a ProgressStyle Live Update"
+assert "Notification.ProgressStyle" in focus_source and '"android.requestPromotedOngoing"' in focus_source and "getExtras().putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)" in focus_source, "API 36 must request a ProgressStyle Live Update using the documented extra"
 assert "builder.setProgress(PROGRESS_MAX, progress, !timer.isCountdown())" in focus_source, "older Android and disabled promotion need a standard progress fallback"
 assert "Notification.VISIBILITY_PRIVATE" in focus_source, "task title must remain private on the lock screen"
 assert "NotificationManager.IMPORTANCE_LOW" in focus_source, "focus channel must not use IMPORTANCE_MIN"
