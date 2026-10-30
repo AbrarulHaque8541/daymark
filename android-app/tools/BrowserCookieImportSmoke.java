@@ -47,8 +47,9 @@ public final class BrowserCookieImportSmoke {
                 + "example.com\tFALSE\t/\tFALSE\t0\tname\t" + tooLargeValue)
                 .cookies.isEmpty();
 
-        String[] unsafeValues = {"x; Secure", "x,Domain=evil.test", "x\\"y",
-                "x\\\\y", "value with space", "café"};
+        String[] unsafeValues = {"x; Secure", "x,Domain=evil.test",
+                "value with space", "café", "x" + ((char) 34) + "y",
+                "x" + ((char) 92) + "y"};
         for (String value : unsafeValues) {
             BrowserCookieImport.ParseResult unsafe = BrowserCookieImport.parse(
                     "example.com\tFALSE\t/\tFALSE\t0\tname\t" + value);
