@@ -41,9 +41,16 @@ Three gaps documented in [`TASK_BROWSER_PAGE_GAPS.md`](TASK_BROWSER_PAGE_GAPS.md
    POWER FEATURES → **Keyboard shortcuts** lists the exact chords the code handles, so the
    feature is discoverable without reading the release notes.
 
+4. **Command palette (Ctrl+Shift+P).** New pure `CommandPalette` ranks matches by where the query
+   lands — title prefix, then title substring, then notes/tags — puts open tasks above completed
+   ones at the same rank, and bounds the list at `MAX_RESULTS = 6`. The dialog's fixed commands
+   (New task, Open settings, Open browser) only appear while the query is empty, and choosing one
+   closes the palette before acting. Ctrl+P alone is deliberately left unbound, and every other
+   Shift chord still falls through to the IME.
+
 Supporting work: `TaskFilterSmoke` (20 assertions), `NoteFormatSmoke` (45), `KeyShortcutsSmoke`
-(23), and `check-task-ux.py` (98 assertions) with five `expect_fail_after_removal` mutations
-proving it fails closed.
+(27), `CommandPaletteSmoke` (16), and `check-task-ux.py` with five `expect_fail_after_removal`
+mutations proving it fails closed.
 
 ## Checks actually run
 
@@ -53,7 +60,7 @@ proving it fails closed.
   fail-closed mutations for `check-task-ux.py`).
 - `sh android-app/tools/run-core-tests.sh` — **PASS**; new smokes report
   `PASS task filter smoke: 20 assertions`, `PASS note format smoke: 45 assertions`,
-  `PASS key shortcuts smoke: 23 assertions`.
+  `PASS key shortcuts smoke: 27 assertions`, `PASS command palette smoke: 16 assertions`.
 - `npm test` (repository root) — **PASS**, 32/32.
 - `javac --release 17` against the real API-36 `android.jar` for `githubSideload` and `play`
   source sets, 73 sources each — **PASS** (exit 0 each).

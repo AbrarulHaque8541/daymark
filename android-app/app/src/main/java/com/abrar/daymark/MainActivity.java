@@ -753,6 +753,9 @@ public final class MainActivity extends Activity {
                 if (browserWebView == null) return false;
                 browserWebView.reload();
                 return true;
+            case KeyShortcuts.COMMAND_PALETTE:
+                showCommandPalette();
+                return true;
             case KeyShortcuts.CLEAR_SEARCH:
                 if (webMode || searchInput == null) return false;
                 if (searchQuery.isEmpty() && activeTag.isEmpty()) return false;
@@ -7562,9 +7565,83 @@ public final class MainActivity extends Activity {
         parent.addView(heading);
     }
 
+    /**
+     * One field that searches tasks and runs the few global commands, so a keyboard user never
+     * has to leave the home row. Results are ranked by {@link CommandPalette} and bounded; the
+     * fixed commands only appear while the query is empty.
+     */
+    private void showCommandPalette() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(8), dp(18), dp(4));
+
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setTextSize(15 * textScale);
+        input.setHint("Search tasks or run a command");
+        input.setContentDescription("Command palette search");
+        input.setBackground(shape(palette.surfaceAlt, 14, palette.line));
+        input.setPadding(dp(12), dp(8), dp(12), dp(8));
+        content.addView(input, bottomMargin(dp(8)));
+
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(results);
+        content.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(320)));
+
+        final AlertDialog[] holder = new AlertDialog[1];
+        Runnable refresh = () -> {
+            results.removeAllViews();
+            String query = input.getText() == null ? "" : input.getText().toString();
+            List<Task> matches = CommandPalette.matchingTasks(tasks, query,
+                    CommandPalette.MAX_RESULTS);
+            for (Task task : matches) {
+                String detail = (task.completed ? "Completed · " : "") + dueLabelForDate(task.dueDate);
+                addSettingsRow(results, task.title, detail, () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    showTaskEditor(task);
+                });
+            }
+            if (query.trim().isEmpty()) {
+                addSettingsRow(results, "New task", "Open the full editor", () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    showTaskEditor(null);
+                });
+                addSettingsRow(results, "Open settings", "Appearance, data and power features", () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    showSettingsDialog();
+                });
+                addSettingsRow(results, "Open browser", "Switch to the Web workspace", () -> {
+                    if (holder[0] != null) holder[0].dismiss();
+                    setWebMode(true);
+                });
+            }
+            if (results.getChildCount() == 0) {
+                TextView empty = text("No matching tasks.", 12, palette.muted, Typeface.NORMAL);
+                empty.setPadding(dp(4), dp(12), dp(4), dp(12));
+                results.addView(empty);
+            }
+        };
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { refresh.run(); }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        refresh.run();
+        holder[0] = new AlertDialog.Builder(this)
+                .setTitle("Commands")
+                .setView(content)
+                .setNegativeButton("Close", null)
+                .show();
+        input.requestFocus();
+    }
+
     /** Lists the chords {@link KeyShortcuts} actually handles, so they are discoverable. */
     private void showKeyboardShortcutsDialog() {
         String[][] shortcuts = {
+                { "Ctrl + Shift + P", "Open the command palette" },
                 { "Ctrl + K", "Jump to quick add" },
                 { "Ctrl + F", "Find a task, or search the page in the browser" },
                 { "Ctrl + T", "Open a new browser tab" },

@@ -187,10 +187,48 @@ check('addSettingsRow(content, "Keyboard shortcuts"' in ACTIVITY,
       "shortcuts must be discoverable from Settings")
 shortcut_dialog = region("private void showKeyboardShortcutsDialog", "private void addSettingsRow",
                          "keyboard shortcut dialog")
-for chord in ("Ctrl + K", "Ctrl + F", "Ctrl + T", "Ctrl + W", "Ctrl + R", "Esc"):
+for chord in ("Ctrl + Shift + P", "Ctrl + K", "Ctrl + F", "Ctrl + T", "Ctrl + W", "Ctrl + R",
+              "Esc"):
     check(f'{{ "{chord}"' in shortcut_dialog, f"{chord} must be listed in the dialog")
 check('row.setContentDescription(shortcut[0] + ". " + shortcut[1]);' in shortcut_dialog,
       "each shortcut row needs an accessible description")
+
+# --- 3b. Command palette -------------------------------------------------------------------
+
+PALETTE = MAIN / "CommandPalette.java"
+PALETTE_SMOKE = ROOT / "tools/CommandPaletteSmoke.java"
+check(PALETTE.is_file(), "CommandPalette.java missing")
+palette = PALETTE.read_text(encoding="utf-8")
+check("import android." not in palette, "CommandPalette must stay pure for host tests")
+check("static final int MAX_RESULTS = 6;" in palette, "palette result cap missing")
+check("static List<Task> matchingTasks(List<Task> tasks, String query, int limit)" in palette,
+      "matchingTasks entry point missing")
+check("if (title.startsWith(normalizedQuery)) return 0;" in palette, "prefix ranking missing")
+check("if (title.contains(normalizedQuery)) return 1;" in palette, "substring ranking missing")
+check("return body.contains(normalizedQuery) ? 2 : -1;" in palette,
+      "notes/tag ranking missing")
+check("if (limit >= 0 && ranked.size() > limit)" in palette, "limit must be optional")
+check("static final int COMMAND_PALETTE = 8;" in keys, "COMMAND_PALETTE constant missing")
+check("return keyCode == KEY_P ? COMMAND_PALETTE : NONE;" in keys,
+      "Ctrl+Shift+P must map to the palette")
+check("case KeyShortcuts.COMMAND_PALETTE:" in handled, "palette case missing in handleShortcut")
+check("showCommandPalette();" in handled, "palette case must open the dialog")
+palette_ui = region("private void showCommandPalette", "private void showKeyboardShortcutsDialog",
+                    "showCommandPalette")
+check("CommandPalette.matchingTasks(tasks, query," in palette_ui,
+      "the palette must rank through CommandPalette")
+check("CommandPalette.MAX_RESULTS" in palette_ui, "the palette must use the shared cap")
+check('addSettingsRow(results, "New task"' in palette_ui, "palette must offer New task")
+check('addSettingsRow(results, "Open settings"' in palette_ui, "palette must offer Settings")
+check('addSettingsRow(results, "Open browser"' in palette_ui, "palette must offer the browser")
+check("if (query.trim().isEmpty()) {" in palette_ui,
+      "fixed commands must only appear on an empty query")
+check("input.requestFocus();" in palette_ui, "the palette must focus its field")
+check("if (holder[0] != null) holder[0].dismiss();" in palette_ui,
+      "a chosen command must close the palette first")
+check(PALETTE_SMOKE.is_file(), "CommandPaletteSmoke.java missing")
+check(PALETTE_SMOKE.name in CORE_RUNNER, "CommandPaletteSmoke must run in run-core-tests.sh")
+check("CommandPalette.java" in CORE_RUNNER, "CommandPalette.java must be compiled by run-core-tests.sh")
 
 # --- 4. Registration -----------------------------------------------------------------------
 

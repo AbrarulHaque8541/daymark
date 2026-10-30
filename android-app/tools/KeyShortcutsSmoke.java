@@ -20,6 +20,7 @@ public final class KeyShortcutsSmoke {
     private static void keyCodesMatchAndroid() {
         check(KeyShortcuts.KEY_F == 34, "KEYCODE_F");
         check(KeyShortcuts.KEY_K == 39, "KEYCODE_K");
+        check(KeyShortcuts.KEY_P == 44, "KEYCODE_P");
         check(KeyShortcuts.KEY_R == 46, "KEYCODE_R");
         check(KeyShortcuts.KEY_T == 48, "KEYCODE_T");
         check(KeyShortcuts.KEY_W == 52, "KEYCODE_W");
@@ -50,6 +51,12 @@ public final class KeyShortcutsSmoke {
                 == KeyShortcuts.NONE, "Ctrl+Shift+K is left to the IME");
         check(KeyShortcuts.actionFor(KeyShortcuts.KEY_K, true, false, true, false)
                 == KeyShortcuts.NONE, "Ctrl+Alt+K is left alone");
+        check(KeyShortcuts.actionFor(KeyShortcuts.KEY_P, true, true, false, false)
+                == KeyShortcuts.COMMAND_PALETTE, "Ctrl+Shift+P opens the palette");
+        check(KeyShortcuts.actionFor(KeyShortcuts.KEY_P, true, true, false, true)
+                == KeyShortcuts.COMMAND_PALETTE, "the palette also opens from the browser");
+        check(KeyShortcuts.actionFor(KeyShortcuts.KEY_P, true, false, false, false)
+                == KeyShortcuts.NONE, "Ctrl+P alone is unbindable (print/print-preview conventions)");
         check(KeyShortcuts.actionFor(KeyShortcuts.KEY_ESCAPE, false, false, false, false)
                 == KeyShortcuts.CLEAR_SEARCH, "Escape clears search");
         check(KeyShortcuts.actionFor(KeyShortcuts.KEY_ESCAPE, true, false, false, false)

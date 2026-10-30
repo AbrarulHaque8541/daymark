@@ -20,9 +20,11 @@ final class KeyShortcuts {
     static final int CLOSE_TAB = 5;
     static final int RELOAD_PAGE = 6;
     static final int CLEAR_SEARCH = 7;
+    static final int COMMAND_PALETTE = 8;
 
     static final int KEY_F = 34;
     static final int KEY_K = 39;
+    static final int KEY_P = 44;
     static final int KEY_R = 46;
     static final int KEY_T = 48;
     static final int KEY_W = 52;
@@ -34,12 +36,16 @@ final class KeyShortcuts {
      * Resolves a key press to an action.
      *
      * <p>Ctrl+K is quick add, Ctrl+F is task search or find-in-page depending on the workspace,
-     * and Ctrl+T/Ctrl+W/Ctrl+R only act in the browser. Escape clears a narrowing search. Alt and
-     * Shift chords are left alone so they stay available to the IME and to app shortcuts.
+     * and Ctrl+T/Ctrl+W/Ctrl+R only act in the browser. Ctrl+Shift+P opens the command palette.
+     * Escape clears a narrowing search. Every other Alt or Shift chord is left alone so it stays
+     * available to the IME and to app shortcuts.
      */
     static int actionFor(int keyCode, boolean ctrl, boolean shift, boolean alt, boolean webMode) {
         if (keyCode == KEY_ESCAPE) {
             return ctrl || alt || shift ? NONE : CLEAR_SEARCH;
+        }
+        if (ctrl && shift && !alt) {
+            return keyCode == KEY_P ? COMMAND_PALETTE : NONE;
         }
         if (!ctrl || alt || shift) return NONE;
         switch (keyCode) {
