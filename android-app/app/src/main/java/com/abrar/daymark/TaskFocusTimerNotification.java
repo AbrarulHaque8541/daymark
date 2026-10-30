@@ -31,6 +31,11 @@ final class TaskFocusTimerNotification {
             return false;
         }
 
+        if (timer.isCountdown() && timer.isExpiredAt(nowElapsedRealtimeMs)) {
+            cancel(context, notificationId);
+            return false;
+        }
+
         NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null || !manager.areNotificationsEnabled()
@@ -124,7 +129,7 @@ final class TaskFocusTimerNotification {
             Notification.ProgressStyle style = new Notification.ProgressStyle()
                     .setProgressIndeterminate(!countdown)
                     .setStyledByProgress(true);
-            if (countdown) style.setProgress(Math.max(0, Math.min(PROGRESS_MAX, progress)));
+            if (countdown) style.setProgress(Math.max(0, Math.min(100, progress / 10)));
             builder.setStyle(style);
             builder.setRequestPromotedOngoing(true);
         }
