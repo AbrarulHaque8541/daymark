@@ -30,12 +30,12 @@ jobs:
           java-version: "17"
       - name: Run repository host regression suite
         run: npm test
-      - name: Run canonical source guard
-        run: sh android-app/tools/check-v1-source.sh
       - name: Run parser and import-policy host tests
         run: sh android-app/tools/run-browser-cookie-import-tests.sh
       - name: Verify SAF-only import boundaries
         run: python3 android-app/tools/check-browser-cookie-import-saf.py
+      - name: Run canonical source guard
+        run: sh android-app/tools/check-v1-source.sh
       - name: Grant execute permission for Gradle wrapper
         working-directory: android-app
         run: chmod +x gradlew
