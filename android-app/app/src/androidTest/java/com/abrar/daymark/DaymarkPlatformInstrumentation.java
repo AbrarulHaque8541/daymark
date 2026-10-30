@@ -46,25 +46,203 @@ import javax.crypto.spec.SecretKeySpec;
 /** Platform-only instrumentation; intentionally uses no JUnit/AndroidX test dependency. */
 public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private static final String TASK_ID = "instrumentation-task-v1";
+    private static final String LOG_TAG = "DaymarkInstr";
     private int assertions;
+
+    @Override
+    public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        marker("instrumentation onCreate; dispatching start()");
+        start();
+    }
 
     @Override
     public void onStart() {
         Bundle result = new Bundle();
         try {
-            importLegacySnapshotRoundTripAndRollback();
-            attachmentProviderPipeAndAndroidCrypto();
-            portableImportUriJournalPreservesRecreationAndCleansOrphans();
-            portableBackupRekeysAndReconcilesProcessDeath();
+            marker("instrumentation starting on SDK " + android.os.Build.VERSION.SDK_INT);
+            runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
+            runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
+            runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
+            runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
+            runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
+            marker("all phases passed; " + assertions + " assertions");
             result.putString("result", "passed");
             result.putInt("assertions", assertions);
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
+            android.util.Log.e(LOG_TAG, "instrumentation failed after " + assertions + " assertions", failure);
+            marker("instrumentation failed after " + assertions + " assertions: " + failure);
             result.putString("result", "failed");
             result.putInt("assertions", assertions);
             result.putString("failure", stackTrace(failure));
             finish(Activity.RESULT_CANCELED, result);
         }
+    }
+
+    /** Logs a progress marker before and after each phase so CI can localize any hang. */
+    private void runPhase(String name, PhaseAction action) throws Exception {
+        marker("PHASE " + name + ": start");
+        action.run();
+        marker("PHASE " + name + ": ok (" + assertions + " assertions so far)");
+    }
+
+    /**
+     * Markers go to logcat and to an app-local file; verbose CI boot logging rotates logcat
+     * quickly, and the file survives rotation and is readable through run-as on a debug build.
+     */
+    private void marker(String message) {
+        android.util.Log.i(LOG_TAG, message);
+        try {
+            File log = new File(getTargetContext().getFilesDir(), "instrumentation-phases.log");
+            try (FileOutputStream out = new FileOutputStream(log, true)) {
+                out.write((System.currentTimeMillis() + " " + message + "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Throwable suppressed) { }
+    }
+
+    @FunctionalInterface
+    private interface PhaseAction {
+        void run() throws Exception;
+    }
+
+    private void reminderNotificationLifecycleUsesCurrentTaskState() throws Exception {
+        Context context = getTargetContext();
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            check(context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    "notification lifecycle test requires POST_NOTIFICATIONS grant");
+        }
+        android.app.NotificationManager manager =
+                (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        check(manager != null, "NotificationManager is available");
+        Task task = TaskLogic.create("Reminder original", "2099-12-01", "high",
+                null, null, 60, null);
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.Instant fire = ReminderSchedulePolicy.baseFire(task, zone);
+        check(fire != null, "future reminder fire instant is computed");
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(task));
+        Integer notificationId = TaskReminderScheduler.getNotificationId(context, task.id);
+        check(notificationId != null && notificationId > 0, "scheduler stores the canonical request code");
+
+        TaskReminderScheduler.ensureChannel(context);
+        postTestReminder(manager, context, notificationId, task, fire.toString());
+        check(hasActiveNotification(manager, notificationId),
+                "synthetic reminder notification is active before reconciliation");
+
+        Task renamed = task.withDetails("Reminder updated", task.dueDate, task.priority,
+                java.time.Instant.now().toString());
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
+        android.app.Notification refreshed = activeNotification(manager, notificationId);
+        check(refreshed != null && renamed.title.equals(
+                        refreshed.extras.getString(android.app.Notification.EXTRA_TITLE)),
+                "title-only task edit refreshes the active reminder notification");
+
+        // Simulate a process interruption between notification posting and preference commit.
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().remove(task.id).commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
+        check(notificationId.equals(TaskReminderScheduler.getNotificationId(context, task.id)),
+                "valid active notification recovers a lost canonical ID index");
+        check(hasActiveNotification(manager, notificationId),
+                "index recovery preserves the matching active notification");
+
+        check(TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString()),
+                "current notification can persist and arm a snooze");
+        String snoozeRecord = TaskReminderScheduler.snoozeRecord(context, task.id);
+        String snoozeFire = ReminderSchedulePolicy.validSnoozeFire(snoozeRecord, fire.toString());
+        check(snoozeFire != null, "snooze fire time is persisted against its base occurrence");
+        check(ReminderSchedulePolicy.acceptsFire(renamed, zone, snoozeFire, snoozeRecord),
+                "receiver policy accepts the persisted snooze occurrence");
+        manager.cancel(notificationId);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
+        check(snoozeRecord.equals(TaskReminderScheduler.snoozeRecord(context, task.id)),
+                "app rescheduling preserves a valid snooze instead of overwriting it");
+
+        Task moved = renamed.withDetails(renamed.title, "2099-12-02", renamed.priority,
+                java.time.Instant.now().toString());
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(moved));
+        check(TaskReminderScheduler.snoozeRecord(context, task.id) == null,
+                "due-date edit invalidates the previous occurrence's snooze");
+        check(!hasActiveNotification(manager, notificationId),
+                "old occurrence notification is removed after due-date edit");
+
+        java.time.Instant movedFire = ReminderSchedulePolicy.baseFire(moved, zone);
+        check(movedFire != null, "edited reminder has a new occurrence");
+        postTestReminder(manager, context, notificationId, moved, movedFire.toString());
+        Task completed = TaskLogic.toggleCompleted(moved);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(completed));
+        check(!hasActiveNotification(manager, notificationId),
+                "notification is canceled when its task is completed");
+        check(TaskReminderScheduler.getNotificationId(context, task.id) == null,
+                "completed task releases its canonical reminder ID");
+
+        Task deleted = TaskLogic.create("Reminder deleted", "2099-12-03", "high",
+                null, null, 60, null);
+        java.time.Instant deletedFire = ReminderSchedulePolicy.baseFire(deleted, zone);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(deleted));
+        Integer deletedId = TaskReminderScheduler.getNotificationId(context, deleted.id);
+        check(deletedId != null, "deleted-task fixture has a scheduled reminder ID");
+        postTestReminder(manager, context, deletedId, deleted, deletedFire.toString());
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().remove(deleted.id).commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+        check(!hasActiveNotification(manager, deletedId),
+                "posted notification is removed for a deleted task even when its ID index is missing");
+
+        Task malformedIndex = TaskLogic.create("Malformed reminder index", "2099-12-04",
+                "high", null, null, 60, null);
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().putString(malformedIndex.id, "not-a-positive-id").commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(malformedIndex));
+        Integer repairedId = TaskReminderScheduler.getNotificationId(context, malformedIndex.id);
+        check(repairedId != null && repairedId > 0,
+                "malformed request-code preference is repaired without aborting other reminders");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+
+        Task orphanNotificationTask = TaskLogic.create("Orphan notification", "2099-12-05",
+                "high", null, null, null, null);
+        int orphanNotificationId = 990001;
+        postTestReminder(manager, context, orphanNotificationId, orphanNotificationTask,
+                "2099-12-04T00:00:00Z");
+        Context noAlarmManager = new ContextWrapper(context) {
+            @Override
+            public Object getSystemService(String name) {
+                if (Context.ALARM_SERVICE.equals(name)) return null;
+                return super.getSystemService(name);
+            }
+        };
+        TaskReminderScheduler.rescheduleAll(noAlarmManager, Collections.emptyList());
+        check(!hasActiveNotification(manager, orphanNotificationId),
+                "notification reconciliation still runs when AlarmManager is unavailable");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+    }
+
+    private static void postTestReminder(android.app.NotificationManager manager,
+            Context context, int notificationId, Task task, String fireInstant) {
+        android.app.Notification notification = new android.app.Notification.Builder(
+                context, TaskReminderScheduler.CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(task.title)
+                .setContentText("Instrumentation reminder")
+                .setOnlyAlertOnce(true)
+                .build();
+        notification.extras.putString(TaskReminderReceiver.EXTRA_TASK_ID, task.id);
+        notification.extras.putString(TaskReminderReceiver.EXTRA_FIRE_INSTANT, fireInstant);
+        manager.notify(notificationId, notification);
+    }
+
+    private static boolean hasActiveNotification(android.app.NotificationManager manager, int id) {
+        return activeNotification(manager, id) != null;
+    }
+
+    private static android.app.Notification activeNotification(
+            android.app.NotificationManager manager, int id) {
+        for (android.service.notification.StatusBarNotification posted : manager.getActiveNotifications()) {
+            if (posted.getId() == id) return posted.getNotification();
+        }
+        return null;
     }
 
     private void importLegacySnapshotRoundTripAndRollback() throws Exception {
@@ -722,3 +900,4 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         InputStream open() throws IOException;
     }
 }
+
