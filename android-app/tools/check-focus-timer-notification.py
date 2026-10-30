@@ -20,7 +20,7 @@ checks = [
     ("Build.VERSION.SDK_INT >= 36" in source and "canPostPromotedNotifications()" in source
      and '"githubSideload".equals(BuildConfig.FLAVOR)' in source,
      "Live Update promotion is gated by API 36, sideload flavor and user setting"),
-    ("Build.getMinorSdkVersion(Build.VERSION.SDK_INT_FULL) < 1" in source
+    ("Build.VERSION.SDK_INT_FULL <= Build.VERSION_CODES_FULL.BAKLAVA" in source
      and "return Api36.canPromote(manager);" in source,
      "API 36.0 safely falls back; extension-only promotion APIs are called only on Android 16 extension 36.1+"),
     ("android.requestPromotedOngoing" in source and "getExtras().putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)" in source and "Notification.ProgressStyle" in source,
