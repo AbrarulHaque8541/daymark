@@ -457,7 +457,6 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
 
         ProgressRing(Context context) {
             super(context);
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             track.setStyle(Paint.Style.STROKE);
             track.setStrokeCap(Paint.Cap.ROUND);
             track.setStrokeWidth(dp(9));
@@ -504,9 +503,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             float cy = bounds.centerY();
             canvas.drawArc(bounds, 0, 360, false, track);
             progress.setColor(color);
-            progress.setShadowLayer(dp(8), 0, 0, color);
             canvas.drawArc(bounds, -90, value * 360f, false, progress);
-            progress.clearShadowLayer();
         }
     }
 }
