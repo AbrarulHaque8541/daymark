@@ -36,7 +36,7 @@ final class OAuthCredentialCodec {
             throw new IOException("OAuth credential count is outside the safe limit.");
         }
         List<OAuthCredential> ordered = new ArrayList<>(credentials);
-        ordered.sort(Comparator.comparing(item -> item == null ? "" : item.providerId));
+        ordered.sort(Comparator.comparing(item -> item == null || item.providerId == null ? "" : item.providerId));
         Set<String> providers = new HashSet<>();
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream output = new DataOutputStream(bytes)) {
