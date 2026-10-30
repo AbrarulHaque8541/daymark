@@ -32,6 +32,7 @@ sideload_source_perms = get_permissions(sideload_source_manifest)
 assert sideload_source_perms == {
     "android.permission.INTERNET",
     "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.POST_PROMOTED_NOTIFICATIONS",
 }, f"sideload source manifest unexpected perms: {sideload_source_perms}"
 
 # Verify cleartext traffic disabled in main
@@ -50,6 +51,7 @@ if play_merged:
     assert play_perms == {
         "android.permission.INTERNET",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.POST_PROMOTED_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
     }, f"Play merged manifest has unexpected extra permissions: {play_perms}"
@@ -71,6 +73,6 @@ if sideload_merged:
     }, f"Sideload merged manifest has unexpected extra permissions: {sideload_perms}"
     sideload_merged_app = sideload_merged_tree.find("application")
     assert sideload_merged_app.get(android_ns + "usesCleartextTraffic") == "false", "Sideload merged cleartext must be false"
-    print("PASS Sideload merged manifest check: INTERNET=YES, ACCESS_NETWORK_STATE=YES, reminder perms=YES, cleartext=false")
+    print("PASS Sideload merged manifest check: INTERNET=YES, ACCESS_NETWORK_STATE=YES, reminder perms=YES, optional promoted-notification permission=YES, cleartext=false")
 
-print("PASS manifest architecture policy: Play and Sideload inherit INTERNET for WebView plus the POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE task-reminder permissions; Sideload alone adds ACCESS_NETWORK_STATE")
+print("PASS manifest architecture policy: Play inherits only shared WebView/reminder permissions; Sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS; Play never requests Live Update promotion")
