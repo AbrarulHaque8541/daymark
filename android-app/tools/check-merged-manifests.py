@@ -51,7 +51,6 @@ if play_merged:
     assert play_perms == {
         "android.permission.INTERNET",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.POST_PROMOTED_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
     }, f"Play merged manifest has unexpected extra permissions: {play_perms}"
@@ -68,6 +67,7 @@ if sideload_merged:
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.POST_PROMOTED_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
     }, f"Sideload merged manifest has unexpected extra permissions: {sideload_perms}"
