@@ -44,6 +44,8 @@ public final class GitHubTransportSmoke {
         parserIgnoresOnlyWellFormedUnstableReleaseFlags();
         parserRejectsMalformedOrAmbiguousMetadata();
         parserAcceptsThePublishedVersionScheme();
+        parserAcceptsCurrentPublishedV15ReleaseContract();
+        updaterClassifiesIncompatibleInstalledPackage();
         releaseClientConstrainsRequestAndClassifiesResponses();
         releaseClientRejectsRedirectAndOversizedBody();
         downloaderFollowsOnlyValidatedRedirectsAndCopiesExactBytes();
@@ -184,6 +186,31 @@ public final class GitHubTransportSmoke {
         check(!UpdaterCore.isValidVersionName("1.5-rc1"), "version scheme rejects a pre-release suffix");
         check(UpdaterCore.isValidTag("v1.5"), "tag scheme accepts a published two-part tag");
         check(!UpdaterCore.isValidTag("1.5"), "tag scheme requires the v prefix");
+    }
+
+    private static void parserAcceptsCurrentPublishedV15ReleaseContract() throws Exception {
+        String publisher = "{\\"applicationId\\":\\"com.abrar.daymark\\",\\"versionCode\\":12,\\"minSdkVersion\\":26,"
+                + "\\"signerCertificateSha256\\":\\"ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580\\"}";
+        String digest = "sha256:496280987fc910d3a9dde9e4ecac79c5f9286b6c2a88f2f18df75e45d9702bc8";
+        String url = "https://github.com/AbrarulHaque8541/daymark/releases/download/v1.5/Daymark-v1.5-githubSideload.apk";
+        UpdaterCore.Release release = GitHubReleaseClient.parseRelease(
+                fixture(false, false, publisher, 253936, digest, url, false));
+        check("v1.5".equals(release.tag), "the currently published v1.5 tag parses");
+        check(release.versionCode == 12L, "the currently published v1.5 version code parses");
+        check(release.apkSizeBytes == 253936L, "the currently published v1.5 APK size parses");
+        check("496280987fc910d3a9dde9e4ecac79c5f9286b6c2a88f2f18df75e45d9702bc8".equals(release.apkSha256),
+                "the currently published v1.5 GitHub digest parses");
+        check("ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580".equals(release.signerSha256),
+                "the currently published v1.5 production signer parses");
+        check(UpdaterCore.check(() -> release, UpdaterCore.APPLICATION_ID, 11L).status
+                == UpdaterCore.CheckStatus.UPDATE_AVAILABLE,
+                "the currently published v1.5 release passes update policy when version 11 is installed");
+    }
+
+    private static void updaterClassifiesIncompatibleInstalledPackage() throws Exception {
+        expectFailure(UpdaterCore.Failure.INCOMPATIBLE_INSTALL,
+                () -> UpdaterCore.check(() -> validRelease(), "com.cue.daymark", 1L),
+                "a legacy/different package ID is reported as an install-identity incompatibility, not bad release metadata");
     }
 
     private static void releaseClientConstrainsRequestAndClassifiesResponses() throws Exception {
