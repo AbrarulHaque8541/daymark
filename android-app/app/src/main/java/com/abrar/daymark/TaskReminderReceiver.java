@@ -166,7 +166,12 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                 .build();
         notification.extras.putString(EXTRA_TASK_ID, task.id);
         notification.extras.putString(EXTRA_FIRE_INSTANT, fireInstant);
-        notificationManager.notify(notificationId, notification);
+        try {
+            notificationManager.notify(notificationId, notification);
+        } catch (RuntimeException notifyFailure) {
+            Log.w("DaymarkReminder", "Could not publish reminder notification for task " + task.id,
+                    notifyFailure);
+        }
     }
 
     /** Dismiss clears only this visible notification; task state and its schedule are unchanged. */
@@ -213,7 +218,13 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     private void cancelNotification(Context context, int notificationId) {
         NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null) manager.cancel(notificationId);
+        if (manager == null) return;
+        try {
+            manager.cancel(notificationId);
+        } catch (RuntimeException cancelFailure) {
+            Log.w("DaymarkReminder", "Could not cancel reminder notification " + notificationId,
+                    cancelFailure);
+        }
     }
 
     private void rescheduleAfterBoot(Context context) {
