@@ -17,6 +17,7 @@ on:
       - "android-app/tools/TaskFocusTimerSnapshotSmoke.java"
       - "android-app/tools/run-focus-timer-persistence-tests.sh"
       - "android-app/tools/check-merged-manifests.py"
+  workflow_dispatch:
 
 permissions:
   contents: read

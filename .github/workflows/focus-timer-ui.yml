@@ -11,6 +11,7 @@ on:
       - "android-app/tools/TasksHomeLayoutPolicySmoke.java"
       - "android-app/tools/run-core-tests.sh"
       - ".github/workflows/focus-timer-ui.yml"
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
