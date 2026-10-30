@@ -85,7 +85,13 @@ assert "static boolean acceptsFire(" in policy
 assert "reconcileActiveNotifications(context, alarmManager, notificationManager, codes, known, liveTasks);" in scheduler
 assert "manager.getActiveNotifications()" in scheduler
 assert "baseFireText.equals(postedFire)" in scheduler
-assert "manager.cancel(posted.getId())" in scheduler
+assert "cancelPostedNotification(manager, posted.getId())" in scheduler
+assert "manager.cancel(notificationId)" in scheduler
+assert "private static String readString(SharedPreferences preferences, String key)" in scheduler
+assert "Discarding malformed reminder request-code counter." in scheduler
+assert "Could not schedule reminder for task " in scheduler
+assert "Could not cancel stale reminder alarm for task " in scheduler
+assert "Could not publish reminder notification for task " in receiver
 assert "cancelAlarm(context, alarmManager, taskId, posted.getId())" in scheduler
 assert "known.put(taskId, String.valueOf(posted.getId()))" in scheduler,     "valid active notifications must recover a lost request-code index"
 assert "TaskReminderReceiver.refreshPostedNotification(" in scheduler
@@ -109,6 +115,8 @@ assert "app rescheduling preserves a valid snooze instead of overwriting it" in 
 assert "due-date edit invalidates the previous occurrence's snooze" in instrumentation
 assert "deleted task even when its ID index is missing" in instrumentation
 assert "malformed request-code preference is repaired without aborting other reminders" in instrumentation
+assert "wrong-typed snooze preference is discarded without aborting reconciliation" in instrumentation
+assert "wrong-typed request-code counter is reset and a fresh ID is allocated" in instrumentation
 assert "notification reconciliation still runs when AlarmManager is unavailable" in instrumentation
 
 print("PASS reminder lifecycle guards: visible-only consumption, runner startup, canonical IDs, stale-notification recovery, durable occurrence-bound snooze and host regression coverage")
