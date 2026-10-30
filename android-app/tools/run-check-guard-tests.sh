@@ -67,12 +67,18 @@ expect_fail_after_removal check-press-feedback.py "android.view.MotionEvent.ACTI
 expect_fail_after_removal check-press-feedback.py "palette.text, palette.muted, palette.warning, palette.danger"
 expect_fail_after_removal check-press-feedback.py "int... labelColors"
 expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
+# Tag filtering, note formatting and keyboard shortcuts must fail closed too.
+expect_fail_after_removal check-task-ux.py "renderTagFilters();"
+expect_fail_after_removal check-task-ux.py "TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today)"
+expect_fail_after_removal check-task-ux.py "NoteFormat.spans(task.notes)"
+expect_fail_after_removal check-task-ux.py "KeyShortcuts.actionFor(event.getKeyCode()"
+expect_fail_after_removal check-task-ux.py "BrowserAddress.isAllowedWebUrl(url)"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "openReliablePipeHelper(" "$PROVIDER" "$ROOT"
 
-for checker in check-text-scale.py check-window-insets.py check-web-mode-state.py check-silent-catch.py check-press-feedback.py; do
+for checker in check-text-scale.py check-window-insets.py check-web-mode-state.py check-silent-catch.py check-press-feedback.py check-task-ux.py; do
   python3 "$ROOT/tools/$checker" >/dev/null
   echo "PASS meta: $checker passes on current source"
 done
