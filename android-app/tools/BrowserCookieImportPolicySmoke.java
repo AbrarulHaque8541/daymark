@@ -25,7 +25,6 @@ public final class BrowserCookieImportPolicySmoke {
         assert preview.prefixRejectedCookieCount == 4 : preview.prefixRejectedCookieCount;
         assert preview.rejectedLineCount == 0;
         assert preview.domains.size() == 3;
-        assert "example.com".equals(preview.domains.get(0).domain);
         // TreeMap ordering is deterministic: example.com, host.example.com, secure.example.com.
         assert "example.com".equals(preview.domains.get(0).domain);
         assert "host.example.com".equals(preview.domains.get(1).domain);
