@@ -121,8 +121,8 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                 new Intent(context, TaskReminderReceiver.class)
                         .setAction(ACTION_SNOOZE)
                         .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
-                        .putExtra(EXTRA_TASK_ID, intent.getStringExtra(EXTRA_TASK_ID))
-                        .putExtra(EXTRA_TASK_TITLE, title),
+                        .putExtra(EXTRA_TASK_ID, task.id)
+                        .putExtra(EXTRA_TASK_TITLE, task.title),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
