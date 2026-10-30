@@ -57,6 +57,9 @@ for marker in (
 ):
     assert marker in tests, f"platform instrumentation is missing required coverage marker: {marker}"
 assert "org.junit" not in tests and "androidx.test" not in tests, "platform instrumentation must not depend on JUnit/AndroidX"
+assert 'migrated.optInt("version", -1) == TaskSnapshotCodec.CURRENT_VERSION' in tests, \
+    "legacy migration test must follow the current schema version instead of pinning a retired version"
+assert '== TaskSnapshotCodec.CURRENT_VERSION' in tests and "schema-v2 attachment snapshot migrates to the current schema" in tests
 
 print("PASS schema-v1 golden fixture: complete legacy fields, nullable dates, open/completed tasks, strict decoder checks")
 print("PASS dependency-free Android instrumentation source: migration/rollback, provider metadata/pipe and Android Keystore coverage")
