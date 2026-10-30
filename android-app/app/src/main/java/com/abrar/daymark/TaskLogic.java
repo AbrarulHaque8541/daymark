@@ -445,8 +445,8 @@ final class TaskLogic {
 
     /**
      * Category filter + free-text query + optional exact tag, all ANDed. A blank {@code tag}
-     * matches everything, so the three-argument-free overload above is the same query with no
-     * tag selected.
+     * matches everything, so the four-argument overload above is the same query with no tag
+     * selected.
      */
     static List<Task> filter(List<Task> tasks, String filter, String query, String tag,
                              LocalDate today) {
