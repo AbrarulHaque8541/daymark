@@ -1,4 +1,3 @@
-package com.abrar.daymark;
 
 import android.app.Activity;
 import android.net.http.SslError;
@@ -139,9 +138,14 @@ final class DaymarkWebView extends WebView {
                     listener.onOfflineNavigationBlocked();
                     return true;
                 }
-                if (request.isForMainFrame()
-                        && "http".equalsIgnoreCase(request.getUrl().getScheme())) {
-                    listener.onHttpNavigationBlocked(url, request.isRedirect());
+                // HTTP and HTTPS are both allowed in the browser (BrowserHttpPolicy.ALLOW_HTTP).
+                // HTTP pages show "Not encrypted" in the UI. Updater stays HTTPS-only (separate path).
+                // HTTPS→HTTP redirect downgrades are still blocked below for safety.
+                if (request.isForMainFrame() && request.isRedirect()
+                        && "http".equalsIgnoreCase(request.getUrl().getScheme())
+                        && view.getUrl() != null
+                        && "https".equalsIgnoreCase(android.net.Uri.parse(view.getUrl()).getScheme())) {
+                    listener.onHttpNavigationBlocked(url, true);
                     return true;
                 }
                 if (BrowserAddress.isAllowedWebUrl(url)) return false;
@@ -203,11 +207,7 @@ final class DaymarkWebView extends WebView {
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
-                if (failingUrl != null && failingUrl.toLowerCase().startsWith("http:")) {
-                    listener.onHttpNavigationBlocked(failingUrl, false);
-                } else {
-                    listener.onLoadError(errorCode, description == null ? "" : description, failingUrl);
-                }
+                listener.onLoadError(errorCode, description == null ? "" : description, failingUrl);
             }
 
             @Override
@@ -221,13 +221,9 @@ final class DaymarkWebView extends WebView {
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
-                if ("http".equalsIgnoreCase(request.getUrl().getScheme())) {
-                    listener.onHttpNavigationBlocked(request.getUrl().toString(), request.isRedirect());
-                } else {
-                    listener.onLoadError(error.getErrorCode(),
-                            error.getDescription() == null ? "" : error.getDescription().toString(),
-                            request.getUrl().toString());
-                }
+                listener.onLoadError(error.getErrorCode(),
+                        error.getDescription() == null ? "" : error.getDescription().toString(),
+                        request.getUrl().toString());
             }
 
             @Override
