@@ -14,7 +14,13 @@ final class TaskListRenderGate {
 
     /** @return true if the list should be rebuilt (key changed). */
     boolean shouldRebuild(String filter, String query, List<Task> visible, boolean saveFailed) {
-        String key = fingerprint(filter, query, visible, saveFailed);
+        return shouldRebuild(filter, query, "", visible, saveFailed);
+    }
+
+    /** @return true if the list should be rebuilt (key changed); {@code tag} is part of the key. */
+    boolean shouldRebuild(String filter, String query, String tag, List<Task> visible,
+                          boolean saveFailed) {
+        String key = fingerprint(filter, query, tag, visible, saveFailed);
         if (key.equals(lastKey)) {
             return false;
         }
@@ -26,10 +32,12 @@ final class TaskListRenderGate {
         lastKey = "";
     }
 
-    private static String fingerprint(String filter, String query, List<Task> visible, boolean saveFailed) {
+    private static String fingerprint(String filter, String query, String tag, List<Task> visible,
+                                      boolean saveFailed) {
         StringBuilder sb = new StringBuilder(64 + (visible == null ? 0 : visible.size() * 32));
         sb.append(filter == null ? "" : filter).append('|');
         sb.append(query == null ? "" : query).append('|');
+        sb.append(tag == null ? "" : tag).append('|');
         sb.append(saveFailed).append('|');
         if (visible != null) {
             for (Task t : visible) {

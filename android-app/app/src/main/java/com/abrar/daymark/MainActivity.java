@@ -31,7 +31,13 @@ import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.text.Editable;
 import android.text.InputFilter;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.TextPaint;
 import android.text.TextWatcher;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
+import android.text.style.TypefaceSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -224,6 +230,8 @@ public final class MainActivity extends Activity {
     private ExtensionRuntime extensionRuntime;
     private String activeFilter = TaskLogic.FILTER_ALL;
     private String searchQuery = "";
+    /** Exact tag chip selected under the search field; empty means no tag filter. */
+    private String activeTag = "";
     private Task pendingDeletedTask;
     private int pendingDeletedIndex;
     private Task pendingAttachmentCleanupTask;
@@ -257,6 +265,8 @@ public final class MainActivity extends Activity {
     private TextView captureFeedback;
     private EditText searchInput;
     private TextView searchClear;
+    private HorizontalScrollView tagFilterScroll;
+    private LinearLayout tagFilterRow;
     private View suggestionCard;
     private View filterControlView;
     private View searchControlView;
@@ -701,6 +711,59 @@ public final class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         handleDaymarkBackNavigation();
+    }
+
+    /**
+     * Hardware-keyboard entry point. Only unmodified single chords are considered, and the
+     * mapping lives in {@link KeyShortcuts} so it can be tested without an Activity. Dialogs own
+     * their own window, so Escape still closes an open dialog first; this only sees keys the
+     * Activity itself would handle.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            int shortcut = KeyShortcuts.actionFor(event.getKeyCode(), event.isCtrlPressed(),
+                    event.isShiftPressed(), event.isAltPressed(), webMode);
+            if (shortcut != KeyShortcuts.NONE && handleShortcut(shortcut)) return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private boolean handleShortcut(int shortcut) {
+        switch (shortcut) {
+            case KeyShortcuts.QUICK_ADD:
+                setWebMode(false);
+                if (quickCaptureInput == null) return false;
+                quickCaptureInput.requestFocus();
+                return true;
+            case KeyShortcuts.SEARCH:
+                if (searchInput == null || storageLoading || storageLoadFailed) return false;
+                searchInput.requestFocus();
+                return true;
+            case KeyShortcuts.FIND_IN_PAGE:
+                showFindInPageDialog();
+                return true;
+            case KeyShortcuts.NEW_TAB:
+                requestNewBrowserTab();
+                return true;
+            case KeyShortcuts.CLOSE_TAB:
+                closeCurrentBrowserTab();
+                return true;
+            case KeyShortcuts.RELOAD_PAGE:
+                if (browserWebView == null) return false;
+                browserWebView.reload();
+                return true;
+            case KeyShortcuts.CLEAR_SEARCH:
+                if (webMode || searchInput == null || searchQuery.isEmpty()) return false;
+                searchInput.setText("");
+                searchQuery = "";
+                activeTag = "";
+                renderTaskList();
+                renderTaskCount();
+                return true;
+            default:
+                return false;
+        }
     }
 
     private void registerDaymarkBackCallback() {
@@ -4190,6 +4253,14 @@ public final class MainActivity extends Activity {
         searchRow.setVisibility(View.GONE);
         content.addView(searchRow, bottomMargin(dp(11)));
 
+        tagFilterRow = new LinearLayout(this);
+        tagFilterRow.setOrientation(LinearLayout.HORIZONTAL);
+        tagFilterScroll = new HorizontalScrollView(this);
+        tagFilterScroll.setHorizontalScrollBarEnabled(false);
+        tagFilterScroll.addView(tagFilterRow);
+        tagFilterScroll.setVisibility(View.GONE);
+        content.addView(tagFilterScroll, bottomMargin(dp(9)));
+
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -4471,6 +4542,7 @@ public final class MainActivity extends Activity {
             powerOnly.setVisibility(powerMode ? View.VISIBLE : View.GONE);
         }
         renderFilters(today);
+        renderTagFilters();
         renderTaskList(today);
         renderTaskCount(today);
         renderSuggestions(today);
@@ -4868,6 +4940,56 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Chips for the tags actually present in the store, so a filter never points at a tag no task
+     * carries. Selecting one narrows the list to that exact tag; the chip row stays out of the way
+     * in the compact layout and whenever there is nothing to filter.
+     */
+    private void renderTagFilters() {
+        if (tagFilterRow == null || tagFilterScroll == null) return;
+        List<String> tags = TaskLogic.availableTags(tasks);
+        if (!activeTag.isEmpty() && !tags.contains(activeTag)) activeTag = "";
+        boolean show = powerMode && !webMode && !storageLoading && !storageLoadFailed
+                && !tags.isEmpty();
+        tagFilterScroll.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) {
+            if (tagFilterRow.getChildCount() > 0) tagFilterRow.removeAllViews();
+            return;
+        }
+        tagFilterRow.removeAllViews();
+        for (String tag : tags) {
+            boolean selected = tag.equals(activeTag);
+            Button chip = tagChip(tag, selected);
+            chip.setOnClickListener(view -> {
+                activeTag = selected ? "" : tag;
+                render();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+            params.rightMargin = dp(6);
+            tagFilterRow.addView(chip, params);
+        }
+    }
+
+    private Button tagChip(String tag, boolean selected) {
+        Button chip = new Button(this);
+        chip.setAllCaps(false);
+        chip.setText("#" + tag);
+        chip.setTextSize(11 * textScale);
+        chip.setMinHeight(dp(44));
+        chip.setMinimumHeight(dp(44));
+        chip.setMinimumWidth(dp(44));
+        chip.setPadding(dp(10), 0, dp(10), 0);
+        chip.setTextColor(selected ? palette.accent : palette.muted);
+        chip.setBackground(pressable(selected ? palette.accentSoft : palette.surfaceAlt, 22,
+                selected ? palette.accent : palette.line,
+                selected ? palette.accent : palette.muted));
+        chip.setContentDescription(selected
+                ? "Tag " + tag + ", selected. Filtering the list to this tag."
+                : "Filter the list by tag " + tag);
+        return chip;
+    }
+
     /** Splits a comma-separated editor tags field; normalization happens in TaskLogic. */
     private List<String> parseEditorTags(String raw) {
         List<String> tags = new ArrayList<>();
@@ -4930,8 +5052,10 @@ public final class MainActivity extends Activity {
         }
         String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
-        List<Task> visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, today);
-        if (!taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, visible, storageSaveFailed)) {
+        String selectedTag = powerMode ? activeTag : "";
+        List<Task> visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today);
+        if (!taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, selectedTag,
+                visible, storageSaveFailed)) {
             return;
         }
         taskList.removeAllViews();
@@ -4947,6 +5071,9 @@ public final class MainActivity extends Activity {
             } else if (!selectedQuery.trim().isEmpty()) {
                 emptyTitle.setText("No matching tasks");
                 emptyCopy.setText("Try another search or clear the field above.");
+            } else if (!selectedTag.isEmpty()) {
+                emptyTitle.setText("No tasks tagged #" + selectedTag);
+                emptyCopy.setText("Tap the selected tag chip again to show every task.");
             } else if (TaskLogic.FILTER_COMPLETED.equals(selectedFilter)) {
                 emptyTitle.setText("No tasks done yet");
                 emptyCopy.setText("Tasks you finish will appear here.");
@@ -4983,10 +5110,12 @@ public final class MainActivity extends Activity {
         }
         String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
-        int visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, today).size();
-        taskCount.setText(selectedQuery.trim().isEmpty()
-                ? visible + (visible == 1 ? " task" : " tasks")
-                : visible + (visible == 1 ? " match" : " matches"));
+        String selectedTag = powerMode ? activeTag : "";
+        int visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today).size();
+        boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty();
+        taskCount.setText(narrowed
+                ? visible + (visible == 1 ? " match" : " matches")
+                : visible + (visible == 1 ? " task" : " tasks"));
         searchClear.setVisibility(searchQuery.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
@@ -5555,7 +5684,15 @@ public final class MainActivity extends Activity {
 
     private void showNotesDialog(Task task) {
         if (task == null) return;
-        TextView notes = text(task.notes, 14, palette.text, Typeface.NORMAL);
+        List<NoteFormat.Span> spans = NoteFormat.spans(task.notes);
+        TextView notes = text("", 14, palette.text, Typeface.NORMAL);
+        notes.setText(formatNote(task.notes, spans));
+        for (NoteFormat.Span span : spans) {
+            if (span.kind == NoteFormat.Kind.LINK) {
+                notes.setMovementMethod(LinkMovementMethod.getInstance());
+                break;
+            }
+        }
         notes.setLineSpacing(dp(2), 1f);
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -5569,6 +5706,50 @@ public final class MainActivity extends Activity {
                 .setView(scroll)
                 .setPositiveButton("Done", null)
                 .show();
+    }
+
+    /**
+     * Applies {@link NoteFormat} to a note: inline code in the monospace family, HTTPS links
+     * underlined in the accent color and tappable. The note text itself is never interpreted as
+     * HTML or Markdown, so a stored note cannot inject markup into the dialog.
+     */
+    private CharSequence formatNote(String raw, List<NoteFormat.Span> spans) {
+        if (spans.isEmpty()) return raw;
+        SpannableString styled = new SpannableString(raw);
+        for (NoteFormat.Span span : spans) {
+            if (span.kind == NoteFormat.Kind.CODE) {
+                styled.setSpan(new TypefaceSpan("monospace"), span.start, span.end,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else if (span.target != null) {
+                final String target = span.target;
+                styled.setSpan(new ClickableSpan() {
+                    @Override public void onClick(View widget) {
+                        openNoteLink(target);
+                    }
+
+                    @Override public void updateDrawState(TextPaint paint) {
+                        super.updateDrawState(paint);
+                        paint.setColor(palette.accent);
+                        paint.setUnderlineText(true);
+                    }
+                }, span.start, span.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return styled;
+    }
+
+    /** Opens a note's link in the in-app browser, which enforces the same HTTPS-only policy. */
+    private void openNoteLink(String url) {
+        if (url == null || !BrowserAddress.isAllowedWebUrl(url)) {
+            showToast("Only HTTPS links can be opened from a note.");
+            return;
+        }
+        setWebMode(true);
+        if (!browserNetworkPolicy.allowsRemoteLoads()) {
+            confirmBrowserOnlineAccess(() -> loadBrowserAddress(url));
+            return;
+        }
+        loadBrowserAddress(url);
     }
 
     private void showAttachmentManager(Task task) {

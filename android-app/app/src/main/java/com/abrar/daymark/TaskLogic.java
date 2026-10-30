@@ -30,6 +30,8 @@ final class TaskLogic {
     /** Tags per task and characters per tag, enforced on create/update and on decode. */
     static final int MAX_TAGS = 5;
     static final int MAX_TAG_CHARS = 24;
+    /** Most distinct tags offered as filter chips; the row scrolls and the rest stay reachable by search. */
+    static final int MAX_TAG_CHIPS = 24;
     /** Reminder lead options offered by the editor, in minutes before the due moment. */
     static final int[] REMINDER_LEADS = { 0, 30, 60, 1440 };
     /** Default clock time used to compute a reminder fire moment when a task has no due time. */
@@ -438,9 +440,21 @@ final class TaskLogic {
     }
 
     static List<Task> filter(List<Task> tasks, String filter, String query, LocalDate today) {
+        return filter(tasks, filter, query, "", today);
+    }
+
+    /**
+     * Category filter + free-text query + optional exact tag, all ANDed. A blank {@code tag}
+     * matches everything, so the three-argument-free overload above is the same query with no
+     * tag selected.
+     */
+    static List<Task> filter(List<Task> tasks, String filter, String query, String tag,
+                             LocalDate today) {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        String normalizedTag = tag == null ? "" : tag.trim();
         List<Task> result = new ArrayList<>();
         for (Task task : tasks) {
+            if (!normalizedTag.isEmpty() && !task.tags.contains(normalizedTag)) continue;
             if (FILTER_COMPLETED.equals(filter) && !task.completed) continue;
             if (FILTER_OVERDUE.equals(filter) && (task.completed || task.dueDate == null || !LocalDate.parse(task.dueDate).isBefore(today))) continue;
             if (FILTER_NO_DATE.equals(filter) && task.dueDate != null) continue;
@@ -459,6 +473,25 @@ final class TaskLogic {
         }
         result.sort(taskOrder());
         return result;
+    }
+
+    /**
+     * Distinct tags across every task, alphabetical so the chip row is stable between renders.
+     * Bounded so a large store cannot grow an unbounded number of chip views.
+     */
+    static List<String> availableTags(List<Task> tasks) {
+        Set<String> unique = new HashSet<>();
+        if (tasks != null) {
+            for (Task task : tasks) {
+                if (task != null && task.tags != null) unique.addAll(task.tags);
+            }
+        }
+        List<String> tags = new ArrayList<>(unique);
+        Collections.sort(tags);
+        if (tags.size() > MAX_TAG_CHIPS) {
+            return new ArrayList<>(tags.subList(0, MAX_TAG_CHIPS));
+        }
+        return tags;
     }
 
     static List<Suggestion> suggestions(List<Task> tasks, LocalDate today) {
