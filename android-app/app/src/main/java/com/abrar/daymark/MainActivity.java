@@ -4082,21 +4082,85 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void refreshHistoryDialogList(List<String> history, String query,
+            ArrayAdapter<String> adapter, List<Integer> matchedIndices) {
+        adapter.setNotifyOnChange(false);
+        adapter.clear();
+        matchedIndices.clear();
+        if (history.isEmpty()) {
+            adapter.add("No recent sites");
+        } else {
+            for (String entry : BrowserHistory.filter(history, query)) {
+                matchedIndices.add(history.indexOf(entry));
+                adapter.add(entry);
+            }
+            if (adapter.getCount() == 0) adapter.add("No saved sites match this filter");
+        }
+        adapter.notifyDataSetChanged();
+    }
+
     private void showBrowserHistoryDialog() {
         sanitizeStoredBrowserHistory();
-        List<String> history = BrowserHistory.decode(browserPreferences.getString(BROWSER_HISTORY_KEY, ""));
-        String[] entries = history.isEmpty() ? new String[] { "No recent sites" }
-                : history.toArray(new String[0]);
+        final List<String> history = BrowserHistory.decode(
+                browserPreferences.getString(BROWSER_HISTORY_KEY, ""));
+        final List<Integer> matchedIndices = new ArrayList<>();
+        final ArrayAdapter<String> adapter =
+                new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        EditText filterInput = new EditText(this);
+        filterInput.setHint("Filter saved sites");
+        filterInput.setSingleLine(true);
+        filterInput.setContentDescription("Filter site history by address");
+        filterInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(Editable s) {
+                refreshHistoryDialogList(history, s.toString(), adapter, matchedIndices);
+            }
+        });
+        refreshHistoryDialogList(history, "", adapter, matchedIndices);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(16), dp(4), dp(16), 0);
+        container.addView(filterInput);
+        ListView historyList = new ListView(this);
+        historyList.setAdapter(adapter);
+        historyList.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        container.addView(historyList);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Site history (HTTPS origins only)")
-                .setItems(entries, (whichDialog, selected) -> {
-                    if (selected < 0 || selected >= history.size()) return;
-                    quickCaptureInput.setText(history.get(selected));
-                    navigateBrowserTo(history.get(selected));
-                })
+                .setView(container)
                 .setNeutralButton("Clear site history & data", null)
                 .setPositiveButton("Close", null)
                 .create();
+        historyList.setOnItemClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= matchedIndices.size()) return;
+            String url = history.get(matchedIndices.get(position));
+            dialog.dismiss();
+            quickCaptureInput.setText(url);
+            navigateBrowserTo(url);
+        });
+        historyList.setOnItemLongClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= matchedIndices.size()) return false;
+            String url = history.get(matchedIndices.get(position));
+            new AlertDialog.Builder(this)
+                    .setTitle("Forget this site?")
+                    .setMessage(url + " will be removed from Daymark's site history. Cookies and "
+                            + "stored site data are not changed; use Clear site history & data for that.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Forget", (confirm, which) -> {
+                        String updated = BrowserHistory.remove(
+                                browserPreferences.getString(BROWSER_HISTORY_KEY, ""), url);
+                        browserPreferences.edit()
+                                .putString(BROWSER_HISTORY_KEY, updated).apply();
+                        history.clear();
+                        history.addAll(BrowserHistory.decode(updated));
+                        refreshHistoryDialogList(history, filterInput.getText().toString(),
+                                adapter, matchedIndices);
+                    })
+                    .show();
+            return true;
+        });
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
                 .setOnClickListener(view -> {
                     dialog.dismiss();

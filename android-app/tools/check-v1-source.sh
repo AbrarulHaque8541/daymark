@@ -37,6 +37,7 @@ python3 ./tools/check-task-ux.py "$ROOT"
 python3 ./tools/check-release-updater-metadata.py "$ROOT"
 python3 ./tools/check-schema-v1-fixture.py "$ROOT"
 python3 ./tools/check-browser-site-info.py "$ROOT"
+python3 ./tools/check-browser-history.py "$ROOT"
 python3 ./tools/check-browser-diagnostics.py "$ROOT"
 python3 ./tools/check-browser-log-privacy.py "$ROOT"
 python3 ./tools/check-scroll-theme.py "$ROOT"
@@ -297,7 +298,7 @@ assert "sanitizeStoredBrowserHistory();" in activity and "BrowserHistory.sanitiz
 assert "BrowserHistory.sanitizeUrl(url)" in activity and "BrowserHistory.add(current, safeHistoryUrl)" in activity, "each history write must pass through the sanitizer"
 history_dialog = re.search(r"private void showBrowserHistoryDialog\(\)\s*\{(.*?)\n    \}", activity, re.S)
 assert history_dialog and 'setTitle("Site history (HTTPS origins only)")' in history_dialog.group(1)
-assert history_dialog and "navigateBrowserTo(history.get(selected))" in history_dialog.group(1), "reopening a saved site must navigate to its origin"
+assert history_dialog and "String url = history.get(matchedIndices.get(position));" in history_dialog.group(1) and "navigateBrowserTo(url)" in history_dialog.group(1), "reopening a saved site must navigate to its origin"
 for expected in ("source.getHost()", "source.getPort()", "port != HTTPS_DEFAULT_PORT", "HTTPS_DEFAULT_PORT = 443",
                  "sanitized.getRawUserInfo()", "sanitized.getRawQuery()", "sanitized.getRawFragment()", "sanitized.getRawPath()"):
     assert expected in history_source, f"history sanitizer must handle {expected}"

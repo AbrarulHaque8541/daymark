@@ -80,6 +80,11 @@ expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(in
 # Reminder snooze must only re-arm the alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt," "$SCHEDULER" "$ROOT"
+# Site history search and single-site removal must fail closed.
+python3 "$ROOT/tools/check-browser-history.py" "$ROOT" >/dev/null
+echo "PASS meta: check-browser-history.py passes on current source"
+expect_fail_after_removal check-browser-history.py "BrowserHistory.filter(history, query)" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-browser-history.py "BrowserHistory.remove(" "$ACTIVITY" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"
