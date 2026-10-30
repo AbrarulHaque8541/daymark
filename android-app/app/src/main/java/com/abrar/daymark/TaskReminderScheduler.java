@@ -332,12 +332,17 @@ final class TaskReminderScheduler {
 
     private static void cancelAlarm(Context context, AlarmManager alarmManager,
             String taskId, int requestCode) {
-        PendingIntent pending = PendingIntent.getBroadcast(context, requestCode,
-                reminderIntent(context, taskId),
-                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
-        if (pending != null) {
-            alarmManager.cancel(pending);
-            pending.cancel();
+        try {
+            PendingIntent pending = PendingIntent.getBroadcast(context, requestCode,
+                    reminderIntent(context, taskId),
+                    PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+            if (pending != null) {
+                alarmManager.cancel(pending);
+                pending.cancel();
+            }
+        } catch (RuntimeException cancellationFailure) {
+            Log.w(LOG_TAG, "Could not cancel stale reminder alarm for task " + taskId,
+                    cancellationFailure);
         }
     }
 
@@ -415,7 +420,12 @@ final class TaskReminderScheduler {
         String normalized = soundUri == null ? "" : soundUri;
         String previous = readString(preferences, CHANNEL_SOUND_KEY);
         if (previous != null && !previous.equals(normalized)) {
-            notificationManager.deleteNotificationChannel(CHANNEL_ID);
+            try {
+                notificationManager.deleteNotificationChannel(CHANNEL_ID);
+            } catch (RuntimeException channelDeleteFailure) {
+                Log.w(LOG_TAG, "Could not replace reminder notification channel.",
+                        channelDeleteFailure);
+            }
         }
         preferences.edit().putString(CHANNEL_SOUND_KEY, normalized).apply();
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
