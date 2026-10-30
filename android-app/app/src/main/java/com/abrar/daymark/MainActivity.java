@@ -239,6 +239,14 @@ public final class MainActivity extends Activity {
     private boolean pendingAttachmentCleanupExpired;
     private Runnable undoDismissal;
     private Palette palette;
+    private TaskFocusSessionRuntime focusSessionRuntime;
+    private TaskFocusTimerPanel focusTimerPanel;
+    private TaskFocusSessionCoordinator.Snapshot focusSnapshot;
+    private String selectedFocusTaskId;
+    private boolean focusStorageUnavailable;
+    private boolean focusTimerTickScheduled;
+    private boolean focusExpiryRefreshPending;
+    private final Runnable focusTimerTick = this::tickFocusTimer;
 
     private LinearLayout root;
     private View appTopBar;
@@ -469,6 +477,7 @@ public final class MainActivity extends Activity {
             storageExecutor = Executors.newSingleThreadExecutor();
             updaterExecutor = Executors.newSingleThreadExecutor();
             taskStore = new EncryptedTaskStore(this);
+            focusSessionRuntime = new TaskFocusSessionRuntime(getApplicationContext());
             attachmentStore = new AndroidAttachmentStore(getApplicationContext());
             extensionRuntime = ExtensionRuntime.create(this);
             portableBackupManager = new PortableBackupManager(getApplicationContext());
@@ -855,6 +864,7 @@ public final class MainActivity extends Activity {
             }
         }
         activityResumed = false;
+        stopFocusTimerTick();
         super.onPause();
     }
 
@@ -892,6 +902,8 @@ public final class MainActivity extends Activity {
         if (storageExecutor != null) storageExecutor.shutdown();
         if (updaterExecutor != null) updaterExecutor.shutdownNow();
         if (browserAddressNoticeView != null) browserAddressNoticeView.dispose();
+        stopFocusTimerTick();
+        if (focusTimerPanel != null) focusTimerPanel.close();
         if (browserWebView != null) discardBrowserWebView();
         super.onDestroy();
     }
@@ -948,6 +960,7 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         activityResumed = true;
+        if (storageReady) refreshFocusSessionAfterResume();
         if (browserWebView != null) {
             try {
                 browserWebView.resumeTimers();
@@ -1233,16 +1246,29 @@ public final class MainActivity extends Activity {
         taskScreen = scrollView;
         root.addView(scrollView, scrollParams);
 
+        int screenWidthDp = getResources().getConfiguration().screenWidthDp;
+        TasksHomeLayoutPolicy.Layout homeLayout = TasksHomeLayoutPolicy.forWidthDp(screenWidthDp);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(18), dp(14), dp(18), dp(24));
+        content.setPadding(dp(homeLayout.horizontalPaddingDp), dp(14),
+                dp(homeLayout.horizontalPaddingDp), dp(24));
         // Content-sized gradient reveals a gentle color blend naturally during scrolling.
         // It avoids per-frame allocations, timers, and changes to the existing scroll listener.
         content.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 ScrollThemeColor.gradientColors(
                         palette.background, palette.accentSoft, palette.surfaceAlt, highContrast)));
-        scrollView.addView(content, new ScrollView.LayoutParams(
+        android.widget.FrameLayout contentFrame = new android.widget.FrameLayout(this);
+        contentFrame.setClipChildren(false);
+        contentFrame.setClipToPadding(false);
+        int contentWidth = homeLayout.maxContentWidthDp <= 0
+                ? ViewGroup.LayoutParams.MATCH_PARENT
+                : dp(Math.min(screenWidthDp, homeLayout.maxContentWidthDp));
+        android.widget.FrameLayout.LayoutParams contentParams =
+                new android.widget.FrameLayout.LayoutParams(contentWidth,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        contentFrame.addView(content, contentParams);
+        scrollView.addView(contentFrame, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         addDashboardHeading(content);
@@ -4363,6 +4389,18 @@ public final class MainActivity extends Activity {
         sectionTitle.addView(taskCount);
         content.addView(sectionTitle, bottomMargin(dp(10)));
 
+        focusTimerPanel = new TaskFocusTimerPanel(this, new TaskFocusTimerPanel.Listener() {
+            @Override public void onStart(TaskFocusTimer.Mode mode, long targetDurationMs) {
+                startFocusSession(mode, targetDurationMs);
+            }
+            @Override public void onPause() { pauseFocusSession(); }
+            @Override public void onResume() { resumeFocusSession(); }
+            @Override public void onStop() { finishFocusSession(); }
+            @Override public void onChooseTask() { showFocusTaskPicker(); }
+        }, palette.background, palette.surface, palette.surfaceAlt, palette.text, palette.muted,
+                palette.accent, palette.accentSoft, palette.warning);
+        content.addView(focusTimerPanel, bottomMargin(dp(18)));
+
         HorizontalScrollView filterScroll = new HorizontalScrollView(this);
         filterScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout chips = new LinearLayout(this);
@@ -4533,6 +4571,8 @@ public final class MainActivity extends Activity {
             List<Task> loaded = null;
             List<TaskTemplate> loadedTemplates = null;
             Exception failure = null;
+            TaskFocusSessionCoordinator.Snapshot restoredFocus = null;
+            Exception focusRestoreFailure = null;
             boolean portableSelectionPreserved = false;
             try {
                 PortableImportGrantRecovery.awaitNoActivityRestoreWorker();
@@ -4548,9 +4588,19 @@ public final class MainActivity extends Activity {
             } catch (Exception exception) {
                 failure = exception;
             }
+            if (failure == null && focusSessionRuntime != null) {
+                try {
+                    restoredFocus = focusSessionRuntime.restoreAfterProcessStart(loaded);
+                } catch (Exception focusFailure) {
+                    focusRestoreFailure = focusFailure;
+                    Log.w("DaymarkFocus", "Focus session could not be restored; encrypted tasks remain available", focusFailure);
+                }
+            }
             List<Task> result = loaded;
             List<TaskTemplate> templateResult = loadedTemplates;
             Exception error = failure;
+            TaskFocusSessionCoordinator.Snapshot focusResult = restoredFocus;
+            Exception focusError = focusRestoreFailure;
             boolean selectionPreserved = portableSelectionPreserved;
             postActivityCallback(() -> {
                 storageLoading = false;
@@ -4567,6 +4617,8 @@ public final class MainActivity extends Activity {
                     storageFailureDetails = null;
                     storageStatus.setText(attachmentBusy ? "Importing attachment…" : "Encrypted storage ready");
                     storageStatus.setTextColor(attachmentBusy ? palette.muted : palette.accent);
+                    focusStorageUnavailable = focusError != null;
+                    applyFocusSnapshot(focusError == null ? focusResult : null);
                 } else {
                     pendingPickedAttachmentUri = null;
                     pendingPickedAttachmentTaskId = null;
@@ -4587,6 +4639,9 @@ public final class MainActivity extends Activity {
                     pendingPortableImportNeedsRepick = true;
                 }
                 render();
+                if (focusError != null) {
+                    showToast("Focus session could not be restored. Your encrypted tasks are still available and unchanged.");
+                }
                 dispatchPendingLauncherShortcut();
                 checkDueReminders();
                 if (pendingPortableImportNeedsRepick) {
@@ -4618,14 +4673,27 @@ public final class MainActivity extends Activity {
         storageStatus.setTextColor(palette.muted);
         storageExecutor.execute(() -> {
             Exception failure = null;
+            TaskFocusSessionCoordinator.Snapshot focusAfterSave = null;
+            boolean focusReconciled = false;
             try {
                 taskStore.saveSnapshot(snapshot, templateSnapshot);
+                if (focusSessionRuntime != null) {
+                    try {
+                        focusAfterSave = focusSessionRuntime.reconcileTasks(snapshot);
+                        focusReconciled = true;
+                    } catch (Exception focusFailure) {
+                        Log.w("DaymarkFocus", "Focus session reconciliation failed; task save remains committed", focusFailure);
+                    }
+                }
             } catch (Exception exception) {
                 failure = exception;
             }
             Exception error = failure;
+            TaskFocusSessionCoordinator.Snapshot focusResult = focusAfterSave;
+            boolean focusWasReconciled = focusReconciled;
             postActivityCallback(() -> {
                 if (error == null) {
+                    if (focusWasReconciled) applyFocusSnapshot(focusResult);
                     lastSavedTasks.clear();
                     lastSavedTasks.addAll(snapshot);
                     rescheduleTaskReminders();
@@ -4718,6 +4786,185 @@ public final class MainActivity extends Activity {
         renderTaskList(today);
         renderTaskCount(today);
         renderSuggestions(today);
+        renderFocusTimerPanel();
+    }
+
+    private interface FocusAction {
+        TaskFocusSessionCoordinator.Snapshot run() throws Exception;
+    }
+
+    private void showFocusTaskPicker() {
+        if (!canEdit() || webMode) {
+            showToast("Load your encrypted tasks before starting a focus session.");
+            return;
+        }
+        if (focusSnapshot != null && !focusSnapshot.isFinished()) {
+            showToast("Pause or finish the current focus session before switching tasks.");
+            return;
+        }
+        List<Task> eligible = new ArrayList<>();
+        for (Task task : tasks) {
+            if (!task.completed) eligible.add(task);
+        }
+        if (eligible.isEmpty()) {
+            showToast("Add an open task before starting a focus session.");
+            return;
+        }
+        String[] labels = new String[eligible.size()];
+        for (int i = 0; i < eligible.size(); i++) labels[i] = eligible.get(i).title;
+        new AlertDialog.Builder(this)
+                .setTitle("Choose a task to focus on")
+                .setItems(labels, (dialog, which) -> {
+                    if (which < 0 || which >= eligible.size()) return;
+                    Task chosen = eligible.get(which);
+                    selectedFocusTaskId = chosen.id;
+                    if (focusTimerPanel != null) focusTimerPanel.setTaskLabel(chosen.title);
+                    renderFocusTimerPanel();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startFocusSession(TaskFocusTimer.Mode mode, long targetDurationMs) {
+        if (!canEdit() || webMode || focusStorageUnavailable || focusSessionRuntime == null) {
+            showToast("Focus timer storage is unavailable. Your task data has not been changed.");
+            return;
+        }
+        Task selected = findTask(selectedFocusTaskId);
+        if (selected == null || selected.completed) {
+            showFocusTaskPicker();
+            return;
+        }
+        runFocusAction(() -> focusSessionRuntime.startFromUserAction(
+                selected.id, selected.title, mode, targetDurationMs));
+    }
+
+    private void pauseFocusSession() {
+        runFocusAction(() -> focusSessionRuntime.pauseFromUserAction());
+    }
+
+    private void resumeFocusSession() {
+        Task selected = findTask(selectedFocusTaskId);
+        if (selected == null) {
+            showFocusTaskPicker();
+            return;
+        }
+        runFocusAction(() -> focusSessionRuntime.resumeFromUserAction(selected.title));
+    }
+
+    private void finishFocusSession() {
+        runFocusAction(() -> focusSessionRuntime.finishFromUserAction());
+    }
+
+    private void runFocusAction(FocusAction action) {
+        if (!canEdit() || webMode || focusStorageUnavailable || focusSessionRuntime == null
+                || storageExecutor == null) {
+            showToast("Focus timer is unavailable until encrypted task storage is ready.");
+            return;
+        }
+        storageExecutor.execute(() -> {
+            try {
+                TaskFocusSessionCoordinator.Snapshot result = action.run();
+                postActivityCallback(() -> {
+                    applyFocusSnapshot(result);
+                    if (result != null && result.isRunning() && !result.notificationPublished) {
+                        showToast("Focus is running and saved. Notifications are disabled, so the timer stays in Daymark.");
+                    } else if (result != null && result.isFinished()) {
+                        showToast("Focus session finished. The task remains open until you complete it.");
+                    }
+                });
+            } catch (Exception failure) {
+                Log.w("DaymarkFocus", "Focus action was not committed", failure);
+                postActivityCallback(() -> showToast("Focus timer could not be saved. Your task data is unchanged."));
+            }
+        });
+    }
+
+    private void refreshFocusSessionAfterResume() {
+        if (!storageReady || focusSessionRuntime == null || storageExecutor == null) return;
+        List<Task> taskSnapshot = new ArrayList<>(tasks);
+        storageExecutor.execute(() -> {
+            try {
+                TaskFocusSessionCoordinator.Snapshot refreshed =
+                        focusSessionRuntime.reconcileTasks(taskSnapshot);
+                postActivityCallback(() -> applyFocusSnapshot(refreshed));
+            } catch (Exception failure) {
+                Log.w("DaymarkFocus", "Focus session refresh failed safely", failure);
+                postActivityCallback(() -> showToast("Focus session status could not be refreshed; task data is unchanged."));
+            }
+        });
+    }
+
+    private void applyFocusSnapshot(TaskFocusSessionCoordinator.Snapshot snapshot) {
+        focusSnapshot = snapshot;
+        if (snapshot != null && snapshot.timer != null) {
+            selectedFocusTaskId = snapshot.timer.taskId();
+        }
+        Task selected = findTask(selectedFocusTaskId);
+        if (selected == null) selectedFocusTaskId = null;
+        renderFocusTimerPanel();
+    }
+
+    private void renderFocusTimerPanel() {
+        if (focusTimerPanel == null) return;
+        Task selected = findTask(selectedFocusTaskId);
+        if (selected == null) selectedFocusTaskId = null;
+        focusTimerPanel.setTaskLabel(selected == null ? "Choose a task" : selected.title);
+        TaskFocusTimer timer = focusSnapshot == null ? null : focusSnapshot.timer;
+        focusTimerPanel.render(timer, android.os.SystemClock.elapsedRealtime());
+        if (timer != null && timer.isRunning() && activityResumed && !webMode) {
+            scheduleFocusTimerTick();
+        } else {
+            stopFocusTimerTick();
+        }
+    }
+
+    private void scheduleFocusTimerTick() {
+        if (focusTimerTickScheduled || !activityResumed || webMode || focusSnapshot == null
+                || !focusSnapshot.isRunning()) return;
+        focusTimerTickScheduled = true;
+        mainHandler.postDelayed(focusTimerTick, 1000L);
+    }
+
+    private void stopFocusTimerTick() {
+        mainHandler.removeCallbacks(focusTimerTick);
+        focusTimerTickScheduled = false;
+    }
+
+    private void tickFocusTimer() {
+        focusTimerTickScheduled = false;
+        if (!activityResumed || webMode || focusTimerPanel == null || focusSnapshot == null) return;
+        TaskFocusTimer timer = focusSnapshot.timer;
+        if (timer == null || !timer.isRunning()) {
+            renderFocusTimerPanel();
+            return;
+        }
+        long now = android.os.SystemClock.elapsedRealtime();
+        focusTimerPanel.render(timer, now);
+        if (timer.isCountdown() && timer.isExpiredAt(now)) {
+            if (!focusExpiryRefreshPending && storageExecutor != null && focusSessionRuntime != null) {
+                focusExpiryRefreshPending = true;
+                List<Task> taskSnapshot = new ArrayList<>(tasks);
+                storageExecutor.execute(() -> {
+                    try {
+                        TaskFocusSessionCoordinator.Snapshot finished =
+                                focusSessionRuntime.reconcileTasks(taskSnapshot);
+                        postActivityCallback(() -> {
+                            focusExpiryRefreshPending = false;
+                            applyFocusSnapshot(finished);
+                        });
+                    } catch (Exception failure) {
+                        Log.w("DaymarkFocus", "Expired countdown could not be finalized yet", failure);
+                        postActivityCallback(() -> {
+                            focusExpiryRefreshPending = false;
+                            showToast("Countdown reached zero. Reopen Daymark to reconcile its saved state.");
+                        });
+                    }
+                });
+            }
+            return;
+        }
+        scheduleFocusTimerTick();
     }
 
     private void setTaskChromeHidden(boolean hidden) {
@@ -5231,8 +5478,33 @@ public final class MainActivity extends Activity {
             return;
         }
         taskList.removeAllViews();
-        for (Task task : visible) {
-            taskList.addView(buildTaskRow(task), bottomMargin(dp(8)));
+        TasksHomeLayoutPolicy.Layout homeLayout =
+                TasksHomeLayoutPolicy.forWidthDp(getResources().getConfiguration().screenWidthDp);
+        if (homeLayout.columns == 1) {
+            for (Task task : visible) {
+                taskList.addView(buildTaskRow(task), bottomMargin(dp(8)));
+            }
+        } else {
+            LinearLayout row = null;
+            for (int index = 0; index < visible.size(); index++) {
+                if (index % homeLayout.columns == 0) {
+                    row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.TOP);
+                    taskList.addView(row, bottomMargin(dp(homeLayout.rowGapDp)));
+                }
+                LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                if (index % homeLayout.columns == 0) {
+                    itemParams.setMargins(0, 0, dp(homeLayout.columnGapDp), 0);
+                }
+                row.addView(buildTaskRow(visible.get(index)), itemParams);
+                if (index % homeLayout.columns == homeLayout.columns - 1) row = null;
+            }
+            if (row != null) {
+                View spacer = new View(this);
+                row.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+            }
         }
         boolean showEmpty = visible.isEmpty();
         emptyStateView.setVisibility(showEmpty ? View.VISIBLE : View.GONE);
@@ -7568,6 +7840,7 @@ public final class MainActivity extends Activity {
         try {
             storageExecutor.execute(() -> {
                 List<Task> restored = null;
+                List<Task> currentTasksAfterRestore = null;
                 Exception failure = null;
                 try {
                     synchronized (AndroidAttachmentStore.transactionLock()) {
@@ -7589,9 +7862,9 @@ public final class MainActivity extends Activity {
                             PortableBackupCodec.clear(recoveryKey);
                         } finally {
                             try {
-                                List<Task> current = taskStore.load();
+                                currentTasksAfterRestore = taskStore.load();
                                 portableBackupManager.finishActivePortableImportUri(
-                                        selectedOperation, current, attachmentStore);
+                                        selectedOperation, currentTasksAfterRestore, attachmentStore);
                             } catch (Exception cleanupFailure) {
                                 if (failure == null) {
                                     failure = new PortableBackupManager.RestoreOutcomeUncertainException(
@@ -7608,8 +7881,20 @@ public final class MainActivity extends Activity {
                     portableRestoreWorkerActive = false;
                     PortableImportGrantRecovery.activityRestoreWorkerFinished();
                 }
+                TaskFocusSessionCoordinator.Snapshot focusAfterRestore = null;
+                boolean focusWasReconciled = false;
+                if (currentTasksAfterRestore != null && focusSessionRuntime != null) {
+                    try {
+                        focusAfterRestore = focusSessionRuntime.reconcileTasks(currentTasksAfterRestore);
+                        focusWasReconciled = true;
+                    } catch (Exception focusFailure) {
+                        Log.w("DaymarkFocus", "Portable restore committed; focus record reconciliation will retry on next task load", focusFailure);
+                    }
+                }
             List<Task> result = restored;
             Exception error = failure;
+            TaskFocusSessionCoordinator.Snapshot focusResult = focusAfterRestore;
+            boolean focusReconciled = focusWasReconciled;
             postActivityCallback(() -> {
                 if (activePortableImportUri == selected
                         && selectedOperation.operationToken.equals(activePortableImportOperationToken)) {
@@ -7624,6 +7909,7 @@ public final class MainActivity extends Activity {
                 portableCanCancel = false;
                 portableCancelRequested = false;
                 cancelAttachmentButton.setVisibility(View.GONE);
+                if (focusReconciled) applyFocusSnapshot(focusResult);
                 if (error == null && result != null) {
                     tasks.clear();
                     tasks.addAll(result);
