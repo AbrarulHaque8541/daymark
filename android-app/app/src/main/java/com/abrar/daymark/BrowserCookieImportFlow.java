@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * User-initiated SAF cookie import flow, kept separate from MainActivity until its current
+ * User-initiated SAF cookie import flow, kept separate from the host screen until its current
  * owners finish their work. The host starts this flow from an explicit user action and forwards
  * onActivityResult(requestCode, resultCode, data) to this instance.
  *
