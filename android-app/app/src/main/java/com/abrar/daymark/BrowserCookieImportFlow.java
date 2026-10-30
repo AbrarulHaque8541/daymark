@@ -296,7 +296,7 @@ public final class BrowserCookieImportFlow {
                         .onUnmappableCharacter(CodingErrorAction.REPORT)
                         .decode(ByteBuffer.wrap(bytes, 0, total));
                 String text = decoded.toString();
-                return text.startsWith("\\uFEFF") ? text.substring(1) : text;
+                return text.startsWith("\uFEFF") ? text.substring(1) : text;
             }
         } catch (CharacterCodingException invalidUtf8) {
             throw new IOException("Selected document is not valid UTF-8.", invalidUtf8);
