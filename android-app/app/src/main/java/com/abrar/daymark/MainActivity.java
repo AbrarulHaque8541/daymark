@@ -790,8 +790,7 @@ public final class MainActivity extends Activity {
         if (!canEdit() || stagedSharedAttachmentUris.isEmpty() || pendingSharedTaskTitle == null) return;
         String title = pendingSharedTaskTitle;
         String notes = pendingSharedTaskNotes == null ? "" : pendingSharedTaskNotes;
-        pendingSharedTaskTitle = null;
-        pendingSharedTaskNotes = null;
+        // Keep the draft metadata through dialog display so Android can restore it after rotation.
         showTaskEditor(null, title, notes);
         showToast("Review the task and shared files, then save to encrypt and attach them.");
     }
@@ -7293,6 +7292,8 @@ public final class MainActivity extends Activity {
                     stagedSharedAttachmentUris.clear();
                     pendingSharedAttachmentTaskId = created.id;
                     pendingSharedAttachmentIndex = 0;
+                    pendingSharedTaskTitle = null;
+                    pendingSharedTaskNotes = null;
                 }
                 if (sourceTemplate == null) quickCaptureInput.setText("");
                 captureFeedback.setText(sourceTemplate == null
