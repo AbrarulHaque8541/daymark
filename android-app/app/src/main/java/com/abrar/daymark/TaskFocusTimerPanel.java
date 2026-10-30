@@ -6,8 +6,6 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.graphics.SweepGradient;
-import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
@@ -15,7 +13,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -36,15 +33,16 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         void onChooseTask();
     }
 
-    private static final int BG = 0xFF07121D;
-    private static final int SURFACE = 0xFF101F2D;
-    private static final int SURFACE_HI = 0xFF172A3B;
-    private static final int TEXT = 0xFFF3F7FC;
-    private static final int MUTED = 0xFF9BAFC1;
-    private static final int CYAN = 0xFF27D5F2;
-    private static final int VIOLET = 0xFF9B70FF;
-    private static final int AMBER = 0xFFFFB547;
-    private static final int GREEN = 0xFF36D6A0;
+    // Colors are injected from MainActivity.Palette so Light, Dark, System and High Contrast
+    // all use the same design tokens as the rest of Daymark.
+    private final int BG;
+    private final int SURFACE;
+    private final int SURFACE_HI;
+    private final int TEXT;
+    private final int MUTED;
+    private final int ACCENT;
+    private final int ACCENT_SOFT;
+    private final int WARNING;
     private static final long[] PRESETS_MINUTES = {5, 15, 25, 45, 60};
 
     private final Listener listener;
@@ -72,10 +70,20 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private boolean closed;
     private TextView dailySummary;
 
-    TaskFocusTimerPanel(Context context, Listener listener) {
+    TaskFocusTimerPanel(Context context, Listener listener,
+            int background, int surface, int surfaceAlt, int text, int muted,
+            int accent, int accentSoft, int warning) {
         super(context);
         if (listener == null) throw new IllegalArgumentException("A timer action listener is required.");
         this.listener = listener;
+        BG = background;
+        SURFACE = surface;
+        SURFACE_HI = surfaceAlt;
+        TEXT = text;
+        MUTED = muted;
+        ACCENT = accent;
+        ACCENT_SOFT = accentSoft;
+        WARNING = warning;
         setOrientation(VERTICAL);
         setPadding(dp(18), dp(20), dp(18), dp(18));
         setBackground(round(BG, 30));
@@ -167,7 +175,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         LayoutParams actionLp = matchWrap();
         actionLp.topMargin = dp(20);
         addView(actions, actionLp);
-        primaryAction = actionButton("Start focus", VIOLET);
+        primaryAction = actionButton("Start focus", ACCENT);
         stopAction = actionButton("Finish", SURFACE_HI);
         actions.addView(primaryAction, new LayoutParams(0, dp(58), 1.5f));
         LayoutParams stopLp = new LayoutParams(0, dp(58), 1);
@@ -265,7 +273,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                     : value.isCountdown() ? "TIME REMAINING" : "FOCUS IN PROGRESS");
             float progress = value.isCountdown()
                     ? value.progressPermilleAt(nowElapsedRealtimeMs) / 1000f : 0f;
-            progressRing.setProgress(progress, value.isCountdown() ? AMBER : CYAN);
+            progressRing.setProgress(progress, value.isCountdown() ? WARNING : ACCENT);
             if (value.isCountdown() && value.isRunning()) {
                 sounds.onCountdownSecond((int) Math.ceil(value.remainingMsAt(nowElapsedRealtimeMs) / 1000d));
             }
@@ -307,8 +315,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         if (timer != null && !timer.isFinished()) return;
         selectedMode = mode;
         sounds.onSelection();
-        modeStopwatch.setBackground(round(mode == TaskFocusTimer.Mode.STOPWATCH ? 0xFF12617A : SURFACE, 18));
-        modeCountdown.setBackground(round(mode == TaskFocusTimer.Mode.COUNTDOWN ? 0xFF54368F : SURFACE, 18));
+        modeStopwatch.setBackground(round(mode == TaskFocusTimer.Mode.STOPWATCH ? ACCENT_SOFT : SURFACE, 18));
+        modeCountdown.setBackground(round(mode == TaskFocusTimer.Mode.COUNTDOWN ? ACCENT_SOFT : SURFACE, 18));
         modeStopwatch.setTextColor(mode == TaskFocusTimer.Mode.STOPWATCH ? TEXT : MUTED);
         modeCountdown.setTextColor(mode == TaskFocusTimer.Mode.COUNTDOWN ? TEXT : MUTED);
         render(null, 0);
@@ -440,7 +448,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         private final Paint progress = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF bounds = new RectF();
         private float value;
-        private int color = CYAN;
+        private int color = ACCENT;
 
         ProgressRing(Context context) {
             super(context);
