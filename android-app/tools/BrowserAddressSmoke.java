@@ -47,11 +47,13 @@ public final class BrowserAddressSmoke {
         rejects("data:text/html,hello");
 
         for (String scheme : new String[]{"tg", "telegram", "mailto", "tel", "sms",
-                "smsto", "geo", "market", "whatsapp", "TG"}) {
+                "smsto", "geo", "market", "whatsapp", "TG", "ftp", "viber", "spotify",
+                "youtube", "chatgpt", "instagram", "android-app", "custom+scheme"}) {
             assert BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
-        for (String scheme : new String[]{"http", "https", "intent", "javascript",
-                "file", "content", "data", "ftp", null}) {
+        for (String scheme : new String[]{"http", "https", "intent", "javascript", "vbscript",
+                "file", "content", "data", "blob", "about", "daymark-download",
+                "chrome", "chrome-extension", "devtools", "view-source", "", "bad scheme", null}) {
             assert !BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
         assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "tg");
