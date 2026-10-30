@@ -32,6 +32,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskSnapshotCodec.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Subtask.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserExtension.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserAddress.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHistory.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLogPolicy.java" \
