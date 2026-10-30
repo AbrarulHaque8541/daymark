@@ -126,7 +126,9 @@ check("isTrailingPunctuation" in note, "trailing punctuation trimming missing")
 
 check("List<NoteFormat.Span> spans = NoteFormat.spans(task.notes);" in ACTIVITY,
       "the note dialog must format through NoteFormat")
-check("notes.setText(formatNote(task.notes, spans));" in ACTIVITY, "styled note not applied")
+check("notes.setText(formatNote(task.notes, spans," in ACTIVITY, "styled note not applied")
+check("if (holder[0] != null) holder[0].dismiss();" in ACTIVITY,
+      "a tapped note link must close the dialog before navigating behind it")
 check("notes.setMovementMethod(LinkMovementMethod.getInstance());" in ACTIVITY,
       "links need a movement method to be tappable")
 check("new TypefaceSpan(\"monospace\")" in ACTIVITY, "inline code must render in monospace")

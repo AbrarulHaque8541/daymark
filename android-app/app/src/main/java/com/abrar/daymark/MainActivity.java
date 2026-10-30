@@ -754,7 +754,8 @@ public final class MainActivity extends Activity {
                 browserWebView.reload();
                 return true;
             case KeyShortcuts.CLEAR_SEARCH:
-                if (webMode || searchInput == null || searchQuery.isEmpty()) return false;
+                if (webMode || searchInput == null) return false;
+                if (searchQuery.isEmpty() && activeTag.isEmpty()) return false;
                 searchInput.setText("");
                 searchQuery = "";
                 activeTag = "";
@@ -5686,7 +5687,11 @@ public final class MainActivity extends Activity {
         if (task == null) return;
         List<NoteFormat.Span> spans = NoteFormat.spans(task.notes);
         TextView notes = text("", 14, palette.text, Typeface.NORMAL);
-        notes.setText(formatNote(task.notes, spans));
+        // A tapped link navigates behind this dialog, so the dialog has to close first or the
+        // browser change would be invisible under it.
+        final AlertDialog[] holder = new AlertDialog[1];
+        notes.setText(formatNote(task.notes, spans,
+                () -> { if (holder[0] != null) holder[0].dismiss(); }));
         for (NoteFormat.Span span : spans) {
             if (span.kind == NoteFormat.Kind.LINK) {
                 notes.setMovementMethod(LinkMovementMethod.getInstance());
@@ -5701,7 +5706,7 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(18), dp(8), dp(18), dp(8));
         content.addView(notes);
         scroll.addView(content);
-        new AlertDialog.Builder(this)
+        holder[0] = new AlertDialog.Builder(this)
                 .setTitle("Note · " + task.title)
                 .setView(scroll)
                 .setPositiveButton("Done", null)
@@ -5713,7 +5718,7 @@ public final class MainActivity extends Activity {
      * underlined in the accent color and tappable. The note text itself is never interpreted as
      * HTML or Markdown, so a stored note cannot inject markup into the dialog.
      */
-    private CharSequence formatNote(String raw, List<NoteFormat.Span> spans) {
+    private CharSequence formatNote(String raw, List<NoteFormat.Span> spans, Runnable beforeOpen) {
         if (spans.isEmpty()) return raw;
         SpannableString styled = new SpannableString(raw);
         for (NoteFormat.Span span : spans) {
@@ -5724,6 +5729,7 @@ public final class MainActivity extends Activity {
                 final String target = span.target;
                 styled.setSpan(new ClickableSpan() {
                     @Override public void onClick(View widget) {
+                        beforeOpen.run();
                         openNoteLink(target);
                     }
 
