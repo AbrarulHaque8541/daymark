@@ -75,7 +75,7 @@ public final class BrowserCookieImportFlow {
     /** Call only in response to a visible user action, such as a future browser settings row. */
     @SuppressWarnings("deprecation")
     public void start() {
-        if (importing) return;
+        if (importing || (activeDialog != null && activeDialog.isShowing())) return;
         Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         picker.addCategory(Intent.CATEGORY_OPENABLE);
         picker.setType("*/*");
@@ -154,6 +154,22 @@ public final class BrowserCookieImportFlow {
 
     /** Release in-memory references when the host abandons this flow. */
     public void cancel() {
+        if (activeDialog != null) {
+            try {
+                activeDialog.dismiss();
+            } catch (RuntimeException ignored) {
+                // The host may already be finishing.
+            }
+            activeDialog = null;
+        }
+        if (progressDialog != null) {
+            try {
+                progressDialog.dismiss();
+            } catch (RuntimeException ignored) {
+                // The host may already be finishing.
+            }
+            progressDialog = null;
+        }
         if (!importing) clearSensitiveState();
     }
 
