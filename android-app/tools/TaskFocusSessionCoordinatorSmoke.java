@@ -206,9 +206,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 "a failed Pause leaves the last known running state intact");
         check(fixture.notifications.active,
                 "a failed Pause does not cancel the notification for the still-running persisted session");
-        check(fixture.events().equals(list("save", "unused")) == false
-                        && fixture.events().size() == 1
-                        && "save".equals(fixture.events().get(0)),
+        check(fixture.events().size() == 1 && "save".equals(fixture.events().get(0)),
                 "a failed Pause records only the attempted store write and performs no notification side effect");
     }
 
