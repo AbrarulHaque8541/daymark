@@ -5,6 +5,16 @@ Audience: owner + agents. Not a release claim.
 
 **Current-source correction (2026-10-13):** Task tags are available in the editor, visible task summary, and search; a dedicated tag-filter-chip UI is not present. Natural-language quick add (supported dates/times, priorities, and `#tags`) later merged in [PR #292](https://github.com/AbrarulHaque8541/ai-personal-task-assistant/pull/292). Current browser source also has searchable/filterable tabs and local HTTPS-origin bookmarks; Browser Settings owns the default search engine, site history/data, bookmarks, extensions, image loading, Safe Browsing, and desktop-site preference. These later features supersede matching 2026-10-11 gaps below. The settings-ownership section and ordered work are historical proposals, not today's backlog; consult [`../PROJECT_PLAN.md`](../PROJECT_PLAN.md) and live issues [#221](https://github.com/AbrarulHaque8541/daymark/issues/221) / [#222](https://github.com/AbrarulHaque8541/daymark/issues/222) before proposing work. Quick-add formats are listed in [`NL_QUICK_ADD.md`](NL_QUICK_ADD.md).
 
+**Current-source correction (2026-10-30, branch `feat/android-press-feedback-motion-20261029`):** these specific gaps below are now implemented in source on that branch (not merged, and no rendered behaviour device-tested):
+
+- Tag **filter chips** exist under the search field in the power layout, backed by `TaskLogic.availableTags` and the tag-aware filter/render gate.
+- Share-in is no longer weak: multi-line or over-long shared text opens the editor with title and notes, an article link keeps its subject, and the activity accepts `ACTION_PROCESS_TEXT` (text selection → Daymark).
+- Site history is now a **searchable** list with single-site forget; typed history (paths, queries, titles) is still deliberately not stored for privacy, so "full typed history" remains a decision, not a missing feature.
+- Hardware keyboard shortcuts and a command palette exist (`Ctrl+K/F/L/T/W/R`, `Esc`, `Ctrl+Shift+P`) and are listed in Settings → Keyboard shortcuts.
+- Reminder notifications carry a **Snooze 10 min** action that re-arms the same alarm slot.
+
+See [`CURRENT_STATUS_2026-10-30_0418Z.md`](CURRENT_STATUS_2026-10-30_0418Z.md) for the evidence and the not-tested list.
+
 ## 1. What improved recently (main)
 
 ### Task / home
