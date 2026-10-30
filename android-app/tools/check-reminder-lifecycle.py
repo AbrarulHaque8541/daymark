@@ -109,6 +109,7 @@ assert "setExact(" not in scheduler, "reminders must remain inexact and must not
 assert "ReminderSchedulePolicySmoke.java" in core_runner
 assert "com.abrar.daymark.ReminderSchedulePolicySmoke" in core_runner
 assert "postTestReminder(manager, context, notificationId, task, fire.toString())" in instrumentation
+assert "fire != null && !fire.isAfter(java.time.Instant.now())" in instrumentation, "snooze fixture must represent a reminder whose base occurrence has fired"
 assert "valid active notification recovers a lost canonical ID index" in instrumentation
 assert "TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString())" in instrumentation
 assert "app rescheduling preserves a valid snooze instead of overwriting it" in instrumentation
