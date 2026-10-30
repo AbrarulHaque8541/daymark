@@ -6,6 +6,11 @@ import sys
 
 root = Path(sys.argv[1])
 activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+instrumentation = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java").read_text(encoding="utf-8")
+assert "public void onCreate(Bundle arguments)" in instrumentation, "custom instrumentation runner must implement onCreate"
+assert "super.onCreate(arguments);" in instrumentation, "custom instrumentation runner must call super.onCreate"
+assert "marker(\"instrumentation onCreate; dispatching start()\");" in instrumentation, "instrumentation dispatch must be visible in phase diagnostics"
+assert "start();" in instrumentation.split("public void onCreate(Bundle arguments)", 1)[1].split("public void onStart()", 1)[0], "onCreate must dispatch start() so onStart runs"
 method = activity.split("private void checkDueReminders()", 1)[1].split(
     "private void showTaskActions", 1
 )[0]
