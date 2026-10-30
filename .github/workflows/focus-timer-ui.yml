@@ -6,9 +6,6 @@ on:
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerSoundscape.java"
       - "android-app/tools/check-focus-timer-ui.py"
       - ".github/workflows/focus-timer-ui.yml"
-  push:
-    branches:
-      - "feat/focus-timer-2027-ui-sound-20261030"
 permissions:
   contents: read
 jobs:
