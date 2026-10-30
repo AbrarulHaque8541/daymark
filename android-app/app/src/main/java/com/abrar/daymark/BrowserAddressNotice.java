@@ -73,7 +73,11 @@ final class BrowserAddressNotice {
     /** Shows a new notice inline. Repeated delivery of the same notice id is suppressed. */
     boolean show(Notice notice) {
         if (notice == null) throw new IllegalArgumentException("notice is required");
-        if (current != null && current.id.equals(notice.id)) return false;
+        if (current != null) {
+            if (current.id.equals(notice.id)) return false;
+            // Never let a later informational event hide an unresolved security-critical notice.
+            if (current.severity == Severity.CRITICAL) return false;
+        }
         current = notice;
         presentation = Presentation.INLINE;
         return true;

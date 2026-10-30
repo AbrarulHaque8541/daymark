@@ -45,11 +45,20 @@ public final class BrowserAddressNoticeSmoke {
         assert notices.show(tls);
         assert !notices.dismiss() : "critical notice cannot be generically dismissed";
         assert !notices.onInlineTimeout() : "critical notice cannot auto-dismiss";
+        BrowserAddressNotice.Notice laterInfo = new BrowserAddressNotice.Notice(
+                "later-info", "Page information", "A later informational event.",
+                BrowserAddressNotice.Severity.INFO, true, Collections.emptyList());
+        assert !notices.show(laterInfo)
+                : "an unresolved critical notice must not be displaced by a later event";
+        assert notices.current() == tls;
         assert notices.openPanel();
         assert notices.resolve("another-notice") == false;
         assert notices.current() == tls;
         assert notices.resolve("tls-example");
         assert notices.presentation() == BrowserAddressNotice.Presentation.HIDDEN;
+        assert notices.show(laterInfo) : "new notices may appear after critical resolution";
+        assert notices.current() == laterInfo;
+        assert notices.dismiss();
 
         boolean rejected = false;
         try {
