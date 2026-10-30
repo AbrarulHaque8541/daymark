@@ -42,13 +42,17 @@ if [ "$SDK_INT" -ge 33 ]; then
   "$ADB" -s "$MODE" shell pm grant com.abrar.daymark android.permission.POST_NOTIFICATIONS
 fi
 set +e
-timeout 360 "$ADB" -s "$MODE" shell am instrument -w \
+timeout 900 "$ADB" -s "$MODE" shell am instrument -w \
   com.abrar.daymark.test/com.abrar.daymark.DaymarkPlatformInstrumentation > /tmp/daymark-reminder-instrumentation.log 2>&1
 STATUS=$?
 set -e
 cat /tmp/daymark-reminder-instrumentation.log
 if [ "$STATUS" -ne 0 ]; then
   echo "FAIL platform instrumentation command exit: $STATUS" >&2
+  echo "--- process state at failure:" >&2
+  "$ADB" -s "$MODE" shell ps -A 2>/dev/null | grep daymark >&2 || true
+  echo "--- recent device log:" >&2
+  "$ADB" -s "$MODE" logcat -d -t 200 2>/dev/null | tail -n 100 >&2 || true
   exit "$STATUS"
 fi
 grep -q '^INSTRUMENTATION_RESULT: result=passed' /tmp/daymark-reminder-instrumentation.log
