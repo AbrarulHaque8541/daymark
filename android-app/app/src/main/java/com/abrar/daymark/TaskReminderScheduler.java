@@ -89,8 +89,13 @@ final class TaskReminderScheduler {
         SharedPreferences preferences =
                 context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE);
         String key = snoozeKey(task.id);
-        if (!preferences.edit().putString(key, record).commit()) {
-            Log.w(LOG_TAG, "Snooze not armed: its state could not be persisted.");
+        try {
+            if (!preferences.edit().putString(key, record).commit()) {
+                Log.w(LOG_TAG, "Snooze not armed: its state could not be persisted.");
+                return false;
+            }
+        } catch (RuntimeException persistenceFailure) {
+            Log.w(LOG_TAG, "Snooze not armed: its state could not be persisted.", persistenceFailure);
             return false;
         }
 
@@ -112,14 +117,20 @@ final class TaskReminderScheduler {
 
     static String snoozeRecord(Context context, String taskId) {
         if (context == null || taskId == null) return null;
-        return context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE)
-                .getString(snoozeKey(taskId), null);
+        SharedPreferences preferences =
+                context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE);
+        return readString(preferences, snoozeKey(taskId));
     }
 
     static void clearSnooze(Context context, String taskId) {
         if (context == null || taskId == null) return;
-        context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE)
-                .edit().remove(snoozeKey(taskId)).apply();
+        try {
+            context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE)
+                    .edit().remove(snoozeKey(taskId)).apply();
+        } catch (RuntimeException cleanupFailure) {
+            Log.w(LOG_TAG, "Could not clear stale snooze state for task " + taskId,
+                    cleanupFailure);
+        }
     }
 
     private static String snoozeKey(String taskId) {
@@ -174,7 +185,7 @@ final class TaskReminderScheduler {
             }
             if (!liveTasks.containsKey(taskId)) {
                 if (alarmManager != null) cancelAlarm(context, alarmManager, taskId, requestCode);
-                if (notificationManager != null) notificationManager.cancel(requestCode);
+                cancelPostedNotification(notificationManager, requestCode);
                 codes.edit().remove(taskId).apply();
                 known.remove(taskId);
                 clearSnooze(context, taskId);
@@ -194,7 +205,7 @@ final class TaskReminderScheduler {
             if (!needsReminder || baseFire == null || alreadyShown) {
                 if (assigned != null) {
                     if (alarmManager != null) cancelAlarm(context, alarmManager, task.id, assigned);
-                    if (notificationManager != null) notificationManager.cancel(assigned);
+                    cancelPostedNotification(notificationManager, assigned);
                     codes.edit().remove(task.id).apply();
                     known.remove(task.id);
                 }
@@ -224,8 +235,14 @@ final class TaskReminderScheduler {
             }
             int requestCode = assigned == null ? requestCodeFor(context, task.id) : assigned;
             known.put(task.id, String.valueOf(requestCode));
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextFire.toEpochMilli(),
-                    pendingIntent(context, task, nextFire.toString(), requestCode));
+            try {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextFire.toEpochMilli(),
+                        pendingIntent(context, task, nextFire.toString(), requestCode));
+            } catch (RuntimeException scheduleFailure) {
+                // One malformed/unavailable alarm must not prevent the remaining tasks from
+                // being reconciled. Keep the stable ID so the next app-open retry can repair it.
+                Log.w(LOG_TAG, "Could not schedule reminder for task " + task.id, scheduleFailure);
+            }
         }
     }
 
@@ -261,7 +278,7 @@ final class TaskReminderScheduler {
                     && (assigned == null || assigned == posted.getId())
                     && !seenTasks.contains(taskId);
             if (!valid) {
-                manager.cancel(posted.getId());
+                cancelPostedNotification(manager, posted.getId());
                 if (alarmManager != null && taskId != null) {
                     cancelAlarm(context, alarmManager, taskId, posted.getId());
                 }
@@ -283,8 +300,13 @@ final class TaskReminderScheduler {
             CharSequence postedTitle = extras == null ? null
                     : extras.getCharSequence(Notification.EXTRA_TITLE);
             if (postedTitle == null || !task.title.contentEquals(postedTitle)) {
-                TaskReminderReceiver.refreshPostedNotification(
-                        context, posted.getId(), task, baseFireText);
+                try {
+                    TaskReminderReceiver.refreshPostedNotification(
+                            context, posted.getId(), task, baseFireText);
+                } catch (RuntimeException refreshFailure) {
+                    Log.w(LOG_TAG, "Could not refresh reminder notification for task " + taskId,
+                            refreshFailure);
+                }
             }
         }
     }
@@ -339,7 +361,14 @@ final class TaskReminderScheduler {
                 context.getSharedPreferences(CODE_PREFERENCES, Context.MODE_PRIVATE);
         Integer existing = parsePositiveId(codes.getAll().get(taskId));
         if (existing != null) return existing;
-        int next = codes.getInt(CODE_COUNTER_KEY, FIRST_REQUEST_CODE);
+        int next = FIRST_REQUEST_CODE;
+        try {
+            next = codes.getInt(CODE_COUNTER_KEY, FIRST_REQUEST_CODE);
+        } catch (RuntimeException malformedCounter) {
+            // A bad preference type must not abort every task's reminder scheduling.
+            codes.edit().remove(CODE_COUNTER_KEY).apply();
+            Log.w(LOG_TAG, "Discarding malformed reminder request-code counter.", malformedCounter);
+        }
         if (next < FIRST_REQUEST_CODE || next == Integer.MAX_VALUE) next = FIRST_REQUEST_CODE;
         Set<Integer> used = new HashSet<>();
         for (Map.Entry<String, ?> entry : codes.getAll().entrySet()) {
@@ -382,9 +411,9 @@ final class TaskReminderScheduler {
         }
         SharedPreferences preferences =
                 context.getSharedPreferences(REMINDER_PREFERENCES, Context.MODE_PRIVATE);
-        String soundUri = preferences.getString(NOTIFICATION_SOUND_URI_KEY, null);
+        String soundUri = readString(preferences, NOTIFICATION_SOUND_URI_KEY);
         String normalized = soundUri == null ? "" : soundUri;
-        String previous = preferences.getString(CHANNEL_SOUND_KEY, null);
+        String previous = readString(preferences, CHANNEL_SOUND_KEY);
         if (previous != null && !previous.equals(normalized)) {
             notificationManager.deleteNotificationChannel(CHANNEL_ID);
         }
@@ -398,6 +427,31 @@ final class TaskReminderScheduler {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build());
-        notificationManager.createNotificationChannel(channel);
+        try {
+            notificationManager.createNotificationChannel(channel);
+        } catch (RuntimeException channelFailure) {
+            Log.w(LOG_TAG, "Reminder channel could not be configured; in-app reminders remain available.",
+                    channelFailure);
+        }
+    }
+
+    private static String readString(SharedPreferences preferences, String key) {
+        try {
+            return preferences.getString(key, null);
+        } catch (RuntimeException malformedValue) {
+            preferences.edit().remove(key).apply();
+            Log.w(LOG_TAG, "Discarding malformed reminder preference: " + key, malformedValue);
+            return null;
+        }
+    }
+
+    private static void cancelPostedNotification(NotificationManager manager, int notificationId) {
+        if (manager == null || notificationId <= 0) return;
+        try {
+            manager.cancel(notificationId);
+        } catch (RuntimeException cancellationFailure) {
+            Log.w(LOG_TAG, "Could not cancel stale reminder notification " + notificationId,
+                    cancellationFailure);
+        }
     }
 }
