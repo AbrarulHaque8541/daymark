@@ -3,10 +3,10 @@ package com.abrar.daymark;
 public final class BrowserCookieImportSmoke {
     public static void main(String[] args) {
         String export = "# Netscape HTTP Cookie File\n"
-                + ".example.com\\tTRUE\\t/\\tTRUE\\t1900000000\\tsid\\tabc123\n"
-                + "#HttpOnly_secure.example.com\\tFALSE\\t/account\\tTRUE\\t0\\tsecret\\tvalue=1\n"
-                + "bad.example.com\\tmaybe\\t/\\tFALSE\\t1\\tx\\ty\n"
-                + "bad.example.com\\tFALSE\\tno-slash\\tFALSE\\t1\\tx\\ty\n";
+                + ".example.com\tTRUE\t/\tTRUE\t1900000000\tsid\tabc123\n"
+                + "#HttpOnly_secure.example.com\tFALSE\t/account\tTRUE\t0\tsecret\tvalue=1\n"
+                + "bad.example.com\tmaybe\t/\tFALSE\t1\tx\ty\n"
+                + "bad.example.com\tFALSE\tno-slash\tFALSE\t1\tx\ty\n";
         BrowserCookieImport.ParseResult parsed = BrowserCookieImport.parse(export);
         assert parsed.recognizedFormat;
         assert parsed.cookies.size() == 2 : parsed.cookies.size();
@@ -39,7 +39,7 @@ public final class BrowserCookieImportSmoke {
 
         String tooLargeValue = "x".repeat(BrowserCookieImport.MAX_VALUE_CHARS + 1);
         String oversized = "# Netscape HTTP Cookie File\n"
-                + "example.com\\tFALSE\\t/\\tFALSE\\t0\\tname\\t" + tooLargeValue;
+                + "example.com\tFALSE\t/\tFALSE\t0\tname\t" + tooLargeValue;
         assert BrowserCookieImport.parse(oversized).cookies.isEmpty();
         System.out.println("PASS browser cookie import parser: Netscape format, HttpOnly, flags, expiry, bounds and malformed-line rejection");
     }
