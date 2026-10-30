@@ -282,6 +282,7 @@ public final class MainActivity extends Activity {
     private FrameLayout browserViewport;
     private View browserHomeView;
     private View browserAddressBarView;
+    private BrowserAddressNoticeView browserAddressNoticeView;
     private HorizontalScrollView browserToolbarScroll;
     private Runnable browserChromeRestoreRunnable;
     private boolean browserChromeHidden;
@@ -334,6 +335,8 @@ public final class MainActivity extends Activity {
     private String lastBrowserAddress;
     private Runnable browserLoadWatchdog;
     private boolean browserLoadFailed;
+    private String browserAddressNoticeId;
+    private long browserAddressNoticeSequence;
     private boolean browserPageLoading;
     private Bundle pendingBrowserWebViewState;
     private long browserNavigationGeneration;
@@ -888,6 +891,7 @@ public final class MainActivity extends Activity {
         pendingSaveTransaction = null;
         if (storageExecutor != null) storageExecutor.shutdown();
         if (updaterExecutor != null) updaterExecutor.shutdownNow();
+        if (browserAddressNoticeView != null) browserAddressNoticeView.dispose();
         if (browserWebView != null) discardBrowserWebView();
         super.onDestroy();
     }
@@ -1611,6 +1615,19 @@ public final class MainActivity extends Activity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
+        browserAddressNoticeView = new BrowserAddressNoticeView(this);
+        browserAddressNoticeView.setMaxInlineWidthPx(dp(96));
+        browserAddressNoticeView.setSiteInfoListener(this::showBrowserSiteInfo);
+        browserAddressNoticeView.setActionListener((noticeId, actionId) -> {
+            if (noticeId == null || !noticeId.equals(browserAddressNoticeId)) return;
+            if ("retry".equals(actionId) && browserLoadFailed
+                    && BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) {
+                resolveBrowserAddressNotice();
+                navigateBrowserTo(lastBrowserAddress);
+            }
+        });
+        top.addView(browserAddressNoticeView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
         browserAddressInput = new EditText(this);
         browserAddressInput.setSingleLine(true);
         browserAddressInput.setTextSize(14 * textScale);
@@ -1698,6 +1715,46 @@ public final class MainActivity extends Activity {
         } catch (IllegalArgumentException exception) {
             browserAddressInput.setError(exception.getMessage());
         }
+    }
+
+    private void showBrowserSiteInfo() {
+        if (isFinishing() || isDestroyed()) return;
+        String origin = BrowserAddress.isAllowedWebUrl(lastBrowserAddress)
+                ? BrowserLogPolicy.redactedOrigin(lastBrowserAddress) : "No HTTPS page is open.";
+        String details = origin + "\n\nDaymark allows HTTPS pages only. Certificate errors are "
+                + "cancelled and never bypassed. HTTPS protects the connection in transit but does "
+                + "not guarantee that a website itself is trustworthy or safe.";
+        new AlertDialog.Builder(this)
+                .setTitle("Site information")
+                .setMessage(details)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private String nextBrowserNoticeId(String prefix) {
+        return prefix + "-" + (++browserAddressNoticeSequence);
+    }
+
+    private void showBrowserNotice(String id, String title, String message,
+            BrowserAddressNotice.Severity severity, boolean dismissible,
+            List<BrowserAddressNotice.Action> actions) {
+        if (browserAddressNoticeView == null || isFinishing() || isDestroyed()) return;
+        BrowserAddressNotice.Notice notice = new BrowserAddressNotice.Notice(
+                id, title, message, severity, dismissible, actions);
+        if (browserAddressNoticeView.showNotice(notice)) browserAddressNoticeId = id;
+    }
+
+    private void resolveBrowserAddressNotice() {
+        if (browserAddressNoticeView != null && browserAddressNoticeId != null) {
+            browserAddressNoticeView.resolveNotice(browserAddressNoticeId);
+        }
+        browserAddressNoticeId = null;
+    }
+
+    private void showBrowserRetryNotice(String prefix, String title, String message) {
+        showBrowserNotice(nextBrowserNoticeId(prefix), title, message,
+                BrowserAddressNotice.Severity.WARNING, true,
+                Arrays.asList(new BrowserAddressNotice.Action("retry", "Retry page")));
     }
 
     private LinearLayout buildBrowserScreen() {
@@ -2296,6 +2353,8 @@ public final class MainActivity extends Activity {
             if (browserWebView != null) browserWebView.stopLoading();
             browserPageLoading = false;
             browserLoadFailed = true;
+            showBrowserRetryNotice("load-timeout", "Page load timed out",
+                    "The page did not finish loading. You can retry the current HTTPS address.");
             showBrowserStatus("Load Timeout: Check WebView version or Retry");
         });
         mainHandler.postDelayed(browserLoadWatchdog, BROWSER_LOAD_WATCHDOG_MS);
@@ -2350,6 +2409,7 @@ public final class MainActivity extends Activity {
                 browserSettingsPolicy.isSafeBrowsingEnabled(), new DaymarkWebView.Listener() {
             @Override public void onPageStarted(String url) {
                 if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
+                resolveBrowserAddressNotice();
                 cancelBrowserLoadWatchdog();
                 browserPageLoading = true;
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
@@ -2373,6 +2433,7 @@ public final class MainActivity extends Activity {
                     injectVideoDownloadOverlay(targetRef[0]);
                     return;
                 }
+                resolveBrowserAddressNotice();
                 browserSelfHealingPolicy.onPageLoaded(url);
                 cancelBrowserLoadWatchdog();
                 browserPageLoading = false;
@@ -2389,6 +2450,9 @@ public final class MainActivity extends Activity {
                 if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
                 browserPageLoading = false;
                 cancelBrowserLoadWatchdog();
+                showBrowserNotice(nextBrowserNoticeId("navigation-blocked"),
+                        "Navigation blocked", "Daymark only opens HTTPS pages. This link was not opened.",
+                        BrowserAddressNotice.Severity.WARNING, true, java.util.Collections.emptyList());
                 showBrowserStatus("A non-HTTPS page link was blocked. Use HTTPS; a per-site HTTP exception requires a separate explicit request.");
                 browserDiagnostics.record(System.currentTimeMillis(), "navigation blocked (non-HTTPS)", url, null);
                 showToast("Only HTTPS pages open here. HTTP is blocked; site exceptions need a separate request.");
@@ -2399,7 +2463,12 @@ public final class MainActivity extends Activity {
                     browserPageLoading = false;
                     cancelBrowserLoadWatchdog();
                 }
-                postActivityCallback(MainActivity.this::showBrowserOfflineStatus);
+                postActivityCallback(() -> {
+                    showBrowserOfflineStatus();
+                    showBrowserNotice(nextBrowserNoticeId("offline-blocked"), "Offline mode",
+                            "This navigation was blocked because remote browsing is currently disabled.",
+                            BrowserAddressNotice.Severity.WARNING, true, java.util.Collections.emptyList());
+                });
             }
 
             @Override public void onHttpNavigationBlocked(String url, boolean redirect) {
@@ -2411,6 +2480,9 @@ public final class MainActivity extends Activity {
                         ? "An HTTP redirect/downgrade was blocked. No insecure page was opened."
                         : "An HTTP page navigation was blocked. No insecure page was opened.";
                 postActivityCallback(() -> {
+                    showBrowserNotice(nextBrowserNoticeId("http-blocked"), "Insecure navigation blocked",
+                            message + " Daymark does not open HTTP pages.",
+                            BrowserAddressNotice.Severity.WARNING, true, java.util.Collections.emptyList());
                     showBrowserStatus(message + " Only HTTPS is supported. A per-site exception requires a separate explicit request.");
                     browserDiagnostics.record(System.currentTimeMillis(), "navigation blocked (HTTP)", url, message);
                     showToast("Insecure HTTP navigation blocked. Use HTTPS instead.");
@@ -2422,6 +2494,16 @@ public final class MainActivity extends Activity {
                 cancelBrowserLoadWatchdog();
                 browserPageLoading = false;
                 browserLoadFailed = true;
+                if (errorCode == -1) {
+                    showBrowserNotice(nextBrowserNoticeId("certificate-error"),
+                            "Certificate validation failed",
+                            "Daymark cancelled this connection. The certificate error was not bypassed. "
+                                    + "Leave the site or try again after the website fixes its certificate.",
+                            BrowserAddressNotice.Severity.CRITICAL, false, java.util.Collections.emptyList());
+                } else {
+                    showBrowserRetryNotice("load-error", "Page failed to load",
+                            "The page could not be loaded. You can retry the current HTTPS address.");
+                }
                 Log.e(BROWSER_LOG_TAG, "load failed: code=" + errorCode
                         + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl));
                 browserDiagnostics.record(System.currentTimeMillis(), "load failed", failingUrl,
