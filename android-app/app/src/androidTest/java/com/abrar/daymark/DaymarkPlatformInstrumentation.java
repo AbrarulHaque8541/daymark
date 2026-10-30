@@ -138,14 +138,22 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 "fired reminder retains its canonical request code");
 
         TaskReminderScheduler.ensureChannel(context);
+        check(manager.areNotificationsEnabled(),
+                "app-level notifications are enabled on the scratch emulator");
+        android.app.NotificationChannel reminderChannel =
+                manager.getNotificationChannel(TaskReminderScheduler.CHANNEL_ID);
+        check(reminderChannel != null
+                        && reminderChannel.getImportance() != android.app.NotificationManager.IMPORTANCE_NONE,
+                "reminder notification channel exists and is enabled");
         postTestReminder(manager, context, notificationId, task, fire.toString());
-        check(hasActiveNotification(manager, notificationId),
-                "synthetic reminder notification is active before reconciliation");
+        check(awaitNotificationState(manager, notificationId, true),
+                "synthetic reminder notification becomes active before reconciliation");
 
         Task renamed = task.withDetails("Reminder updated", task.dueDate, task.priority,
                 java.time.Instant.now().toString());
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
-        android.app.Notification refreshed = activeNotification(manager, notificationId);
+        android.app.Notification refreshed = awaitNotificationTitle(
+                manager, notificationId, renamed.title);
         check(refreshed != null && renamed.title.equals(
                         refreshed.extras.getString(android.app.Notification.EXTRA_TITLE)),
                 "title-only task edit refreshes the active reminder notification");
@@ -156,7 +164,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
         check(notificationId.equals(TaskReminderScheduler.getNotificationId(context, task.id)),
                 "valid active notification recovers a lost canonical ID index");
-        check(hasActiveNotification(manager, notificationId),
+        check(awaitNotificationState(manager, notificationId, true),
                 "index recovery preserves the matching active notification");
 
         check(TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString()),
@@ -176,7 +184,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(moved));
         check(TaskReminderScheduler.snoozeRecord(context, task.id) == null,
                 "due-date edit invalidates the previous occurrence's snooze");
-        check(!hasActiveNotification(manager, notificationId),
+        check(awaitNotificationState(manager, notificationId, false),
                 "old occurrence notification is removed after due-date edit");
 
         java.time.Instant movedFire = ReminderSchedulePolicy.baseFire(moved, zone);
@@ -184,7 +192,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         postTestReminder(manager, context, notificationId, moved, movedFire.toString());
         Task completed = TaskLogic.toggleCompleted(moved);
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(completed));
-        check(!hasActiveNotification(manager, notificationId),
+        check(awaitNotificationState(manager, notificationId, false),
                 "notification is canceled when its task is completed");
         check(TaskReminderScheduler.getNotificationId(context, task.id) == null,
                 "completed task releases its canonical reminder ID");
@@ -199,7 +207,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
                 .edit().remove(deleted.id).commit();
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
-        check(!hasActiveNotification(manager, deletedId),
+        check(awaitNotificationState(manager, deletedId, false),
                 "posted notification is removed for a deleted task even when its ID index is missing");
 
         Task malformedIndex = TaskLogic.create("Malformed reminder index", "2099-12-04",
@@ -240,7 +248,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         };
         TaskReminderScheduler.rescheduleAll(noAlarmManager, Collections.emptyList());
-        check(!hasActiveNotification(manager, orphanNotificationId),
+        check(awaitNotificationState(manager, orphanNotificationId, false),
                 "notification reconciliation still runs when AlarmManager is unavailable");
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
     }
@@ -261,6 +269,28 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private static boolean hasActiveNotification(android.app.NotificationManager manager, int id) {
         return activeNotification(manager, id) != null;
+    }
+
+    private static boolean awaitNotificationState(android.app.NotificationManager manager,
+            int id, boolean expectedActive) throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            if (hasActiveNotification(manager, id) == expectedActive) return true;
+            Thread.sleep(100L);
+        }
+        return hasActiveNotification(manager, id) == expectedActive;
+    }
+
+    private static android.app.Notification awaitNotificationTitle(
+            android.app.NotificationManager manager, int id, String expectedTitle)
+            throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            android.app.Notification notification = activeNotification(manager, id);
+            if (notification != null && notification.extras != null
+                    && expectedTitle.equals(notification.extras.getString(
+                            android.app.Notification.EXTRA_TITLE))) return notification;
+            Thread.sleep(100L);
+        }
+        return activeNotification(manager, id);
     }
 
     private static android.app.Notification activeNotification(
