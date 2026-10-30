@@ -1,4 +1,3 @@
-#!/usr/bin/env sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BUILD_DIR=$(mktemp -d "daymark-core-tests.XXXXXX")
@@ -113,3 +112,5 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDiagnosticsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ExtensionPackageParserSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserCookieImportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CosmeticFilterToCssSmoke
+
+# Retrigger CI: previous build job hit the 60-minute job timeout on a congested runner.
