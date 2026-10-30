@@ -42,7 +42,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run real Android platform instrumentation on emulator
+      - name: Install app and instrumentation APKs, then execute the platform runner
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
@@ -54,4 +54,17 @@ jobs:
           working-directory: android-app
           script: |
             chmod +x gradlew
-            ./gradlew --no-daemon connectedGithubSideloadDebugAndroidTest
+            ./gradlew --no-daemon installGithubSideloadDebug installGithubSideloadDebugAndroidTest
+            instrumentation="$(adb shell pm list instrumentation | tr -d '\\r' | sed -n 's/^instrumentation:\\([^ ]*DaymarkPlatformInstrumentation\\).*/\\1/p' | head -n 1)"
+            if [ -z "$instrumentation" ]; then
+              echo "DaymarkPlatformInstrumentation was not installed" >&2
+              adb shell pm list instrumentation
+              exit 1
+            fi
+            echo "Running Android instrumentation component: $instrumentation"
+            output="$(adb shell am instrument -w -r "$instrumentation" 2>&1)" || {
+              printf '%s\\n' "$output"
+              exit 1
+            }
+            printf '%s\\n' "$output"
+            printf '%s\\n' "$output" | grep -q 'INSTRUMENTATION_RESULT: result=passed'
