@@ -134,8 +134,11 @@ public final class GitHubReleaseClient implements UpdaterCore.ReleaseClient {
         } catch (UpdaterCore.UpdateException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            throw new UpdaterCore.UpdateException(UpdaterCore.Failure.INVALID_METADATA,
-                    "GitHub returned invalid release metadata.", exception);
+            String detail = exception.getMessage();
+            String message = detail == null || detail.trim().isEmpty()
+                    ? "GitHub returned invalid release metadata."
+                    : "GitHub returned invalid release metadata: " + detail;
+            throw new UpdaterCore.UpdateException(UpdaterCore.Failure.INVALID_METADATA, message, exception);
         }
     }
 
