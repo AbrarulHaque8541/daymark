@@ -123,6 +123,8 @@ assert "due-date edit invalidates the previous occurrence's snooze" in instrumen
 assert "deleted task even when its ID index is missing" in instrumentation
 assert "deleted-task notification is active before its ID index is lost" in instrumentation
 assert "orphan notification is active before AlarmManager-less reconciliation" in instrumentation
+assert "Dismiss action removes only the visible reminder notification" in instrumentation
+assert "Dismiss leaves the task's canonical reminder identity intact" in instrumentation
 assert "edited-task notification is active before completion reconciliation" in instrumentation
 assert "malformed request-code preference is repaired without aborting other reminders" in instrumentation
 assert "wrong-typed snooze preference is discarded without aborting reconciliation" in instrumentation
