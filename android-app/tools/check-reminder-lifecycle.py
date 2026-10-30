@@ -110,6 +110,12 @@ assert "ReminderSchedulePolicySmoke.java" in core_runner
 assert "com.abrar.daymark.ReminderSchedulePolicySmoke" in core_runner
 assert "postTestReminder(manager, context, notificationId, task, fire.toString())" in instrumentation
 assert "fire != null && !fire.isAfter(java.time.Instant.now())" in instrumentation, "snooze fixture must represent a reminder whose base occurrence has fired"
+assert "manager.areNotificationsEnabled()" in instrumentation
+assert "reminderChannel.getImportance() != android.app.NotificationManager.IMPORTANCE_NONE" in instrumentation
+assert "awaitNotificationState(manager, notificationId, true)" in instrumentation
+assert "awaitNotificationTitle(" in instrumentation
+assert "cmd appops set com.abrar.daymark POST_NOTIFICATION allow" in (root / "tools/run-reminder-lifecycle-instrumentation.sh").read_text(encoding="utf-8")
+assert "dumpsys notification --noredact" in (root / "tools/run-reminder-lifecycle-instrumentation.sh").read_text(encoding="utf-8")
 assert "valid active notification recovers a lost canonical ID index" in instrumentation
 assert "TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString())" in instrumentation
 assert "app rescheduling preserves a valid snooze instead of overwriting it" in instrumentation
