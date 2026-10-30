@@ -108,7 +108,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         taskName.setBackground(round(SURFACE_HI, 22));
         taskName.setClickable(true);
         taskName.setFocusable(true);
-        taskName.setOnClickListener(v -> { sounds.onSelection(); listener.onChooseTask(); });
+        taskName.setOnClickListener(v -> { if (closed) return; sounds.onSelection(); listener.onChooseTask(); });
         LayoutParams taskLp = wrapWrap();
         taskLp.gravity = Gravity.CENTER_HORIZONTAL;
         taskLp.topMargin = dp(16);
@@ -217,7 +217,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         timeValue.setContentDescription("Focus timer value");
         primaryAction.setOnClickListener(v -> performPrimaryAction());
         stopAction.setOnClickListener(v -> {
-            if (timer != null && !timer.isFinished()) {
+            if (!closed && timer != null && !timer.isFinished()) {
                 sounds.onAction();
                 listener.onStop();
             }
@@ -265,17 +265,20 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     void setTaskLabel(String value) {
+        if (closed) return;
         taskLabel = value == null || value.trim().isEmpty() ? "Choose a task" : value.trim();
         taskName.setText(taskLabel + "  ›");
     }
 
     void setDailySummary(long focusDurationMs, int sessionCount) {
+        if (closed) return;
         long minutes = Math.max(0L, focusDurationMs / 60_000L);
         int safeSessions = Math.max(0, sessionCount);
         dailySummary.setText("TODAY  ·  " + minutes + "m focus  ·  " + safeSessions + " sessions");
     }
 
     void setSoundEnabled(boolean enabled) {
+        if (closed) return;
         soundEnabled = enabled;
         sounds.setEnabled(enabled);
         soundToggle.setText((enabled ? "●  " : "○  ") + "Soft interaction sounds");
@@ -283,12 +286,14 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     void setFinalTicksEnabled(boolean enabled) {
+        if (closed) return;
         finalTicksEnabled = enabled;
         sounds.setFinalTicksEnabled(enabled);
         tickToggle.setText((enabled ? "●  " : "○  ") + "Final 10-second ticks");
     }
 
     void render(TaskFocusTimer value, long nowElapsedRealtimeMs) {
+        if (closed) return;
         timer = value;
         boolean active = value != null && !value.isFinished();
         if (value == null) {
@@ -329,6 +334,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private void performPrimaryAction() {
+        if (closed) return;
         sounds.onAction();
         if (timer == null || timer.isFinished()) {
             sounds.resetForNewSession();
@@ -343,7 +349,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private void chooseMode(TaskFocusTimer.Mode mode) {
-        if (timer != null && !timer.isFinished()) return;
+        if (closed || timer != null && !timer.isFinished()) return;
         selectedMode = mode;
         sounds.onSelection();
         modeStopwatch.setBackground(round(mode == TaskFocusTimer.Mode.STOPWATCH ? ACCENT_SOFT : SURFACE, 18));
@@ -354,7 +360,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private void chooseDisplayUnit(DisplayUnit unit) {
-        if (unit == null) return;
+        if (closed || unit == null) return;
         displayUnit = unit;
         sounds.onSelection();
         String[] names = {"Auto", "Seconds", "Minutes", "Hours"};
@@ -397,7 +403,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private void showCustomDuration() {
-        if (timer != null && !timer.isFinished()) return;
+        if (closed || timer != null && !timer.isFinished()) return;
         EditText input = new EditText(getContext());
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setSingleLine(true);
@@ -428,6 +434,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(v -> {
+                    if (closed) { dialog.dismiss(); return; }
                     try {
                         long amount = Long.parseLong(input.getText().toString().trim());
                         long multiplier = units.getCheckedRadioButtonId() == unitIds[0] ? 1000L
