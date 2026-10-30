@@ -108,9 +108,17 @@ final class TaskFocusTimerNotification {
     private static boolean canRequestLiveUpdate(Context context, NotificationManager manager) {
         // Live Update promotion is enabled only in the GitHub sideload flavor, which declares
         // POST_PROMOTED_NOTIFICATIONS. Play keeps the ordinary progress notification fallback.
-        return Build.VERSION.SDK_INT >= 36
-                && "githubSideload".equals(BuildConfig.FLAVOR)
-                && Api36.canPromote(manager);
+        if (Build.VERSION.SDK_INT < 36
+                || !"githubSideload".equals(BuildConfig.FLAVOR)) {
+            return false;
+        }
+        // Promoted-ongoing eligibility APIs are part of the Android 16 (36.1)
+        // extension. API 36.0 devices must keep the standard notification path;
+        // calling canPostPromotedNotifications() before extension 1 can fail at runtime.
+        if (android.os.ext.SdkExtensions.getExtensionVersion(Build.VERSION_CODES.BAKLAVA) < 1) {
+            return false;
+        }
+        return Api36.canPromote(manager);
     }
 
     private static String safeTitle(String title) {
