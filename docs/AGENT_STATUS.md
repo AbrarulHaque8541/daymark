@@ -4,6 +4,16 @@
 
 ## Latest reviewed snapshot
 
+- [Daymark status snapshot — 2026-10-30T11:59:44.268Z](./CURRENT_STATUS_20261030T1200Z.md)
+
+- [Daymark status snapshot — 2026-10-30T11:57:57.578Z](./CURRENT_STATUS_20261030T115757Z.md)
+
+- [Daymark status snapshot — 2026-10-30T10:50Z](./CURRENT_STATUS_20261030_1050Z.md)
+
+- [Daymark status snapshot — 2026-10-30T10:16:25Z](./CURRENT_STATUS_20261030_101625Z.md)
+
+- [Daymark status snapshot — 2026-10-30T09:26Z](./CURRENT_STATUS_20261030_0926Z.md)
+
 - [Daymark status snapshot — 2026-10-30T06:08:51Z](./CURRENT_STATUS_20261030_060851Z.md)
 
 - [Daymark status snapshot — 2026-10-30 0418 UTC](CURRENT_STATUS_2026-10-30_0418Z.md)
@@ -32,13 +42,13 @@
 
 - [Daymark status snapshot — 2026-10-13 1635 UTC](CURRENT_STATUS_2026-10-13_1635Z.md)
 
-- [Daymark status snapshot — 2026-10-13 14:17:30.287 UTC](CURRENT_STATUS_2026-10-13_1417Z.md)
+- [Daymark status snapshot — 2026-10-13 14:17:30.287 UTC](CURRENT_STATUS_20261013_1417Z.md)
 
 ## Before acting
 
 1. Open the latest snapshot for context.
 2. Re-check live `main`, Releases/tags, relevant issues and PRs, exact PR head SHA, and Actions runs.
-3. If live evidence disagrees with the snapshot, trust live evidence for current state, record the discrepancy, and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
+3. If live evidence disagrees with the snapshot, trust live evidence, record the discrepancy, and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
 
 ## Snapshot maintenance
 
@@ -46,4 +56,4 @@
 - Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
 - Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
-- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object/build.
+- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
