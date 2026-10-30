@@ -82,13 +82,16 @@ final class BrowserCookieImport {
         final int rejectedLineCount;
         final boolean rejectionListTruncated;
         final boolean recognizedFormat;
+        final boolean inputTruncated;
 
-        ParseResult(List<Cookie> cookies, RejectionAccumulator rejected, boolean recognizedFormat) {
+        ParseResult(List<Cookie> cookies, RejectionAccumulator rejected, boolean recognizedFormat,
+                    boolean inputTruncated) {
             this.cookies = Collections.unmodifiableList(new ArrayList<>(cookies));
             this.rejectedLines = Collections.unmodifiableList(new ArrayList<>(rejected.lines));
             this.rejectedLineCount = rejected.count;
             this.rejectionListTruncated = rejected.truncated;
             this.recognizedFormat = recognizedFormat;
+            this.inputTruncated = inputTruncated;
         }
 
         boolean isEmpty() {
@@ -118,15 +121,17 @@ final class BrowserCookieImport {
         RejectionAccumulator rejected = new RejectionAccumulator();
         if (input == null || input.length() > MAX_FILE_CHARS) {
             rejected.add(1, Rejection.MALFORMED_FIELDS);
-            return new ParseResult(cookies, rejected, false);
+            return new ParseResult(cookies, rejected, false, true);
         }
 
         boolean recognized = false;
+        boolean inputTruncated = false;
         int offset = 0;
         int lineNumber = 1;
         while (offset <= input.length()) {
             if (lineNumber > MAX_LINES) {
                 rejected.add(lineNumber, Rejection.TOO_MANY_LINES);
+                inputTruncated = true;
                 break;
             }
 
@@ -196,6 +201,7 @@ final class BrowserCookieImport {
                                                 rejected.add(lineNumber, Rejection.INVALID_VALUE);
                                             } else if (cookies.size() >= MAX_COOKIES) {
                                                 rejected.add(lineNumber, Rejection.TOO_MANY_COOKIES);
+                                                inputTruncated = true;
                                                 break;
                                             } else {
                                                 cookies.add(new Cookie(domain,
@@ -219,7 +225,7 @@ final class BrowserCookieImport {
             lineNumber++;
             if (offset >= input.length()) break;
         }
-        return new ParseResult(cookies, rejected, recognized);
+        return new ParseResult(cookies, rejected, recognized, inputTruncated);
     }
 
     static boolean isValidDomain(String domain) {
