@@ -13,7 +13,11 @@ required_panel = [
     "primaryAction.setEnabled(true)",
     "int background, int surface, int surfaceAlt, int text, int muted",
     "int accent, int accentSoft, int warning",
-    "ACCENT_SOFT",
+    "ACCENT_SOFT", "DisplayUnit { AUTO, SECONDS, MINUTES, HOURS }",
+    "TIME DISPLAY", "chooseDisplayUnit", "formatFixedUnit",
+    "return totalSeconds + \" sec\";", "\"min\"", "\"hr\"",
+    "RadioGroup units", "Maximum duration is 24 hours.",
+    "TaskFocusTimer.MAX_COUNTDOWN_MS / multiplier",
 ]
 for token in required_panel:
     assert token in panel, f"Focus Timer panel missing contract: {token}"
