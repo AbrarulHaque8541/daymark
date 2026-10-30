@@ -164,10 +164,8 @@ final class BrowserCookieImport {
                             } else if (!"TRUE".equalsIgnoreCase(fields[1])
                                     && !"FALSE".equalsIgnoreCase(fields[1])) {
                                 rejected.add(lineNumber, Rejection.INVALID_DOMAIN_FLAG);
-                            } else if (leadingDot != "TRUE".equalsIgnoreCase(fields[1])) {
-                                // Netscape's leading-dot and include-subdomains flag must agree.
-                                rejected.add(lineNumber, Rejection.INVALID_DOMAIN_FLAG);
                             } else {
+                                // The flag is authoritative; the historical leading dot is optional.
                                 String path = fields[2];
                                 if (!isValidPath(path)) {
                                     rejected.add(lineNumber, Rejection.INVALID_PATH);
@@ -219,6 +217,7 @@ final class BrowserCookieImport {
             if (newline < 0) break;
             offset = newline + 1;
             lineNumber++;
+            if (offset >= input.length()) break;
         }
         return new ParseResult(cookies, rejected, recognized);
     }
