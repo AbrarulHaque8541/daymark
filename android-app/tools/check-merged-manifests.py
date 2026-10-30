@@ -21,6 +21,7 @@ main_perms = get_permissions(main_manifest)
 assert main_perms == {
     "android.permission.INTERNET",
     "android.permission.POST_NOTIFICATIONS",
+    "android.permission.POST_PROMOTED_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.VIBRATE",
 }, f"main manifest unexpected perms: {main_perms}"
@@ -73,4 +74,4 @@ if sideload_merged:
     assert sideload_merged_app.get(android_ns + "usesCleartextTraffic") == "false", "Sideload merged cleartext must be false"
     print("PASS Sideload merged manifest check: INTERNET=YES, ACCESS_NETWORK_STATE=YES, reminder perms=YES, cleartext=false")
 
-print("PASS manifest architecture policy: Play and Sideload inherit INTERNET for WebView plus the POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE task-reminder permissions; Sideload alone adds ACCESS_NETWORK_STATE")
+print("PASS manifest architecture policy: Play and Sideload inherit INTERNET for WebView plus the POST_NOTIFICATIONS/POST_PROMOTED_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE task-reminder permissions; Sideload alone adds ACCESS_NETWORK_STATE")
