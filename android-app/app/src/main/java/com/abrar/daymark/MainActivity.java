@@ -7991,7 +7991,12 @@ public final class MainActivity extends Activity {
             case NETWORK_POLICY:
                 return "Wi-Fi only was selected. Connect to Wi-Fi or explicitly allow mobile data before downloading. No APK was saved.";
             case INVALID_METADATA:
-                return "The GitHub release metadata was incomplete or invalid. No APK was downloaded.";
+                return "GitHub release metadata could not be validated. No APK was downloaded. Details: "
+                        + (error.getMessage() == null ? "unknown metadata validation error" : error.getMessage());
+            case INCOMPATIBLE_INSTALL:
+                return "This installed Daymark package cannot be updated by the current release channel. "
+                        + "Your existing app and encrypted tasks are untouched. Do not uninstall it; "
+                        + "a compatible migration path is required.";
             case HTTP:
                 return "GitHub did not return a usable release response. No APK was downloaded.";
             case APK_MISMATCH:
