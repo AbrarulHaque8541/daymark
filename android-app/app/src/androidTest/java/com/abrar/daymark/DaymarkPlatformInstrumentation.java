@@ -66,6 +66,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
             runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
             runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
+            // Exercise the real Android Keystore, AtomicFile and NotificationManager on API 29 and 36 emulators.
             runPhase("focus-timer-keystore-notification-lifecycle", this::focusTimerKeystoreAndNotificationLifecycle);
             marker("all phases passed; " + assertions + " assertions");
             result.putString("result", "passed");
