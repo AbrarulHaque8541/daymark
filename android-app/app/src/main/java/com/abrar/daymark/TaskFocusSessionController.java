@@ -49,6 +49,10 @@ final class TaskFocusSessionController {
     synchronized TaskFocusTimer start(String taskId, String taskTitle,
                                       TaskFocusTimer.Mode mode, long targetDurationMs)
             throws Exception {
+        TaskFocusTimer existing = loadCurrent();
+        if (existing != null && !existing.isFinished()) {
+            throw new IllegalStateException("Finish the existing focus session before starting another.");
+        }
         long now = clock.elapsedRealtimeMs();
         TaskFocusTimer timer = TaskFocusTimer.start(taskId, mode, targetDurationMs, now);
         persist(timer);
@@ -58,7 +62,7 @@ final class TaskFocusSessionController {
 
     /** Pauses a running session and removes its ongoing notification. */
     synchronized TaskFocusTimer pause(TaskFocusTimer timer) throws Exception {
-        requireTimer(timer);
+        requireCurrent(timer, TaskFocusTimer.Status.RUNNING);
         TaskFocusTimer paused = timer.pause(clock.elapsedRealtimeMs());
         persist(paused);
         notifications.cancel();
@@ -67,7 +71,7 @@ final class TaskFocusSessionController {
 
     /** Resumes only a paused session after an explicit user Resume action. */
     synchronized TaskFocusTimer resume(TaskFocusTimer timer, String taskTitle) throws Exception {
-        requireTimer(timer);
+        requireCurrent(timer, TaskFocusTimer.Status.PAUSED);
         long now = clock.elapsedRealtimeMs();
         TaskFocusTimer running = timer.resume(now);
         persist(running);
@@ -81,30 +85,57 @@ final class TaskFocusSessionController {
      */
     synchronized TaskFocusTimer restore(String taskTitle) throws Exception {
         long nowElapsed = clock.elapsedRealtimeMs();
-        TaskFocusTimer restored = store.load(nowElapsed, clock.wallClockMs(), clock.bootCount());
+        final TaskFocusTimer restored;
+        try {
+            restored = store.load(nowElapsed, clock.wallClockMs(), clock.bootCount());
+        } catch (Exception exception) {
+            // Fail closed: a corrupt/unreadable snapshot must not leave an old ongoing notification.
+            notifications.cancel();
+            throw exception;
+        }
         if (restored == null) {
             notifications.cancel();
             return null;
         }
-        if (restored.isRunning() && restored.isCountdown() && restored.isExpiredAt(nowElapsed)) {
-            restored = restored.finish(nowElapsed);
-            persist(restored);
+        TaskFocusTimer current = restored;
+        if (current.isRunning() && current.isCountdown() && current.isExpiredAt(nowElapsed)) {
+            current = current.finish(nowElapsed);
+            persist(current);
         }
-        if (restored.isRunning()) {
-            publishIfRunning(restored, taskTitle, nowElapsed);
+        if (current.isRunning()) {
+            publishIfRunning(current, taskTitle, nowElapsed);
         } else {
             notifications.cancel();
         }
-        return restored;
+        return current;
     }
 
     /** Finishes the focus session only; it never marks the task complete. */
     synchronized TaskFocusTimer finish(TaskFocusTimer timer) throws Exception {
         requireTimer(timer);
+        TaskFocusTimer persisted = loadCurrent();
+        if (persisted == null || !persisted.taskId().equals(timer.taskId())
+                || persisted.isFinished()) {
+            throw new IllegalStateException("The focus session is no longer active.");
+        }
         TaskFocusTimer finished = timer.finish(clock.elapsedRealtimeMs());
         store.clear(clock.elapsedRealtimeMs(), clock.wallClockMs(), clock.bootCount());
         notifications.cancel();
         return finished;
+    }
+
+    private TaskFocusTimer loadCurrent() throws Exception {
+        return store.load(clock.elapsedRealtimeMs(), clock.wallClockMs(), clock.bootCount());
+    }
+
+    private void requireCurrent(TaskFocusTimer timer, TaskFocusTimer.Status expected)
+            throws Exception {
+        requireTimer(timer);
+        TaskFocusTimer persisted = loadCurrent();
+        if (persisted == null || !persisted.taskId().equals(timer.taskId())
+                || persisted.status() != expected) {
+            throw new IllegalStateException("The saved focus session changed; restore it before acting.");
+        }
     }
 
     private void persist(TaskFocusTimer timer) throws Exception {
