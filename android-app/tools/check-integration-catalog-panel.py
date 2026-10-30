@@ -12,7 +12,7 @@ for token in ("Search integrations", "renderEntries()", "renderFamilies()",
               "listener.onUse(entry)", "action.setEnabled(false)",
               "entry.statusLabel()", "No matching integrations."):
     assert token in panel, f"Connections panel missing contract: {token}"
-assert "entry.availability == Availability.AVAILABLE" in catalog
+assert "return availability == Availability.AVAILABLE;" in catalog
 assert "setEnabled(true)" not in panel, "only the positive canConnect branch may enable an action"
 for forbidden in ("HttpURLConnection", "SharedPreferences", "OAuthTokenVault", "startActivity("):
     assert forbidden not in panel, f"catalog UI must not perform hidden connection work: {forbidden}"
