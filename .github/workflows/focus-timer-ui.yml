@@ -1,0 +1,32 @@
+name: Focus Timer UI and Sound
+on:
+  pull_request:
+    paths:
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerSoundscape.java"
+      - "android-app/tools/check-focus-timer-ui.py"
+      - ".github/workflows/focus-timer-ui.yml"
+  push:
+    branches:
+      - "feat/focus-timer-2027-ui-sound-20261030"
+permissions:
+  contents: read
+jobs:
+  focus-timer-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Focus Timer UI and sound contract
+        run: python3 android-app/tools/check-focus-timer-ui.py
+      - name: Assemble Android debug app
+        working-directory: android-app
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
