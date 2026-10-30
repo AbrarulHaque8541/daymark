@@ -62,7 +62,7 @@ test('returned profile arrays are immutable snapshots', () => {
 
 test('Java and JavaScript device policies share one cross-platform fixture contract', () => {
   const fixture = path.join(__dirname, '..', 'contracts', 'device-capability-policy.tsv');
-  const lines = fs.readFileSync(fixture, 'utf8').split(/\\r?\\n/);
+  const lines = fs.readFileSync(fixture, 'utf8').split(/\r?\n/);
   let cases = 0;
   for (const [index, line] of lines.entries()) {
     if (!line || line.startsWith('#')) continue;
