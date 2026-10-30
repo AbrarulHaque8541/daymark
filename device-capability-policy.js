@@ -62,4 +62,6 @@ function createDeviceCapabilityProfile(input) {
   });
 }
 
-module.exports = { SURFACES, DISPLAYS, INPUTS, FEATURES, createDeviceCapabilityProfile };
+const api = Object.freeze({ SURFACES, DISPLAYS, INPUTS, FEATURES, createDeviceCapabilityProfile });
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+if (typeof globalThis !== 'undefined') globalThis.DaymarkDeviceCapabilityPolicy = api;
