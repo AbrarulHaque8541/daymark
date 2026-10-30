@@ -12,16 +12,19 @@ public final class BrowserCookieImportPolicySmoke {
                 + "#HttpOnly_secure.example.com\tFALSE\t/account\tTRUE\t0\tsecret\tvalue=1\n"
                 + "host.example.com\tFALSE\t/\tFALSE\t0\t__Secure-missing\tno\n"
                 + "host.example.com\tFALSE\t/\tFALSE\t0\t__Host-bad\tno\n"
+                + "host.example.com\tFALSE\t/\tTRUE\t0\t__Host-valid\tgood\n"
+                + "badhost.example.com\tTRUE\t/\tTRUE\t0\t__Host-domain\tno\n"
+                + "badpath.example.com\tFALSE\t/sub\tTRUE\t0\t__Host-path\tno\n"
                 + "expired.example.com\tFALSE\t/\tFALSE\t1\told\tvalue\n";
         BrowserCookieImport.ParseResult parsed = BrowserCookieImport.parse(export);
         BrowserCookieImportPolicy.Preview preview =
                 BrowserCookieImportPolicy.createPreview(parsed, 1800000000L);
 
-        assert preview.importableCookieCount == 2 : preview.importableCookieCount;
+        assert preview.importableCookieCount == 3 : preview.importableCookieCount;
         assert preview.expiredCookieCount == 1 : preview.expiredCookieCount;
-        assert preview.prefixRejectedCookieCount == 2 : preview.prefixRejectedCookieCount;
+        assert preview.prefixRejectedCookieCount == 4 : preview.prefixRejectedCookieCount;
         assert preview.rejectedLineCount == 0;
-        assert preview.domains.size() == 2;
+        assert preview.domains.size() == 3;
         assert "example.com".equals(preview.domains.get(0).domain);
         assert "secure.example.com".equals(preview.domains.get(1).domain);
         assert preview.domains.get(0).secureCount == 1;
@@ -43,12 +46,19 @@ public final class BrowserCookieImportPolicySmoke {
         assert domainCookie.endsWith("; Secure");
         assert !domainCookie.contains("HttpOnly");
 
-        BrowserCookieImport.Cookie hostOnly = preview.domains.get(1).cookies.get(0);
+        BrowserCookieImport.Cookie hostOnly = preview.domains.get(2).cookies.get(0);
         String hostHeader = BrowserCookieImportPolicy.buildSetCookieHeader(hostOnly, 1800000000L);
         assert hostHeader.startsWith("secret=value=1; Path=/account");
         assert !hostHeader.contains("Domain=");
         assert !hostHeader.contains("Expires=");
         assert hostHeader.endsWith("; Secure; HttpOnly");
+
+        BrowserCookieImport.Cookie hostPrefix = preview.domains.get(1).cookies.get(0);
+        assert "__Host-valid".equals(hostPrefix.name);
+        String hostPrefixHeader = BrowserCookieImportPolicy.buildSetCookieHeader(hostPrefix, 1800000000L);
+        assert hostPrefixHeader != null && hostPrefixHeader.startsWith("__Host-valid=good; Path=/;");
+        assert hostPrefixHeader.endsWith("; Secure");
+        assert !hostPrefixHeader.contains("Domain=");
 
         BrowserCookieImport.ParseResult tooManyDomains = BrowserCookieImport.parse(
                 makeManyDomains(BrowserCookieImportPolicy.MAX_PREVIEW_DOMAINS + 1));
