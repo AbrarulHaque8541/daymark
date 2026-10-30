@@ -701,10 +701,9 @@ public final class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     private void handleShareInIntent(Intent intent) {
         if (intent == null) return;
-        String action = intent.getAction();
-        boolean send = Intent.ACTION_SEND.equals(action);
-        boolean sendMultiple = Intent.ACTION_SEND_MULTIPLE.equals(action);
-        boolean processText = Intent.ACTION_PROCESS_TEXT.equals(action);
+        boolean send = Intent.ACTION_SEND.equals(intent.getAction());
+        boolean sendMultiple = Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction());
+        boolean processText = Intent.ACTION_PROCESS_TEXT.equals(intent.getAction());
         if (!send && !sendMultiple && !processText) return;
 
         CharSequence shared = processText
