@@ -18,7 +18,7 @@ for marker in (
     "BrowserCookieImport.parse(text)",
     "CookieManager.getInstance()",
     "cookieManager.setCookie(",
-    "CookieManager.getInstance().flush()",
+    "cookieManager.flush()",
     "Cookie import preview",
     "Confirm cookie import",
     "I understand these cookies are session credentials.",
