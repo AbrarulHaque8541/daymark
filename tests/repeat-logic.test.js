@@ -25,9 +25,12 @@ test('daily repeat never lands in the past even after a long gap', () => {
   assert.equal(repeat.nextDueDate('2026-09-01', 'daily', '2026-10-30'), '2026-10-30');
 });
 
-test('weekly repeat keeps the weekday and stays ahead of today', () => {
+test('weekly repeat keeps the weekday and can land on today', () => {
+  // Due Friday 2026-10-30, completed today: the next Friday is 2026-11-06.
   assert.equal(repeat.nextDueDate('2026-10-30', 'weekly', '2026-10-30'), '2026-11-06');
-  assert.equal(repeat.nextDueDate('2026-10-09', 'weekly', '2026-10-30'), '2026-11-06');
+  // Missed two Fridays from 2026-10-09; the next occurrence is Friday
+  // 2026-10-30 itself (today), consistent with the daily catch-up rule.
+  assert.equal(repeat.nextDueDate('2026-10-09', 'weekly', '2026-10-30'), '2026-10-30');
 });
 
 test('monthly repeat lands on the same day of the next month', () => {
