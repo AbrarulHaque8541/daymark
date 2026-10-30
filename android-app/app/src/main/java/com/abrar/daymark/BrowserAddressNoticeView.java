@@ -55,7 +55,7 @@ final class BrowserAddressNoticeView extends LinearLayout {
     private SiteInfoListener siteInfoListener;
     private int maxInlineWidthPx;
     private boolean disposed;
-    private boolean detached;
+    private boolean detached = true;
 
     BrowserAddressNoticeView(Context context) {
         this(context, null);
@@ -95,7 +95,7 @@ final class BrowserAddressNoticeView extends LinearLayout {
         inlineLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         inlineLabel.setTextColor(themeColor(android.R.attr.textColorPrimary, Color.BLACK));
         inlineLabel.setPadding(dp(9), 0, dp(9), 0);
-        inlineLabel.setMinHeight(dp(40));
+        inlineLabel.setMinHeight(dp(48));
         inlineLabel.setMaxWidth(maxInlineWidthPx);
         inlineLabel.setBackground(capsuleBackground());
         inlineLabel.setVisibility(GONE);
@@ -103,7 +103,7 @@ final class BrowserAddressNoticeView extends LinearLayout {
         inlineLabel.setClickable(true);
         inlineLabel.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         inlineLabel.setOnClickListener(view -> openPanel());
-        addView(inlineLabel, new LayoutParams(0, dp(40)));
+        addView(inlineLabel, new LayoutParams(0, dp(48)));
     }
 
     void setActionListener(ActionListener listener) {
@@ -379,7 +379,7 @@ final class BrowserAddressNoticeView extends LinearLayout {
     }
 
     private GradientDrawable capsuleBackground() {
-        return roundedBackground(dp(18));
+        return roundedBackground(dp(24));
     }
 
     private GradientDrawable panelBackground() {

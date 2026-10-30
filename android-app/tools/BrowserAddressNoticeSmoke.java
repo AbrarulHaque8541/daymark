@@ -78,6 +78,6 @@ public final class BrowserAddressNoticeSmoke {
             rejected = true;
         }
         assert rejected : "action ids must be unique";
-        System.out.println("PASS address-bar notice state: inline/panel, duplicate suppression, timeout, critical persistence and explicit resolution");
+        System.out.println("PASS address-bar notice state: inline/panel, duplicate suppression, timeout, critical persistence, replacement guard and explicit resolution");
     }
 }
