@@ -121,6 +121,9 @@ assert "TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toSt
 assert "app rescheduling preserves a valid snooze instead of overwriting it" in instrumentation
 assert "due-date edit invalidates the previous occurrence's snooze" in instrumentation
 assert "deleted task even when its ID index is missing" in instrumentation
+assert "deleted-task notification is active before its ID index is lost" in instrumentation
+assert "orphan notification is active before AlarmManager-less reconciliation" in instrumentation
+assert "edited-task notification is active before completion reconciliation" in instrumentation
 assert "malformed request-code preference is repaired without aborting other reminders" in instrumentation
 assert "wrong-typed snooze preference is discarded without aborting reconciliation" in instrumentation
 assert "wrong-typed request-code counter is reset and a fresh ID is allocated" in instrumentation
