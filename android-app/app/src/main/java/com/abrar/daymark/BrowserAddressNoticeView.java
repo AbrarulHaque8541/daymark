@@ -39,7 +39,8 @@ final class BrowserAddressNoticeView extends LinearLayout {
         void onSiteInfoRequested();
     }
 
-    private static final long INLINE_TIMEOUT_MS = 5000L;
+    private static final long INFO_INLINE_TIMEOUT_MS = 1000L;
+    private static final long WARNING_INLINE_TIMEOUT_MS = 5000L;
     private static final long EXPANSION_DURATION_MS = 180L;
 
     private final BrowserAddressNotice state = new BrowserAddressNotice();
@@ -345,7 +346,9 @@ final class BrowserAddressNoticeView extends LinearLayout {
             timeoutRunnable = null;
             if (state.onInlineTimeout()) renderInline(true);
         };
-        mainHandler.postDelayed(timeoutRunnable, INLINE_TIMEOUT_MS);
+        long timeoutMs = notice.severity == BrowserAddressNotice.Severity.INFO
+                ? INFO_INLINE_TIMEOUT_MS : WARNING_INLINE_TIMEOUT_MS;
+        mainHandler.postDelayed(timeoutRunnable, timeoutMs);
     }
 
     private void cancelTimeout() {
