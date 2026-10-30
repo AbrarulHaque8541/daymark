@@ -150,7 +150,7 @@ final class TaskReminderScheduler {
 
         // Reconcile active app-owned reminder notifications first. This also recovers a missing
         // request-code entry from a valid notification's task ID and notification ID.
-        reconcileActiveNotifications(context, notificationManager, codes, known, liveTasks);
+        reconcileActiveNotifications(context, alarmManager, notificationManager, codes, known, liveTasks);
 
         // Remove alarm slots and snooze state for deleted tasks. Notification cleanup above
         // does not depend on either preference index being present.
@@ -222,7 +222,7 @@ final class TaskReminderScheduler {
         }
     }
 
-    private static void reconcileActiveNotifications(Context context,
+    private static void reconcileActiveNotifications(Context context, AlarmManager alarmManager,
             NotificationManager manager, SharedPreferences codes, Map<String, Object> known,
             Map<String, Task> liveTasks) {
         if (manager == null || Build.VERSION.SDK_INT < 23) return;
@@ -255,6 +255,9 @@ final class TaskReminderScheduler {
                     && !seenTasks.contains(taskId);
             if (!valid) {
                 manager.cancel(posted.getId());
+                if (alarmManager != null && taskId != null) {
+                    cancelAlarm(context, alarmManager, taskId, posted.getId());
+                }
                 continue;
             }
 
