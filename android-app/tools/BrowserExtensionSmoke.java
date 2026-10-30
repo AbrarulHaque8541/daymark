@@ -1,5 +1,6 @@
 package com.abrar.daymark;
 
+
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -43,8 +44,10 @@ public final class BrowserExtensionSmoke {
     }
 
     private static void nonWebUrlsNeverMatch() {
-        check(!BrowserExtension.MatchRules.matches("*://*/*", "http://example.com/"),
-                "cleartext pages are never matched");
+        check(BrowserExtension.MatchRules.matches("*://*/*", "http://example.com/"),
+                "HTTP pages are matched by the all-sites wildcard since HTTP+HTTPS are both allowed");
+        check(BrowserExtension.MatchRules.matches("*://*/*", "https://example.com/"),
+                "HTTPS pages are matched by the all-sites wildcard");
         check(!BrowserExtension.MatchRules.matches("*://*/*", "file:///etc/passwd"),
                 "file URLs are never matched");
         check(!BrowserExtension.MatchRules.matches("*://*/*", "javascript:alert(1)"),
