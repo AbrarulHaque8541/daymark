@@ -169,8 +169,7 @@ final class BrowserCookieImport {
                                 rejected.add(lineNumber, Rejection.INVALID_DOMAIN_FLAG);
                             } else {
                                 String path = fields[2];
-                                if (path.isEmpty() || path.charAt(0) != '/'
-                                        || containsControl(path) || path.indexOf(';') >= 0) {
+                                if (!isValidPath(path)) {
                                     rejected.add(lineNumber, Rejection.INVALID_PATH);
                                 } else if (!"TRUE".equalsIgnoreCase(fields[3])
                                         && !"FALSE".equalsIgnoreCase(fields[3])) {
@@ -224,7 +223,7 @@ final class BrowserCookieImport {
         return new ParseResult(cookies, rejected, recognized);
     }
 
-    private static boolean isValidDomain(String domain) {
+    static boolean isValidDomain(String domain) {
         if (domain.isEmpty() || domain.length() > 253 || domain.startsWith(".")
                 || domain.endsWith(".") || domain.contains("..")) return false;
         String[] labels = domain.split("\\.", -1);
@@ -241,7 +240,7 @@ final class BrowserCookieImport {
         return true;
     }
 
-    private static boolean isValidName(String name) {
+    static boolean isValidName(String name) {
         if (name.isEmpty() || name.length() > 256) return false;
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
@@ -253,7 +252,7 @@ final class BrowserCookieImport {
         return true;
     }
 
-    private static boolean isValidValue(String value) {
+    static boolean isValidValue(String value) {
         // RFC 6265 cookie-octet: printable ASCII except DQUOTE, comma, semicolon and backslash.
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
@@ -262,6 +261,11 @@ final class BrowserCookieImport {
             }
         }
         return true;
+    }
+
+    static boolean isValidPath(String path) {
+        return path != null && !path.isEmpty() && path.charAt(0) == '/'
+                && path.indexOf(';') < 0 && !containsControl(path);
     }
 
     private static boolean containsControl(String value) {
