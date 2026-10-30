@@ -6,17 +6,19 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Strict, UI-independent parser for the Netscape cookies.txt interchange format.
+ * Strict, UI-independent parser for an explicitly user-selected Netscape cookies.txt export.
  *
- * <p>This parses only a file explicitly selected by the user. It does not inspect another
- * browser's private storage, discover installed apps, or import cookies by itself. Netscape
- * exports cannot represent every modern cookie attribute (notably SameSite metadata).
+ * <p>This parser never discovers installed browsers or reads another app's private storage.
+ * Netscape exports cannot represent every modern cookie attribute, including SameSite metadata.
  */
 final class BrowserCookieImport {
     static final int MAX_FILE_CHARS = 2 * 1024 * 1024;
     static final int MAX_COOKIES = 10_000;
     static final int MAX_LINE_CHARS = 32 * 1024;
     static final int MAX_VALUE_CHARS = 16 * 1024;
+    static final int MAX_LINES = 20_000;
+    static final int MAX_REJECTED_LINES_RETAINED = 500;
+    static final long MAX_EXPIRY_EPOCH_SECONDS = 253402300799L; // 9999-12-31T23:59:59Z
 
     enum Rejection {
         MALFORMED_FIELDS,
@@ -26,9 +28,11 @@ final class BrowserCookieImport {
         INVALID_SECURE_FLAG,
         INVALID_EXPIRY,
         INVALID_NAME,
+        INVALID_VALUE,
         VALUE_TOO_LARGE,
         LINE_TOO_LARGE,
-        TOO_MANY_COOKIES
+        TOO_MANY_COOKIES,
+        TOO_MANY_LINES
     }
 
     static final class Cookie {
@@ -75,13 +79,19 @@ final class BrowserCookieImport {
     static final class ParseResult {
         final List<Cookie> cookies;
         final List<RejectedLine> rejectedLines;
+        final int rejectedLineCount;
+        final boolean rejectionListTruncated;
         final boolean recognizedFormat;
+        final boolean inputTruncated;
 
-        ParseResult(List<Cookie> cookies, List<RejectedLine> rejectedLines,
-                    boolean recognizedFormat) {
+        ParseResult(List<Cookie> cookies, RejectionAccumulator rejected, boolean recognizedFormat,
+                    boolean inputTruncated) {
             this.cookies = Collections.unmodifiableList(new ArrayList<>(cookies));
-            this.rejectedLines = Collections.unmodifiableList(new ArrayList<>(rejectedLines));
+            this.rejectedLines = Collections.unmodifiableList(new ArrayList<>(rejected.lines));
+            this.rejectedLineCount = rejected.count;
+            this.rejectionListTruncated = rejected.truncated;
             this.recognizedFormat = recognizedFormat;
+            this.inputTruncated = inputTruncated;
         }
 
         boolean isEmpty() {
@@ -89,112 +99,178 @@ final class BrowserCookieImport {
         }
     }
 
+    private static final class RejectionAccumulator {
+        final List<RejectedLine> lines = new ArrayList<>();
+        int count;
+        boolean truncated;
+
+        void add(int lineNumber, Rejection reason) {
+            count++;
+            if (lines.size() < MAX_REJECTED_LINES_RETAINED) {
+                lines.add(new RejectedLine(lineNumber, reason));
+            } else {
+                truncated = true;
+            }
+        }
+    }
+
     private BrowserCookieImport() { }
 
     static ParseResult parse(String input) {
         List<Cookie> cookies = new ArrayList<>();
-        List<RejectedLine> rejected = new ArrayList<>();
+        RejectionAccumulator rejected = new RejectionAccumulator();
         if (input == null || input.length() > MAX_FILE_CHARS) {
-            rejected.add(new RejectedLine(1, Rejection.MALFORMED_FIELDS));
-            return new ParseResult(cookies, rejected, false);
+            rejected.add(1, Rejection.MALFORMED_FIELDS);
+            return new ParseResult(cookies, rejected, false, true);
         }
 
         boolean recognized = false;
-        String[] lines = input.split("\\r?\\n", -1);
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            if (line.length() > MAX_LINE_CHARS) {
-                rejected.add(new RejectedLine(i + 1, Rejection.LINE_TOO_LARGE));
-                continue;
-            }
-            if (line.isEmpty()) continue;
-            if (line.startsWith("# Netscape HTTP Cookie File")
-                    || line.startsWith("# HTTP Cookie File")) {
-                recognized = true;
-                continue;
-            }
-            boolean httpOnly = line.startsWith("#HttpOnly_");
-            if (httpOnly) {
-                recognized = true;
-                line = line.substring("#HttpOnly_".length());
-            } else if (line.startsWith("#")) {
-                continue;
-            }
-
-            String[] fields = line.split("\\t", -1);
-            if (fields.length != 7) {
-                rejected.add(new RejectedLine(i + 1, Rejection.MALFORMED_FIELDS));
-                continue;
-            }
-
-            String domain = fields[0].trim().toLowerCase(Locale.ROOT);
-            if (domain.startsWith(".")) domain = domain.substring(1);
-            if (!isValidDomain(domain)) {
-                rejected.add(new RejectedLine(i + 1, Rejection.INVALID_DOMAIN));
-                continue;
-            }
-            if (!"TRUE".equalsIgnoreCase(fields[1]) && !"FALSE".equalsIgnoreCase(fields[1])) {
-                rejected.add(new RejectedLine(i + 1, Rejection.INVALID_DOMAIN_FLAG));
-                continue;
-            }
-            String path = fields[2];
-            if (path.isEmpty() || path.charAt(0) != '/' || containsControl(path)) {
-                rejected.add(new RejectedLine(i + 1, Rejection.INVALID_PATH));
-                continue;
-            }
-            if (!"TRUE".equalsIgnoreCase(fields[3]) && !"FALSE".equalsIgnoreCase(fields[3])) {
-                rejected.add(new RejectedLine(i + 1, Rejection.INVALID_SECURE_FLAG));
-                continue;
-            }
-            long expiry;
-            try {
-                expiry = Long.parseLong(fields[4]);
-                if (expiry < 0L) throw new NumberFormatException("negative expiry");
-            } catch (NumberFormatException invalidExpiry) {
-                rejected.add(new RejectedLine(i + 1, Rejection.INVALID_EXPIRY));
-                continue;
-            }
-            String name = fields[5];
-            if (!isValidName(name)) {
-                rejected.add(new RejectedLine(i + 1, Rejection.INVALID_NAME));
-                continue;
-            }
-            String value = fields[6];
-            if (value.length() > MAX_VALUE_CHARS || containsControl(value)) {
-                rejected.add(new RejectedLine(i + 1, Rejection.VALUE_TOO_LARGE));
-                continue;
-            }
-            if (cookies.size() >= MAX_COOKIES) {
-                rejected.add(new RejectedLine(i + 1, Rejection.TOO_MANY_COOKIES));
+        boolean inputTruncated = false;
+        int offset = 0;
+        int lineNumber = 1;
+        while (offset <= input.length()) {
+            if (lineNumber > MAX_LINES) {
+                rejected.add(lineNumber, Rejection.TOO_MANY_LINES);
+                inputTruncated = true;
                 break;
             }
-            cookies.add(new Cookie(domain, "TRUE".equalsIgnoreCase(fields[1]), path,
-                    "TRUE".equalsIgnoreCase(fields[3]), expiry, name, value, httpOnly));
+
+            int newline = input.indexOf('\n', offset);
+            int end = newline >= 0 ? newline : input.length();
+            if (end > offset && input.charAt(end - 1) == '\r') end--;
+            String line = input.substring(offset, end);
+
+            if (line.length() > MAX_LINE_CHARS) {
+                rejected.add(lineNumber, Rejection.LINE_TOO_LARGE);
+            } else if (!line.isEmpty()) {
+                if (line.startsWith("# Netscape HTTP Cookie File")
+                        || line.startsWith("# HTTP Cookie File")) {
+                    recognized = true;
+                } else {
+                    boolean httpOnly = line.startsWith("#HttpOnly_");
+                    if (httpOnly) {
+                        recognized = true;
+                        line = line.substring("#HttpOnly_".length());
+                    } else if (line.startsWith("#")) {
+                        // Ordinary Netscape comments are not cookie rows.
+                        line = null;
+                    }
+
+                    if (line != null) {
+                        String[] fields = line.split("\\t", -1);
+                        if (fields.length != 7) {
+                            rejected.add(lineNumber, Rejection.MALFORMED_FIELDS);
+                        } else {
+                            String rawDomain = fields[0].toLowerCase(Locale.ROOT);
+                            boolean leadingDot = rawDomain.startsWith(".");
+                            String domain = leadingDot ? rawDomain.substring(1) : rawDomain;
+                            if (!isValidDomain(domain)) {
+                                rejected.add(lineNumber, Rejection.INVALID_DOMAIN);
+                            } else if (!"TRUE".equalsIgnoreCase(fields[1])
+                                    && !"FALSE".equalsIgnoreCase(fields[1])) {
+                                rejected.add(lineNumber, Rejection.INVALID_DOMAIN_FLAG);
+                            } else {
+                                // The flag is authoritative; the historical leading dot is optional.
+                                String path = fields[2];
+                                if (!isValidPath(path)) {
+                                    rejected.add(lineNumber, Rejection.INVALID_PATH);
+                                } else if (!"TRUE".equalsIgnoreCase(fields[3])
+                                        && !"FALSE".equalsIgnoreCase(fields[3])) {
+                                    rejected.add(lineNumber, Rejection.INVALID_SECURE_FLAG);
+                                } else {
+                                    long expiry;
+                                    try {
+                                        expiry = Long.parseLong(fields[4]);
+                                        if (expiry < 0L || expiry > MAX_EXPIRY_EPOCH_SECONDS) {
+                                            throw new NumberFormatException("expiry out of range");
+                                        }
+                                    } catch (NumberFormatException invalidExpiry) {
+                                        rejected.add(lineNumber, Rejection.INVALID_EXPIRY);
+                                        expiry = -1L;
+                                    }
+
+                                    if (expiry >= 0L) {
+                                        String name = fields[5];
+                                        if (!isValidName(name)) {
+                                            rejected.add(lineNumber, Rejection.INVALID_NAME);
+                                        } else {
+                                            String value = fields[6];
+                                            if (value.length() > MAX_VALUE_CHARS) {
+                                                rejected.add(lineNumber, Rejection.VALUE_TOO_LARGE);
+                                            } else if (!isValidValue(value)) {
+                                                rejected.add(lineNumber, Rejection.INVALID_VALUE);
+                                            } else if (cookies.size() >= MAX_COOKIES) {
+                                                rejected.add(lineNumber, Rejection.TOO_MANY_COOKIES);
+                                                inputTruncated = true;
+                                                break;
+                                            } else {
+                                                cookies.add(new Cookie(domain,
+                                                        "TRUE".equalsIgnoreCase(fields[1]), path,
+                                                        "TRUE".equalsIgnoreCase(fields[3]), expiry,
+                                                        name, value, httpOnly));
+                                                // Headerless Netscape exports are valid too.
+                                                recognized = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (newline < 0) break;
+            offset = newline + 1;
+            lineNumber++;
+            if (offset >= input.length()) break;
         }
-        return new ParseResult(cookies, rejected, recognized);
+        return new ParseResult(cookies, rejected, recognized, inputTruncated);
     }
 
-    private static boolean isValidDomain(String domain) {
+    static boolean isValidDomain(String domain) {
         if (domain.isEmpty() || domain.length() > 253 || domain.startsWith(".")
                 || domain.endsWith(".") || domain.contains("..")) return false;
-        for (int i = 0; i < domain.length(); i++) {
-            char c = domain.charAt(i);
-            if (!(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9')
-                    && c != '.' && c != '-') return false;
-            if (c == '-' && (i == 0 || domain.charAt(i - 1) == '.'
-                    || i == domain.length() - 1 || domain.charAt(i + 1) == '.')) return false;
+        String[] labels = domain.split("\\.", -1);
+        for (String label : labels) {
+            if (label.isEmpty() || label.length() > 63 || label.charAt(0) == '-'
+                    || label.charAt(label.length() - 1) == '-') return false;
+            for (int i = 0; i < label.length(); i++) {
+                char c = label.charAt(i);
+                if (!(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '-') {
+                    return false;
+                }
+            }
         }
         return true;
     }
 
-    private static boolean isValidName(String name) {
+    static boolean isValidName(String name) {
         if (name.isEmpty() || name.length() > 256) return false;
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
-            if (c <= 0x20 || c >= 0x7f || c == ';' || c == ',' || c == '='
-                    || c == '\\' || c == '"') return false;
+            boolean alphaNumeric = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9');
+            boolean tokenPunctuation = "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+            if (!alphaNumeric && !tokenPunctuation) return false;
         }
         return true;
+    }
+
+    static boolean isValidValue(String value) {
+        // RFC 6265 cookie-octet: printable ASCII except DQUOTE, comma, semicolon and backslash.
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x21 || c > 0x7e || c == '"' || c == ',' || c == ';' || c == '\\') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static boolean isValidPath(String path) {
+        return path != null && !path.isEmpty() && path.charAt(0) == '/'
+                && path.indexOf(';') < 0 && !containsControl(path);
     }
 
     private static boolean containsControl(String value) {
