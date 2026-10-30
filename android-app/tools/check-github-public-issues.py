@@ -11,10 +11,7 @@ test = root / "tools/GitHubPublicIssuesClientSmoke.java"
 for token in ("https://api.github.com/repos/", "setInstanceFollowRedirects(false)",
               "setRequestMethod(\"GET\")", "application/vnd.github+json",
               "X-GitHub-Api-Version", "MAX_RESPONSE_BYTES", "parseIssues(response, owner, repository)",
-              "validateHtmlUrl(htmlUrl, owner, repository, number, pullRequest)",
-              "MessageDigest"):
-    if token == "MessageDigest":
-        continue
+              "validateHtmlUrl(htmlUrl, owner, repository, number, pullRequest)"):
     assert token in source, f"GitHub connector missing security contract: {token}"
 
 for forbidden in ("Authorization", "POST", "PATCH", "DELETE", "http://api.github.com",
