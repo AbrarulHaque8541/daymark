@@ -4,6 +4,8 @@
 
 ## Latest reviewed snapshot
 
+- [Daymark status snapshot — 2026-10-30T10:09:57Z](./CURRENT_STATUS_20261030_100957Z.md)
+
 - [Daymark status snapshot — 2026-10-30T09:26Z](./CURRENT_STATUS_20261030_0926Z.md)
 
 - [Daymark status snapshot — 2026-10-30T06:08:51Z](./CURRENT_STATUS_20261030_060851Z.md)
@@ -34,13 +36,13 @@
 
 - [Daymark status snapshot — 2026-10-13 1635 UTC](CURRENT_STATUS_2026-10-13_1635Z.md)
 
-- [Daymark status snapshot — 2026-10-13 14:17:30.287 UTC](CURRENT_STATUS_2026-10-13_1417Z.md)
+- [Daymark status snapshot — 2026-10-13 14:17:30.287 UTC](CURRENT_STATUS_20261013_1417Z.md)
 
 ## Before acting
 
 1. Open the latest snapshot for context.
 2. Re-check live `main`, Releases/tags, relevant issues and PRs, exact PR head SHA, and Actions runs.
-3. If live evidence disagrees with the snapshot, trust live evidence for current state, record the discrepancy, and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
+3. If live evidence disagrees with the snapshot, trust live evidence, record the discrepancy, and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
 
 ## Snapshot maintenance
 
