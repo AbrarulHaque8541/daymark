@@ -16,6 +16,8 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
 import android.widget.TextView;
 
 import java.util.Locale;
@@ -44,6 +46,9 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private final int ACCENT_SOFT;
     private final int WARNING;
     private static final long[] PRESETS_MINUTES = {5, 15, 25, 45, 60};
+    private enum DisplayUnit { AUTO, SECONDS, MINUTES, HOURS }
+    private DisplayUnit displayUnit = DisplayUnit.AUTO;
+    private final TextView[] displayUnitButtons = new TextView[4];
 
     private final Listener listener;
     private final TaskFocusTimerSoundscape sounds = new TaskFocusTimerSoundscape();
@@ -145,6 +150,32 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         ringLp.gravity = Gravity.CENTER_HORIZONTAL;
         ringLp.topMargin = dp(12);
         addView(ringFrame, ringLp);
+
+        TextView displayLabel = label("TIME DISPLAY", 10, MUTED, true);
+        displayLabel.setLetterSpacing(0.14f);
+        LayoutParams displayLabelLp = matchWrap();
+        displayLabelLp.topMargin = dp(2);
+        addView(displayLabel, displayLabelLp);
+        LinearLayout displayModes = new LinearLayout(context);
+        displayModes.setOrientation(HORIZONTAL);
+        displayModes.setGravity(Gravity.CENTER);
+        displayModes.setPadding(dp(4), dp(4), dp(4), dp(4));
+        displayModes.setBackground(round(SURFACE, 18));
+        String[] displayNames = {"Auto", "Seconds", "Minutes", "Hours"};
+        DisplayUnit[] displayValues = DisplayUnit.values();
+        for (int i = 0; i < displayNames.length; i++) {
+            final DisplayUnit unit = displayValues[i];
+            TextView choice = label(displayNames[i], 11, unit == displayUnit ? TEXT : MUTED, true);
+            choice.setGravity(Gravity.CENTER);
+            choice.setPadding(dp(5), dp(11), dp(5), dp(11));
+            choice.setBackground(round(unit == displayUnit ? ACCENT_SOFT : SURFACE, 14));
+            displayUnitButtons[i] = choice;
+            displayModes.addView(choice, new LayoutParams(0, dp(42), 1));
+            choice.setOnClickListener(v -> chooseDisplayUnit(unit));
+        }
+        LayoutParams displayModesLp = matchWrap();
+        displayModesLp.topMargin = dp(7);
+        addView(displayModes, displayModesLp);
 
         TextView targetLabel = label("QUICK DURATION", 10, MUTED, true);
         targetLabel.setLetterSpacing(0.14f);
@@ -261,7 +292,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         timer = value;
         boolean active = value != null && !value.isFinished();
         if (value == null) {
-            timeValue.setText(selectedMode == TaskFocusTimer.Mode.STOPWATCH ? "00:00:00" : format(selectedDurationMs));
+            timeValue.setText(selectedMode == TaskFocusTimer.Mode.STOPWATCH ? format(0L) : format(selectedDurationMs));
             statusLabel.setText(selectedMode == TaskFocusTimer.Mode.STOPWATCH ? "READY WHEN YOU ARE" : "TARGET DURATION");
             progressRing.setProgress(0f, ACCENT);
         } else {
@@ -322,6 +353,21 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         render(null, 0);
     }
 
+    private void chooseDisplayUnit(DisplayUnit unit) {
+        if (unit == null) return;
+        displayUnit = unit;
+        sounds.onSelection();
+        String[] names = {"Auto", "Seconds", "Minutes", "Hours"};
+        DisplayUnit[] values = DisplayUnit.values();
+        for (int i = 0; i < displayUnitButtons.length; i++) {
+            boolean selected = values[i] == unit;
+            displayUnitButtons[i].setBackground(round(selected ? ACCENT_SOFT : SURFACE, 14));
+            displayUnitButtons[i].setTextColor(selected ? TEXT : MUTED);
+            displayUnitButtons[i].setContentDescription(names[i] + (selected ? ", selected" : ""));
+        }
+        render(timer, timer == null ? 0 : android.os.SystemClock.elapsedRealtime());
+    }
+
     private TextView modeButton(String text, boolean selected) {
         TextView view = label(text, 13, selected ? TEXT : MUTED, true);
         view.setGravity(Gravity.CENTER);
@@ -355,27 +401,47 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         EditText input = new EditText(getContext());
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setSingleLine(true);
-        input.setHint("Minutes (1–1440)");
+        input.setHint("Duration");
         input.setText(String.valueOf(Math.max(1, selectedDurationMs / 60_000L)));
+        RadioGroup units = new RadioGroup(getContext());
+        units.setOrientation(RadioGroup.HORIZONTAL);
+        String[] unitNames = {"Seconds", "Minutes", "Hours"};
+        int[] unitIds = {1001, 1002, 1003};
+        for (int i = 0; i < unitNames.length; i++) {
+            RadioButton option = new RadioButton(getContext());
+            option.setId(unitIds[i]);
+            option.setText(unitNames[i]);
+            units.addView(option);
+        }
+        units.check(unitIds[1]);
+        LinearLayout content = new LinearLayout(getContext());
+        content.setOrientation(VERTICAL);
+        content.setPadding(dp(8), dp(4), dp(8), dp(4));
+        content.addView(input, matchWrap());
+        content.addView(units, matchWrap());
         AlertDialog dialog = new AlertDialog.Builder(getContext())
                 .setTitle("Custom focus duration")
-                .setMessage("Choose between 1 minute and 24 hours.")
-                .setView(input)
+                .setMessage("Choose a unit. Maximum duration is 24 hours.")
+                .setView(content)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Apply", null)
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(v -> {
                     try {
-                        long minutes = Long.parseLong(input.getText().toString().trim());
-                        if (minutes < 1 || minutes > 1440) throw new NumberFormatException();
-                        selectedDurationMs = minutes * 60_000L;
+                        long amount = Long.parseLong(input.getText().toString().trim());
+                        long multiplier = units.getCheckedRadioButtonId() == unitIds[0] ? 1000L
+                                : units.getCheckedRadioButtonId() == unitIds[2] ? 3_600_000L : 60_000L;
+                        if (amount < 1 || amount > TaskFocusTimer.MAX_COUNTDOWN_MS / multiplier) {
+                            throw new NumberFormatException();
+                        }
+                        selectedDurationMs = amount * multiplier;
                         sounds.onSelection();
                         rebuildPresets();
                         render(null, 0);
                         dialog.dismiss();
                     } catch (NumberFormatException invalid) {
-                        input.setError("Enter 1–1440 minutes");
+                        input.setError("Enter a valid duration up to 24 hours");
                     }
                 }));
         dialog.show();
@@ -426,14 +492,28 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         return new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
-    private static String format(long millis) {
+    private String format(long millis) {
         long totalSeconds = Math.max(0, millis / 1000L);
+        if (displayUnit == DisplayUnit.SECONDS) return totalSeconds + " sec";
+        if (displayUnit == DisplayUnit.MINUTES) {
+            return formatFixedUnit(totalSeconds / 60.0d, "min");
+        }
+        if (displayUnit == DisplayUnit.HOURS) {
+            return formatFixedUnit(totalSeconds / 3600.0d, "hr");
+        }
         long hours = totalSeconds / 3600L;
         long minutes = (totalSeconds / 60L) % 60L;
         long seconds = totalSeconds % 60L;
         return hours > 0
                 ? String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
                 : String.format(Locale.ROOT, "%02d:%02d", minutes, seconds);
+    }
+
+    private static String formatFixedUnit(double value, String suffix) {
+        if (Math.abs(value - Math.rint(value)) < 0.000001d) {
+            return String.format(Locale.ROOT, "%.0f %s", value, suffix);
+        }
+        return String.format(Locale.ROOT, "%.1f %s", value, suffix);
     }
 
     @Override
