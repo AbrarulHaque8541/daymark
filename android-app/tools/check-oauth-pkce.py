@@ -12,7 +12,7 @@ for token in ("new SecureRandom()", "MessageDigest.getInstance(\"SHA-256\")",
               "Base64.getUrlEncoder().withoutPadding()", "MessageDigest.isEqual(",
               "sameRedirect(expected, actual)", "expected.getHost().equalsIgnoreCase(actual.getHost())",
               "expectedPath.equals(actualPath)", "actual.getRawQuery()",
-              "result.containsKey(name)", "code and an error"):
+              "result.containsKey(name)", "either a code or an error"):
     assert token in source, f"OAuth PKCE implementation missing security contract: {token}"
 
 for forbidden in ("client_secret", "SharedPreferences", "Log.", "HttpURLConnection",
