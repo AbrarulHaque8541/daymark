@@ -52,6 +52,8 @@ assert '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' in receiver
 assert "PendingIntent.FLAG_IMMUTABLE" in receiver
 assert "static final int SNOOZE_MINUTES = 10;" in scheduler
 assert "ReminderSchedulePolicy.encodeSnooze(baseFireText, snoozeFire)" in scheduler
+assert "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," in scheduler
+assert "setExact(" not in scheduler, "reminders must remain inexact and must not require exact-alarm access"
 assert "preferences.edit().putString(key, record).commit()" in scheduler
 assert "ReminderSchedulePolicy.scheduledFire(" in scheduler
 assert "ReminderSchedulePolicy.acceptsFire(" in receiver
