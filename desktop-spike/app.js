@@ -2,7 +2,8 @@
   'use strict';
   const core = window.DaymarkTaskCore;
   const capabilityPolicy = window.DaymarkDeviceCapabilityPolicy;
-  if (!core || !capabilityPolicy) return;
+  const surfaceAdapter = window.DaymarkWebSurfaceAdapter;
+  if (!core || !capabilityPolicy || !surfaceAdapter) return;
 
   let tasks = [];
   let activeFilter = 'open';
@@ -18,36 +19,25 @@
   const filterButtons = Array.from(document.querySelectorAll('[data-filter]'));
   const surfaceMode = document.getElementById('surface-mode');
 
-  // Browser APIs expose input/display affordances, not reliable hardware identity.
-  // Classify the current interaction surface; never claim native OS or wearable support.
+  // Browser APIs expose interaction affordances, not reliable hardware identity.
   function detectSurfaceProfile() {
-    const width = document.documentElement.clientWidth || window.innerWidth || 320;
     const media = (query) => typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
-    const finePointer = media('(pointer: fine)');
-    const coarsePointer = media('(pointer: coarse)');
-    const touchPoints = Number.isFinite(navigator.maxTouchPoints) ? navigator.maxTouchPoints : 0;
-    const surface = finePointer && media('(hover: hover)') ? 'desktop' : width >= 600 ? 'tablet' : 'phone';
-    const display = width >= 900 ? 'full' : width >= 600 ? 'compact' : 'glance';
-    const inputs = [];
-    if (finePointer) inputs.push('pointer');
-    if (coarsePointer || touchPoints > 0) inputs.push('touch');
-    const profile = capabilityPolicy.createDeviceCapabilityProfile({
-      surface,
-      display,
-      inputs,
-      features: ['task-capture', 'task-review']
+    const profile = surfaceAdapter.detectWebSurfaceProfile(capabilityPolicy, {
+      viewportWidth: document.documentElement.clientWidth || window.innerWidth || 320,
+      finePointer: media('(pointer: fine)'),
+      coarsePointer: media('(pointer: coarse)'),
+      hover: media('(hover: hover)'),
+      maxTouchPoints: Number.isFinite(navigator.maxTouchPoints) ? navigator.maxTouchPoints : 0
     });
-    document.documentElement.dataset.daymarkSurface = surface;
-    document.documentElement.dataset.daymarkDisplay = display;
-    if (surfaceMode) surfaceMode.textContent = `${surface} · ${display} view`;
-    const canCapture = profile.actions.includes('capture-task');
+    document.documentElement.dataset.daymarkSurface = profile.surface;
+    document.documentElement.dataset.daymarkDisplay = profile.display;
+    if (surfaceMode) surfaceMode.textContent = profile.surface + ' · ' + profile.display + ' view';
     const submit = form.querySelector('button[type="submit"]');
-    input.disabled = !canCapture;
-    submit.disabled = !canCapture;
-    if (!canCapture) announce('This input mode is read-only. Connect a supported touch or pointer input to add tasks.');
+    input.disabled = !profile.canCapture;
+    submit.disabled = !profile.canCapture;
+    if (!profile.canCapture) announce('This input mode is read-only. Connect a supported touch or pointer input to add tasks.');
     return profile;
   }
-
   let surfaceProfile = detectSurfaceProfile();
   let resizeFrame = null;
   window.addEventListener('resize', () => {
