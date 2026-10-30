@@ -1,0 +1,58 @@
+name: Browser cookie import safety
+
+on:
+  pull_request:
+    paths:
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserCookieImport*.java"
+      - "android-app/tools/BrowserCookieImport*.java"
+      - "android-app/tools/run-browser-cookie-import-tests.sh"
+      - "android-app/tools/check-browser-cookie-import-saf.py"
+      - ".github/workflows/browser-cookie-import-safety.yml"
+  push:
+    branches:
+      - feat/browser-cookie-import-preview-20261030
+    paths:
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserCookieImport*.java"
+      - "android-app/tools/BrowserCookieImport*.java"
+      - "android-app/tools/run-browser-cookie-import-tests.sh"
+      - "android-app/tools/check-browser-cookie-import-saf.py"
+      - ".github/workflows/browser-cookie-import-safety.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-cookie-import-safety-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cookie-import-safety:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Run parser and import-policy host tests
+        run: sh android-app/tools/run-browser-cookie-import-tests.sh
+      - name: Verify SAF-only import boundaries
+        run: python3 android-app/tools/check-browser-cookie-import-saf.py
+      - name: Grant execute permission for Gradle wrapper
+        working-directory: android-app
+        run: chmod +x gradlew
+      - name: Compile and lint both Android debug flavors
+        working-directory: android-app
+        run: >-
+          ./gradlew --no-daemon
+          assembleGithubSideloadDebug
+          assemblePlayDebug
+          lintGithubSideloadDebug
+          lintPlayDebug
+          testGithubSideloadDebugUnitTest
+          testPlayDebugUnitTest
+          compileGithubSideloadDebugAndroidTestJavaWithJavac
+          compilePlayDebugAndroidTestJavaWithJavac
