@@ -37,3 +37,11 @@ jobs:
       - name: Run Android production core host tests against shared fixtures
         shell: bash
         run: bash android-app/tools/run-core-tests.sh
+      - name: Compile and test platform-neutral device capability core
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_dir="$(mktemp -d)"
+          trap 'rm -rf "$build_dir"' EXIT
+          javac --release 17 -encoding UTF-8 -d "$build_dir" shared-core/src/main/java/com/daymark/core/DeviceCapabilityPolicy.java shared-core/src/test/java/com/daymark/core/DeviceCapabilityPolicySmoke.java
+          java -ea -cp "$build_dir" com.daymark.core.DeviceCapabilityPolicySmoke contracts/device-capability-policy.tsv
