@@ -49,21 +49,27 @@ set -e
 cat /tmp/daymark-reminder-instrumentation.log
 if [ "$STATUS" -ne 0 ]; then
   echo "FAIL platform instrumentation command exit: $STATUS" >&2
-  echo "--- instrumentation phase markers (DaymarkInstr / DaymarkReminder):" >&2
-  "$ADB" -s "$MODE" logcat -d -s DaymarkInstr:V DaymarkReminder:V 2>/dev/null >&2 || true
   echo "--- process state at failure:" >&2
   "$ADB" -s "$MODE" shell ps -A 2>/dev/null | grep daymark >&2 || true
   PID=$("$ADB" -s "$MODE" shell pidof com.abrar.daymark 2>/dev/null | tr -d '\r' || true)
   PID=$(echo "$PID" | tr -d ' ')
   if [ -n "$PID" ]; then
-    echo "--- thread stacks for com.abrar.daymark (pid $PID):" >&2
+    STACKS=/tmp/daymark-thread-stacks.txt
     "$ADB" -s "$MODE" root >/dev/null 2>&1 || true
     "$ADB" -s "$MODE" wait-for-device >/dev/null 2>&1 || true
-    "$ADB" -s "$MODE" shell debuggerd -j "$PID" >&2 2>/dev/null || \
-      "$ADB" -s "$MODE" shell debuggerd -b "$PID" >&2 2>/dev/null || true
+    : > "$STACKS"
+    "$ADB" -s "$MODE" shell debuggerd -j "$PID" > "$STACKS" 2>/dev/null || \
+      "$ADB" -s "$MODE" shell debuggerd -b "$PID" > "$STACKS" 2>/dev/null || true
+    echo "--- main thread (pid $PID):" >&2
+    awk '/^"main" prio/{flag=1} flag && /^"/ && !/^"main" prio/{exit} flag{print}' "$STACKS" >&2 || true
+    echo "--- instrumentation thread (pid $PID):" >&2
+    awk '/^"Instr/{flag=1} flag && /^"/ && !/^"Instr/{exit} flag{print}' "$STACKS" >&2 || true
+    echo "--- threads running daymark code:" >&2
+    grep -B 2 -A 14 'at com\.abrar\.daymark\.' "$STACKS" 2>/dev/null | head -n 200 >&2 || true
   fi
-  echo "--- recent device log:" >&2
-  "$ADB" -s "$MODE" logcat -d -t 200 2>/dev/null | tail -n 100 >&2 || true
+  echo "--- instrumentation phase markers (run-as file + logcat):" >&2
+  "$ADB" -s "$MODE" shell run-as com.abrar.daymark cat files/instrumentation-phases.log 2>/dev/null >&2 || true
+  "$ADB" -s "$MODE" logcat -d -s DaymarkInstr:V DaymarkReminder:V 2>/dev/null | tail -n 40 >&2 || true
   exit "$STATUS"
 fi
 grep -q '^INSTRUMENTATION_RESULT: result=passed' /tmp/daymark-reminder-instrumentation.log

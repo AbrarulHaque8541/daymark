@@ -53,18 +53,19 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     public void onStart() {
         Bundle result = new Bundle();
         try {
-            android.util.Log.i(LOG_TAG, "instrumentation starting on SDK " + android.os.Build.VERSION.SDK_INT);
+            marker("instrumentation starting on SDK " + android.os.Build.VERSION.SDK_INT);
             runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
             runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
             runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
             runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
-            android.util.Log.i(LOG_TAG, "all phases passed; " + assertions + " assertions");
+            marker("all phases passed; " + assertions + " assertions");
             result.putString("result", "passed");
             result.putInt("assertions", assertions);
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
             android.util.Log.e(LOG_TAG, "instrumentation failed after " + assertions + " assertions", failure);
+            marker("instrumentation failed after " + assertions + " assertions: " + failure);
             result.putString("result", "failed");
             result.putInt("assertions", assertions);
             result.putString("failure", stackTrace(failure));
@@ -74,9 +75,24 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     /** Logs a progress marker before and after each phase so CI can localize any hang. */
     private void runPhase(String name, PhaseAction action) throws Exception {
-        android.util.Log.i(LOG_TAG, "PHASE " + name + ": start");
+        marker("PHASE " + name + ": start");
         action.run();
-        android.util.Log.i(LOG_TAG, "PHASE " + name + ": ok (" + assertions + " assertions so far)");
+        marker("PHASE " + name + ": ok (" + assertions + " assertions so far)");
+    }
+
+    /**
+     * Markers go to logcat and to an app-local file; verbose CI boot logging rotates logcat
+     * quickly, and the file survives rotation and is readable through run-as on a debug build.
+     */
+    private void marker(String message) {
+        android.util.Log.i(LOG_TAG, message);
+        try {
+            File log = new File(getTargetContext().getFilesDir(), "instrumentation-phases.log");
+            try (FileOutputStream out = new FileOutputStream(log, true)) {
+                out.write((System.currentTimeMillis() + " " + message + "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Throwable suppressed) { }
     }
 
     @FunctionalInterface
