@@ -167,6 +167,20 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(awaitNotificationState(manager, notificationId, true),
                 "index recovery preserves the matching active notification");
 
+        android.content.Intent dismissIntent = new android.content.Intent(
+                context, TaskReminderReceiver.class)
+                .setAction(TaskReminderReceiver.ACTION_DISMISS)
+                .putExtra(TaskReminderReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                .putExtra(TaskReminderReceiver.EXTRA_TASK_ID, renamed.id);
+        new TaskReminderReceiver().onReceive(context, dismissIntent);
+        check(awaitNotificationState(manager, notificationId, false),
+                "Dismiss action removes only the visible reminder notification");
+        check(notificationId.equals(TaskReminderScheduler.getNotificationId(context, renamed.id)),
+                "Dismiss leaves the task's canonical reminder identity intact");
+        postTestReminder(manager, context, notificationId, renamed, fire.toString());
+        check(awaitNotificationState(manager, notificationId, true),
+                "notification can be posted again after Dismiss without changing the task");
+
         check(TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString()),
                 "current notification can persist and arm a snooze");
         String snoozeRecord = TaskReminderScheduler.snoozeRecord(context, task.id);
