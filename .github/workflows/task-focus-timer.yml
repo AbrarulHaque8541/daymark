@@ -1,0 +1,32 @@
+name: Task focus timer contract
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/task-focus-timer.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimer.java"
+      - "android-app/tools/TaskFocusTimerSmoke.java"
+      - "android-app/tools/run-focus-timer-tests.sh"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/task-focus-timer.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimer.java"
+      - "android-app/tools/TaskFocusTimerSmoke.java"
+      - "android-app/tools/run-focus-timer-tests.sh"
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Compile and exercise focus timer state transitions
+        run: sh android-app/tools/run-focus-timer-tests.sh
