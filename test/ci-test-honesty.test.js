@@ -52,7 +52,7 @@ test("CI honesty guard rejects vacuous Gradle unit-test tasks in any workflow", 
       "run: ./gradlew testGithubSideloadReleaseUnitTest\n",
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /android-release-assets\\.yml:1: vacuous unit-test task reference/);
+  assert.match(result.stderr, /android-release-assets\.yml:1: vacuous unit-test task reference/);
 });
 
 test("CI honesty guard requires main host checks and production checks before signing", () => {
@@ -62,8 +62,8 @@ test("CI honesty guard requires main host checks and production checks before si
       "KEYSTORE_BASE64: configured-secret\nrun: sh ./tools/check-v1-source.sh\n",
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /android-production-release\\.yml: source checks must run BEFORE keystore restore\\/signing/);
-  assert.match(result.stderr, /android\\.yml: missing check-v1-source\\.sh host regression checks/);
+  assert.match(result.stderr, /android-production-release\.yml: source checks must run BEFORE keystore restore.*signing/);
+  assert.match(result.stderr, /android\.yml: missing check-v1-source\.sh host regression checks/);
 });
 
 // Keep mutation cases isolated so failures identify the exact CI policy regression.
