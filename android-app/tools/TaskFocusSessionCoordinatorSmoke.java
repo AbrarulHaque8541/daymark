@@ -234,17 +234,19 @@ public final class TaskFocusSessionCoordinatorSmoke {
     private static final class Fixture {
         final FakeClock clock;
         final FakeStore store;
+        final List<String> eventLog;
         final FakeNotifications notifications;
         final TaskFocusSessionCoordinator coordinator;
 
         Fixture() {
-            this(new FakeClock(), new FakeStore(new ArrayList<>()));
+            this(new FakeClock(), null);
         }
 
-        Fixture(FakeClock clock, FakeStore store) {
+        Fixture(FakeClock clock, FakeStore existingStore) {
             this.clock = clock;
-            this.store = store;
-            this.notifications = new FakeNotifications(new ArrayList<>());
+            this.eventLog = existingStore == null ? new ArrayList<>() : existingStore.events;
+            this.store = existingStore == null ? new FakeStore(eventLog) : existingStore;
+            this.notifications = new FakeNotifications(eventLog);
             this.coordinator = new TaskFocusSessionCoordinator(clock, store, notifications);
         }
 
@@ -255,10 +257,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         }
 
         List<String> events() {
-            List<String> combined = new ArrayList<>();
-            combined.addAll(store.events);
-            combined.addAll(notifications.events);
-            return combined;
+            return new ArrayList<>(eventLog);
         }
     }
 
