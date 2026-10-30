@@ -11,7 +11,7 @@ for marker in (
     "Intent.ACTION_OPEN_DOCUMENT",
     "Intent.CATEGORY_OPENABLE",
     "Intent.FLAG_GRANT_READ_URI_PERMISSION",
-    "ContentResolver",
+    "activity.getContentResolver().openInputStream",
     "openInputStream(selectedUri)",
     "MAX_FILE_BYTES",
     "CodingErrorAction.REPORT",
