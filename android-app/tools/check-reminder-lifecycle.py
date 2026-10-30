@@ -101,5 +101,7 @@ assert "TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toSt
 assert "app rescheduling preserves a valid snooze instead of overwriting it" in instrumentation
 assert "due-date edit invalidates the previous occurrence's snooze" in instrumentation
 assert "deleted task even when its ID index is missing" in instrumentation
+assert "malformed request-code preference is repaired without aborting other reminders" in instrumentation
+assert "notification reconciliation still runs when AlarmManager is unavailable" in instrumentation
 
 print("PASS reminder lifecycle guards: visible-only consumption, runner startup, canonical IDs, stale-notification recovery, durable occurrence-bound snooze and host regression coverage")
