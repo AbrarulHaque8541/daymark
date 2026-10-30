@@ -366,21 +366,38 @@ public final class BrowserCookieImportFlow {
         }
         importing = false;
         if (progressDialog != null) {
-            progressDialog.dismiss();
+            try {
+                progressDialog.dismiss();
+            } catch (RuntimeException ignored) {
+                // The host may already be finishing.
+            }
             progressDialog = null;
         }
 
         int imported = importedCount;
-        int rejected = rejectedCount;
+        int webViewRejected = rejectedCount;
+        int malformedRows = preview == null ? 0 : preview.rejectedLineCount;
+        int prefixRejected = preview == null ? 0 : preview.prefixRejectedCookieCount;
+        int rejected = webViewRejected + malformedRows + prefixRejected;
         int expired = preview == null ? expiredDuringImport
                 : preview.expiredCookieCount + expiredDuringImport;
-        if (listener != null) listener.onCookieImportFinished(imported, rejected, expired);
+        boolean storeFlushFailed = flushFailed;
+        if (listener != null) {
+            try {
+                listener.onCookieImportFinished(imported, rejected, expired);
+            } catch (RuntimeException ignored) {
+                // A host callback must not interrupt cleanup of in-memory cookie values.
+            }
+        }
         clearSensitiveState();
         if (activity.isFinishing() || activity.isDestroyed()) return;
 
-        String message = "Imported: " + imported + "\nRejected by WebView: " + rejected
-                + "\nExpired/skipped: " + expired
-                + "\n\nCookie values were not displayed or written to logs.";
+        String message = "Imported: " + imported + "\nRejected by WebView: " + webViewRejected
+                + "\nMalformed rows skipped: " + malformedRows
+                + "\nPrefix-rule violations skipped: " + prefixRejected
+                + "\nExpired/skipped: " + expired;
+        if (storeFlushFailed) message += "\n\nThe WebView cookie store could not confirm a flush.";
+        message += "\n\nCookie values were not displayed or written to logs.";
         showMessage("Cookie import result", message);
     }
 
