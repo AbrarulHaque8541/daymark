@@ -68,6 +68,7 @@ public final class BrowserCookieImportFlow {
     private int rejectedCount;
     private int expiredDuringImport;
     private boolean importing;
+    private boolean importCancelled;
     private boolean flushFailed;
 
     public BrowserCookieImportFlow(Activity activity, Listener listener) {
@@ -260,7 +261,14 @@ public final class BrowserCookieImportFlow {
             activeDialog = null;
         }
         dismissProgressDialog();
-        if (!importing) clearSensitiveState();
+        if (importing) {
+            // CookieManager cannot cancel a write already submitted. Let that one callback settle,
+            // then stop scheduling further cookies and flush the partial result.
+            importCancelled = true;
+            pendingCookies = Collections.emptyList();
+            return;
+        }
+        clearSensitiveState();
     }
 
     private String readSelectedFile(Uri selectedUri) throws IOException {
@@ -440,6 +448,7 @@ public final class BrowserCookieImportFlow {
         expiredDuringImport = 0;
         flushFailed = false;
         importing = true;
+        importCancelled = false;
         try {
             showProgressDialog("Writing only the domains you selected…");
             applyNextCookie(CookieManager.getInstance());
@@ -450,7 +459,7 @@ public final class BrowserCookieImportFlow {
     }
 
     private void applyNextCookie(CookieManager cookieManager) {
-        if (pendingIndex >= pendingCookies.size()) {
+        if (importCancelled || pendingIndex >= pendingCookies.size()) {
             try {
                 Thread flushThread = new Thread(() -> {
                     boolean flushed = true;
@@ -491,6 +500,7 @@ public final class BrowserCookieImportFlow {
     }
 
     private void finishImport(boolean flushAttempted, boolean flushSucceeded) {
+        boolean wasCancelled = importCancelled;
         flushFailed = flushAttempted && !flushSucceeded;
         importing = false;
         dismissProgressDialog();
@@ -503,7 +513,7 @@ public final class BrowserCookieImportFlow {
         int expired = preview == null ? expiredDuringImport
                 : preview.expiredCookieCount + expiredDuringImport;
         boolean storeFlushFailed = flushFailed;
-        if (listener != null) {
+        if (!wasCancelled && listener != null) {
             try {
                 listener.onCookieImportFinished(imported, rejected, expired);
             } catch (RuntimeException ignored) {
@@ -511,7 +521,7 @@ public final class BrowserCookieImportFlow {
             }
         }
         clearSensitiveState();
-        if (activity.isFinishing() || activity.isDestroyed()) return;
+        if (wasCancelled || activity.isFinishing() || activity.isDestroyed()) return;
 
         String message = "Imported: " + imported + "\nRejected by WebView: " + webViewRejected
                 + "\nMalformed rows skipped: " + malformedRows
