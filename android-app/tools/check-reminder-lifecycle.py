@@ -80,8 +80,8 @@ assert "private static Integer parsePositiveId(Object value)" in scheduler
 assert "EXTRA_TASK_TITLE" not in receiver and "EXTRA_TASK_TITLE" not in scheduler, \
     "alarm PendingIntents must not carry a stale task title"
 assert "private static void schedule(" not in scheduler, "there must be one canonical scheduling path"
-assert "ReminderSchedulePolicy.validSnoozeFire" in policy
-assert "ReminderSchedulePolicy.acceptsFire" in policy
+assert "static String validSnoozeFire(" in policy
+assert "static boolean acceptsFire(" in policy
 assert "reconcileActiveNotifications(context, alarmManager, notificationManager, codes, known, liveTasks);" in scheduler
 assert "manager.getActiveNotifications()" in scheduler
 assert "baseFireText.equals(postedFire)" in scheduler
