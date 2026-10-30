@@ -189,7 +189,7 @@ public final class GitHubTransportSmoke {
     }
 
     private static void parserAcceptsCurrentPublishedV15ReleaseContract() throws Exception {
-        String publisher = "{\"applicationId\":\"com.abrar.daymark\",\"versionCode\":12,\"minSdkVersion\":26,
+        String publisher = "{\"applicationId\":\"com.abrar.daymark\",\"versionCode\":12,\"minSdkVersion\":26,"
                 + "\"signerCertificateSha256\":\"ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580\"}";
         String digest = "sha256:496280987fc910d3a9dde9e4ecac79c5f9286b6c2a88f2f18df75e45d9702bc8";
         String url = "https://github.com/AbrarulHaque8541/daymark/releases/download/v1.5/Daymark-v1.5-githubSideload.apk";
