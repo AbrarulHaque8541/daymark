@@ -51,31 +51,43 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             Log.w("DaymarkReminder", "A reminder alarm fired without usable details; no notification is shown.");
             return;
         }
+        // Validate against current encrypted task state before trusting any alarm or
+        // notification payload. The payload title is never used as the source of truth.
+        Task currentTask = findValidReminderTask(context, taskId, fireInstant);
+        if (currentTask == null || currentTask.title == null || currentTask.title.trim().isEmpty()) {
+            Log.i("DaymarkReminder", "Stale or unverifiable reminder for task " + taskId + "; notification suppressed.");
+            cancelNotification(context, notificationId);
+            return;
+        }
+
+        Integer expectedNotificationId = TaskReminderScheduler.getNotificationId(context, taskId);
+        if (expectedNotificationId == null || expectedNotificationId != notificationId) {
+            Log.i("DaymarkReminder", "Reminder alarm ID no longer matches the task's current request code; notification suppressed.");
+            cancelNotification(context, notificationId);
+            return;
+        }
+
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        Instant baseFire = TaskLogic.reminderFireInstant(currentTask, zone);
+        if (baseFire == null) {
+            cancelNotification(context, notificationId);
+            return;
+        }
+        String snoozeRecord = TaskReminderScheduler.snoozeRecord(context, taskId);
+        boolean deliveredSnooze = ReminderSchedulePolicy.isSnoozedFire(
+                currentTask, zone, fireInstant, snoozeRecord);
+        if (deliveredSnooze) TaskReminderScheduler.clearSnooze(context, taskId);
+
         if (Build.VERSION.SDK_INT >= 33
                 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
             Log.i("DaymarkReminder", "Notification permission is denied; the reminder stays in the in-app dialog.");
             return;
         }
-        
-        // Load and validate the task once. Never fall back to an alarm's stale title
-        // if current encrypted task state cannot be read.
-        Task currentTask = findValidReminderTask(context, taskId, fireInstant);
-        if (currentTask == null || currentTask.title == null || currentTask.title.trim().isEmpty()) {
-            Log.i("DaymarkReminder", "Stale or unverifiable reminder for task " + taskId + "; notification suppressed.");
-            return;
-        }
-        
-        Integer expectedNotificationId = TaskReminderScheduler.getNotificationId(context, taskId);
-        if (expectedNotificationId == null || expectedNotificationId != notificationId) {
-            Log.i("DaymarkReminder", "Reminder alarm ID no longer matches the task's current notification ID; notification suppressed.");
-            NotificationManager manager =
-                    (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (manager != null) manager.cancel(notificationId);
-            return;
-        }
 
-        refreshPostedNotification(context, notificationId, currentTask, fireInstant);
+        // Notification metadata always carries the base occurrence, not the temporary
+        // snooze alarm time. Reconciliation can therefore compare it with the task.
+        refreshPostedNotification(context, notificationId, currentTask, baseFire.toString());
     }
 
     /**
@@ -91,10 +103,9 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                 if (task.completed || task.reminderLeadMinutes == null || task.dueDate == null) {
                     return null;
                 }
-                if (fireInstant.equals(task.reminderShownFire)) return null;
-                Instant fire = Instant.parse(fireInstant);
-                Instant expectedFire = TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault());
-                if (expectedFire == null || !fire.equals(expectedFire)) return null;
+                String snooze = TaskReminderScheduler.snoozeRecord(context, taskId);
+                if (!ReminderSchedulePolicy.acceptsFire(task,
+                        java.time.ZoneId.systemDefault(), fireInstant, snooze)) return null;
                 return task;
             }
             return null; // deleted task
@@ -122,7 +133,8 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                         .setAction(ACTION_SNOOZE)
                         .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
                         .putExtra(EXTRA_TASK_ID, task.id)
-                        .putExtra(EXTRA_TASK_TITLE, task.title),
+                        .putExtra(EXTRA_TASK_TITLE, task.title)
+                        .putExtra(EXTRA_FIRE_INSTANT, fireInstant),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
@@ -147,15 +159,32 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     private void snoozeReminder(Context context, Intent intent) {
         int notificationId = intent == null ? 0 : intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
         String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);
-        String title = intent == null ? null : intent.getStringExtra(EXTRA_TASK_TITLE);
-        if (notificationId == 0 || title == null || title.trim().isEmpty()) {
-            Log.w("DaymarkReminder", "A snooze action arrived without usable details; nothing was scheduled.");
+        String baseFire = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);
+        if (notificationId <= 0 || taskId == null || baseFire == null) {
+            Log.w("DaymarkReminder", "A snooze action arrived without a task occurrence; nothing was scheduled.");
             return;
         }
-        NotificationManager notificationManager =
+
+        // Snooze is an action on a posted notification, not a trusted alarm. Re-read the
+        // current task and verify both the base occurrence and canonical notification ID.
+        Task currentTask = findValidReminderTask(context, taskId, baseFire);
+        Integer expectedId = TaskReminderScheduler.getNotificationId(context, taskId);
+        if (currentTask == null || expectedId == null || expectedId != notificationId) {
+            cancelNotification(context, notificationId);
+            TaskReminderScheduler.clearSnooze(context, taskId);
+            Log.i("DaymarkReminder", "Stale snooze action ignored for task " + taskId);
+            return;
+        }
+
+        if (TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire)) {
+            cancelNotification(context, notificationId);
+        }
+    }
+
+    private void cancelNotification(Context context, int notificationId) {
+        NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager != null) notificationManager.cancel(notificationId);
-        TaskReminderScheduler.snooze(context, notificationId, taskId, title);
+        if (manager != null) manager.cancel(notificationId);
     }
 
     private void rescheduleAfterBoot(Context context) {
@@ -163,6 +192,8 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             EncryptedTaskStore store = new EncryptedTaskStore(context);
             List<Task> tasks = store.load();
             TaskReminderScheduler.rescheduleAll(context, tasks);
+            context.getSharedPreferences(TaskReminderScheduler.REMINDER_PREFERENCES, Context.MODE_PRIVATE)
+                    .edit().remove(TaskReminderScheduler.BOOT_RESCHEDULE_FAILED_KEY).apply();
         } catch (Exception reminderRescheduleFailed) {
             Log.w("DaymarkReminder", "Boot reschedule failed; alarms retry on the next app open.",
                     reminderRescheduleFailed);
