@@ -52,19 +52,4 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           working-directory: android-app
-          script: |
-            chmod +x gradlew
-            ./gradlew --no-daemon installGithubSideloadDebug installGithubSideloadDebugAndroidTest
-            instrumentation="$(adb shell pm list instrumentation | tr -d '\r' | sed -n 's/^instrumentation:\([^ ]*DaymarkPlatformInstrumentation\).*/\1/p' | head -n 1)"
-            if [ -z "$instrumentation" ]; then
-              echo "DaymarkPlatformInstrumentation was not installed" >&2
-              adb shell pm list instrumentation
-              exit 1
-            fi
-            echo "Running Android instrumentation component: $instrumentation"
-            output="$(adb shell am instrument -w -r "$instrumentation" 2>&1)" || {
-              printf '%s\n' "$output"
-              exit 1
-            }
-            printf '%s\n' "$output"
-            printf '%s\n' "$output" | grep -q 'INSTRUMENTATION_RESULT: result=passed'
+          script: sh tools/run-platform-instrumentation-on-emulator.sh
