@@ -51,7 +51,7 @@ public final class OAuthCredentialCodecSmoke {
                 0L, Collections.emptyList());
         expectFailure(() -> OAuthCredentialCodec.encode(Collections.singletonList(invalidControl)),
                 "control characters are rejected");
-        OAuthCredential invalidUnicode = new OAuthCredential("provider", "token\uD800", null, "Bearer",
+        OAuthCredential invalidUnicode = new OAuthCredential("provider", "token" + String.valueOf((char) 0xD800), null, "Bearer",
                 0L, Collections.emptyList());
         expectFailure(() -> OAuthCredentialCodec.encode(Collections.singletonList(invalidUnicode)),
                 "unpaired Unicode surrogates are rejected");
