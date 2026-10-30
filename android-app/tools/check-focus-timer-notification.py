@@ -26,6 +26,8 @@ checks = [
      "task title remains private on lock screen"),
     ("timer.isRunning()" in source and "timer.elapsedMsAt(nowElapsedRealtimeMs)" in source,
      "only an active user-started timer is published using monotonic elapsed time"),
+    ("setUsesChronometer(true)" in source and "setChronometerCountDown(true)" in source and ".setWhen(" in source,
+     "system chronometer keeps the countdown/stopwatch time live without a polling service"),
     ("manager.areNotificationsEnabled()" in source and "hasNotificationPermission(context)" in source,
      "notifications are skipped when permission or app-level notification access is unavailable"),
     ("setCustomContentView" not in source and "setColorized(true)" not in source,
