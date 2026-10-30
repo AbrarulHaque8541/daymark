@@ -149,6 +149,7 @@ check("static final int KEY_ESCAPE = 111;" in keys, "escaped key constant missin
 check("if (!ctrl || alt || shift) return NONE;" in keys,
       "only plain Ctrl chords may be claimed")
 check("return webMode ? FIND_IN_PAGE : SEARCH;" in keys, "Ctrl+F must follow the workspace")
+check("return webMode ? ADDRESS_BAR : SEARCH;" in keys, "Ctrl+L must follow the workspace")
 check("return webMode ? NEW_TAB : NONE;" in keys, "Ctrl+T is browser-only")
 check("return webMode ? CLOSE_TAB : NONE;" in keys, "Ctrl+W is browser-only")
 check("return webMode ? RELOAD_PAGE : NONE;" in keys, "Ctrl+R is browser-only")
@@ -170,6 +171,7 @@ for action, wiring in [
     ("KeyShortcuts.NEW_TAB", "requestNewBrowserTab();"),
     ("KeyShortcuts.CLOSE_TAB", "closeCurrentBrowserTab();"),
     ("KeyShortcuts.RELOAD_PAGE", "browserWebView.reload();"),
+    ("KeyShortcuts.ADDRESS_BAR", "browserAddressInput.requestFocus();"),
 ]:
     check(f"case {action}:" in handled, f"{action} case missing")
     check(wiring in handled, f"{action} must call {wiring}")
@@ -180,15 +182,15 @@ check("render();" in clear, "Escape must repaint the chips, not only the list")
 check("searchQuery.isEmpty() && activeTag.isEmpty()" in clear,
       "Escape must still fire when only a tag narrows the list")
 
-for constant in ("KEY_K", "KEY_F", "KEY_T", "KEY_W", "KEY_R", "KEY_ESCAPE"):
+for constant in ("KEY_K", "KEY_F", "KEY_L", "KEY_T", "KEY_W", "KEY_R", "KEY_ESCAPE"):
     check(f"static final int {constant} = " in keys, f"{constant} missing")
 
 check('addSettingsRow(content, "Keyboard shortcuts"' in ACTIVITY,
       "shortcuts must be discoverable from Settings")
 shortcut_dialog = region("private void showKeyboardShortcutsDialog", "private void addSettingsRow",
                          "keyboard shortcut dialog")
-for chord in ("Ctrl + Shift + P", "Ctrl + K", "Ctrl + F", "Ctrl + T", "Ctrl + W", "Ctrl + R",
-              "Esc"):
+for chord in ("Ctrl + Shift + P", "Ctrl + K", "Ctrl + F", "Ctrl + L", "Ctrl + T", "Ctrl + W",
+              "Ctrl + R", "Esc"):
     check(f'{{ "{chord}"' in shortcut_dialog, f"{chord} must be listed in the dialog")
 check('row.setContentDescription(shortcut[0] + ". " + shortcut[1]);' in shortcut_dialog,
       "each shortcut row needs an accessible description")
@@ -230,12 +232,52 @@ check(PALETTE_SMOKE.is_file(), "CommandPaletteSmoke.java missing")
 check(PALETTE_SMOKE.name in CORE_RUNNER, "CommandPaletteSmoke must run in run-core-tests.sh")
 check("CommandPalette.java" in CORE_RUNNER, "CommandPalette.java must be compiled by run-core-tests.sh")
 
+# --- 3c. Share intake -----------------------------------------------------------------------
+
+SHARE_INTAKE = MAIN / "ShareIntake.java"
+SHARE_SMOKE = ROOT / "tools/ShareIntakeSmoke.java"
+check(SHARE_INTAKE.is_file(), "ShareIntake.java missing")
+share = SHARE_INTAKE.read_text(encoding="utf-8")
+check("import android." not in share, "ShareIntake must stay pure for host tests")
+check("static final int MAX_QUICK_ADD = 2048;" in share,
+      "the quick-add bound must match the field's length filter")
+check("static final int MAX_TITLE = 160;" in share,
+      "the title bound must match the editor's length filter")
+check("if (singleLine && body.length() <= MAX_QUICK_ADD && !linkWithSubject)" in share,
+      "single short lines must keep going to the natural-language quick add")
+check("notes.length() > TaskLogic.MAX_NOTES_CHARS" in share,
+      "shared notes must respect the editor's notes limit")
+
+share_intent = region("private void handleShareInIntent", "private void showTaskEditor(Task editing)",
+                      "handleShareInIntent")
+for fragment in ("Intent.ACTION_SEND.equals(intent.getAction())",
+                 "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())",
+                 "intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)",
+                 "ShareIntake.parse(",
+                 "intent.removeExtra(Intent.EXTRA_TEXT);",
+                 "intent.removeExtra(Intent.EXTRA_SUBJECT);",
+                 "showTaskEditor(null, draft.title, draft.notes);",
+                 "quickCaptureInput.setSelection(Math.min(draft.title.length(), "
+                 "ShareIntake.MAX_QUICK_ADD));"):
+    check(fragment in share_intent, f"share intake must contain {fragment}")
+check("text.substring(0, 2048)" not in share_intent,
+      "the intake must not silently truncate shared text")
+
+manifest = (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+check('android:name="android.intent.action.PROCESS_TEXT"' in manifest,
+      "selected text cannot reach Daymark without a PROCESS_TEXT filter")
+check('android:name="android.intent.action.SEND"' in manifest, "share target filter missing")
+check("notesInput.setText(draftNotes);" in ACTIVITY, "the editor must prefill notes from a share")
+check(SHARE_SMOKE.is_file(), "ShareIntakeSmoke.java missing")
+check(SHARE_SMOKE.name in CORE_RUNNER, "ShareIntakeSmoke must run in run-core-tests.sh")
+check("ShareIntake.java" in CORE_RUNNER, "ShareIntake.java must be compiled by run-core-tests.sh")
+
 # --- 4. Registration -----------------------------------------------------------------------
 
 for smoke in (NOTE_SMOKE, KEYS_SMOKE, TAG_SMOKE):
     check(smoke.is_file(), f"{smoke.name} missing")
     check(smoke.name in CORE_RUNNER, f"{smoke.name} must run in run-core-tests.sh")
-for source in ("NoteFormat.java", "KeyShortcuts.java"):
+for source in ("NoteFormat.java", "KeyShortcuts.java", "ShareIntake.java"):
     check(source in CORE_RUNNER, f"{source} must be compiled by run-core-tests.sh")
 
 print(f"PASS task UX source checks: {checks} assertions")

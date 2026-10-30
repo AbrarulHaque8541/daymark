@@ -19,6 +19,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NoteFormat.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/KeyShortcuts.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/CommandPalette.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/ShareIntake.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Task.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NaturalLanguageTaskParse.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
@@ -57,6 +58,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/NoteFormatSmoke.java" \
   "$ROOT/tools/KeyShortcutsSmoke.java" \
   "$ROOT/tools/CommandPaletteSmoke.java" \
+  "$ROOT/tools/ShareIntakeSmoke.java" \
   "$ROOT/tools/NaturalLanguageTaskParseSmoke.java" \
   "$ROOT/tools/TaskListRenderGateSmoke.java" \
   "$ROOT/tools/TaskSnapshotCodecSmoke.java" \
@@ -83,6 +85,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskFilterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NoteFormatSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.KeyShortcutsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CommandPaletteSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.ShareIntakeSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NaturalLanguageTaskParseSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskListRenderGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSnapshotCodecSmoke

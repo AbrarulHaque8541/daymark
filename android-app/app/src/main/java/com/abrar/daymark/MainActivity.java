@@ -611,19 +611,36 @@ public final class MainActivity extends Activity {
         }
     }
 
-    // Android Share target: ACTION_SEND plain text becomes the task draft so the
-    // user can review it in the full editor before any task is created.
+    // Android share target: shared text becomes the task draft so the user can
+    // review it before any task is created. Multi-line or over-long text opens the
+    // full editor, whose title field is capped at 160 characters.
     private void handleShareInIntent(Intent intent) {
-        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
-        if (!"text/plain".equals(intent.getType())) return;
-        CharSequence shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
-        String text = shared == null ? "" : shared.toString().trim();
-        if (text.isEmpty()) return;
-        if (text.length() > 2048) text = text.substring(0, 2048);
+        if (intent == null) return;
+        CharSequence shared;
+        if (Intent.ACTION_SEND.equals(intent.getAction()) && "text/plain".equals(intent.getType())) {
+            shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+        } else if (Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())
+                && "text/plain".equals(intent.getType())) {
+            shared = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
+        } else {
+            return;
+        }
+        ShareIntake.Draft draft = ShareIntake.parse(
+                intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT), shared);
+        // Consume the extras so a rotation or re-entry cannot overwrite the draft.
+        intent.removeExtra(Intent.EXTRA_TEXT);
+        intent.removeExtra(Intent.EXTRA_PROCESS_TEXT);
+        intent.removeExtra(Intent.EXTRA_SUBJECT);
+        if (draft.isEmpty()) return;
         setWebMode(false);
-        taskDraft = text;
-        quickCaptureInput.setText(text);
-        quickCaptureInput.setSelection(Math.min(text.length(), 2048));
+        if (draft.openEditor) {
+            showTaskEditor(null, draft.title, draft.notes);
+            showToast("Shared text is in the task editor. Review it, then save.");
+            return;
+        }
+        taskDraft = draft.title;
+        quickCaptureInput.setText(draft.title);
+        quickCaptureInput.setSelection(Math.min(draft.title.length(), ShareIntake.MAX_QUICK_ADD));
         quickCaptureInput.requestFocus();
         showToast("Shared text is in your task draft. Review it, then add the task.");
     }
@@ -755,6 +772,11 @@ public final class MainActivity extends Activity {
                 return true;
             case KeyShortcuts.COMMAND_PALETTE:
                 showCommandPalette();
+                return true;
+            case KeyShortcuts.ADDRESS_BAR:
+                if (browserAddressInput == null) return false;
+                browserAddressInput.requestFocus();
+                browserAddressInput.selectAll();
                 return true;
             case KeyShortcuts.CLEAR_SEARCH:
                 if (webMode || searchInput == null) return false;
@@ -6217,25 +6239,32 @@ public final class MainActivity extends Activity {
     }
 
     private void showTaskEditor(Task editing) {
-        showTaskEditor(editing, "", editing == null ? null : editing.dueDate,
+        showTaskEditor(editing, "", "", editing == null ? null : editing.dueDate,
                 editing == null ? "medium" : editing.priority, null, false);
     }
 
     private void showTaskEditor(Task editing, String draftTitle) {
-        showTaskEditor(editing, draftTitle, editing == null ? null : editing.dueDate,
+        showTaskEditor(editing, draftTitle, "", editing == null ? null : editing.dueDate,
+                editing == null ? "medium" : editing.priority, null, false);
+    }
+
+    /** Opens the editor with a title and notes prefilled, used by the share intake. */
+    private void showTaskEditor(Task editing, String draftTitle, String draftNotes) {
+        showTaskEditor(editing, draftTitle, draftNotes, editing == null ? null : editing.dueDate,
                 editing == null ? "medium" : editing.priority, null, false);
     }
 
     private void showTaskEditorFromTemplate(TaskTemplate template) {
-        showTaskEditor(null, template.title, template.dueDate, template.priority, template, false);
+        showTaskEditor(null, template.title, "", template.dueDate, template.priority, template, false);
     }
 
     private void showNewTemplateEditor() {
-        showTaskEditor(null, "", null, "medium", null, true);
+        showTaskEditor(null, "", "", null, "medium", null, true);
     }
 
-    private void showTaskEditor(Task editing, String draftTitle, String initialDueDate,
-                                String initialPriority, TaskTemplate sourceTemplate, boolean templateOnly) {
+    private void showTaskEditor(Task editing, String draftTitle, String draftNotes,
+                                String initialDueDate, String initialPriority,
+                                TaskTemplate sourceTemplate, boolean templateOnly) {
         if (webMode) return;
         if (!canEdit()) {
             showToast("Encrypted task storage is unavailable; edits are paused.");
@@ -6275,6 +6304,7 @@ public final class MainActivity extends Activity {
         notesInput.setMinLines(2);
         notesInput.setGravity(Gravity.TOP | Gravity.START);
         if (editing != null) notesInput.setText(editing.notes);
+        else if (draftNotes != null && !draftNotes.trim().isEmpty()) notesInput.setText(draftNotes);
 
         EditText tagsInput = new EditText(this);
         tagsInput.setSingleLine(true);
@@ -7644,6 +7674,7 @@ public final class MainActivity extends Activity {
                 { "Ctrl + Shift + P", "Open the command palette" },
                 { "Ctrl + K", "Jump to quick add" },
                 { "Ctrl + F", "Find a task, or search the page in the browser" },
+                { "Ctrl + L", "Jump to task search, or to the browser address bar" },
                 { "Ctrl + T", "Open a new browser tab" },
                 { "Ctrl + W", "Close the current browser tab" },
                 { "Ctrl + R", "Reload the current page" },

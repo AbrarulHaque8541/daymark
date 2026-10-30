@@ -73,6 +73,8 @@ expect_fail_after_removal check-task-ux.py "TaskLogic.filter(tasks, selectedFilt
 expect_fail_after_removal check-task-ux.py "NoteFormat.spans(task.notes)"
 expect_fail_after_removal check-task-ux.py "KeyShortcuts.actionFor(event.getKeyCode()"
 expect_fail_after_removal check-task-ux.py "BrowserAddress.isAllowedWebUrl(url)"
+expect_fail_after_removal check-task-ux.py "ShareIntake.parse("
+expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"

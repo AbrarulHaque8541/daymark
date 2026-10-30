@@ -17,7 +17,7 @@ Verified live at `2026-10-30T03:25:36Z`. Durable rules stay in [`AGENTS.md`](../
 
 ## What this batch adds
 
-Three gaps documented in [`TASK_BROWSER_PAGE_GAPS.md`](TASK_BROWSER_PAGE_GAPS.md) and
+Four gaps documented in [`TASK_BROWSER_PAGE_GAPS.md`](TASK_BROWSER_PAGE_GAPS.md) and
 [`OWNER_FEATURE_SUGGESTIONS_2026-10-10.md`](OWNER_FEATURE_SUGGESTIONS_2026-10-10.md):
 
 1. **Tag filter chips.** `TaskLogic.filter(tasks, filter, query, tag, today)` ANDs an exact tag

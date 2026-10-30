@@ -20,6 +20,7 @@ public final class KeyShortcutsSmoke {
     private static void keyCodesMatchAndroid() {
         check(KeyShortcuts.KEY_F == 34, "KEYCODE_F");
         check(KeyShortcuts.KEY_K == 39, "KEYCODE_K");
+        check(KeyShortcuts.KEY_L == 40, "KEYCODE_L");
         check(KeyShortcuts.KEY_P == 44, "KEYCODE_P");
         check(KeyShortcuts.KEY_R == 46, "KEYCODE_R");
         check(KeyShortcuts.KEY_T == 48, "KEYCODE_T");
@@ -31,6 +32,7 @@ public final class KeyShortcutsSmoke {
     private static void taskWorkspaceChords() {
         check(act(KeyShortcuts.KEY_K, false) == KeyShortcuts.QUICK_ADD, "Ctrl+K adds a task");
         check(act(KeyShortcuts.KEY_F, false) == KeyShortcuts.SEARCH, "Ctrl+F focuses task search");
+        check(act(KeyShortcuts.KEY_L, false) == KeyShortcuts.SEARCH, "Ctrl+L focuses task search");
         check(act(KeyShortcuts.KEY_T, false) == KeyShortcuts.NONE, "Ctrl+T is browser-only");
         check(act(KeyShortcuts.KEY_W, false) == KeyShortcuts.NONE, "Ctrl+W is browser-only");
         check(act(KeyShortcuts.KEY_R, false) == KeyShortcuts.NONE, "Ctrl+R is browser-only");
@@ -39,6 +41,7 @@ public final class KeyShortcutsSmoke {
     private static void browserWorkspaceChords() {
         check(act(KeyShortcuts.KEY_K, true) == KeyShortcuts.QUICK_ADD, "Ctrl+K leaves the browser");
         check(act(KeyShortcuts.KEY_F, true) == KeyShortcuts.FIND_IN_PAGE, "Ctrl+F finds on the page");
+        check(act(KeyShortcuts.KEY_L, true) == KeyShortcuts.ADDRESS_BAR, "Ctrl+L reaches the address bar");
         check(act(KeyShortcuts.KEY_T, true) == KeyShortcuts.NEW_TAB, "Ctrl+T opens a tab");
         check(act(KeyShortcuts.KEY_W, true) == KeyShortcuts.CLOSE_TAB, "Ctrl+W closes a tab");
         check(act(KeyShortcuts.KEY_R, true) == KeyShortcuts.RELOAD_PAGE, "Ctrl+R reloads");
