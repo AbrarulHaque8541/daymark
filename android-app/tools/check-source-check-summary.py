@@ -32,5 +32,7 @@ for stale in ("no permissions/network", "no permissions, network"):
 
 check(any("INTERNET for the HTTP+HTTPS browser" in line for line in summaries),
       "the summary must state the real INTERNET permission for the browser")
+check(any("optional POST_PROMOTED_NOTIFICATIONS" in line and "Play adds no permissions" in line for line in summaries),
+      "the summary must state that Live Update permission is sideload-only and Play remains permission-minimal")
 
 print(f"PASS source-check summary: {checks} assertions (no duplicate or stale summary lines)")

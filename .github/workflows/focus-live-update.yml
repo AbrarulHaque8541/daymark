@@ -1,0 +1,52 @@
+name: Focus timer Live Update adapter
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/focus-live-update.yml"
+      - "android-app/app/src/main/AndroidManifest.xml"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerNotification.java"
+      - "android-app/tools/check-focus-timer-notification.py"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerSnapshotCodec.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerStore.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusSessionRuntime.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java"
+      - "android-app/app/src/githubSideload/AndroidManifest.xml"
+      - "android-app/tools/check-v1-source.sh"
+      - "android-app/tools/run-core-tests.sh"
+      - "android-app/tools/TaskFocusTimerSnapshotSmoke.java"
+      - "android-app/tools/run-focus-timer-persistence-tests.sh"
+      - "android-app/tools/check-merged-manifests.py"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: android-app/**/*.gradle*
+      - name: Enable Gradle wrapper
+        run: chmod +x gradlew
+      - name: Verify Live Update and manifest policy
+        run: |
+          python3 tools/check-focus-timer-notification.py "$PWD"
+          sh tools/run-focus-timer-persistence-tests.sh
+          python3 tools/check-merged-manifests.py "$PWD"
+      - name: Compile both distribution variants and lint
+        run: >-
+          ./gradlew --no-daemon
+          assembleGithubSideloadDebug
+          assemblePlayDebug
+          lintGithubSideloadDebug
+          lintPlayDebug
