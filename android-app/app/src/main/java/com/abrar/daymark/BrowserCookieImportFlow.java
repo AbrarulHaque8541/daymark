@@ -280,8 +280,8 @@ public final class BrowserCookieImportFlow {
         }
         addText(content, "Add " + selected.size() + " cookies for " + domains
                 + " to Daymark's WebView cookie store? Imported cookies are sign-in credentials "
-                + "and may grant access to the listed websites. They remain until they expire "
-                + "or browser site data is cleared.", 15, false);
+                + "and may grant access to the listed websites. A matching existing cookie may "
+                + "be replaced. They remain until they expire or browser site data is cleared.", 15, false);
         CheckBox acknowledgement = new CheckBox(activity);
         acknowledgement.setText("I understand these cookies are session credentials.");
         content.addView(acknowledgement);
