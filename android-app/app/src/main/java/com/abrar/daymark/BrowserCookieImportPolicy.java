@@ -105,6 +105,10 @@ final class BrowserCookieImportPolicy {
 
     static boolean isImportable(BrowserCookieImport.Cookie cookie, long nowEpochSeconds) {
         return cookie != null && !cookie.isExpired(nowEpochSeconds)
+                && cookie.domain != null && BrowserCookieImport.isValidDomain(cookie.domain)
+                && cookie.name != null && BrowserCookieImport.isValidName(cookie.name)
+                && cookie.value != null && BrowserCookieImport.isValidValue(cookie.value)
+                && BrowserCookieImport.isValidPath(cookie.path)
                 && hasValidPrefixSemantics(cookie);
     }
 
@@ -114,8 +118,10 @@ final class BrowserCookieImportPolicy {
 
     static String buildSetCookieHeader(BrowserCookieImport.Cookie cookie, long nowEpochSeconds) {
         if (!isImportable(cookie, nowEpochSeconds)) return null;
-        if (cookie.path == null || cookie.path.isEmpty() || cookie.path.charAt(0) != '/'
-                || cookie.path.indexOf(';') >= 0 || containsControl(cookie.path)) return null;
+        if (!BrowserCookieImport.isValidDomain(cookie.domain)
+                || !BrowserCookieImport.isValidName(cookie.name)
+                || !BrowserCookieImport.isValidValue(cookie.value)
+                || !BrowserCookieImport.isValidPath(cookie.path)) return null;
 
         StringBuilder header = new StringBuilder(cookie.name.length() + cookie.value.length() + 64);
         header.append(cookie.name).append('=').append(cookie.value);
@@ -145,11 +151,4 @@ final class BrowserCookieImportPolicy {
         return format.format(new Date(epochSeconds * 1000L));
     }
 
-    private static boolean containsControl(String value) {
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (c < 0x20 || c == 0x7f) return true;
-        }
-        return false;
-    }
 }
