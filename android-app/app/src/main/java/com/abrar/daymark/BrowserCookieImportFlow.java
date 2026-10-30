@@ -106,6 +106,16 @@ public final class BrowserCookieImportFlow {
         if (reading || readThread != null) cancelRead();
 
         final Uri selectedUri = data.getData();
+        // ACTION_OPEN_DOCUMENT must return a provider-backed content URI. Reject file:// and
+        // other URI schemes rather than broadening the import surface beyond SAF.
+        if (!"content".equalsIgnoreCase(selectedUri.getScheme())
+                || selectedUri.getAuthority() == null
+                || selectedUri.getAuthority().isEmpty()) {
+            clearSensitiveState();
+            showMessage("Unsupported document source",
+                    "Choose a document from the system document picker. No cookies were imported.");
+            return true;
+        }
         final int generation = ++readGeneration;
         reading = true;
         try {
