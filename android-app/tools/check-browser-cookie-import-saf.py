@@ -13,6 +13,11 @@ for marker in (
     "Intent.FLAG_GRANT_READ_URI_PERMISSION",
     "activity.getContentResolver().openInputStream",
     "openInputStream(selectedUri)",
+    "Thread worker = new Thread(() ->",
+    "readThread.start()",
+    "activeReadStream",
+    "Thread.currentThread().isInterrupted()",
+    "Reading the selected document…",
     "MAX_FILE_BYTES",
     "CodingErrorAction.REPORT",
     "BrowserCookieImport.parse(text)",
@@ -52,6 +57,11 @@ assert "isValidValue" in PARSER and "c == ';'" in PARSER
 assert "MAX_REJECTED_LINES_RETAINED" in PARSER and "MAX_LINES" in PARSER
 assert "hasValidPrefixSemantics" in POLICY
 assert "selectedDomains" in FLOW
+read_thread_start = FLOW.index("Thread worker = new Thread(() ->")
+read_call = FLOW.index("readSelectedFile(selectedUri)")
+read_thread_end = FLOW.index('}, "DaymarkCookieImportRead");', read_thread_start)
+assert read_thread_start < read_call < read_thread_end, "selected SAF document must be read inside the background worker"
+assert "readThread.start()" in FLOW
 assert "Cookie values are hidden" in FLOW
 assert "SameSite metadata" in FLOW
 print("PASS browser cookie import SAF guard: explicit user-picked URI, bounded strict UTF-8 read, no persistent grant/broad storage permission/private-app scan, domain selection and second confirmation")
