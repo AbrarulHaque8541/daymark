@@ -40,8 +40,8 @@ final class TaskFocusTimerSnapshotCodec {
                 }
                 out.writeShort(taskId.length);
                 out.write(taskId);
-                out.writeByte(saved.mode.ordinal());
-                out.writeByte(saved.status.ordinal());
+                out.writeByte(modeCode(saved.mode));
+                out.writeByte(statusCode(saved.status));
                 out.writeLong(saved.targetDurationMs);
                 out.writeLong(saved.elapsedMs);
                 out.writeLong(saved.savedAtElapsedRealtimeMs);
@@ -84,19 +84,13 @@ final class TaskFocusTimerSnapshotCodec {
             }
             byte[] idBytes = new byte[idLength];
             in.readFully(idBytes);
-            String taskId = new String(idBytes, StandardCharsets.UTF_8);
+            String taskId = decodeUtf8Strict(idBytes);
             if (taskId.trim().isEmpty() || taskId.length() > MAX_TASK_ID_CHARS) {
                 throw new IOException("Focus timer task identity is invalid.");
             }
 
-            int modeValue = in.readUnsignedByte();
-            int statusValue = in.readUnsignedByte();
-            if (modeValue >= TaskFocusTimer.Mode.values().length
-                    || statusValue >= TaskFocusTimer.Status.values().length) {
-                throw new IOException("Focus timer mode or status is invalid.");
-            }
-            TaskFocusTimer.Mode mode = TaskFocusTimer.Mode.values()[modeValue];
-            TaskFocusTimer.Status status = TaskFocusTimer.Status.values()[statusValue];
+            TaskFocusTimer.Mode mode = modeFromCode(in.readUnsignedByte());
+            TaskFocusTimer.Status status = statusFromCode(in.readUnsignedByte());
             long target = in.readLong();
             long elapsed = in.readLong();
             long savedAtElapsed = in.readLong();
@@ -150,6 +144,40 @@ final class TaskFocusTimerSnapshotCodec {
         if (status == TaskFocusTimer.Status.RUNNING) return paused.resume(nowElapsed);
         if (status == TaskFocusTimer.Status.FINISHED) return paused.finish(nowElapsed);
         return paused;
+    }
+
+    private static int modeCode(TaskFocusTimer.Mode mode) {
+        return mode == TaskFocusTimer.Mode.STOPWATCH ? 1 : 2;
+    }
+
+    private static int statusCode(TaskFocusTimer.Status status) {
+        if (status == TaskFocusTimer.Status.RUNNING) return 1;
+        if (status == TaskFocusTimer.Status.PAUSED) return 2;
+        return 3;
+    }
+
+    private static TaskFocusTimer.Mode modeFromCode(int code) throws IOException {
+        if (code == 1) return TaskFocusTimer.Mode.STOPWATCH;
+        if (code == 2) return TaskFocusTimer.Mode.COUNTDOWN;
+        throw new IOException("Focus timer mode code is invalid.");
+    }
+
+    private static TaskFocusTimer.Status statusFromCode(int code) throws IOException {
+        if (code == 1) return TaskFocusTimer.Status.RUNNING;
+        if (code == 2) return TaskFocusTimer.Status.PAUSED;
+        if (code == 3) return TaskFocusTimer.Status.FINISHED;
+        throw new IOException("Focus timer status code is invalid.");
+    }
+
+    private static String decodeUtf8Strict(byte[] bytes) throws IOException {
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                    .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+        } catch (java.nio.charset.CharacterCodingException exception) {
+            throw new IOException("Focus timer task identity is not valid UTF-8.", exception);
+        }
     }
 
     private static long saturatedAdd(long left, long right) {
