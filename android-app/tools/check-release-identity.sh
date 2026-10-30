@@ -35,6 +35,9 @@ require_literal "$UPDATER" 'ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d
 # Provision the exact compile platform on all build workflows and assert the package target.
 require_literal "$DEVICE_TEST" 'platforms;android-36 build-tools;35.0.0' 'device-test workflow must provision API 36'
 require_literal "$DEVICE_TEST" '^v[0-9]+\.[0-9]+(\.[0-9]+)?-device-test\.[0-9]+$' 'device-test workflow must accept versioned device-test tags'
+require_literal "$DEVICE_TEST" '"$aapt" dump badging "$apk"' 'device-test workflow must inspect the built APK manifest with aapt'
+require_literal "$DEVICE_TEST" '[[ "$app_id" == "com.abrar.daymark" ]]' 'device-test APK must assert the approved application ID'
+require_literal "$DEVICE_TEST" '[[ "$min_sdk" == "26" ]]' 'device-test APK must assert min SDK 26'
 require_literal "$DEVICE_TEST" '[[ "$target_sdk_version" == "36" ]]' 'device-test APK must assert target SDK 36 from the inspected APK manifest'
 require_literal "$PRODUCTION" 'platforms;android-36 build-tools;35.0.0' 'production workflow must provision API 36'
 require_literal "$PRODUCTION" '[[ "$tag" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]' 'production workflow must accept versioned release tags matching versionName'
