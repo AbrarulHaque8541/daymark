@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from pathlib import Path
 import sys
 
@@ -70,6 +69,24 @@ checks.extend([
      "task rename/deletion reconciliation updates or clears only the independent focus session"),
 ])
 for ok, message in checks[-4:]:
+    if not ok:
+        raise AssertionError(message)
+activity = (main / "java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+checks.extend([
+    ("setContentIntent(actionPendingIntent(" in source and ".addAction(" in source
+     and "PendingIntent.getActivity(" in source and "FLAG_IMMUTABLE" in source,
+     "focus notification is tappable and carries immutable shade action PendingIntents"),
+    ('ACTION_OPEN = "com.abrar.daymark.action.FOCUS_OPEN"' in source
+     and 'ACTION_PAUSE = "com.abrar.daymark.action.FOCUS_PAUSE"' in source
+     and 'ACTION_FINISH = "com.abrar.daymark.action.FOCUS_FINISH"' in source,
+     "focus notification declares open/pause/finish actions"),
+    ("handleFocusNotificationIntent(getIntent());" in activity
+     and "handleFocusNotificationIntent(intent);" in activity
+     and "dispatchFocusNotificationAction" in activity
+     and "pauseFocusSession();" in activity and "finishFocusSession();" in activity,
+     "MainActivity routes notification shade actions to the focus session runtime"),
+])
+for ok, message in checks[-3:]:
     if not ok:
         raise AssertionError(message)
 print(f"PASS focus timer notification source checks: {len(checks)} assertions")

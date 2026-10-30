@@ -1,4 +1,3 @@
-package com.abrar.daymark;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -109,7 +108,12 @@ public final class MainActivity extends Activity {
     private static final String ACTION_SHORTCUT_NEW_TASK = "com.abrar.daymark.action.SHORTCUT_NEW_TASK";
     private static final String ACTION_SHORTCUT_TASK_DETAILS = "com.abrar.daymark.action.SHORTCUT_TASK_DETAILS";
     private static final String ACTION_SHORTCUT_OPEN_BROWSER = "com.abrar.daymark.action.SHORTCUT_OPEN_BROWSER";
+    private static final String ACTION_FOCUS_OPEN = "com.abrar.daymark.action.FOCUS_OPEN";
+    private static final String ACTION_FOCUS_PAUSE = "com.abrar.daymark.action.FOCUS_PAUSE";
+    private static final String ACTION_FOCUS_RESUME = "com.abrar.daymark.action.FOCUS_RESUME";
+    private static final String ACTION_FOCUS_FINISH = "com.abrar.daymark.action.FOCUS_FINISH";
     private String pendingLauncherShortcutAction;
+    private String pendingFocusNotificationAction;
     private static final int REQUEST_IMPORT_EXTENSION = 7812;
     private static final int REQUEST_EXPORT_EXTENSION = 7813;
     private static final int REQUEST_PORTABLE_EXPORT = 7342;
@@ -521,6 +525,7 @@ public final class MainActivity extends Activity {
             loadEncryptedTasks();
             handleShareInIntent(getIntent());
             handleShortcutIntent(getIntent());
+            handleFocusNotificationIntent(getIntent());
         } catch (Throwable startupFailure) {
             Log.e("Daymark-ColdStart", "Crash details", startupFailure);
             showStartupFailureScreen(startupFailure);
@@ -552,6 +557,7 @@ public final class MainActivity extends Activity {
         setIntent(intent);
         handleShareInIntent(intent);
         handleShortcutIntent(intent);
+        handleFocusNotificationIntent(intent);
     }
 
     // Android launcher app shortcuts appear when the user long-presses the Daymark icon.
@@ -572,6 +578,54 @@ public final class MainActivity extends Activity {
         dispatchLauncherShortcut(action);
     }
 
+    // Focus-session notification actions (tap, Pause, Resume, Finish) arrive here from the shade.
+    private void handleFocusNotificationIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!isFocusNotificationAction(action)) return;
+        intent.setAction(null);
+        if (!canEdit()) {
+            // Encrypted storage loads asynchronously; defer until its result is known.
+            pendingFocusNotificationAction = action;
+            return;
+        }
+        dispatchFocusNotificationAction(action);
+    }
+
+    private boolean isFocusNotificationAction(String action) {
+        return ACTION_FOCUS_OPEN.equals(action)
+                || ACTION_FOCUS_PAUSE.equals(action)
+                || ACTION_FOCUS_RESUME.equals(action)
+                || ACTION_FOCUS_FINISH.equals(action);
+    }
+
+    private void dispatchPendingFocusNotificationAction() {
+        String action = pendingFocusNotificationAction;
+        if (action == null) return;
+        pendingFocusNotificationAction = null;
+        if (!canEdit()) return;
+        dispatchFocusNotificationAction(action);
+    }
+
+    private void dispatchFocusNotificationAction(String action) {
+        if (ACTION_FOCUS_OPEN.equals(action)) {
+            setWebMode(false);
+            renderFocusTimerPanel();
+            return;
+        }
+        if (ACTION_FOCUS_PAUSE.equals(action)) {
+            pauseFocusSession();
+            return;
+        }
+        if (ACTION_FOCUS_RESUME.equals(action)) {
+            resumeFocusSession();
+            return;
+        }
+        if (ACTION_FOCUS_FINISH.equals(action)) {
+            finishFocusSession();
+        }
+    }
+
     private boolean isDaymarkShortcutAction(String action) {
         return ACTION_SHORTCUT_NEW_TASK.equals(action)
                 || ACTION_SHORTCUT_TASK_DETAILS.equals(action)
@@ -580,13 +634,17 @@ public final class MainActivity extends Activity {
 
     private void dispatchPendingLauncherShortcut() {
         String action = pendingLauncherShortcutAction;
-        if (action == null) return;
+        if (action == null) {
+            dispatchPendingFocusNotificationAction();
+            return;
+        }
         pendingLauncherShortcutAction = null;
         if (!canEdit()) {
             showToast("Saved tasks are unavailable. Task shortcuts are paused to protect your data.");
             return;
         }
         dispatchLauncherShortcut(action);
+        dispatchPendingFocusNotificationAction();
     }
 
     private void dispatchLauncherShortcut(String action) {

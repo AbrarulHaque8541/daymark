@@ -1,10 +1,11 @@
-package com.abrar.daymark;
 
 import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
@@ -15,13 +16,22 @@ import java.util.Locale;
  *
  * Android 16+ requests Live Update promotion only when the user has enabled it.
  * The platform/OEM still decides whether to promote; a normal progress notification
- * is posted otherwise. Callers own the timer lifecycle and should refresh this
+ * is posted otherwise. The notification is tappable (opens the focus timer) and carries
+ * Pause/Finish shade actions. Callers own the timer lifecycle and should refresh this
  * notification when the timer state/progress changes.
  */
 final class TaskFocusTimerNotification {
     static final String CHANNEL_ID = "daymark_focus_sessions";
     private static final int PROGRESS_MAX = 1000;
     private static final String EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing";
+    static final String ACTION_OPEN = "com.abrar.daymark.action.FOCUS_OPEN";
+    static final String ACTION_PAUSE = "com.abrar.daymark.action.FOCUS_PAUSE";
+    static final String ACTION_RESUME = "com.abrar.daymark.action.FOCUS_RESUME";
+    static final String ACTION_FINISH = "com.abrar.daymark.action.FOCUS_FINISH";
+    private static final int REQUEST_OPEN = 9411;
+    private static final int REQUEST_PAUSE = 9412;
+    private static final int REQUEST_RESUME = 9413;
+    private static final int REQUEST_FINISH = 9414;
 
     private TaskFocusTimerNotification() { }
 
@@ -65,7 +75,12 @@ final class TaskFocusTimerNotification {
                         ? System.currentTimeMillis() + remaining
                         : Math.max(0, System.currentTimeMillis() - elapsed))
                 .setUsesChronometer(true)
-                .setShowWhen(true);
+                .setShowWhen(true)
+                .setContentIntent(actionPendingIntent(context, REQUEST_OPEN, ACTION_OPEN))
+                .addAction(android.R.drawable.ic_media_pause, "Pause",
+                        actionPendingIntent(context, REQUEST_PAUSE, ACTION_PAUSE))
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Finish",
+                        actionPendingIntent(context, REQUEST_FINISH, ACTION_FINISH));
         if (timer.isCountdown()) {
             builder.setChronometerCountDown(true);
             builder.setTimeoutAfter(remaining);
@@ -87,6 +102,20 @@ final class TaskFocusTimerNotification {
         NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) manager.cancel(notificationId);
+    }
+
+    /**
+     * Shade actions reuse the activity: tapping the notification opens the focus timer,
+     * and Pause/Finish control the running session directly from the shade, the way a
+     * navigation app's ongoing trip notification does. PendingIntents are immutable and
+     * update in place per request code.
+     */
+    private static PendingIntent actionPendingIntent(Context context, int requestCode, String action) {
+        Intent intent = new Intent(context, MainActivity.class)
+                .setAction(action)
+                .setPackage(context.getPackageName());
+        return PendingIntent.getActivity(context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     private static boolean hasNotificationPermission(Context context) {

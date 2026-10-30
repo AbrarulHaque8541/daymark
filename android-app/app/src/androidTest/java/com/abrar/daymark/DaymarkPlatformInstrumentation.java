@@ -1,4 +1,3 @@
-package com.abrar.daymark;
 
 import android.app.Activity;
 import android.app.Instrumentation;
@@ -338,6 +337,11 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(posted != null && (posted.flags & android.app.Notification.FLAG_ONGOING_EVENT) != 0
                             && android.app.Notification.CATEGORY_PROGRESS.equals(posted.category),
                     "explicit countdown posts a private ongoing progress notification");
+
+            check(posted != null && posted.contentIntent != null,
+                    "focus notification tap opens Daymark");
+            check(posted != null && posted.actions != null && posted.actions.length == 2,
+                    "focus notification exposes Pause and Finish actions in the shade");
 
             // A second runtime instance exercises the same restore boundary used after process recreation.
             TaskFocusSessionRuntime restoredRuntime = new TaskFocusSessionRuntime(isolated);
