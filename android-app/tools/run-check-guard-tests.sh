@@ -4,6 +4,8 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ACTIVITY="$ROOT/app/src/main/java/com/abrar/daymark/MainActivity.java"
 PROVIDER="$ROOT/app/src/main/java/com/abrar/daymark/AttachmentContentProvider.java"
+RECEIVER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java"
+SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
 PROVIDER_BACKUP=$(mktemp)
@@ -75,6 +77,9 @@ expect_fail_after_removal check-task-ux.py "KeyShortcuts.actionFor(event.getKeyC
 expect_fail_after_removal check-task-ux.py "BrowserAddress.isAllowedWebUrl(url)"
 expect_fail_after_removal check-task-ux.py "ShareIntake.parse("
 expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())"
+# Reminder snooze must only re-arm the alarm slot.
+expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' "$RECEIVER" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt," "$SCHEDULER" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"

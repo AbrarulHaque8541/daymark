@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.util.Log;
 
@@ -22,10 +23,16 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     static final String EXTRA_TASK_ID = "daymark.extra.task_id";
     static final String EXTRA_TASK_TITLE = "daymark.extra.task_title";
     static final String EXTRA_FIRE_INSTANT = "daymark.extra.fire_instant";
+    /** Sent by the notification's Snooze action; the distinct action keeps its PendingIntent separate. */
+    static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";
 
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent == null || intent.getAction() == null ? "" : intent.getAction();
+        if (ACTION_SNOOZE.equals(action)) {
+            snoozeReminder(context, intent);
+            return;
+        }
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)
                 || "android.intent.action.QUICKBOOT_POWERON".equals(action)) {
             rescheduleAfterBoot(context);
@@ -54,14 +61,42 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         PendingIntent open = PendingIntent.getActivity(context, notificationId,
                 new Intent(context, MainActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent snooze = PendingIntent.getBroadcast(context, notificationId,
+                new Intent(context, TaskReminderReceiver.class)
+                        .setAction(ACTION_SNOOZE)
+                        .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                        .putExtra(EXTRA_TASK_ID, intent.getStringExtra(EXTRA_TASK_ID))
+                        .putExtra(EXTRA_TASK_TITLE, title),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle(title)
                 .setContentText("Task reminder. Tap to open Daymark.")
                 .setContentIntent(open)
+                .addAction(new Notification.Action.Builder(
+                        Icon.createWithResource(context, android.R.drawable.ic_popup_reminder),
+                        "Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min", snooze).build())
                 .setAutoCancel(true)
                 .build();
         notificationManager.notify(notificationId, notification);
+    }
+
+    /**
+     * Snooze only re-arms an alarm; it never touches the encrypted task store, so it cannot race
+     * the open activity's snapshot writes.
+     */
+    private void snoozeReminder(Context context, Intent intent) {
+        int notificationId = intent == null ? 0 : intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
+        String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);
+        String title = intent == null ? null : intent.getStringExtra(EXTRA_TASK_TITLE);
+        if (notificationId == 0 || title == null || title.trim().isEmpty()) {
+            Log.w("DaymarkReminder", "A snooze action arrived without usable details; nothing was scheduled.");
+            return;
+        }
+        NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) notificationManager.cancel(notificationId);
+        TaskReminderScheduler.snooze(context, notificationId, taskId, title);
     }
 
     private void rescheduleAfterBoot(Context context) {
