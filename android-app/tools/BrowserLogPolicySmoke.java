@@ -1,4 +1,5 @@
-/** Host smoke tests for origin-only browser Logcat redaction. */
+package com.abrar.daymark;
+
 public final class BrowserLogPolicySmoke {
     public static void main(String[] args) {
         String secretUrl = "https://user:pass@example.com/private/reset-token"
