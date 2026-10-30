@@ -188,6 +188,7 @@ public final class GitHubTransportSmoke {
         check(!UpdaterCore.isValidTag("1.5"), "tag scheme requires the v prefix");
     }
 
+    // Locks the updater contract to the exact public release API asset shape and trust metadata.
     private static void parserAcceptsCurrentPublishedV15ReleaseContract() throws Exception {
         String publisher = "{\"applicationId\":\"com.abrar.daymark\",\"versionCode\":12,\"minSdkVersion\":26,"
                 + "\"signerCertificateSha256\":\"ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580\"}";
