@@ -61,7 +61,12 @@ final class TaskFocusTimerNotification {
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setShowWhen(false);
+                .setWhen(timer.isCountdown()
+                        ? System.currentTimeMillis() + remaining
+                        : Math.max(0, System.currentTimeMillis() - elapsed))
+                .setUsesChronometer(true)
+                .setShowWhen(true);
+        if (timer.isCountdown()) builder.setChronometerCountDown(true);
 
         if (Build.VERSION.SDK_INT >= 36 && canRequestLiveUpdate(manager)) {
             Api36.applyLiveUpdateStyle(builder, timer.isCountdown(), progress);
