@@ -23,11 +23,14 @@ required_sound = [
     "void onAction()", "void onSelection()", "void onCountdownSecond(int remainingSeconds)",
     "remainingSeconds > 10", "remainingSeconds == lastTickSecond",
     "void onFinished()", "void close()", "toneGenerator.release()",
+    "private void ensureToneGenerator()",
 ]
 for token in required_sound:
     assert token in sound, f"Focus Timer soundscape missing contract: {token}"
 
-assert "private boolean soundEnabled = true;" in panel
+assert "private boolean soundEnabled;" in panel
+assert "track.setColor(SURFACE_HI);" in panel, "progress track must use the injected Daymark palette"
+assert "activeAnimator.cancel()" in panel, "progress animation must cancel superseded animations"
 assert "private boolean finalTicksEnabled;" in panel
 assert "startTone" not in panel, "UI must route sounds through the soundscape"
 for fixed_accent in ["0xFF12617A", "0xFF54368F", "0xFF27D5F2", "0xFF9B70FF"]:
