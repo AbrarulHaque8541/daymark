@@ -32,8 +32,11 @@ checks = [
      "Live Update eligibility is not invalidated by custom views or colorized notifications"),
     ('"focus-session.enc"' in store and '"daymark.focus-timer.aes-gcm.v1"' in store and "new EncryptedBlobStore" in store,
      "focus session uses a dedicated AES-GCM encrypted file and key alias"),
-    ("tasks.enc" not in store and "EncryptedTaskStore" not in store and "TaskSnapshotCodec" not in store,
-     "focus session persistence is isolated from the encrypted task snapshot"),
+    ('FILE_NAME = "focus-session.enc"' in store and "new File(context.getFilesDir(), FILE_NAME)" in store
+     and "new EncryptedBlobStore" in store,
+     "focus session uses its own file and encrypted blob adapter, not the task snapshot path"),
+    ("new EncryptedTaskStore(" not in store and "TaskSnapshotCodec." not in store,
+     "focus session persistence does not call the task snapshot store or codec"),
     ("TaskFocusTimerSnapshotCodec.encode" in store and "TaskFocusTimerSnapshotCodec.restore" in store,
      "focus store persists and restores the monotonic timer snapshot"),
     ("MAX_PAYLOAD_BYTES" in codec and "requireEnd(in)" in codec,
