@@ -39,8 +39,11 @@ public final class BrowserCookieImportSmoke {
         assert !unrecognized.recognizedFormat;
         assert unrecognized.cookies.isEmpty();
         assert BrowserCookieImport.parse(null).cookies.isEmpty();
-        assert BrowserCookieImport.parse("x".repeat(BrowserCookieImport.MAX_FILE_CHARS + 1))
-                .cookies.isEmpty();
+        assert BrowserCookieImport.parse(null).inputTruncated;
+        BrowserCookieImport.ParseResult oversizedFile = BrowserCookieImport.parse(
+                "x".repeat(BrowserCookieImport.MAX_FILE_CHARS + 1));
+        assert oversizedFile.cookies.isEmpty();
+        assert oversizedFile.inputTruncated;
 
         String tooLargeValue = "x".repeat(BrowserCookieImport.MAX_VALUE_CHARS + 1);
         assert BrowserCookieImport.parse("# Netscape HTTP Cookie File\n"
@@ -72,6 +75,7 @@ public final class BrowserCookieImportSmoke {
                 BrowserCookieImport.parse("\n".repeat(BrowserCookieImport.MAX_LINES + 1));
         assert tooManyLines.rejectedLineCount == 1;
         assert tooManyLines.rejectedLines.get(0).reason == BrowserCookieImport.Rejection.TOO_MANY_LINES;
+        assert tooManyLines.inputTruncated;
 
         StringBuilder manyBadRows = new StringBuilder();
         for (int i = 0; i < BrowserCookieImport.MAX_REJECTED_LINES_RETAINED + 20; i++) {
@@ -82,6 +86,7 @@ public final class BrowserCookieImportSmoke {
         assert boundedRejections.rejectedLineCount == BrowserCookieImport.MAX_REJECTED_LINES_RETAINED + 20;
         assert boundedRejections.rejectedLines.size() == BrowserCookieImport.MAX_REJECTED_LINES_RETAINED;
         assert boundedRejections.rejectionListTruncated;
+        assert !boundedRejections.inputTruncated;
 
         String validRow = "host.example.com\tFALSE\t/\tFALSE\t0\tn\tv\n";
         StringBuilder manyCookies = new StringBuilder();
@@ -89,6 +94,7 @@ public final class BrowserCookieImportSmoke {
         BrowserCookieImport.ParseResult boundedCookies = BrowserCookieImport.parse(manyCookies.toString());
         assert boundedCookies.cookies.size() == BrowserCookieImport.MAX_COOKIES;
         assert boundedCookies.rejectedLines.get(0).reason == BrowserCookieImport.Rejection.TOO_MANY_COOKIES;
+        assert boundedCookies.inputTruncated;
 
         System.out.println("PASS browser cookie import parser: headerless Netscape, HttpOnly, strict cookie-octet, flags, expiry, line/cookie/rejection bounds and malformed-line rejection");
     }
