@@ -37,6 +37,41 @@ final class DaymarkWebView extends WebView {
         void onRendererGone();
     }
 
+    private boolean handOffVerifiedAppLink(WebView view, android.net.Uri uri) {
+        android.content.Intent appLink = new android.content.Intent(
+                android.content.Intent.ACTION_VIEW, uri);
+        appLink.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
+        android.content.pm.PackageManager packageManager = view.getContext().getPackageManager();
+        android.content.pm.ResolveInfo resolved = packageManager.resolveActivity(appLink,
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+                        | android.content.pm.PackageManager.GET_RESOLVED_FILTER);
+        if (resolved == null || resolved.activityInfo == null || resolved.filter == null
+                || !resolved.isDefault || resolved.filter.countDataAuthorities() == 0) {
+            return false; // No default handler with an explicit host filter; keep the URL in Daymark.
+        }
+        boolean specificHost = false;
+        for (int i = 0; i < resolved.filter.countDataAuthorities(); i++) {
+            android.content.IntentFilter.AuthorityEntry authority =
+                    resolved.filter.getDataAuthority(i);
+            String filterHost = authority == null ? null : authority.getHost();
+            if (filterHost == null || filterHost.startsWith("*")) continue;
+            if (filterHost.equalsIgnoreCase(uri.getHost())
+                    && authority.match(uri) != android.content.IntentFilter.NO_MATCH_DATA) {
+                specificHost = true;
+                break;
+            }
+        }
+        if (!specificHost) {
+            return false; // Generic browser/wildcard filters never count as a verified App Link.
+        }
+        try {
+            view.getContext().startActivity(appLink);
+            return true;
+        } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
+            return false; // Resolver changed or app declined: continue the original URL in WebView.
+        }
+    }
+
     private final ExtensionRuntime extensionRuntime;
     private final Listener listener;
 
@@ -111,17 +146,28 @@ final class DaymarkWebView extends WebView {
                 if (request == null || request.getUrl() == null) return true;
                 String url = request.getUrl().toString();
                 String scheme = request.getUrl().getScheme();
+                // Verified HTTP(S) App Links may open in their owning app after a top-level
+                // user gesture. Generic browser handlers remain inside Daymark.
+                if (request.isForMainFrame() && request.hasGesture()
+                        && BrowserAddress.isAllowedWebUrl(url)
+                        && handOffVerifiedAppLink(view, request.getUrl())) {
+                    return true;
+                }
+
                 if (BrowserAddress.shouldHandOffExternalScheme(request.isForMainFrame(),
                         request.hasGesture(), scheme)) {
                     try {
                         android.content.Intent external = new android.content.Intent(
                                 android.content.Intent.ACTION_VIEW, request.getUrl());
                         external.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
-                        external.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                        view.getContext().startActivity(external);
+                        android.content.Intent chooser = android.content.Intent.createChooser(
+                                external, "Open with — cancel to stay in Daymark");
+                        view.getContext().startActivity(chooser);
                     } catch (android.content.ActivityNotFoundException
                              | SecurityException unavailable) {
-                        listener.onNavigationBlocked(url);
+                        android.widget.Toast.makeText(view.getContext(),
+                                "No compatible app found. This page remains open.",
+                                android.widget.Toast.LENGTH_SHORT).show();
                     }
                     return true;
                 }
