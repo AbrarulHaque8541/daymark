@@ -37,6 +37,58 @@ final class DaymarkWebView extends WebView {
         void onRendererGone();
     }
 
+    private boolean handleIntentLink(WebView view, String value) {
+        final BrowserIntentLinkPolicy.Decision decision;
+        try {
+            decision = BrowserIntentLinkPolicy.parse(value);
+        } catch (IllegalArgumentException invalid) {
+            android.widget.Toast.makeText(view.getContext(),
+                    "This Android app link was blocked because its Intent data is unsafe.",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return true;
+        }
+
+        android.net.Uri target = android.net.Uri.parse(decision.targetUri);
+        String scheme = target.getScheme();
+        boolean webTarget = "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
+        if (webTarget && decision.packageName == null) {
+            if (!networkPolicy.allowsRemoteLoads()) {
+                listener.onOfflineNavigationBlocked();
+                return true;
+            }
+            if (BrowserAddress.isAllowedWebUrl(decision.targetUri)) {
+                view.loadUrl(decision.targetUri);
+            } else {
+                listener.onNavigationBlocked(decision.targetUri);
+            }
+            return true;
+        }
+
+        android.content.Intent external = new android.content.Intent(
+                android.content.Intent.ACTION_VIEW, target);
+        external.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
+        if (decision.packageName != null) external.setPackage(decision.packageName);
+        try {
+            android.content.pm.ResolveInfo resolved = view.getContext().getPackageManager()
+                    .resolveActivity(external, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+            if (resolved == null) throw new android.content.ActivityNotFoundException();
+            view.getContext().startActivity(android.content.Intent.createChooser(
+                    external, "Open with — cancel to stay in Daymark"));
+            return true;
+        } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
+            String fallback = decision.fallbackUrl;
+            if (fallback != null && BrowserAddress.isAllowedWebUrl(fallback)) {
+                if (networkPolicy.allowsRemoteLoads()) view.loadUrl(fallback);
+                else listener.onOfflineNavigationBlocked();
+            } else {
+                android.widget.Toast.makeText(view.getContext(),
+                        "No compatible app found. This page remains open.",
+                        android.widget.Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        }
+    }
+
     private boolean handOffVerifiedAppLink(WebView view, android.net.Uri uri) {
         android.content.Intent appLink = new android.content.Intent(
                 android.content.Intent.ACTION_VIEW, uri);
@@ -73,6 +125,7 @@ final class DaymarkWebView extends WebView {
     }
 
     private final ExtensionRuntime extensionRuntime;
+    private final BrowserNetworkPolicy networkPolicy;
     private final Listener listener;
 
     boolean isShowingCustomView() {
@@ -94,6 +147,7 @@ final class DaymarkWebView extends WebView {
     DaymarkWebView(Activity activity, BrowserNetworkPolicy networkPolicy,
                    boolean safeBrowsingEnabled, Listener listener) {
         super(activity);
+        this.networkPolicy = networkPolicy;
         this.listener = listener;
         this.extensionRuntime = ExtensionRuntime.create(activity);
         try {
@@ -146,6 +200,8 @@ final class DaymarkWebView extends WebView {
                 if (request == null || request.getUrl() == null) return true;
                 String url = request.getUrl().toString();
                 String scheme = request.getUrl().getScheme();
+                // Parse intent:// metadata and construct only a fresh, allowlisted ACTION_VIEW intent.
+                if ("intent".equalsIgnoreCase(scheme)) return handleIntentLink(view, url);
                 // Verified HTTP(S) App Links may open in their owning app after a top-level
                 // user gesture. Generic browser handlers remain inside Daymark.
                 if (request.isForMainFrame() && request.hasGesture()
