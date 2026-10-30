@@ -5346,16 +5346,21 @@ public final class MainActivity extends Activity {
 
         LinearLayout chips = new LinearLayout(this);
         chips.setOrientation(LinearLayout.HORIZONTAL);
-        Button attachments = compactButton("Files " + task.attachments.size(), false);
-        attachments.setContentDescription("Manage " + task.attachments.size()
-                + " attachments for task: " + task.title);
-        attachments.setEnabled(canEdit());
-        attachments.setOnClickListener(view -> showAttachmentManager(task));
-        attachments.setMinHeight(dp(34));
-        attachments.setMinimumHeight(dp(34));
-        attachments.setPadding(dp(8), 0, dp(8), 0);
-        chips.addView(attachments, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+        // Keep the task list visually quiet: an empty Files chip communicates no state and
+        // consumes a full line of horizontal space. Attachment management remains available
+        // from the row's overflow actions, so hiding this zero-count shortcut removes no feature.
+        if (!task.attachments.isEmpty()) {
+            Button attachments = compactButton("Files " + task.attachments.size(), false);
+            attachments.setContentDescription("Manage " + task.attachments.size()
+                    + " attachments for task: " + task.title);
+            attachments.setEnabled(canEdit());
+            attachments.setOnClickListener(view -> showAttachmentManager(task));
+            attachments.setMinHeight(dp(34));
+            attachments.setMinimumHeight(dp(34));
+            attachments.setPadding(dp(8), 0, dp(8), 0);
+            chips.addView(attachments, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+        }
         if (!task.subtasks.isEmpty()) {
             int doneCount = TaskLogic.completedSubtaskCount(task);
             Button subtasksChip = compactButton("Checklist " + doneCount + "/" + task.subtasks.size(), false);
@@ -5385,12 +5390,16 @@ public final class MainActivity extends Activity {
             reminderChip.setMinimumHeight(dp(34));
             chips.addView(reminderChip, chipMargin());
         }
-        HorizontalScrollView chipsScroll = new HorizontalScrollView(this);
-        chipsScroll.setHorizontalScrollBarEnabled(false);
-        chipsScroll.setFillViewport(false);
-        chipsScroll.addView(chips, new HorizontalScrollView.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        copy.addView(chipsScroll, topMargin(dp(3)));
+        // Do not reserve a metadata row when the task has no files, checklist, note or
+        // reminder. This keeps plain tasks compact without removing any row action.
+        if (chips.getChildCount() > 0) {
+            HorizontalScrollView chipsScroll = new HorizontalScrollView(this);
+            chipsScroll.setHorizontalScrollBarEnabled(false);
+            chipsScroll.setFillViewport(false);
+            chipsScroll.addView(chips, new HorizontalScrollView.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            copy.addView(chipsScroll, topMargin(dp(3)));
+        }
         row.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         Button more = compactButton("⋮", false);
@@ -7982,7 +7991,12 @@ public final class MainActivity extends Activity {
             case NETWORK_POLICY:
                 return "Wi-Fi only was selected. Connect to Wi-Fi or explicitly allow mobile data before downloading. No APK was saved.";
             case INVALID_METADATA:
-                return "The GitHub release metadata was incomplete or invalid. No APK was downloaded.";
+                return "GitHub release metadata could not be validated. No APK was downloaded. Details: "
+                        + (error.getMessage() == null ? "unknown metadata validation error" : error.getMessage());
+            case INCOMPATIBLE_INSTALL:
+                return "This installed Daymark package cannot be updated by the current release channel. "
+                        + "Your existing app and encrypted tasks are untouched. Do not uninstall it; "
+                        + "a compatible migration path is required.";
             case HTTP:
                 return "GitHub did not return a usable release response. No APK was downloaded.";
             case APK_MISMATCH:

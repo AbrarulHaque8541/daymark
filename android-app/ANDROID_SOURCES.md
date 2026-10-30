@@ -179,3 +179,32 @@ Android [user-initiated data transfer jobs](https://developer.android.com/develo
 Android's [Auto Backup rules](https://developer.android.com/identity/data/autobackup) define separate file, database, shared-preference, root, app-specific external, and device-protected domains. The [application manifest reference](https://developer.android.com/guide/topics/manifest/application-element#allowbackup) warns that some Android 12+ manufacturers may still perform device-to-device migration despite `allowBackup=false`. Excluding only `tasks.enc` and its temporary variants did not explicitly cover browser history/preferences, WebView data, or other app-private files.
 
 The rules now exclude `path="."` in all nine documented domains for cloud backup, device transfer, and legacy full backup, retaining the existing task-file exclusions and `allowBackup=false`. This is defense in depth for Android transports that honor these rules, not a guarantee against every OEM migration path. Encrypted user-selected `.dmbackup` export/import, key aliases, task storage formats, app identity, and permissions are unchanged. The source guard checks all three policies and rejects each missing whole-domain exclusion (27 negative cases); these checks do not simulate Android backup or prove OEM behavior. Real-device backup/D2D and recovery acceptance remain separate gates.
+
+
+## Official-source refresh (2026-10-26)
+
+Checked against live `main` at `cac2d7524491a3fce488e57b5cf810dc7b5c5017`. This review found no reason to add a runtime dependency, model, downloader, shell/Termux bridge, native-code loader, or new permission. The app remains local-first; deterministic suggestions are not AI; no cloud fallback is implemented.
+
+### Android, Jetpack, and future code delivery
+
+The AndroidX [recent release notes](https://developer.android.com/jetpack/androidx/versions/all-channel) list a substantial 2026-10-21 batch across libraries and release channels. Daymark has no app runtime dependencies in its `dependencies` block, so adding a Jetpack library or adopting preview releases is not justified without a concrete feature need.
+
+Android's [Android 17 target behavior page](https://developer.android.com/about/versions/17/behavior-changes-17), updated 2026-10-23, says apps targeting API 37 must load native libraries through `System.load()` from read-only files; the guidance also recommends avoiding dynamic code loading because of tampering/injection risk. Daymark targets API 36 and ships no dynamically loaded Android native libraries. This is a future target/API-37 gate, not a reason to change the current target or treat model weights as executable code.
+
+Android's [developer-verification rollout](https://developer.android.com/developer-verification) began 2026-09-30 for apps installed from participating stores in Brazil, Indonesia, Singapore, and Thailand on certified Android 7+ devices, with global expansion planned for 2027. The [FAQ](https://developer.android.com/developer-verification/guides/faq) says direct sideloads and non-participating stores are not in the initial enforcement phase; it recommends preparing before global expansion. Developers distributing exclusively outside Play can use the [Android Developer Console](https://developer.android.com/developer-verification/guides/android-developer-console) to verify their identity and register package names/signing keys. The separate [open-source app registration guide](https://developer.android.com/developer-verification/guides/open-source-app-registration), updated 2026-10-23, says open-source repositories do not have to register, but registration retains the same install experience there. Do not assume that repository-specific path is a blanket exemption for direct GitHub downloads. Daymark's current `com.abrar.daymark` package and production signer remain unchanged; the owner should review registration before broad distribution as global enforcement approaches.
+
+### Local model/runtime and licensing
+
+Official llama.cpp [release b11880](https://github.com/ggml-org/llama.cpp/releases/tag/b11880) (2026-10-25) adds rejection of truncated GGUF tensor data in merge tooling; [release b11881](https://github.com/ggml-org/llama.cpp/releases/tag/b11881) (2026-10-25) changes cache handling to respect `no_alloc`. These are relevant only if Daymark later selects that runtime or uses its model tooling. No runtime, GGUF parser, model weights, importer, or model distribution exists in the app, so no dependency or artifact update is warranted. Future work still requires an exact patched runtime, model provenance and license review, hash verification, bounded resource use, user-started transfer/removal, and ABI/device qualification.
+
+### Privacy, WebView scripts, and app updates
+
+The official [WebView native-bridge security guidance](https://developer.android.com/privacy-and-security/risks/insecure-webview-native-bridges) was updated 2026-10-23 and reiterates that a JavaScript interface is exposed to all frames without a reliable calling-origin check; untrusted WebView content should not receive a broad native bridge. Daymark has no such bridge. `ExtensionInjector` uses `evaluateJavascript()` in the currently displayed page's JavaScript context, not a Chrome-style isolated extension world. The existing import dialog warns that a trusted enabled script can read/change matching page content and that page-visible information may be sent externally. Do not describe this as a hostile-code sandbox. A precise UI wording addition is deferred while open PR [#339](https://github.com/AbrarulHaque8541/daymark/pull/339) edits `MainActivity.java`; coordinate any later UI change rather than overlapping that shared file.
+
+No material first-party Android storage/Keystore/backup or Termux change was identified in this review window. The October 2026 [Android Security Bulletin](https://source.android.com/docs/security/bulletin/2026/2026-10-01) was published 2026-10-05 and updated 2026-10-08, before this window. The developer-verification program is the material distribution change to track: direct sideloads are outside the initial phase, but wider availability should be prepared ahead of the stated 2027 global rollout. No application code, installer flow, or signing key was changed; the current status and release evidence are recorded in the [agent status snapshot](../docs/AGENT_STATUS.md).
+
+---
+Work by: Cue
+Model: not disclosed by runtime
+Tooling: Git, GitHub CLI, official Android/llama.cpp sources
+Timestamp (UTC): 2026-10-26T03:57:57Z
