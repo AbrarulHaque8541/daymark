@@ -38,7 +38,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .sidebar-bottom strong, .sidebar-bottom small { display: block; }.sidebar-bottom strong { font-size: 12px; }.sidebar-bottom small { margin-top: 4px; color: var(--muted); font-size: 11px; }
 .main { width: min(1040px, 100%); margin: 0 auto; padding: 28px clamp(20px, 5vw, 64px) 24px; }
-.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
 .eyebrow { margin: 0; font-size: 10px; line-height: 1.5; font-weight: 750; letter-spacing: 1.65px; color: var(--muted); }
 .privacy-pill { border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; font-size: 11px; color: var(--muted); white-space: nowrap; }.privacy-pill span { color: var(--accent); font-size: 9px; margin-right: 5px; }
 .intro { padding: 58px 0 35px; display: flex; justify-content: space-between; align-items: end; gap: 30px; }
