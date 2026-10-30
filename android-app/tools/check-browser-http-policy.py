@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source guard for BrowserHttpPolicy and BrowserDownloadTracker."""
+"""Source guard for BrowserHttpPolicy, BrowserAddress, and BrowserDownloadTracker."""
 import pathlib
 import sys
 
@@ -13,8 +13,20 @@ assert "ALLOW_HTTP = true" in s, "HTTP must be explicitly allowed"
 assert "isHttp(" in s and "isHttps(" in s, "scheme detection missing"
 assert "securityLabel(" in s, "user-facing security label missing"
 assert '"Not encrypted"' in s, "HTTP must show 'Not encrypted' label"
-assert "resolveBareDomain(" in s, "bare-domain → HTTPS resolution missing"
+assert "resolveBareDomain(" in s, "bare-domain to HTTPS resolution missing"
 assert "isAllowedWebScheme(" in s, "scheme allowlist missing"
+
+addr = base / "BrowserAddress.java"
+assert addr.exists(), "BrowserAddress.java missing"
+a = addr.read_text(encoding="utf-8")
+assert "BrowserHttpPolicy.isAllowedWebScheme(" in a, "BrowserAddress must delegate scheme check to BrowserHttpPolicy.isAllowedWebScheme()"
+assert "Only HTTP and HTTPS pages are supported" in a, "BrowserAddress must accept HTTP+HTTPS, reject other schemes"
+
+hist = base / "BrowserHistory.java"
+assert hist.exists(), "BrowserHistory.java missing"
+h = hist.read_text(encoding="utf-8")
+assert '"http".equalsIgnoreCase(scheme)' in h, "BrowserHistory must accept HTTP origins"
+assert "HTTP/HTTPS" in h, "BrowserHistory must document HTTP/HTTPS origin storage"
 
 dl = base / "BrowserDownloadTracker.java"
 assert dl.exists(), "BrowserDownloadTracker.java missing"
@@ -26,4 +38,4 @@ assert "redact(" in d, "URL redaction missing (privacy)"
 assert "synchronized" in d, "thread safety missing"
 assert "progress()" in d, "progress calculation missing"
 
-print("PASS check-browser-http-policy: HTTP policy + download tracker contract verified")
+print("PASS check-browser-http-policy: HTTP+HTTPS browser policy, address validation, history, and download tracker contract verified")

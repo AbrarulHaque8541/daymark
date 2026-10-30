@@ -27,12 +27,26 @@ public final class BrowserAddressSmoke {
                 .equals("https://example.com:8443/path");
         assert BrowserAddress.resolveInput("https://example.com/a", BrowserAddress.SearchEngine.GOOGLE)
                 .equals("https://example.com/a");
+
+        // HTTP is allowed alongside HTTPS (BrowserHttpPolicy.ALLOW_HTTP=true).
+        // HTTP pages show "Not encrypted" in the UI; bare domains still resolve to HTTPS.
+        assert BrowserAddress.resolveInput("http://example.com", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("http://example.com") : "HTTP URLs must be accepted";
+        assert BrowserAddress.resolveInput("http://example.com/after-redirect", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("http://example.com/after-redirect") : "HTTP URLs must be accepted";
+        assert BrowserAddress.isAllowedWebUrl("http://example.com/") : "HTTP must be an allowed web URL";
+        assert BrowserAddress.isAllowedWebUrl("http://example.com/after-redirect");
+        assert BrowserAddress.isAllowedWebUrl("http://example.com:8080/path?q=1");
+        assert BrowserAddress.resolveInput("http://example.com:8080", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("http://example.com:8080");
+
         rejects("javascript:alert(1)");
-        rejects("http://example.com");
-        rejects("http://example.com/after-redirect");
         rejects("file:///etc/passwd");
         rejects("content://com.example/private");
         rejects("intent://open");
+        rejects("ftp://example.com/file");
+        rejects("data:text/html,hello");
+
         for (String scheme : new String[]{"tg", "telegram", "mailto", "tel", "sms",
                 "smsto", "geo", "market", "whatsapp", "TG"}) {
             assert BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
@@ -45,10 +59,8 @@ public final class BrowserAddressSmoke {
         assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "tg");
         assert !BrowserAddress.shouldHandOffExternalScheme(true, true, null);
 
-        assert !BrowserAddress.isAllowedWebUrl("data:text/html,hello");
-        assert !BrowserAddress.isAllowedWebUrl("http://example.com/");
-        assert !BrowserAddress.isAllowedWebUrl("http://example.com/after-redirect");
         assert !BrowserAddress.isAllowedWebUrl("https://user:pass@example.com/");
+        assert !BrowserAddress.isAllowedWebUrl("http://user:pass@example.com/");
         assert !BrowserAddress.isAllowedWebUrl("https://example.com:0");
         assert !BrowserAddress.isAllowedWebUrl("https://example.com:65536");
         assert !BrowserAddress.isAllowedWebUrl("https://example.com:99999");
@@ -87,6 +99,15 @@ public final class BrowserAddressSmoke {
         assert BrowserAddress.isAllowedWebUrl(sites.get(0)) : "Saved origin should be reopenable in WebView";
         assertStored(history, "https://example.com");
         assert BrowserHistory.decode(BrowserHistory.clear()).isEmpty();
+
+        // HTTP origins are also stored in history (scheme preserved, default port 80 stripped).
+        String httpHistory = BrowserHistory.add("", "http://insecure.example/page?q=secret");
+        assert BrowserHistory.decode(httpHistory).get(0).equals("http://insecure.example")
+                : "HTTP origin must be sanitized to scheme://host";
+        assertStored(httpHistory, "http://insecure.example");
+        assert BrowserHistory.sanitizeUrl("http://example.com/path?q=secret").equals("http://example.com");
+        assert BrowserHistory.sanitizeUrl("http://example.com:80/path").equals("http://example.com");
+        assert BrowserHistory.sanitizeUrl("http://example.com:8080/path").equals("http://example.com:8080");
 
         history = BrowserHistory.add(history, "https://other.example.net/path");
         history = BrowserHistory.add(history, "https://example.com/third");
@@ -147,7 +168,6 @@ public final class BrowserAddressSmoke {
         String sanitizedLegacy = BrowserHistory.sanitizeSerialized(legacyStored);
         assertStored(sanitizedLegacy, "https://example.net");
         assert BrowserHistory.decode(sanitizedLegacy).equals(migrated);
-        assert BrowserHistory.sanitizeUrl("http://example.com/path?q=secret") == null;
 
         for (int i = 0; i < BrowserHistory.MAX_ENTRIES + 5; i++) {
             history = BrowserHistory.add(history, "https://site" + i + ".example.com/page/" + i);
@@ -175,12 +195,12 @@ public final class BrowserAddressSmoke {
         assert prunedEntries.size() == 2 : prunedEntries;
         assert !prunedEntries.contains("https://beta.example:8443") : "the forgotten site is gone";
         assert prunedEntries.get(0).equals("https://gamma.example") : "other entries keep their order";
-        assert BrowserHistory.remove(searchable, "http://insecure.example").equals(searchable)
+        assert BrowserHistory.remove(searchable, "javascript:alert(1)").equals(searchable)
                 : "an unusable URL must not change history";
         assert BrowserHistory.remove(searchable, null).equals(searchable)
                 : "a null URL must not change history";
 
-        System.out.println("PASS browser address/site-history smoke tests: search engines, HTTPS validation, origin-only persistence, secret redaction, legacy migration, reopen, dedup, ports, search, single-site forget, and clear");
+        System.out.println("PASS browser address/site-history smoke tests: search engines, HTTP+HTTPS validation, origin-only persistence, secret redaction, legacy migration, reopen, dedup, ports, search, single-site forget, and clear");
     }
 
     private static void rejects(String value) {
@@ -199,7 +219,8 @@ public final class BrowserAddressSmoke {
         String stored = new String(Base64.getUrlDecoder().decode(lines[0]), StandardCharsets.UTF_8);
         assert stored.equals(expectedOrigin) : "Sensitive URL data persisted: " + stored;
         URI uri = new URI(stored);
-        assert "https".equals(uri.getScheme()) && uri.getHost() != null : "History must be a validated HTTPS origin";
+        assert ("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) && uri.getHost() != null
+                : "History must be a validated HTTP/HTTPS origin";
         assert uri.getRawUserInfo() == null && uri.getRawQuery() == null && uri.getRawFragment() == null
                 : "Userinfo, query, and fragment must not be stored: " + stored;
         assert uri.getRawPath() == null || uri.getRawPath().isEmpty()

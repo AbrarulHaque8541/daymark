@@ -8,10 +8,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
-/** Local site history stores only validated HTTPS origins; no paths, queries, fragments, userinfo, or titles. */
+/** Local site history stores only validated HTTP/HTTPS origins; no paths, queries, fragments, userinfo, or titles. */
 final class BrowserHistory {
     static final int MAX_ENTRIES = 50;
     private static final int HTTPS_DEFAULT_PORT = 443;
+    private static final int HTTP_DEFAULT_PORT = 80;
 
     private BrowserHistory() { }
 
@@ -19,7 +20,8 @@ final class BrowserHistory {
         if (address == null || address.trim().isEmpty()) return null;
         try {
             URI source = new URI(address.trim());
-            if (!"https".equalsIgnoreCase(source.getScheme())) return null;
+            String scheme = source.getScheme();
+            if (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme)) return null;
             String host = source.getHost();
             if (host == null || host.trim().isEmpty()) return null;
 
@@ -30,13 +32,15 @@ final class BrowserHistory {
             if (host.indexOf(':') >= 0 && !(host.startsWith("[") && host.endsWith("]"))) {
                 host = "[" + host + "]";
             }
-            int storedPort = port > 0 && port != HTTPS_DEFAULT_PORT ? port : -1;
-            StringBuilder origin = new StringBuilder("https://").append(host);
+            int defaultPort = "https".equalsIgnoreCase(scheme) ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT;
+            int storedPort = port > 0 && port != defaultPort ? port : -1;
+            StringBuilder origin = new StringBuilder(scheme.toLowerCase(Locale.ROOT)).append("://").append(host);
             if (storedPort > 0) origin.append(':').append(storedPort);
 
             URI sanitized = new URI(origin.toString());
-            if (!"https".equalsIgnoreCase(sanitized.getScheme())
-                    || sanitized.getHost() == null
+            String sanitizedScheme = sanitized.getScheme();
+            if (!"https".equalsIgnoreCase(sanitizedScheme) && !"http".equalsIgnoreCase(sanitizedScheme)) return null;
+            if (sanitized.getHost() == null
                     || sanitized.getRawUserInfo() != null
                     || sanitized.getPort() != storedPort
                     || (sanitized.getRawPath() != null && !sanitized.getRawPath().isEmpty())
@@ -73,7 +77,7 @@ final class BrowserHistory {
     static String add(String serialized, String address) {
         String origin = sanitizeUrl(address);
         if (origin == null) {
-            throw new IllegalArgumentException("Only valid HTTPS origins can be saved in site history.");
+            throw new IllegalArgumentException("Only valid HTTP/HTTPS origins can be saved in site history.");
         }
         List<String> entries = decode(serialized);
         entries.remove(origin);
