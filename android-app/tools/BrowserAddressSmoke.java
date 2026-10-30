@@ -1,4 +1,3 @@
-package com.abrar.daymark;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -72,6 +71,19 @@ public final class BrowserAddressSmoke {
         assert BrowserAddress.resolveInput("example.com:8443", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://example.com:8443");
 
+        // IPv4 and IPv6 literals must navigate when an explicit scheme is given.
+        assert BrowserAddress.resolveInput("http://192.168.1.1/admin", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("http://192.168.1.1/admin") : "IPv4 literal with explicit scheme must be accepted";
+        assert BrowserAddress.resolveInput("https://10.0.0.1:8443/", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://10.0.0.1:8443/") : "IPv4 with port must be accepted";
+        assert BrowserAddress.isAllowedWebUrl("http://[::1]:8080/dev") : "IPv6 literal must be accepted";
+        assert BrowserAddress.resolveInput("http://[::1]:8080/dev", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("http://[::1]:8080/dev") : "IPv6 literal with port must round-trip";
+        assert BrowserAddress.isAllowedWebUrl("https://[2001:db8::1]/path") : "IPv6 global unicast must be accepted";
+        assert !BrowserAddress.isAllowedWebUrl("https://[::1]:0/") : "IPv6 with invalid port must be rejected";
+        assert !BrowserAddress.isAllowedWebUrl("https://[::1]:99999/") : "IPv6 with out-of-range port must be rejected";
+        assert !BrowserAddress.isLikelyWebAddress("192.168.1.1") : "bare IPv4 is not a bare domain";
+        assert BrowserAddress.isLikelyWebAddress("http://192.168.1.1") : "explicit scheme makes IPv4 a web address";
         // Internationalized (non-ASCII) hosts must navigate instead of being rejected or
         // mistaken for a search: the address bar shows the punycode form, which is the
         // unambiguous representation a browser can actually load.
