@@ -32,12 +32,13 @@ test('small touch viewport is a phone glance surface', () => {
   assert.equal(result.canCapture, true);
 });
 
-test('no reported pointer/touch fails closed for task capture', () => {
+test('keyboard/IME input remains available when pointer and touch signals are absent', () => {
   const result = detectWebSurfaceProfile(policy, {
     viewportWidth: 1200, finePointer: false, coarsePointer: false, hover: false, maxTouchPoints: 0
   });
-  assert.equal(result.canCapture, false);
+  assert.equal(result.canCapture, true);
   assert.equal(result.canReview, true);
+  assert.ok(result.inputs.includes('keyboard'));
 });
 
 test('invalid browser measurements are rejected rather than guessed', () => {
