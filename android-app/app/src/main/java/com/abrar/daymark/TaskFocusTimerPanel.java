@@ -66,7 +66,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private long selectedDurationMs = 25L * 60L * 1000L;
     private TaskFocusTimer timer;
     private String taskLabel = "Choose a task";
-    private boolean soundEnabled;
+    private boolean soundEnabled = true;
     private boolean finalTicksEnabled;
     private boolean finishSoundPlayed;
     private boolean closed;
@@ -197,7 +197,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         summaryLp.topMargin = dp(14);
         addView(dailySummary, summaryLp);
 
-        soundToggle = settingRow("Soft interaction sounds", false);
+        soundToggle = settingRow("Soft interaction sounds", soundEnabled);
         tickToggle = settingRow("Final 10-second ticks", false);
         LayoutParams settingLp = matchWrap();
         settingLp.topMargin = dp(8);
@@ -205,6 +205,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         LayoutParams tickLp = matchWrap();
         tickLp.topMargin = dp(7);
         addView(tickToggle, tickLp);
+        sounds.setEnabled(soundEnabled);
+        tickToggle.setAlpha(0.45f);
         soundToggle.setOnClickListener(v -> {
             soundEnabled = !soundEnabled;
             sounds.setEnabled(soundEnabled);
