@@ -115,7 +115,7 @@ final class TaskFocusTimerNotification {
         // Promoted-ongoing eligibility APIs are part of the Android 16 (36.1)
         // extension. API 36.0 devices must keep the standard notification path;
         // calling canPostPromotedNotifications() before extension 1 can fail at runtime.
-        if (android.os.ext.SdkExtensions.getExtensionVersion(Build.VERSION_CODES.BAKLAVA) < 1) {
+        if (Build.getMinorSdkVersion(Build.VERSION.SDK_INT_FULL) < 1) {
             return false;
         }
         return Api36.canPromote(manager);
