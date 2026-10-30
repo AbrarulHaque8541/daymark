@@ -10,6 +10,7 @@ final class BrowserMediaPolicy {
                 && userGesture
                 && "daymark-download".equalsIgnoreCase(scheme)
                 && "media".equalsIgnoreCase(host)
+                && BrowserHttpPolicy.isHttps(mediaUrl)
                 && BrowserAddress.isAllowedWebUrl(mediaUrl);
     }
 }
