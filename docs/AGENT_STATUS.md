@@ -4,6 +4,8 @@
 
 ## Latest reviewed snapshot
 
+- [Daymark status snapshot — 2026-10-30T10:50Z](./CURRENT_STATUS_20261030_1050Z.md)
+
 - [Daymark status snapshot — 2026-10-30T10:16:25Z](./CURRENT_STATUS_20261030_101625Z.md)
 
 - [Daymark status snapshot — 2026-10-30T09:26Z](./CURRENT_STATUS_20261030_0926Z.md)
@@ -50,4 +52,4 @@
 - Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
 - Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
-- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object/build.
+- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
