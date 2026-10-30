@@ -1,5 +1,4 @@
 package com.abrar.daymark;
-
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
@@ -8,7 +7,6 @@ import android.content.pm.ProviderInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -22,15 +20,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
 
-/** Dedicated instrumentation runner for AttachmentContentProvider streaming error propagation. */
 public final class AttachmentStreamingErrorInstrumentation extends Instrumentation {
-
     @Override
     public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         start();
     }
-
     @Override
     public void onStart() {
         Bundle result = new Bundle();
@@ -45,13 +40,11 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             finish(Activity.RESULT_CANCELED, result);
         }
     }
-
     public static int runTests(Context targetContext) throws Exception {
         int assertions = 0;
         File root = new File(targetContext.getCacheDir(),
                 "daymark-streaming-error-test-" + UUID.randomUUID());
         if (!root.mkdirs()) throw new IOException("Could not create test directory.");
-
         try {
             Context context = new IsolatedContext(targetContext, root);
             File noBackup = context.getNoBackupFilesDir();
@@ -62,13 +55,11 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             for (int i = 0; i < plaintext.length; i++) {
                 plaintext[i] = (byte) (i * 17 + 3);
             }
-
             AttachmentBlobStore blobs = new AttachmentBlobStore(attachmentsDirectory,
                     new AndroidAttachmentStore.AndroidKeyAccess());
             blobs.importStream(taskId, attachmentId, new ByteArrayInputStream(plaintext));
             File ciphertextFile = new File(attachmentsDirectory, attachmentId + ".enc");
             byte[] goodCiphertext = readFile(ciphertextFile);
-
             String displayName = "test-doc.txt";
             AttachmentRef reference = new AttachmentRef(attachmentId, displayName, "text/plain", plaintext.length);
             Task task = new Task(taskId, "Streaming Error Test Task", null, "medium", false,
@@ -78,7 +69,6 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
                 throw new AssertionError("Isolated task fixture must start empty.");
             }
             taskStore.save(Collections.singletonList(task));
-
             String authority = context.getPackageName() + ".attachments";
             Uri uri = new Uri.Builder().scheme("content").authority(authority).appendPath(attachmentId).build();
             AttachmentContentProvider provider = new AttachmentContentProvider();
@@ -90,8 +80,6 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             providerInfo.exported = false;
             providerInfo.grantUriPermissions = true;
             provider.attachInfo(context, providerInfo);
-
-            // 1. Valid encrypted attachment streams byte-for-byte exact plaintext.
             writeFile(ciphertextFile, goodCiphertext);
             ParcelFileDescriptor pipe1 = provider.openFile(uri, "r");
             byte[] streamed1;
@@ -102,28 +90,20 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             if (!Arrays.equals(plaintext, streamed1)) {
                 throw new AssertionError("Valid encrypted attachment streaming failed to yield exact plaintext.");
             }
-
-            // 2. Truncated ciphertext causes reader IOException instead of clean EOF.
             byte[] truncatedCiphertext = Arrays.copyOf(goodCiphertext, goodCiphertext.length / 2);
             writeFile(ciphertextFile, truncatedCiphertext);
             assertReadFails(provider, uri, "Truncated ciphertext");
             assertions++;
-
-            // 3. Corrupted payload ciphertext causes reader IOException instead of clean EOF.
             byte[] corruptedCiphertext = goodCiphertext.clone();
             corruptedCiphertext[goodCiphertext.length / 2] ^= 0xFF;
             writeFile(ciphertextFile, corruptedCiphertext);
             assertReadFails(provider, uri, "Corrupted ciphertext");
             assertions++;
-
-            // 4. Authentication / AES-GCM tag failure causes reader IOException instead of clean EOF.
             byte[] tamperedTagCiphertext = goodCiphertext.clone();
             tamperedTagCiphertext[goodCiphertext.length - 1] ^= 0x01;
             writeFile(ciphertextFile, tamperedTagCiphertext);
             assertReadFails(provider, uri, "AES-GCM tag failure");
             assertions++;
-
-            // 5. Cancellation smoke check only; this does not assert writer termination.
             writeFile(ciphertextFile, goodCiphertext);
             ParcelFileDescriptor pipe5 = provider.openFile(uri, "r");
             try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(pipe5)) {
@@ -134,17 +114,13 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
                     throw new AssertionError("Reader early cancellation test failed to read initial bytes.");
                 }
             }
-
         } finally {
             deleteTree(root);
         }
-
         return assertions;
     }
-
     private static void assertReadFails(AttachmentContentProvider provider, Uri uri, String label)
             throws Exception {
-        // A rejected open or an exception only during close is not a read failure.
         try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(provider.openFile(uri, "r"))) {
             boolean readFailed = false;
             try {
@@ -157,7 +133,6 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
             }
         }
     }
-
     private static byte[] readAll(InputStream input) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
@@ -167,37 +142,31 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
         }
         return output.toByteArray();
     }
-
     private static byte[] readFile(File file) throws IOException {
         try (InputStream input = new FileInputStream(file)) {
             return readAll(input);
         }
     }
-
     private static void writeFile(File file, byte[] contents) throws IOException {
         try (FileOutputStream output = new FileOutputStream(file)) {
             output.write(contents);
             output.getFD().sync();
         }
     }
-
     private static void deleteTree(File file) {
         if (file == null || !file.exists()) return;
         File[] children = file.listFiles();
         if (children != null) for (File child : children) deleteTree(child);
         if (!file.delete() && file.exists()) file.deleteOnExit();
     }
-
     private static String stackTrace(Throwable failure) {
         StringWriter text = new StringWriter();
         failure.printStackTrace(new PrintWriter(text));
         return text.toString();
     }
-
     private static final class IsolatedContext extends ContextWrapper {
         private final File files;
         private final File noBackup;
-
         IsolatedContext(Context base, File root) throws IOException {
             super(base);
             files = new File(root, "files");
@@ -206,7 +175,6 @@ public final class AttachmentStreamingErrorInstrumentation extends Instrumentati
                 throw new IOException("Could not create isolated application directories.");
             }
         }
-
         @Override public File getFilesDir() { return files; }
         @Override public File getNoBackupFilesDir() { return noBackup; }
         @Override public Context getApplicationContext() { return this; }
