@@ -64,7 +64,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private long selectedDurationMs = 25L * 60L * 1000L;
     private TaskFocusTimer timer;
     private String taskLabel = "Choose a task";
-    private boolean soundEnabled = true;
+    private boolean soundEnabled;
     private boolean finalTicksEnabled;
     private boolean finishSoundPlayed;
     private boolean closed;
@@ -440,6 +440,10 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        if (progressRing.activeAnimator != null) {
+            progressRing.activeAnimator.cancel();
+            progressRing.activeAnimator = null;
+        }
         sounds.close();
     }
 
@@ -449,6 +453,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         private final RectF bounds = new RectF();
         private float value;
         private int color = ACCENT;
+        private ValueAnimator activeAnimator;
 
         ProgressRing(Context context) {
             super(context);
@@ -456,7 +461,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             track.setStyle(Paint.Style.STROKE);
             track.setStrokeCap(Paint.Cap.ROUND);
             track.setStrokeWidth(dp(9));
-            track.setColor(0xFF1B3042);
+            track.setColor(SURFACE_HI);
             progress.setStyle(Paint.Style.STROKE);
             progress.setStrokeCap(Paint.Cap.ROUND);
             progress.setStrokeWidth(dp(9));
@@ -465,12 +470,27 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         void setProgress(float next, int tint) {
             float bounded = Math.max(0f, Math.min(1f, next));
             color = tint;
+            if (Math.abs(value - bounded) < 0.001f) {
+                color = tint;
+                invalidate();
+                return;
+            }
+            if (activeAnimator != null) activeAnimator.cancel();
             ValueAnimator animator = ValueAnimator.ofFloat(value, bounded);
+            activeAnimator = animator;
             animator.setDuration(260L);
             animator.setInterpolator(new DecelerateInterpolator());
             animator.addUpdateListener(a -> {
                 value = (Float) a.getAnimatedValue();
                 invalidate();
+            });
+            animator.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator animation) {
+                    if (activeAnimator == animator) activeAnimator = null;
+                }
+                @Override public void onAnimationCancel(android.animation.Animator animation) {
+                    if (activeAnimator == animator) activeAnimator = null;
+                }
             });
             animator.start();
         }
