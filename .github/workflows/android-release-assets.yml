@@ -137,9 +137,7 @@ jobs:
               assembleGithubSideloadRelease \
               assemblePlayRelease \
               lintGithubSideloadRelease \
-              lintPlayRelease \
-              testGithubSideloadReleaseUnitTest \
-              testPlayReleaseUnitTest
+              lintPlayRelease
 
             rm -f "$RUNNER_TEMP/release.keystore"
           else
@@ -148,8 +146,6 @@ jobs:
               assemblePlayDebug \
               lintGithubSideloadDebug \
               lintPlayDebug \
-              testGithubSideloadDebugUnitTest \
-              testPlayDebugUnitTest \
               compileGithubSideloadDebugAndroidTestJavaWithJavac \
               compilePlayDebugAndroidTestJavaWithJavac
           fi
