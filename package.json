@@ -1,6 +1,6 @@
 {
   "name": "daymark-web-prototype",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Daymark — local-first personal task manager, reference web prototype.",
   "scripts": {

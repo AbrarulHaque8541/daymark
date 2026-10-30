@@ -5,7 +5,8 @@
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
-  const state = { tasks: [], filter: 'all', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [] };
+  const repeat = window.DaymarkRepeat || null;
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [] };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -123,6 +124,16 @@
     return logic.isReminderLead(lead) ? lead : null;
   }
 
+  function taskRepeat(task) {
+    const rule = task ? task.repeat : null;
+    return rule && repeat && repeat.isRepeat(rule) ? rule : null;
+  }
+
+  function readRepeatRule(select) {
+    if (!repeat || !select || select.disabled || select.value === '') return null;
+    return repeat.isRepeat(select.value) ? select.value : null;
+  }
+
   function parseQuickTags(title) {
     // Quick tagging from the composer, matching the Android app's #tag quick add:
     // pull "#tag" tokens out of the title and store them as real tags.
@@ -182,7 +193,9 @@
       clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
       bell: '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
       note: '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/>',
-      steps: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2m-3 6 1 1 2-2m-3 6 1 1 2-2"/>'
+      steps: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2m-3 6 1 1 2-2m-3 6 1 1 2-2"/>',
+    repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+    copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
     };
     return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
   }
@@ -203,7 +216,9 @@
     const subtaskChip = summary
       ? `<button class="task-chip subtask-chip${summary.done === summary.total ? ' is-all-done' : ''}" type="button" data-action="edit" aria-label="Edit subtasks (${summary.done} of ${summary.total} done)" title="Subtasks: ${summary.done}/${summary.total}">${icon('steps')} ${summary.done}/${summary.total}</button>`
       : '';
-    const hasReminder = logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null;
+    const repeatRule = taskRepeat(task);
+    const repeatChip = repeatRule ? `<span class="task-chip repeat-chip" title="Repeats ${repeatRule}. Completing it schedules the next occurrence.">${icon('repeat')}</span>` : '';
+    const hasReminder = !task.completed && logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null;
     const reminderChip = hasReminder
       ? `<span class="task-chip reminder-chip" title="${task.reminderLeadMinutes === 0 ? 'Reminder at due time' : `Reminder ${task.reminderLeadMinutes === 1440 ? '1 day' : task.reminderLeadMinutes === 60 ? '1 hour' : '30 min'} before`}">${icon('bell')}</span>`
       : '';
@@ -211,10 +226,11 @@
       <button class="complete-button" type="button" data-action="toggle" aria-label="${completionLabel}" aria-pressed="${task.completed}">${icon('check')}</button>
       <div class="task-main">
         <span class="task-title" title="${escapeHTML(task.title)}">${escapeHTML(task.title)}</span>
-        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${reminderChip}${notesChip}${subtaskChip}</div>
+        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${repeatChip}${reminderChip}${notesChip}${subtaskChip}</div>
       </div>
       <div class="task-actions">
         <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}">${icon('edit')}</button>
+        <button class="icon-button duplicate-button" type="button" data-action="duplicate" aria-label="Duplicate ${escapeHTML(task.title)}" title="Duplicate as a new task">${icon('copy')}</button>
         <button class="icon-button delete-button" type="button" data-action="delete" aria-label="Delete ${escapeHTML(task.title)}">${icon('trash')}</button>
       </div>
     </article>`;
@@ -240,6 +256,9 @@
       const extra = source.filter((task) => !knownIds.has(task.id) && matchesSubtaskTitle(task, normalizedQuery));
       if (extra.length) filteredTasks = logic.getFilteredTasks(filteredTasks.concat(extra), effectiveFilter, '', today);
     }
+    if (state.sort === 'title') {
+      filteredTasks = filteredTasks.slice().sort((a, b) => a.title.localeCompare(b.title) || (a.dueDate || '').localeCompare(b.dueDate || ''));
+    }
     const openTasks = state.tasks.filter((task) => !task.completed);
     const todayTasks = state.tasks.filter((task) => task.dueDate === today);
     const upcomingTasks = state.tasks.filter((task) => task.dueDate !== null && task.dueDate > today);
@@ -264,6 +283,7 @@
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
     $('#clear-completed').hidden = completedTasks.length === 0;
     $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
+    $('#sort-toggle').textContent = state.sort === 'title' ? 'Sort: A–Z' : 'Sort: Smart';
 
     document.querySelectorAll('.filter-button').forEach((button) => {
       const active = button.dataset.filter === state.filter;
@@ -298,6 +318,25 @@
       $('#empty-copy').textContent = 'Add your first task above. Small steps count.';
     }
 
+    const completedAll = state.tasks.filter((task) => task.completed);
+    const doneDays = new Set(completedAll.map((task) => logic.localDateString(new Date(task.updatedAt))));
+    const doneToday = doneDays.has(today)
+      ? completedAll.filter((task) => logic.localDateString(new Date(task.updatedAt)) === today).length : 0;
+    const weekStartDate = new Date();
+    weekStartDate.setDate(weekStartDate.getDate() - 6);
+    const weekStartDay = logic.localDateString(weekStartDate);
+    const doneWeek = completedAll.filter((task) => logic.localDateString(new Date(task.updatedAt)) >= weekStartDay).length;
+    let streak = 0;
+    const streakCursor = new Date();
+    if (!doneDays.has(logic.localDateString(streakCursor))) streakCursor.setDate(streakCursor.getDate() - 1);
+    while (doneDays.has(logic.localDateString(streakCursor))) {
+      streak += 1;
+      streakCursor.setDate(streakCursor.getDate() - 1);
+    }
+    $('#stats-strip').hidden = completedAll.length === 0;
+    $('#stat-done-today').textContent = String(doneToday);
+    $('#stat-done-week').textContent = String(doneWeek);
+    $('#stat-streak').textContent = String(streak);
     const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
     suggestionList.innerHTML = suggestions.length
       ? suggestions.map(({ task, reason }, index) => `<div class="suggestion-item"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></div>`).join('')
@@ -393,6 +432,8 @@
     };
     if (tags) task.tags = tags;
     if (hasDate && reminderLead !== null) task.reminderLeadMinutes = reminderLead;
+    const repeatRule = readRepeatRule($('#new-repeat'));
+    if (hasDate && repeatRule) task.repeat = repeatRule;
     state.tasks.push(task);
     const saved = persistTasks();
     form.reset();
@@ -400,6 +441,8 @@
     $('#new-due-time').disabled = true;
     $('#new-reminder').disabled = true;
     $('#new-reminder').value = '';
+    $('#new-repeat').disabled = true;
+    $('#new-repeat').value = '';
     state.filter = 'all';
     state.query = '';
     $('#task-search').value = '';
@@ -418,6 +461,9 @@
     reminderSelect.disabled = !task.dueDate;
     reminderSelect.value = logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null
       ? String(task.reminderLeadMinutes) : '';
+    const repeatSelect = $('#edit-repeat');
+    repeatSelect.disabled = !task.dueDate;
+    repeatSelect.value = taskRepeat(task) || '';
     $('#edit-priority').value = task.priority;
     $('#edit-tags').value = Array.isArray(task.tags) ? task.tags.join(', ') : '';
     $('#edit-notes').value = typeof task.notes === 'string' ? task.notes : '';
@@ -508,6 +554,9 @@
       delete task.reminderLeadMinutes;
       delete task.reminderShownFire;
     }
+    const repeatRule = readRepeatRule($('#edit-repeat'));
+    if (task.dueDate && repeatRule) task.repeat = repeatRule;
+    else delete task.repeat;
     task.priority = readPriority($('#edit-priority'));
     const notes = $('#edit-notes').value;
     task.notes = notes.trim() ? notes : undefined;
@@ -524,6 +573,42 @@
     showSaveResult(saved, 'Task updated.');
   }
 
+  function scheduleNextOccurrence(task) {
+    const rule = taskRepeat(task);
+    if (!repeat || !rule || !logic.isDateOnly(task.dueDate)) return null;
+    const nextDue = repeat.nextDueDate(task.dueDate, rule, logic.localDateString());
+    if (!nextDue) return null;
+    const now = new Date().toISOString();
+    const next = {
+      id: makeId(),
+      title: task.title,
+      dueDate: nextDue,
+      dueTime: logic.isTimeOnly(task.dueTime) ? task.dueTime : null,
+      priority: task.priority,
+      completed: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    if (typeof task.notes === 'string' && task.notes.trim()) next.notes = task.notes;
+    if (Array.isArray(task.tags) && task.tags.length) next.tags = task.tags.slice();
+    if (Array.isArray(task.subtasks) && task.subtasks.length) {
+      next.subtasks = task.subtasks.map((subtask) => ({ id: makeId(), title: subtask.title, done: false }));
+    }
+    if (logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null) {
+      next.reminderLeadMinutes = task.reminderLeadMinutes;
+    }
+    next.repeat = rule;
+    state.tasks.push(next);
+    return `Task completed — next one is scheduled for ${formatDate(nextDue)}.`;
+  }
+
+  function setQuickDueDate(offsetDays) {
+    const target = new Date();
+    target.setDate(target.getDate() + offsetDays);
+    $('#new-due-date').value = logic.localDateString(target);
+    syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'));
+  }
+
   function handleTaskAction(event) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
@@ -533,11 +618,21 @@
     if (button.dataset.action === 'toggle') {
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
+      const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
       render();
-      showSaveResult(saved, task.completed ? 'Task completed.' : 'Task reopened.');
+      showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
       openEditor(task);
+    } else if (button.dataset.action === 'duplicate') {
+      const now = new Date().toISOString();
+      const copy = Object.assign({}, task, { id: makeId(), completed: false, createdAt: now, updatedAt: now });
+      delete copy.reminderShownFire;
+      if (Array.isArray(copy.subtasks)) copy.subtasks = copy.subtasks.map((subtask) => ({ id: makeId(), title: subtask.title, done: false }));
+      state.tasks.push(copy);
+      const saved = persistTasks();
+      render();
+      showSaveResult(saved, 'Task duplicated as a new open task.');
     } else if (button.dataset.action === 'tag') {
       state.query = button.dataset.tag;
       $('#task-search').value = button.dataset.tag;
@@ -717,13 +812,17 @@
     }
   }
 
-  function syncDueInputs(dateInput, timeInput, reminderSelect) {
+  function syncDueInputs(dateInput, timeInput, reminderSelect, repeatSelect) {
     const hasDate = logic.isDateOnly(dateInput.value);
     timeInput.disabled = !hasDate;
     if (timeInput.disabled) timeInput.value = '';
     if (reminderSelect) {
       reminderSelect.disabled = !hasDate;
       if (reminderSelect.disabled) reminderSelect.value = '';
+    }
+    if (repeatSelect) {
+      repeatSelect.disabled = !hasDate;
+      if (repeatSelect.disabled) repeatSelect.value = '';
     }
   }
 
@@ -735,12 +834,18 @@
       $('#add-error').hidden = true;
       $('#new-title').removeAttribute('aria-invalid');
     });
-    $('#new-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#new-due-time'), $('#new-reminder')));
+    $('#new-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#new-due-time'), $('#new-reminder'), $('#new-repeat')));
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
       render();
     });
     $('#clear-search').addEventListener('click', clearSearch);
+    $('#chip-today').addEventListener('click', () => setQuickDueDate(0));
+    $('#chip-tomorrow').addEventListener('click', () => setQuickDueDate(1));
+    $('#sort-toggle').addEventListener('click', () => {
+      state.sort = state.sort === 'smart' ? 'title' : 'smart';
+      render();
+    });
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
     $('#export-tasks').addEventListener('click', exportTasks);
@@ -760,7 +865,7 @@
       $('#edit-error').hidden = true;
       $('#edit-title').removeAttribute('aria-invalid');
     });
-    $('#edit-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#edit-due-time'), $('#edit-reminder')));
+    $('#edit-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#edit-due-time'), $('#edit-reminder'), $('#edit-repeat')));
     $('#add-subtask').addEventListener('click', addSubtaskFromInput);
     $('#new-subtask').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {

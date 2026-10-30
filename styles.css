@@ -358,3 +358,30 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .toast { border-color: #232d35; background: rgba(26, 33, 40, .9); color: #c2d4c8; box-shadow: 0 8px 25px rgba(0, 0, 0, .4); }
   .toast-action { border-color: #232d35; background: rgba(26, 33, 40, .9); box-shadow: 0 8px 25px rgba(0, 0, 0, .4); }
 }
+
+
+/* ── v1.3 additions: repeat rules, quick due dates, stats, sort, duplicate ── */
+@media (min-width: 721px) {
+  .add-form { grid-template-columns: minmax(100px, 1fr) 112px 88px 96px 100px 100px auto; }
+}
+.date-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+.date-chip { height: 30px; padding: 0 12px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 999px; background: rgba(255, 255, 255, .6); color: #5f6c76; font-size: 10px; font-weight: 700; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
+.date-chip:hover { border-color: var(--accent-bright); background: var(--accent-soft); color: var(--accent); transform: translateY(-1px); }
+.stats-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 2px 0 12px; animation: rise-in .22s ease both; }
+.stats-strip[hidden] { display: none; }
+.stat-cell { display: flex; align-items: baseline; gap: 7px; padding: 9px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(226, 240, 235, .42); }
+.stat-cell-number { font: 700 15px Manrope, sans-serif; letter-spacing: -.04em; color: var(--accent); }
+.stat-cell-label { color: #7c8a94; font-size: 9px; font-weight: 700; letter-spacing: .05em; }
+.repeat-chip svg { stroke: var(--accent); }
+.icon-button.duplicate-button:hover { color: var(--accent); background: var(--accent-soft); }
+.reminder-note-standalone { margin: -6px 0 13px; color: #94a1ab; font-size: 10px; line-height: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .date-chip { border-color: #323f47; background: rgba(22, 28, 34, .8); color: #a4b1ba; }
+  .date-chip:hover { border-color: #33493a; background: #20342d; color: #8fd9c2; }
+  .stat-cell { border-color: #232d35; background: rgba(26, 36, 34, .6); }
+  .stat-cell-number { color: #8fd9c2; }
+  .stat-cell-label { color: #94a1ac; }
+  .repeat-chip svg { stroke: #7acdb2; }
+  .icon-button.duplicate-button:hover { background: #20342d; color: #8fd9c2; }
+  .reminder-note-standalone { color: #77848e; }
+}
