@@ -105,6 +105,13 @@ public final class BrowserCookieImportFlow {
             } finally {
                 text = null;
             }
+            if (parsed.inputTruncated) {
+                clearSensitiveState();
+                showMessage("Export exceeds safe limits",
+                        "The file exceeded the parser's size, line or cookie limit. Split the export "
+                                + "into smaller files and try again. No cookies were imported.");
+                return true;
+            }
             if (!parsed.recognizedFormat || parsed.isEmpty()) {
                 clearSensitiveState();
                 showMessage("Unsupported cookie export",
