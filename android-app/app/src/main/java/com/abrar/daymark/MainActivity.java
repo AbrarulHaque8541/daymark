@@ -759,8 +759,8 @@ public final class MainActivity extends Activity {
                 searchInput.setText("");
                 searchQuery = "";
                 activeTag = "";
-                renderTaskList();
-                renderTaskCount();
+                // render() also repaints the chip row, whose selected state just changed.
+                render();
                 return true;
             default:
                 return false;

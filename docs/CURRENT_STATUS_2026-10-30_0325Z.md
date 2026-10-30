@@ -42,7 +42,7 @@ Three gaps documented in [`TASK_BROWSER_PAGE_GAPS.md`](TASK_BROWSER_PAGE_GAPS.md
    feature is discoverable without reading the release notes.
 
 Supporting work: `TaskFilterSmoke` (20 assertions), `NoteFormatSmoke` (45), `KeyShortcutsSmoke`
-(23), and `check-task-ux.py` (96 assertions) with five `expect_fail_after_removal` mutations
+(23), and `check-task-ux.py` (98 assertions) with five `expect_fail_after_removal` mutations
 proving it fails closed.
 
 ## Checks actually run

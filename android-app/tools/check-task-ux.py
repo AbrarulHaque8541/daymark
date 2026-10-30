@@ -176,6 +176,9 @@ for action, wiring in [
 check("case KeyShortcuts.CLEAR_SEARCH:" in handled, "Escape case missing")
 clear = handled.split("case KeyShortcuts.CLEAR_SEARCH:", 1)[1]
 check("activeTag = \"\";" in clear, "Escape must clear the tag as well as the query")
+check("render();" in clear, "Escape must repaint the chips, not only the list")
+check("searchQuery.isEmpty() && activeTag.isEmpty()" in clear,
+      "Escape must still fire when only a tag narrows the list")
 
 for constant in ("KEY_K", "KEY_F", "KEY_T", "KEY_W", "KEY_R", "KEY_ESCAPE"):
     check(f"static final int {constant} = " in keys, f"{constant} missing")
