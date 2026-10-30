@@ -18,8 +18,8 @@ def region(source: str, start: str, end: str, label: str) -> str:
 
 share = region(main, "private void handleShareInIntent", "private List<Uri> collectSharedAttachmentUris",
                "share handler")
-for token in ("Intent.ACTION_SEND.equals(action)", "Intent.ACTION_SEND_MULTIPLE.equals(action)",
-              "Intent.ACTION_PROCESS_TEXT.equals(action)", "collectSharedAttachmentUris(intent, send, sendMultiple)",
+for token in ("Intent.ACTION_SEND.equals(intent.getAction())", "Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())",
+              "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())", "collectSharedAttachmentUris(intent, send, sendMultiple)",
               "intent.removeExtra(Intent.EXTRA_STREAM);", "intent.setClipData(null);",
               "stagedSharedAttachmentUris.addAll(sharedUris)", "dispatchPendingSharedTaskEditor()"):
     assert token in share, f"share handler missing {token}"
