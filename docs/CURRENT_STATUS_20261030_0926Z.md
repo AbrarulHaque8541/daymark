@@ -1,4 +1,4 @@
-# Daymark status snapshot — 2026-10-30T09:26Z
+# Daymark status snapshot — 2026-10-30T09:26Z (refreshed after later CI results)
 
 ## Live repository
 - Current main is `c9bc8311b8b04535eb6d54432463fe49045f467b`, verified identical to the named `main` ref.
@@ -33,4 +33,4 @@
 Work by: ChatGPT
 Model: GPT-6
 Tooling: GitHub MCP tools via functions runtime
-Timestamp (UTC): 2026-10-30T09:25:55.401Z
+Timestamp (UTC): 2026-10-30T09:28:35.557Z
