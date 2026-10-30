@@ -1,7 +1,9 @@
 (() => {
   'use strict';
   const core = window.DaymarkTaskCore;
-  if (!core) return;
+  const capabilityPolicy = window.DaymarkDeviceCapabilityPolicy;
+  const surfaceAdapter = window.DaymarkWebSurfaceAdapter;
+  if (!core || !capabilityPolicy || !surfaceAdapter) return;
 
   let tasks = [];
   let activeFilter = 'open';
@@ -15,6 +17,36 @@
   const doneCount = document.getElementById('done-count');
   const status = document.getElementById('status-message');
   const filterButtons = Array.from(document.querySelectorAll('[data-filter]'));
+  const surfaceMode = document.getElementById('surface-mode');
+
+  // Browser APIs expose interaction affordances, not reliable hardware identity.
+  function detectSurfaceProfile() {
+    const media = (query) => typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+    const profile = surfaceAdapter.detectWebSurfaceProfile(capabilityPolicy, {
+      viewportWidth: document.documentElement.clientWidth || window.innerWidth || 320,
+      finePointer: media('(pointer: fine)'),
+      coarsePointer: media('(pointer: coarse)'),
+      hover: media('(hover: hover)'),
+      maxTouchPoints: Number.isFinite(navigator.maxTouchPoints) ? navigator.maxTouchPoints : 0
+    });
+    document.documentElement.dataset.daymarkSurface = profile.surface;
+    document.documentElement.dataset.daymarkDisplay = profile.display;
+    if (surfaceMode) surfaceMode.textContent = profile.surface + ' · ' + profile.display + ' view';
+    const submit = form.querySelector('button[type="submit"]');
+    input.disabled = !profile.canCapture;
+    submit.disabled = !profile.canCapture;
+    if (!profile.canCapture) announce('This input mode is read-only. Connect a supported touch or pointer input to add tasks.');
+    return profile;
+  }
+  let surfaceProfile = detectSurfaceProfile();
+  let resizeFrame = null;
+  window.addEventListener('resize', () => {
+    if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+    resizeFrame = window.requestAnimationFrame(() => {
+      resizeFrame = null;
+      surfaceProfile = detectSurfaceProfile();
+    });
+  }, { passive: true });
 
   function announce(message) { status.textContent = message; }
 

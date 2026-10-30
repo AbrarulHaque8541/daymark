@@ -1,0 +1,8 @@
+# surface|display|inputs (comma separated)|features (comma separated)|expected actions (comma separated)
+phone|full|touch,keyboard|task-capture,task-edit,task-review,focus-timer,browser|capture-task,edit-task,review-tasks,start-focus,pause-focus,finish-focus,open-browser
+ring|none|button|task-capture,task-edit,task-review,focus-timer,reminder-actions,browser|capture-task,start-focus,pause-focus,finish-focus,acknowledge-reminder,snooze-reminder
+watch|glance|touch,voice|task-review,task-edit,focus-timer,reminder-actions|review-tasks,start-focus,pause-focus,finish-focus,acknowledge-reminder,snooze-reminder
+car|compact|touch,voice|task-capture,task-edit,task-review,focus-timer,reminder-actions,browser,voice-capture|acknowledge-reminder,snooze-reminder
+eink|full|pointer|task-review|review-tasks
+desktop|full|keyboard,pointer|task-capture,task-edit|capture-task,edit-task
+displayless|none|button|focus-timer|start-focus,pause-focus,finish-focus

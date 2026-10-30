@@ -8,6 +8,8 @@
   <meta name="description" content="Experimental Daymark desktop task workspace UI. Uses in-memory synthetic data only.">
   <title>Daymark — desktop UI spike</title>
   <link rel="stylesheet" href="./styles.css">
+  <script src="../device-capability-policy.js" defer></script>
+  <script src="./device-adapter.js" defer></script>
   <script src="./task-core.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
@@ -33,6 +35,7 @@
       <header class="topbar">
         <span class="eyebrow">DAYMARK / WORKSPACE</span>
         <span class="privacy-pill"><span aria-hidden="true">●</span> Memory-only demo</span>
+        <span class="privacy-pill" id="surface-mode" aria-live="polite">Detecting device…</span>
       </header>
 
       <section class="intro" aria-labelledby="page-title">
