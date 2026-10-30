@@ -2,6 +2,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Task reminders only: best-effort notification alarms, boot reschedule, and vibration. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16+ Live Updates are optional system promotion; a standard progress notification remains the fallback. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <application
