@@ -325,13 +325,27 @@ public final class BrowserCookieImportFlow {
             applyNextCookie(CookieManager.getInstance());
         } catch (RuntimeException unavailable) {
             rejectedCount = pendingCookies.size();
-            finishImport(false);
+            finishImport(false, false);
         }
     }
 
     private void applyNextCookie(CookieManager cookieManager) {
         if (pendingIndex >= pendingCookies.size()) {
-            finishImport(true);
+            try {
+                Thread flushThread = new Thread(() -> {
+                    boolean flushed = true;
+                    try {
+                        cookieManager.flush();
+                    } catch (RuntimeException flushFailure) {
+                        flushed = false;
+                    }
+                    boolean flushResult = flushed;
+                    mainHandler.post(() -> finishImport(true, flushResult));
+                }, "DaymarkCookieImportFlush");
+                flushThread.start();
+            } catch (RuntimeException threadFailure) {
+                finishImport(true, false);
+            }
             return;
         }
 
@@ -356,14 +370,8 @@ public final class BrowserCookieImportFlow {
         }
     }
 
-    private void finishImport(boolean flush) {
-        if (flush) {
-            try {
-                CookieManager.getInstance().flush();
-            } catch (RuntimeException ignored) {
-                flushFailed = true;
-            }
-        }
+    private void finishImport(boolean flushAttempted, boolean flushSucceeded) {
+        flushFailed = flushAttempted && !flushSucceeded;
         importing = false;
         if (progressDialog != null) {
             try {
