@@ -119,22 +119,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(manager != null, "NotificationManager is available");
         Task task = TaskLogic.create("Reminder original", "2099-12-01", "high",
                 null, null, 60, null);
-        java.time.Instant fire = TaskLogic.reminderFireInstant(task, java.time.ZoneId.systemDefault());
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.Instant fire = ReminderSchedulePolicy.baseFire(task, zone);
         check(fire != null, "future reminder fire instant is computed");
         TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(task));
         Integer notificationId = TaskReminderScheduler.getNotificationId(context, task.id);
-        check(notificationId != null && notificationId > 0, "scheduler stores a notification ID");
+        check(notificationId != null && notificationId > 0, "scheduler stores the canonical request code");
 
         TaskReminderScheduler.ensureChannel(context);
-        android.app.Notification notification = new android.app.Notification.Builder(
-                context, TaskReminderScheduler.CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
-                .setContentTitle(task.title)
-                .setContentText("Instrumentation reminder")
-                .build();
-        notification.extras.putString(TaskReminderReceiver.EXTRA_TASK_ID, task.id);
-        notification.extras.putString(TaskReminderReceiver.EXTRA_FIRE_INSTANT, fire.toString());
-        manager.notify(notificationId, notification);
+        postTestReminder(manager, context, notificationId, task, fire.toString());
         check(hasActiveNotification(manager, notificationId),
                 "synthetic reminder notification is active before reconciliation");
 
@@ -146,13 +139,72 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                         refreshed.extras.getString(android.app.Notification.EXTRA_TITLE)),
                 "title-only task edit refreshes the active reminder notification");
 
-        Task shown = renamed.withReminderShown(fire.toString(), java.time.Instant.now().toString());
-        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(shown));
+        // Simulate a process interruption between notification posting and preference commit.
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().remove(task.id).commit();
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
+        check(notificationId.equals(TaskReminderScheduler.getNotificationId(context, task.id)),
+                "valid active notification recovers a lost canonical ID index");
+        check(hasActiveNotification(manager, notificationId),
+                "index recovery preserves the matching active notification");
+
+        check(TaskReminderScheduler.snooze(context, notificationId, renamed, fire.toString()),
+                "current notification can persist and arm a snooze");
+        String snoozeRecord = TaskReminderScheduler.snoozeRecord(context, task.id);
+        String snoozeFire = ReminderSchedulePolicy.validSnoozeFire(snoozeRecord, fire.toString());
+        check(snoozeFire != null, "snooze fire time is persisted against its base occurrence");
+        check(ReminderSchedulePolicy.acceptsFire(renamed, zone, snoozeFire, snoozeRecord),
+                "receiver policy accepts the persisted snooze occurrence");
+        manager.cancel(notificationId);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(renamed));
+        check(snoozeRecord.equals(TaskReminderScheduler.snoozeRecord(context, task.id)),
+                "app rescheduling preserves a valid snooze instead of overwriting it");
+
+        Task moved = renamed.withDetails(renamed.title, "2099-12-02", renamed.priority,
+                java.time.Instant.now().toString());
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(moved));
+        check(TaskReminderScheduler.snoozeRecord(context, task.id) == null,
+                "due-date edit invalidates the previous occurrence's snooze");
         check(!hasActiveNotification(manager, notificationId),
-                "notification is canceled after the in-app reminder is marked shown");
+                "old occurrence notification is removed after due-date edit");
+
+        java.time.Instant movedFire = ReminderSchedulePolicy.baseFire(moved, zone);
+        check(movedFire != null, "edited reminder has a new occurrence");
+        postTestReminder(manager, context, notificationId, moved, movedFire.toString());
+        Task completed = TaskLogic.toggleCompleted(moved);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(completed));
+        check(!hasActiveNotification(manager, notificationId),
+                "notification is canceled when its task is completed");
         check(TaskReminderScheduler.getNotificationId(context, task.id) == null,
-                "canceled stale notification tracking is removed");
+                "completed task releases its canonical reminder ID");
+
+        Task deleted = TaskLogic.create("Reminder deleted", "2099-12-03", "high",
+                null, null, 60, null);
+        java.time.Instant deletedFire = ReminderSchedulePolicy.baseFire(deleted, zone);
+        TaskReminderScheduler.rescheduleAll(context, Collections.singletonList(deleted));
+        Integer deletedId = TaskReminderScheduler.getNotificationId(context, deleted.id);
+        check(deletedId != null, "deleted-task fixture has a scheduled reminder ID");
+        postTestReminder(manager, context, deletedId, deleted, deletedFire.toString());
+        context.getSharedPreferences("daymark.reminder.codes.v1", Context.MODE_PRIVATE)
+                .edit().remove(deleted.id).commit();
         TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+        check(!hasActiveNotification(manager, deletedId),
+                "posted notification is removed for a deleted task even when its ID index is missing");
+        TaskReminderScheduler.rescheduleAll(context, Collections.emptyList());
+    }
+
+    private static void postTestReminder(android.app.NotificationManager manager,
+            Context context, int notificationId, Task task, String fireInstant) {
+        android.app.Notification notification = new android.app.Notification.Builder(
+                context, TaskReminderScheduler.CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(task.title)
+                .setContentText("Instrumentation reminder")
+                .setOnlyAlertOnce(true)
+                .build();
+        notification.extras.putString(TaskReminderReceiver.EXTRA_TASK_ID, task.id);
+        notification.extras.putString(TaskReminderReceiver.EXTRA_FIRE_INSTANT, fireInstant);
+        manager.notify(notificationId, notification);
     }
 
     private static boolean hasActiveNotification(android.app.NotificationManager manager, int id) {
