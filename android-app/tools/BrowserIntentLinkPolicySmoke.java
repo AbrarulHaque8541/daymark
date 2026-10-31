@@ -46,6 +46,12 @@ public final class BrowserIntentLinkPolicySmoke {
         check("https://example.com/a+b?q=one+two".equals(plusFallback.fallbackUrl),
                 "literal plus in URI metadata must not be form-decoded into spaces");
 
+        BrowserIntentLinkPolicy.Decision encodedPlusFallback = BrowserIntentLinkPolicy.parse(
+                "intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fa%252Bb%3Fq%3Done%252Btwo;end");
+        check("https://example.com/a%2Bb?q=one%2Btwo".equals(encodedPlusFallback.fallbackUrl),
+                "percent-encoded plus inside fallback URL is decoded once, not twice");
+
         BrowserIntentLinkPolicy.Decision packageOnly = BrowserIntentLinkPolicy.parse(
                 "intent://open/#Intent;scheme=myapp;package=com.example.mobile;end");
         check("myapp://open/".equals(packageOnly.targetUri), "custom app scheme is supported");
