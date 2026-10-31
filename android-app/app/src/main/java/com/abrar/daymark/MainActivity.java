@@ -1,5 +1,6 @@
 package com.abrar.daymark;
-
+successfully downloaded text file (SHA: dbad056fa6cf89e1567ac06b3d6895bdf8261db7)package com.abrar.daymark;
+successfully downloaded text file (SHA: 7e669a726bca283410f5ea53d775eafce9fa0745)
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
@@ -8180,6 +8181,87 @@ public final class MainActivity extends Activity {
         requestAttachmentCancel();
     }
 
+    private void showIntegrationCatalogDialog() {
+        IntegrationCatalogPanel panel = new IntegrationCatalogPanel(this, null);
+        int availableHeight = getResources().getDisplayMetrics().heightPixels - dp(160);
+        int panelHeight = Math.max(dp(360), Math.min(dp(560), availableHeight));
+        panel.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, panelHeight));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Apps & services")
+                .setView(panel)
+                .setNegativeButton("Close", null)
+                .create();
+        panel.setListener(entry -> {
+            dialog.dismiss();
+            useIntegrationCatalogEntry(entry);
+        });
+        dialog.show();
+    }
+
+    private void useIntegrationCatalogEntry(IntegrationCatalog.Entry entry) {
+        if (entry == null || !entry.canConnect()) {
+            showToast("This integration is not available in this build.");
+            return;
+        }
+        switch (entry.id) {
+            case "android.share.text":
+                showInfo("Share into Daymark",
+                        "Open any app, choose Share, and select Daymark. Shared text opens a reviewable task draft. "
+                                + "Shared files are attached only after you review and save the new task.");
+                return;
+            case "android.documents.import":
+                showIntegrationTaskPicker(false);
+                return;
+            case "android.attachments.open":
+                showIntegrationTaskPicker(true);
+                return;
+            default:
+                showToast("This integration does not have an action in this build yet.");
+        }
+    }
+
+    private void showIntegrationTaskPicker(boolean manageAttachments) {
+        if (!canEdit()) {
+            showToast("Unlock encrypted tasks before using this integration.");
+            return;
+        }
+        List<Task> candidates = new ArrayList<>();
+        for (Task task : tasks) {
+            if (manageAttachments ? !task.attachments.isEmpty()
+                    : AttachmentLogic.canAddToTask(task, tasks)) {
+                candidates.add(task);
+            }
+        }
+        if (candidates.isEmpty()) {
+            showToast(manageAttachments
+                    ? "No tasks have attachments to open yet."
+                    : "Create a task before importing a document.");
+            return;
+        }
+        String[] labels = new String[candidates.size()];
+        for (int index = 0; index < candidates.size(); index++) {
+            Task task = candidates.get(index);
+            labels[index] = task.title + (manageAttachments
+                    ? " · " + task.attachments.size() + " files" : "");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(manageAttachments ? "Choose a task's attachments" : "Attach a document to a task")
+                .setItems(labels, (dialog, which) -> {
+                    if (which < 0 || which >= candidates.size()) return;
+                    Task latest = findTask(candidates.get(which).id);
+                    if (latest == null) {
+                        showToast("That task is no longer available.");
+                    } else if (manageAttachments) {
+                        showAttachmentManager(latest);
+                    } else {
+                        openAttachmentPicker(latest.id);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void showSettingsDialog() {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -8206,6 +8288,10 @@ public final class MainActivity extends Activity {
                 () -> showPermissionStatus());
         addSettingsRow(content, "Encrypted backup & restore", "Export or add tasks from a .dmbackup file",
                 () -> showPortableBackupDialog());
+
+        addSettingsSection(content, "CONNECTIONS");
+        addSettingsRow(content, "Apps & services", "Search supported app handoffs and planned integrations",
+                () -> showIntegrationCatalogDialog());
 
         addSettingsSection(content, "TASK TOOLS");
         addSettingsRow(content, "Task templates", "Save and reuse local encrypted task templates",
