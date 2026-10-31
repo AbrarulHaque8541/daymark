@@ -1,6 +1,6 @@
 # Daymark
 
-**Daymark** is a local-first Android task assistant with an HTTPS-only embedded browser, encrypted local task storage, attachments, portable encrypted backups, and a lightweight page-local extension system.
+**Daymark** is a local-first Android task assistant with an HTTP/HTTPS embedded browser, encrypted local task storage, attachments, portable encrypted backups, and a lightweight page-local extension system.
 
 - **Android application ID:** `com.abrar.daymark` (owner-approved fresh identity; previous app installations remain separate)
 - **Current implementation:** Java-based Android Activity + Android System WebView; no third-party runtime dependencies in the current baseline. This describes the code today, not a restriction on future engineering choices.
@@ -33,7 +33,8 @@
 - Local task capture with natural-language date/time, priority, and `#tag` quick add; edit, completion, delete/undo, notes, due date/time, tags, subtasks, attachments, and templates
 - Task reminders: in-app dialog plus best-effort OS notifications, daily/weekly/monthly repeat rules, custom notification sound — see [docs/TASK_REMINDERS.md](docs/TASK_REMINDERS.md) for the honest limits
 - Encrypted portable backup / restore
-- HTTPS-only in-app browser: starts Offline; first remote navigation requires an explicit disclosure and opt-in. Search engines, AI site shortcuts, tabs, HTTPS-origin bookmarks, find-in-page, downloads, Reader Mode (local text extract), page-local extensions
+- HTTP/HTTPS in-app browser: starts Offline; first remote navigation requires an explicit disclosure and opt-in, and HTTP is labeled “Not encrypted”. Search engines, AI site shortcuts, tabs, origin-only bookmarks, find-in-page, downloads, Reader Mode (local text extract), page-local extensions
+- Review and save an offline Reader Mode excerpt as an encrypted task note — see [offline web clips](android-app/WEB_CLIPPING.md)
 - Optional in-app update check against signed GitHub Releases (sideload flavor)
 
 ## Agents & contributors

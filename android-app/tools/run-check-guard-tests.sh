@@ -77,6 +77,9 @@ expect_fail_after_removal check-task-ux.py "KeyShortcuts.actionFor(event.getKeyC
 expect_fail_after_removal check-task-ux.py "BrowserAddress.isAllowedWebUrl(url)"
 expect_fail_after_removal check-task-ux.py "ShareIntake.parse("
 expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())"
+# A clip is review-only until the user saves it through the encrypted task pipeline.
+expect_fail_after_removal check-web-clip.py "pendingWebClip = WebClip.fromReader(" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-web-clip.py 'saveTasksAsync("Saving offline clip…");' "$ACTIVITY" "$ROOT"
 # Reminder snooze must only re-arm the alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"

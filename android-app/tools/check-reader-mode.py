@@ -59,4 +59,4 @@ for marker in (
 assert "loadUrl(" not in dialog and "loadDataWithBaseURL(" not in dialog, \
     "Reader Mode must not render extracted content as HTML or trigger another page load"
 assert "cloneNode(true)" not in reader, "Reader Mode should not clone the full page DOM and increase memory pressure"
-print("PASS: Reader Mode is user-triggered, HTTPS-only, bounded, local text-only, and separate from full-screen view")
+print("PASS: Reader Mode is user-triggered, HTTP/HTTPS, bounded, local text-only, and separate from full-screen view")

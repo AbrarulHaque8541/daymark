@@ -23,6 +23,8 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskShareText.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/SharedAttachmentPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ActivityCallbackGate.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/EncryptedBlobStore.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/WebClip.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollThemeColor.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollChromeReserve.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/PressSurface.java" \
@@ -70,6 +72,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/IntegrationCatalogSmoke.java" \
   "$ROOT/tools/SharedAttachmentPolicySmoke.java" \
   "$ROOT/tools/TaskShareTextSmoke.java" \
+  "$ROOT/tools/WebClipSmoke.java" \
   "$ROOT/tools/OAuthPkceSmoke.java" \
   "$ROOT/tools/CalendarEventDraftSmoke.java" \
   "$ROOT/tools/OAuthCredentialCodecSmoke.java" \
@@ -108,6 +111,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.SharedAttachmentPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.IntegrationCatalogSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskShareTextSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.WebClipSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.OAuthPkceSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CalendarEventDraftSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.OAuthCredentialCodecSmoke
