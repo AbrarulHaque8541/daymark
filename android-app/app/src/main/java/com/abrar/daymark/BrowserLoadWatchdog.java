@@ -252,7 +252,7 @@ final class BrowserLoadWatchdog {
             if (queryStart >= 0) authorityEnd = Math.min(authorityEnd, queryStart);
             if (fragmentStart >= 0) authorityEnd = Math.min(authorityEnd, fragmentStart);
 
-            int atSign = url.indexOf('@', authorityStart);
+            int atSign = url.lastIndexOf('@', authorityEnd - 1);
             int hostStart = (atSign >= 0 && atSign < authorityEnd)
                     ? atSign + 1 : authorityStart;
             return url.substring(0, schemeEnd + 3) + url.substring(hostStart, authorityEnd);
