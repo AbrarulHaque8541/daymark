@@ -50,13 +50,13 @@
         setStorageStatus(backupSaved
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
-        if (backupSaved) offerRecoveryExport();
+        if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
       } else if (hasPartialRecoveryBackup()) {
         // A prior backup may contain records rejected by validation. Keep it
         // until the user can recover those originals; a healthy filtered store
         // does not make that backup stale.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
-        offerRecoveryExport();
+        offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
       } else {
         setStorageStatus('Saved on this device');
         // A backup of an unreadable payload is stale once the primary store is
@@ -77,7 +77,7 @@
       showToast(backupSaved
         ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
         : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged');
-      if (backupSaved) offerRecoveryExport();
+      if (backupSaved) offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
       return [];
     }
   }
@@ -468,7 +468,7 @@
     state.toastTimer = setTimeout(dismissToast, action ? 7000 : 2600);
   }
 
-  function offerRecoveryExport() {
+  function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
     let raw = null;
     try {
       raw = localStorage.getItem(BACKUP_KEY);
@@ -476,7 +476,7 @@
       return;
     }
     if (typeof raw !== 'string' || raw.length === 0) return;
-    showToast('Recovery data is preserved on this device. Export it for manual review.', {
+    showToast(message, {
       label: 'Export recovery',
       run: exportRecoveryBackup
     });
