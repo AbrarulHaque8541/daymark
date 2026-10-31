@@ -185,6 +185,17 @@ final class BrowserLoadWatchdog {
         pendingAddress = null;
     }
 
+    /**
+     * Short status string for loading indicators and accessibility announcements.
+     * Returns null when idle (no pending load or terminal failure).
+     */
+    synchronized String currentStatus() {
+        if (pendingAddress == null || failFired) return null;
+        if (retryFired) return "Still opening\u2026 (retrying)";
+        if (hintFired) return "Still opening\u2026";
+        return "Opening\u2026";
+    }
+
     private void fireHint() {
         final String address;
         synchronized (this) {
@@ -218,7 +229,7 @@ final class BrowserLoadWatchdog {
             failFired = true;
             address = pendingAddress;
             record("watchdog-fail: " + address);
-            Log.e(TAG, "watchdog-fail (25s): " + address + " — page did not open");
+            Log.e(TAG, "watchdog-fail (25s): " + address + " \u2014 page did not open");
         }
         if (listener != null) listener.onStageFail(address);
     }
