@@ -45,6 +45,10 @@ kbd { display: inline-grid; place-items: center; min-width: 17px; height: 17px; 
 .local-badge svg { flex: 0 0 auto; width: 14px; height: 14px; fill: none; stroke: #3f9a82; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .local-badge.is-warning { border-color: #efc9c4; background: var(--red-soft); color: #a3281f; }
 .local-badge.is-warning svg { stroke: #a3281f; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.recovery-export-button { height: 32px; padding: 0 10px; font-size: 10px; border-color: rgba(163, 40, 31, .25); color: #a3281f; background: rgba(251, 233, 231, .6); }
+.recovery-export-button:hover { background: var(--red-soft); color: #a3281f; border-color: #efc9c4; }
+.recovery-export-button[hidden] { display: none; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; padding: 47px 0 28px; }
 .eyebrow { margin: 0 0 10px; color: #7c8a94; font-size: 9px; font-weight: 700; letter-spacing: .18em; }
 h1, h2, h3, p { margin-top: 0; }
