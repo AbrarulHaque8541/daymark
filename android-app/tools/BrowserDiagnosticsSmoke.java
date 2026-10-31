@@ -11,6 +11,12 @@ public final class BrowserDiagnosticsSmoke {
                 .equals("https://example.com/search") : "query and fragment must be redacted";
         assert BrowserDiagnostics.redactUrl("https://example.com/a@b/path?x=1")
                 .equals("https://example.com/a@b/path") : "an @ inside the path is not a credential and must be kept";
+        assert BrowserDiagnostics.redactUrl("https://example.com?email=person@example.net")
+                .equals("https://example.com") : "an @ inside a query-only URL must not corrupt the origin";
+        assert BrowserDiagnostics.redactUrl("https://example.com#anchor@other.example")
+                .equals("https://example.com") : "an @ inside a fragment must not corrupt the origin";
+        assert BrowserDiagnostics.redactUrl("https://user:secret@example.com?redirect=https://a@b.example")
+                .equals("https://example.com") : "userinfo must be removed even when the query also contains @";
         assert BrowserDiagnostics.redactUrl(null).isEmpty() && BrowserDiagnostics.redactUrl("   ").isEmpty()
                 : "null/blank URLs must become empty strings";
         assert BrowserDiagnostics.redactUrl("https://example.com/very/" + "x".repeat(300))
