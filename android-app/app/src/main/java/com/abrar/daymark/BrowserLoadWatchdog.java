@@ -240,12 +240,22 @@ final class BrowserLoadWatchdog {
         try {
             int schemeEnd = url.indexOf("://");
             if (schemeEnd < 0) return "[non-http]";
-            int hostStart = schemeEnd + 3;
-            int pathStart = url.indexOf('/', hostStart);
-            int atSign = url.indexOf('@', hostStart);
-            int hostEnd = (pathStart >= 0) ? pathStart : url.length();
-            if (atSign >= 0 && atSign < hostEnd) hostStart = atSign + 1;
-            return url.substring(0, schemeEnd + 3) + url.substring(hostStart, hostEnd);
+            int authorityStart = schemeEnd + 3;
+
+            // A query or fragment can immediately follow the authority (without a slash).
+            // Stop at the first URI delimiter so diagnostics never retain secrets.
+            int authorityEnd = url.length();
+            int pathStart = url.indexOf('/', authorityStart);
+            int queryStart = url.indexOf('?', authorityStart);
+            int fragmentStart = url.indexOf('#', authorityStart);
+            if (pathStart >= 0) authorityEnd = Math.min(authorityEnd, pathStart);
+            if (queryStart >= 0) authorityEnd = Math.min(authorityEnd, queryStart);
+            if (fragmentStart >= 0) authorityEnd = Math.min(authorityEnd, fragmentStart);
+
+            int atSign = url.indexOf('@', authorityStart);
+            int hostStart = (atSign >= 0 && atSign < authorityEnd)
+                    ? atSign + 1 : authorityStart;
+            return url.substring(0, schemeEnd + 3) + url.substring(hostStart, authorityEnd);
         } catch (Exception e) {
             return "[redact-error]";
         }
