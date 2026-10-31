@@ -47,11 +47,15 @@
         setStorageStatus(backUpRawPayload(saved)
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored', true);
+      } else if (hasPartialRecoveryBackup()) {
+        // A prior backup may contain records rejected by validation. Keep it
+        // until the user can recover those originals; a healthy filtered store
+        // does not make that backup stale.
+        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
       } else {
         setStorageStatus('Saved on this device');
-        // The main store is healthy again, so a recovery backup left over from an
-        // earlier unreadable payload is now stale and should not linger as if it
-        // were current data.
+        // A backup of an unreadable payload is stale once the primary store is
+        // healthy. Backups containing rejected task records are retained above.
         clearRecoveryBackup();
       }
       return validated.tasks;
@@ -78,12 +82,28 @@
     }
   }
 
+  function hasPartialRecoveryBackup() {
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
+    } catch (error) {
+      // A malformed backup is not classified as a partial task list here.
+      return false;
+    }
+  }
+
   function persistTasks() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
-      setStorageStatus('Saved on this device');
-      // A successful full save makes any earlier recovery backup stale.
-      clearRecoveryBackup();
+      if (hasPartialRecoveryBackup()) {
+        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+      } else {
+        setStorageStatus('Saved on this device');
+        // A full save can clear a stale backup, but not one with rejected records.
+        clearRecoveryBackup();
+      }
       return true;
     } catch (error) {
       console.warn('Could not save Daymark tasks:', error);
