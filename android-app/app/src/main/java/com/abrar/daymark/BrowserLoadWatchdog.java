@@ -221,9 +221,9 @@ final class BrowserLoadWatchdog {
     }
 
     private void cancelStages() {
-        handler.removeCallbacks(this::fireHint);
-        handler.removeCallbacks(this::fireRetry);
-        handler.removeCallbacks(this::fireFail);
+        handler.removeCallbacks(hintRunnable);
+        handler.removeCallbacks(retryRunnable);
+        handler.removeCallbacks(failRunnable);
     }
 
     private void record(String event) {
