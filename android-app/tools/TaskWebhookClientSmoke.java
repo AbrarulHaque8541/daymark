@@ -47,6 +47,16 @@ public final class TaskWebhookClientSmoke {
                 "URL fragments are rejected");
         expectIllegal(() -> TaskWebhookClient.validateEndpoint("https://hooks.example.test:0/path"),
                 "invalid ports are rejected");
+        expectIllegal(() -> TaskWebhookClient.validateEndpoint("https://hooks.example.test:"),
+                "explicit empty port without path is rejected");
+        expectIllegal(() -> TaskWebhookClient.validateEndpoint("https://hooks.example.test:/path"),
+                "explicit empty port with path is rejected");
+        expectIllegal(() -> TaskWebhookClient.validateEndpoint("https://[2001:db8::1]:"),
+                "explicit empty IPv6 port without path is rejected");
+        expectIllegal(() -> TaskWebhookClient.validateEndpoint("https://[2001:db8::1]:/path"),
+                "explicit empty IPv6 port with path is rejected");
+        URL nonDefaultPort = TaskWebhookClient.validateEndpoint("https://hooks.example.test:8443/path");
+        check(nonDefaultPort.getPort() == 8443, "valid explicit port is preserved");
         expectIllegal(() -> TaskWebhookClient.validateEndpoint("not a URL"),
                 "malformed endpoint is rejected");
 
