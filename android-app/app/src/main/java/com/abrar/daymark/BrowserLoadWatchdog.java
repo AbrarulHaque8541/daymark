@@ -146,22 +146,25 @@ final class BrowserLoadWatchdog {
         record("watchdog-paused");
     }
 
-    /** Resume watchdog (Activity.onResume). Re-arms if a load was in flight. */
+    /** Resume watchdog (Activity.onResume). Re-arms if a load was in flight.
+     *  Overdue stages are posted with zero delay so they fire on the next dispatch. */
     synchronized void resume() {
         if (!paused) return;
         paused = false;
         record("watchdog-resumed");
         if (pendingAddress != null && !failFired) {
             long elapsed = SystemClock.elapsedRealtime() - loadStartMs;
-            if (elapsed < STAGE_HINT_MS) {
-                handler.postDelayed(hintRunnable, STAGE_HINT_MS - elapsed);
-                handler.postDelayed(retryRunnable, STAGE_RETRY_MS - elapsed);
-                handler.postDelayed(failRunnable, STAGE_FAIL_MS - elapsed);
-            } else if (elapsed < STAGE_RETRY_MS) {
-                handler.postDelayed(retryRunnable, STAGE_RETRY_MS - elapsed);
-                handler.postDelayed(failRunnable, STAGE_FAIL_MS - elapsed);
-            } else if (elapsed < STAGE_FAIL_MS) {
-                handler.postDelayed(failRunnable, STAGE_FAIL_MS - elapsed);
+            if (!hintFired) {
+                long delay = Math.max(0L, STAGE_HINT_MS - elapsed);
+                handler.postDelayed(hintRunnable, delay);
+            }
+            if (!retryFired) {
+                long delay = Math.max(0L, STAGE_RETRY_MS - elapsed);
+                handler.postDelayed(retryRunnable, delay);
+            }
+            if (!failFired) {
+                long delay = Math.max(0L, STAGE_FAIL_MS - elapsed);
+                handler.postDelayed(failRunnable, delay);
             }
         }
     }
