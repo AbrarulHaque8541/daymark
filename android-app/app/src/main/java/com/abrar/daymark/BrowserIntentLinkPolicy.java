@@ -34,6 +34,20 @@ final class BrowserIntentLinkPolicy {
 
     private BrowserIntentLinkPolicy() { }
 
+    /**
+     * Percent-decode Android Intent URI metadata.
+     * Intent metadata uses percent-encoding, not HTML form encoding, so a literal '+' must be preserved.
+     */
+    private static String decodeIntentMetadata(String raw) {
+        if (raw == null) return "";
+        try {
+            // Protect literal '+' before decoding so it is not treated as a space.
+            return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8.name());
+        } catch (Exception invalid) {
+            throw new IllegalArgumentException("Android app link metadata encoding is invalid.", invalid);
+        }
+    }
+
     static Decision parse(String value) {
         if (value == null || value.length() > MAX_INPUT_LENGTH || !value.startsWith("intent://")) {
             throw new IllegalArgumentException("Invalid Android app link.");
@@ -70,14 +84,7 @@ final class BrowserIntentLinkPolicy {
                     throw new IllegalArgumentException("Android app link requests an unsupported Intent capability.");
                 }
                 if (values.containsKey(key)) throw new IllegalArgumentException("Android app link contains duplicate metadata.");
-                String decoded;
-                try {
-                    // Android Intent URI metadata uses percent escapes, not form encoding: preserve literal '+'.
-                    decoded = URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8.name());
-                } catch (Exception invalid) {
-                    throw new IllegalArgumentException("Android app link metadata encoding is invalid.", invalid);
-                }
-                values.put(key, decoded);
+                values.put(key, decodeIntentMetadata(raw));
             }
         }
 
