@@ -54,6 +54,25 @@ public final class BrowserLoadWatchdogSmoke {
         assert success.failures == 0 : "stale failure fired after page finish";
         assert success.hints == 1 : "stale hint fired after page finish";
 
+        // Query/fragment-only URLs have no slash: diagnostics must still stop at origin.
+        Events queryOnly = new Events();
+        watchdog = create(queryOnly);
+        watchdog.onLoadRequested("https://example.com?access_token=must-not-leak#session");
+        assert "load-requested: https://example.com".equals(watchdog.snapshotEvents().get(0))
+                : "query/fragment must be stripped even when authority has no slash";
+
+        Events userInfo = new Events();
+        watchdog = create(userInfo);
+        watchdog.onLoadRequested("https://user:password@example.com?secret=must-not-leak");
+        assert "load-requested: https://example.com".equals(watchdog.snapshotEvents().get(0))
+                : "userinfo and query must be stripped from origin diagnostics";
+
+        Events ipv6 = new Events();
+        watchdog = create(ipv6);
+        watchdog.onLoadRequested("https://[2001:db8::1]:8443?token=must-not-leak");
+        assert "load-requested: https://[2001:db8::1]:8443".equals(watchdog.snapshotEvents().get(0))
+                : "IPv6 authority and port must be retained while query is stripped";
+
         // A main-frame error also clears all pending stage callbacks.
         Events error = new Events();
         watchdog = create(error);
