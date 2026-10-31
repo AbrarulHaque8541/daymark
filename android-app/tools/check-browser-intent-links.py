@@ -14,7 +14,8 @@ for token in ('value.startsWith("intent://")', '"#Intent;"', 'value.endsWith(";e
               '"action".equals(key)', '"category".equals(key)',
               '"S.browser_fallback_url".equals(key)', 'values.containsKey(key)',
               'targetUri.getRawUserInfo() != null',
-              'BrowserAddress.requireAllowedWebUrl(fallback)'):
+              'BrowserAddress.requireAllowedWebUrl(fallback)',
+              'raw.replace("+", "%2B")'):
     assert token in policy, f"Intent URI parser missing {token}"
 for forbidden in ('"component".equals(key)', '"selector".equals(key)',
                   '"launchFlags".equals(key)', '"S.".equals(key)'):

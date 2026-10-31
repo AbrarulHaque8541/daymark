@@ -14,9 +14,9 @@ Autonomous engineering iteration 4: preserve literal plus in intent:// fallback 
 - Android Intent URI string metadata uses percent decoding; a literal plus should remain plus. A fallback like `https://example.com/a+b?q=x+y` could be silently altered to `https://example.com/a b?q=x y`.
 - Fix protects literal plus before percent-decoding `S.browser_fallback_url`; percent-encoded values still decode normally.
 - Added a host regression covering plus in both path and query.
+- Added a source guard assertion to prevent reverting the plus-preserving decoder.
 - PR: [#450](https://github.com/AbrarulHaque8541/daymark/pull/450)
-- Exact initial head: `0e9b078c120e609ce0d1e1a0d25f40e61cd22a48`.
-- Follow-up documentation-only head is being recorded; check runs are re-triggered by it.
+- Exact latest PR head: `HEAD_SHA_TO_BE_FILLED` (source + test + guard + status evidence).
 
 ## Focused validation
 - Local Java 21 JShell reproduction of the exact decoder expression: **PASS**. Confirmed old expression changes `a+b?q=x+y` into `a b?q=x y`, while the fix preserves plus.
@@ -25,12 +25,10 @@ Autonomous engineering iteration 4: preserve literal plus in intent:// fallback 
 - Local `npm test`: **NOT RUN** (same environment limitation).
 - Physical-device test: **NOT REQUIRED** for this pure-Java parser change; overall #160 remains NOT TESTED.
 
-## Exact-head CI (initial PR head)
-- Android CI run [41232545792](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545792): build **IN PROGRESS**.
-- Cross-platform contract run [41232545755](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545755): Windows **IN PROGRESS**, Ubuntu **QUEUED**.
-- Non-publishing QA APK run [41232545830](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545830): **IN PROGRESS**.
-- Device-test APK run [41232545761](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545761): **IN PROGRESS**.
-- Release asset workflow: **IN PROGRESS** but this is not a production release action; no release/tag created by this work. Confirm final conclusion before merge.
+## CI
+- Initial code/test head `0e9b078c120e609ce0d1e1a0d25f40e61cd22a48`: all four workflows were started; at last check Android build, Windows/Ubuntu contracts, non-publishing QA APK and device-test APK were **IN PROGRESS/QUEUED**.
+- Source guard was added afterward so CI covers the complete regression contract on the next head.
+- Exact latest-head checks: **PENDING** until workflows are discovered and complete.
 
 ## Cross-agent audit evidence
 - Inspected PR #449 actual diff: `BrowserIntentLinkPolicy.java`, `BrowserIntentLinkPolicySmoke.java`, `check-browser-intent-links.py`, `run-core-tests.sh`, and status docs.
