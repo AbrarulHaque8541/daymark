@@ -12,7 +12,22 @@ const STORAGE_KEY = 'daymark.tasks.v1';
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
 
-function bootApp({ savedValue = null, savedFocus = null, withFocus = true } = {}) {
+// A Date whose clock is frozen at nowMs, so tests that assert on wall-clock
+// derived values (remaining time, progress) stay exact even on slow runners
+// where booting the app in the VM can take over a second.
+function frozenDate(nowMs) {
+  return class extends Date {
+    constructor(...args) {
+      if (args.length === 0) super(nowMs);
+      else super(...args);
+    }
+    static now() {
+      return nowMs;
+    }
+  };
+}
+
+function bootApp({ savedValue = null, savedFocus = null, withFocus = true, now = null } = {}) {
   const elements = new Map();
   const storedValues = new Map();
   if (savedValue !== null) storedValues.set(STORAGE_KEY, savedValue);
@@ -78,7 +93,7 @@ function bootApp({ savedValue = null, savedFocus = null, withFocus = true } = {}
   if (withFocus) window.DaymarkFocus = focus;
 
   vm.runInNewContext(APP_SOURCE, {
-    Date,
+    Date: now === null ? Date : frozenDate(now),
     Intl,
     Math,
     console: { warn() {} },
@@ -94,9 +109,10 @@ function bootApp({ savedValue = null, savedFocus = null, withFocus = true } = {}
 }
 
 test('a persisted running focus session is revived and shows the remaining time', () => {
-  const startedAt = Date.now() - 10 * 60 * 1000; // started 10 minutes ago
+  const now = Date.now();
+  const startedAt = now - 10 * 60 * 1000; // started 10 minutes ago
   const session = focus.createSession({ kind: 'focus', durationMinutes: 25, taskId: null }, startedAt);
-  const { elements } = bootApp({ savedFocus: JSON.stringify({ session: focus.serialize(session), log: [] }) });
+  const { elements } = bootApp({ savedFocus: JSON.stringify({ session: focus.serialize(session), log: [] }), now });
 
   assert.equal(elements.get('#focus-time').textContent, '15:00');
   assert.equal(elements.get('#focus-state-label').textContent, 'Focusing');
@@ -133,7 +149,7 @@ test('focus minutes from the log are totalled for today', () => {
     completed: true
   };
   const breakEntry = { ...entry, id: 'log-2', kind: 'short-break', elapsedMs: 5 * 60 * 1000 };
-  const { elements } = bootApp({ savedFocus: JSON.stringify({ session: null, log: [entry, breakEntry] }) });
+  const { elements } = bootApp({ savedFocus: JSON.stringify({ session: null, log: [entry, breakEntry] }), now: start.getTime() });
 
   assert.equal(elements.get('#focus-today').textContent, '30', 'breaks are not counted as focus time');
 });
