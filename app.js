@@ -48,11 +48,15 @@
         setStorageStatus(backUpRawPayload(saved)
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored', true);
+      } else if (hasPartialRecoveryBackup()) {
+        // A prior backup may contain records rejected by validation. Keep it
+        // until the user can recover those originals; a healthy filtered store
+        // does not make that backup stale.
+        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
       } else {
         setStorageStatus('Saved on this device');
-        // The main store is healthy again, so a recovery backup left over from an
-        // earlier unreadable payload is now stale and should not linger as if it
-        // were current data.
+        // A backup of an unreadable payload is stale once the primary store is
+        // healthy. Backups containing rejected task records are retained above.
         clearRecoveryBackup();
       }
       return validated.tasks;
@@ -69,9 +73,47 @@
     }
   }
 
+  function isPartialRecoveryPayload(raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function recoveryBackupPayloads(raw) {
+    if (typeof raw !== 'string' || !raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return isPartialRecoveryPayload(raw) ? [raw] : [];
+      }
+      if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
+          && Array.isArray(parsed.payloads)) {
+        return parsed.payloads.filter((payload) => typeof payload === 'string');
+      }
+    } catch (error) {
+      // Unrecognized/malformed backups are not treated as partial task arrays.
+    }
+    return [];
+  }
+
   function backUpRawPayload(raw) {
     try {
-      localStorage.setItem(BACKUP_KEY, raw);
+      const existing = localStorage.getItem(BACKUP_KEY);
+      const existingPayloads = recoveryBackupPayloads(existing);
+      if (existingPayloads.some(isPartialRecoveryPayload)) {
+        // Keep every earlier recovery source when another damaged/partially
+        // invalid primary payload needs backup. De-duplicate repeated reloads.
+        const payloads = Array.from(new Set([...existingPayloads, raw]));
+        localStorage.setItem(BACKUP_KEY, JSON.stringify({
+          format: 'daymark-recovery-bundle-v1',
+          payloads
+        }));
+      } else {
+        localStorage.setItem(BACKUP_KEY, raw);
+      }
       return true;
     } catch (backupError) {
       console.warn('Could not keep a backup of raw Daymark tasks:', backupError);
@@ -79,12 +121,25 @@
     }
   }
 
+  function hasPartialRecoveryBackup() {
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      return recoveryBackupPayloads(raw).some(isPartialRecoveryPayload);
+    } catch (error) {
+      return false;
+    }
+  }
+
   function persistTasks() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
-      setStorageStatus('Saved on this device');
-      // A successful full save makes any earlier recovery backup stale.
-      clearRecoveryBackup();
+      if (hasPartialRecoveryBackup()) {
+        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+      } else {
+        setStorageStatus('Saved on this device');
+        // A full save can clear a stale backup, but not one with rejected records.
+        clearRecoveryBackup();
+      }
       return true;
     } catch (error) {
       console.warn('Could not save Daymark tasks:', error);
