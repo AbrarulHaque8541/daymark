@@ -27,16 +27,18 @@ function frozenDate(nowMs) {
   };
 }
 
-function bootApp({ savedValue = null, savedFocus = null, withFocus = true, now = null } = {}) {
+function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null, failWrites = new Set(), withFocus = true, now = null } = {}) {
   const elements = new Map();
   const storedValues = new Map();
   if (savedValue !== null) storedValues.set(STORAGE_KEY, savedValue);
   if (savedFocus !== null) storedValues.set(FOCUS_KEY, savedFocus);
+  if (savedFocusBackup !== null) storedValues.set(FOCUS_BACKUP_KEY, savedFocusBackup);
 
   function element(selector) {
     if (!elements.has(selector)) {
       const attributes = new Map();
       const classes = new Set();
+      const listeners = new Map();
       elements.set(selector, {
         textContent: '',
         value: '',
@@ -56,7 +58,11 @@ function bootApp({ savedValue = null, savedFocus = null, withFocus = true, now =
             return enabled;
           }
         },
-        addEventListener() {},
+        addEventListener: (type, listener) => listeners.set(type, listener),
+        dispatch: (type, event = {}) => {
+          const listener = listeners.get(type);
+          if (listener) listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
+        },
         setAttribute: (name, value) => attributes.set(name, value),
         removeAttribute: (name) => attributes.delete(name),
         querySelector: (childSelector) => element(`${selector} ${childSelector}`),
@@ -73,6 +79,7 @@ function bootApp({ savedValue = null, savedFocus = null, withFocus = true, now =
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
+      if (failWrites.has(key)) throw new Error('QuotaExceededError');
       storedValues.set(key, String(value));
     },
     removeItem(key) {
@@ -171,4 +178,69 @@ test('a corrupt focus payload is kept in a recovery backup and the app still boo
 test('the app still boots cleanly when the focus module is absent', () => {
   const { elements } = bootApp({ withFocus: false });
   assert.equal(elements.get('#focus-time').textContent, '—');
+});
+
+
+test('rejected focus-log records are backed up and the original survives later focus saves', () => {
+  const now = Date.now();
+  const session = focus.createSession({ kind: 'focus', durationMinutes: 25 }, now);
+  focus.finish(session, now + 60_000, false);
+  const validEntry = focus.makeLogEntry(session);
+  assert.equal(focus.validateFocusLog([validEntry]).rejectedCount, 0);
+  const rejectedEntry = { ...validEntry, id: '' };
+  const original = JSON.stringify({ session: null, log: [validEntry, rejectedEntry] });
+
+  const { elements, storedValues } = bootApp({ savedFocus: original });
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
+    'the complete source must be backed up when even one focus-log record is rejected');
+  assert.equal(JSON.parse(storedValues.get(FOCUS_KEY)).log.length, 1,
+    'the valid focus-log record remains usable');
+
+  elements.get('#focus-start').dispatch('click');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
+    'starting/saving a new focus session must not erase rejected originals');
+  assert.notEqual(storedValues.get(FOCUS_KEY), original);
+
+  bootApp({
+    savedFocus: storedValues.get(FOCUS_KEY),
+    savedFocusBackup: storedValues.get(FOCUS_BACKUP_KEY)
+  });
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
+    'a subsequent reload must retain the recovery backup');
+});
+
+test('multiple corrupt focus payloads are bundled instead of overwriting earlier recovery data', () => {
+  const earlier = '{older corrupt focus payload';
+  const current = '{new corrupt focus payload';
+  const { elements, storedValues } = bootApp({
+    savedFocus: current,
+    savedFocusBackup: earlier
+  });
+
+  const bundle = JSON.parse(storedValues.get(FOCUS_BACKUP_KEY));
+  assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, [earlier, current]);
+
+  elements.get('#focus-start').dispatch('click');
+  assert.deepEqual(JSON.parse(storedValues.get(FOCUS_BACKUP_KEY)).payloads, [earlier, current],
+    'a later valid focus save must preserve all original recovery payloads');
+});
+
+test('failed focus-backup writes leave the only original primary untouched until retry succeeds', () => {
+  const original = '{unreadable focus state';
+  const failWrites = new Set([FOCUS_BACKUP_KEY]);
+  const { elements, storedValues } = bootApp({ savedFocus: original, failWrites });
+
+  assert.equal(storedValues.get(FOCUS_KEY), original);
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
+
+  elements.get('#focus-start').dispatch('click');
+  assert.equal(storedValues.get(FOCUS_KEY), original,
+    'a focus save must not replace the only original when backup creation still fails');
+
+  failWrites.delete(FOCUS_BACKUP_KEY);
+  elements.get('#focus-pause').dispatch('click');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
+    'the retry must create the backup before replacing primary focus state');
+  assert.notEqual(storedValues.get(FOCUS_KEY), original);
 });
