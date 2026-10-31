@@ -385,3 +385,41 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .icon-button.duplicate-button:hover { background: #20342d; color: #8fd9c2; }
   .reminder-note-standalone { color: #77848e; }
 }
+
+
+/* Side column holds the suggestion and focus cards */
+.side-column { display: grid; gap: 24px; align-content: start; min-width: 0; }
+
+/* Focus timer card */
+.focus-card { border: 1px solid rgba(219, 232, 228, .8); border-radius: 20px; background: var(--surface); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow); padding: 19px 18px 15px; }
+.focus-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.focus-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.focus-card h2 { margin: 0 0 6px; font-size: 17px; line-height: 1.25; letter-spacing: -.04em; }
+.focus-description { margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.focus-time-wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.focus-time { font: 700 34px/1 Manrope, sans-serif; letter-spacing: -.05em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.focus-state-label { color: #7c8a94; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.focus-progress { height: 6px; margin: 12px 0 14px; border-radius: 999px; background: rgba(219, 226, 232, .8); overflow: hidden; }
+.focus-progress-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-bright), var(--accent-dark)); transition: width .3s ease; }
+.focus-presets { display: flex; flex-wrap: wrap; gap: 7px; }
+.focus-card .field-label { margin: 15px 0 7px; }
+.focus-card select { width: 100%; height: 40px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); color: var(--ink); padding: 0 10px; font-size: 12px; }
+.focus-card select:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(22, 112, 95, .12); outline: none; }
+.focus-card select:disabled { opacity: .55; }
+.focus-actions { display: flex; gap: 8px; margin-top: 14px; }
+.focus-actions .button { flex: 1 1 0; height: 40px; padding: 0 8px; }
+.focus-today { margin: 13px 0 0; color: #7c8a94; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+.focus-today span { color: var(--accent); font-weight: 800; }
+.icon-button.focus-button:hover { color: var(--accent); background: var(--accent-soft); }
+
+@media (prefers-color-scheme: dark) {
+  .focus-card { border-color: #232d35; }
+  .focus-dot { background: #7acdb2; box-shadow: 0 0 0 3px #20342d; }
+  .focus-time { color: #8fd9c2; }
+  .focus-state-label, .focus-today { color: #94a1ac; }
+  .focus-today span { color: #8fd9c2; }
+  .focus-progress { background: #232d35; }
+  .focus-progress-fill { background: linear-gradient(90deg, #5cb99d, #8fd9c2); }
+  .focus-card select { border-color: #323f47; background: rgba(22, 28, 34, .8); color: #d8e2e8; }
+  .icon-button.focus-button:hover { background: #20342d; color: #8fd9c2; }
+}
