@@ -47,6 +47,9 @@ jobs:
           sh ./tools/run-updater-picker-routing-tests.sh
           python3 ./tools/check-ci-test-honesty.py "$GITHUB_WORKSPACE"
 
+      - name: Run UiFeedbackPolicy host regression tests
+        run: sh ./tools/run-ui-feedback-policy-tests.sh
+
       - name: Run repository-level Node tests
         working-directory: ${{ github.workspace }}
         run: npm test
