@@ -13,7 +13,9 @@
   }
   .status-dot,
   .empty-illustration,
-  .sparkle {
+  .sparkle,
+  .skeleton-row,
+  .local-badge.is-checking {
     animation: none !important;
   }
   .task-row:hover,
@@ -64,4 +66,37 @@
 .complete-button {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Initial loading skeleton for the task list (hidden once list is ready). */
+.task-list-skeleton {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.skeleton-row {
+  height: 76px;
+  border-radius: 16px;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, .55) 0%,
+    rgba(226, 240, 235, .65) 40%,
+    rgba(255, 255, 255, .55) 80%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border: 1px solid rgba(219, 226, 232, .6);
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.task-list.is-ready .task-list-skeleton {
+  display: none;
+}
+
+/* Storage badge loading pulse while checking. */
+.local-badge.is-checking {
+  animation: storage-pulse 1.6s ease-in-out infinite;
+}
+@keyframes storage-pulse {
+  50% { border-color: rgba(22, 112, 95, .45); }
 }
