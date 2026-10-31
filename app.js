@@ -50,11 +50,13 @@
         setStorageStatus(backupSaved
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
+        if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
       } else if (hasPartialRecoveryBackup()) {
         // A prior backup may contain records rejected by validation. Keep it
         // until the user can recover those originals; a healthy filtered store
         // does not make that backup stale.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+        offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
       } else {
         setStorageStatus('Saved on this device');
         // A backup of an unreadable payload is stale once the primary store is
@@ -74,7 +76,8 @@
       }
       showToast(backupSaved
         ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
-        : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged.');
+        : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged');
+      if (backupSaved) offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
       return [];
     }
   }
@@ -100,18 +103,38 @@
         return parsed.payloads.filter((payload) => typeof payload === 'string');
       }
     } catch (error) {
-      // Unrecognized/malformed backups are not treated as partial task arrays.
+      // An opaque/malformed backup may itself be the only surviving copy of
+      // older data. Preserve its exact bytes when a new damaged payload arrives.
     }
-    return [];
+    return [raw];
+  }
+
+  function isHealthyTaskPayload(raw) {
+    if (typeof raw !== 'string' || !raw) return false;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount === 0;
+    } catch (error) {
+      return false;
+    }
   }
 
   function backUpRawPayload(raw) {
     try {
       const existing = localStorage.getItem(BACKUP_KEY);
       const existingPayloads = recoveryBackupPayloads(existing);
-      if (existingPayloads.some(isPartialRecoveryPayload)) {
-        // Keep every earlier recovery source when another damaged/partially
-        // invalid primary payload needs backup. De-duplicate repeated reloads.
+      const existingParsed = (() => {
+        try { return JSON.parse(existing); } catch (error) { return null; }
+      })();
+      const existingIsBundle = Boolean(existingParsed
+        && existingParsed.format === 'daymark-recovery-bundle-v1'
+        && Array.isArray(existingParsed.payloads));
+      const preserveExisting = existingPayloads.length > 0
+        && (existingIsBundle || !isHealthyTaskPayload(existing));
+      if (preserveExisting) {
+        // A recovery bundle, partial payload, or opaque prior backup may hold
+        // unique user data. Merge it with the newly rejected original rather
+        // than replacing it. Healthy task-array backups remain stale.
         const payloads = Array.from(new Set([...existingPayloads, raw]));
         localStorage.setItem(BACKUP_KEY, JSON.stringify({
           format: 'daymark-recovery-bundle-v1',
@@ -443,6 +466,51 @@
     $('#toast-stack').classList.add('is-visible');
     clearTimeout(state.toastTimer);
     state.toastTimer = setTimeout(dismissToast, action ? 7000 : 2600);
+  }
+
+  function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(BACKUP_KEY);
+    } catch (error) {
+      return;
+    }
+    if (typeof raw !== 'string' || raw.length === 0) return;
+    showToast(message, {
+      label: 'Export recovery',
+      run: exportRecoveryBackup
+    });
+  }
+
+  function exportRecoveryBackup() {
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (typeof raw !== 'string' || raw.length === 0) {
+        showToast('No recovery backup is available to export.');
+        return;
+      }
+      const link = document.createElement('a');
+      let objectUrl = null;
+      if (typeof Blob === 'function' && globalThis.URL
+          && typeof globalThis.URL.createObjectURL === 'function') {
+        objectUrl = globalThis.URL.createObjectURL(new Blob([raw], {
+          type: 'text/plain;charset=utf-8'
+        }));
+        link.href = objectUrl;
+      } else {
+        link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(raw)}`;
+      }
+      link.download = 'daymark-recovery-backup.txt';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      if (objectUrl && typeof globalThis.URL.revokeObjectURL === 'function') {
+        setTimeout(() => globalThis.URL.revokeObjectURL(objectUrl), 1000);
+      }
+      showToast('Recovery backup exported. Keep this file private; it may contain task data');
+    } catch (error) {
+      showToast('Recovery backup export is not available in this browser.');
+    }
   }
 
   function runToastAction() {
