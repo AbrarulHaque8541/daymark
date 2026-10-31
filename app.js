@@ -9,7 +9,7 @@
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -42,12 +42,14 @@
       if (!Array.isArray(parsed)) throw new Error('Saved task data is not a list.');
       const validated = logic.validateStoredTasks(parsed);
       if (validated.rejectedCount > 0) {
-        // Some records failed validation and are about to be dropped. Keep the
-        // original payload in a recovery backup so nothing is silently lost,
-        // mirroring the protection used for a completely unreadable payload.
-        setStorageStatus(backUpRawPayload(saved)
+        // Some records failed validation and are about to be dropped. If backup
+        // storage is full/unavailable, keep the original primary payload and
+        // retry backup creation before any later save can replace it.
+        const backupSaved = backUpRawPayload(saved);
+        if (!backupSaved) state.recoveryBackupPendingPayload = saved;
+        setStorageStatus(backupSaved
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
-          : 'Some saved tasks were ignored', true);
+          : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
       } else if (hasPartialRecoveryBackup()) {
         // A prior backup may contain records rejected by validation. Keep it
         // until the user can recover those originals; a healthy filtered store
@@ -66,6 +68,10 @@
       // Preserve the unreadable payload instead of silently discarding it, so a
       // future fix or manual recovery can still reach the original data.
       const backupSaved = backUpRawPayload(saved);
+      if (!backupSaved) {
+        state.recoveryBackupPendingPayload = saved;
+        setStorageStatus('Saved data could not be read; recovery backup could not be created. Free storage before saving', true);
+      }
       showToast(backupSaved
         ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
         : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged.');
@@ -132,6 +138,17 @@
 
   function persistTasks() {
     try {
+      if (state.recoveryBackupPendingPayload !== null) {
+        // Do not overwrite the only remaining copy of rejected/unreadable
+        // source data. Retry backing it up first; if storage still refuses,
+        // leave the primary entry untouched and let the user free space.
+        const backupSaved = backUpRawPayload(state.recoveryBackupPendingPayload);
+        if (!backupSaved) {
+          setStorageStatus('Cannot save safely: recovery backup could not be created. Free browser storage and retry.', true);
+          return false;
+        }
+        state.recoveryBackupPendingPayload = null;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
       if (hasPartialRecoveryBackup()) {
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
