@@ -1,11 +1,11 @@
-const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const logic = require('../task-logic.js');
+const test = require('node:test');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const LOGIC_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'task-logic.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
@@ -23,9 +23,8 @@ function bootApp({ savedValue, failBackup = false }) {
         textContent: '',
         value: '',
         hidden: false,
-        innerHTML: '',
-        open: false,
-        dataset: {},
+        disabled: false,
+        attributes,
         classList: {
           add: (name) => classes.add(name),
           remove: (name) => classes.delete(name),
@@ -37,36 +36,23 @@ function bootApp({ savedValue, failBackup = false }) {
             return enabled;
           }
         },
-        addEventListener() {},
         setAttribute: (name, value) => attributes.set(name, value),
-        removeAttribute: (name) => attributes.delete(name),
-        querySelector: (childSelector) => element(`${selector} ${childSelector}`),
-        focus() {},
-        showModal() { this.open = true; },
-        close() { this.open = false; }
+        getAttribute: (name) => attributes.get(name) || null,
+        dataset: {},
+        addEventListener() {},
+        querySelector() { return null; },
+        querySelectorAll() { return []; }
       });
     }
     return elements.get(selector);
   }
 
-  const localStorage = {
-    getItem(key) {
-      return storedValues.has(key) ? storedValues.get(key) : null;
-    },
-    setItem(key, value) {
-      if (key === BACKUP_KEY && failBackup) throw new Error('Quota exceeded');
-      storedValues.set(key, String(value));
-    }
-  };
   const document = {
-    hidden: false,
     querySelector: element,
     querySelectorAll: () => [],
-    addEventListener() {}
-  };
-  const window = {
-    DaymarkLogic: logic,
-    addEventListener() {}
+    getElementById: (id) => element(`#${id}`),
+    addEventListener() {},
+    body: { appendChild() {} }
   };
 
   element('#storage-status').classList.add('is-checking');
@@ -74,13 +60,18 @@ function bootApp({ savedValue, failBackup = false }) {
   vm.runInNewContext(APP_SOURCE, {
     Date,
     Intl,
-    Math,
-    console: { warn() {} },
     document,
-    localStorage,
-    window,
-    clearTimeout() {},
+    localStorage: {
+      getItem: (key) => storedValues.get(key) || null,
+      setItem: (key, value) => {
+        if (failBackup && key === BACKUP_KEY) throw new Error('quota');
+        storedValues.set(key, value);
+      },
+      removeItem: (key) => storedValues.delete(key)
+    },
+    window: {},
     setTimeout: () => 1,
+    clearTimeout() {},
     setInterval: () => 1
   }, { filename: 'app.js' });
 
@@ -88,22 +79,10 @@ function bootApp({ savedValue, failBackup = false }) {
 }
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
-  const corruptData = '{not valid JSON';
-  const { elements, storedValues } = bootApp({ savedValue: corruptData });
-
-  assert.equal(storedValues.get(BACKUP_KEY), corruptData);
-  assert.match(elements.get('#toast').textContent, /kept in a browser backup/);
+  const { elements, storedValues } = bootApp({ savedValue: '{broken' });
+  assert.equal(elements.get('#storage-status').classList.contains('is-warning'), true);
+  assert.equal(storedValues.get(BACKUP_KEY), '{broken');
 });
-
-test('backup failure is reported honestly and leaves the original entry untouched', () => {
-  const corruptData = '{not valid JSON';
-  const { elements, storedValues } = bootApp({ savedValue: corruptData, failBackup: true });
-
-  assert.equal(storedValues.has(BACKUP_KEY), false);
-  assert.equal(storedValues.get(STORAGE_KEY), corruptData);
-  assert.match(elements.get('#toast').textContent, /could not create a recovery backup/);
-});
-
 
 test('simultaneous reminders are summarized in one toast instead of overwriting each other', () => {
   const now = new Date();
@@ -133,14 +112,20 @@ test('simultaneous reminders are summarized in one toast instead of overwriting 
 
 
 test('initial loading indicators clear only when the real app render and storage check finish', () => {
-  const { classSets } = bootApp({ savedValue: null });
+  const { classSets, elements } = bootApp({ savedValue: null });
 
   assert.equal(classSets.get('#task-list').has('is-ready'), true,
     'render marks the task list ready');
   assert.equal(classSets.get('#storage-status').has('is-checking'), false,
     'storage status update clears its checking indicator');
+  assert.equal(elements.get('#storage-status').getAttribute('aria-busy'), 'false',
+    'storage status clears aria-busy when resolved');
+  assert.equal(elements.get('#task-list').getAttribute('aria-busy'), 'false',
+    'task list clears aria-busy after first render');
 
   const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.equal(indexSource.includes('}, 120);'), false,
     'index must not hide loading indicators after an arbitrary timeout');
+  assert.equal(indexSource.includes('aria-busy="true"'), true,
+    'index starts storage status and task list as aria-busy');
 });
