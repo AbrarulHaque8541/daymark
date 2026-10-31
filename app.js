@@ -73,9 +73,47 @@
     }
   }
 
+  function isPartialRecoveryPayload(raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function recoveryBackupPayloads(raw) {
+    if (typeof raw !== 'string' || !raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return isPartialRecoveryPayload(raw) ? [raw] : [];
+      }
+      if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
+          && Array.isArray(parsed.payloads)) {
+        return parsed.payloads.filter((payload) => typeof payload === 'string');
+      }
+    } catch (error) {
+      // Unrecognized/malformed backups are not treated as partial task arrays.
+    }
+    return [];
+  }
+
   function backUpRawPayload(raw) {
     try {
-      localStorage.setItem(BACKUP_KEY, raw);
+      const existing = localStorage.getItem(BACKUP_KEY);
+      const existingPayloads = recoveryBackupPayloads(existing);
+      if (existingPayloads.some(isPartialRecoveryPayload)) {
+        // Keep every earlier recovery source when another damaged/partially
+        // invalid primary payload needs backup. De-duplicate repeated reloads.
+        const payloads = Array.from(new Set([...existingPayloads, raw]));
+        localStorage.setItem(BACKUP_KEY, JSON.stringify({
+          format: 'daymark-recovery-bundle-v1',
+          payloads
+        }));
+      } else {
+        localStorage.setItem(BACKUP_KEY, raw);
+      }
       return true;
     } catch (backupError) {
       console.warn('Could not keep a backup of raw Daymark tasks:', backupError);
@@ -86,11 +124,8 @@
   function hasPartialRecoveryBackup() {
     try {
       const raw = localStorage.getItem(BACKUP_KEY);
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
+      return recoveryBackupPayloads(raw).some(isPartialRecoveryPayload);
     } catch (error) {
-      // A malformed backup is not classified as a partial task list here.
       return false;
     }
   }
