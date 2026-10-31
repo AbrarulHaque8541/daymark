@@ -18,6 +18,28 @@ public final class BrowserIntentLinkPolicySmoke {
         check("https://example.com/fallback".equals(web.fallbackUrl),
                 "encoded browser fallback is decoded");
 
+        BrowserIntentLinkPolicy.Decision httpFallback = BrowserIntentLinkPolicy.parse(
+                "intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=http%3A%2F%2Fexample.com%3A8080%2Ffallback;end");
+        check("http://example.com:8080/fallback".equals(httpFallback.fallbackUrl),
+                "valid HTTP fallback with explicit port is accepted");
+
+        expectFailure("intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=https%3A%2F%2Fexample.com%3A99999%2Ffallback;end",
+                "out-of-range fallback port rejected");
+        expectFailure("intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=https%3A%2F%2Fexample.com%3A0%2Ffallback;end",
+                "zero fallback port rejected");
+        expectFailure("intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=https%3A%2F%2Fexample.com%3A65536%2Ffallback;end",
+                "port above 65535 rejected");
+        expectFailure("intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=https%3A%2F%2Fexample.com%3A%2Ffallback;end",
+                "explicit empty fallback port rejected");
+        expectFailure("intent://example.com/#Intent;scheme=https;"
+                        + "S.browser_fallback_url=https%3A%2F%2Fuser%40example.com%2Ffallback;end",
+                "fallback credentials rejected");
+
         BrowserIntentLinkPolicy.Decision packageOnly = BrowserIntentLinkPolicy.parse(
                 "intent://open/#Intent;scheme=myapp;package=com.example.mobile;end");
         check("myapp://open/".equals(packageOnly.targetUri), "custom app scheme is supported");

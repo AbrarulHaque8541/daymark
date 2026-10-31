@@ -120,15 +120,12 @@ final class BrowserIntentLinkPolicy {
         String fallback = values.get("S.browser_fallback_url");
         if (fallback != null) {
             try {
-                URI fallbackUri = new URI(fallback);
-                String fallbackScheme = fallbackUri.getScheme();
-                if (fallbackUri.getHost() == null || fallbackUri.getRawUserInfo() != null
-                        || !("https".equalsIgnoreCase(fallbackScheme)
-                        || "http".equalsIgnoreCase(fallbackScheme))) {
-                    throw new IllegalArgumentException("Android app link fallback must be a web address.");
-                }
-            } catch (Exception invalid) {
-                throw new IllegalArgumentException("Android app link fallback is invalid.", invalid);
+                // Share the browser's full URL validation contract: HTTP(S), a real host,
+                // no embedded credentials, and no empty/out-of-range explicit port.
+                fallback = BrowserAddress.requireAllowedWebUrl(fallback);
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalArgumentException(
+                        "Android app link fallback must be a valid HTTP or HTTPS web address.", invalid);
             }
         }
         return new Decision(targetUri.toASCIIString(), packageName, fallback);
