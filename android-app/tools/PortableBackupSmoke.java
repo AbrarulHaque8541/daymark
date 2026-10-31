@@ -33,6 +33,7 @@ public final class PortableBackupSmoke {
         recoveryKeyEncodingRoundTripsAndChecksErrors();
         archiveRoundTripsWithoutExposingTaskData();
         manifestV3RoundTripsExtendedTaskFieldsAndRepeatAnchor();
+        manifestV3RoundTripsWeekdayAndYearlyRepeatRules();
         legacyV1ManifestStillDecodesWithDefaults();
         legacyV2ManifestStillDecodesWithDefaults();
         manifestV3RejectsMalformedRepeatFields();
@@ -843,6 +844,39 @@ public final class PortableBackupSmoke {
         PortableBackupCodec.clear(key);
     }
 
+    private static void manifestV3RoundTripsWeekdayAndYearlyRepeatRules() throws Exception {
+        byte[] key = PortableBackupCodec.newRecoveryKey(new SecureRandom());
+        Task weekdays = new Task(UUID.randomUUID().toString(), "Gym", "2026-10-30", "medium", false,
+                "2026-01-01T10:15:30Z", "2026-01-01T10:15:30Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_WEEKDAYS, null, Collections.<Subtask>emptyList(),
+                Collections.<String>emptyList());
+        Task yearly = new Task(UUID.randomUUID().toString(), "Tax review", "2026-04-15", "high", false,
+                "2026-01-01T10:15:30Z", "2026-01-01T10:15:30Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_YEARLY, null, Collections.<Subtask>emptyList(),
+                Collections.<String>emptyList());
+        ByteArrayOutputStream archiveBytes = new ByteArrayOutputStream();
+        PortableBackupCodec.writeArchive(archiveBytes, key, Arrays.asList(weekdays, yearly),
+                (sourceTask, reference) -> new ByteArrayInputStream(new byte[0]),
+                new SecureRandom(), () -> false);
+        File stage = Files.createTempDirectory("portable-backup-repeat-rules").toFile();
+        PortableBackupCodec.VerifiedArchive opened = PortableBackupCodec.readArchive(
+                new ByteArrayInputStream(archiveBytes.toByteArray()), key, stage, id -> { }, () -> false);
+        check(opened.tasks.size() == 2, "v3 manifest restores both repeating tasks");
+        java.util.Map<String, PortableBackupCodec.PortableTask> byTitle = new java.util.HashMap<>();
+        for (PortableBackupCodec.PortableTask task : opened.tasks) byTitle.put(task.title, task);
+        check(TaskLogic.REPEAT_WEEKDAYS.equals(byTitle.get("Gym").repeatRule)
+                        && byTitle.get("Gym").repeatDayOfMonth == null,
+                "weekday repeat rule round-trips in DMM3 without a monthly anchor");
+        check(TaskLogic.REPEAT_YEARLY.equals(byTitle.get("Tax review").repeatRule)
+                        && byTitle.get("Tax review").repeatDayOfMonth == null,
+                "yearly repeat rule round-trips in DMM3 without a monthly anchor");
+        opened.clearStagedPlaintext();
+        deleteTree(stage);
+        PortableBackupCodec.clear(key);
+    }
+
     private static void legacyV1ManifestStillDecodesWithDefaults() throws Exception {
         // A hand-built DMM1 manifest (the pre-v2 layout) must keep decoding with empty defaults.
         byte[] manifestToken = randomToken();
@@ -883,10 +917,12 @@ public final class PortableBackupSmoke {
     }
 
     private static void manifestV3RejectsMalformedRepeatFields() throws Exception {
-        expectManifestFailure(buildV3Manifest(4, 0), "unknown DMM3 repeat code is rejected");
+        expectManifestFailure(buildV3Manifest(6, 0), "unknown DMM3 repeat code is rejected");
         expectManifestFailure(buildV3Manifest(3, 0), "monthly DMM3 repeat without an anchor is rejected");
         expectManifestFailure(buildV3Manifest(3, 32), "monthly DMM3 anchor above 31 is rejected");
         expectManifestFailure(buildV3Manifest(0, 1), "DMM3 anchor without a monthly rule is rejected");
+        expectManifestFailure(buildV3Manifest(4, 31), "weekday DMM3 repeat with a monthly anchor is rejected");
+        expectManifestFailure(buildV3Manifest(5, 31), "yearly DMM3 repeat with a monthly anchor is rejected");
         expectManifestFailure(buildV3Manifest(0, 0, "BadTag"), "noncanonical DMM3 tags are rejected");
         expectManifestFailure(buildV3Manifest(0, 0, "same", "same"), "duplicate DMM3 tags are rejected");
         expectManifestFailure(buildV3Manifest(0, 0, "a", "b", "c", "d", "e", "f"),
@@ -1124,3 +1160,4 @@ public final class PortableBackupSmoke {
 
     private interface IoOperation { void run() throws Exception; }
 }
+

@@ -7,7 +7,7 @@ Current `main` source behavior after the v1.0.6 OS-reminders work, including the
 - Reminders fire **at due time**, or **30 minutes / 1 hour / 1 day before** the due moment (a due date is required; due time optional).
 - At the reminder moment Daymark posts a **best-effort Android notification** (title, due label, tap opens the app) and also shows the **in-app reminder dialog** the next time you open the app.
 - A reminder is shown **once per fire moment** (stored as `reminderShownFire`).
-- **Repeat rules**: a task can repeat **Daily / Weekly / Monthly**. On app open a repeating task without a reminder rolls forward to its next occurrence; when a repeating task's reminder is shown, the task advances to the next occurrence instead of being marked done. Repeat requires a due date; clearing the due date clears the repeat.
+- **Repeat rules**: a task can repeat **Daily / Weekly / Monthly / Weekdays (Mon–Fri) / Yearly**. On app open a repeating task without a reminder rolls forward to its next occurrence; when a repeating task's reminder is shown, the task advances to the next occurrence instead of being marked done. Repeat requires a due date; clearing the due date clears the repeat. Weekday repeats skip weekends; yearly repeats keep the same month and day (Feb 29 clamps to Feb 28 in short years).
 - **Notification sound**: chosen from the system ringtone picker (notification type). Default is the system notification sound. Changing it recreates the reminder channel so the new sound applies.
 
 ## How it is scheduled
@@ -21,7 +21,7 @@ Current `main` source behavior after the v1.0.6 OS-reminders work, including the
 
 - `POST_NOTIFICATIONS` (Android 13+): requested **only when you select a reminder option**, never at app open. If denied, notifications are skipped but in-app reminder dialogs still work.
 - `RECEIVE_BOOT_COMPLETED` + `VIBRATE`: exist only for task reminders.
-- The reminder receiver is `exported="false"`, listens only for boot actions, and starts no UI.
+- The reminder receiver is `exported=\"false\"`, listens only for boot actions, and starts no UI.
 - **No reminder text leaves the device.** Nothing is synced or uploaded.
 
 ## Honest limitations
@@ -35,7 +35,7 @@ Current `main` source behavior after the v1.0.6 OS-reminders work, including the
 
 | Area | Files |
 |------|-------|
-| Model / rules | `Task.java` (`repeatDayOfMonth`), `TaskLogic.java` (`REPEAT_DAILY`/`REPEAT_WEEKLY`/`REPEAT_MONTHLY`, anchored `advanceRepeat`) |
+| Model / rules | `Task.java` (`repeatDayOfMonth`), `TaskLogic.java` (`REPEAT_DAILY`/`REPEAT_WEEKLY`/`REPEAT_MONTHLY`/`REPEAT_WEEKDAYS`/`REPEAT_YEARLY`, anchored `advanceRepeat`) |
 | Encrypted storage | `TaskSnapshotCodec.java` (schema v5 stores `repeatRule` and `repeatDayOfMonth`; v1–v4 snapshots still load, with legacy monthly rules anchored to their current due-date day) |
 | Scheduling | `TaskReminderScheduler.java` (alarms, request codes, channel + sound), `TaskReminderReceiver.java` (boot + notify) |
 | Wiring | `MainActivity.java` (reschedule on open/save, repeat roll-forward, editor Repeat + sound UI, permission prompt on reminder selection) |

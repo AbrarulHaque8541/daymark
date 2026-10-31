@@ -67,6 +67,12 @@ public final class BrowserLoadWatchdogSmoke {
         assert "load-requested: https://example.com".equals(watchdog.snapshotEvents().get(0))
                 : "userinfo and query must be stripped from origin diagnostics";
 
+        Events multipleUserInfo = new Events();
+        watchdog = create(multipleUserInfo);
+        watchdog.onLoadRequested("https://first-secret@second-secret@example.com/path?token=must-not-leak");
+        assert "load-requested: https://example.com".equals(watchdog.snapshotEvents().get(0))
+                : "all userinfo before the final authority separator must be redacted";
+
         Events ipv6 = new Events();
         watchdog = create(ipv6);
         watchdog.onLoadRequested("https://[2001:db8::1]:8443?token=must-not-leak");
