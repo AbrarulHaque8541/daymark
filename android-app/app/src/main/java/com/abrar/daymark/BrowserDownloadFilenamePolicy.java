@@ -12,8 +12,9 @@ import java.util.regex.Pattern;
  */
 final class BrowserDownloadFilenamePolicy {
     private static final int MAX_UTF8_BYTES = 180;
+    // Windows also reserves the superscript-digit COM/LPT device names.
     private static final Pattern WINDOWS_RESERVED_BASE = Pattern.compile(
-            "(?i)^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$");
+            "(?i)^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$");
 
     private BrowserDownloadFilenamePolicy() { }
 
@@ -46,7 +47,10 @@ final class BrowserDownloadFilenamePolicy {
 
         int extension = result.indexOf('.');
         String base = extension < 0 ? result : result.substring(0, extension);
-        if (WINDOWS_RESERVED_BASE.matcher(base).matches()) result = "_" + result;
+        // Windows trims trailing dots/spaces from path components. Do the same
+        // before checking device names so "CON .txt" cannot evade the guard.
+        String reservedCheckBase = base.replaceAll("[ .]+$", "");
+        if (WINDOWS_RESERVED_BASE.matcher(reservedCheckBase).matches()) result = "_" + result;
         return result;
     }
 
@@ -63,9 +67,11 @@ final class BrowserDownloadFilenamePolicy {
     private static boolean isUnsafeControl(int codePoint) {
         if (Character.isISOControl(codePoint)) return true;
         // Unicode directional controls can visually reorder a filename's extension.
+        // U+2028/U+2029 are line/paragraph separators and can split UI labels.
         return codePoint == 0x061C || codePoint == 0x200E || codePoint == 0x200F
                 || (codePoint >= 0x202A && codePoint <= 0x202E)
                 || (codePoint >= 0x2066 && codePoint <= 0x2069)
+                || codePoint == 0x2028 || codePoint == 0x2029
                 || codePoint == 0xFEFF;
     }
 
