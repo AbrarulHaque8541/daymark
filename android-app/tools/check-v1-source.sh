@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+successfully downloaded text file (SHA: 1ccd9813cd4fcc63a9227741e60aa31cc6a97285)#!/usr/bin/env sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
@@ -33,10 +33,12 @@ python3 ./tools/check-reader-mode.py "$ROOT"
 python3 ./tools/check-find-in-page.py "$ROOT"
 python3 ./tools/check-browser-downloads-entry.py "$ROOT"
 python3 ./tools/check-browser-downloads-shortcut.py "$ROOT"
+python3 ./tools/check-integration-catalog-panel.py "$ROOT"
 python3 ./tools/check-bottom-navigation.py "$ROOT"
 python3 ./tools/check-press-feedback.py "$ROOT"
 python3 ./tools/check-task-ux.py "$ROOT"
-python3 ./tools/check-integration-catalog-panel.py "$ROOT"
+python3 ./tools/check-share-out-handoff.py "$ROOT"
+python3 ./tools/check-share-file-intake.py "$ROOT"
 python3 ./tools/check-release-updater-metadata.py "$ROOT"
 python3 ./tools/check-schema-v1-fixture.py "$ROOT"
 python3 ./tools/check-browser-site-info.py "$ROOT"

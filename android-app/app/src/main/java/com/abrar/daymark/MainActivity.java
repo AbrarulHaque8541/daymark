@@ -121,6 +121,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_PORTABLE_IMPORT = 7343;
     private static final int REQUEST_REMINDER_SOUND = 7345;
     private static final String STATE_PENDING_ATTACHMENT_TASK = "pending_attachment_task";
+    private static final String STATE_SHARED_ATTACHMENT_URIS = "shared_attachment_uris";
+    private static final String STATE_SHARED_TASK_TITLE = "shared_task_title";
+    private static final String STATE_SHARED_TASK_NOTES = "shared_task_notes";
     private static final String STATE_PENDING_PORTABLE_IMPORT_URI = "pending_portable_import_uri";
     private static final String STATE_PENDING_PORTABLE_IMPORT_TOKEN = "pending_portable_import_token";
     private static final String STATE_WEB_MODE = WebModeState.KEY;
@@ -200,6 +203,12 @@ public final class MainActivity extends Activity {
     private String pendingExtensionExportId;
     private Uri pendingPickedAttachmentUri;
     private String pendingPickedAttachmentTaskId;
+    private final List<Uri> stagedSharedAttachmentUris = new ArrayList<>();
+    private final List<Uri> pendingSharedAttachmentUris = new ArrayList<>();
+    private String pendingSharedTaskTitle;
+    private String pendingSharedTaskNotes;
+    private String pendingSharedAttachmentTaskId;
+    private int pendingSharedAttachmentIndex;
     private boolean storageReady;
     private boolean storageLoading = true;
     private boolean storageLoadFailed;
@@ -488,6 +497,11 @@ public final class MainActivity extends Activity {
             portableBackupManager = new PortableBackupManager(getApplicationContext());
             if (savedInstanceState != null) {
                 pendingAttachmentTaskId = savedInstanceState.getString(STATE_PENDING_ATTACHMENT_TASK);
+                ArrayList<Uri> restoredSharedUris =
+                        savedInstanceState.getParcelableArrayList(STATE_SHARED_ATTACHMENT_URIS);
+                if (restoredSharedUris != null) stagedSharedAttachmentUris.addAll(restoredSharedUris);
+                pendingSharedTaskTitle = savedInstanceState.getString(STATE_SHARED_TASK_TITLE);
+                pendingSharedTaskNotes = savedInstanceState.getString(STATE_SHARED_TASK_NOTES);
                 String savedDraft = savedInstanceState.getString(STATE_TASK_DRAFT);
                 if (savedDraft != null) {
                     taskDraft = savedDraft;
@@ -682,26 +696,50 @@ public final class MainActivity extends Activity {
         }
     }
 
-    // Android share target: shared text becomes the task draft so the user can
-    // review it before any task is created. Multi-line or over-long text opens the
-    // full editor, whose title field is capped at 160 characters.
+    // Android share target: text and content:// attachments are staged for explicit review.
+    // Files are copied into the encrypted attachment store only after the user saves a task.
+    @SuppressWarnings("deprecation")
     private void handleShareInIntent(Intent intent) {
         if (intent == null) return;
-        CharSequence shared;
-        if (Intent.ACTION_SEND.equals(intent.getAction()) && "text/plain".equals(intent.getType())) {
-            shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
-        } else if (Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())
-                && "text/plain".equals(intent.getType())) {
-            shared = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
-        } else {
-            return;
-        }
+        boolean send = Intent.ACTION_SEND.equals(intent.getAction());
+        boolean sendMultiple = Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction());
+        boolean processText = Intent.ACTION_PROCESS_TEXT.equals(intent.getAction());
+        if (!send && !sendMultiple && !processText) return;
+
+        CharSequence shared = processText
+                ? intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
+                : intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+        List<Uri> sharedUris = collectSharedAttachmentUris(intent, send, sendMultiple);
         ShareIntake.Draft draft = ShareIntake.parse(
                 intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT), shared);
-        // Consume the extras so a rotation or re-entry cannot overwrite the draft.
+
+        // Consume every payload surface so rotation/re-entry cannot import it twice.
         intent.removeExtra(Intent.EXTRA_TEXT);
         intent.removeExtra(Intent.EXTRA_PROCESS_TEXT);
         intent.removeExtra(Intent.EXTRA_SUBJECT);
+        intent.removeExtra(Intent.EXTRA_STREAM);
+        intent.setClipData(null);
+
+        if (!sharedUris.isEmpty()) {
+            if (!SharedAttachmentPolicy.isValidBatchSize(sharedUris.size())) {
+                showToast("Share up to " + SharedAttachmentPolicy.MAX_FILES + " files at a time.");
+                return;
+            }
+            stagedSharedAttachmentUris.clear();
+            stagedSharedAttachmentUris.addAll(sharedUris);
+            pendingSharedTaskTitle = draft.isEmpty()
+                    ? SharedAttachmentPolicy.defaultTaskTitle(sharedUris.size())
+                    : draft.title;
+            pendingSharedTaskNotes = draft.notes;
+            setWebMode(false);
+            if (canEdit()) {
+                dispatchPendingSharedTaskEditor();
+            } else {
+                showToast("Shared files are waiting while encrypted tasks open. Nothing has been imported yet.");
+            }
+            return;
+        }
+
         if (draft.isEmpty()) return;
         setWebMode(false);
         if (draft.openEditor) {
@@ -714,6 +752,71 @@ public final class MainActivity extends Activity {
         quickCaptureInput.setSelection(Math.min(draft.title.length(), ShareIntake.MAX_QUICK_ADD));
         quickCaptureInput.requestFocus();
         showToast("Shared text is in your task draft. Review it, then add the task.");
+    }
+
+    @SuppressWarnings("deprecation")
+    private List<Uri> collectSharedAttachmentUris(Intent intent, boolean send, boolean sendMultiple) {
+        List<Uri> result = new ArrayList<>();
+        ClipData clip = intent.getClipData();
+        if (clip != null) {
+            for (int index = 0; index < clip.getItemCount(); index++) {
+                addSharedAttachmentUri(result, clip.getItemAt(index).getUri());
+            }
+        }
+        if (send) {
+            Uri stream = Build.VERSION.SDK_INT >= 33
+                    ? intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri.class)
+                    : (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            addSharedAttachmentUri(result, stream);
+        } else if (sendMultiple) {
+            ArrayList<Uri> streams = Build.VERSION.SDK_INT >= 33
+                    ? intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri.class)
+                    : intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (streams != null) {
+                for (Uri stream : streams) addSharedAttachmentUri(result, stream);
+            }
+        }
+        return result;
+    }
+
+    private void addSharedAttachmentUri(List<Uri> result, Uri uri) {
+        if (uri == null || !SharedAttachmentPolicy.isSupportedUriScheme(uri.getScheme())
+                || result.contains(uri)) return;
+        result.add(uri);
+    }
+
+    private void dispatchPendingSharedTaskEditor() {
+        if (!canEdit() || stagedSharedAttachmentUris.isEmpty() || pendingSharedTaskTitle == null) return;
+        String title = pendingSharedTaskTitle;
+        String notes = pendingSharedTaskNotes == null ? "" : pendingSharedTaskNotes;
+        // Keep the draft metadata through dialog display so Android can restore it after rotation.
+        showTaskEditor(null, title, notes);
+        showToast("Review the task and shared files, then save to encrypt and attach them.");
+    }
+
+    private void importNextSharedAttachment() {
+        if (pendingSharedAttachmentTaskId == null) return;
+        if (pendingSharedAttachmentIndex >= pendingSharedAttachmentUris.size()) {
+            pendingSharedAttachmentUris.clear();
+            pendingSharedAttachmentTaskId = null;
+            pendingSharedAttachmentIndex = 0;
+            showToast("All shared files were imported into the task.");
+            return;
+        }
+        Task target = findTask(pendingSharedAttachmentTaskId);
+        if (!canEdit() || target == null || !AttachmentLogic.canAddToTask(target, tasks)) {
+            clearPendingSharedAttachments();
+            showToast("The remaining shared files could not be attached because a task limit was reached.");
+            return;
+        }
+        Uri next = pendingSharedAttachmentUris.get(pendingSharedAttachmentIndex);
+        importAttachment(pendingSharedAttachmentTaskId, next);
+    }
+
+    private void clearPendingSharedAttachments() {
+        pendingSharedAttachmentUris.clear();
+        pendingSharedAttachmentTaskId = null;
+        pendingSharedAttachmentIndex = 0;
     }
 
     @SuppressWarnings("deprecation")
@@ -971,6 +1074,12 @@ public final class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle outState) {
         if (pendingAttachmentTaskId != null) {
             outState.putString(STATE_PENDING_ATTACHMENT_TASK, pendingAttachmentTaskId);
+        }
+        if (!stagedSharedAttachmentUris.isEmpty()) {
+            outState.putParcelableArrayList(STATE_SHARED_ATTACHMENT_URIS,
+                    new ArrayList<>(stagedSharedAttachmentUris));
+            if (pendingSharedTaskTitle != null) outState.putString(STATE_SHARED_TASK_TITLE, pendingSharedTaskTitle);
+            if (pendingSharedTaskNotes != null) outState.putString(STATE_SHARED_TASK_NOTES, pendingSharedTaskNotes);
         }
         outState.putBoolean(STATE_WEB_MODE, webMode);
         if (!webMode && quickCaptureInput != null && quickCaptureInput.getText() != null) {
@@ -4702,6 +4811,7 @@ public final class MainActivity extends Activity {
                     showToast("Focus session could not be restored. Your encrypted tasks are still available and unchanged.");
                 }
                 dispatchPendingLauncherShortcut();
+                dispatchPendingSharedTaskEditor();
                 checkDueReminders();
                 if (pendingPortableImportNeedsRepick) {
                     pendingPortableImportNeedsRepick = false;
@@ -6459,7 +6569,12 @@ public final class MainActivity extends Activity {
                     storageStatus.setText("Encrypted storage ready");
                     storageStatus.setTextColor(palette.accent);
                     showToast("Attachment saved privately on this device.");
+                    if (pendingSharedAttachmentTaskId != null) {
+                        pendingSharedAttachmentIndex++;
+                        importNextSharedAttachment();
+                    }
                 } else if (saveOutcomeAmbiguous) {
+                    clearPendingSharedAttachments();
                     storageReady = false;
                     storageSaveFailed = true;
                     storageStatus.setText("Attachment save could not be verified");
@@ -6470,6 +6585,10 @@ public final class MainActivity extends Activity {
                     storageStatus.setText(storageReady ? "Encrypted storage ready" : "Saved tasks unavailable");
                     storageStatus.setTextColor(storageReady ? palette.accent : palette.danger);
                     showToast(attachmentFailureMessage(error, cleanupPending));
+                    if (pendingSharedAttachmentTaskId != null) {
+                        clearPendingSharedAttachments();
+                        showToast("The remaining shared files were not imported. Already saved attachments remain intact.");
+                    }
                 }
                 render();
             });
@@ -7033,6 +7152,16 @@ public final class MainActivity extends Activity {
                         : sourceTemplate != null ? "Create task" : "Add task", null);
         if (!templateOnly) editorBuilder.setNeutralButton("Save as template", null);
         AlertDialog dialog = editorBuilder.create();
+        if (!stagedSharedAttachmentUris.isEmpty()) {
+            dialog.setOnDismissListener(ignored -> {
+                if (!stagedSharedAttachmentUris.isEmpty()) {
+                    stagedSharedAttachmentUris.clear();
+                    pendingSharedTaskTitle = null;
+                    pendingSharedTaskNotes = null;
+                    showToast("Shared files were not attached because task creation was cancelled.");
+                }
+            });
+        }
         dialog.setOnShowListener(ignored -> {
             Button saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             titleInput.setOnEditorActionListener((view, actionId, event) -> {
@@ -7147,12 +7276,24 @@ public final class MainActivity extends Activity {
                                     String selectedDate, String priority, TaskTemplate sourceTemplate,
                                     String notes, String selectedTime, Integer reminderLead,
                                     List<Subtask> subtasks, String repeatRule, List<String> tags) {
+        String createdTaskId = null;
         try {
             if (editing == null) {
-                tasks.add(sourceTemplate == null
+                Task created = sourceTemplate == null
                         ? TaskLogic.create(normalized, selectedDate, priority, notes,
                                 selectedTime, reminderLead, subtasks, repeatRule, tags)
-                        : TaskTemplateLogic.instantiate(sourceTemplate, normalized, selectedDate, priority));
+                        : TaskTemplateLogic.instantiate(sourceTemplate, normalized, selectedDate, priority);
+                tasks.add(created);
+                createdTaskId = created.id;
+                if (sourceTemplate == null && !stagedSharedAttachmentUris.isEmpty()) {
+                    pendingSharedAttachmentUris.clear();
+                    pendingSharedAttachmentUris.addAll(stagedSharedAttachmentUris);
+                    stagedSharedAttachmentUris.clear();
+                    pendingSharedAttachmentTaskId = created.id;
+                    pendingSharedAttachmentIndex = 0;
+                    pendingSharedTaskTitle = null;
+                    pendingSharedTaskNotes = null;
+                }
                 if (sourceTemplate == null) quickCaptureInput.setText("");
                 captureFeedback.setText(sourceTemplate == null
                         ? "Task added. You can edit it later in your list."
@@ -7164,6 +7305,9 @@ public final class MainActivity extends Activity {
             dialog.dismiss();
             render();
             saveTasksAsync();
+            if (createdTaskId != null && createdTaskId.equals(pendingSharedAttachmentTaskId)) {
+                importNextSharedAttachment();
+            }
             showToast(editing == null
                     ? sourceTemplate == null ? "Task added." : "Task created from template."
                     : "Task updated.");
