@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Source guard for honest, searchable Connections catalog UI."""
 from pathlib import Path
 import sys
