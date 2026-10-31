@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Source guard for BrowserHttpPolicy, BrowserAddress, and BrowserDownloadTracker."""
 import pathlib
+import subprocess
 import sys
 
 root = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path(".")
@@ -37,5 +38,9 @@ assert "QUEUED" in d and "IN_PROGRESS" in d and "COMPLETED" in d and "FAILED" in
 assert "redact(" in d, "URL redaction missing (privacy)"
 assert "synchronized" in d, "thread safety missing"
 assert "progress()" in d, "progress calculation missing"
+
+# Run the tracker regression on the same host JDK used by the other policy smokes.
+# This catches privacy regressions that source-only checks cannot detect.
+subprocess.run(["sh", str(root / "tools/run-browser-download-tracker-tests.sh")], check=True)
 
 print("PASS browser address-policy/history/download source guards; HTTP WebView runtime and UI labeling NOT TESTED")
