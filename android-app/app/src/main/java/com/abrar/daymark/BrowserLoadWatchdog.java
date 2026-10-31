@@ -131,6 +131,8 @@ final class BrowserLoadWatchdog {
     synchronized void onRendererGone(String url) {
         cancelStages();
         pendingAddress = null;
+        hintFired = true;
+        retryFired = true;
         failFired = true;
         record("renderer-gone: " + redact(url));
         Log.e(TAG, "renderer-gone: " + redact(url));
@@ -183,6 +185,10 @@ final class BrowserLoadWatchdog {
     synchronized void cancel() {
         cancelStages();
         pendingAddress = null;
+        hintFired = true;
+        retryFired = true;
+        failFired = true;
+        record("watchdog-cancelled");
     }
 
     private void fireHint() {
