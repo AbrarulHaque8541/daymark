@@ -105,11 +105,6 @@ final class OAuthPkce {
                 actual.getBytes(StandardCharsets.UTF_8));
     }
 
-    /**
-     * Parses only a callback for the exact registered redirect origin/path. State is returned to
-     * the caller for comparison with Session.matchesState(); callers must not exchange the code
-     * until that comparison succeeds.
-     */
     static Callback parseCallback(String expectedRedirectUri, String callbackUri) {
         URI expected = parseUri(expectedRedirectUri);
         URI actual = parseUri(callbackUri);
