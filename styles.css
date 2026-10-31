@@ -423,3 +423,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .focus-card select { border-color: #323f47; background: rgba(22, 28, 34, .8); color: #d8e2e8; }
   .icon-button.focus-button:hover { background: #20342d; color: #8fd9c2; }
 }
+
+.recovery-export { margin-left: 8px; height: 32px; font-size: 11px; }
+.recovery-export[hidden] { display: none; }
+

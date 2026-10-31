@@ -63,6 +63,7 @@
         // healthy. Backups containing rejected task records are retained above.
         clearRecoveryBackup();
       }
+      updateRecoveryIndicator();
       return validated.tasks;
     } catch (error) {
       console.warn('Could not load saved Daymark tasks:', error);
@@ -78,9 +79,13 @@
         ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
         : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged');
       if (backupSaved) offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
+      updateRecoveryIndicator();
       return [];
     }
   }
+
+  // ensure indicator on initial empty
+  updateRecoveryIndicator();
 
   function isPartialRecoveryPayload(raw) {
     try {
@@ -194,6 +199,21 @@
     } catch (error) {
       console.warn('Could not clear the Daymark recovery backup:', error);
     }
+    updateRecoveryIndicator();
+  }
+
+  function updateRecoveryIndicator() {
+    const button = $('#recovery-export');
+    if (!button) return;
+    let hasBackup = false;
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      hasBackup = typeof raw === 'string' && raw.length > 0;
+    } catch (error) {
+      hasBackup = false;
+    }
+    button.hidden = !hasBackup;
+    button.setAttribute('aria-hidden', hasBackup ? 'false' : 'true');
   }
 
   function showSaveResult(saved, successMessage) {
@@ -1232,6 +1252,10 @@
   }
 
   function setUp() {
+    const recoveryButton = $('#recovery-export');
+    if (recoveryButton) {
+      recoveryButton.addEventListener('click', exportRecoveryBackup);
+    }
     state.tasks = loadTasks();
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
