@@ -1,4 +1,4 @@
-successfully downloaded text file (SHA: e8e96d145db559a2d0840f33b9465b2e37c09582)#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Source guard for the anonymous, HTTPS-only, read-only GitHub issues connector."""
 from pathlib import Path
 import sys
