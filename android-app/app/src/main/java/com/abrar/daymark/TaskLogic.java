@@ -1,5 +1,6 @@
 package com.abrar.daymark;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,6 +41,10 @@ final class TaskLogic {
     static final String REPEAT_DAILY = "daily";
     static final String REPEAT_WEEKLY = "weekly";
     static final String REPEAT_MONTHLY = "monthly";
+    /** Repeats on every weekday (Monday-Friday); weekends are skipped. */
+    static final String REPEAT_WEEKDAYS = "weekdays";
+    /** Repeats once a year on the same month and day; Feb 29 clamps to Feb 28 in short years. */
+    static final String REPEAT_YEARLY = "yearly";
 
     private TaskLogic() { }
 
@@ -113,7 +118,8 @@ final class TaskLogic {
     }
 
     static boolean isRepeatRule(String rule) {
-        return REPEAT_DAILY.equals(rule) || REPEAT_WEEKLY.equals(rule) || REPEAT_MONTHLY.equals(rule);
+        return REPEAT_DAILY.equals(rule) || REPEAT_WEEKLY.equals(rule) || REPEAT_MONTHLY.equals(rule)
+                || REPEAT_WEEKDAYS.equals(rule) || REPEAT_YEARLY.equals(rule);
     }
 
     static boolean isValidRepeatDayOfMonth(Integer dayOfMonth) {
@@ -163,7 +169,10 @@ final class TaskLogic {
         return nextDueDate(dueDate, rule, repeatDayOfMonth);
     }
 
-    /** Monthly rules clamp in short months while retaining their original day-of-month anchor. */
+    /**
+     * Monthly rules clamp in short months while retaining their original day-of-month anchor.
+     * Weekday rules skip Saturdays and Sundays; yearly rules clamp Feb 29 to Feb 28 in short years.
+     */
     static String nextDueDate(String dueDate, String rule, Integer repeatDayOfMonth) {
         if (!isDateOnly(dueDate) || !isRepeatRule(rule)) {
             throw new IllegalArgumentException("Choose a valid repeat rule.");
@@ -171,6 +180,14 @@ final class TaskLogic {
         LocalDate date = LocalDate.parse(dueDate);
         if (REPEAT_DAILY.equals(rule)) return date.plusDays(1).toString();
         if (REPEAT_WEEKLY.equals(rule)) return date.plusWeeks(1).toString();
+        if (REPEAT_WEEKDAYS.equals(rule)) {
+            LocalDate next = date.plusDays(1);
+            while (next.getDayOfWeek() == DayOfWeek.SATURDAY || next.getDayOfWeek() == DayOfWeek.SUNDAY) {
+                next = next.plusDays(1);
+            }
+            return next.toString();
+        }
+        if (REPEAT_YEARLY.equals(rule)) return date.plusYears(1).toString();
         if (!isValidRepeatDayOfMonth(repeatDayOfMonth)) {
             throw new IllegalArgumentException("Choose a valid monthly repeat date.");
         }
@@ -551,3 +568,4 @@ final class TaskLogic {
         }
     }
 }
+

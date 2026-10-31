@@ -3,10 +3,13 @@
 
   const STORAGE_KEY = 'daymark.tasks.v1';
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
+  const FOCUS_KEY = 'daymark.focus.v1';
+  const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [] };
+  const focus = window.DaymarkFocus || null;
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -195,7 +198,8 @@
       note: '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/>',
       steps: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2m-3 6 1 1 2-2m-3 6 1 1 2-2"/>',
     repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
-    copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
+    copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/>'
     };
     return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
   }
@@ -229,6 +233,7 @@
         <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${repeatChip}${reminderChip}${notesChip}${subtaskChip}</div>
       </div>
       <div class="task-actions">
+        <button class="icon-button focus-button" type="button" data-action="focus" aria-label="Start focus timer for ${escapeHTML(task.title)}" title="Start a focus timer for this task">${icon('timer')}</button>
         <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}">${icon('edit')}</button>
         <button class="icon-button duplicate-button" type="button" data-action="duplicate" aria-label="Duplicate ${escapeHTML(task.title)}" title="Duplicate as a new task">${icon('copy')}</button>
         <button class="icon-button delete-button" type="button" data-action="delete" aria-label="Delete ${escapeHTML(task.title)}">${icon('trash')}</button>
@@ -341,6 +346,7 @@
     suggestionList.innerHTML = suggestions.length
       ? suggestions.map(({ task, reason }, index) => `<div class="suggestion-item"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></div>`).join('')
       : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
+    renderFocus();
   }
 
   function dismissToast() {
@@ -633,6 +639,10 @@
       const saved = persistTasks();
       render();
       showSaveResult(saved, 'Task duplicated as a new open task.');
+    } else if (button.dataset.action === 'focus') {
+      startFocus(task.id);
+      const card = $('#focus-card');
+      if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (button.dataset.action === 'tag') {
       state.query = button.dataset.tag;
       $('#task-search').value = button.dataset.tag;
@@ -732,6 +742,188 @@
     reader.readAsText(file);
   }
 
+  function loadFocusState() {
+    const empty = { session: null, log: [] };
+    if (!focus) return empty;
+    let saved = null;
+    try {
+      saved = localStorage.getItem(FOCUS_KEY);
+    } catch (error) {
+      console.warn('Could not read Daymark focus storage:', error);
+      return empty;
+    }
+    if (!saved) return empty;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Saved focus data is not an object.');
+      const log = focus.validateFocusLog(parsed.log);
+      if (log.rejectedCount > 0 && !Array.isArray(parsed.log)) throw new Error('Saved focus log is not a list.');
+      const session = parsed.session ? focus.restoreSession(parsed.session, Date.now()) : null;
+      return { session, log: log.entries };
+    } catch (error) {
+      console.warn('Could not load saved Daymark focus state:', error);
+      // Preserve the unreadable payload instead of silently discarding it,
+      // mirroring the task-store recovery backup.
+      try {
+        localStorage.setItem(FOCUS_BACKUP_KEY, saved);
+      } catch (backupError) {
+        console.warn('Could not keep a backup of raw Daymark focus state:', backupError);
+      }
+      return empty;
+    }
+  }
+
+  function persistFocusState() {
+    if (!focus) return false;
+    try {
+      const payload = {
+        session: state.focusSession ? focus.serialize(state.focusSession) : null,
+        log: state.focusLog
+      };
+      localStorage.setItem(FOCUS_KEY, JSON.stringify(payload));
+      try {
+        localStorage.removeItem(FOCUS_BACKUP_KEY);
+      } catch (error) {
+        console.warn('Could not clear the Daymark focus recovery backup:', error);
+      }
+      return true;
+    } catch (error) {
+      console.warn('Could not save Daymark focus state:', error);
+      return false;
+    }
+  }
+
+  function renderFocus() {
+    const timeEl = $('#focus-time');
+    if (!timeEl) return;
+    if (!focus) {
+      timeEl.textContent = '—';
+      return;
+    }
+    const now = Date.now();
+    const session = state.focusSession;
+    const labelEl = $('#focus-state-label');
+    const fill = $('#focus-progress-fill');
+    const startBtn = $('#focus-start');
+    const pauseBtn = $('#focus-pause');
+    const stopBtn = $('#focus-stop');
+    const taskSelect = $('#focus-task');
+    if (taskSelect) {
+      const openTasks = state.tasks.filter((task) => !task.completed);
+      taskSelect.innerHTML = ['<option value="">No task</option>']
+        .concat(openTasks.map((task) => `<option value="${escapeHTML(task.id)}">${escapeHTML(task.title)}</option>`))
+        .join('');
+      const stillThere = state.focusTaskId && openTasks.some((task) => task.id === state.focusTaskId);
+      taskSelect.value = stillThere ? state.focusTaskId : '';
+      state.focusTaskId = taskSelect.value;
+      taskSelect.disabled = Boolean(session);
+    }
+    document.querySelectorAll('.focus-preset').forEach((button) => {
+      const active = button.dataset.focusPreset === state.focusPreset;
+      button.classList.toggle('is-active', active);
+      button.disabled = Boolean(session);
+    });
+    if (!session) {
+      const minutes = focus.presetMinutes(state.focusPreset) || focus.PRESET_MINUTES.focus;
+      timeEl.textContent = focus.formatClock(minutes * 60 * 1000);
+      if (labelEl) labelEl.textContent = 'Ready';
+      if (fill && fill.style) fill.style.width = '0%';
+      if (startBtn) {
+        startBtn.hidden = false;
+        startBtn.textContent = 'Start';
+      }
+      if (pauseBtn) pauseBtn.hidden = true;
+      if (stopBtn) stopBtn.hidden = true;
+    } else {
+      timeEl.textContent = focus.formatClock(focus.remainingMs(session, now));
+      if (labelEl) {
+        labelEl.textContent = session.state === 'paused'
+          ? 'Paused'
+          : (session.kind === 'focus' ? 'Focusing' : 'On break');
+      }
+      if (fill && fill.style) fill.style.width = `${Math.round(focus.progressRatio(session, now) * 100)}%`;
+      if (startBtn) startBtn.hidden = true;
+      if (pauseBtn) {
+        pauseBtn.hidden = false;
+        pauseBtn.textContent = session.state === 'paused' ? 'Resume' : 'Pause';
+      }
+      if (stopBtn) stopBtn.hidden = false;
+    }
+    const todayEl = $('#focus-today');
+    if (todayEl) todayEl.textContent = String(focus.focusMinutesOn(state.focusLog, logic.localDateString()));
+  }
+
+  function ensureFocusTimer() {
+    if (state.focusTimer != null || typeof setInterval !== 'function') return;
+    state.focusTimer = setInterval(tickFocus, 1000);
+  }
+
+  function stopFocusTimer() {
+    if (state.focusTimer == null) return;
+    clearTimeout(state.focusTimer);
+    if (typeof clearInterval === 'function') clearInterval(state.focusTimer);
+    state.focusTimer = null;
+  }
+
+  function tickFocus() {
+    if (!focus || !state.focusSession) return;
+    const outcome = focus.tick(state.focusSession, Date.now());
+    if (outcome.finished) {
+      endFocusSession(true);
+      return;
+    }
+    renderFocus();
+  }
+
+  function startFocus(taskId) {
+    if (!focus) return;
+    if (state.focusSession) {
+      showToast('Finish or stop the current focus session first.');
+      return;
+    }
+    const kind = focus.isKind(state.focusPreset) ? state.focusPreset : 'focus';
+    const minutes = focus.presetMinutes(kind);
+    const linkedTaskId = taskId || state.focusTaskId || null;
+    state.focusSession = focus.createSession({ taskId: linkedTaskId, kind, durationMinutes: minutes }, Date.now());
+    state.focusTaskId = linkedTaskId || '';
+    persistFocusState();
+    renderFocus();
+    ensureFocusTimer();
+    const task = linkedTaskId ? state.tasks.find((item) => item.id === linkedTaskId) : null;
+    showToast(task
+      ? `Focus started for “${task.title}” — ${focus.formatClock(minutes * 60 * 1000)} on the clock.`
+      : `Focus started — ${focus.formatClock(minutes * 60 * 1000)} on the clock.`);
+  }
+
+  function toggleFocusPause() {
+    if (!focus || !state.focusSession) return;
+    const now = Date.now();
+    if (state.focusSession.state === 'running') focus.pause(state.focusSession, now);
+    else focus.resume(state.focusSession, now);
+    persistFocusState();
+    renderFocus();
+  }
+
+  function endFocusSession(completed) {
+    if (!focus || !state.focusSession) return;
+    const now = Date.now();
+    focus.finish(state.focusSession, now, completed);
+    const entry = focus.makeLogEntry(state.focusSession);
+    if (entry) state.focusLog = focus.appendLogEntry(state.focusLog, entry);
+    const task = state.focusSession.taskId ? state.tasks.find((item) => item.id === state.focusSession.taskId) : null;
+    state.focusSession = null;
+    persistFocusState();
+    stopFocusTimer();
+    renderFocus();
+    render();
+    if (entry) {
+      const minutes = Math.max(1, Math.round(entry.elapsedMs / 60000));
+      showToast(completed
+        ? (task ? `Focus complete — ${minutes} min logged on “${task.title}”. Nice work.` : `Focus session complete — ${minutes} min logged. Nice work.`)
+        : `Focus stopped — ${minutes} min logged as partial.`);
+    }
+  }
+
   function scheduledFireTime(task) {
     if (task.completed || !logic.isDateOnly(task.dueDate)) return null;
     const lead = task.reminderLeadMinutes;
@@ -828,6 +1020,9 @@
 
   function setUp() {
     state.tasks = loadTasks();
+    const focusState = loadFocusState();
+    state.focusSession = focusState.session;
+    state.focusLog = focusState.log;
     render();
     $('#add-form').addEventListener('submit', addTask);
     $('#new-title').addEventListener('input', () => {
@@ -902,10 +1097,28 @@
         render();
       }
     });
-    window.addEventListener('focus', refreshIfLocalDayChanged);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) refreshIfLocalDayChanged();
+    $('#focus-start').addEventListener('click', () => startFocus(null));
+    $('#focus-pause').addEventListener('click', toggleFocusPause);
+    $('#focus-stop').addEventListener('click', () => endFocusSession(false));
+    $('#focus-task').addEventListener('change', (event) => {
+      state.focusTaskId = event.currentTarget.value;
     });
+    document.querySelectorAll('.focus-preset').forEach((button) => button.addEventListener('click', () => {
+      if (state.focusSession) return;
+      state.focusPreset = button.dataset.focusPreset;
+      renderFocus();
+    }));
+    window.addEventListener('focus', () => {
+      refreshIfLocalDayChanged();
+      tickFocus();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshIfLocalDayChanged();
+        tickFocus();
+      }
+    });
+    if (state.focusSession) ensureFocusTimer();
     scheduleNextDayRefresh();
     if (typeof setInterval === 'function') {
       state.reminderTimer = setInterval(checkReminders, 30000);
@@ -915,3 +1128,4 @@
 
   setUp();
 })();
+

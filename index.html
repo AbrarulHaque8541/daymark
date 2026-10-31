@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css">
   <script src="task-logic.js" defer></script>
   <script src="repeat-logic.js" defer></script>
+  <script src="focus-logic.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -72,6 +73,8 @@
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
+            <option value="weekdays">Weekdays</option>
+            <option value="yearly">Yearly</option>
           </select>
           <label class="sr-only" for="new-priority">Priority</label>
           <select id="new-priority" name="priority" aria-label="Priority">
@@ -129,6 +132,7 @@
           <p class="storage-note"><span class="storage-dot" aria-hidden="true"></span> This prototype stores tasks only in this browser — no account or cross-device sync.</p>
         </section>
 
+        <div class="side-column">
         <aside class="suggestion-card" aria-labelledby="suggestion-title">
           <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span><span class="demo-label">DEMO SUGGESTION</span></div>
           <h2 id="suggestion-title">A good place to begin</h2>
@@ -136,6 +140,31 @@
           <div class="suggestion-list" id="suggestion-list" aria-live="polite"></div>
           <div class="suggestion-footnote"><span aria-hidden="true">i</span><p>Demo suggestions use due date and priority rules only. No AI service is connected.</p></div>
         </aside>
+
+        <aside class="focus-card" id="focus-card" aria-labelledby="focus-heading">
+          <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span><span class="demo-label">FOCUS TIMER</span></div>
+          <h2 id="focus-heading">One thing at a time</h2>
+          <p class="focus-description">A simple local timer to work through a task. No network, no account — it keeps running while this tab is open.</p>
+          <div class="focus-time-wrap">
+            <span class="focus-time" id="focus-time" role="timer">25:00</span>
+            <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite">Ready</span>
+          </div>
+          <div class="focus-progress" aria-hidden="true"><div class="focus-progress-fill" id="focus-progress-fill"></div></div>
+          <div class="focus-presets" role="group" aria-label="Timer length">
+            <button class="date-chip focus-preset is-active" type="button" data-focus-preset="focus">Focus · 25 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
+          </div>
+          <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
+          <select id="focus-task"><option value="">No task</option></select>
+          <div class="focus-actions">
+            <button class="button button-primary" id="focus-start" type="button">Start</button>
+            <button class="button button-quiet" id="focus-pause" type="button" hidden>Pause</button>
+            <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
+          </div>
+          <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
+        </aside>
+        </div>
       </div>
       <footer class="page-footer"><span>DAYMARK <span aria-hidden="true">·</span> PERSONAL TASKS</span><span>Made for a calmer kind of productive.</span></footer>
     </main>
@@ -157,7 +186,7 @@
       </div>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
-        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
       </div>
       <p class="reminder-note-standalone">Reminders show on this page while it is open. Completing a repeating task automatically schedules its next occurrence.</p>
       <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
@@ -181,3 +210,4 @@
   </div>
 </body>
 </html>
+
