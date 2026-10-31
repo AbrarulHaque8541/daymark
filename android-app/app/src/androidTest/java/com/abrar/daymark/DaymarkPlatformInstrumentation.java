@@ -71,6 +71,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
             runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
             runPhase("offline-web-clip-store", this::offlineWebClipStoreRoundTrip);
+            runPhase("connections-panel-accessibility", this::connectionsPanelAccessibility);
             runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
             runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
@@ -433,6 +434,72 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             if (posted.getId() == id) return posted.getNotification();
         }
         return null;
+    }
+
+    /** Exercises filter semantics, touch-target minima and real catalog action gates on Android. */
+    private void connectionsPanelAccessibility() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> used =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        runOnMainSync(() -> {
+            try {
+                Context themed = new android.view.ContextThemeWrapper(getTargetContext(), R.style.AppThemeLight);
+                IntegrationCatalogPanel panel = new IntegrationCatalogPanel(themed, entry -> used.set(entry.id));
+                android.widget.EditText search = (android.widget.EditText) panel.getChildAt(2);
+                android.widget.HorizontalScrollView scroller =
+                        (android.widget.HorizontalScrollView) panel.getChildAt(3);
+                android.widget.LinearLayout families = (android.widget.LinearLayout) scroller.getChildAt(0);
+                android.widget.Button all = (android.widget.Button) families.getChildAt(0);
+                android.widget.Button files = null;
+                for (int index = 0; index < families.getChildCount(); index++) {
+                    android.widget.Button chip = (android.widget.Button) families.getChildAt(index);
+                    if (chip.getTag() == IntegrationCatalog.Family.FILES) files = chip;
+                }
+                int minimumTarget = Math.round(48 * themed.getResources().getDisplayMetrics().density);
+                check(all.isSelected() && all.getContentDescription().toString().contains(", selected"),
+                        "initial All filter announces selection");
+                check(search.getMinimumHeight() >= minimumTarget && all.getMinimumHeight() >= minimumTarget,
+                        "search and category controls request at least 48 dp touch targets");
+                check(files != null && files.getMinimumHeight() >= minimumTarget,
+                        "file filter exists with a 48 dp minimum target");
+                android.widget.Button originalFiles = files;
+                files.performClick();
+                check(files.isSelected() && files.getContentDescription().toString().contains(", selected"),
+                        "selected category is announced");
+                check(!all.isSelected() && all.getContentDescription().toString().contains(", not selected"),
+                        "previous category announces it is not selected");
+                check(families.getChildAt(0) == all && originalFiles.getParent() == families,
+                        "selecting a category retains the existing focusable views");
+                all.performClick();
+                android.widget.ScrollView scroll = (android.widget.ScrollView) panel.getChildAt(4);
+                android.widget.LinearLayout entries = (android.widget.LinearLayout) scroll.getChildAt(0);
+                search.setText("n8n");
+                check(entries.getChildCount() == 1, "search narrows the visible catalog");
+                android.widget.LinearLayout plannedCard = (android.widget.LinearLayout) entries.getChildAt(0);
+                android.widget.Button planned = (android.widget.Button) plannedCard.getChildAt(4);
+                check(!planned.isEnabled() && planned.getMinimumHeight() >= minimumTarget,
+                        "planned integration is disabled and has a 48 dp minimum target");
+                planned.performClick();
+                check(used.get() == null, "a planned integration cannot invoke a host action");
+                search.setText("Android text sharing");
+                check(entries.getChildCount() == 1, "search finds the implemented Android sharing entry");
+                android.widget.LinearLayout availableCard = (android.widget.LinearLayout) entries.getChildAt(0);
+                android.widget.Button available = (android.widget.Button) availableCard.getChildAt(4);
+                check(available.isEnabled() && available.getContentDescription().toString()
+                                .contains("Android text sharing"),
+                        "available action announces which integration it uses");
+                available.performClick();
+                check("android.share.text".equals(used.get()), "available entry dispatches its real action");
+                used.set(null);
+                panel.setListener(null);
+                available.performClick();
+                check(used.get() == null, "a stale button cannot invoke a removed host listener");
+            } catch (Throwable error) {
+                failure.set(error);
+            }
+        });
+        if (failure.get() != null) throw new Exception("Connections panel accessibility failed", failure.get());
     }
 
     /** Exercises the clip through the Android AtomicFile task-store adapter, without network access. */
