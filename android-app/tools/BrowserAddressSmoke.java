@@ -62,6 +62,10 @@ public final class BrowserAddressSmoke {
 
         assert !BrowserAddress.isAllowedWebUrl("https://user:pass@example.com/");
         assert !BrowserAddress.isAllowedWebUrl("http://user:pass@example.com/");
+        assert !BrowserAddress.isAllowedWebUrl("https://example.com:");
+        assert !BrowserAddress.isAllowedWebUrl("http://[::1]:");
+        assert !BrowserAddress.isAllowedWebUrl("https://münchen.de:");
+        rejects("https://example.com:/path");
         assert !BrowserAddress.isAllowedWebUrl("https://example.com:0");
         assert !BrowserAddress.isAllowedWebUrl("https://example.com:65536");
         assert !BrowserAddress.isAllowedWebUrl("https://example.com:99999");
