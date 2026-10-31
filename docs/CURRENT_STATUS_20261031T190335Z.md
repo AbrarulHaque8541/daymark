@@ -16,7 +16,7 @@ Autonomous engineering iteration 4: preserve literal plus in intent:// fallback 
 - Added a host regression covering plus in both path and query.
 - Added a source guard assertion to prevent reverting the plus-preserving decoder.
 - PR: [#450](https://github.com/AbrarulHaque8541/daymark/pull/450)
-- Exact latest PR head: `HEAD_SHA_TO_BE_FILLED` (source + test + guard + status evidence).
+- Code + test + source-guard commit: `2c1f417163d679345be8801223476ac2efbd7b22`. A subsequent status-only commit will be the final PR head.
 
 ## Focused validation
 - Local Java 21 JShell reproduction of the exact decoder expression: **PASS**. Confirmed old expression changes `a+b?q=x+y` into `a b?q=x y`, while the fix preserves plus.
@@ -28,7 +28,7 @@ Autonomous engineering iteration 4: preserve literal plus in intent:// fallback 
 ## CI
 - Initial code/test head `0e9b078c120e609ce0d1e1a0d25f40e61cd22a48`: all four workflows were started; at last check Android build, Windows/Ubuntu contracts, non-publishing QA APK and device-test APK were **IN PROGRESS/QUEUED**.
 - Source guard was added afterward so CI covers the complete regression contract on the next head.
-- Exact latest-head checks: **PENDING** until workflows are discovered and complete.
+- Exact code + test + guard-head workflows for `2c1f417163d679345be8801223476ac2efbd7b22`: Android CI, cross-platform contracts, non-publishing QA APK and device-test APK have been created and are **PENDING/QUEUED**. Re-check after any later commit.
 
 ## Cross-agent audit evidence
 - Inspected PR #449 actual diff: `BrowserIntentLinkPolicy.java`, `BrowserIntentLinkPolicySmoke.java`, `check-browser-intent-links.py`, `run-core-tests.sh`, and status docs.
