@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
@@ -36,6 +35,7 @@ python3 ./tools/check-browser-downloads-shortcut.py "$ROOT"
 python3 ./tools/check-bottom-navigation.py "$ROOT"
 python3 ./tools/check-press-feedback.py "$ROOT"
 python3 ./tools/check-task-ux.py "$ROOT"
+python3 ./tools/check-integration-catalog-panel.py "$ROOT"
 python3 ./tools/check-share-out-handoff.py "$ROOT"
 python3 ./tools/check-share-file-intake.py "$ROOT"
 python3 ./tools/check-release-updater-metadata.py "$ROOT"
