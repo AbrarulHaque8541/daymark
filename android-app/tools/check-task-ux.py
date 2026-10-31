@@ -133,6 +133,39 @@ check("searchDebounceRunnable = null;" in clear_action
 check(search_controls.count("renderTaskCount(renderTaskList());") == 2,
       "clear and debounced typing must each reuse the list result count")
 
+# Task-entry and row controls must not shrink their tappable bounds below 48 dp. Labels
+# also need wrap-content height so the user's font scale is not confined to a fixed row.
+composer = region("private View buildSharedComposer()", "private View buildBrowserAddressBar()",
+                  "task composer")
+check("quickCaptureInput.setMinHeight(dp(48))" in composer
+      and "quickCaptureInput.setMinimumHeight(dp(48))" in composer,
+      "quick capture input must retain a 48 dp minimum target")
+check("quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(\n"
+      "                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))" in composer,
+      "task-editor shortcut must not force a shorter fixed height")
+check("LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(\n"
+      "                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)" in composer,
+      "search shortcut must not force a shorter fixed height")
+check("addTaskButton.setMinHeight(dp(40))" not in composer,
+      "Add task must inherit the compact button's 48 dp minimum")
+task_row = region("private View buildTaskRow(Task task)", "private void showSwipeTaskActions",
+                  "task row")
+for marker in ("checkBox.setMinimumWidth(dp(48))", "checkBox.setMinimumHeight(dp(48))",
+               "new LinearLayout.LayoutParams(dp(48), dp(48))", "more.setMinimumWidth(dp(48))",
+               "more.setMinimumHeight(dp(48))", "new LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT)",
+               "chips.addView(subtasksChip, taskChipMargin())", "chips.addView(notes, taskChipMargin())"):
+    check(marker in task_row, f"task row touch target/scaling contract missing: {marker}")
+check("dp(34)" not in task_row and "dp(40)" not in task_row and "dp(42)" not in task_row,
+      "task-row controls must not override their 48 dp minimum with smaller bounds")
+compact = region("private Button compactButton(", "private LinearLayout horizontalCard", "compact button")
+check("button.setMinHeight(dp(48))" in compact and "button.setMinimumHeight(dp(48))" in compact,
+      "Files, Notes and Checklist controls inherit a 48 dp minimum")
+task_chip_params = region("private LinearLayout.LayoutParams taskChipMargin()", "private LinearLayout.LayoutParams topMargin(",
+                          "task chip layout")
+check("ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT" in task_chip_params
+      and "params.setMarginStart(dp(5))" in task_chip_params,
+      "task chips must grow for larger text and use a direction-aware margin")
+
 check("boolean shouldRebuild(String filter, String query, String tag, List<Task> visible,"
       in RENDER_GATE, "gate overload with tag missing")
 check("shouldRebuild(filter, query, \"\", visible, saveFailed);" in RENDER_GATE,

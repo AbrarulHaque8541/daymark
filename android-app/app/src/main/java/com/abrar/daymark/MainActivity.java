@@ -1658,7 +1658,7 @@ public final class MainActivity extends Activity {
         cancelAttachmentButton.setVisibility(View.GONE);
         cancelAttachmentButton.setOnClickListener(view -> requestOperationCancel());
         statusRow.addView(cancelAttachmentButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         content.addView(statusRow, bottomMargin(dp(5)));
     }
 
@@ -1674,7 +1674,8 @@ public final class MainActivity extends Activity {
         Button addTaskShortcut = compactButton("+ Task", false);
         addTaskShortcut.setContentDescription("Open the task editor to create a task with date, priority, notes and other options");
         addTaskShortcut.setOnClickListener(view -> showTaskEditor(null, ""));
-        quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button searchTasksShortcut = compactButton("⌕ Search", false);
         searchTasksShortcut.setContentDescription("Expand task search by title and words");
         searchTasksShortcut.setOnClickListener(view -> {
@@ -1685,7 +1686,8 @@ public final class MainActivity extends Activity {
                 if (taskScrollView != null) taskScrollView.post(() -> taskScrollView.smoothScrollTo(0, searchControlView.getTop()));
             }
         });
-        LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         searchShortcutParams.leftMargin = dp(6);
         quickActions.addView(searchTasksShortcut, searchShortcutParams);
         card.addView(quickActions, bottomMargin(dp(7)));
@@ -1698,7 +1700,8 @@ public final class MainActivity extends Activity {
         quickCaptureInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
         quickCaptureInput.setFilters(new InputFilter[] { new InputFilter.LengthFilter(2048) });
         quickCaptureInput.setPadding(dp(12), dp(8), dp(12), dp(8));
-        quickCaptureInput.setMinHeight(dp(44));
+        quickCaptureInput.setMinHeight(dp(48));
+        quickCaptureInput.setMinimumHeight(dp(48));
         quickCaptureInput.setTextColor(palette.text);
         quickCaptureInput.setHintTextColor(palette.muted);
         quickCaptureInput.setBackground(shape(palette.background, 14, palette.line));
@@ -1727,8 +1730,6 @@ public final class MainActivity extends Activity {
         taskActions = new LinearLayout(this);
         taskActions.setOrientation(LinearLayout.VERTICAL);
         addTaskButton = compactButton("Add task", false);
-        addTaskButton.setMinHeight(dp(40));
-        addTaskButton.setMinimumHeight(dp(40));
         addTaskButton.setContentDescription("Add this task in the full editor with the captured text");
         addTaskButton.setOnClickListener(view -> {
             String draft = quickCaptureInput.getText() == null
@@ -6148,7 +6149,9 @@ public final class MainActivity extends Activity {
                 ? "Mark “" + task.title + "” as not done"
                 : "Mark “" + task.title + "” as done");
         checkBox.setEnabled(canEdit());
-        row.addView(checkBox, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        checkBox.setMinimumWidth(dp(48));
+        checkBox.setMinimumHeight(dp(48));
+        row.addView(checkBox, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -6181,11 +6184,9 @@ public final class MainActivity extends Activity {
                     + " attachments for task: " + task.title);
             attachments.setEnabled(canEdit());
             attachments.setOnClickListener(view -> showAttachmentManager(task));
-            attachments.setMinHeight(dp(34));
-            attachments.setMinimumHeight(dp(34));
             attachments.setPadding(dp(8), 0, dp(8), 0);
             chips.addView(attachments, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
         if (!task.subtasks.isEmpty()) {
             int doneCount = TaskLogic.completedSubtaskCount(task);
@@ -6193,28 +6194,22 @@ public final class MainActivity extends Activity {
             subtasksChip.setContentDescription("Checklist for task: " + task.title
                     + ". " + doneCount + " of " + task.subtasks.size() + " done. Open to update.");
             subtasksChip.setEnabled(canEdit());
-            subtasksChip.setMinHeight(dp(34));
-            subtasksChip.setMinimumHeight(dp(34));
             subtasksChip.setPadding(dp(8), 0, dp(8), 0);
             subtasksChip.setOnClickListener(view -> showSubtasksDialog(task));
-            chips.addView(subtasksChip, chipMargin());
+            chips.addView(subtasksChip, taskChipMargin());
         }
         if (!task.notes.isEmpty()) {
             Button notes = compactButton("Note", false);
             notes.setContentDescription("Show the note for task: " + task.title);
-            notes.setMinHeight(dp(34));
-            notes.setMinimumHeight(dp(34));
             notes.setOnClickListener(view -> showNotesDialog(task));
-            chips.addView(notes, chipMargin());
+            chips.addView(notes, taskChipMargin());
         }
         String reminder = reminderLabel(task);
         if (reminder != null && !task.completed) {
             Button reminderChip = compactButton(reminder, false);
             reminderChip.setContentDescription(reminder + " for task: " + task.title);
             reminderChip.setEnabled(false);
-            reminderChip.setMinHeight(dp(34));
-            reminderChip.setMinimumHeight(dp(34));
-            chips.addView(reminderChip, chipMargin());
+            chips.addView(reminderChip, taskChipMargin());
         }
         // Do not reserve a metadata row when the task has no files, checklist, note or
         // reminder. This keeps plain tasks compact without removing any row action.
@@ -6230,15 +6225,15 @@ public final class MainActivity extends Activity {
 
         Button more = compactButton("⋮", false);
         more.setTextSize(20 * textScale);
-        more.setMinWidth(dp(36));
-        more.setMinimumWidth(dp(36));
-        more.setMinHeight(dp(40));
-        more.setMinimumHeight(dp(40));
+        more.setMinWidth(dp(48));
+        more.setMinimumWidth(dp(48));
+        more.setMinHeight(dp(48));
+        more.setMinimumHeight(dp(48));
         more.setPadding(0, 0, 0, 0);
         more.setContentDescription("Task actions for: " + task.title);
         more.setEnabled(canEdit());
         more.setOnClickListener(view -> showSwipeTaskActions(task));
-        row.addView(more, new LinearLayout.LayoutParams(dp(36), dp(40)));
+        row.addView(more, new LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         checkBox.setOnCheckedChangeListener((button, checked) -> {
             if (!canEdit() || checked == task.completed) return;
@@ -9527,6 +9522,14 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         params.leftMargin = dp(5);
+        return params;
+    }
+
+    /** Metadata buttons keep a 48 dp minimum while growing for larger text. */
+    private LinearLayout.LayoutParams taskChipMargin() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMarginStart(dp(5));
         return params;
     }
 
