@@ -38,11 +38,14 @@ assert "System.currentTimeMillis()" not in src, "wall-clock deadline is vulnerab
 # Terminal navigation callbacks must invalidate queued stages even if a callback races removal.
 for method, marker in (("onPageFinished(String url)", "page-finished:"),
                        ("onReceivedError(String url, int errorCode, String description)", "load-error:"),
-                       ("onRendererGone(String url)", "renderer-gone:")):
+                       ("onRendererGone(String url)", "renderer-gone:"),
+                       ("void cancel()", "watchdog-cancelled")):
     start = src.find(method)
     assert start >= 0, f"{method} missing"
     body_start = src.find("{", start)
     next_method = src.find("\n    /**", body_start)
+    if next_method < 0:
+        next_method = src.find("\n    private ", body_start)
     body = src[body_start:next_method if next_method >= 0 else len(src)]
     assert "cancelStages();" in body, f"{method} must cancel stages"
     assert "pendingAddress = null;" in body, f"{method} must invalidate queued callbacks"
