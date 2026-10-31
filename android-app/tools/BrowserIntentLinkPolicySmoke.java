@@ -24,6 +24,18 @@ public final class BrowserIntentLinkPolicySmoke {
         check("http://example.com:8080/fallback".equals(httpFallback.fallbackUrl),
                 "valid HTTP fallback with explicit port is accepted");
 
+        BrowserIntentLinkPolicy.Decision httpsTargetPort = BrowserIntentLinkPolicy.parse(
+                "intent://example.com:8443/secure#Intent;scheme=https;end");
+        check("https://example.com:8443/secure".equals(httpsTargetPort.targetUri),
+                "valid HTTPS target with explicit port is accepted");
+
+        expectFailure("intent://example.com:99999/#Intent;scheme=https;end",
+                "out-of-range HTTPS target port rejected");
+        expectFailure("intent://example.com:0/#Intent;scheme=http;end",
+                "zero HTTP target port rejected");
+        expectFailure("intent://example.com:/#Intent;scheme=https;end",
+                "explicit empty HTTPS target port rejected");
+
         expectFailure("intent://example.com/#Intent;scheme=https;"
                         + "S.browser_fallback_url=https%3A%2F%2Fexample.com%3A99999%2Ffallback;end",
                 "out-of-range fallback port rejected");
