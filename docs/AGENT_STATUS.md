@@ -2,8 +2,7 @@
 
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
-## Latest reviewed snapshot
-
+NaN
 - [Daymark status snapshot — 2026-10-31T15:59:20Z](./CURRENT_STATUS_20261031T155920Z.md)
 - [Daymark status snapshot — 2026-10-31T15:07:24.269Z](./CURRENT_STATUS_20261031T150724Z.md)
 - [Daymark status snapshot — 2026-10-31T14:35:15Z](./CURRENT_STATUS_20261031T143515Z.md)
