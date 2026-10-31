@@ -14,6 +14,9 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentLogic.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskWebhookPayload.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskWebhookClient.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/IntegrationCatalog.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/TaskShareText.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/SharedAttachmentPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ActivityCallbackGate.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollThemeColor.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollChromeReserve.java" \
@@ -36,6 +39,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserExtension.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserAddress.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentLinkPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHistory.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLogPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserNetworkPolicy.java" \
@@ -57,6 +61,9 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubReleaseClient.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubApkDownloader.java" \
   "$ROOT/tools/TaskWebhookClientSmoke.java" \
+  "$ROOT/tools/IntegrationCatalogSmoke.java" \
+  "$ROOT/tools/SharedAttachmentPolicySmoke.java" \
+  "$ROOT/tools/TaskShareTextSmoke.java" \
   "$ROOT/tools/TaskLogicSmoke.java" \
   "$ROOT/tools/ReminderSchedulePolicySmoke.java" \
   "$ROOT/tools/ScrollThemeColorSmoke.java" \
@@ -74,6 +81,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/ActivityCallbackGateSmoke.java" \
   "$ROOT/tools/UpdaterSmoke.java" \
   "$ROOT/tools/GitHubTransportSmoke.java" \
+  "$ROOT/tools/BrowserIntentLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserAddressSmoke.java" \
   "$ROOT/tools/BrowserExternalLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserLogPolicySmoke.java" \
@@ -88,7 +96,10 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserCookieImportSmoke.java" \
   "$ROOT/tools/CosmeticFilterToCssSmoke.java" \
   "$ROOT/tools/TasksHomeLayoutPolicySmoke.java"
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskWebhookClientSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.SharedAttachmentPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.IntegrationCatalogSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskShareTextSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmokejava -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskWebhookClientSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
@@ -107,6 +118,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExternalLinkPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserLogPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserNetworkPolicySmoke "$ROOT/../contracts/browser-network-policy.tsv"
