@@ -31,6 +31,7 @@ python3 ./tools/check-browser-tab-settings.py "$ROOT"
 python3 ./tools/check-browser-downloads.py "$ROOT"
 python3 ./tools/check-reminder-lifecycle.py "$ROOT"
 python3 ./tools/check-reader-mode.py "$ROOT"
+python3 ./tools/check-web-clip.py "$ROOT"
 python3 ./tools/check-find-in-page.py "$ROOT"
 python3 ./tools/check-browser-downloads-entry.py "$ROOT"
 python3 ./tools/check-browser-downloads-shortcut.py "$ROOT"
@@ -52,6 +53,7 @@ python3 ./tools/check-browser-site-info.py "$ROOT"
 python3 ./tools/check-browser-history.py "$ROOT"
 python3 ./tools/check-browser-http-policy.py "$ROOT"
 python3 ./tools/check-updater-https-only.py "$ROOT"
+python3 ./tools/test-updater-https-guard.py
 python3 ./tools/check-browser-diagnostics.py "$ROOT"
 python3 ./tools/check-browser-log-privacy.py "$ROOT"
 python3 ./tools/check-scroll-theme.py "$ROOT"
@@ -80,7 +82,7 @@ assert permission_names(manifest) == {
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.VIBRATE",
-}, "shared manifest declares INTERNET for the HTTP+HTTPS browser plus notification/boot/vibrate for task reminders"
+}, "shared manifest declares INTERNET for browsing/app clients plus notification/boot/vibrate for task reminders"
 assert permission_names(play_manifest) == set(), "Play flavor must not declare permissions"
 assert permission_names(sideload_manifest) == {
     "android.permission.INTERNET",
@@ -565,16 +567,16 @@ assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")
 
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
-# INTERNET for the HTTP+HTTPS browser (issue #45) — a stale summary that contradicted
-# the assertions above it.
-print("PASS manifest/permissions: main declares INTERNET for the HTTP+HTTPS browser plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
+# INTERNET for the browser and app clients (issue #45) — a stale summary that contradicted
+# the assertions above it. This is not a runtime HTTP-browsing assertion.
+print("PASS manifest/permissions: main declares INTERNET for browsing and app network clients plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
 print("PASS permission policy: manifest-backed browser status plus a notification permission prompt only when a reminder is enabled; no other runtime permission prompt code")
 print("PASS encrypted task-store policy: writer and reader share invalid/duplicate-task rejection")
 print("PASS lifecycle policy: task/storage/attachment/browser callbacks are suppressed after Activity destruction")
 print("PASS portable backup policy: bounded AES-GCM format, SAF create-only export, snapshot-last restore journal")
 print("PASS task/browser separation: web input does not create tasks or receive task-draft prefill")
 print("PASS browser policy: fresh installs Offline; legacy implicit Online is rejected; explicit disclosure opt-in is required; HTTP/HTTPS navigation still requires a separate Go/site tap")
-print("PASS browser policy: encoded explicit search, HTTP+HTTPS (HTTP labeled Not encrypted) with redirect downgrade blocking, no JS bridge/request interceptor")
+print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, downgrade guard, no JS bridge/interceptor; HTTP runtime and visible label NOT TESTED")
 print("PASS browser settings: Safe Browsing defaults on, confirmed opt-out persists, and current/future WebViews track the preference")
 print("PASS WebView source security: Safe Browsing, mixed-content/file-access restrictions, SSL cancel, site permission denial, pop-up/download handling")
 print("PASS local browser data: capped origin-only site history, legacy-origin migration, reopen/dedup, secret redaction, and explicit history/cookie/cache/WebStorage clear")

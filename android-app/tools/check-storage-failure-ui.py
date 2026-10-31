@@ -41,8 +41,8 @@ check("tasks.clear()" not in failed_save and "tasks.addAll(lastSavedTasks)" not 
 check("lastSavedTasks.clear()" not in failed_save,
       "failed save retains the last-known committed in-memory snapshot")
 
-render_start = ACTIVITY.index("private void renderTaskList(LocalDate today)")
-render_end = ACTIVITY.index("private void renderTaskCount()", render_start)
+render_start = ACTIVITY.index("private int renderTaskList(LocalDate today)")
+render_end = ACTIVITY.index("private void renderTaskCount(int visible)", render_start)
 render_tasks = ACTIVITY[render_start:render_end]
 check(render_tasks.index("if (storageLoading || storageLoadFailed)") < render_tasks.index("String selectedFilter"),
       "loading or load failure takes precedence over ordinary empty/filter states")

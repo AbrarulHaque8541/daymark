@@ -23,6 +23,12 @@ MAIN = ROOT / "app/src/main/java/com/abrar/daymark"
 ACTIVITY = (MAIN / "MainActivity.java").read_text(encoding="utf-8")
 TASK_LOGIC = (MAIN / "TaskLogic.java").read_text(encoding="utf-8")
 RENDER_GATE = (MAIN / "TaskListRenderGate.java").read_text(encoding="utf-8")
+TASK_MODEL = (MAIN / "Task.java").read_text(encoding="utf-8")
+ATTACHMENT_MODEL = (MAIN / "AttachmentRef.java").read_text(encoding="utf-8")
+SUBTASK_MODEL = (MAIN / "Subtask.java").read_text(encoding="utf-8")
+GATE_SMOKE = (ROOT / "tools/TaskListRenderGateSmoke.java").read_text(encoding="utf-8")
+TASK_SEARCH = (MAIN / "TaskSearch.java").read_text(encoding="utf-8")
+SEARCH_SMOKE = (ROOT / "tools/TaskSearchSmoke.java").read_text(encoding="utf-8")
 NOTE_FORMAT = MAIN / "NoteFormat.java"
 KEY_SHORTCUTS = MAIN / "KeyShortcuts.java"
 NOTE_SMOKE = ROOT / "tools/NoteFormatSmoke.java"
@@ -86,7 +92,7 @@ check("chip.setText(\"#\" + tag);" in chip, "chip label must show the tag")
 check("chip.setContentDescription(" in chip, "chip needs an accessible description")
 check("\"Tag \" + tag + \", selected." in chip, "selected chip must announce its state")
 
-listing = region("private void renderTaskList(LocalDate today)", "private void renderTaskCount()",
+listing = region("private int renderTaskList(LocalDate today)", "private void renderTaskCount(int visible)",
                  "renderTaskList")
 check("String selectedTag = powerMode ? activeTag : \"\";" in listing,
       "renderTaskList must read the tag only in the task workspace")
@@ -94,21 +100,129 @@ check("TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today
       "renderTaskList must pass the tag to the filter")
 check("taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, selectedTag,"
       in listing, "the render gate must key on the tag")
-count = region("private void renderTaskCount(LocalDate today)", "private void appendSmartToken",
+count = region("private void renderTaskCount(int visible)", "private void appendSmartToken",
                "renderTaskCount")
 check("String selectedTag = powerMode ? activeTag : \"\";" in count,
       "renderTaskCount must read the tag")
 check("boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty();" in count,
       "a tag filter must read as narrowing the list")
 check("No tasks tagged #\" + selectedTag" in listing, "empty state must name the active tag")
+check(listing.count("TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today)") == 1,
+      "one filter pass must supply the task list")
+check(listing.count("return visible.size();") == 2,
+      "both rebuilt and reused lists must return the visible count")
+check("TaskLogic.filter(" not in count and "visible + (visible == 1" in count,
+      "the count label must reuse the list result instead of filtering again")
+check("renderTaskCount(renderTaskList(today));" in render,
+      "a full render must pass the list's count directly to its label")
+search_controls = region("searchInput = new EditText(this);", "taskList = new LinearLayout(this);",
+                         "task search controls")
+check('searchInput.setContentDescription("Search tasks by title, notes, tags, priority or due date")'
+      in search_controls, "search accessibility text must name the supported fields")
+for marker in ("searchInput.setMinHeight(dp(48))", "searchInput.setMinimumHeight(dp(48))",
+               "searchClear.setMinimumHeight(dp(48))", "ViewGroup.LayoutParams.WRAP_CONTENT"):
+    check(marker in search_controls, f"search controls must fit scaled text and 48 dp targets: {marker}")
+clear_action = search_controls.split("searchClear.setOnClickListener", 1)[1].split(
+    "searchRow.addView(searchClear", 1)[0]
+check(clear_action.index('searchInput.setText(\"\");')
+      < clear_action.index("mainHandler.removeCallbacks(searchDebounceRunnable);"),
+      "clearing text must cancel the debounce scheduled by its TextWatcher")
+check("searchDebounceRunnable = null;" in clear_action
+      and "renderTaskCount(renderTaskList());" in clear_action,
+      "clearing must update list and count once without leaving a pending callback")
+check(search_controls.count("renderTaskCount(renderTaskList());") == 2,
+      "clear and debounced typing must each reuse the list result count")
+
+# Task-entry and row controls must not shrink their tappable bounds below 48 dp. Labels
+# also need wrap-content height so the user's font scale is not confined to a fixed row.
+composer = region("private View buildSharedComposer()", "private View buildBrowserAddressBar()",
+                  "task composer")
+check("quickCaptureInput.setMinHeight(dp(48))" in composer
+      and "quickCaptureInput.setMinimumHeight(dp(48))" in composer,
+      "quick capture input must retain a 48 dp minimum target")
+check("quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(\n"
+      "                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))" in composer,
+      "task-editor shortcut must not force a shorter fixed height")
+check("LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(\n"
+      "                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)" in composer,
+      "search shortcut must not force a shorter fixed height")
+check("addTaskButton.setMinHeight(dp(40))" not in composer,
+      "Add task must inherit the compact button's 48 dp minimum")
+task_row = region("private View buildTaskRow(Task task)", "private void showSwipeTaskActions",
+                  "task row")
+for marker in ("checkBox.setMinimumWidth(dp(48))", "checkBox.setMinimumHeight(dp(48))",
+               "new LinearLayout.LayoutParams(dp(48), dp(48))", "more.setMinimumWidth(dp(48))",
+               "more.setMinimumHeight(dp(48))", "new LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT)",
+               "chips.addView(subtasksChip, taskChipMargin())", "chips.addView(notes, taskChipMargin())"):
+    check(marker in task_row, f"task row touch target/scaling contract missing: {marker}")
+check("dp(34)" not in task_row and "dp(40)" not in task_row and "dp(42)" not in task_row,
+      "task-row controls must not override their 48 dp minimum with smaller bounds")
+compact = region("private Button compactButton(", "private LinearLayout horizontalCard", "compact button")
+check("button.setMinHeight(dp(48))" in compact and "button.setMinimumHeight(dp(48))" in compact,
+      "Files, Notes and Checklist controls inherit a 48 dp minimum")
+task_chip_params = region("private LinearLayout.LayoutParams taskChipMargin()", "private LinearLayout.LayoutParams topMargin(",
+                          "task chip layout")
+check("ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT" in task_chip_params
+      and "params.setMarginStart(dp(5))" in task_chip_params,
+      "task chips must grow for larger text and use a direction-aware margin")
 
 check("boolean shouldRebuild(String filter, String query, String tag, List<Task> visible,"
       in RENDER_GATE, "gate overload with tag missing")
 check("shouldRebuild(filter, query, \"\", visible, saveFailed);" in RENDER_GATE,
       "tag-free gate overload must delegate with no tag")
-check("private static String fingerprint" in RENDER_GATE, "gate fingerprint missing")
-check("sb.append(tag == null ? \"\" : tag).append('|');" in RENDER_GATE,
-      "gate fingerprint must include the tag")
+check("lastTag.equals(nextTag)" in RENDER_GATE,
+      "gate must compare the selected tag independently")
+check("sameTasksByIdentity(lastVisible, visible)" in RENDER_GATE,
+      "gate must compare the task snapshots captured by row callbacks")
+check("if (task != iterator.next()) return false;" in RENDER_GATE,
+      "a new immutable task instance must refresh its row, even with the same timestamp")
+check("new ArrayList<>(visible)" in RENDER_GATE,
+      "gate must copy task references rather than retain a mutable list")
+for field in ("id", "title", "dueDate", "priority", "createdAt", "updatedAt", "notes",
+              "dueTime", "reminderShownFire", "repeatRule"):
+    check(f"final String {field};" in TASK_MODEL, f"Task.{field} must be immutable for the render gate")
+for marker in ("final boolean completed;", "final Integer reminderLeadMinutes;",
+               "final Integer repeatDayOfMonth;", "final List<AttachmentRef> attachments;",
+               "final List<Subtask> subtasks;", "final List<String> tags;",
+               "Collections.unmodifiableList(new ArrayList<>(attachments))",
+               "Collections.unmodifiableList(new ArrayList<>(subtasks))",
+               "Collections.unmodifiableList(new ArrayList<>(tags))"):
+    check(marker in TASK_MODEL, f"render gate relies on immutable task data: {marker}")
+for model, markers in ((ATTACHMENT_MODEL, ("final class AttachmentRef", "final String id;",
+                                            "final String displayName;", "final String mimeType;",
+                                            "final long sizeBytes;")),
+                       (SUBTASK_MODEL, ("final class Subtask", "final String id;",
+                                        "final String title;", "final boolean done;"))):
+    for marker in markers:
+        check(marker in model, f"render gate relies on immutable nested task data: {marker}")
+for marker in ("detectsAttachmentChangesWithoutTimestampChanges()",
+               "imported attachment must refresh the row and its captured task",
+               "completion of the refreshed row retains the imported attachment",
+               "snapshotsTheListRatherThanRetainingAMutableContainer()"):
+    check(marker in GATE_SMOKE, f"render-gate regression coverage missing: {marker}")
+check('"$ROOT/tools/TaskListRenderGateSmoke.java"' in CORE_RUNNER
+      and "com.abrar.daymark.TaskListRenderGateSmoke" in CORE_RUNNER,
+      "render-gate regression test must be compiled and run")
+
+# Search stays local and retains literal behavior before bounded fuzzy fallback.
+filter_body = region_in(TASK_LOGIC, "static List<Task> filter(List<Task> tasks, String filter, String query, String tag,",
+                        "static List<String> availableTags", "tag-aware task filter")
+check("TaskSearch.prepare(query)" in filter_body and "if (!search.matches(task)) continue;" in filter_body,
+      "the existing list/filter flow must use local search")
+for marker in ("Locale.ROOT", "searchable.contains(literal)", "searchable.contains(term.text)",
+               "MAX_FUZZY_QUERY_CHARS = 160", "MAX_FUZZY_TERMS = 6",
+               "MIN_FUZZY_TERM_CODE_POINTS = 4", "MAX_FUZZY_TERM_CODE_POINTS = 32",
+               "withinOneEdit(", "Character.isLetterOrDigit("):
+    check(marker in TASK_SEARCH, f"bounded local search contract missing: {marker}")
+for forbidden in ("import android.", "openConnection(", "loadUrl(", "HttpURLConnection"):
+    check(forbidden not in TASK_SEARCH, f"task search must not need Android or a network request: {forbidden}")
+for marker in ("preservesExistingSearch()", "matchesCommonTyposAndMultipleTerms()",
+               "keepsCategoryAndTagFiltersExact()", "handlesUnicodeAndBoundsConservatively()",
+               "matchesReferenceOneEditPolicy()"):
+    check(marker in SEARCH_SMOKE, f"search behavior coverage missing: {marker}")
+check('"$ROOT/tools/TaskSearchSmoke.java"' in CORE_RUNNER
+      and "com.abrar.daymark.TaskSearchSmoke" in CORE_RUNNER,
+      "search regression test must be compiled and run")
 
 # --- 2. Note formatting --------------------------------------------------------------------
 

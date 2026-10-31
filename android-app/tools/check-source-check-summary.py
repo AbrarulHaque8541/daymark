@@ -30,8 +30,10 @@ for stale in ("no permissions/network", "no permissions, network"):
     check(not any(stale in line for line in summaries),
           f"the summary must not claim the app declares no network permission: {stale}")
 
-check(any("INTERNET for the HTTP+HTTPS browser" in line for line in summaries),
-      "the summary must state the real INTERNET permission for the browser")
+check(any("INTERNET for browsing and app network clients" in line for line in summaries),
+      "the summary must state the real INTERNET permission without asserting HTTP runtime behavior")
+check(any("HTTP runtime and visible label NOT TESTED" in line for line in summaries),
+      "the summary must not treat the HTTP policy helper as Android runtime or UI evidence")
 check(any("optional POST_PROMOTED_NOTIFICATIONS" in line and "Play adds no permissions" in line for line in summaries),
       "the summary must state that Live Update permission is sideload-only and Play remains permission-minimal")
 

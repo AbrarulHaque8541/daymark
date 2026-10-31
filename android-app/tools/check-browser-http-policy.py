@@ -38,4 +38,4 @@ assert "redact(" in d, "URL redaction missing (privacy)"
 assert "synchronized" in d, "thread safety missing"
 assert "progress()" in d, "progress calculation missing"
 
-print("PASS check-browser-http-policy: HTTP+HTTPS browser policy, address validation, history, and download tracker contract verified")
+print("PASS browser address-policy/history/download source guards; HTTP WebView runtime and UI labeling NOT TESTED")

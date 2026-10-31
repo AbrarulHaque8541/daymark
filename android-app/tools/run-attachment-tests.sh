@@ -11,5 +11,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Subtask.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskDuePresets.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/TaskSearch.java" \
   "$ROOT/tools/AttachmentBlobStoreSmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.AttachmentBlobStoreSmoke

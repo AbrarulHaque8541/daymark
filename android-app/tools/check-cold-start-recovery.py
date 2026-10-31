@@ -13,6 +13,9 @@ assert 'Log.e("Daymark-ColdStart", "Crash details", startupFailure);' in create,
 assert "showStartupFailureScreen(startupFailure);" in create, "cold-start failures must reach the safe UI fallback"
 ui = source[source.index("private void showStartupFailureScreen"):source.index("    @Override\n    protected void onNewIntent", start)]
 assert "App initialization failed." in ui, "startup fallback must be user-friendly"
-assert "Please restart" in ui and "clear app data" in ui, "startup fallback must provide recovery guidance"
+assert "Please restart" in ui, "startup fallback must suggest a non-destructive restart"
+assert ui.count("Do not clear app data or reinstall") == 2, \
+    "both startup fallbacks must warn against deleting encrypted task data"
+assert "or clear app data" not in ui, "startup recovery must not recommend deleting app data"
 assert ".setMessage(" in ui and ".show();" in ui, "startup fallback must use a dialog"
 print("PASS cold-start recovery: logged failure boundary and graceful dialog fallback")

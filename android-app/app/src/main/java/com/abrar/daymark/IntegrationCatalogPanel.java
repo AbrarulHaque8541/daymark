@@ -2,9 +2,8 @@ package com.abrar.daymark;
 import android.content.Context;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
+import android.view.HapticFeedbackConstants;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -12,8 +11,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 /**
@@ -52,9 +49,12 @@ final class IntegrationCatalogPanel extends LinearLayout {
 
         search = new EditText(context);
         search.setSingleLine(true);
+        search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         search.setHint("Search apps, services and protocols");
         search.setContentDescription("Search integrations");
-        addView(search, new LayoutParams(LayoutParams.MATCH_PARENT, dp(48)));
+        search.setMinHeight(dp(48));
+        search.setMinimumHeight(dp(48));
+        addView(search, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         HorizontalScrollView familyScroll = new HorizontalScrollView(context);
         familyScroll.setHorizontalScrollBarEnabled(false);
@@ -88,10 +88,22 @@ final class IntegrationCatalogPanel extends LinearLayout {
     }
 
     private void renderFamilies() {
-        familyRow.removeAllViews();
-        addFamilyChip(null, "All");
-        for (IntegrationCatalog.Family family : IntegrationCatalog.Family.values()) {
-            addFamilyChip(family, familyLabel(family));
+        // Build once: replacing the focused chip on every selection loses keyboard/TalkBack focus.
+        if (familyRow.getChildCount() == 0) {
+            addFamilyChip(null, "All");
+            for (IntegrationCatalog.Family family : IntegrationCatalog.Family.values()) {
+                addFamilyChip(family, familyLabel(family));
+            }
+        }
+        for (int index = 0; index < familyRow.getChildCount(); index++) {
+            Button chip = (Button) familyRow.getChildAt(index);
+            IntegrationCatalog.Family family = (IntegrationCatalog.Family) chip.getTag();
+            String label = family == null ? "All" : familyLabel(family);
+            boolean selected = selectedFamily == family;
+            chip.setSelected(selected);
+            chip.setText((selected ? "✓  " : "") + label);
+            chip.setContentDescription("Filter integrations: " + label
+                    + (selected ? ", selected" : ", not selected"));
         }
     }
 
@@ -99,15 +111,18 @@ final class IntegrationCatalogPanel extends LinearLayout {
         Button chip = new Button(context);
         chip.setText(label);
         chip.setAllCaps(false);
-        chip.setSelected(selectedFamily == family);
-        chip.setContentDescription("Filter integrations: " + label);
+        chip.setTag(family);
+        chip.setMinHeight(dp(48));
+        chip.setMinimumHeight(dp(48));
         chip.setOnClickListener(view -> {
+            if (selectedFamily == family) return;
             selectedFamily = family;
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             renderFamilies();
             renderEntries();
         });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LayoutParams.WRAP_CONTENT, dp(40));
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 0, dp(6), dp(6));
         familyRow.addView(chip, params);
     }
@@ -127,7 +142,7 @@ final class IntegrationCatalogPanel extends LinearLayout {
         }
         if (shown == 0) {
             TextView empty = new TextView(context);
-            empty.setText("No matching integrations.");
+            empty.setText("No matching integrations. Try another search or choose All.");
             empty.setPadding(0, dp(16), 0, dp(16));
             entryColumn.addView(empty, matchWrap());
         }
@@ -163,15 +178,24 @@ final class IntegrationCatalogPanel extends LinearLayout {
 
         Button action = new Button(context);
         action.setAllCaps(false);
+        action.setMinHeight(dp(48));
+        action.setMinimumHeight(dp(48));
         if (entry.canConnect() && listener != null) {
             action.setText("Use");
+            action.setContentDescription("Use " + entry.name);
             action.setEnabled(true);
-            action.setOnClickListener(view -> listener.onUse(entry));
+            action.setOnClickListener(view -> {
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                Listener current = listener;
+                if (current != null && entry.canConnect()) current.onUse(entry);
+            });
         } else {
             action.setText(entry.canConnect() ? "Action unavailable" : entry.statusLabel());
+            action.setContentDescription(entry.name + ": "
+                    + (entry.canConnect() ? "Action unavailable" : entry.statusLabel()));
             action.setEnabled(false);
         }
-        card.addView(action, new LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)));
+        card.addView(action, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -180,7 +204,9 @@ final class IntegrationCatalogPanel extends LinearLayout {
     }
 
     private static String familyLabel(IntegrationCatalog.Family family) {
-        return family.name().replace('_', ' ').toLowerCase(Locale.ROOT);
+        if (family == IntegrationCatalog.Family.AI_TOOLS) return "AI tools";
+        String label = family.name().replace('_', ' ').toLowerCase(Locale.ROOT);
+        return Character.toUpperCase(label.charAt(0)) + label.substring(1);
     }
 
     private LayoutParams matchWrap() {

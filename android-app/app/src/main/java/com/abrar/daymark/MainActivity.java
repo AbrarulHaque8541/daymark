@@ -252,6 +252,8 @@ public final class MainActivity extends Activity {
     private boolean pendingAttachmentCleanupExpired;
     private Runnable undoDismissal;
     private Palette palette;
+    private WebClip.Draft pendingWebClip;
+    private AlertDialog webClipDialog;
     private TaskFocusSessionRuntime focusSessionRuntime;
     private TaskFocusTimerPanel focusTimerPanel;
     private TaskFocusSessionCoordinator.Snapshot focusSnapshot;
@@ -495,6 +497,8 @@ public final class MainActivity extends Activity {
             attachmentStore = new AndroidAttachmentStore(getApplicationContext());
             extensionRuntime = ExtensionRuntime.create(this);
             portableBackupManager = new PortableBackupManager(getApplicationContext());
+            Object retained = getLastNonConfigurationInstance();
+            if (retained instanceof WebClip.Draft) pendingWebClip = (WebClip.Draft) retained;
             if (savedInstanceState != null) {
                 pendingAttachmentTaskId = savedInstanceState.getString(STATE_PENDING_ATTACHMENT_TASK);
                 ArrayList<Uri> restoredSharedUris =
@@ -552,14 +556,14 @@ public final class MainActivity extends Activity {
         try {
             new AlertDialog.Builder(this)
                     .setTitle("Daymark could not start")
-                    .setMessage("App initialization failed. Please restart the app or clear app data if the problem continues.")
+                    .setMessage("App initialization failed. Please restart the app. Do not clear app data or reinstall; that can remove your encrypted tasks. Seek support if restarting does not help.")
                     .setPositiveButton("Close", null)
                     .setCancelable(false)
                     .show();
         } catch (Throwable dialogFailure) {
             Log.e("Daymark-ColdStart", "Unable to show startup error dialog", dialogFailure);
             TextView message = new TextView(this);
-            message.setText("App initialization failed. Please restart or clear app data.");
+            message.setText("App initialization failed. Please restart the app. Do not clear app data or reinstall; that can remove your encrypted tasks.");
             int pad = Math.round(18 * getResources().getDisplayMetrics().density);
             message.setPadding(pad, pad, pad, pad);
             setContentView(message);
@@ -1049,6 +1053,12 @@ public final class MainActivity extends Activity {
         unregisterDaymarkBackCallback();
         activityCallbackGate.close();
         if (undoDismissal != null) mainHandler.removeCallbacks(undoDismissal);
+        if (searchDebounceRunnable != null) mainHandler.removeCallbacks(searchDebounceRunnable);
+        if (webClipDialog != null && webClipDialog.isShowing()) {
+            webClipDialog.setOnDismissListener(null);
+            webClipDialog.dismiss();
+        }
+        webClipDialog = null;
         portableCancelRequested = true;
         if (!portableRestoreWorkerActive) {
             PortableBackupCodec.clear(pendingRecoveryKey);
@@ -1069,6 +1079,12 @@ public final class MainActivity extends Activity {
         if (focusTimerPanel != null) focusTimerPanel.close();
         if (browserWebView != null) discardBrowserWebView();
         super.onDestroy();
+    }
+
+    /** Keep only the unsaved clip draft in memory through a configuration change. */
+    @Override
+    public Object onRetainNonConfigurationInstance() {
+        return pendingWebClip;
     }
 
     @Override
@@ -1159,6 +1175,7 @@ public final class MainActivity extends Activity {
             checkForUpdates(false);
         }
         checkDueReminders();
+        showPendingWebClip();
     }
 
     @Override
@@ -1641,7 +1658,7 @@ public final class MainActivity extends Activity {
         cancelAttachmentButton.setVisibility(View.GONE);
         cancelAttachmentButton.setOnClickListener(view -> requestOperationCancel());
         statusRow.addView(cancelAttachmentButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         content.addView(statusRow, bottomMargin(dp(5)));
     }
 
@@ -1657,7 +1674,8 @@ public final class MainActivity extends Activity {
         Button addTaskShortcut = compactButton("+ Task", false);
         addTaskShortcut.setContentDescription("Open the task editor to create a task with date, priority, notes and other options");
         addTaskShortcut.setOnClickListener(view -> showTaskEditor(null, ""));
-        quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button searchTasksShortcut = compactButton("⌕ Search", false);
         searchTasksShortcut.setContentDescription("Expand task search by title and words");
         searchTasksShortcut.setOnClickListener(view -> {
@@ -1668,7 +1686,8 @@ public final class MainActivity extends Activity {
                 if (taskScrollView != null) taskScrollView.post(() -> taskScrollView.smoothScrollTo(0, searchControlView.getTop()));
             }
         });
-        LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         searchShortcutParams.leftMargin = dp(6);
         quickActions.addView(searchTasksShortcut, searchShortcutParams);
         card.addView(quickActions, bottomMargin(dp(7)));
@@ -1681,7 +1700,8 @@ public final class MainActivity extends Activity {
         quickCaptureInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
         quickCaptureInput.setFilters(new InputFilter[] { new InputFilter.LengthFilter(2048) });
         quickCaptureInput.setPadding(dp(12), dp(8), dp(12), dp(8));
-        quickCaptureInput.setMinHeight(dp(44));
+        quickCaptureInput.setMinHeight(dp(48));
+        quickCaptureInput.setMinimumHeight(dp(48));
         quickCaptureInput.setTextColor(palette.text);
         quickCaptureInput.setHintTextColor(palette.muted);
         quickCaptureInput.setBackground(shape(palette.background, 14, palette.line));
@@ -1710,8 +1730,6 @@ public final class MainActivity extends Activity {
         taskActions = new LinearLayout(this);
         taskActions.setOrientation(LinearLayout.VERTICAL);
         addTaskButton = compactButton("Add task", false);
-        addTaskButton.setMinHeight(dp(40));
-        addTaskButton.setMinimumHeight(dp(40));
         addTaskButton.setContentDescription("Add this task in the full editor with the captured text");
         addTaskButton.setOnClickListener(view -> {
             String draft = quickCaptureInput.getText() == null
@@ -3004,18 +3022,26 @@ public final class MainActivity extends Activity {
     }
 
     private void saveCurrentPageAsTask() {
-        // Research loop (docs/TASK_BROWSER_PAGE_GAPS.md section 5 C): a page the
-        // owner is reading becomes a task. The URL stays in the encrypted local
-        // task store; nothing is sent anywhere by this action.
         if (browserWebView == null || browserWebView.getUrl() == null) {
             showToast("No page is open to save as a task.");
             return;
         }
-        String title = browserWebView.getTitle();
-        if (title == null || title.trim().isEmpty()) title = "Read this page";
-        final String draftTitle = "Read: " + title.trim() + " \u00b7 " + browserWebView.getUrl();
+        if (!canEdit()) {
+            showToast("Encrypted task storage is unavailable; try again when it is ready.");
+            return;
+        }
+        final String sourceUrl;
+        try {
+            sourceUrl = BrowserAddress.requireAllowedWebUrl(browserWebView.getUrl());
+        } catch (IllegalArgumentException invalidPage) {
+            showToast("This page does not have a valid web address to save.");
+            return;
+        }
+        // Put the complete address in notes, not in the 160-character title field.
+        // This explicit link-saving action retains query parameters for review in the editor.
+        final String draftTitle = WebClip.taskTitle(browserWebView.getTitle());
         setWebMode(false);
-        postActivityCallback(() -> showTaskEditor(null, draftTitle));
+        postActivityCallback(() -> showTaskEditor(null, draftTitle, sourceUrl));
     }
 
     private void bookmarkCurrentBrowserPage() {
@@ -4097,7 +4123,7 @@ public final class MainActivity extends Activity {
     private void openReaderMode() {
         if (!browserNetworkPolicy.allowsRemoteLoads() || browserWebView == null
                 || !BrowserAddress.isAllowedWebUrl(browserWebView.getUrl())) {
-            showToast("Open an HTTPS article first.");
+            showToast("Open an HTTP or HTTPS article first.");
             return;
         }
         if (browserWebView.getProgress() < 100) {
@@ -4147,6 +4173,8 @@ public final class MainActivity extends Activity {
     }
 
     private void showReaderModeDialog(String title, String body) {
+        // Capture the address with the extracted text; the live tab may navigate later.
+        final String readerSourceUrl = browserWebView == null ? null : browserWebView.getUrl();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
         scroll.setClipToPadding(false);
@@ -4196,6 +4224,9 @@ public final class MainActivity extends Activity {
             clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Daymark Reader Mode", body));
             showToast("Article text copied.");
         });
+
+        Button clip = primaryButton("Clip to task");
+        clip.setContentDescription("Review an offline excerpt from this article as a task");
 
         TextView article = text(body, 16, palette.text, Typeface.NORMAL);
         article.setTextIsSelectable(true);
@@ -4250,6 +4281,7 @@ public final class MainActivity extends Activity {
 
         content.addView(note, bottomMargin(dp(10)));
         content.addView(controls, bottomMargin(dp(10)));
+        content.addView(clip, bottomMargin(dp(8)));
         content.addView(copy, bottomMargin(dp(10)));
         content.addView(article);
         scroll.addView(content);
@@ -4262,10 +4294,247 @@ public final class MainActivity extends Activity {
                 .setView(scroll)
                 .setPositiveButton("Done", null)
                 .create();
+        clip.setOnClickListener(view -> {
+            if (!canEdit()) {
+                haptic(view, HapticFeedbackConstants.REJECT);
+                showToast("Encrypted task storage is unavailable; try clipping again when it is ready.");
+                return;
+            }
+            try {
+                pendingWebClip = WebClip.fromReader(title, body, readerSourceUrl);
+            } catch (IllegalArgumentException invalidClip) {
+                haptic(view, HapticFeedbackConstants.REJECT);
+                showToast(invalidClip.getMessage());
+                return;
+            }
+            haptic(view, HapticFeedbackConstants.CONFIRM);
+            dialog.dismiss();
+            showPendingWebClip();
+        });
         content.setAlpha(0f);
         content.setTranslationY(dp(6));
         dialog.show();
         content.animate().alpha(1f).translationY(0f).setDuration(140L).start();
+    }
+
+    /** Review remains on-device and does not trigger a second request for the page. */
+    private void showPendingWebClip() {
+        if (pendingWebClip == null || !activityResumed || storageLoading
+                || !isActivityCallbackCurrent() || (webClipDialog != null && webClipDialog.isShowing())) {
+            return;
+        }
+        WebClip.Draft initial = pendingWebClip;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(22), dp(22), dp(22), dp(18));
+
+        TextView eyebrow = text("OFFLINE CLIP", 10, palette.accent, Typeface.BOLD);
+        eyebrow.setLetterSpacing(0.12f);
+        content.addView(eyebrow, bottomMargin(dp(5)));
+        TextView heading = text("Keep the useful bits", 22, palette.text, Typeface.BOLD);
+        content.addView(heading, bottomMargin(dp(6)));
+        TextView description = text("Review this excerpt before adding it to your encrypted tasks. "
+                + "It will be available offline; the original page is unchanged.",
+                13, palette.muted, Typeface.NORMAL);
+        description.setLineSpacing(dp(2), 1f);
+        content.addView(description, bottomMargin(dp(14)));
+
+        LinearLayout notice = new LinearLayout(this);
+        notice.setOrientation(LinearLayout.VERTICAL);
+        notice.setPadding(dp(12), dp(10), dp(12), dp(10));
+        notice.setBackground(shape(palette.accentSoft, 14, palette.line));
+        TextView badge = text("PRIVATE TO THIS DEVICE  ·  #web-clip", 10, palette.accent, Typeface.BOLD);
+        notice.addView(badge, bottomMargin(dp(4)));
+        String clipNotice = initial.excerptShortened
+                ? "Only the beginning fits in a task note. You can edit it below. "
+                : "The extracted text fits in a task note. ";
+        if (initial.sourceTreatment == WebClip.SourceTreatment.PARAMETERS_REMOVED) {
+            clipNotice += "The source omits URL query parameters and the fragment. ";
+        } else if (initial.sourceTreatment == WebClip.SourceTreatment.ORIGIN_ONLY) {
+            clipNotice += "The long source address was reduced to its site origin. ";
+        } else if (initial.sourceTreatment == WebClip.SourceTreatment.OMITTED) {
+            clipNotice += "No source address could be safely included. ";
+        }
+        clipNotice += "Page text and URL paths may contain private information; review them before saving.";
+        TextView disclosure = text(clipNotice, 12, palette.text, Typeface.NORMAL);
+        disclosure.setLineSpacing(dp(2), 1f);
+        notice.addView(disclosure);
+        content.addView(notice, bottomMargin(dp(14)));
+
+        TextView titleLabel = text("TASK TITLE", 10, palette.muted, Typeface.BOLD);
+        titleLabel.setLetterSpacing(0.08f);
+        content.addView(titleLabel, bottomMargin(dp(5)));
+        EditText titleInput = new EditText(this);
+        titleInput.setSingleLine(true);
+        titleInput.setTextSize(16 * textScale);
+        titleInput.setTextColor(palette.text);
+        titleInput.setHintTextColor(palette.muted);
+        titleInput.setHint("Name this clip");
+        titleInput.setContentDescription("Offline clip task title");
+        titleInput.setFilters(new InputFilter[] { new InputFilter.LengthFilter(WebClip.MAX_TITLE_CHARS) });
+        titleInput.setSaveEnabled(false);
+        titleInput.setBackground(shape(palette.surfaceAlt, 12, palette.line));
+        titleInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+        titleInput.setText(initial.title);
+        content.addView(titleInput, bottomMargin(dp(12)));
+
+        TextView noteLabel = text("SOURCE & EXCERPT", 10, palette.muted, Typeface.BOLD);
+        noteLabel.setLetterSpacing(0.08f);
+        content.addView(noteLabel, bottomMargin(dp(5)));
+        EditText noteInput = new EditText(this);
+        noteInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        noteInput.setTextSize(14 * textScale);
+        noteInput.setTextColor(palette.text);
+        noteInput.setHintTextColor(palette.muted);
+        noteInput.setHint("Add a note");
+        noteInput.setGravity(Gravity.TOP | Gravity.START);
+        noteInput.setMinLines(4);
+        noteInput.setMaxLines(8);
+        noteInput.setVerticalScrollBarEnabled(true);
+        noteInput.setContentDescription("Editable source and article excerpt, up to 4000 characters");
+        noteInput.setFilters(new InputFilter[] { new InputFilter.LengthFilter(TaskLogic.MAX_NOTES_CHARS) });
+        noteInput.setSaveEnabled(false);
+        noteInput.setBackground(shape(palette.surfaceAlt, 12, palette.line));
+        noteInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+        noteInput.setText(initial.notes);
+        content.addView(noteInput, bottomMargin(dp(4)));
+        TextView counter = text(initial.notes.length() + " / " + TaskLogic.MAX_NOTES_CHARS,
+                11, palette.muted, Typeface.NORMAL);
+        counter.setGravity(Gravity.END);
+        content.addView(counter, bottomMargin(dp(10)));
+
+        titleInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (pendingWebClip != null) pendingWebClip = pendingWebClip.withTitle(s == null ? "" : s.toString());
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        noteInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String value = s == null ? "" : s.toString();
+                counter.setText(value.length() + " / " + TaskLogic.MAX_NOTES_CHARS);
+                if (pendingWebClip != null) pendingWebClip = pendingWebClip.withNotes(value);
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+
+        TextView validation = text("", 12, palette.danger, Typeface.NORMAL);
+        validation.setVisibility(View.GONE);
+        validation.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        content.addView(validation, bottomMargin(dp(6)));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button cancel = plainButton("Cancel");
+        Button save = primaryButton("Save task");
+        cancel.setContentDescription("Discard this unsaved clip");
+        save.setContentDescription("Save this clip as an encrypted task");
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.35f);
+        saveParams.setMarginStart(dp(8));
+        actions.addView(save, saveParams);
+        content.addView(actions);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setClipToPadding(false);
+        scroll.addView(content);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(scroll).create();
+        webClipDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (webClipDialog == dialog) {
+                webClipDialog = null;
+                if (!isChangingConfigurations()) pendingWebClip = null;
+            }
+        });
+        cancel.setOnClickListener(view -> dialog.dismiss());
+        save.setOnClickListener(view -> {
+            if (!canEdit()) {
+                haptic(view, HapticFeedbackConstants.REJECT);
+                validation.setText("Task storage is unavailable. Your draft is still open; try again when storage is ready.");
+                validation.setVisibility(View.VISIBLE);
+                return;
+            }
+            String title = pendingWebClip == null ? "" : pendingWebClip.title.trim();
+            if (title.isEmpty()) {
+                haptic(view, HapticFeedbackConstants.REJECT);
+                validation.setText("Give this clip a task title.");
+                validation.setVisibility(View.VISIBLE);
+                titleInput.setError("Enter a task title");
+                titleInput.requestFocus();
+                return;
+            }
+            boolean duplicate = false;
+            for (Task task : tasks) {
+                if (task.title.trim().equalsIgnoreCase(title)) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Possible duplicate task")
+                        .setMessage("A task with this title already exists. Save another clip anyway?")
+                        .setNegativeButton("Keep editing", null)
+                        .setPositiveButton("Save anyway", (confirm, which) -> saveWebClip(dialog, save, validation))
+                        .show();
+            } else {
+                saveWebClip(dialog, save, validation);
+            }
+        });
+
+        content.setAlpha(0f);
+        content.setTranslationY(dp(8));
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            int glass = highContrast ? palette.surface : (palette.surface & 0x00FFFFFF) | 0xF9000000;
+            window.setBackgroundDrawable(shape(glass, 24, palette.line));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setDimAmount(0.36f);
+            if (Build.VERSION.SDK_INT >= 31 && !highContrast) window.setBackgroundBlurRadius(dp(16));
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                    | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+            int width = Math.min(dp(560), Math.max(1, getResources().getDisplayMetrics().widthPixels - dp(32)));
+            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        titleInput.requestFocus();
+        titleInput.setSelection(titleInput.length());
+        content.animate().alpha(1f).translationY(0f).setDuration(180L)
+                .setInterpolator(MOTION_ENTER).start();
+    }
+
+    private void saveWebClip(AlertDialog dialog, View action, TextView validation) {
+        if (pendingWebClip == null || !canEdit()) {
+            haptic(action, HapticFeedbackConstants.REJECT);
+            validation.setText("Task storage is unavailable. Your draft is still open; try again when storage is ready.");
+            validation.setVisibility(View.VISIBLE);
+            return;
+        }
+        try {
+            Task task = WebClip.createTask(pendingWebClip);
+            tasks.add(task);
+            pendingWebClip = null;
+            haptic(action, HapticFeedbackConstants.CONFIRM);
+            dialog.dismiss();
+            setWebMode(false);
+            activeFilter = TaskLogic.FILTER_ALL;
+            activeTag = "";
+            searchQuery = "";
+            if (searchInput != null) searchInput.setText("");
+            captureFeedback.setText("Clip added to your task list; saving encrypted data on this device.");
+            render();
+            saveTasksAsync("Saving offline clip…");
+            showToast("Adding clip to encrypted tasks…");
+        } catch (IllegalArgumentException invalidClip) {
+            haptic(action, HapticFeedbackConstants.REJECT);
+            validation.setText(invalidClip.getMessage());
+            validation.setVisibility(View.VISIBLE);
+        }
     }
 
     private void openFullScreenWebView() {
@@ -4618,7 +4887,7 @@ public final class MainActivity extends Activity {
             });
             filterButtons.add(chip);
             LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             chipParams.setMargins(0, 0, dp(5), 0);
             chips.addView(chip, chipParams);
         }
@@ -4633,32 +4902,39 @@ public final class MainActivity extends Activity {
         searchInput.setSingleLine(true);
         searchInput.setTextSize(16 * textScale);
         searchInput.setHint("Search tasks");
-        searchInput.setContentDescription("Search tasks by title");
+        searchInput.setContentDescription("Search tasks by title, notes, tags, priority or due date");
         searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchInput.setPadding(dp(12), 0, dp(12), 0);
+        searchInput.setMinHeight(dp(48));
+        searchInput.setMinimumHeight(dp(48));
         searchInput.setTextColor(palette.text);
         searchInput.setHintTextColor(palette.muted);
         searchInput.setBackground(shape(palette.surface, 14, palette.line));
-        searchRow.addView(searchInput, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        searchRow.addView(searchInput, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         searchClear = text("Clear", 12, palette.accent, Typeface.BOLD);
         searchClear.setGravity(Gravity.CENTER);
         searchClear.setPadding(dp(11), 0, dp(5), 0);
         searchClear.setMinimumWidth(dp(64));
+        searchClear.setMinHeight(dp(48));
+        searchClear.setMinimumHeight(dp(48));
         searchClear.setFocusable(true);
         searchClear.setBackground(shape(palette.accentSoft, 12, palette.accentSoft));
         searchClear.setContentDescription("Clear task search");
         searchClear.setOnClickListener(view -> {
+            searchInput.setText("");
+            // setText invokes the watcher, so cancel the newly scheduled debounce as well.
             if (searchDebounceRunnable != null) {
                 mainHandler.removeCallbacks(searchDebounceRunnable);
+                searchDebounceRunnable = null;
             }
-            searchInput.setText("");
             searchQuery = "";
-            renderTaskList();
-            renderTaskCount();
+            haptic(view, HapticFeedbackConstants.CLOCK_TICK);
+            renderTaskCount(renderTaskList());
             searchInput.requestFocus();
         });
         searchRow.addView(searchClear, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         searchControlView = searchRow;
         searchRow.setVisibility(View.GONE);
         content.addView(searchRow, bottomMargin(dp(11)));
@@ -4679,8 +4955,8 @@ public final class MainActivity extends Activity {
                     mainHandler.removeCallbacks(searchDebounceRunnable);
                 }
                 searchDebounceRunnable = () -> {
-                    renderTaskList();
-                    renderTaskCount();
+                    searchDebounceRunnable = null;
+                    renderTaskCount(renderTaskList());
                 };
                 mainHandler.postDelayed(searchDebounceRunnable, 150);
             }
@@ -4845,6 +5121,7 @@ public final class MainActivity extends Activity {
                 dispatchPendingLauncherShortcut();
                 dispatchPendingSharedTaskEditor();
                 checkDueReminders();
+                showPendingWebClip();
                 if (pendingPortableImportNeedsRepick) {
                     pendingPortableImportNeedsRepick = false;
                     showToast("Access to the selected backup was not retained. Choose the backup again to restore it.");
@@ -4984,8 +5261,7 @@ public final class MainActivity extends Activity {
         }
         renderFilters(today);
         renderTagFilters();
-        renderTaskList(today);
-        renderTaskCount(today);
+        renderTaskCount(renderTaskList(today));
         renderSuggestions(today);
         renderFocusTimerPanel();
     }
@@ -5650,11 +5926,12 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void renderTaskList() {
-        renderTaskList(LocalDate.now());
+    private int renderTaskList() {
+        return renderTaskList(LocalDate.now());
     }
 
-    private void renderTaskList(LocalDate today) {
+    /** Renders once and returns the same result count for the task-count label. */
+    private int renderTaskList(LocalDate today) {
         if (storageLoading || storageLoadFailed) {
             taskListRenderGate.invalidate();
             taskList.removeAllViews();
@@ -5668,7 +5945,7 @@ public final class MainActivity extends Activity {
                         : storageFailureDetails);
             }
             emptyStateView.setVisibility(View.VISIBLE);
-            return;
+            return 0; // The count label independently displays Loading or Unavailable.
         }
         String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
@@ -5676,7 +5953,7 @@ public final class MainActivity extends Activity {
         List<Task> visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today);
         if (!taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, selectedTag,
                 visible, storageSaveFailed)) {
-            return;
+            return visible.size();
         }
         taskList.removeAllViews();
         TasksHomeLayoutPolicy.Layout homeLayout =
@@ -5736,13 +6013,10 @@ public final class MainActivity extends Activity {
                 emptyCopy.setText("Add a task above when you are ready.");
             }
         }
+        return visible.size();
     }
 
-    private void renderTaskCount() {
-        renderTaskCount(LocalDate.now());
-    }
-
-    private void renderTaskCount(LocalDate today) {
+    private void renderTaskCount(int visible) {
         if (storageLoading) {
             taskCount.setText("Loading");
             searchClear.setVisibility(View.GONE);
@@ -5753,10 +6027,8 @@ public final class MainActivity extends Activity {
             searchClear.setVisibility(View.GONE);
             return;
         }
-        String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
         String selectedTag = powerMode ? activeTag : "";
-        int visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today).size();
         boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty();
         taskCount.setText(narrowed
                 ? visible + (visible == 1 ? " match" : " matches")
@@ -5877,7 +6149,9 @@ public final class MainActivity extends Activity {
                 ? "Mark “" + task.title + "” as not done"
                 : "Mark “" + task.title + "” as done");
         checkBox.setEnabled(canEdit());
-        row.addView(checkBox, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        checkBox.setMinimumWidth(dp(48));
+        checkBox.setMinimumHeight(dp(48));
+        row.addView(checkBox, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -5910,11 +6184,9 @@ public final class MainActivity extends Activity {
                     + " attachments for task: " + task.title);
             attachments.setEnabled(canEdit());
             attachments.setOnClickListener(view -> showAttachmentManager(task));
-            attachments.setMinHeight(dp(34));
-            attachments.setMinimumHeight(dp(34));
             attachments.setPadding(dp(8), 0, dp(8), 0);
             chips.addView(attachments, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
         if (!task.subtasks.isEmpty()) {
             int doneCount = TaskLogic.completedSubtaskCount(task);
@@ -5922,28 +6194,22 @@ public final class MainActivity extends Activity {
             subtasksChip.setContentDescription("Checklist for task: " + task.title
                     + ". " + doneCount + " of " + task.subtasks.size() + " done. Open to update.");
             subtasksChip.setEnabled(canEdit());
-            subtasksChip.setMinHeight(dp(34));
-            subtasksChip.setMinimumHeight(dp(34));
             subtasksChip.setPadding(dp(8), 0, dp(8), 0);
             subtasksChip.setOnClickListener(view -> showSubtasksDialog(task));
-            chips.addView(subtasksChip, chipMargin());
+            chips.addView(subtasksChip, taskChipMargin());
         }
         if (!task.notes.isEmpty()) {
             Button notes = compactButton("Note", false);
             notes.setContentDescription("Show the note for task: " + task.title);
-            notes.setMinHeight(dp(34));
-            notes.setMinimumHeight(dp(34));
             notes.setOnClickListener(view -> showNotesDialog(task));
-            chips.addView(notes, chipMargin());
+            chips.addView(notes, taskChipMargin());
         }
         String reminder = reminderLabel(task);
         if (reminder != null && !task.completed) {
             Button reminderChip = compactButton(reminder, false);
             reminderChip.setContentDescription(reminder + " for task: " + task.title);
             reminderChip.setEnabled(false);
-            reminderChip.setMinHeight(dp(34));
-            reminderChip.setMinimumHeight(dp(34));
-            chips.addView(reminderChip, chipMargin());
+            chips.addView(reminderChip, taskChipMargin());
         }
         // Do not reserve a metadata row when the task has no files, checklist, note or
         // reminder. This keeps plain tasks compact without removing any row action.
@@ -5959,15 +6225,15 @@ public final class MainActivity extends Activity {
 
         Button more = compactButton("⋮", false);
         more.setTextSize(20 * textScale);
-        more.setMinWidth(dp(36));
-        more.setMinimumWidth(dp(36));
-        more.setMinHeight(dp(40));
-        more.setMinimumHeight(dp(40));
+        more.setMinWidth(dp(48));
+        more.setMinimumWidth(dp(48));
+        more.setMinHeight(dp(48));
+        more.setMinimumHeight(dp(48));
         more.setPadding(0, 0, 0, 0);
         more.setContentDescription("Task actions for: " + task.title);
         more.setEnabled(canEdit());
         more.setOnClickListener(view -> showSwipeTaskActions(task));
-        row.addView(more, new LinearLayout.LayoutParams(dp(36), dp(40)));
+        row.addView(more, new LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         checkBox.setOnCheckedChangeListener((button, checked) -> {
             if (!canEdit() || checked == task.completed) return;
@@ -9256,6 +9522,14 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         params.leftMargin = dp(5);
+        return params;
+    }
+
+    /** Metadata buttons keep a 48 dp minimum while growing for larger text. */
+    private LinearLayout.LayoutParams taskChipMargin() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMarginStart(dp(5));
         return params;
     }
 

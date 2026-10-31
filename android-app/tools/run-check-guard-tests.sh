@@ -6,14 +6,18 @@ ACTIVITY="$ROOT/app/src/main/java/com/abrar/daymark/MainActivity.java"
 PROVIDER="$ROOT/app/src/main/java/com/abrar/daymark/AttachmentContentProvider.java"
 RECEIVER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java"
 SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
+RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
 PROVIDER_BACKUP=$(mktemp)
 cp "$PROVIDER" "$PROVIDER_BACKUP"
+RENDER_GATE_BACKUP=$(mktemp)
+cp "$RENDER_GATE" "$RENDER_GATE_BACKUP"
 restore() {
   cp "$BACKUP" "$ACTIVITY"
   cp "$PROVIDER_BACKUP" "$PROVIDER"
-  rm -f "$BACKUP" "$PROVIDER_BACKUP"
+  cp "$RENDER_GATE_BACKUP" "$RENDER_GATE"
+  rm -f "$BACKUP" "$PROVIDER_BACKUP" "$RENDER_GATE_BACKUP"
 }
 trap restore EXIT INT TERM
 
@@ -72,11 +76,20 @@ expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
 # Tag filtering, note formatting and keyboard shortcuts must fail closed too.
 expect_fail_after_removal check-task-ux.py "renderTagFilters();"
 expect_fail_after_removal check-task-ux.py "TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today)"
+expect_fail_after_removal check-task-ux.py "renderTaskCount(renderTaskList(today));"
+expect_fail_after_removal check-task-ux.py "searchInput.setMinimumHeight(dp(48));"
+expect_fail_after_removal check-task-ux.py "checkBox.setMinimumHeight(dp(48));"
+expect_fail_after_removal check-task-ux.py "more.setMinimumHeight(dp(48));"
+expect_fail_after_removal check-task-ux.py "quickCaptureInput.setMinimumHeight(dp(48));"
 expect_fail_after_removal check-task-ux.py "NoteFormat.spans(task.notes)"
 expect_fail_after_removal check-task-ux.py "KeyShortcuts.actionFor(event.getKeyCode()"
 expect_fail_after_removal check-task-ux.py "BrowserAddress.isAllowedWebUrl(url)"
 expect_fail_after_removal check-task-ux.py "ShareIntake.parse("
 expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())"
+expect_fail_after_removal check-task-ux.py 'if (task != iterator.next()) return false;' "$RENDER_GATE"
+# A clip is review-only until the user saves it through the encrypted task pipeline.
+expect_fail_after_removal check-web-clip.py "pendingWebClip = WebClip.fromReader(" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-web-clip.py 'saveTasksAsync("Saving offline clip…");' "$ACTIVITY" "$ROOT"
 # Reminder snooze must only re-arm the alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"

@@ -23,6 +23,8 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskShareText.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/SharedAttachmentPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ActivityCallbackGate.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/EncryptedBlobStore.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/WebClip.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollThemeColor.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollChromeReserve.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/PressSurface.java" \
@@ -33,6 +35,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Task.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NaturalLanguageTaskParse.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/TaskSearch.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskDuePresets.java" \
@@ -70,6 +73,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/IntegrationCatalogSmoke.java" \
   "$ROOT/tools/SharedAttachmentPolicySmoke.java" \
   "$ROOT/tools/TaskShareTextSmoke.java" \
+  "$ROOT/tools/WebClipSmoke.java" \
   "$ROOT/tools/OAuthPkceSmoke.java" \
   "$ROOT/tools/CalendarEventDraftSmoke.java" \
   "$ROOT/tools/OAuthCredentialCodecSmoke.java" \
@@ -79,6 +83,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/ScrollChromeReserveSmoke.java" \
   "$ROOT/tools/PressSurfaceSmoke.java" \
   "$ROOT/tools/TaskFilterSmoke.java" \
+  "$ROOT/tools/TaskSearchSmoke.java" \
   "$ROOT/tools/NoteFormatSmoke.java" \
   "$ROOT/tools/KeyShortcutsSmoke.java" \
   "$ROOT/tools/CommandPaletteSmoke.java" \
@@ -108,6 +113,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.SharedAttachmentPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.IntegrationCatalogSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskShareTextSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.WebClipSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.OAuthPkceSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CalendarEventDraftSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.OAuthCredentialCodecSmoke
@@ -119,6 +125,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollChromeReserveSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.PressSurfaceSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskFilterSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSearchSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NoteFormatSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.KeyShortcutsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CommandPaletteSmoke

@@ -1,47 +1,68 @@
 #!/usr/bin/env python3
-"""Source guard: updater and all non-browser network clients must remain HTTPS-only,
-even though the embedded browser now allows HTTP (BrowserHttpPolicy.ALLOW_HTTP).
-This is the #348 P0 checkbox: "Ensure browser-only cleartext support does not weaken
-updater or other app network clients."
+"""Static guards for the current HTTPS-only app clients and cleartext manifest setting.
+
+These source assertions do not prove Android WebView HTTP behavior. WebView honors the current
+manifest's cleartext restriction for this target SDK; see docs/BROWSER_HTTP_POLICY_AUDIT.md.
 """
 import pathlib
 import re
 import sys
+import xml.etree.ElementTree as ET
 
 root = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path(".")
 base = root / "app/src/main/java/com/abrar/daymark"
 updater = base / "updater"
 
-# 1. Updater release endpoint must be HTTPS
+# The release endpoint and each updater URL boundary must require HTTPS independently.
 release_client = (updater / "GitHubReleaseClient.java").read_text(encoding="utf-8")
-assert 'RELEASES_ENDPOINT =' in release_client, "RELEASES_ENDPOINT missing"
 m = re.search(r'RELEASES_ENDPOINT\s*=\s*"([^"]+)"', release_client)
-assert m, "RELEASES_ENDPOINT value not found"
-assert m.group(1).startswith("https://"), f"Updater endpoint must be HTTPS, got {m.group(1)}"
+assert m and m.group(1).startswith("https://"), "Updater release endpoint must be HTTPS"
+assert "connection.setInstanceFollowRedirects(false);" in release_client, \
+    "Release metadata redirects must not be followed automatically"
 
-# 2. UpdaterCore.isAllowedAssetUrl must require https scheme
 core = (updater / "UpdaterCore.java").read_text(encoding="utf-8")
-assert '"https".equalsIgnoreCase(uri.getScheme())' in core, "isAllowedAssetUrl must require https scheme"
-assert 'isAllowedAssetRedirectUrl' in core, "isAllowedAssetRedirectUrl missing"
-assert core.count('"https".equalsIgnoreCase') >= 2, "Both isAllowedAssetUrl and isAllowedAssetRedirectUrl must enforce https"
+asset = core.split("public static boolean isAllowedAssetUrl(", 1)[1].split("\n    }", 1)[0]
+redirect = core.split("public static boolean isAllowedAssetRedirectUrl(", 1)[1].split("\n    }", 1)[0]
+assert '"https".equalsIgnoreCase(uri.getScheme())' in asset, "Asset URL must require HTTPS"
+assert '"https".equalsIgnoreCase(uri.getScheme())' in redirect, "Asset redirects must require HTTPS"
+downloader = (updater / "GitHubApkDownloader.java").read_text(encoding="utf-8")
+for marker in ("UpdaterCore.isAllowedAssetUrl(release.assetUrl)",
+               "connection.setInstanceFollowRedirects(false);",
+               "UpdaterCore.isAllowedAssetRedirectUrl(redirect.toExternalForm())"):
+    assert marker in downloader, f"Updater downloader boundary missing: {marker}"
 
-# 3. No http:// string literals in updater package (except in comments)
-for f in sorted(updater.glob("*.java")):
-    text = f.read_text(encoding="utf-8")
-    # Strip comments before checking for http:// literals
-    no_comments = re.sub(r"//.*", "", text)
-    no_comments = re.sub(r"/\*.*?\*/", "", no_comments, flags=re.DOTALL)
-    http_literals = re.findall(r'"http://[^"]*"', no_comments)
-    assert not http_literals, f"{f.name} contains http:// string literal: {http_literals}"
+# Recognize comments and Java quoted literals in one pass. Stripping // comments first also
+# strips the // inside "http://...", which silently hid insecure literals from the old guard.
+tokens = re.compile(r'''/\*.*?\*/|//[^\r\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*' ''',
+                    re.DOTALL | re.VERBOSE)
+for path in sorted(updater.glob("*.java")):
+    text = path.read_text(encoding="utf-8")
+    literals = [match.group(0) for match in tokens.finditer(text)
+                if match.group(0).startswith('"')]
+    assert not any("http://" in literal.lower() for literal in literals), \
+        f"{path.name} contains an HTTP URL string literal"
 
-# 4. Android manifest must keep usesCleartextTraffic=false (blocks app-level cleartext;
-#    WebView handles its own network stack, so HTTP browsing still works in-browser)
-manifest = (root / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
-assert 'usesCleartextTraffic="false"' in manifest, "Main manifest must keep usesCleartextTraffic=false"
+# Other current app-owned clients have fixed HTTPS endpoints or validate the user endpoint,
+# and do not automatically follow redirects. These are source checks, not exhaustive proofs.
+issues = (base / "GitHubPublicIssuesClient.java").read_text(encoding="utf-8")
+assert 'return "https://api.github.com/repos/"' in issues, "Public issues endpoint must be HTTPS"
+assert "connection.setInstanceFollowRedirects(false);" in issues, "Public issues redirects must be disabled"
+webhook = (base / "TaskWebhookClient.java").read_text(encoding="utf-8")
+for marker in ('"https".equalsIgnoreCase(uri.getScheme())', "url = validateEndpoint(endpoint);",
+               "HttpsURLConnection", "connection.setInstanceFollowRedirects(false);"):
+    assert marker in webhook, f"Webhook HTTPS boundary missing: {marker}"
 
-# 5. BrowserHttpPolicy must allow HTTP (browser) while updater stays HTTPS-only (separate path)
+# Preserve the existing app-wide platform defense. It also affects WebView; do not assert
+# that HTTP browsing works until a reviewed policy change and runtime tests establish it.
+manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
+application = manifest.find("application")
+assert application is not None
+android = "{http://schemas.android.com/apk/res/android}"
+assert application.get(android + "usesCleartextTraffic") == "false", \
+    "Main manifest must keep usesCleartextTraffic=false pending security review"
+
 http_policy = (base / "BrowserHttpPolicy.java").read_text(encoding="utf-8")
-assert "ALLOW_HTTP = true" in http_policy, "Browser allows HTTP"
-assert '"Not encrypted"' in http_policy, "HTTP pages must be labeled Not encrypted"
+assert "ALLOW_HTTP = true" in http_policy, "Browser address policy should accept HTTP"
+assert '"Not encrypted"' in http_policy, "The intended HTTP label must remain defined"
 
-print("PASS check-updater-https-only: updater endpoint, asset URLs, redirect URLs, manifest cleartext, and browser HTTP policy all verified")
+print("PASS HTTPS client and manifest source guards; HTTP WebView runtime/label NOT TESTED")

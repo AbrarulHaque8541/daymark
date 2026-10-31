@@ -70,6 +70,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                         "platform instrumentation grants POST_NOTIFICATIONS before notification phases");
             }
             runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
+            runPhase("offline-web-clip-store", this::offlineWebClipStoreRoundTrip);
+            runPhase("connections-panel-accessibility", this::connectionsPanelAccessibility);
             runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
             runPhase("portable-backup-rekey", this::portableBackupRekeysAndReconcilesProcessDeath);
@@ -432,6 +434,107 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             if (posted.getId() == id) return posted.getNotification();
         }
         return null;
+    }
+
+    /** Exercises filter semantics, touch-target minima and real catalog action gates on Android. */
+    private void connectionsPanelAccessibility() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> used =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        runOnMainSync(() -> {
+            try {
+                Context themed = new android.view.ContextThemeWrapper(getTargetContext(), R.style.AppThemeLight);
+                IntegrationCatalogPanel panel = new IntegrationCatalogPanel(themed, entry -> used.set(entry.id));
+                android.widget.EditText search = (android.widget.EditText) panel.getChildAt(2);
+                android.widget.HorizontalScrollView scroller =
+                        (android.widget.HorizontalScrollView) panel.getChildAt(3);
+                android.widget.LinearLayout families = (android.widget.LinearLayout) scroller.getChildAt(0);
+                android.widget.Button all = (android.widget.Button) families.getChildAt(0);
+                android.widget.Button files = null;
+                for (int index = 0; index < families.getChildCount(); index++) {
+                    android.widget.Button chip = (android.widget.Button) families.getChildAt(index);
+                    if (chip.getTag() == IntegrationCatalog.Family.FILES) files = chip;
+                }
+                int minimumTarget = Math.round(48 * themed.getResources().getDisplayMetrics().density);
+                check(all.isSelected() && all.getContentDescription().toString().contains(", selected"),
+                        "initial All filter announces selection");
+                check(search.getMinimumHeight() >= minimumTarget && all.getMinimumHeight() >= minimumTarget,
+                        "search and category controls request at least 48 dp touch targets");
+                check(files != null && files.getMinimumHeight() >= minimumTarget,
+                        "file filter exists with a 48 dp minimum target");
+                android.widget.Button originalFiles = files;
+                files.performClick();
+                check(files.isSelected() && files.getContentDescription().toString().contains(", selected"),
+                        "selected category is announced");
+                check(!all.isSelected() && all.getContentDescription().toString().contains(", not selected"),
+                        "previous category announces it is not selected");
+                check(families.getChildAt(0) == all && originalFiles.getParent() == families,
+                        "selecting a category retains the existing focusable views");
+                all.performClick();
+                android.widget.ScrollView scroll = (android.widget.ScrollView) panel.getChildAt(4);
+                android.widget.LinearLayout entries = (android.widget.LinearLayout) scroll.getChildAt(0);
+                search.setText("n8n");
+                check(entries.getChildCount() == 1, "search narrows the visible catalog");
+                android.widget.LinearLayout plannedCard = (android.widget.LinearLayout) entries.getChildAt(0);
+                android.widget.Button planned = (android.widget.Button) plannedCard.getChildAt(4);
+                check(!planned.isEnabled() && planned.getMinimumHeight() >= minimumTarget,
+                        "planned integration is disabled and has a 48 dp minimum target");
+                planned.performClick();
+                check(used.get() == null, "a planned integration cannot invoke a host action");
+                search.setText("Android text sharing");
+                check(entries.getChildCount() == 1, "search finds the implemented Android sharing entry");
+                android.widget.LinearLayout availableCard = (android.widget.LinearLayout) entries.getChildAt(0);
+                android.widget.Button available = (android.widget.Button) availableCard.getChildAt(4);
+                check(available.isEnabled() && available.getContentDescription().toString()
+                                .contains("Android text sharing"),
+                        "available action announces which integration it uses");
+                available.performClick();
+                check("android.share.text".equals(used.get()), "available entry dispatches its real action");
+                used.set(null);
+                panel.setListener(null);
+                available.performClick();
+                check(used.get() == null, "a stale button cannot invoke a removed host listener");
+            } catch (Throwable error) {
+                failure.set(error);
+            }
+        });
+        if (failure.get() != null) throw new Exception("Connections panel accessibility failed", failure.get());
+    }
+
+    /** Exercises the clip through the Android AtomicFile task-store adapter, without network access. */
+    private void offlineWebClipStoreRoundTrip() throws Exception {
+        File root = makeTestDirectory("web-clip");
+        try {
+            File snapshotFile = new File(root, "tasks.enc");
+            EncryptedBlobStore.KeyAccess keys = new FixedTestKey();
+            EncryptedTaskStore store = new EncryptedTaskStore(snapshotFile, keys);
+            check(store.load().isEmpty(), "clip fixture starts with an empty isolated store");
+            Task existing = TaskLogic.create("Existing task", null, "medium");
+            WebClip.Draft draft = WebClip.fromReader("Offline article", "Clip content for offline use",
+                    "https://example.com/article?token=private#section");
+            check(draft.sourceTreatment == WebClip.SourceTreatment.PARAMETERS_REMOVED,
+                    "clip omits query and fragment before saving");
+            Task clip = WebClip.createTask(draft);
+            TaskTemplate template = TaskTemplateLogic.create("Existing template", null, "low");
+            store.saveSnapshot(Arrays.asList(existing, clip), Collections.singletonList(template));
+            check(!new String(readFile(snapshotFile), StandardCharsets.ISO_8859_1)
+                            .contains("Clip content for offline use"),
+                    "platform task store writes ciphertext rather than clip plaintext");
+            EncryptedTaskStore reopened = new EncryptedTaskStore(snapshotFile, keys);
+            List<Task> tasks = reopened.load();
+            check(tasks.size() == 2 && tasks.get(0).id.equals(existing.id),
+                    "saving a clip preserves existing tasks");
+            check(tasks.get(1).notes.equals(clip.notes) && tasks.get(1).tags.contains(WebClip.TAG),
+                    "clip note and tag survive the Android encrypted-store round trip");
+            check(!tasks.get(1).notes.contains("token=private") && !tasks.get(1).notes.contains("#section"),
+                    "URL secrets do not enter the saved clip source");
+            check(reopened.loadTemplates().size() == 1
+                            && reopened.loadTemplates().get(0).id.equals(template.id),
+                    "saving a clip preserves existing templates");
+        } finally {
+            deleteTree(root);
+        }
     }
 
     private void importLegacySnapshotRoundTripAndRollback() throws Exception {
