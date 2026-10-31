@@ -92,7 +92,7 @@ check("chip.setText(\"#\" + tag);" in chip, "chip label must show the tag")
 check("chip.setContentDescription(" in chip, "chip needs an accessible description")
 check("\"Tag \" + tag + \", selected." in chip, "selected chip must announce its state")
 
-listing = region("private void renderTaskList(LocalDate today)", "private void renderTaskCount()",
+listing = region("private int renderTaskList(LocalDate today)", "private void renderTaskCount(int visible)",
                  "renderTaskList")
 check("String selectedTag = powerMode ? activeTag : \"\";" in listing,
       "renderTaskList must read the tag only in the task workspace")
@@ -100,13 +100,38 @@ check("TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today
       "renderTaskList must pass the tag to the filter")
 check("taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, selectedTag,"
       in listing, "the render gate must key on the tag")
-count = region("private void renderTaskCount(LocalDate today)", "private void appendSmartToken",
+count = region("private void renderTaskCount(int visible)", "private void appendSmartToken",
                "renderTaskCount")
 check("String selectedTag = powerMode ? activeTag : \"\";" in count,
       "renderTaskCount must read the tag")
 check("boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty();" in count,
       "a tag filter must read as narrowing the list")
 check("No tasks tagged #\" + selectedTag" in listing, "empty state must name the active tag")
+check(listing.count("TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today)") == 1,
+      "one filter pass must supply the task list")
+check(listing.count("return visible.size();") == 2,
+      "both rebuilt and reused lists must return the visible count")
+check("TaskLogic.filter(" not in count and "visible + (visible == 1" in count,
+      "the count label must reuse the list result instead of filtering again")
+check("renderTaskCount(renderTaskList(today));" in render,
+      "a full render must pass the list's count directly to its label")
+search_controls = region("searchInput = new EditText(this);", "taskList = new LinearLayout(this);",
+                         "task search controls")
+check('searchInput.setContentDescription("Search tasks by title, notes, tags, priority or due date")'
+      in search_controls, "search accessibility text must name the supported fields")
+for marker in ("searchInput.setMinHeight(dp(48))", "searchInput.setMinimumHeight(dp(48))",
+               "searchClear.setMinimumHeight(dp(48))", "ViewGroup.LayoutParams.WRAP_CONTENT"):
+    check(marker in search_controls, f"search controls must fit scaled text and 48 dp targets: {marker}")
+clear_action = search_controls.split("searchClear.setOnClickListener", 1)[1].split(
+    "searchRow.addView(searchClear", 1)[0]
+check(clear_action.index('searchInput.setText(\"\");')
+      < clear_action.index("mainHandler.removeCallbacks(searchDebounceRunnable);"),
+      "clearing text must cancel the debounce scheduled by its TextWatcher")
+check("searchDebounceRunnable = null;" in clear_action
+      and "renderTaskCount(renderTaskList());" in clear_action,
+      "clearing must update list and count once without leaving a pending callback")
+check(search_controls.count("renderTaskCount(renderTaskList());") == 2,
+      "clear and debounced typing must each reuse the list result count")
 
 check("boolean shouldRebuild(String filter, String query, String tag, List<Task> visible,"
       in RENDER_GATE, "gate overload with tag missing")

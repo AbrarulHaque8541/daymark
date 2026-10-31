@@ -4886,7 +4886,7 @@ public final class MainActivity extends Activity {
             });
             filterButtons.add(chip);
             LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             chipParams.setMargins(0, 0, dp(5), 0);
             chips.addView(chip, chipParams);
         }
@@ -4901,32 +4901,39 @@ public final class MainActivity extends Activity {
         searchInput.setSingleLine(true);
         searchInput.setTextSize(16 * textScale);
         searchInput.setHint("Search tasks");
-        searchInput.setContentDescription("Search tasks by title");
+        searchInput.setContentDescription("Search tasks by title, notes, tags, priority or due date");
         searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchInput.setPadding(dp(12), 0, dp(12), 0);
+        searchInput.setMinHeight(dp(48));
+        searchInput.setMinimumHeight(dp(48));
         searchInput.setTextColor(palette.text);
         searchInput.setHintTextColor(palette.muted);
         searchInput.setBackground(shape(palette.surface, 14, palette.line));
-        searchRow.addView(searchInput, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        searchRow.addView(searchInput, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         searchClear = text("Clear", 12, palette.accent, Typeface.BOLD);
         searchClear.setGravity(Gravity.CENTER);
         searchClear.setPadding(dp(11), 0, dp(5), 0);
         searchClear.setMinimumWidth(dp(64));
+        searchClear.setMinHeight(dp(48));
+        searchClear.setMinimumHeight(dp(48));
         searchClear.setFocusable(true);
         searchClear.setBackground(shape(palette.accentSoft, 12, palette.accentSoft));
         searchClear.setContentDescription("Clear task search");
         searchClear.setOnClickListener(view -> {
+            searchInput.setText("");
+            // setText invokes the watcher, so cancel the newly scheduled debounce as well.
             if (searchDebounceRunnable != null) {
                 mainHandler.removeCallbacks(searchDebounceRunnable);
+                searchDebounceRunnable = null;
             }
-            searchInput.setText("");
             searchQuery = "";
-            renderTaskList();
-            renderTaskCount();
+            haptic(view, HapticFeedbackConstants.CLOCK_TICK);
+            renderTaskCount(renderTaskList());
             searchInput.requestFocus();
         });
         searchRow.addView(searchClear, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         searchControlView = searchRow;
         searchRow.setVisibility(View.GONE);
         content.addView(searchRow, bottomMargin(dp(11)));
@@ -4947,8 +4954,8 @@ public final class MainActivity extends Activity {
                     mainHandler.removeCallbacks(searchDebounceRunnable);
                 }
                 searchDebounceRunnable = () -> {
-                    renderTaskList();
-                    renderTaskCount();
+                    searchDebounceRunnable = null;
+                    renderTaskCount(renderTaskList());
                 };
                 mainHandler.postDelayed(searchDebounceRunnable, 150);
             }
@@ -5253,8 +5260,7 @@ public final class MainActivity extends Activity {
         }
         renderFilters(today);
         renderTagFilters();
-        renderTaskList(today);
-        renderTaskCount(today);
+        renderTaskCount(renderTaskList(today));
         renderSuggestions(today);
         renderFocusTimerPanel();
     }
@@ -5919,11 +5925,12 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void renderTaskList() {
-        renderTaskList(LocalDate.now());
+    private int renderTaskList() {
+        return renderTaskList(LocalDate.now());
     }
 
-    private void renderTaskList(LocalDate today) {
+    /** Renders once and returns the same result count for the task-count label. */
+    private int renderTaskList(LocalDate today) {
         if (storageLoading || storageLoadFailed) {
             taskListRenderGate.invalidate();
             taskList.removeAllViews();
@@ -5937,7 +5944,7 @@ public final class MainActivity extends Activity {
                         : storageFailureDetails);
             }
             emptyStateView.setVisibility(View.VISIBLE);
-            return;
+            return 0; // The count label independently displays Loading or Unavailable.
         }
         String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
@@ -5945,7 +5952,7 @@ public final class MainActivity extends Activity {
         List<Task> visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today);
         if (!taskListRenderGate.shouldRebuild(selectedFilter, selectedQuery, selectedTag,
                 visible, storageSaveFailed)) {
-            return;
+            return visible.size();
         }
         taskList.removeAllViews();
         TasksHomeLayoutPolicy.Layout homeLayout =
@@ -6005,13 +6012,10 @@ public final class MainActivity extends Activity {
                 emptyCopy.setText("Add a task above when you are ready.");
             }
         }
+        return visible.size();
     }
 
-    private void renderTaskCount() {
-        renderTaskCount(LocalDate.now());
-    }
-
-    private void renderTaskCount(LocalDate today) {
+    private void renderTaskCount(int visible) {
         if (storageLoading) {
             taskCount.setText("Loading");
             searchClear.setVisibility(View.GONE);
@@ -6022,10 +6026,8 @@ public final class MainActivity extends Activity {
             searchClear.setVisibility(View.GONE);
             return;
         }
-        String selectedFilter = powerMode ? activeFilter : TaskLogic.FILTER_ALL;
         String selectedQuery = powerMode ? searchQuery : "";
         String selectedTag = powerMode ? activeTag : "";
-        int visible = TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today).size();
         boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty();
         taskCount.setText(narrowed
                 ? visible + (visible == 1 ? " match" : " matches")

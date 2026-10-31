@@ -76,6 +76,8 @@ expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
 # Tag filtering, note formatting and keyboard shortcuts must fail closed too.
 expect_fail_after_removal check-task-ux.py "renderTagFilters();"
 expect_fail_after_removal check-task-ux.py "TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today)"
+expect_fail_after_removal check-task-ux.py "renderTaskCount(renderTaskList(today));"
+expect_fail_after_removal check-task-ux.py "searchInput.setMinimumHeight(dp(48));"
 expect_fail_after_removal check-task-ux.py "NoteFormat.spans(task.notes)"
 expect_fail_after_removal check-task-ux.py "KeyShortcuts.actionFor(event.getKeyCode()"
 expect_fail_after_removal check-task-ux.py "BrowserAddress.isAllowedWebUrl(url)"
