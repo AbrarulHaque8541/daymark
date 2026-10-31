@@ -12,6 +12,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/host-stubs/org/json/JsonWriter.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentRef.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentLogic.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/OAuthPkce.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/IntegrationCatalog.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskShareText.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/SharedAttachmentPolicy.java" \
@@ -61,6 +62,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/IntegrationCatalogSmoke.java" \
   "$ROOT/tools/SharedAttachmentPolicySmoke.java" \
   "$ROOT/tools/TaskShareTextSmoke.java" \
+  "$ROOT/tools/OAuthPkceSmoke.java" \
   "$ROOT/tools/TaskLogicSmoke.java" \
   "$ROOT/tools/ReminderSchedulePolicySmoke.java" \
   "$ROOT/tools/ScrollThemeColorSmoke.java" \
@@ -96,6 +98,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.SharedAttachmentPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.IntegrationCatalogSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskShareTextSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.OAuthPkceSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
