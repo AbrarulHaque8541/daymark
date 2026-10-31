@@ -72,6 +72,8 @@
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
+            <option value="weekdays">Weekdays</option>
+            <option value="yearly">Yearly</option>
           </select>
           <label class="sr-only" for="new-priority">Priority</label>
           <select id="new-priority" name="priority" aria-label="Priority">
@@ -157,7 +159,7 @@
       </div>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
-        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
       </div>
       <p class="reminder-note-standalone">Reminders show on this page while it is open. Completing a repeating task automatically schedules its next occurrence.</p>
       <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
@@ -181,3 +183,4 @@
   </div>
 </body>
 </html>
+
