@@ -193,8 +193,8 @@ test('rejected focus-log records are backed up and the original survives later f
   const { elements, storedValues } = bootApp({ savedFocus: original });
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
     'the complete source must be backed up when even one focus-log record is rejected');
-  assert.equal(JSON.parse(storedValues.get(FOCUS_KEY)).log.length, 1,
-    'the valid focus-log record remains usable');
+  assert.equal(elements.get('#focus-today').textContent, '1',
+    'the valid focus-log record remains usable even though the original source stays intact');
 
   elements.get('#focus-start').dispatch('click');
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
