@@ -20,6 +20,15 @@ public final class BrowserDownloadFilenamePolicySmoke {
                 "CR/LF and bidi override controls must be removed and punctuation neutralized");
         check("_CON.txt".equals(BrowserDownloadFilenamePolicy.sanitize("CON.txt")),
                 "Windows reserved device names should be neutralized");
+        check("_COM¹.txt".equals(BrowserDownloadFilenamePolicy.sanitize("COM¹.txt")),
+                "Windows superscript-digit COM device names should be neutralized");
+        check("_LPT³.csv".equals(BrowserDownloadFilenamePolicy.sanitize("LPT³.csv")),
+                "Windows superscript-digit LPT device names should be neutralized");
+        check("_CON .txt".equals(BrowserDownloadFilenamePolicy.sanitize("CON .txt")),
+                "trailing spaces before extensions must not evade reserved-name checks");
+        check("linebreaks.txt".equals(BrowserDownloadFilenamePolicy.sanitize(
+                        "line\u2028break\u2029s.txt")),
+                "Unicode line and paragraph separators must not survive into UI filenames");
         check("download".equals(BrowserDownloadFilenamePolicy.sanitize("...")),
                 "dot-only names should fall back to a safe default");
         check("download".equals(BrowserDownloadFilenamePolicy.sanitize(null)),
