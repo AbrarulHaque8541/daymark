@@ -118,13 +118,35 @@ final class TaskWebhookClient {
             if (!"https".equalsIgnoreCase(uri.getScheme())
                     || uri.getHost() == null || uri.getHost().trim().isEmpty()
                     || uri.getRawUserInfo() != null || uri.getRawFragment() != null
-                    || uri.getPort() == 0 || uri.getPort() > 65535) {
+                    || uri.getPort() == 0 || uri.getPort() > 65535
+                    || hasExplicitEmptyPort(uri)) {
                 throw new IllegalArgumentException("Webhook endpoint must be a valid HTTPS URL without embedded credentials or fragments.");
             }
             return uri.toURL();
         } catch (URISyntaxException | IOException exception) {
             throw new IllegalArgumentException("Webhook endpoint is invalid.", exception);
         }
+    }
+
+    /**
+     * URI.getPort() returns -1 for both an absent port and an explicit empty port delimiter.
+     * Reject the latter before a webhook request can be sent.
+     */
+    private static boolean hasExplicitEmptyPort(URI uri) {
+        String authority = uri.getRawAuthority();
+        if (authority == null || authority.isEmpty()) return false;
+        int userInfoEnd = authority.lastIndexOf('@');
+        if (userInfoEnd >= 0) authority = authority.substring(userInfoEnd + 1);
+        if (authority.isEmpty()) return false;
+
+        if (authority.charAt(0) == '[') {
+            int closingBracket = authority.indexOf(']');
+            return closingBracket >= 0
+                    && closingBracket + 1 < authority.length()
+                    && authority.charAt(closingBracket + 1) == ':'
+                    && closingBracket + 2 == authority.length();
+        }
+        return authority.charAt(authority.length() - 1) == ':';
     }
 
     private static void readLimited(InputStream input) throws IOException, WebhookException {
