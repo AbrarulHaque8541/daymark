@@ -43,6 +43,8 @@ Live automation iteration 2. Sources: GitHub API (repository/default branch, PRs
 
 ## Completed this iteration / cross-agent audit
 
+- Issue [#221](https://github.com/AbrarulHaque8541/daymark/issues/221) is currently **CLOSED** (live API: closed at 2026-10-31T13:27:34Z). Closure does not itself provide physical-device evidence; canonical device acceptance issue [#160](https://github.com/AbrarulHaque8541/daymark/issues/160) remains **OPEN**.
+
 ### PR #412 — watchdog diagnostic userinfo redaction
 - **MERGED**; head `307b22fb4a6705ad2ae0bef3f403c1dee9ed670a`; merge commit `9824a9c6b180b0fa399c211771a93e064287f611`.
 - Exact-head Android build, device-test APK build, debug APK build, Ubuntu/Windows contracts: **PASS**; release-asset publication check **SKIPPED** (not a release PR).
