@@ -31,6 +31,15 @@ public final class CalendarEventDraftSmoke {
         check("FREQ=MONTHLY;BYMONTHDAY=31".equals(monthly.recurrenceRule),
                 "monthly repeat preserves the task's day-of-month anchor");
 
+        CalendarEventDraft weekdays = CalendarEventDraft.fromTask(
+                task("2026-06-15", null, "weekdays", ""), ZoneId.of("UTC"));
+        check("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR".equals(weekdays.recurrenceRule),
+                "weekday repeat maps to a BYDAY RRULE");
+
+        CalendarEventDraft yearly = CalendarEventDraft.fromTask(
+                task("2026-06-15", null, "yearly", ""), ZoneId.of("UTC"));
+        check("FREQ=YEARLY".equals(yearly.recurrenceRule), "yearly repeat maps to an RRULE");
+
         CalendarEventDraft noRepeat = CalendarEventDraft.fromTask(
                 task("2026-06-15", null, null, ""), ZoneId.of("UTC"));
         check(noRepeat.recurrenceRule == null, "one-off tasks do not repeat in the calendar");
@@ -67,3 +76,4 @@ public final class CalendarEventDraftSmoke {
         if (!condition) throw new AssertionError(message);
     }
 }
+

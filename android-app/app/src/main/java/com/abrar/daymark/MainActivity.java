@@ -7099,7 +7099,7 @@ public final class MainActivity extends Activity {
         reminderHint.setLineSpacing(dp(2), 1f);
         Spinner repeatSpinner = new Spinner(this);
         repeatSpinner.setContentDescription("Choose how often this task repeats");
-        String[] repeatOptions = { "No repeat", "Daily", "Weekly", "Monthly" };
+        String[] repeatOptions = { "No repeat", "Daily", "Weekly", "Monthly", "Weekdays", "Yearly" };
         ArrayAdapter<String> repeatAdapter = new ArrayAdapter<String>(this,
                 android.R.layout.simple_spinner_item, repeatOptions) {
             @Override
@@ -7390,6 +7390,8 @@ public final class MainActivity extends Activity {
         if (TaskLogic.REPEAT_DAILY.equals(repeatRule)) return 1;
         if (TaskLogic.REPEAT_WEEKLY.equals(repeatRule)) return 2;
         if (TaskLogic.REPEAT_MONTHLY.equals(repeatRule)) return 3;
+        if (TaskLogic.REPEAT_WEEKDAYS.equals(repeatRule)) return 4;
+        if (TaskLogic.REPEAT_YEARLY.equals(repeatRule)) return 5;
         return 0;
     }
 
@@ -7397,6 +7399,8 @@ public final class MainActivity extends Activity {
         if (spinnerIndex == 1) return TaskLogic.REPEAT_DAILY;
         if (spinnerIndex == 2) return TaskLogic.REPEAT_WEEKLY;
         if (spinnerIndex == 3) return TaskLogic.REPEAT_MONTHLY;
+        if (spinnerIndex == 4) return TaskLogic.REPEAT_WEEKDAYS;
+        if (spinnerIndex == 5) return TaskLogic.REPEAT_YEARLY;
         return null;
     }
 
@@ -9312,6 +9316,7 @@ public final class MainActivity extends Activity {
         }
     }
 }
+
 
 
 
