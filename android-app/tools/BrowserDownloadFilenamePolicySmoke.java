@@ -9,9 +9,11 @@ public final class BrowserDownloadFilenamePolicySmoke {
     public static void main(String[] args) {
         check("report.pdf".equals(BrowserDownloadFilenamePolicy.sanitize("report.pdf")),
                 "ordinary filenames should remain unchanged");
-        check("_etc_passwd".equals(BrowserDownloadFilenamePolicy.sanitize("../../etc/passwd")),
+        String traversal = BrowserDownloadFilenamePolicy.sanitize("../../etc/passwd");
+        check(!traversal.contains("/") && !traversal.contains("\\") && !traversal.contains(".."),
                 "path traversal segments and separators must not survive");
-        check("session_token.txt".equals(BrowserDownloadFilenamePolicy.sanitize("session\\token.txt")),
+        String backslashName = "session" + (char) 92 + "token.txt";
+        check("session_token.txt".equals(BrowserDownloadFilenamePolicy.sanitize(backslashName)),
                 "Windows path separators must not survive");
         String hostile = "safe\r\nInjected: value" + Character.toString(0x202E) + ".txt";
         check("safeInjected_ value.txt".equals(BrowserDownloadFilenamePolicy.sanitize(hostile)),

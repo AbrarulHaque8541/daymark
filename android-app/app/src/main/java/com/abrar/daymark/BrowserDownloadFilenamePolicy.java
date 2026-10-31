@@ -36,7 +36,7 @@ final class BrowserDownloadFilenamePolicy {
             byteCount += encodedBytes;
         }
 
-        String result = safe.toString().trim();
+        String result = safe.toString().replace("..", "_").trim();
         while (result.endsWith(".") || result.endsWith(" ")) {
             result = result.substring(0, result.length() - 1);
         }
