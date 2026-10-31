@@ -17,6 +17,10 @@ public final class BrowserDiagnosticsSmoke {
                 .equals("https://example.com") : "an @ inside a fragment must not corrupt the origin";
         assert BrowserDiagnostics.redactUrl("https://user:secret@example.com?redirect=https://a@b.example")
                 .equals("https://example.com") : "userinfo must be removed even when the query also contains @";
+        assert BrowserDiagnostics.redactUrl("https://user:secret@example.com:8443/path")
+                .equals("https://example.com:8443/path") : "port must be preserved after userinfo redaction";
+        assert BrowserDiagnostics.redactUrl("https://user:secret@[::1]:8080/path?q=1")
+                .equals("https://[::1]:8080/path") : "bracketed IPv6 authority and port must survive userinfo redaction";
         assert BrowserDiagnostics.redactUrl(null).isEmpty() && BrowserDiagnostics.redactUrl("   ").isEmpty()
                 : "null/blank URLs must become empty strings";
         assert BrowserDiagnostics.redactUrl("https://example.com/very/" + "x".repeat(300))
