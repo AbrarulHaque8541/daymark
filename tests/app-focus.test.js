@@ -244,3 +244,21 @@ test('failed focus-backup writes leave the only original primary untouched until
     'the retry must create the backup before replacing primary focus state');
   assert.notEqual(storedValues.get(FOCUS_KEY), original);
 });
+
+
+test('a malformed focus-recovery envelope is preserved when another source is backed up', () => {
+  const earlier = JSON.stringify({
+    format: 'daymark-focus-recovery-bundle-v1',
+    payloads: [null, 7]
+  });
+  const current = '{new unreadable focus source';
+  const { storedValues } = bootApp({
+    savedFocus: current,
+    savedFocusBackup: earlier
+  });
+
+  const bundle = JSON.parse(storedValues.get(FOCUS_BACKUP_KEY));
+  assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, [earlier, current],
+    'a malformed existing envelope must remain byte-for-byte available inside the new bundle');
+});
