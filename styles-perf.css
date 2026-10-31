@@ -1,0 +1,14 @@
+/* Performance: list virtualization hints + faster taps (additive; does not replace design). */
+#task-list { contain: layout; }
+.task-row {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
+  touch-action: manipulation;
+}
+button, .tool-button, .filter-button, .icon-button, .complete-button {
+  touch-action: manipulation;
+}
+@media (prefers-reduced-motion: reduce) {
+  .empty-illustration, .sparkle { animation: none !important; }
+}
