@@ -122,6 +122,9 @@ final class BrowserAddress {
             if (host == null || host.trim().isEmpty()) {
                 throw new IllegalArgumentException("Enter a valid web address with a host name.");
             }
+            if (hasExplicitEmptyPort(uri)) {
+                throw new IllegalArgumentException("Enter a valid port between 1 and 65535.");
+            }
             int port = uri.getPort();
             if (port == 0 || port > 65535) {
                 throw new IllegalArgumentException("Enter a valid port between 1 and 65535.");
@@ -179,6 +182,22 @@ final class BrowserAddress {
             hostPart = asciiHost + (colon < 0 ? "" : hostPart.substring(colon));
         }
         return BARE_DOMAIN.matcher(hostPart).matches() && hostPart.toLowerCase(Locale.ROOT).contains(".");
+    }
+
+    /** Reject an explicit trailing port separator; URI.getPort() reports -1 for it. */
+    private static boolean hasExplicitEmptyPort(URI uri) {
+        String authority = uri.getRawAuthority();
+        if (authority == null) return false;
+        int userInfoEnd = authority.lastIndexOf('@');
+        if (userInfoEnd >= 0) authority = authority.substring(userInfoEnd + 1);
+        if (authority.startsWith("[")) {
+            int closingBracket = authority.indexOf(']');
+            return closingBracket >= 0 && closingBracket + 1 < authority.length()
+                    && authority.charAt(closingBracket + 1) == ':'
+                    && closingBracket + 2 == authority.length();
+        }
+        int colon = authority.lastIndexOf(':');
+        return colon >= 0 && colon == authority.length() - 1;
     }
 
     private static String toAsciiHostUrl(String candidate) {
