@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Source guard for BrowserLoadWatchdog v2.
-
-Verifies the watchdog file exists and contains the staged timeout contract,
-bounded event buffer, URL redaction, and lifecycle gating.
-"""
+"""Source guard for BrowserLoadWatchdog v2 cancellation and timing correctness."""
 import pathlib
 import sys
 
@@ -27,4 +23,33 @@ assert "BrowserSelfHealingPolicy" in src, "must integrate with BrowserSelfHealin
 assert "synchronized" in src, "thread safety (synchronized) missing"
 assert "ArrayDeque" in src, "bounded ring buffer (ArrayDeque) missing"
 
-print("PASS check-browser-load-watchdog-v2: staged watchdog contract verified")
+# Handler.removeCallbacks removes by Runnable identity, not method-reference equivalence.
+for name, callback in (("hint", "fireHint"), ("retry", "fireRetry"), ("fail", "fireFail")):
+    field = f"private final Runnable {name}Runnable = this::{callback};"
+    assert field in src, f"stable {name} callback instance missing"
+    assert f"handler.postDelayed({name}Runnable," in src, f"{name} must schedule its stable Runnable"
+    assert f"handler.removeCallbacks({name}Runnable);" in src, f"{name} must cancel its stable Runnable"
+assert "handler.removeCallbacks(this::fire" not in src, "fresh method references cannot reliably cancel Handler callbacks"
+
+# Deadlines must be based on monotonic time, not a wall clock that can jump.
+assert "SystemClock.elapsedRealtime()" in src, "watchdog must use monotonic elapsed time"
+assert "System.currentTimeMillis()" not in src, "wall-clock deadline is vulnerable to clock changes"
+
+# Terminal navigation callbacks must invalidate queued stages even if a callback races removal.
+for method, marker in (("onPageFinished(String url)", "page-finished:"),
+                       ("onReceivedError(String url, int errorCode, String description)", "load-error:"),
+                       ("onRendererGone(String url)", "renderer-gone:")):
+    start = src.find(method)
+    assert start >= 0, f"{method} missing"
+    body_start = src.find("{", start)
+    next_method = src.find("\n    /**", body_start)
+    body = src[body_start:next_method if next_method >= 0 else len(src)]
+    assert "cancelStages();" in body, f"{method} must cancel stages"
+    assert "pendingAddress = null;" in body, f"{method} must invalidate queued callbacks"
+
+smoke = root / "tools/BrowserLoadWatchdogSmoke.java"
+assert smoke.exists(), "deterministic watchdog regression test missing"
+runner = root / "tools/run-load-watchdog-tests.sh"
+assert runner.exists(), "watchdog test runner missing"
+
+print("PASS check-browser-load-watchdog-v2: stable callback identity, monotonic deadlines, terminal invalidation")
