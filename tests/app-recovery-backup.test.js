@@ -128,7 +128,7 @@ test('partially rejected saved tasks survive a subsequent edit and page reload',
 test('a stale malformed backup is still cleared when the primary task store is healthy', () => {
   const storedValues = new Map([
     [STORAGE_KEY, JSON.stringify([validTask('valid-1', 'Healthy task')])],
-    [BACKUP_KEY, '{previously unreadable'
+    [BACKUP_KEY, '{previously unreadable']
   ]);
   bootApp(storedValues);
   assert.equal(storedValues.has(BACKUP_KEY), false);
