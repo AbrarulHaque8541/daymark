@@ -1,56 +1,69 @@
 package com.abrar.daymark;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
-/** Cheap fingerprint so task list UI can skip identical rebuilds. */
+/** Avoid rebuilding task rows only while their immutable task instances and inputs are unchanged. */
 final class TaskListRenderGate {
-    private String lastKey = "";
+    private boolean hasRendered;
+    private String lastFilter = "";
+    private String lastQuery = "";
+    private String lastTag = "";
+    private boolean lastSaveFailed;
+    private List<Task> lastVisible = Collections.emptyList();
 
-    TaskListRenderGate() {}
+    TaskListRenderGate() { }
 
     static TaskListRenderGate create() {
         return new TaskListRenderGate();
     }
 
-    /** @return true if the list should be rebuilt (key changed). */
+    /** @return true if the list should be rebuilt. */
     boolean shouldRebuild(String filter, String query, List<Task> visible, boolean saveFailed) {
         return shouldRebuild(filter, query, "", visible, saveFailed);
     }
 
-    /** @return true if the list should be rebuilt (key changed); {@code tag} is part of the key. */
+    /** @return true if the list or any filter input changed. */
     boolean shouldRebuild(String filter, String query, String tag, List<Task> visible,
                           boolean saveFailed) {
-        String key = fingerprint(filter, query, tag, visible, saveFailed);
-        if (key.equals(lastKey)) {
+        String nextFilter = filter == null ? "" : filter;
+        String nextQuery = query == null ? "" : query;
+        String nextTag = tag == null ? "" : tag;
+        if (hasRendered && lastFilter.equals(nextFilter) && lastQuery.equals(nextQuery)
+                && lastTag.equals(nextTag) && lastSaveFailed == saveFailed
+                && sameTasksByIdentity(lastVisible, visible)) {
             return false;
         }
-        lastKey = key;
+        lastFilter = nextFilter;
+        lastQuery = nextQuery;
+        lastTag = nextTag;
+        lastSaveFailed = saveFailed;
+        // Callers may mutate their list in place. Copy only the references, not the task data.
+        lastVisible = visible == null ? Collections.emptyList() : new ArrayList<>(visible);
+        hasRendered = true;
         return true;
     }
 
     void invalidate() {
-        lastKey = "";
+        hasRendered = false;
+        lastVisible = Collections.emptyList();
     }
 
-    private static String fingerprint(String filter, String query, String tag, List<Task> visible,
-                                      boolean saveFailed) {
-        StringBuilder sb = new StringBuilder(64 + (visible == null ? 0 : visible.size() * 32));
-        sb.append(filter == null ? "" : filter).append('|');
-        sb.append(query == null ? "" : query).append('|');
-        sb.append(tag == null ? "" : tag).append('|');
-        sb.append(saveFailed).append('|');
-        if (visible != null) {
-            for (Task t : visible) {
-                if (t == null) {
-                    continue;
-                }
-                sb.append(t.id == null ? "" : t.id).append(':');
-                sb.append(t.completed).append(':');
-                sb.append(t.priority == null ? "" : t.priority).append(':');
-                sb.append(t.dueDate == null ? "" : t.dueDate).append(':');
-                sb.append(t.updatedAt == null ? "" : t.updatedAt).append(';');
-            }
+    /**
+     * Task is immutable, including its copied attachment/subtask/tag lists. Every modification
+     * produces a new instance, even when updatedAt is unchanged (attachment import/removal does
+     * exactly that). Rows and their callbacks capture an instance, so comparing a partial string
+     * fingerprint or only updatedAt can otherwise retain stale data and overwrite newer fields.
+     */
+    private static boolean sameTasksByIdentity(List<Task> previous, List<Task> current) {
+        if (current == null) return previous.isEmpty();
+        if (previous.size() != current.size()) return false;
+        Iterator<Task> iterator = current.iterator();
+        for (Task task : previous) {
+            if (task != iterator.next()) return false;
         }
-        return sb.toString();
+        return true;
     }
 }

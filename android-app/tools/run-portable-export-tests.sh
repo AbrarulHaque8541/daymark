@@ -8,6 +8,7 @@ javac -encoding UTF-8 -d "$BUILD" \
     "$ROOT/app/src/main/java/com/abrar/daymark/PortableExportWriter.java" \
     "$ROOT/app/src/main/java/com/abrar/daymark/PortableBackupCodec.java" \
     "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
+    "$ROOT/app/src/main/java/com/abrar/daymark/TaskSearch.java" \
     "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentLogic.java" \
     "$ROOT/app/src/main/java/com/abrar/daymark/Task.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Subtask.java" \

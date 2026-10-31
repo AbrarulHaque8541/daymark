@@ -444,13 +444,14 @@ final class TaskLogic {
     }
 
     /**
-     * Category filter + free-text query + optional exact tag, all ANDed. A blank {@code tag}
-     * matches everything, so the four-argument overload above is the same query with no tag
-     * selected.
+     * Category filter + local text search + optional exact tag, all ANDed. Search preserves
+     * literal substring matches and adds bounded typo tolerance for word queries. A blank
+     * {@code tag} matches everything, so the four-argument overload above is equivalent
+     * to passing no tag.
      */
     static List<Task> filter(List<Task> tasks, String filter, String query, String tag,
                              LocalDate today) {
-        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        TaskSearch.Query search = TaskSearch.prepare(query);
         String normalizedTag = tag == null ? "" : tag.trim();
         List<Task> result = new ArrayList<>();
         for (Task task : tasks) {
@@ -461,14 +462,7 @@ final class TaskLogic {
             if (FILTER_TODAY.equals(filter) && !today.toString().equals(task.dueDate)) continue;
             if (FILTER_UPCOMING.equals(filter)
                     && (task.dueDate == null || !LocalDate.parse(task.dueDate).isAfter(today))) continue;
-            if (!normalizedQuery.isEmpty()) {
-                String searchable = task.title.toLowerCase(Locale.ROOT)
-                        + " " + task.notes.toLowerCase(Locale.ROOT)
-                        + " " + String.join(" ", task.tags)
-                        + " " + task.priority.toLowerCase(Locale.ROOT)
-                        + " " + (task.dueDate == null ? "no date" : task.dueDate);
-                if (!searchable.contains(normalizedQuery)) continue;
-            }
+            if (!search.matches(task)) continue;
             result.add(task);
         }
         result.sort(taskOrder());

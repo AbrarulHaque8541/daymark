@@ -1,0 +1,9 @@
+# Local task search
+
+In the Tasks workspace, switch to the Power path and type in **Search tasks**. Results update after the existing short input debounce. Search is performed on this device over task titles, notes, tags, priority, and due date; no account or network request is used. The selected category and tag remain exact filters, and task ordering stays the same.
+
+Literal, case-insensitive substring searches continue to work. For word queries, search also accepts one insertion, deletion, substitution, or adjacent transposition per alphabetic word of 4–32 Unicode code points. Multiple words can match different fields, and every word must match. Very short words and words containing digits are literal-only. Queries containing unsupported punctuation or symbols, more than six words, a word longer than 32 code points, or more than 160 UTF-16 code units use literal matching only; the original query is never truncated. Search does not infer synonyms or rank results by relevance.
+
+Examples: `meting` can find “meeting”; `budget plan` can find “Plan” in a title and “budget” in its note. `2026-10-05`, URLs, emoji, and other punctuation-rich input remain literal searches. Empty search preserves the ordinary task list.
+
+The host regression suite tests literal compatibility, common typos, combined filters, Unicode and bounds, and compares the matcher against an independent edit-distance oracle. The UI still uses its existing 150 ms debounce and renders the list on the Activity thread; actual responsiveness, large-list behavior, screen-reader labels, and battery usage have **not** been measured on Android devices.

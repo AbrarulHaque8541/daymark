@@ -35,6 +35,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Task.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NaturalLanguageTaskParse.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskLogic.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/TaskSearch.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskDuePresets.java" \
@@ -82,6 +83,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/ScrollChromeReserveSmoke.java" \
   "$ROOT/tools/PressSurfaceSmoke.java" \
   "$ROOT/tools/TaskFilterSmoke.java" \
+  "$ROOT/tools/TaskSearchSmoke.java" \
   "$ROOT/tools/NoteFormatSmoke.java" \
   "$ROOT/tools/KeyShortcutsSmoke.java" \
   "$ROOT/tools/CommandPaletteSmoke.java" \
@@ -123,6 +125,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollChromeReserveSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.PressSurfaceSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskFilterSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSearchSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NoteFormatSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.KeyShortcutsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CommandPaletteSmoke

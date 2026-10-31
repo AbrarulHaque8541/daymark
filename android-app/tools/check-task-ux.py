@@ -23,6 +23,12 @@ MAIN = ROOT / "app/src/main/java/com/abrar/daymark"
 ACTIVITY = (MAIN / "MainActivity.java").read_text(encoding="utf-8")
 TASK_LOGIC = (MAIN / "TaskLogic.java").read_text(encoding="utf-8")
 RENDER_GATE = (MAIN / "TaskListRenderGate.java").read_text(encoding="utf-8")
+TASK_MODEL = (MAIN / "Task.java").read_text(encoding="utf-8")
+ATTACHMENT_MODEL = (MAIN / "AttachmentRef.java").read_text(encoding="utf-8")
+SUBTASK_MODEL = (MAIN / "Subtask.java").read_text(encoding="utf-8")
+GATE_SMOKE = (ROOT / "tools/TaskListRenderGateSmoke.java").read_text(encoding="utf-8")
+TASK_SEARCH = (MAIN / "TaskSearch.java").read_text(encoding="utf-8")
+SEARCH_SMOKE = (ROOT / "tools/TaskSearchSmoke.java").read_text(encoding="utf-8")
 NOTE_FORMAT = MAIN / "NoteFormat.java"
 KEY_SHORTCUTS = MAIN / "KeyShortcuts.java"
 NOTE_SMOKE = ROOT / "tools/NoteFormatSmoke.java"
@@ -106,9 +112,59 @@ check("boolean shouldRebuild(String filter, String query, String tag, List<Task>
       in RENDER_GATE, "gate overload with tag missing")
 check("shouldRebuild(filter, query, \"\", visible, saveFailed);" in RENDER_GATE,
       "tag-free gate overload must delegate with no tag")
-check("private static String fingerprint" in RENDER_GATE, "gate fingerprint missing")
-check("sb.append(tag == null ? \"\" : tag).append('|');" in RENDER_GATE,
-      "gate fingerprint must include the tag")
+check("lastTag.equals(nextTag)" in RENDER_GATE,
+      "gate must compare the selected tag independently")
+check("sameTasksByIdentity(lastVisible, visible)" in RENDER_GATE,
+      "gate must compare the task snapshots captured by row callbacks")
+check("if (task != iterator.next()) return false;" in RENDER_GATE,
+      "a new immutable task instance must refresh its row, even with the same timestamp")
+check("new ArrayList<>(visible)" in RENDER_GATE,
+      "gate must copy task references rather than retain a mutable list")
+for field in ("id", "title", "dueDate", "priority", "createdAt", "updatedAt", "notes",
+              "dueTime", "reminderShownFire", "repeatRule"):
+    check(f"final String {field};" in TASK_MODEL, f"Task.{field} must be immutable for the render gate")
+for marker in ("final boolean completed;", "final Integer reminderLeadMinutes;",
+               "final Integer repeatDayOfMonth;", "final List<AttachmentRef> attachments;",
+               "final List<Subtask> subtasks;", "final List<String> tags;",
+               "Collections.unmodifiableList(new ArrayList<>(attachments))",
+               "Collections.unmodifiableList(new ArrayList<>(subtasks))",
+               "Collections.unmodifiableList(new ArrayList<>(tags))"):
+    check(marker in TASK_MODEL, f"render gate relies on immutable task data: {marker}")
+for model, markers in ((ATTACHMENT_MODEL, ("final class AttachmentRef", "final String id;",
+                                            "final String displayName;", "final String mimeType;",
+                                            "final long sizeBytes;")),
+                       (SUBTASK_MODEL, ("final class Subtask", "final String id;",
+                                        "final String title;", "final boolean done;"))):
+    for marker in markers:
+        check(marker in model, f"render gate relies on immutable nested task data: {marker}")
+for marker in ("detectsAttachmentChangesWithoutTimestampChanges()",
+               "imported attachment must refresh the row and its captured task",
+               "completion of the refreshed row retains the imported attachment",
+               "snapshotsTheListRatherThanRetainingAMutableContainer()"):
+    check(marker in GATE_SMOKE, f"render-gate regression coverage missing: {marker}")
+check('"$ROOT/tools/TaskListRenderGateSmoke.java"' in CORE_RUNNER
+      and "com.abrar.daymark.TaskListRenderGateSmoke" in CORE_RUNNER,
+      "render-gate regression test must be compiled and run")
+
+# Search stays local and retains literal behavior before bounded fuzzy fallback.
+filter_body = region_in(TASK_LOGIC, "static List<Task> filter(List<Task> tasks, String filter, String query, String tag,",
+                        "static List<String> availableTags", "tag-aware task filter")
+check("TaskSearch.prepare(query)" in filter_body and "if (!search.matches(task)) continue;" in filter_body,
+      "the existing list/filter flow must use local search")
+for marker in ("Locale.ROOT", "searchable.contains(literal)", "searchable.contains(term.text)",
+               "MAX_FUZZY_QUERY_CHARS = 160", "MAX_FUZZY_TERMS = 6",
+               "MIN_FUZZY_TERM_CODE_POINTS = 4", "MAX_FUZZY_TERM_CODE_POINTS = 32",
+               "withinOneEdit(", "Character.isLetterOrDigit("):
+    check(marker in TASK_SEARCH, f"bounded local search contract missing: {marker}")
+for forbidden in ("import android.", "openConnection(", "loadUrl(", "HttpURLConnection"):
+    check(forbidden not in TASK_SEARCH, f"task search must not need Android or a network request: {forbidden}")
+for marker in ("preservesExistingSearch()", "matchesCommonTyposAndMultipleTerms()",
+               "keepsCategoryAndTagFiltersExact()", "handlesUnicodeAndBoundsConservatively()",
+               "matchesReferenceOneEditPolicy()"):
+    check(marker in SEARCH_SMOKE, f"search behavior coverage missing: {marker}")
+check('"$ROOT/tools/TaskSearchSmoke.java"' in CORE_RUNNER
+      and "com.abrar.daymark.TaskSearchSmoke" in CORE_RUNNER,
+      "search regression test must be compiled and run")
 
 # --- 2. Note formatting --------------------------------------------------------------------
 
