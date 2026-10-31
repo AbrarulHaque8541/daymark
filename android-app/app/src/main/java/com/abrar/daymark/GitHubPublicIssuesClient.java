@@ -1,4 +1,5 @@
 package com.abrar.daymark;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,12 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/**
- * Read-only adapter for public GitHub repository issues and pull requests.
- *
- * <p>Requests are anonymous and fixed to api.github.com. This adapter cannot access private
- * repositories, mutate issues, or bypass provider rate limits. Call it off the UI thread.
- */
+/** Read-only adapter for public GitHub repository issues and pull requests. */
 final class GitHubPublicIssuesClient {
     private static final int CONNECT_TIMEOUT_MILLIS = 10_000;
     private static final int READ_TIMEOUT_MILLIS = 15_000;
@@ -35,12 +31,10 @@ final class GitHubPublicIssuesClient {
 
     static final class IntegrationException extends Exception {
         final Failure failure;
-
         IntegrationException(Failure failure, String message) {
             super(message);
             this.failure = failure;
         }
-
         IntegrationException(Failure failure, String message, Throwable cause) {
             super(message, cause);
             this.failure = failure;
@@ -55,7 +49,6 @@ final class GitHubPublicIssuesClient {
         final String htmlUrl;
         final String updatedAt;
         final boolean pullRequest;
-
         Issue(int number, String title, String body, String state, String htmlUrl,
               String updatedAt, boolean pullRequest) {
             this.number = number;
