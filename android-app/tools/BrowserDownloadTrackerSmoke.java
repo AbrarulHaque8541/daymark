@@ -60,6 +60,7 @@ public final class BrowserDownloadTrackerSmoke {
                 10L, "https://bad host?token=secret", "download.bin");
         check("[redact-error]".equals(malformed.url), "malformed URL must fail closed");
 
+        for (long id = 2L; id <= 10L; id++) tracker.onCancel(id);
         tracker.onProgress(1L, 50L, 100L);
         check(tracker.get(1L).status == BrowserDownloadTracker.Status.IN_PROGRESS,
                 "progress must mark entry in progress");
