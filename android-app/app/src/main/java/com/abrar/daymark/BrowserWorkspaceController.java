@@ -1,4 +1,3 @@
-successfully downloaded text file (SHA: 5f4eb18e14c35ba338d083a315c4319af9e330fa)
 package com.abrar.daymark;
 
 import java.util.List;

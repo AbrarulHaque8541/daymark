@@ -1,4 +1,3 @@
-successfully downloaded text file (SHA: a62c16e86cd3efa098976e6d21adfc91e2099498)
 package com.abrar.daymark;
 
 import android.os.Handler;

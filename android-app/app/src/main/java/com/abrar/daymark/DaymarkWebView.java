@@ -1,4 +1,3 @@
-successfully downloaded text file (SHA: 92e8c69e42da0f46498f02043f0b6169bc95c34b)
 package com.abrar.daymark;
 import android.app.Activity;
 import android.net.http.SslError;
