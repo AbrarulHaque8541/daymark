@@ -16,6 +16,7 @@
   <script src="app.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <div class="app-shell">
     <aside class="rail" aria-label="Application identity">
       <a class="brand" href="#main" aria-label="Daymark home">
@@ -28,7 +29,7 @@
       </div>
     </aside>
 
-    <main id="main" class="main-content">
+    <main id="main" class="main-content" tabindex="-1">
       <header class="topbar">
         <div class="workspace-label"><span class="status-dot" aria-hidden="true"></span> Personal workspace</div>
         <div class="topbar-right">
@@ -211,4 +212,3 @@
   </div>
 </body>
 </html>
-
