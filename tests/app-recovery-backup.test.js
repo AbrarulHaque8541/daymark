@@ -125,6 +125,36 @@ test('partially rejected saved tasks survive a subsequent edit and page reload',
     /ignored originals remain in a recovery backup/);
 });
 
+test('a new partial recovery backup preserves earlier rejected task records', () => {
+  const earlier = JSON.stringify([
+    validTask('earlier-valid', 'Earlier valid task'),
+    validTask('earlier-invalid', 'x'.repeat(170))
+  ]);
+  const current = JSON.stringify([
+    validTask('current-valid', 'Current valid task'),
+    validTask('current-invalid', 'y'.repeat(170))
+  ]);
+  const storedValues = new Map([
+    [STORAGE_KEY, current],
+    [BACKUP_KEY, earlier]
+  ]);
+
+  const first = bootApp(storedValues);
+  const bundle = JSON.parse(storedValues.get(BACKUP_KEY));
+  assert.equal(bundle.format, 'daymark-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, [earlier, current],
+    'backing up a new rejected payload must not overwrite the previous recovery source');
+
+  first.elements.get('#new-title').value = 'Another task';
+  first.elements.get('#add-form').dispatch('submit');
+  assert.deepEqual(JSON.parse(storedValues.get(BACKUP_KEY)).payloads, [earlier, current],
+    'subsequent saves must retain all recovery sources');
+
+  bootApp(storedValues);
+  assert.deepEqual(JSON.parse(storedValues.get(BACKUP_KEY)).payloads, [earlier, current],
+    'reload must recognize the recovery bundle and retain it');
+});
+
 test('a stale malformed backup is still cleared when the primary task store is healthy', () => {
   const storedValues = new Map([
     [STORAGE_KEY, JSON.stringify([validTask('valid-1', 'Healthy task')])],
