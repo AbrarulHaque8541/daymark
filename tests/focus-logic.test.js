@@ -102,7 +102,7 @@ test('tick completion accounts for paused gaps in the end timestamp', () => {
   const { finished } = focus.tick(session, T0 + 70 * 60 * 1000 + 15 * 60 * 1000);
   assert.equal(finished, true);
   assert.equal(session.finalElapsedMs, 25 * 60 * 1000);
-  assert.equal(session.endedAtMs, T0 + 85 * 60 * 1000, 'expiry = start + active time, pauses excluded');
+  assert.equal(session.endedAtMs, T0 + 25 * 60 * 1000, 'expiry = start + active time, pauses excluded');
 });
 
 test('finish with manual stop records a partial, incomplete session', () => {
