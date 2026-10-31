@@ -9,7 +9,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp(storedValues) {
+function bootApp(storedValues, failWrites = new Set()) {
   const elements = new Map();
 
   function element(selector) {
@@ -59,7 +59,10 @@ function bootApp(storedValues) {
 
   const localStorage = {
     getItem: (key) => storedValues.has(key) ? storedValues.get(key) : null,
-    setItem: (key, value) => storedValues.set(key, String(value)),
+    setItem: (key, value) => {
+      if (failWrites.has(key)) throw new Error('QuotaExceededError');
+      storedValues.set(key, String(value));
+    },
     removeItem: (key) => storedValues.delete(key)
   };
   const document = {
@@ -162,4 +165,36 @@ test('a stale malformed backup is still cleared when the primary task store is h
   ]);
   bootApp(storedValues);
   assert.equal(storedValues.has(BACKUP_KEY), false);
+});
+
+
+test('failed recovery backup creation never overwrites the only original task payload', () => {
+  const original = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const failWrites = new Set([BACKUP_KEY]);
+  const app = bootApp(storedValues, failWrites);
+
+  assert.equal(storedValues.get(STORAGE_KEY), original,
+    'the primary remains byte-for-byte intact when backup creation fails');
+  assert.equal(storedValues.has(BACKUP_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup could not be created/);
+
+  app.elements.get('#new-title').value = 'First unsaved edit';
+  app.elements.get('#add-form').dispatch('submit');
+  assert.equal(storedValues.get(STORAGE_KEY), original,
+    'a later task save must not overwrite the only original copy');
+
+  failWrites.delete(BACKUP_KEY);
+  app.elements.get('#new-title').value = 'Retry after freeing storage';
+  app.elements.get('#add-form').dispatch('submit');
+
+  assert.equal(storedValues.get(BACKUP_KEY), original,
+    'retry must create the recovery backup before changing primary storage');
+  const saved = JSON.parse(storedValues.get(STORAGE_KEY));
+  assert.ok(saved.some((task) => task.title === 'First unsaved edit'));
+  assert.ok(saved.some((task) => task.title === 'Retry after freeing storage'));
 });
