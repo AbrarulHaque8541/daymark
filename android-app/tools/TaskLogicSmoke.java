@@ -495,9 +495,10 @@ public final class TaskLogicSmoke {
         Task yearlyAdvanced = TaskLogic.advanceRepeat(yearlyTask, zone, now);
         check("2027-10-05".equals(yearlyAdvanced.dueDate),
                 "yearly repeat skips the occurrence that just passed and lands a year later");
-        Task persistedWeekdaysAnchor = task("bad-weekdays-anchor", "Bad", null, "medium", false, 43)
-                .withFullDetails("Bad", "", "2026-10-05", null, "medium", null, TaskLogic.REPEAT_WEEKDAYS,
-                        Collections.<Subtask>emptyList(), Integer.valueOf(5), "2026-10-05T00:00:43Z");
+        Task persistedWeekdaysAnchor = new Task("bad-weekdays-anchor", "Bad", "2026-10-05", "medium", false,
+                "2026-10-05T00:00:43Z", "2026-10-05T00:00:43Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_WEEKDAYS, Integer.valueOf(5), Collections.<Subtask>emptyList());
         check(!TaskLogic.isValid(persistedWeekdaysAnchor),
                 "persisted weekday repeat with a monthly anchor fails validation");
         expectIllegalArgument(() -> TaskLogic.create("Weekday without date", null, "medium", "",
