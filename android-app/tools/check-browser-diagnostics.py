@@ -28,17 +28,18 @@ assert "never sent automatically" in activity and "no task data" in activity, \
     "the dialog must disclose that the report is local-only and task-free"
 
 # Redaction and bounds live in the pure recorder class and are host-tested.
-for expected in ("redactUrl", "MAX_EVENTS", "indexOf('?')", "indexOf('#')", "indexOf('@')", "indexOf('/')"):
+# Authority boundary uses lastIndexOf('@') within the prefix before /, ?, or #.
+for expected in ("redactUrl", "MAX_EVENTS", "indexOf('?')", "indexOf('#')", "indexOf('/')", "lastIndexOf('@'", "authorityEnd"):
     assert expected in diagnostics, f"diagnostics recorder must implement redaction/bounds: {expected}"
 for forbidden in ("SharedPreferences", "java.net", "Intent", "ContentResolver", "openOutputStream"):
     assert forbidden not in diagnostics, f"the recorder must stay in-memory and side-effect-free: {forbidden}"
 for expected in ("credentials, query, and fragment must be redacted", "buffer must stay bounded",
                  "report must never contain query strings", "events() must return a defensive copy",
-                 "an @ inside the path is not a credential"):
+                 "an @ inside the path is not a credential", "query-only URL must not corrupt the origin"):
     assert expected in smoke, f"missing executable diagnostics regression: {expected}"
 print("PASS browser diagnostics: user-triggered only, redacted URLs, bounded in-memory events, opt-in copy export")
 
-# Work by: Vibe
-# Model: GLM (glm-5-latest-short)
-# Tooling: GitHub MCP tools
-# Timestamp (UTC): 2026-10-11T17:55:00Z
+# Work by: Grok
+# Model: Grok 4.7
+# Tooling: GitHub connector
+# Timestamp (UTC): 2026-10-31T17:45:00Z

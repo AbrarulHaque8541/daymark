@@ -60,11 +60,18 @@ final class BrowserDiagnostics {
         } else {
             String prefix = trimmed.substring(0, schemeEnd + 3);
             String rest = trimmed.substring(schemeEnd + 3);
-            // Only strip userinfo before the first path slash: an '@' inside a path
-            // segment (common in e-mail slugs) is not a credential.
+            // Userinfo belongs only to the authority. Treat '/', '?', and '#'
+            // as authority boundaries: an '@' in a query or fragment (including a
+            // query-only URL with no slash) must never be mistaken for credentials.
+            int authorityEnd = rest.length();
             int slash = rest.indexOf('/');
-            int at = rest.indexOf('@');
-            if (at >= 0 && (slash < 0 || at < slash)) rest = rest.substring(at + 1);
+            int query = rest.indexOf('?');
+            int fragment = rest.indexOf('#');
+            if (slash >= 0 && slash < authorityEnd) authorityEnd = slash;
+            if (query >= 0 && query < authorityEnd) authorityEnd = query;
+            if (fragment >= 0 && fragment < authorityEnd) authorityEnd = fragment;
+            int at = authorityEnd > 0 ? rest.lastIndexOf('@', authorityEnd - 1) : -1;
+            if (at >= 0) rest = rest.substring(at + 1);
             result = prefix + stripSensitiveTail(rest);
         }
         if (result.length() > MAX_TEXT_LENGTH) result = result.substring(0, MAX_TEXT_LENGTH);
