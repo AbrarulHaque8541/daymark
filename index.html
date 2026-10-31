@@ -32,7 +32,7 @@
       <header class="topbar">
         <div class="workspace-label"><span class="status-dot" aria-hidden="true"></span> Personal workspace</div>
         <div class="topbar-right">
-          <span class="local-badge" id="storage-status" role="status" aria-live="polite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
+          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
         </div>
       </header>
 
@@ -123,7 +123,13 @@
             <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks from a backup file">Import</button>
             <input id="import-file" type="file" accept="application/json,.json" hidden>
           </div>
-          <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text"></div>
+          <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
+            <div class="task-list-skeleton" aria-hidden="true">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
           <div class="empty-state" id="empty-state" hidden>
             <div class="empty-illustration" aria-hidden="true"><span class="empty-sun"></span><span class="empty-line line-one"></span><span class="empty-line line-two"></span><span class="empty-check">✓</span></div>
             <h3 id="empty-title">A clear start</h3>
@@ -209,6 +215,17 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <button class="toast-action" id="toast-action" type="button" hidden>Undo</button>
   </div>
+  <script>
+    // Hide the initial skeleton once the app has painted the real list.
+    // app.js runs deferred; this runs after it and after the first render.
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(function () {
+        var list = document.getElementById('task-list');
+        if (list) list.classList.add('is-ready');
+        var badge = document.getElementById('storage-status');
+        if (badge) badge.classList.remove('is-checking');
+      }, 120);
+    });
+  </script>
 </body>
 </html>
-
