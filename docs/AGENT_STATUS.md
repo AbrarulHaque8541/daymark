@@ -4,6 +4,7 @@
 
 ## Latest reviewed snapshot
 
+- [Daymark status snapshot — 2026-10-31T08:05:31Z](./CURRENT_STATUS_20261031T080531Z.md)
 - [Daymark status snapshot — 2026-10-31T06:36:57Z](./CURRENT_STATUS_20261031T063657Z.md)
 - [Daymark status snapshot — 2026-10-31T05:46:46Z](./CURRENT_STATUS_20261031T054646Z.md)
 - [Daymark status snapshot — 2026-10-31T05:45:54Z](./CURRENT_STATUS_20261031T054554Z.md)
@@ -35,7 +36,7 @@
 ## Before acting
 
 1. Open the latest snapshot for context.
-2. Re-check live `main`, Releases/tags, relevant issues and PRs, exact PR head SHA, and Actions runs.
+2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
 3. If live evidence disagrees with the snapshot, trust live evidence, record the discrepancy, and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
 
 ## Snapshot maintenance
