@@ -215,17 +215,5 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <button class="toast-action" id="toast-action" type="button" hidden>Undo</button>
   </div>
-  <script>
-    // Hide the initial skeleton once the app has painted the real list.
-    // app.js runs deferred; this runs after it and after the first render.
-    document.addEventListener('DOMContentLoaded', function () {
-      setTimeout(function () {
-        var list = document.getElementById('task-list');
-        if (list) list.classList.add('is-ready');
-        var badge = document.getElementById('storage-status');
-        if (badge) badge.classList.remove('is-checking');
-      }, 120);
-    });
-  </script>
 </body>
 </html>
