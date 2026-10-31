@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: 92e8c69e42da0f46498f02043f0b6169bc95c34b)
 package com.abrar.daymark;
 import android.app.Activity;
 import android.net.http.SslError;
@@ -37,6 +38,21 @@ final class DaymarkWebView extends WebView {
         void onRendererGone();
     }
 
+    /**
+     * Keeps the WebView-level network block in sync with the policy at every in-WebView
+     * load. Link taps, redirects and form submits bypass MainActivity's navigation
+     * boundary, so without this a tab blocked by enforceOffline() would silently drop
+     * every load with no callback (#221 white viewport signature).
+     */
+    private void syncNetworkBlockWithPolicy(WebView view) {
+        if (!networkPolicy.allowsRemoteLoads()) return;
+        try {
+            view.getSettings().setBlockNetworkLoads(false);
+        } catch (RuntimeException rendererUnavailable) {
+            Log.w("DaymarkWebView", "network block sync failed; load may be dropped");
+        }
+    }
+
     private boolean handleIntentLink(WebView view, String value) {
         final BrowserIntentLinkPolicy.Decision decision;
         try {
@@ -57,6 +73,7 @@ final class DaymarkWebView extends WebView {
                 return true;
             }
             if (BrowserAddress.isAllowedWebUrl(decision.targetUri)) {
+                syncNetworkBlockWithPolicy(view);
                 view.loadUrl(decision.targetUri);
             } else {
                 listener.onNavigationBlocked(decision.targetUri);
@@ -78,8 +95,10 @@ final class DaymarkWebView extends WebView {
         } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
             String fallback = decision.fallbackUrl;
             if (fallback != null && BrowserAddress.isAllowedWebUrl(fallback)) {
-                if (networkPolicy.allowsRemoteLoads()) view.loadUrl(fallback);
-                else listener.onOfflineNavigationBlocked();
+                if (networkPolicy.allowsRemoteLoads()) {
+                    syncNetworkBlockWithPolicy(view);
+                    view.loadUrl(fallback);
+                } else listener.onOfflineNavigationBlocked();
             } else {
                 android.widget.Toast.makeText(view.getContext(),
                         "No compatible app found. This page remains open.",
@@ -159,7 +178,8 @@ final class DaymarkWebView extends WebView {
         setFocusable(true);
         setFocusableInTouchMode(true);
         setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
-        setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        // Default layer type on purpose: an explicit LAYER_TYPE_HARDWARE blanked the
+        // viewport on some device/GPU combinations (#221) while callbacks still fired.
 
         WebSettings settings = getSettings();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -241,6 +261,9 @@ final class DaymarkWebView extends WebView {
                     listener.onOfflineNavigationBlocked();
                     return true;
                 }
+                // In-WebView navigations bypass MainActivity's unblock boundary; re-assert it
+                // here so a tab left blocked by enforceOffline() cannot silently drop loads.
+                syncNetworkBlockWithPolicy(view);
                 // HTTP and HTTPS are both allowed in the browser (BrowserHttpPolicy.ALLOW_HTTP).
                 // HTTP pages show "Not encrypted" in the UI. Updater stays HTTPS-only (separate path).
                 // HTTPS→HTTP redirect downgrades are still blocked below for safety.
