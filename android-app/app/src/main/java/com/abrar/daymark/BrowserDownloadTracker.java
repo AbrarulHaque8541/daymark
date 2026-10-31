@@ -2,6 +2,8 @@ package com.abrar.daymark;
 
 import android.util.Log;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -74,7 +76,7 @@ final class BrowserDownloadTracker {
         Entry e = entries.get(id);
         if (e == null) return;
         e.status = Status.FAILED;
-        e.failureReason = reason != null ? reason.replaceAll("[\r\n]", " ") : "unknown";
+        e.failureReason = reason != null ? reason.replaceAll("[\\r\\n]", " ") : "unknown";
         Log.w(TAG, "download-failed id=" + id + " reason=" + e.failureReason);
     }
 
@@ -117,18 +119,28 @@ final class BrowserDownloadTracker {
         }
     }
 
+    /**
+     * Keep only the HTTP(S) origin in diagnostics. Parsing the URI (rather than searching for a
+     * slash) is important: a URL such as https://example.test?token=... has no path slash before
+     * its query, so delimiter scanning alone would accidentally retain the query in Logcat.
+     */
     private static String redact(String url) {
         if (url == null) return "null";
         try {
-            int schemeEnd = url.indexOf("://");
-            if (schemeEnd < 0) return "[non-http]";
-            int hostStart = schemeEnd + 3;
-            int pathStart = url.indexOf('/', hostStart);
-            int atSign = url.indexOf('@', hostStart);
-            int hostEnd = (pathStart >= 0) ? pathStart : url.length();
-            if (atSign >= 0 && atSign < hostEnd) hostStart = atSign + 1;
-            return url.substring(0, schemeEnd + 3) + url.substring(hostStart, hostEnd);
-        } catch (Exception e) {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"http".equalsIgnoreCase(scheme)
+                    && !"https".equalsIgnoreCase(scheme))) return "[non-http]";
+
+            String authority = uri.getRawAuthority();
+            if (authority == null || authority.isEmpty()) return "[redact-error]";
+            // Strip every credential segment before the final authority separator.
+            int atSign = authority.lastIndexOf('@');
+            if (atSign >= 0) authority = authority.substring(atSign + 1);
+            if (authority.isEmpty()) return "[redact-error]";
+
+            return scheme.toLowerCase(java.util.Locale.ROOT) + "://" + authority;
+        } catch (URISyntaxException e) {
             return "[redact-error]";
         }
     }
