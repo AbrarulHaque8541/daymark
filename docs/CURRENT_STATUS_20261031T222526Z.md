@@ -9,7 +9,8 @@
 
 ## P1 — Task recovery backup data preservation
 - New PR: [#461 — preserve opaque task recovery backups when merging damaged data](https://github.com/AbrarulHaque8541/daymark/pull/461).
-- Exact head: `c6718367226714f04c6c7ed81a7fd6dbd16e22fa`.
+- Implementation commit for code+test: `c6718367226714f04c6c7ed81a7fd6dbd16e22fa`.
+- PR branch subsequently received only status snapshot/index commits; final PR head must be re-fetched and CI checked against that exact head before merge.
 - Base/main SHA: `c9647872a6ef0b8cb50fe65e7344d414733ac299`.
 - Root cause: `recoveryBackupPayloads()` returned an empty list for malformed/opaque existing backup bytes. `backUpRawPayload()` could then replace those bytes with a newly rejected task payload, losing an older recovery source.
 - Implementation: retain opaque/malformed prior backup bytes as a raw recovery source; when a new damaged primary must be backed up, merge the exact opaque source and newly rejected original into a de-duplicated `daymark-recovery-bundle-v1`. A healthy task-array backup remains stale and is not unnecessarily bundled.
@@ -18,7 +19,7 @@
 - No Android native source, package identity, signer, version, release/tag, or destructive data operation.
 
 ## Exact-head validation
-- PR #461 checks are newly triggered and currently **IN PROGRESS**; report only the current head `c6718367226714f04c6c7ed81a7fd6dbd16e22fa`.
+- PR #461 GitHub Actions workflows were triggered for the branch; initial observed run head was `b9e10548ea31633d9041f45c025738f29c6a056c`. Because the branch then received status-document commits, re-fetch the final head and required checks before merge. At last observation: Cross-platform contract tests, Android CI, and Android device-test release assets were **IN PROGRESS**.
 - Local `npm test`: **NOT RUN** (GitHub connector runtime has no local checkout/Node shell).
 - Physical-device acceptance: **NOT TESTED** and not required for this isolated localStorage recovery fix; global issue #160 remains **NOT TESTED**.
 - Release publishing: **NOT REQUESTED**.
