@@ -378,6 +378,8 @@ final class PortableBackupCodec {
         if (TaskLogic.REPEAT_DAILY.equals(repeatRule)) return 1;
         if (TaskLogic.REPEAT_WEEKLY.equals(repeatRule)) return 2;
         if (TaskLogic.REPEAT_MONTHLY.equals(repeatRule)) return 3;
+        if (TaskLogic.REPEAT_WEEKDAYS.equals(repeatRule)) return 4;
+        if (TaskLogic.REPEAT_YEARLY.equals(repeatRule)) return 5;
         throw new IllegalArgumentException("Unsupported repeat rule.");
     }
 
@@ -386,6 +388,8 @@ final class PortableBackupCodec {
         if (code == 1) return TaskLogic.REPEAT_DAILY;
         if (code == 2) return TaskLogic.REPEAT_WEEKLY;
         if (code == 3) return TaskLogic.REPEAT_MONTHLY;
+        if (code == 4) return TaskLogic.REPEAT_WEEKDAYS;
+        if (code == 5) return TaskLogic.REPEAT_YEARLY;
         throw new IOException("The manifest contains an invalid repeat rule.");
     }
 
@@ -1294,3 +1298,4 @@ final class PortableBackupCodec {
         byte[] toByteArray() { return delegate.toByteArray(); }
     }
 }
+

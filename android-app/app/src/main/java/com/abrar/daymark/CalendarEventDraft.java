@@ -72,6 +72,8 @@ final class CalendarEventDraft {
     private static String recurrenceRule(Task task) {
         if ("daily".equals(task.repeatRule)) return "FREQ=DAILY";
         if ("weekly".equals(task.repeatRule)) return "FREQ=WEEKLY";
+        if ("weekdays".equals(task.repeatRule)) return "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+        if ("yearly".equals(task.repeatRule)) return "FREQ=YEARLY";
         if ("monthly".equals(task.repeatRule)) {
             Integer day = task.repeatDayOfMonth;
             return day == null ? "FREQ=MONTHLY" : "FREQ=MONTHLY;BYMONTHDAY=" + day;
@@ -79,3 +81,4 @@ final class CalendarEventDraft {
         return null;
     }
 }
+
