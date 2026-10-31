@@ -1,6 +1,4 @@
 package com.abrar.daymark;
-successfully downloaded text file (SHA: dbad056fa6cf89e1567ac06b3d6895bdf8261db7)package com.abrar.daymark;
-successfully downloaded text file (SHA: 7e669a726bca283410f5ea53d775eafce9fa0745)
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
