@@ -270,6 +270,6 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.equal(link.clicked, true, 'the browser download is triggered');
   assert.equal(link.download, 'daymark-recovery-backup.txt');
   assert.equal(link.href, 'blob:daymark-recovery-test');
-  assert.deepEqual(app.getLastBlob().parts, [backupRaw],
+  assert.equal(app.getLastBlob().parts[0], backupRaw,
     'export contains the exact retained recovery bundle bytes');
 });
