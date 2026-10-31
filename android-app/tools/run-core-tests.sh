@@ -12,7 +12,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/host-stubs/org/json/JsonWriter.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentRef.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/AttachmentLogic.java" \
-  "$ROOT/app/src/main/java/com/abrar/daymark/IntegrationCatalog.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/CalendarEventDraft.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskShareText.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/SharedAttachmentPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ActivityCallbackGate.java" \
@@ -37,7 +37,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserExtension.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserAddress.java" \
-  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentLinkPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHistory.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLogPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserNetworkPolicy.java" \
@@ -51,6 +50,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserCookieImport.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/CosmeticFilterToCss.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TasksHomeLayoutPolicy.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentLinkPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterCore.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterRecoveryStore.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/PendingSaveTransaction.java" \
@@ -58,7 +58,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/StrictJsonParser.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubReleaseClient.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/updater/GitHubApkDownloader.java" \
-  "$ROOT/tools/IntegrationCatalogSmoke.java" \
   "$ROOT/tools/SharedAttachmentPolicySmoke.java" \
   "$ROOT/tools/TaskShareTextSmoke.java" \
   "$ROOT/tools/TaskLogicSmoke.java" \
@@ -78,7 +77,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/ActivityCallbackGateSmoke.java" \
   "$ROOT/tools/UpdaterSmoke.java" \
   "$ROOT/tools/GitHubTransportSmoke.java" \
-  "$ROOT/tools/BrowserIntentLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserAddressSmoke.java" \
   "$ROOT/tools/BrowserExternalLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserLogPolicySmoke.java" \
@@ -92,9 +90,10 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/ExtensionPackageParserSmoke.java" \
   "$ROOT/tools/BrowserCookieImportSmoke.java" \
   "$ROOT/tools/CosmeticFilterToCssSmoke.java" \
-  "$ROOT/tools/TasksHomeLayoutPolicySmoke.java"
+  "$ROOT/tools/TasksHomeLayoutPolicySmoke.java" \
+  "$ROOT/tools/BrowserIntentLinkPolicySmoke.java" \
+  "$ROOT/tools/CalendarEventDraftSmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.SharedAttachmentPolicySmoke
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.IntegrationCatalogSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskShareTextSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
@@ -114,7 +113,6 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExternalLinkPolicySmoke
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserLogPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserNetworkPolicySmoke "$ROOT/../contracts/browser-network-policy.tsv"
@@ -128,8 +126,9 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ExtensionPackageParserSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserCookieImportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CosmeticFilterToCssSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TasksHomeLayoutPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.CalendarEventDraftSmoke
 
-# Focus timer engine, lifecycle coordinator and encrypted snapshot codec.
 sh "$ROOT/tools/run-focus-timer-tests.sh"
 sh "$ROOT/tools/run-focus-session-coordinator-tests.sh"
 sh "$ROOT/tools/run-focus-timer-persistence-tests.sh"
