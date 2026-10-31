@@ -89,6 +89,20 @@ public final class BrowserLoadWatchdogSmoke {
         assert error.retries == 0 && error.failures == 0 && error.hints == 0
                 : "watchdog stage fired after load error";
 
+        // Renderer death is terminal: it fails immediately and invalidates every queued stage.
+        Events rendererGone = new Events();
+        watchdog = create(rendererGone);
+        watchdog.onLoadRequested(URL);
+        watchdog.onRendererGone(URL);
+        assert rendererGone.failures == 1 : "renderer death must immediately notify the recovery UI";
+        advance(30_000L);
+        assert rendererGone.failures == 1 : "renderer death must not emit a duplicate staged failure";
+        assert rendererGone.hints == 0 && rendererGone.retries == 0
+                : "stale hint/retry callbacks must not fire after renderer death";
+        assert watchdog.snapshotEvents().stream().noneMatch(event ->
+                event.contains("private/path") || event.contains("token="))
+                : "renderer-death diagnostics must not retain path or query secrets";
+
         // Explicit teardown/cancel must be terminal for the pending navigation.
         Events cancelled = new Events();
         watchdog = create(cancelled);
