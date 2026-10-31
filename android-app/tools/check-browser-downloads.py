@@ -31,7 +31,7 @@ for marker, explanation in (
     assert marker in method, explanation
 
 assert "showBrowserDownloadsDialog();" in activity, "the overflow Downloads action must open the download list"
-assert re.search(r"BrowserDownloadFilenamePolicy\\.sanitize\\(\\s*URLUtil\\.guessFileName\\(url,\\s*contentDisposition,\\s*mimeType\\)\\s*\\)", activity), \
+assert "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))" in re.sub(r"\\s+", "", activity), \
     "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
 assert "openDownloadsFolder()" not in activity, "Downloads must not be a generic document picker"
 assert "ACTION_OPEN_DOCUMENT" not in method, "the downloads list must not be implemented as a generic file picker"
