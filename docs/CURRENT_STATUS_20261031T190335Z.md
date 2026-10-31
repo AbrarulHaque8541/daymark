@@ -9,17 +9,34 @@ Autonomous engineering iteration 4: preserve literal plus in intent:// fallback 
 - Open PRs at startup: **none**.
 - Latest merged implementation PR audited: [#449](https://github.com/AbrarulHaque8541/daymark/pull/449), fallback-port validation.
 
-## Engineering finding
+## Engineering finding and change
 - `BrowserIntentLinkPolicy` used `URLDecoder.decode()`, which applies HTML form semantics and converts a raw `+` to a space.
 - Android Intent URI string metadata uses percent decoding; a literal plus should remain plus. A fallback like `https://example.com/a+b?q=x+y` could be silently altered to `https://example.com/a b?q=x y`.
-- Proposed focused fix: protect literal plus during percent decoding and add regression coverage for plus in both path and query.
-- Code PR: [pending creation for this snapshot; branch `fix/browser-intent-plus-preservation-20261031-1903`](https://github.com/AbrarulHaque8541/daymark/tree/fix/browser-intent-plus-preservation-20261031-1903).
+- Fix protects literal plus before percent-decoding `S.browser_fallback_url`; percent-encoded values still decode normally.
+- Added a host regression covering plus in both path and query.
+- PR: [#450](https://github.com/AbrarulHaque8541/daymark/pull/450)
+- Exact initial head: `0e9b078c120e609ce0d1e1a0d25f40e61cd22a48`.
+- Follow-up documentation-only head is being recorded; check runs are re-triggered by it.
+
+## Focused validation
+- Local Java 21 JShell reproduction of the exact decoder expression: **PASS**. Confirmed old expression changes `a+b?q=x+y` into `a b?q=x y`, while the fix preserves plus.
+- Regression test is wired into `android-app/tools/run-core-tests.sh` via `BrowserIntentLinkPolicySmoke`.
+- Canonical local `sh android-app/tools/check-v1-source.sh`: **NOT RUN** (connector runtime has no repo checkout/shell).
+- Local `npm test`: **NOT RUN** (same environment limitation).
+- Physical-device test: **NOT REQUIRED** for this pure-Java parser change; overall #160 remains NOT TESTED.
+
+## Exact-head CI (initial PR head)
+- Android CI run [41232545792](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545792): build **IN PROGRESS**.
+- Cross-platform contract run [41232545755](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545755): Windows **IN PROGRESS**, Ubuntu **QUEUED**.
+- Non-publishing QA APK run [41232545830](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545830): **IN PROGRESS**.
+- Device-test APK run [41232545761](https://github.com/AbrarulHaque8541/daymark/actions/runs/41232545761): **IN PROGRESS**.
+- Release asset workflow: **IN PROGRESS** but this is not a production release action; no release/tag created by this work. Confirm final conclusion before merge.
 
 ## Cross-agent audit evidence
 - Inspected PR #449 actual diff: `BrowserIntentLinkPolicy.java`, `BrowserIntentLinkPolicySmoke.java`, `check-browser-intent-links.py`, `run-core-tests.sh`, and status docs.
 - PR #449 exact head `4ee23a28625e35ece01561e08a82f3471461ad88`: Android build **PASS**; Ubuntu/Windows contracts **PASS**; device-test APK **PASS**; debug QA APK **PASS**; release workflow **SKIPPED**.
 - Review threads/reviews on #449: none.
-- No active open PR ownership conflict found at startup.
+- The implementation correctly centralizes fallback validation through `BrowserAddress.requireAllowedWebUrl()`; no omission found there. This iteration fixes the separate form-decoding defect in the same parser.
 
 ## Shared durable backlog
 ### P0 — [Issue #160: current-main Android runtime acceptance](https://github.com/AbrarulHaque8541/daymark/issues/160)
@@ -37,11 +54,8 @@ Autonomous engineering iteration 4: preserve literal plus in intent:// fallback 
 - Next: evidence-backed Linux/Windows shared-core + GUI test feasibility; separate HarmonyOS/OpenHarmony validation; no production rewrite before spike.
 
 ## Evidence and limits
-- Canonical local `sh android-app/tools/check-v1-source.sh`: **NOT RUN** in connector runtime (no repository checkout/shell).
-- Local `npm test`: **NOT RUN** for same environment limitation.
-- New PR exact-head CI: pending after PR creation.
-- Physical Android device acceptance: **NOT TESTED**.
 - No release/tag/version/signing/package-identity change or user-data mutation.
+- Physical Android device acceptance: **NOT TESTED**.
 
 Work by: ChatGPT
 Model: GPT-6
