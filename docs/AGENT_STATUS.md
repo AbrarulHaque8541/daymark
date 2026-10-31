@@ -5,6 +5,8 @@
 ## Latest reviewed snapshot
 
 
+- [Daymark status snapshot — 2026-10-31T23:32:00Z](./CURRENT_STATUS_20261031T233200Z.md)
+
 - [Daymark status snapshot — 2026-10-31T23:08:00Z](./CURRENT_STATUS_20261031T230800Z.md)
 
 - [Daymark status snapshot — 2026-10-31T22:25:26Z](./CURRENT_STATUS_20261031T222526Z.md)
@@ -19,30 +21,33 @@
 
 - [Daymark status snapshot — 2026-10-31T21:01:33Z](./CURRENT_STATUS_20261031T210133Z.md)
 
-- [Daymark status snapshot — 2026-10-31T19:57:19Z](./CURRENT_STATUS_20261031T195719Z.md)
+- [Daymark status snapshot — 2026-10-31T19:57:19Z](./CURRENT_STATUS_20261031T195719Z)
+
+
+- [Daymark status snapshot — 2026-10-31T22:05:35.954Z](./CURRENT_STATUS_20261031T220535Z)
+
 
 - [Daymark status snapshot — 2026-11-01T00:20:00Z](./CURRENT_STATUS_20261101T002000Z.md)
-- [Daymark status snapshot — 2026-10-31T19:03:35Z](./CURRENT_STATUS_20261031T190335Z.md)
-- [Daymark status snapshot — 2026-11-01T00:08:00Z](./CURRENT_STATUS_20261101T000800Z.md)
-- [Daymark status snapshot — 2026-10-31T18:30:41Z](./CURRENT_STATUS_20261031T183041Z.md)
-- [Daymark status snapshot — 2026-10-31T18:06:00Z](./CURRENT_STATUS_20261031T180600Z.md)
-- [Daymark status snapshot — 2026-10-31T17:45:00Z](./CURRENT_STATUS_20261031T174500Z.md)
-- [Daymark status snapshot — 2026-10-31T17:37:00Z](./CURRENT_STATUS_20261031T173700Z.md)
-- [Daymark status snapshot — 2026-10-31T15:59:20Z](./CURRENT_STATUS_20261031T155920Z.md)
-- [Daymark status snapshot — 2026-10-31T15:07:24.269Z](./CURRENT_STATUS_20261031T150724Z.md)
-- [Daymark status snapshot — 2026-10-31T14:35:15Z](./CURRENT_STATUS_20261031T143515Z.md)
-- [Daymark status snapshot — 2026-10-31T14:34:00Z](./CURRENT_STATUS_20261031T143400Z.md)
-- [Daymark status snapshot — 2026-10-31T14:19:18Z](./CURRENT_STATUS_20261031T141918Z.md)
-- [Daymark status snapshot — 2026-10-31T14:03:19Z](./CURRENT_STATUS_20261031T140319Z.md)
-- [Daymark status snapshot — 2026-10-31T13:45:00Z](./CURRENT_STATUS_20261031T134500Z.md)
-- [Daymark status snapshot — 2026-10-31T12:42:00Z](./CURRENT_STATUS_20261031T124200Z.md)
-- [Daymark status snapshot — 2026-10-31T08:05:31Z](./CURRENT_STATUS_20261031T080531Z.md)
-- [Daymark status snapshot — 2026-10-31T06:36:57Z](./CURRENT_STATUS_20261031T063657Z.md)
-- [Daymark status snapshot — 2026-10-31T05:46:46Z](./CURRENT_STATUS_20261031T054646Z.md)
-- [Daymark status snapshot — 2026-10-31T05:45:54Z](./CURRENT_STATUS_20261031T054554Z.md)
-- [Daymark status snapshot — 2026-10-31T03:41:00Z](./CURRENT_STATUS_20261031T034100Z.md)
-- [Daymark status snapshot — 2026-10-31T03:40:00Z](./CURRENT_STATUS_20261031T034000Z.md)
-- [Daymark status snapshot — 2026-10-31T03:39:00Z](./CURRENT_STATUS_20261031T033900Z.md)
+- [Daymark status snapshot — 2026-10-31T19:03:35Z](./CURRENT_STATUS_20261031T190335Z)
+- [Daymark status snapshot — 2026-11-01T00:08:00Z](./CURRENT_STATUS_20261101T000800Z)
+- [Daymark status snapshot — 2026-10-31T18:30:41Z](./CURRENT_STATUS_20261031T183041Z)
+- [Daymark status snapshot — 2026-10-31T18:06:00Z](./CURRENT_STATUS_20261031T180600Z)
+- [Daymark status snapshot — 2026-10-31T17:45:00Z](./CURRENT_STATUS_20261031T174500Z)
+- [Daymark status snapshot — 2026-10-31T17:37:00Z](./CURRENT_STATUS_20261031T173700Z)
+- [Daymark status snapshot — 2026-10-31T15:59:20Z](./CURRENT_STATUS_20261031T155920Z)
+- [Daymark status snapshot — 2026-10-31T15:07:24.269Z](./CURRENT_STATUS_20261031T150724Z)
+- [Daymark status snapshot — 2026-10-31T14:35:15Z](./CURRENT_STATUS_20261031T143515Z)
+- [Daymark status snapshot — 2026-10-31T14:34:00Z](./CURRENT_STATUS_20261031T143400Z)
+- [Daymark status snapshot — 2026-10-31T14:19:18Z](./CURRENT_STATUS_20261031T141918Z)
+- [Daymark status snapshot — 2026-10-31T14:03:19Z](./CURRENT_STATUS_20261031T140319Z)
+- [Daymark status snapshot — 2026-10-31T13:45:00Z](./CURRENT_STATUS_20261031T134500Z)
+- [Daymark status snapshot — 2026-10-31T12:42:00Z](./CURRENT_STATUS_20261031T124200Z)
+- [Daymark status snapshot — 2026-10-31T08:05:31Z](./CURRENT_STATUS_20261031T080531Z)
+- [Daymark status snapshot — 2026-10-31T05:46:46Z](./CURRENT_STATUS_20261031T054646Z)
+- [Daymark status snapshot — 2026-10-31T05:45:54Z](./CURRENT_STATUS_20261031T054554Z)
+- [Daymark status snapshot — 2026-10-31T03:41:00Z](./CURRENT_STATUS_20261031T034100Z)
+- [Daymark status snapshot — 2026-10-31T03:40:00Z](./CURRENT_STATUS_20261031T034000Z)
+- [Daymark status snapshot — 2026-10-31T03:39:00Z](./CURRENT_STATUS_20261031T033900Z)
 - [Daymark status snapshot — 2026-10-30T19:13:41.649Z](./CURRENT_STATUS_20261030T191341Z.md)
 - [Daymark status snapshot — 2026-10-30T11:59:44.268Z](./CURRENT_STATUS_20261030T1200Z.md)
 - [Daymark status snapshot — 2026-10-30T11:57:57.578Z](./CURRENT_STATUS_20261030T115757Z.md)
@@ -69,7 +74,7 @@
 
 1. Open the latest snapshot for context.
 2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
-3. If live evidence disagrees with the snapshot, trust live evidence, record the discrepancy, and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
+3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
 
 ## Snapshot maintenance
 
