@@ -50,12 +50,29 @@ function bootApp(storedValues, failWrites = new Set()) {
         querySelector: (child) => element(`${selector} ${child}`),
         focus() {},
         showModal() { this.open = true; },
-        close() { this.open = false; }
+        close() { this.open = false; },
+        click() { this.clicked = true; },
+        remove() {}
       };
       elements.set(selector, item);
     }
     return elements.get(selector);
   }
+
+  let lastBlob = null;
+  class MockBlob {
+    constructor(parts, options = {}) {
+      this.parts = parts;
+      this.type = options.type || '';
+    }
+  }
+  const mockURL = {
+    createObjectURL(blob) {
+      lastBlob = blob;
+      return 'blob:daymark-recovery-test';
+    },
+    revokeObjectURL() {}
+  };
 
   const localStorage = {
     getItem: (key) => storedValues.has(key) ? storedValues.get(key) : null,
@@ -69,6 +86,8 @@ function bootApp(storedValues, failWrites = new Set()) {
     hidden: false,
     querySelector: element,
     querySelectorAll: () => [],
+    createElement: () => element('#download-link'),
+    body: { appendChild() {} },
     addEventListener() {}
   };
   const window = {
@@ -84,12 +103,14 @@ function bootApp(storedValues, failWrites = new Set()) {
     document,
     localStorage,
     window,
+    Blob: MockBlob,
+    URL: mockURL,
     clearTimeout() {},
     setTimeout: () => 1,
     setInterval: () => 1
   }, { filename: 'app.js' });
 
-  return { elements };
+  return { elements, getLastBlob: () => lastBlob };
 }
 
 function validTask(id, title) {
@@ -225,4 +246,30 @@ test('failed recovery backup creation never overwrites the only original task pa
   const saved = JSON.parse(storedValues.get(STORAGE_KEY));
   assert.ok(saved.some((task) => task.title === 'First unsaved edit'));
   assert.ok(saved.some((task) => task.title === 'Retry after freeing storage'));
+});
+
+test('recovery backup toast exports the exact retained bytes for manual review', () => {
+  const opaque = '{older opaque recovery bytes';
+  const original = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([
+    [STORAGE_KEY, original],
+    [BACKUP_KEY, opaque]
+  ]);
+  const app = bootApp(storedValues);
+
+  const backupRaw = storedValues.get(BACKUP_KEY);
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'recovery toast exposes an export action');
+  assert.equal(action.textContent, 'Export recovery');
+
+  action.dispatch('click');
+  const link = app.elements.get('#download-link');
+  assert.equal(link.clicked, true, 'the browser download is triggered');
+  assert.equal(link.download, 'daymark-recovery-backup.txt');
+  assert.equal(link.href, 'blob:daymark-recovery-test');
+  assert.deepEqual(app.getLastBlob().parts, [backupRaw],
+    'export contains the exact retained recovery bundle bytes');
 });
