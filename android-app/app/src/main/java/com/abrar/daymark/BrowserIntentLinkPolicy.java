@@ -125,6 +125,17 @@ final class BrowserIntentLinkPolicy {
             throw new IllegalArgumentException("Android app link target is invalid.");
         }
 
+        String normalizedTarget = targetUri.toASCIIString();
+        // HTTP(S) targets share the browser navigation contract (ports, credentials, host).
+        if ("http".equals(scheme) || "https".equals(scheme)) {
+            try {
+                normalizedTarget = BrowserAddress.requireAllowedWebUrl(normalizedTarget);
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalArgumentException(
+                        "Android app link HTTP or HTTPS target must be a valid web address.", invalid);
+            }
+        }
+
         String fallback = values.get("S.browser_fallback_url");
         if (fallback != null) {
             try {
@@ -136,6 +147,6 @@ final class BrowserIntentLinkPolicy {
                         "Android app link fallback must be a valid HTTP or HTTPS web address.", invalid);
             }
         }
-        return new Decision(targetUri.toASCIIString(), packageName, fallback);
+        return new Decision(normalizedTarget, packageName, fallback);
     }
 }
