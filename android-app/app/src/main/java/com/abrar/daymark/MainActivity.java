@@ -3913,7 +3913,8 @@ public final class MainActivity extends Activity {
         }
         try {
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            String filename = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            String filename = BrowserDownloadFilenamePolicy.sanitize(
+                    URLUtil.guessFileName(url, contentDisposition, mimeType));
             request.setTitle(filename);
             request.setDescription("Daymark browser download");
             if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
