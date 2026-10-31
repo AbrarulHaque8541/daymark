@@ -11,12 +11,14 @@ const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
 function bootApp({ savedValue, failBackup = false }) {
   const elements = new Map();
+  const classSets = new Map();
   const storedValues = new Map([[STORAGE_KEY, savedValue]]);
 
   function element(selector) {
     if (!elements.has(selector)) {
       const attributes = new Map();
       const classes = new Set();
+      classSets.set(selector, classes);
       elements.set(selector, {
         textContent: '',
         value: '',
@@ -27,6 +29,7 @@ function bootApp({ savedValue, failBackup = false }) {
         classList: {
           add: (name) => classes.add(name),
           remove: (name) => classes.delete(name),
+          contains: (name) => classes.has(name),
           toggle: (name, force) => {
             const enabled = force === undefined ? !classes.has(name) : force;
             if (enabled) classes.add(name);
@@ -66,6 +69,8 @@ function bootApp({ savedValue, failBackup = false }) {
     addEventListener() {}
   };
 
+  element('#storage-status').classList.add('is-checking');
+
   vm.runInNewContext(APP_SOURCE, {
     Date,
     Intl,
@@ -79,7 +84,7 @@ function bootApp({ savedValue, failBackup = false }) {
     setInterval: () => 1
   }, { filename: 'app.js' });
 
-  return { elements, storedValues };
+  return { elements, storedValues, classSets };
 }
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
@@ -124,4 +129,18 @@ test('simultaneous reminders are summarized in one toast instead of overwriting 
   assert.match(toast, /Second reminder/);
   const savedTasks = JSON.parse(storedValues.get(STORAGE_KEY));
   assert.equal(savedTasks.filter((task) => typeof task.reminderShownFire === 'string').length, 2);
+});
+
+
+test('initial loading indicators clear only when the real app render and storage check finish', () => {
+  const { classSets } = bootApp({ savedValue: null });
+
+  assert.equal(classSets.get('#task-list').has('is-ready'), true,
+    'render marks the task list ready');
+  assert.equal(classSets.get('#storage-status').has('is-checking'), false,
+    'storage status update clears its checking indicator');
+
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.doesNotMatch(indexSource, /setTimeout\\(function \\(\\) \\{[\\s\\S]*?\\}, 120\\)/,
+    'index must not hide loading indicators after an arbitrary timeout');
 });
