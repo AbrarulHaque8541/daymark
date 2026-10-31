@@ -81,7 +81,7 @@ jobs:
           "$aapt" dump badging "$apk" > "$badging"
           package_name="$(sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p" "$badging")"
           version_code="$(sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p" "$badging")"
-          version_name="$(sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p" "$badging)"
+          version_name="$(sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p" "$badging")"
           min_sdk="$(sed -n "s/^sdkVersion:[[:space:]]*'\\([^']*\\)'.*/\\1/p" "$badging")"
           target_sdk="$(sed -n "s/^targetSdkVersion:[[:space:]]*'\\([^']*\\)'.*/\\1/p" "$badging")"
           [[ "$package_name" == "com.abrar.daymark" ]]
@@ -112,7 +112,7 @@ jobs:
             echo "- Min/target SDK: `$min_sdk` / `$target_sdk`"
             echo "- APK SHA-256: `$sha256`"
             echo
-            echo "**Safety:** this debug-signed APK is for manual QA. It cannot update an installed production-signed build in place. Do not uninstall Daymark or use it to test task-data migration.**
+            echo "**Safety:** this debug-signed APK is for manual QA. It cannot update an installed production-signed build in place. Do not uninstall Daymark or use it to test task-data migration."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload non-production APK and exact build metadata
