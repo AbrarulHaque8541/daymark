@@ -823,7 +823,8 @@
       const parsed = JSON.parse(raw);
       if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1'
           && Array.isArray(parsed.payloads)) {
-        return parsed.payloads.filter((payload) => typeof payload === 'string' && payload.length > 0);
+        const payloads = parsed.payloads.filter((payload) => typeof payload === 'string' && payload.length > 0);
+        return payloads.length > 0 ? payloads : [raw];
       }
     } catch (error) {
       // Legacy backups may be unreadable raw JSON; preserve them byte-for-byte.
