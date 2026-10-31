@@ -1,4 +1,5 @@
-set -eu
+#!/usr/bin/env sh
+successfully downloaded text file (SHA: bc6f25241ce82633d3101eb3e3896e9872c15ccd)set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BUILD_DIR=$(mktemp -d "daymark-core-tests.XXXXXX")
 trap 'rm -rf "$BUILD_DIR"' EXIT HUP INT TERM

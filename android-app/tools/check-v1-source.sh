@@ -1,4 +1,5 @@
-set -eu
+#!/usr/bin/env sh
+successfully downloaded text file (SHA: 532ec41a1eb005ad2059b90b663b6d5f95b9a922)set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
