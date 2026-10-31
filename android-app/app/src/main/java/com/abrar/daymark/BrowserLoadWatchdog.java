@@ -2,6 +2,7 @@ package com.abrar.daymark;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.util.ArrayDeque;
@@ -40,6 +41,10 @@ final class BrowserLoadWatchdog {
     }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    // Handler.removeCallbacks requires the same Runnable instance passed to postDelayed.
+    private final Runnable hintRunnable = this::fireHint;
+    private final Runnable retryRunnable = this::fireRetry;
+    private final Runnable failRunnable = this::fireFail;
     private final Deque<String> events = new ArrayDeque<>();
     private Listener listener;
     private BrowserSelfHealingPolicy healingPolicy;
@@ -74,29 +79,35 @@ final class BrowserLoadWatchdog {
     synchronized void onLoadRequested(String address, boolean resetHealingBudget) {
         cancelStages();
         pendingAddress = redact(address);
-        loadStartMs = System.currentTimeMillis();
+        loadStartMs = SystemClock.elapsedRealtime();
         hintFired = false;
         retryFired = false;
         failFired = false;
         record("load-requested: " + pendingAddress);
         Log.i(TAG, "load-requested: " + pendingAddress);
         if (resetHealingBudget && healingPolicy != null) healingPolicy.onUserNavigation(address);
-        handler.postDelayed(this::fireHint, STAGE_HINT_MS);
-        handler.postDelayed(this::fireRetry, STAGE_RETRY_MS);
-        handler.postDelayed(this::fireFail, STAGE_FAIL_MS);
+        if (!paused) {
+            handler.postDelayed(hintRunnable, STAGE_HINT_MS);
+            handler.postDelayed(retryRunnable, STAGE_RETRY_MS);
+            handler.postDelayed(failRunnable, STAGE_FAIL_MS);
+        }
     }
 
     /** Call from WebViewClient.onPageStarted. Cancels hint stage. */
     synchronized void onPageStarted(String url) {
         record("page-started: " + redact(url));
         Log.i(TAG, "page-started: " + redact(url));
-        handler.removeCallbacks(this::fireHint);
+        handler.removeCallbacks(hintRunnable);
         hintFired = true;
     }
 
     /** Call from WebViewClient.onPageFinished. Cancels all stages. */
     synchronized void onPageFinished(String url) {
         cancelStages();
+        pendingAddress = null;
+        hintFired = true;
+        retryFired = true;
+        failFired = true;
         record("page-finished: " + redact(url));
         Log.i(TAG, "page-finished: " + redact(url));
         if (healingPolicy != null) healingPolicy.onPageLoaded(url);
@@ -106,6 +117,10 @@ final class BrowserLoadWatchdog {
     /** Call from WebViewClient.onReceivedError. Cancels retry/fail stages, reports error. */
     synchronized void onReceivedError(String url, int errorCode, String description) {
         cancelStages();
+        pendingAddress = null;
+        hintFired = true;
+        retryFired = true;
+        failFired = true;
         String safeDesc = description == null ? "unknown" : description.replaceAll("[\r\n]", " ");
         record("load-error: " + redact(url) + " code=" + errorCode + " " + safeDesc);
         Log.w(TAG, "load-error: " + redact(url) + " code=" + errorCode + " " + safeDesc);
@@ -115,6 +130,8 @@ final class BrowserLoadWatchdog {
     /** Call when renderer dies. Triggers immediate fail with recovery option. */
     synchronized void onRendererGone(String url) {
         cancelStages();
+        pendingAddress = null;
+        failFired = true;
         record("renderer-gone: " + redact(url));
         Log.e(TAG, "renderer-gone: " + redact(url));
         if (listener != null) listener.onStageFail(url);
@@ -123,9 +140,9 @@ final class BrowserLoadWatchdog {
     /** Pause watchdog (Activity.onPause). Removes pending callbacks. */
     synchronized void pause() {
         paused = true;
-        handler.removeCallbacks(this::fireHint);
-        handler.removeCallbacks(this::fireRetry);
-        handler.removeCallbacks(this::fireFail);
+        handler.removeCallbacks(hintRunnable);
+        handler.removeCallbacks(retryRunnable);
+        handler.removeCallbacks(failRunnable);
         record("watchdog-paused");
     }
 
@@ -135,16 +152,16 @@ final class BrowserLoadWatchdog {
         paused = false;
         record("watchdog-resumed");
         if (pendingAddress != null && !failFired) {
-            long elapsed = System.currentTimeMillis() - loadStartMs;
+            long elapsed = SystemClock.elapsedRealtime() - loadStartMs;
             if (elapsed < STAGE_HINT_MS) {
-                handler.postDelayed(this::fireHint, STAGE_HINT_MS - elapsed);
-                handler.postDelayed(this::fireRetry, STAGE_RETRY_MS - elapsed);
-                handler.postDelayed(this::fireFail, STAGE_FAIL_MS - elapsed);
+                handler.postDelayed(hintRunnable, STAGE_HINT_MS - elapsed);
+                handler.postDelayed(retryRunnable, STAGE_RETRY_MS - elapsed);
+                handler.postDelayed(failRunnable, STAGE_FAIL_MS - elapsed);
             } else if (elapsed < STAGE_RETRY_MS) {
-                handler.postDelayed(this::fireRetry, STAGE_RETRY_MS - elapsed);
-                handler.postDelayed(this::fireFail, STAGE_FAIL_MS - elapsed);
+                handler.postDelayed(retryRunnable, STAGE_RETRY_MS - elapsed);
+                handler.postDelayed(failRunnable, STAGE_FAIL_MS - elapsed);
             } else if (elapsed < STAGE_FAIL_MS) {
-                handler.postDelayed(this::fireFail, STAGE_FAIL_MS - elapsed);
+                handler.postDelayed(failRunnable, STAGE_FAIL_MS - elapsed);
             }
         }
     }
@@ -166,35 +183,41 @@ final class BrowserLoadWatchdog {
     }
 
     private void fireHint() {
+        final String address;
         synchronized (this) {
             if (paused || hintFired || pendingAddress == null) return;
             hintFired = true;
-            record("watchdog-hint: " + pendingAddress);
-            Log.i(TAG, "watchdog-hint (5s): " + pendingAddress);
+            address = pendingAddress;
+            record("watchdog-hint: " + address);
+            Log.i(TAG, "watchdog-hint (5s): " + address);
         }
-        if (listener != null) listener.onStageHint(pendingAddress);
+        if (listener != null) listener.onStageHint(address);
     }
 
     private void fireRetry() {
+        final String address;
         synchronized (this) {
             if (paused || retryFired || failFired || pendingAddress == null) return;
             retryFired = true;
-            record("watchdog-retry: " + pendingAddress);
-            Log.i(TAG, "watchdog-retry (15s): " + pendingAddress);
+            address = pendingAddress;
+            record("watchdog-retry: " + address);
+            Log.i(TAG, "watchdog-retry (15s): " + address);
         }
         // The listener decides recovery via BrowserSelfHealingPolicy.shouldRecover with the
         // full URL; this class only carries the redacted origin, which must not reset the budget.
-        if (listener != null) listener.onStageRetry(pendingAddress);
+        if (listener != null) listener.onStageRetry(address);
     }
 
     private void fireFail() {
+        final String address;
         synchronized (this) {
             if (paused || failFired || pendingAddress == null) return;
             failFired = true;
-            record("watchdog-fail: " + pendingAddress);
-            Log.e(TAG, "watchdog-fail (25s): " + pendingAddress + " — page did not open");
+            address = pendingAddress;
+            record("watchdog-fail: " + address);
+            Log.e(TAG, "watchdog-fail (25s): " + address + " — page did not open");
         }
-        if (listener != null) listener.onStageFail(pendingAddress);
+        if (listener != null) listener.onStageFail(address);
     }
 
     private void cancelStages() {
