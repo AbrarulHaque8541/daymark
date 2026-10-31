@@ -19,6 +19,24 @@ final class BrowserWorkspaceController {
         target.getSettings().setBlockNetworkLoads(false);
     }
 
+    /**
+     * Unblocks every retained tab at an explicit, validated user-navigation boundary.
+     * {@link #enforceOffline} blocks ALL tabs when going Offline; without this counterpart
+     * a background tab stays blocked after an offline→online cycle and silently drops
+     * every load with no WebView callback (#221).
+     */
+    static void prepareTabsForExplicitNavigation(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
+        if (policy == null || !policy.allowsRemoteLoads() || tabs == null) return;
+        for (DaymarkWebView tab : tabs) {
+            if (tab == null) continue;
+            try {
+                tab.getSettings().setBlockNetworkLoads(false);
+            } catch (RuntimeException rendererUnavailable) {
+                // A crashed renderer is recovered via onRenderProcessGone.
+            }
+        }
+    }
+
     static void enforceOffline(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
         if (policy == null || policy.allowsRemoteLoads() || tabs == null) return;
         for (DaymarkWebView tab : tabs) {

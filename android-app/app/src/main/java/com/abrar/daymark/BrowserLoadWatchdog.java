@@ -63,6 +63,15 @@ final class BrowserLoadWatchdog {
 
     /** Call when a new loadUrl is issued. Arms all three watchdog stages. */
     synchronized void onLoadRequested(String address) {
+        onLoadRequested(address, true);
+    }
+
+    /**
+     * Same as {@link #onLoadRequested(String)}, but can skip resetting the self-healing
+     * budget. Re-arms after an auto-retry must NOT refresh the budget, otherwise the
+     * bounded one-retry guarantee becomes an unbounded reload loop.
+     */
+    synchronized void onLoadRequested(String address, boolean resetHealingBudget) {
         cancelStages();
         pendingAddress = redact(address);
         loadStartMs = System.currentTimeMillis();
@@ -71,7 +80,7 @@ final class BrowserLoadWatchdog {
         failFired = false;
         record("load-requested: " + pendingAddress);
         Log.i(TAG, "load-requested: " + pendingAddress);
-        if (healingPolicy != null) healingPolicy.onUserNavigation(address);
+        if (resetHealingBudget && healingPolicy != null) healingPolicy.onUserNavigation(address);
         handler.postDelayed(this::fireHint, STAGE_HINT_MS);
         handler.postDelayed(this::fireRetry, STAGE_RETRY_MS);
         handler.postDelayed(this::fireFail, STAGE_FAIL_MS);
@@ -150,6 +159,12 @@ final class BrowserLoadWatchdog {
         events.clear();
     }
 
+    /** Cancels all pending stages without touching the paused flag (teardown / re-arm). */
+    synchronized void cancel() {
+        cancelStages();
+        pendingAddress = null;
+    }
+
     private void fireHint() {
         synchronized (this) {
             if (paused || hintFired || pendingAddress == null) return;
@@ -164,11 +179,12 @@ final class BrowserLoadWatchdog {
         synchronized (this) {
             if (paused || retryFired || failFired || pendingAddress == null) return;
             retryFired = true;
-            boolean canRecover = healingPolicy != null && healingPolicy.shouldRecover(pendingAddress);
-            record("watchdog-retry: " + pendingAddress + " auto=" + canRecover);
-            Log.i(TAG, "watchdog-retry (15s): " + pendingAddress + " auto-recover=" + canRecover);
-            if (listener != null) listener.onStageRetry(pendingAddress);
+            record("watchdog-retry: " + pendingAddress);
+            Log.i(TAG, "watchdog-retry (15s): " + pendingAddress);
         }
+        // The listener decides recovery via BrowserSelfHealingPolicy.shouldRecover with the
+        // full URL; this class only carries the redacted origin, which must not reset the budget.
+        if (listener != null) listener.onStageRetry(pendingAddress);
     }
 
     private void fireFail() {

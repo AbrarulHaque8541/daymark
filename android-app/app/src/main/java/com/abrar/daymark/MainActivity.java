@@ -355,6 +355,7 @@ public final class MainActivity extends Activity {
     private String browserLastSearchQuery = "";
     private String lastBrowserAddress;
     private Runnable browserLoadWatchdog;
+    private BrowserLoadWatchdog stagedLoadWatchdog;
     private boolean browserLoadFailed;
     private String browserAddressNoticeId;
     private long browserAddressNoticeSequence;
@@ -1008,6 +1009,7 @@ public final class MainActivity extends Activity {
             if (browserWebView.getUrl() != null) lastBrowserAddress = browserWebView.getUrl();
             persistLastBrowserAddress();
             cancelBrowserLoadWatchdog();
+            if (stagedLoadWatchdog != null) stagedLoadWatchdog.pause();
             Log.i(BROWSER_LOG_TAG, "backgrounded; pausing WebView session: "
                     + BrowserLogPolicy.redactedOrigin(lastBrowserAddress));
             for (DaymarkWebView tab : new ArrayList<>(browserTabs)) {
@@ -1835,14 +1837,17 @@ public final class MainActivity extends Activity {
         browserAddressInput.setContentDescription("Browser address and search field");
         top.addView(browserAddressInput, new LinearLayout.LayoutParams(0, dp(42), 1f));
 
-        // Hidden 1x1 placeholder: hardware/IME Enter already navigates via the editor
-        // action listener above. Never reuse the composer's webGoButton field here —
-        // reassigning it orphaned the composer's Go button reference (build order dependent).
+        // Visible Go button: IME Enter navigates via the editor action listener above, but
+        // keyboards that send no action/KeyEvent would otherwise have no visible trigger
+        // (#221). Never reuse the composer's webGoButton field here — reassigning it
+        // orphaned the composer's Go button reference (build order dependent).
         Button browserGoButton = primaryButton("Go");
         browserGoButton.setContentDescription("Open the entered web address or search");
         browserGoButton.setOnClickListener(v -> navigateFromBrowserInput());
-        browserGoButton.setVisibility(View.GONE);
-        top.addView(browserGoButton, new LinearLayout.LayoutParams(dp(1), dp(1)));
+        LinearLayout.LayoutParams goParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(42));
+        goParams.leftMargin = dp(5);
+        top.addView(browserGoButton, goParams);
 
         browserProviderPickerButton = compactButton(searchEngine.label + " ▾", false);
         browserProviderPickerButton.setTextSize(11 * textScale);
@@ -2436,6 +2441,9 @@ public final class MainActivity extends Activity {
         }
         try {
             BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
+            // Unblock every retained tab too: enforceOffline() blocks all of them, and a
+            // background tab left blocked would silently drop loads with no callback (#221).
+            BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
             browserWebView.onResume();
             browserWebView.resumeTimers();
         } catch (SecurityException denied) {
@@ -2516,47 +2524,67 @@ public final class MainActivity extends Activity {
 
     private void scheduleBrowserLoadWatchdog(String address) {
         cancelBrowserLoadWatchdog();
-        final long loadGeneration = browserNavigationGeneration;
-        browserLoadWatchdog = activityCallbackGate.guard(() -> {
-            if (!isActivityCallbackCurrent() || loadGeneration != browserNavigationGeneration) return;
-            browserLoadWatchdog = null;
-            Log.e(BROWSER_LOG_TAG, "page did not finish within timeout: "
-                    + BrowserLogPolicy.redactedOrigin(address));
-            browserDiagnostics.record(System.currentTimeMillis(), "watchdog timeout (no page callback)", address, null);
-            if (browserNetworkPolicy.allowsRemoteLoads()
-                    && browserWebView != null
-                    && BrowserAddress.isAllowedWebUrl(address)
-                    && browserSelfHealingPolicy.shouldRecover(address)) {
-                Log.w(BROWSER_LOG_TAG, "attempting one automatic recovery for stalled page");
-                browserDiagnostics.record(System.currentTimeMillis(), "automatic recovery retry", address, null);
-                StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_ATTEMPTED, null);
-                showBrowserStatus("Page stalled. Daymark is retrying once...");
-                try {
-                    browserWebView.stopLoading();
-                    scheduleBrowserLoadWatchdog(address);
-                    browserWebView.loadUrl(address);
-                    return;
-                } catch (RuntimeException failure) {
-                    cancelBrowserLoadWatchdog();
-                    StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_RETRY_FAILED, failure);
+        if (stagedLoadWatchdog == null) {
+            stagedLoadWatchdog = new BrowserLoadWatchdog();
+            stagedLoadWatchdog.setHealingPolicy(browserSelfHealingPolicy);
+            stagedLoadWatchdog.setListener(new BrowserLoadWatchdog.Listener() {
+                @Override public void onStageHint(String stageAddress) {
+                    if (!isActivityCallbackCurrent()) return;
+                    showBrowserStatus("Still opening…");
                 }
-            }
-            StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
-            browserDiagnostics.record(System.currentTimeMillis(), "watchdog exhausted; automatic retry budget spent", address, null);
-            if (browserWebView != null) browserWebView.stopLoading();
-            browserPageLoading = false;
-            browserLoadFailed = true;
-            showBrowserRetryNotice("load-timeout", "Page load timed out",
-                    "The page did not finish loading. You can retry the current HTTPS address.");
-            showBrowserStatus("Load Timeout: Check WebView version or Retry");
-        });
-        mainHandler.postDelayed(browserLoadWatchdog, BROWSER_LOAD_WATCHDOG_MS);
+                @Override public void onStageRetry(String stageAddress) {
+                    if (!isActivityCallbackCurrent()) return;
+                    String address = BrowserAddress.isAllowedWebUrl(lastBrowserAddress)
+                            ? lastBrowserAddress : stageAddress;
+                    if (browserNetworkPolicy.allowsRemoteLoads() && browserWebView != null
+                            && browserSelfHealingPolicy.shouldRecover(address)) {
+                        Log.w(BROWSER_LOG_TAG, "attempting one automatic recovery for stalled page");
+                        browserDiagnostics.record(System.currentTimeMillis(), "automatic recovery retry", address, null);
+                        StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_ATTEMPTED, null);
+                        showBrowserStatus("Page stalled. Daymark is retrying once...");
+                        try {
+                            browserWebView.stopLoading();
+                            browserWebView.loadUrl(address);
+                            // Re-arm without refreshing the recovery budget (bounded one retry).
+                            stagedLoadWatchdog.onLoadRequested(address, false);
+                            return;
+                        } catch (RuntimeException failure) {
+                            StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_RETRY_FAILED, failure);
+                        }
+                    }
+                    StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
+                    browserPageLoading = false;
+                    browserLoadFailed = true;
+                    showBrowserStatus("Page is taking too long. Tap Retry to try again.");
+                }
+                @Override public void onStageFail(String stageAddress) {
+                    if (!isActivityCallbackCurrent()) return;
+                    Log.e(BROWSER_LOG_TAG, "page did not finish within timeout: "
+                            + BrowserLogPolicy.redactedOrigin(stageAddress));
+                    browserDiagnostics.record(System.currentTimeMillis(), "watchdog timeout (no page callback)", stageAddress, null);
+                    if (browserWebView != null) browserWebView.stopLoading();
+                    browserPageLoading = false;
+                    browserLoadFailed = true;
+                    showBrowserRetryNotice("load-timeout", "Page load timed out",
+                            "The page did not finish loading. You can retry the current HTTPS address.");
+                    showBrowserStatus("Load Timeout: Check WebView version or Retry");
+                }
+                @Override public void onLoadStarted(String stageAddress) { }
+                @Override public void onLoadFinished(String stageAddress) { }
+                @Override public void onLoadError(String stageAddress, int errorCode, String description) { }
+            });
+        }
+        // Never reset the self-healing budget on (re-)arm: user navigations reset it in
+        // navigateBrowserTo; page-start/resume/retry re-arms must not refresh it.
+        stagedLoadWatchdog.onLoadRequested(address, false);
     }
 
     private void cancelBrowserLoadWatchdog() {
-        if (browserLoadWatchdog == null) return;
-        mainHandler.removeCallbacks(browserLoadWatchdog);
-        browserLoadWatchdog = null;
+        if (browserLoadWatchdog != null) {
+            mainHandler.removeCallbacks(browserLoadWatchdog);
+            browserLoadWatchdog = null;
+        }
+        if (stagedLoadWatchdog != null) stagedLoadWatchdog.cancel();
     }
 
     private void setBrowserChromeHidden(boolean hidden) {
@@ -2629,6 +2657,7 @@ public final class MainActivity extends Activity {
                 resolveBrowserAddressNotice();
                 browserSelfHealingPolicy.onPageLoaded(url);
                 cancelBrowserLoadWatchdog();
+                if (stagedLoadWatchdog != null) stagedLoadWatchdog.onPageFinished(url);
                 browserPageLoading = false;
                 browserLoadFailed = false;
                 Log.i(BROWSER_LOG_TAG, "page finished: " + BrowserLogPolicy.redactedOrigin(url));
@@ -2685,6 +2714,7 @@ public final class MainActivity extends Activity {
             @Override public void onLoadError(int errorCode, String description, String failingUrl) {
                 if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
                 cancelBrowserLoadWatchdog();
+                if (stagedLoadWatchdog != null) stagedLoadWatchdog.onReceivedError(failingUrl, errorCode, description);
                 browserPageLoading = false;
                 browserLoadFailed = true;
                 if (errorCode == -1) {
@@ -2923,6 +2953,9 @@ public final class MainActivity extends Activity {
             else exitBrowserFullscreen();
         }
         browserWebView = tab;
+        // Re-assert the unblock for the shown tab: tabs blocked by an earlier Offline
+        // transition must not silently drop loads after switching (#221).
+        BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
         browserLastSearchQuery = browserTabQueries.getOrDefault(tab, "");
         boolean hasPage = tab.getUrl() != null && !tab.getUrl().isEmpty();
         for (DaymarkWebView openTab : browserTabs) {
@@ -9279,6 +9312,7 @@ public final class MainActivity extends Activity {
         }
     }
 }
+
 
 
 
