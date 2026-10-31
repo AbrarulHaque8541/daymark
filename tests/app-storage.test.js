@@ -141,6 +141,6 @@ test('initial loading indicators clear only when the real app render and storage
     'storage status update clears its checking indicator');
 
   const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.doesNotMatch(indexSource, /setTimeout\\(function \\(\\) \\{[\\s\\S]*?\\}, 120\\)/,
+  assert.equal(indexSource.includes('}, 120);'), false,
     'index must not hide loading indicators after an arbitrary timeout');
 });
