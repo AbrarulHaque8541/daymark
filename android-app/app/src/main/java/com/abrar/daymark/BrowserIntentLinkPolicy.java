@@ -72,7 +72,8 @@ final class BrowserIntentLinkPolicy {
                 if (values.containsKey(key)) throw new IllegalArgumentException("Android app link contains duplicate metadata.");
                 String decoded;
                 try {
-                    decoded = URLDecoder.decode(raw, StandardCharsets.UTF_8.name());
+                    // Android Intent URI metadata uses percent escapes, not form encoding: preserve literal '+'.
+                    decoded = URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8.name());
                 } catch (Exception invalid) {
                     throw new IllegalArgumentException("Android app link metadata encoding is invalid.", invalid);
                 }
