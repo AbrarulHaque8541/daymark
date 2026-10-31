@@ -27,4 +27,8 @@ assert "Intent.parseUri(" not in webview, "untrusted serialized Intent objects m
 assert "BrowserIntentLinkPolicySmoke.java" in runner
 assert "BrowserIntentLinkPolicy.java" in runner
 assert test.is_file()
+
+for resolver_token in ('if ("intent".equalsIgnoreCase(scheme)) return handleIntentLink(view, url);',
+                       'resolveActivity(external', 'Intent.createChooser('):
+    assert resolver_token in webview, f"intent link resolver wiring missing {resolver_token}"
 print("PASS safe Android intent link source guard")

@@ -73,7 +73,7 @@ final class DaymarkWebView extends WebView {
                     .resolveActivity(external, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
             if (resolved == null) throw new android.content.ActivityNotFoundException();
             view.getContext().startActivity(android.content.Intent.createChooser(
-                    external, "Open with — cancel to stay in Daymark"));
+                    external, "Open with \u2014 cancel to stay in Daymark"));
             return true;
         } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
             String fallback = decision.fallbackUrl;
@@ -147,6 +147,7 @@ final class DaymarkWebView extends WebView {
     DaymarkWebView(Activity activity, BrowserNetworkPolicy networkPolicy,
                    boolean safeBrowsingEnabled, Listener listener) {
         super(activity);
+        this.listener = listener;        super(activity);
         this.networkPolicy = networkPolicy;
         this.listener = listener;
         this.extensionRuntime = ExtensionRuntime.create(activity);
