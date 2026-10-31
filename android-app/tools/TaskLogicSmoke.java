@@ -465,6 +465,44 @@ public final class TaskLogicSmoke {
                         && "2026-10-12".equals(TaskLogic.nextDueDate("2026-10-05", TaskLogic.REPEAT_WEEKLY))
                         && "2026-11-05".equals(TaskLogic.nextDueDate("2026-10-05", TaskLogic.REPEAT_MONTHLY)),
                 "repeat rules compute the next occurrence date");
+
+        check(TaskLogic.isRepeatRule(TaskLogic.REPEAT_WEEKDAYS) && TaskLogic.isRepeatRule(TaskLogic.REPEAT_YEARLY),
+                "weekday and yearly repeat rules are recognized");
+        Task weekdaysTask = TaskLogic.create("Weekday standup", "2026-10-30", "medium", "",
+                null, null, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        check(TaskLogic.isValid(weekdaysTask) && TaskLogic.REPEAT_WEEKDAYS.equals(weekdaysTask.repeatRule)
+                        && weekdaysTask.repeatDayOfMonth == null,
+                "a weekday repeat creates a valid task without a monthly anchor");
+        // 2026-10-30 is a Friday: the next weekday occurrence is Monday 2026-11-02.
+        check("2026-11-02".equals(TaskLogic.nextDueDate("2026-10-30", TaskLogic.REPEAT_WEEKDAYS, null)),
+                "weekday repeat from a Friday lands on the next Monday");
+        check("2026-10-30".equals(TaskLogic.nextDueDate("2026-10-29", TaskLogic.REPEAT_WEEKDAYS, null))
+                        && "2026-11-02".equals(TaskLogic.nextDueDate("2026-10-31", TaskLogic.REPEAT_WEEKDAYS, null))
+                        && "2026-11-02".equals(TaskLogic.nextDueDate("2026-11-01", TaskLogic.REPEAT_WEEKDAYS, null)),
+                "weekday repeat lands on the next weekday from Thursday, Saturday, and Sunday");
+        Task weekdaysPast = TaskLogic.create("Weekday standup past", "2026-10-02", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        check("2026-10-09".equals(TaskLogic.advanceRepeat(weekdaysPast, zone, now).dueDate),
+                "weekday repeat rolls forward across missed weekdays and weekends to Friday");
+        Task yearlyTask = TaskLogic.create("Yearly review", "2025-10-05", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_YEARLY);
+        check(TaskLogic.isValid(yearlyTask) && TaskLogic.REPEAT_YEARLY.equals(yearlyTask.repeatRule),
+                "a yearly repeat creates a valid task");
+        check("2027-10-05".equals(TaskLogic.nextDueDate("2026-10-05", TaskLogic.REPEAT_YEARLY, null))
+                        && "2025-02-28".equals(TaskLogic.nextDueDate("2024-02-29", TaskLogic.REPEAT_YEARLY, null))
+                        && "2028-02-28".equals(TaskLogic.nextDueDate("2027-02-28", TaskLogic.REPEAT_YEARLY, null)),
+                "yearly repeat keeps month and day and clamps Feb 29 in short years");
+        Task yearlyAdvanced = TaskLogic.advanceRepeat(yearlyTask, zone, now);
+        check("2027-10-05".equals(yearlyAdvanced.dueDate),
+                "yearly repeat skips the occurrence that just passed and lands a year later");
+        Task persistedWeekdaysAnchor = task("bad-weekdays-anchor", "Bad", null, "medium", false, 43)
+                .withFullDetails("Bad", "", "2026-10-05", null, "medium", null, TaskLogic.REPEAT_WEEKDAYS,
+                        Collections.<Subtask>emptyList(), Integer.valueOf(5), "2026-10-05T00:00:43Z");
+        check(!TaskLogic.isValid(persistedWeekdaysAnchor),
+                "persisted weekday repeat with a monthly anchor fails validation");
+        expectIllegalArgument(() -> TaskLogic.create("Weekday without date", null, "medium", "",
+                null, null, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS),
+                "weekday repeat without a due date is rejected");
     }
 
     private static Task task(String id, String title, String dueDate, String priority, boolean completed, int second) {
@@ -487,3 +525,4 @@ public final class TaskLogicSmoke {
         }
     }
 }
+
