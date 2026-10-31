@@ -42,12 +42,16 @@ public final class BrowserLoadWatchdogSmoke {
         // Success must cancel every queued stage, not merely the same-looking method reference.
         Events success = new Events();
         BrowserLoadWatchdog watchdog = create(success);
+        assert "Opening\u2026".equals(watchdog.currentStatus()) == false : "idle before load";
         watchdog.onLoadRequested(URL);
+        assert "Opening\u2026".equals(watchdog.currentStatus()) : "status after request";
         advance(5_000L);
         assert success.hints == 1 : "5s hint must fire once";
+        assert "Still opening\u2026".equals(watchdog.currentStatus()) : "status after hint";
         assert "https://example.com".equals(success.lastAddress) : "diagnostics must redact path/query";
         watchdog.onPageStarted(URL);
         watchdog.onPageFinished(URL);
+        assert watchdog.currentStatus() == null : "status cleared on finish";
         advance(30_000L);
         assert success.finished == 1 : "successful load callback missing";
         assert success.retries == 0 : "stale retry fired after page finish";
@@ -63,6 +67,7 @@ public final class BrowserLoadWatchdogSmoke {
         assert error.errors == 1 : "load error callback missing";
         assert error.retries == 0 && error.failures == 0 && error.hints == 0
                 : "watchdog stage fired after load error";
+        assert watchdog.currentStatus() == null : "status cleared on error";
 
         // Explicit teardown/cancel must be terminal for the pending navigation.
         Events cancelled = new Events();
@@ -72,6 +77,7 @@ public final class BrowserLoadWatchdogSmoke {
         advance(30_000L);
         assert cancelled.hints == 0 && cancelled.retries == 0 && cancelled.failures == 0
                 : "watchdog callback fired after cancel";
+        assert watchdog.currentStatus() == null : "status cleared on cancel";
 
         // Pause/resume uses monotonic elapsed time and re-arms only remaining stages.
         Events lifecycle = new Events();
@@ -83,9 +89,11 @@ public final class BrowserLoadWatchdogSmoke {
         watchdog.resume();
         Handler.dispatchDueTasks();
         assert lifecycle.retries == 1 : "retry stage must resume after its elapsed deadline";
+        assert "Still opening\u2026 (retrying)".equals(watchdog.currentStatus()) : "status after retry";
         advance(9_000L);
         assert lifecycle.failures == 1 : "fail stage must resume at the original elapsed deadline";
+        assert watchdog.currentStatus() == null : "status cleared on fail";
 
-        System.out.println("PASS BrowserLoadWatchdogSmoke: terminal cancellation, error, cancel, pause/resume");
+        System.out.println("PASS BrowserLoadWatchdogSmoke: terminal cancellation, error, cancel, pause/resume, status");
     }
 }
