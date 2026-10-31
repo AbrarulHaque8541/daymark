@@ -15,4 +15,15 @@ assert "setOnScrollChangeListener" in activity and "setTaskChromeHidden(true)" i
 assert "ScrollThemeColor.java" in core and "ScrollThemeColorSmoke.java" in core, "core test script must compile helper and smoke test"
 assert "com.abrar.daymark.ScrollThemeColorSmoke" in core, "core test script must execute the smoke test"
 assert "check-scroll-theme.py" in source_guard, "canonical source checks must run the scroll theme guard"
+# The standalone motion/accessibility layer must actually be loaded by the web prototype.
+web_root = root.parent
+index_html = (web_root / "index.html").read_text(encoding="utf-8")
+motion_css_path = web_root / "styles-motion-efficiency.css"
+assert motion_css_path.is_file(), "motion efficiency stylesheet is missing"
+assert 'href="styles-motion-efficiency.css"' in index_html, "index.html must load motion efficiency stylesheet after styles.css"
+motion_css = motion_css_path.read_text(encoding="utf-8")
+assert "@media (prefers-reduced-motion: reduce)" in motion_css, "motion layer must honor reduced motion"
+assert "content-visibility: auto" in motion_css, "motion layer must retain list rendering optimization"
+assert "touch-action: manipulation" in motion_css, "motion layer must retain responsive tap behavior"
+
 print("PASS scroll theme wiring and regression guard")

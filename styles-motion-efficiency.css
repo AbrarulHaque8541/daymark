@@ -1,0 +1,67 @@
+/* Daymark motion + tap efficiency layer.
+ * Loaded after styles.css. Does not change palette, layout structure, or glass design.
+ * Goals: instant press confirmation, battery-aware reduced motion, faster long lists.
+ */
+
+/* Battery + a11y: honor reduced motion; kill decorative infinite loops. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .status-dot,
+  .empty-illustration,
+  .sparkle {
+    animation: none !important;
+  }
+  .task-row:hover,
+  .button-primary:hover,
+  .button-quiet:hover,
+  .tool-button:hover,
+  .icon-button:hover,
+  .suggestion-item:hover,
+  .tag-pill:hover,
+  .date-chip:hover {
+    transform: none !important;
+  }
+}
+
+/* Instant press feedback — same spring language, no cartoon bounce. */
+.button:active,
+.tool-button:active,
+.icon-button:active,
+.filter-button:active,
+.date-chip:active,
+.tag-pill:active,
+.clear-completed:active {
+  transform: translateY(1px) scale(.985);
+}
+.complete-button:active {
+  transform: scale(.92);
+}
+.task-row:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(24, 40, 48, .05);
+}
+
+/* Faster first paint on lists; avoids layout thrash on long task lists. */
+.task-list {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
+}
+.task-row {
+  contain: layout style;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.button,
+.tool-button,
+.icon-button,
+.filter-button,
+.date-chip,
+.complete-button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
