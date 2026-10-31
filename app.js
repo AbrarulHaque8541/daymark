@@ -100,18 +100,38 @@
         return parsed.payloads.filter((payload) => typeof payload === 'string');
       }
     } catch (error) {
-      // Unrecognized/malformed backups are not treated as partial task arrays.
+      // An opaque/malformed backup may itself be the only surviving copy of
+      // older data. Preserve its exact bytes when a new damaged payload arrives.
     }
-    return [];
+    return [raw];
+  }
+
+  function isHealthyTaskPayload(raw) {
+    if (typeof raw !== 'string' || !raw) return false;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount === 0;
+    } catch (error) {
+      return false;
+    }
   }
 
   function backUpRawPayload(raw) {
     try {
       const existing = localStorage.getItem(BACKUP_KEY);
       const existingPayloads = recoveryBackupPayloads(existing);
-      if (existingPayloads.some(isPartialRecoveryPayload)) {
-        // Keep every earlier recovery source when another damaged/partially
-        // invalid primary payload needs backup. De-duplicate repeated reloads.
+      const existingParsed = (() => {
+        try { return JSON.parse(existing); } catch (error) { return null; }
+      })();
+      const existingIsBundle = Boolean(existingParsed
+        && existingParsed.format === 'daymark-recovery-bundle-v1'
+        && Array.isArray(existingParsed.payloads));
+      const preserveExisting = existingPayloads.length > 0
+        && (existingIsBundle || !isHealthyTaskPayload(existing));
+      if (preserveExisting) {
+        // A recovery bundle, partial payload, or opaque prior backup may hold
+        // unique user data. Merge it with the newly rejected original rather
+        // than replacing it. Healthy task-array backups remain stale.
         const payloads = Array.from(new Set([...existingPayloads, raw]));
         localStorage.setItem(BACKUP_KEY, JSON.stringify({
           format: 'daymark-recovery-bundle-v1',
