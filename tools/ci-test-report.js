@@ -1,9 +1,9 @@
 'use strict';
 
 // TEMPORARY CI DIAGNOSTIC (to be reverted): runs the real `node --test` suite
-// with the spec reporter and mirrors every failing test as a GitHub Actions
-// `::error` annotation, so failures are readable via the check-runs API without
-// needing job-log access. Also reports the runner environment.
+// with the spec reporter and mirrors failing tests as GitHub Actions `::error`
+// annotations, so failures are readable via the check-runs API without job-log
+// access. Also reports the runner environment.
 
 const { spawnSync } = require('node:child_process');
 
@@ -16,20 +16,26 @@ const res = spawnSync(
 const out = `${res.stdout || ''}\n${res.stderr || ''}`;
 process.stdout.write(out);
 
-console.log(`::error title=CI diagnostic environment::platform=${process.platform} arch=${process.arch} node=${process.version} tz=${process.env.TZ || '(unset)'} local=${new Date().toString()} utc=${new Date().toISOString()}`);
+const clean = (s) => s.replace(/[^\x20-\x7E]/g, '?').replace(/\s+/g, ' ').trim().slice(0, 280);
 
+console.log(`::error title=CI diagnostic environment::platform=${process.platform} arch=${process.arch} node=${process.version} tz=${process.env.TZ || '(unset)'} utc=${new Date().toISOString()} exit=${res.status}`);
+
+const rawLines = out.split(/\r?\n/);
 let currentFile = '(unknown file)';
-for (const rawLine of out.split(/\r?\n/)) {
-  const line = rawLine.replace(/[^\x20-\x7E]/g, '?');
-  const fileMatch = line.match(/(?:^|\s)((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:test|spec)\.[cm]?js)\s*$/);
-  if (fileMatch && !/^(✔|✖|▶|not ok|ok)/.test(line.trim())) {
-    currentFile = fileMatch[1];
-    continue;
-  }
-  if (/^\s*(✖|not ok)\b/.test(line)) {
-    const clean = line.trim().slice(0, 300);
-    console.log(`::error title=Failing test (${currentFile})::${clean}`);
-  }
+const failures = [];
+for (const raw of rawLines) {
+  const fileMatch = raw.match(/((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:test|spec)\.[cm]?js)/);
+  if (fileMatch) currentFile = fileMatch[1];
+  if (/✖|not ok/.test(raw)) failures.push(`[${currentFile}] ${clean(raw)}`);
+}
+
+if (failures.length === 0 && res.status !== 0) {
+  // No parsed test failure: dump the tail so the load error is visible.
+  for (const raw of rawLines.slice(-12)) failures.push(`[tail] ${clean(raw)}`);
+}
+
+for (const f of failures.slice(0, 8)) {
+  console.log(`::error title=Failing test::${f}`);
 }
 
 process.exit(res.status == null ? 1 : res.status);
