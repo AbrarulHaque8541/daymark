@@ -133,3 +133,61 @@ test('feed cache validation accepts only well-formed cached snapshots', () => {
   assert.equal(feed.isValidFeed(parsed), true);
   assert.equal(feed.isValidFeed(Object.assign({}, parsed, { items: [Object.assign({}, parsed.items[0], { title: '' })] })), false);
 });
+
+test('RDF RSS 1.0 reads channel metadata from its nested channel element', () => {
+  const xml = [
+    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"',
+    ' xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">',
+    ' <channel rdf:about="https://example.com/">',
+    '  <title>RDF Example News</title>',
+    '  <link>https://example.com/</link>',
+    '  <description>Channel metadata lives inside channel.</description>',
+    ' </channel>',
+    ' <item rdf:about="https://example.com/story">',
+    '  <title>RDF story</title>',
+    '  <link>https://example.com/story</link>',
+    '  <description>RDF summary</description>',
+    ' </item>',
+    '</rdf:RDF>'
+  ].join('');
+  const parsed = feed.parseFeed(xml);
+  assert.equal(parsed.format, 'rss');
+  assert.equal(parsed.title, 'RDF Example News');
+  assert.equal(parsed.link, 'https://example.com/');
+  assert.equal(parsed.items.length, 1);
+  assert.equal(parsed.items[0].title, 'RDF story');
+});
+
+test('non-empty invalid feed URL never silently falls back to a cached URL', () => {
+  const cached = 'https://example.com/previous.xml';
+  assert.equal(feed.resolveFeedTarget(' ftp://example.com/new.xml ', cached), null);
+  assert.equal(feed.resolveFeedTarget(' javascript:alert(1) ', cached), null);
+  assert.equal(feed.resolveFeedTarget(' https://example.org/new.xml ', cached), 'https://example.org/new.xml');
+  assert.equal(feed.resolveFeedTarget('', cached), cached);
+  assert.equal(feed.resolveFeedTarget('   ', cached), cached);
+  assert.equal(feed.resolveFeedTarget('', 'ftp://example.com/invalid'), null);
+});
+
+test('feed fetch timeout covers a stalled response body and aborts the request', async () => {
+  let capturedSignal = null;
+  const response = { ok: true, status: 200, text: () => new Promise(() => {}) };
+  await assert.rejects(
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 30),
+    /timed out/
+  );
+  assert.ok(capturedSignal, 'AbortController signal is passed to fetch');
+  assert.equal(capturedSignal.aborted, true, 'timeout aborts even after response headers arrived');
+});
+
+test('feed fetch parses a successful response and rejects non-success status', async () => {
+  const parsed = await feed.fetchFeed('https://example.com/feed.xml', async () => ({
+    ok: true, status: 200, text: async () => RSS
+  }), 1000);
+  assert.equal(parsed.title, 'Example News');
+  await assert.rejects(feed.fetchFeed('https://example.com/feed.xml', async () => ({
+    ok: false, status: 503, text: async () => ''
+  }), 1000), /HTTP 503/);
+});

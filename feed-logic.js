@@ -195,6 +195,45 @@
     return hostname.includes('.') || hostname === 'localhost';
   }
 
+  function resolveFeedTarget(rawUrl, cachedUrl) {
+    const candidate = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+    if (candidate) return isValidFeedUrl(candidate) ? candidate : null;
+    return isValidFeedUrl(cachedUrl) ? String(cachedUrl).trim() : null;
+  }
+
+  async function fetchFeed(url, fetchImpl, timeoutMs = 10000) {
+    if (!isValidFeedUrl(url)) throw new Error('Enter a valid http(s) feed URL first.');
+    if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
+
+    const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000;
+    const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
+    let timedOut = false;
+    let timer = null;
+    const timeout = new Promise((resolve, reject) => {
+      timer = root.setTimeout(() => {
+        timedOut = true;
+        if (controller) controller.abort();
+        reject(new Error('Feed request timed out.'));
+      }, duration);
+    });
+    const request = (async () => {
+      const response = await fetchImpl(url, {
+        signal: controller ? controller.signal : undefined,
+        cache: 'no-store',
+        redirect: 'follow'
+      });
+      if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
+      const xml = await response.text();
+      if (timedOut) throw new Error('Feed request timed out.');
+      return parseFeed(xml);
+    })();
+    try {
+      return await Promise.race([request, timeout]);
+    } finally {
+      if (timer !== null) root.clearTimeout(timer);
+    }
+  }
+
   function pickLink(links) {
     const alternate = links.find((link) => !link.attributes.rel || link.attributes.rel === 'alternate');
     const chosen = alternate || links[0] || null;
@@ -229,7 +268,7 @@
     const root = parseXml(xml);
     const rootName = localName(root.name).toLowerCase();
     if (rootName === 'rss' || rootName === 'rdf') {
-      const channel = rootName === 'rss' ? firstChild(root, 'channel') : root;
+      const channel = rootName === 'rss' ? firstChild(root, 'channel') : (firstChild(root, 'channel') || root);
       if (!channel) throw new Error('The RSS feed has no channel.');
       const itemNodes = rootName === 'rss' ? childElements(channel, 'item') : childElements(root, 'item');
       const items = itemNodes.map((item) => ({
@@ -292,6 +331,8 @@
 
   const api = {
     parseFeed,
+    fetchFeed,
+    resolveFeedTarget,
     isValidFeedUrl,
     isValidWebLink,
     isValidFeed,

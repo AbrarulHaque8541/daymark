@@ -176,7 +176,7 @@
         <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">BRIEFING</span></div>
           <h2 id="briefing-heading">RSS / Atom briefing</h2>
-          <p class="briefing-description">Read a public news feed you choose. It is fetched only when you tap Refresh; the latest items are cached on this device and stay available offline.</p>
+          <p class="briefing-description">Read a public news feed you choose. It is fetched only when you tap Refresh; the latest items are cached on this device and stay available offline. Some publishers block direct browser requests (CORS), so those feeds cannot be fetched here.</p>
           <form id="feed-form" class="feed-form" novalidate>
             <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
             <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>

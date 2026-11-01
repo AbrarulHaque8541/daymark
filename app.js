@@ -1377,7 +1377,7 @@
 
   async function refreshFeed(rawUrl) {
     if (!feed || state.feedLoading) return;
-    const target = feed.isValidFeedUrl(rawUrl) ? rawUrl.trim() : (state.feedCache ? state.feedCache.url : null);
+    const target = feed.resolveFeedTarget(rawUrl, state.feedCache ? state.feedCache.url : null);
     if (!target || !feed.isValidFeedUrl(target)) {
       state.feedNotice = 'Enter a valid http(s) feed URL first.';
       renderFeed();
@@ -1388,16 +1388,7 @@
     renderFeed();
     try {
       if (typeof fetch !== 'function') throw new Error('fetch unavailable');
-      const controller = typeof AbortController === 'function' ? new AbortController() : null;
-      const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
-      const response = await fetch(target, {
-        signal: controller ? controller.signal : undefined,
-        cache: 'no-store',
-        redirect: 'follow'
-      });
-      if (timer) clearTimeout(timer);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const parsed = feed.parseFeed(await response.text());
+      const parsed = await feed.fetchFeed(target, fetch);
       state.feedCache = { version: 1, url: target, fetchedAt: new Date().toISOString(), feed: parsed };
       persistFeedCache();
       state.feedNotice = `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}.`;
