@@ -260,7 +260,7 @@ test('failed recovery backup creation never overwrites the only original task pa
   assert.ok(saved.some((task) => task.title === 'Retry after freeing storage'));
 });
 
-test('recovery backup toast exports the exact retained bytes for manual review', () => {
+test('recovery backup export preserves a second user gesture for browser download', () => {
   const opaque = '{older opaque recovery bytes';
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -277,31 +277,28 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.equal(action.hidden, false, 'recovery toast exposes an export action');
   assert.equal(action.textContent, 'Export recovery');
 
+  // First tap prepares the Blob but does not attempt a delayed download.
   action.dispatch('click');
   const status = app.elements.get('#toast');
-  assert.equal(status.textContent, 'Preparing recovery export…');
-  assert.equal(status.getAttribute('aria-busy'), 'true',
-    'the live region announces that export preparation is in progress');
-  app.flushAnimationFrame();
-  assert.equal(status.getAttribute('aria-busy'), 'true',
-    'the preparation state remains visible through the first frame');
+  assert.match(status.textContent, /Recovery backup is ready/);
+  assert.equal(action.hidden, false);
+  assert.equal(action.textContent, 'Download now');
   assert.equal(app.elements.has('#download-link'), false,
-    'download element is not created until the next frame');
-  app.flushAnimationFrame();
+    'preparation must not consume the first tap by starting a download');
+  assert.equal(app.getLastBlob().parts[0], backupRaw,
+    'prepared Blob contains the exact retained recovery bytes');
 
+  // Second tap is a real user gesture and triggers anchor.click() synchronously.
+  action.dispatch('click');
   const link = app.elements.get('#download-link');
-  assert.equal(link.clicked, true, 'the browser download is triggered');
+  assert.equal(link.clicked, true, 'download starts from the explicit second user gesture');
   assert.equal(link.download, 'daymark-recovery-backup.txt');
   assert.equal(link.href, 'blob:daymark-recovery-test');
-  assert.equal(app.getLastBlob().parts[0], backupRaw,
-    'export contains the exact retained recovery bundle bytes');
   assert.match(status.textContent, /Recovery backup exported/);
-  assert.equal(status.getAttribute('aria-busy'), null,
-    'the live region clears its busy state after export');
 });
 
 
-test('recovery export clears its accessible busy state when browser download setup fails', () => {
+test('recovery export reports Blob preparation failure without offering a broken download', () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -312,16 +309,13 @@ test('recovery export clears its accessible busy state when browser download set
 
   action.dispatch('click');
   const status = app.elements.get('#toast');
-  assert.equal(status.getAttribute('aria-busy'), 'true');
-  app.flushAnimationFrame();
-  assert.equal(status.getAttribute('aria-busy'), 'true');
-  app.flushAnimationFrame();
-
   assert.equal(status.textContent, 'Recovery backup export is not available in this browser.');
-  assert.equal(status.getAttribute('aria-busy'), null,
-    'failed export must not leave the live region permanently busy');
-  assert.equal(status.classList.contains('is-exporting'), false);
+  assert.equal(action.hidden, true,
+    'a failed Blob preparation must not expose a Download now action');
+  assert.equal(app.elements.has('#download-link'), false,
+    'failed preparation must not create or click a download link');
 });
+
 
 test('app.js integrity guard rejects placeholder or truncated application source', () => {
   assert.ok(APP_SOURCE.length >= 50000,
