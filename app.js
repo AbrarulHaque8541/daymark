@@ -443,7 +443,11 @@
     const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
     suggestionList.innerHTML = suggestions.length
       ? suggestions.map(({ task, reason }, index) => `<div class="suggestion-item"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></div>`).join('')
-      : '<div class="suggestion-empty">Your open-task sugge  function releasePreparedRecoveryExport() {
+      : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
+    renderFocus();
+  }
+
+  function releasePreparedRecoveryExport() {
     if (state.recoveryExportTimer !== null) {
       clearTimeout(state.recoveryExportTimer);
       state.recoveryExportTimer = null;
@@ -501,6 +505,7 @@
 
   function exportRecoveryBackup() {
     if (state.recoveryExportInProgress) return;
+
     let raw = null;
     try {
       raw = localStorage.getItem(BACKUP_KEY);
@@ -512,6 +517,7 @@
       showToast('No recovery backup is available to export.');
       return;
     }
+
     state.recoveryExportInProgress = true;
     try {
       let href = null;
