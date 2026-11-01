@@ -483,33 +483,74 @@
   }
 
   function exportRecoveryBackup() {
+    if (state.recoveryExportInProgress) return;
+
+    let raw = null;
     try {
-      const raw = localStorage.getItem(BACKUP_KEY);
-      if (typeof raw !== 'string' || raw.length === 0) {
-        showToast('No recovery backup is available to export.');
-        return;
-      }
-      const link = document.createElement('a');
-      let objectUrl = null;
-      if (typeof Blob === 'function' && globalThis.URL
-          && typeof globalThis.URL.createObjectURL === 'function') {
-        objectUrl = globalThis.URL.createObjectURL(new Blob([raw], {
-          type: 'text/plain;charset=utf-8'
-        }));
-        link.href = objectUrl;
-      } else {
-        link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(raw)}`;
-      }
-      link.download = 'daymark-recovery-backup.txt';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      if (objectUrl && typeof globalThis.URL.revokeObjectURL === 'function') {
-        setTimeout(() => globalThis.URL.revokeObjectURL(objectUrl), 1000);
-      }
-      showToast('Recovery backup exported. Keep this file private; it may contain task data');
+      raw = localStorage.getItem(BACKUP_KEY);
     } catch (error) {
       showToast('Recovery backup export is not available in this browser.');
+      return;
+    }
+    if (typeof raw !== 'string' || raw.length === 0) {
+      showToast('No recovery backup is available to export.');
+      return;
+    }
+
+    // The toast is a polite live region. Mark it busy and defer the download
+    // until the next paint so assistive technology and slower devices can
+    // announce the preparation state before the synchronous Blob work begins.
+    state.recoveryExportInProgress = true;
+    const status = $('#toast');
+    if (status) {
+      status.textContent = 'Preparing recovery export…';
+      status.setAttribute('aria-busy', 'true');
+      status.classList.add('is-exporting');
+    }
+
+    const finishExport = () => {
+      let message = 'Recovery backup export is not available in this browser.';
+      try {
+        const link = document.createElement('a');
+        let objectUrl = null;
+        if (typeof Blob === 'function' && globalThis.URL
+            && typeof globalThis.URL.createObjectURL === 'function') {
+          objectUrl = globalThis.URL.createObjectURL(new Blob([raw], {
+            type: 'text/plain;charset=utf-8'
+          }));
+          link.href = objectUrl;
+        } else {
+          link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(raw)}`;
+        }
+        link.download = 'daymark-recovery-backup.txt';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        if (objectUrl && typeof globalThis.URL.revokeObjectURL === 'function') {
+          setTimeout(() => globalThis.URL.revokeObjectURL(objectUrl), 1000);
+        }
+        message = 'Recovery backup exported. Keep this file private; it may contain task data';
+      } catch (error) {
+        message = 'Recovery backup export is not available in this browser.';
+      } finally {
+        state.recoveryExportInProgress = false;
+        if (status) {
+          status.removeAttribute('aria-busy');
+          status.classList.remove('is-exporting');
+        }
+        showToast(message);
+      }
+    };
+
+    try {
+      if (window && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(finishExport);
+      } else {
+        setTimeout(finishExport, 0);
+      }
+    } catch (error) {
+      // A scheduler failure should not strand recovery data behind a busy UI.
+      finishExport();
     }
   }
 
