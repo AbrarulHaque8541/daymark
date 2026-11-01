@@ -285,8 +285,8 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   app.flushAnimationFrame();
   assert.equal(status.getAttribute('aria-busy'), 'true',
     'the preparation state remains visible through the first frame');
-  assert.equal(app.elements.get('#download-link').clicked, undefined,
-    'download work is deferred until the next frame');
+  assert.equal(app.elements.has('#download-link'), false,
+    'download element is not created until the next frame');
   app.flushAnimationFrame();
 
   const link = app.elements.get('#download-link');
