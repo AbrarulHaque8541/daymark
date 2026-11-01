@@ -165,10 +165,16 @@ check("private static final Interpolator MOTION_ENTER = new DecelerateInterpolat
       "the shared enter curve is missing")
 check("private static final Interpolator MOTION_EXIT = new AccelerateInterpolator(" in ACTIVITY,
       "the shared exit curve is missing")
-check(ACTIVITY.count("setInterpolator(MOTION_ENTER)") >= 4,
-      "browser chrome, brand label, composer and the workspace switch must all use the enter curve")
-check(ACTIVITY.count("setInterpolator(MOTION_EXIT)") >= 3,
-      "browser chrome, brand label and composer hide must all use the exit curve")
+check(ACTIVITY.count("setInterpolator(MOTION_ENTER)") >= 3,
+      "brand label and composer must still use the enter curve in MainActivity")
+check(ACTIVITY.count("setInterpolator(MOTION_EXIT)") >= 2,
+      "brand label and composer hide must still use the exit curve in MainActivity")
+check("WorkspaceMotion.hideChrome(" in ACTIVITY,
+      "browser chrome hide must delegate to WorkspaceMotion")
+check("WorkspaceMotion.showChrome(" in ACTIVITY,
+      "browser chrome show must delegate to WorkspaceMotion")
+check("WorkspaceMotion.animateWorkspaceSwitch(" in ACTIVITY,
+      "workspace/tab switch must delegate to WorkspaceMotion")
 check("ANIMATOR_DURATION_SCALE" not in ACTIVITY,
       "the framework already scales ViewPropertyAnimator by the system animator duration scale; "
       "reading it again here would double-apply and break the reduced-motion setting")

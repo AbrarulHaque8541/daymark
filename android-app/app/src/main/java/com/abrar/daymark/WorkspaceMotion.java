@@ -36,6 +36,7 @@ public final class WorkspaceMotion {
     /** Soft browser chrome hide (scroll down). */
     public static void hideChrome(View view, float hiddenOffset, Interpolator exitInterpolator, Runnable endAction) {
         if (view == null) return;
+        view.animate().cancel();
         view.setVisibility(View.VISIBLE);
         view.animate().translationY(hiddenOffset)
                 .alpha(0f)
@@ -48,6 +49,7 @@ public final class WorkspaceMotion {
     /** Soft browser chrome show (scroll up / top). */
     public static void showChrome(View view, float hiddenOffset, Interpolator enterInterpolator) {
         if (view == null) return;
+        view.animate().cancel();
         view.setVisibility(View.VISIBLE);
         view.setTranslationY(hiddenOffset);
         view.setAlpha(0f);
