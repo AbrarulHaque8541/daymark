@@ -19,7 +19,7 @@
 - Regression test covers 10 min active → 60 min paused → resume 15 min, a 7-min-late tick, accurate log end ISO timestamp, and paused-expired restore. Manual Stop remains a partial session ending at user stop time.
 - Changed: `focus-logic.js`, `tests/focus-logic.test.js`.
 - Commits: implementation `b1f908c030b002da98d93638f73d210d7e1973c6`; tests `63ca5412945b15edaf8d17dac2eaf8ff636292b1`.
-- Delivery branch: `fix/web-focus-paused-expiry-20261101`; PR creation and exact-head Actions pending.
+- Delivery: [PR #478](https://github.com/AbrarulHaque8541/daymark/pull/478), branch `fix/web-focus-paused-expiry-20261101`; current PR head is authoritative live GitHub metadata. Exact-head Actions were queried immediately after PR creation but had not yet appeared; recheck before merge.
 
 ## Verification
 - V8 behavior checks: **PASS** for natural expiry after pause, late tick, correct persisted log end, and unchanged manual Stop semantics.
