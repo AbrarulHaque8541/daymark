@@ -1,3 +1,5 @@
+- [Daymark whole-project engineering status — 2026-11-01T08:03:00Z](./CURRENT_STATUS_20261101T080300Z.md)
+
 # Agent status index
 
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
