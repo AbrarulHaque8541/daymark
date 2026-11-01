@@ -13,6 +13,7 @@ activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read
 history_source = (root / "app/src/main/java/com/abrar/daymark/BrowserHistory.java").read_text(
     encoding="utf-8")
 smoke = (root / "tools/BrowserAddressSmoke.java").read_text(encoding="utf-8")
+history_smoke = (root / "tools/BrowserHistorySmoke.java").read_text(encoding="utf-8")
 
 assert "import java.net.IDN;" in history_source, \
     "history must support standards-based IDN normalization"
@@ -20,8 +21,8 @@ assert "IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES)" in history_source, \
     "Unicode hosts must canonicalize through IDN rather than disappear from history"
 assert "static int parsePort(String value)" in history_source, \
     "explicit ports must be parsed and range-checked even when URI.getHost() is null for IDN"
-assert "normalizeInternationalizedHosts();" in smoke, \
-    "host smoke must exercise Unicode/punycode history normalization"
+assert "normalizeInternationalizedHosts();" in history_smoke, \
+    "BrowserHistory host smoke must exercise Unicode/punycode history normalization"
 
 assert "static List<String> filter(List<String> entries, String query)" in history_source, \
     "BrowserHistory.filter must stay pure and testable"
