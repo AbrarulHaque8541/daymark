@@ -50,6 +50,13 @@ assert 'Download status unavailable. Refresh to check again.' in selection, \\
     "unknown provider states must not be mislabeled as paused"
 assert "the completed file will also be deleted" in selection, \\
     "the UI must disclose DownloadManager.remove's completed-file deletion race"
+for marker, explanation in (
+    ("This cannot be undone.", "the cancel dialog must disclose irreversibility"),
+    ("Download cancelled and removed.", "successful removal must be reported"),
+    ("Download could not be cancelled. Refresh to check its status.", "provider removal failure must be reported honestly"),
+    ("if (removed > 0)", "the success message must depend on the provider's removal result"),
+):
+    assert marker in selection, explanation
 active_check = activity.split("private boolean isBrowserDownloadActive", 1)[1].split(
     "private void queueBrowserDownload", 1
 )[0]
