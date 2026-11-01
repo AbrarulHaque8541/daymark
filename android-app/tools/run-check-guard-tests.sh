@@ -54,6 +54,50 @@ PY
   echo "PASS meta: $checker fails when marker is missing"
 }
 
+expect_fail_after_curve_swap() {
+  marker="$1"
+  expected="$2"
+  target_backup=$(mktemp)
+  checker_output=$(mktemp)
+  cp "$ACTIVITY" "$target_backup"
+  TARGET="$ACTIVITY" MARKER="$marker" python3 - <<'PY'
+import os
+from pathlib import Path
+p = Path(os.environ["TARGET"])
+s = p.read_text(encoding="utf-8")
+marker = os.environ["MARKER"]
+start = s.find(marker)
+if start < 0:
+    raise SystemExit(f"show animation marker not found: {marker}")
+end = s.find(";", start)
+if end < 0:
+    raise SystemExit(f"show animation terminator not found: {marker}")
+branch = s[start:end]
+if "setInterpolator(MOTION_ENTER)" not in branch:
+    raise SystemExit(f"show animation enter curve not found in branch: {marker}")
+p.write_text(s[:start] + branch.replace("setInterpolator(MOTION_ENTER)",
+                                        "setInterpolator(MOTION_EXIT)", 1) + s[end:],
+            encoding="utf-8")
+PY
+  checker_status=0
+  python3 "$ROOT/tools/check-press-feedback.py" >"$checker_output" 2>&1 || checker_status=$?
+  cp "$target_backup" "$ACTIVITY"
+  rm -f "$target_backup"
+  if [ "$checker_status" -eq 0 ]; then
+    rm -f "$checker_output"
+    echo "FAIL: check-press-feedback.py accepted a wrong show interpolator: $marker" >&2
+    return 1
+  fi
+  if ! grep -F "$expected" "$checker_output" >/dev/null; then
+    cat "$checker_output" >&2
+    rm -f "$checker_output"
+    echo "FAIL: wrong show-curve mutation did not fail at its branch assertion: $marker" >&2
+    return 1
+  fi
+  rm -f "$checker_output"
+  echo "PASS meta: check-press-feedback.py rejects a wrong show curve in $marker"
+}
+
 expect_fail_after_removal check-text-scale.py "TextScalePolicy.combined("
 WINDOW="$ROOT/app/src/main/java/com/abrar/daymark/Api30Window.java"
 if [ -f "$WINDOW" ]; then
@@ -73,6 +117,10 @@ expect_fail_after_removal check-press-feedback.py "android.view.MotionEvent.ACTI
 expect_fail_after_removal check-press-feedback.py "palette.text, palette.muted, palette.warning, palette.danger"
 expect_fail_after_removal check-press-feedback.py "int... labelColors"
 expect_fail_after_removal check-press-feedback.py "Build.VERSION.SDK_INT >= 29"
+expect_fail_after_curve_swap "topBarBrand.animate().alpha(1f).setDuration(180L)" \
+  "topBarBrand show must use the shared enter curve in its own branch"
+expect_fail_after_curve_swap "sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L)" \
+  "sharedComposer show must use the shared enter curve in its own branch"
 # Tag filtering, note formatting and keyboard shortcuts must fail closed too.
 expect_fail_after_removal check-task-ux.py "renderTagFilters();"
 expect_fail_after_removal check-task-ux.py "TaskLogic.filter(tasks, selectedFilter, selectedQuery, selectedTag, today)"

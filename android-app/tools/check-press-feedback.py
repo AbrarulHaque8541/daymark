@@ -17,8 +17,10 @@ this file pins the resolutions rather than only the result:
 4. The framework already divides ViewPropertyAnimator durations by the system animator scale, so
    the activity must not read ANIMATOR_DURATION_SCALE itself; a second scale would double-apply.
 
-It also pins the two animator literals other guards depend on, so a future easing change cannot
-quietly break check-v1-source.sh or check-extension-trust-confirmation.py.
+It also verifies that workspace and browser-chrome motion keep their easing when MainActivity
+delegates animation mechanics to WorkspaceMotion, and pins the animator literals other guards
+depend on so a future easing change cannot quietly break check-v1-source.sh or
+check-extension-trust-confirmation.py.
 """
 from pathlib import Path
 import re
@@ -26,6 +28,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTIVITY = (ROOT / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+WORKSPACE_MOTION = (ROOT / "app/src/main/java/com/abrar/daymark/WorkspaceMotion.java").read_text(encoding="utf-8")
 PRESS_SURFACE = ROOT / "app/src/main/java/com/abrar/daymark/PressSurface.java"
 SMOKE = ROOT / "tools/PressSurfaceSmoke.java"
 checks = 0
@@ -38,12 +41,16 @@ def check(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def region(start_marker: str, end_marker: str, label: str) -> str:
+def source_region(source: str, start_marker: str, end_marker: str, label: str) -> str:
     """The source between two markers, for order-sensitive assertions."""
-    body = ACTIVITY.split(start_marker, 1)
+    body = source.split(start_marker, 1)
     if len(body) < 2 or end_marker not in body[1]:
         raise AssertionError(f"cannot locate {label} between {start_marker!r} and {end_marker!r}")
     return body[1].split(end_marker, 1)[0]
+
+
+def region(start_marker: str, end_marker: str, label: str) -> str:
+    return source_region(ACTIVITY, start_marker, end_marker, label)
 
 
 # --- 1. The pure press-surface helper stays pure and keeps its contract ------------------------
@@ -156,7 +163,7 @@ check("return super.onTouchEvent(event);" not in swipe,
       "delegating to View would double-handle the gesture this row owns; keep the explicit "
       "pressed-state calls and update this guard deliberately if that ever changes")
 
-# --- 5. Motion easing: curves present, no second animator-scale application --------------------
+# --- 5. Motion easing: inline and delegated paths keep their curves -----------------------------
 check("import android.view.animation.DecelerateInterpolator;" in ACTIVITY,
       "entering chrome must decelerate into place")
 check("import android.view.animation.AccelerateInterpolator;" in ACTIVITY,
@@ -165,10 +172,59 @@ check("private static final Interpolator MOTION_ENTER = new DecelerateInterpolat
       "the shared enter curve is missing")
 check("private static final Interpolator MOTION_EXIT = new AccelerateInterpolator(" in ACTIVITY,
       "the shared exit curve is missing")
-check(ACTIVITY.count("setInterpolator(MOTION_ENTER)") >= 4,
-      "browser chrome, brand label, composer and the workspace switch must all use the enter curve")
-check(ACTIVITY.count("setInterpolator(MOTION_EXIT)") >= 3,
-      "browser chrome, brand label and composer hide must all use the exit curve")
+task_chrome = region("private void setTaskChromeHidden(boolean hidden)",
+                     "private void setTaskScrollReserve", "setTaskChromeHidden()")
+brand_motion = source_region(task_chrome, "if (topBarBrand != null) {", "if (topBarMark != null",
+                            "topBarBrand motion")
+brand_hide = source_region(brand_motion, "if (hidden) {", "            } else {",
+                           "topBarBrand hide branch")
+brand_show = source_region(brand_motion, "            } else {", "        }",
+                           "topBarBrand show branch")
+check(bool(re.search(r"topBarBrand\.animate\(\)\.alpha\(0f\)\.setDuration\(120L\)\s*"
+                     r"\.setInterpolator\(MOTION_EXIT\)", brand_hide)),
+      "topBarBrand hide must use the shared exit curve in its own branch")
+check(bool(re.search(r"topBarBrand\.animate\(\)\.alpha\(1f\)\.setDuration\(180L\)\s*"
+                     r"\.setInterpolator\(MOTION_ENTER\)\.start\(\)", brand_show)),
+      "topBarBrand show must use the shared enter curve in its own branch")
+composer_start = task_chrome.find("sharedComposer.animate().cancel();")
+check(composer_start >= 0, "sharedComposer motion block is missing")
+composer_motion = task_chrome[composer_start:]
+composer_hide = source_region(composer_motion, "if (hidden) {", "        } else {",
+                              "sharedComposer hide branch")
+composer_show = source_region(composer_motion, "        } else {", "\n    }\n",
+                              "sharedComposer show branch")
+check(bool(re.search(r"sharedComposer\.animate\(\)\.translationY\(-reserve\)\s*"
+                     r"\.alpha\(0f\)\.setDuration\(180L\)\.setInterpolator\(MOTION_EXIT\)",
+                     composer_hide)),
+      "sharedComposer hide must use the shared exit curve in its own branch")
+check(bool(re.search(r"sharedComposer\.animate\(\)\.translationY\(0f\)\.alpha\(1f\)\."
+                     r"setDuration\(200L\)\s*\.setInterpolator\(MOTION_ENTER\)\.start\(\)",
+                     composer_show)),
+      "sharedComposer show must use the shared enter curve in its own branch")
+browser_chrome = region("private void setBrowserChromeHidden(boolean hidden)",
+                        "private void scheduleBrowserChromeRestore", "setBrowserChromeHidden()")
+check("WorkspaceMotion.hideChrome(view, hiddenOffset, MOTION_EXIT," in browser_chrome,
+      "browser chrome hide must pass the shared exit curve into WorkspaceMotion")
+check("WorkspaceMotion.showChrome(view, hiddenOffset, MOTION_ENTER)" in browser_chrome,
+      "browser chrome show must pass the shared enter curve into WorkspaceMotion")
+transition = region("private void animateModeTransition(boolean enteringWeb)",
+                    "private void setBrowserOnlineEnabled", "animateModeTransition()")
+check("WorkspaceMotion.animateWorkspaceSwitch(" in transition and "dp(24)" in transition
+      and "MOTION_ENTER" in transition,
+      "the workspace switch must delegate with bounded travel and the shared enter curve")
+workspace_switch = WORKSPACE_MOTION.split(
+    "public static void animateWorkspaceSwitch(", 1)[1].split(
+        "    /** Soft browser chrome hide", 1)[0]
+check(".setInterpolator(enterInterpolator)" in workspace_switch,
+      "WorkspaceMotion must apply the workspace transition's supplied enter curve")
+workspace_hide = WORKSPACE_MOTION.split(
+    "public static void hideChrome(", 1)[1].split(
+        "    /** Soft browser chrome show", 1)[0]
+check(".setInterpolator(exitInterpolator)" in workspace_hide,
+      "WorkspaceMotion must apply the browser chrome hide exit curve")
+workspace_show = WORKSPACE_MOTION.split("public static void showChrome(", 1)[1]
+check(".setInterpolator(enterInterpolator)" in workspace_show,
+      "WorkspaceMotion must apply the browser chrome show enter curve")
 check("ANIMATOR_DURATION_SCALE" not in ACTIVITY,
       "the framework already scales ViewPropertyAnimator by the system animator duration scale; "
       "reading it again here would double-apply and break the reduced-motion setting")
