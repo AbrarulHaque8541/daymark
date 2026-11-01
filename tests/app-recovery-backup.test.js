@@ -9,7 +9,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
   const elements = new Map();
 
   function element(selector) {
@@ -62,6 +62,9 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
   }
 
   let lastBlob = null;
+  const revokedObjectUrls = [];
+  const timers = new Map();
+  let nextTimerId = 1;
   class MockBlob {
     constructor(parts, options = {}) {
       this.parts = parts;
@@ -74,7 +77,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
       lastBlob = blob;
       return 'blob:daymark-recovery-test';
     },
-    revokeObjectURL() {}
+    revokeObjectURL(url) { revokedObjectUrls.push(url); }
   };
 
   const localStorage = {
@@ -108,16 +111,29 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
     document,
     localStorage,
     window,
-    Blob: MockBlob,
-    URL: mockURL,
-    clearTimeout() {},
-    setTimeout: () => 1,
+    Blob: supportBlob ? MockBlob : undefined,
+    URL: supportBlob ? mockURL : { revokeObjectURL(url) { revokedObjectUrls.push(url); } },
+    clearTimeout(id) { timers.delete(id); },
+    setTimeout(callback, delay = 0) {
+      const id = nextTimerId++;
+      timers.set(id, { callback, delay });
+      return id;
+    },
     setInterval: () => 1
   }, { filename: 'app.js' });
 
   return {
     elements,
     getLastBlob: () => lastBlob,
+    getRevokedObjectUrls: () => revokedObjectUrls.slice(),
+    getPendingTimeouts: () => Array.from(timers.entries()).map(([id, timer]) => ({ id, delay: timer.delay })),
+    lastTimeoutId: () => nextTimerId - 1,
+    runTimeout(id) {
+      const timer = timers.get(id);
+      if (!timer) return;
+      timers.delete(id);
+      timer.callback();
+    },
     flushAnimationFrame() {
       const callback = animationFrames.shift();
       if (callback) callback();
@@ -260,7 +276,7 @@ test('failed recovery backup creation never overwrites the only original task pa
   assert.ok(saved.some((task) => task.title === 'Retry after freeing storage'));
 });
 
-test('recovery backup toast exports the exact retained bytes for manual review', () => {
+test('recovery backup export preserves a second user gesture for browser download', () => {
   const opaque = '{older opaque recovery bytes';
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -277,31 +293,56 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.equal(action.hidden, false, 'recovery toast exposes an export action');
   assert.equal(action.textContent, 'Export recovery');
 
+  // First tap prepares the Blob but does not attempt a delayed download.
   action.dispatch('click');
   const status = app.elements.get('#toast');
-  assert.equal(status.textContent, 'Preparing recovery export…');
-  assert.equal(status.getAttribute('aria-busy'), 'true',
-    'the live region announces that export preparation is in progress');
-  app.flushAnimationFrame();
-  assert.equal(status.getAttribute('aria-busy'), 'true',
-    'the preparation state remains visible through the first frame');
+  assert.match(status.textContent, /Recovery backup prepared\. Tap Download now to save the file\./);
+  assert.equal(action.hidden, false);
+  assert.equal(action.textContent, 'Download now');
   assert.equal(app.elements.has('#download-link'), false,
-    'download element is not created until the next frame');
-  app.flushAnimationFrame();
+    'preparation must not consume the first tap by starting a download');
+  assert.equal(app.getLastBlob().parts[0], backupRaw,
+    'prepared Blob contains the exact retained recovery bytes');
 
+  // Second tap is a real user gesture and triggers anchor.click() synchronously.
+  action.dispatch('click');
   const link = app.elements.get('#download-link');
-  assert.equal(link.clicked, true, 'the browser download is triggered');
+  assert.equal(link.clicked, true, 'download starts from the explicit second user gesture');
   assert.equal(link.download, 'daymark-recovery-backup.txt');
   assert.equal(link.href, 'blob:daymark-recovery-test');
-  assert.equal(app.getLastBlob().parts[0], backupRaw,
-    'export contains the exact retained recovery bundle bytes');
   assert.match(status.textContent, /Recovery backup exported/);
-  assert.equal(status.getAttribute('aria-busy'), null,
-    'the live region clears its busy state after export');
+  const revokeTimer = app.getPendingTimeouts().find((timer) => timer.delay === 1000);
+  assert.ok(revokeTimer, 'successful download schedules object URL cleanup');
+  app.runTimeout(revokeTimer.id);
+  assert.deepEqual(app.getRevokedObjectUrls(), ['blob:daymark-recovery-test'],
+    'object URL is revoked after the browser has had time to consume the download');
 });
 
 
-test('recovery export clears its accessible busy state when browser download setup fails', () => {
+test('recovery export releases its prepared object URL when the action expires', () => {
+  const original = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+
+  action.dispatch('click');
+  assert.equal(app.getRevokedObjectUrls().length, 0,
+    'the prepared URL remains available while the explicit download action is visible');
+  const expiryTimer = app.lastTimeoutId();
+  app.runTimeout(expiryTimer);
+
+  assert.deepEqual(app.getRevokedObjectUrls(), ['blob:daymark-recovery-test'],
+    'ignoring Download now must revoke the prepared object URL');
+  assert.match(app.elements.get('#toast').textContent, /Recovery export expired/);
+  assert.equal(action.hidden, true,
+    'the expired download action must no longer be available');
+});
+
+
+test('recovery export reports Blob preparation failure without offering a broken download', () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -312,15 +353,54 @@ test('recovery export clears its accessible busy state when browser download set
 
   action.dispatch('click');
   const status = app.elements.get('#toast');
-  assert.equal(status.getAttribute('aria-busy'), 'true');
-  app.flushAnimationFrame();
-  assert.equal(status.getAttribute('aria-busy'), 'true');
-  app.flushAnimationFrame();
-
   assert.equal(status.textContent, 'Recovery backup export is not available in this browser.');
-  assert.equal(status.getAttribute('aria-busy'), null,
-    'failed export must not leave the live region permanently busy');
-  assert.equal(status.classList.contains('is-exporting'), false);
+  assert.equal(action.hidden, true,
+    'a failed Blob preparation must not expose a Download now action');
+  assert.equal(app.elements.has('#download-link'), false,
+    'failed preparation must not create or click a download link');
+});
+
+
+
+test('recovery export uses encoded data URL when Blob URL APIs are unavailable', () => {
+  const priorOpaque = '{older opaque + recovery bytes\\nनमस्ते';
+  const primary = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([
+    [STORAGE_KEY, primary],
+    [BACKUP_KEY, priorOpaque]
+  ]);
+  const app = bootApp(storedValues, new Set(), false, false);
+  const raw = storedValues.get(BACKUP_KEY);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false);
+  assert.equal(action.textContent, 'Export recovery');
+  action.dispatch('click');
+
+  const status = app.elements.get('#toast');
+  assert.match(status.textContent, /Recovery backup prepared\. Tap Download now to save the file\./);
+  assert.equal(action.textContent, 'Download now');
+  assert.equal(app.getLastBlob(), null, 'fallback must not depend on Blob support');
+
+  action.dispatch('click');
+  const link = app.elements.get('#download-link');
+  assert.equal(link.clicked, true);
+  assert.equal(link.download, 'daymark-recovery-backup.txt');
+  assert.equal(link.href, 'data:text/plain;charset=utf-8,' + encodeURIComponent(raw),
+    'fallback URI must preserve the exact Unicode and punctuation payload');
+  assert.equal(app.getPendingTimeouts().some((timer) => timer.delay === 1000), false,
+    'data URLs do not need object-URL revocation');
+});
+
+test('app.js parses before browser runtime boot', () => {
+  try {
+    new vm.Script(APP_SOURCE, { filename: 'app.js' });
+  } catch (error) {
+    assert.fail(`app.js syntax error: ${error.stack || error.message}`);
+  }
 });
 
 test('app.js integrity guard rejects placeholder or truncated application source', () => {

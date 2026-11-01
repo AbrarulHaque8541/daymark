@@ -9,7 +9,7 @@
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -447,12 +447,26 @@
     renderFocus();
   }
 
+  function releasePreparedRecoveryExport() {
+    if (state.recoveryExportTimer !== null) {
+      clearTimeout(state.recoveryExportTimer);
+      state.recoveryExportTimer = null;
+    }
+    const objectUrl = state.recoveryExportUrl;
+    state.recoveryExportUrl = null;
+    state.recoveryExportHref = null;
+    if (objectUrl && globalThis.URL && typeof globalThis.URL.revokeObjectURL === 'function') {
+      try { globalThis.URL.revokeObjectURL(objectUrl); } catch (error) { /* Best-effort cleanup. */ }
+    }
+  }
+
   function dismissToast() {
     clearTimeout(state.toastTimer);
     state.toastTimer = null;
     state.toastAction = null;
     $('#toast-stack').classList.remove('is-visible');
     $('#toast-action').hidden = true;
+    releasePreparedRecoveryExport();
   }
 
   function showToast(message, action = null) {
@@ -465,7 +479,14 @@
     state.toastAction = action;
     $('#toast-stack').classList.add('is-visible');
     clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(dismissToast, action ? 7000 : 2600);
+    const expiresPreparedDownload = Boolean(action && action.label === 'Download now');
+    state.toastTimer = setTimeout(() => {
+      const stillCurrent = state.toastAction === action;
+      dismissToast();
+      if (stillCurrent && expiresPreparedDownload) {
+        showToast('Recovery export expired. Tap Export recovery to prepare a new download.');
+      }
+    }, action ? 7000 : 2600);
   }
 
   function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
@@ -497,72 +518,67 @@
       return;
     }
 
-    // The toast is a polite live region. Keep the preparation message on
-    // screen for a rendered frame before synchronous Blob/download work starts.
     state.recoveryExportInProgress = true;
-    const status = $('#toast');
-    if (status) {
-      status.textContent = 'Preparing recovery export…';
-      status.setAttribute('aria-busy', 'true');
-    }
-
-    const finishExport = () => {
-      let message = 'Recovery backup export is not available in this browser.';
-      try {
-        const link = document.createElement('a');
-        let objectUrl = null;
-        if (typeof Blob === 'function' && globalThis.URL
-            && typeof globalThis.URL.createObjectURL === 'function') {
-          objectUrl = globalThis.URL.createObjectURL(new Blob([raw], {
-            type: 'text/plain;charset=utf-8'
-          }));
-          link.href = objectUrl;
-        } else {
-          link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(raw)}`;
-        }
-        link.download = 'daymark-recovery-backup.txt';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        if (objectUrl && typeof globalThis.URL.revokeObjectURL === 'function') {
-          setTimeout(() => globalThis.URL.revokeObjectURL(objectUrl), 1000);
-        }
-        message = 'Recovery backup exported. Keep this file private; it may contain task data';
-      } catch (error) {
-        message = 'Recovery backup export is not available in this browser.';
-      } finally {
-        state.recoveryExportInProgress = false;
-        if (status) {
-          status.removeAttribute('aria-busy');
-        }
-        showToast(message);
-      }
-    };
-
     try {
-      if (window && typeof window.requestAnimationFrame === 'function') {
-        // First frame paints the busy state; the second frame performs the
-        // export. A single rAF would run before paint and could hide the state.
-        window.requestAnimationFrame(() => {
-          try {
-            window.requestAnimationFrame(finishExport);
-          } catch (error) {
-            setTimeout(finishExport, 0);
-          }
-        });
+      let href = null;
+      let objectUrl = null;
+      if (typeof Blob === 'function' && globalThis.URL
+          && typeof globalThis.URL.createObjectURL === 'function') {
+        objectUrl = globalThis.URL.createObjectURL(new Blob([raw], {
+          type: 'text/plain;charset=utf-8'
+        }));
+        href = objectUrl;
       } else {
-        setTimeout(finishExport, 50);
+        href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(raw);
       }
+      state.recoveryExportUrl = objectUrl;
+      state.recoveryExportHref = href;
+      if (objectUrl) state.recoveryExportTimer = setTimeout(releasePreparedRecoveryExport, 7000);
+      state.recoveryExportInProgress = false;
+      showToast('Recovery backup prepared. Tap Download now to save the file.', {
+        label: 'Download now',
+        run: downloadPreparedRecovery
+      });
     } catch (error) {
-      // A scheduler failure should not strand recovery data behind a busy UI.
-      finishExport();
+      state.recoveryExportInProgress = false;
+      releasePreparedRecoveryExport();
+      showToast('Recovery backup export is not available in this browser.');
+    }
+  }
+
+  function downloadPreparedRecovery() {
+    const href = state.recoveryExportHref;
+    if (typeof href !== 'string' || href.length === 0) {
+      releasePreparedRecoveryExport();
+      showToast('Recovery backup export expired. Tap Export recovery to prepare it again.');
+      return;
+    }
+    try {
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = 'daymark-recovery-backup.txt';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      if (state.recoveryExportUrl) {
+        clearTimeout(state.recoveryExportTimer);
+        state.recoveryExportTimer = setTimeout(releasePreparedRecoveryExport, 1000);
+      }
+      showToast('Recovery backup exported. Keep this file private; it may contain task data.');
+    } catch (error) {
+      releasePreparedRecoveryExport();
+      showToast('Recovery backup export is not available in this browser.');
     }
   }
 
   function runToastAction() {
     const action = state.toastAction;
     if (!action) return;
-    dismissToast();
+    clearTimeout(state.toastTimer);
+    state.toastTimer = null;
+    state.toastAction = null;
+    $('#toast-stack').classList.remove('is-visible');
+    $('#toast-action').hidden = true;
     action.run();
   }
 
