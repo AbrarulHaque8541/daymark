@@ -23,6 +23,7 @@ public final class TaskLogicSmoke {
     public static void main(String[] args) throws IOException {
         datesAreStrictAndDateOnly();
         if (args.length > 0) sharedDateContract(Path.of(args[0]));
+        if (args.length > 1) sharedRecurrenceContract(Path.of(args[1]));
         CRUDKeepsStableIdentityAndTimestamps();
         templatesValidateAndCreateFreshTasks();
         templateListsRejectDuplicatesAndExcess();
@@ -624,5 +625,18 @@ public final class TaskLogicSmoke {
             // Expected validation failure.
         }
     }
-}
 
+    private static void sharedRecurrenceContract(Path fixture) throws IOException {
+        int cases = 0;
+        try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\t", -1);
+                check(fields.length >= 2, "recurrence contract fixture has columns");
+                cases++;
+            }
+        }
+        check(cases >= 1, "shared recurrence contract fixture is non-empty");
+    }
+}
