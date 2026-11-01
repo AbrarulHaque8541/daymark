@@ -44,12 +44,16 @@ for marker, explanation in (
     ("isBrowserDownloadActive(manager, id)", "a stale row must be rechecked before deletion"),
 ):
     assert marker in selection, explanation
-assert selection.index('setPositiveButton("Cancel download"') < selection.index("manager.remove(id)"), \\
-    "DownloadManager.remove must occur only inside the confirmed callback"
-assert 'Download status unavailable. Refresh to check again.' in selection, \\
-    "unknown provider states must not be mislabeled as paused"
-assert "the completed file will also be deleted" in selection, \\
-    "the UI must disclose DownloadManager.remove's completed-file deletion race"
+assert (
+    selection.index('setPositiveButton("Cancel download"')
+    < selection.index("manager.remove(id)")
+), "DownloadManager.remove must occur only inside the confirmed callback"
+assert (
+    'Download status unavailable. Refresh to check again.' in selection
+), "unknown provider states must not be mislabeled as paused"
+assert (
+    "the completed file will also be deleted" in selection
+), "the UI must disclose DownloadManager.remove's completed-file deletion race"
 for marker, explanation in (
     ("This cannot be undone.", "the cancel dialog must disclose irreversibility"),
     ("Download cancelled and removed.", "successful removal must be reported"),
@@ -60,10 +64,12 @@ for marker, explanation in (
 active_check = activity.split("private boolean isBrowserDownloadActive", 1)[1].split(
     "private void queueBrowserDownload", 1
 )[0]
-assert "new DownloadManager.Query().setFilterById(id)" in active_check, \\
-    "cancellation must re-query the exact download rather than trust stale list state"
-assert "DownloadManager.STATUS_SUCCESSFUL" not in active_check, \\
-    "a completed file must never be offered for cancellation/removal"
+assert (
+    "new DownloadManager.Query().setFilterById(id)" in active_check
+), "cancellation must re-query the exact download rather than trust stale list state"
+assert (
+    "DownloadManager.STATUS_SUCCESSFUL" not in active_check
+), "a completed file must never be offered for cancellation/removal"
 for marker, explanation in (
     ("currentStatus == DownloadManager.STATUS_PENDING", "pending state must remain cancelable"),
     ("currentStatus == DownloadManager.STATUS_RUNNING", "running state must remain cancelable"),
@@ -83,4 +89,4 @@ print("PASS browser downloads source checks: status/progress, confirmed HTTPS re
 # Work by: ChatGPT
 # Model: GPT-6
 # Tooling: GitHub MCP tools
-# Timestamp (UTC): 2026-10-09T17:30:04Z
+# Timestamp (UTC): 2026-11-01T07:28:39Z
