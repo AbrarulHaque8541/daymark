@@ -11,13 +11,13 @@ const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 
-function bootApp({ savedValue, savedFocusValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
   const confirmMessages = [];
   let fileReadCount = 0;
-  const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
+  const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue], [BACKUP_KEY, savedBackupValue]]);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -66,6 +66,10 @@ function bootApp({ savedValue, savedFocusValue = null, failBackup = false, failP
     setItem(key, value) {
       if ((key === BACKUP_KEY && failBackup) || (key === STORAGE_KEY && failPrimarySave) || (key === FOCUS_KEY && failFocusSave)) throw new Error('Quota exceeded');
       storedValues.set(key, String(value));
+    },
+    removeItem(key) {
+      storedValues.delete(key);
+    }
     }
   };
   const document = {
@@ -312,6 +316,28 @@ test('malformed combined recovery bundle fails closed without prompting or mutat
   assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
   assert.equal(app.storedValues.get(FOCUS_KEY), savedFocus);
   assert.match(app.elements.get('#toast').textContent, /No valid recovery data/);
+});
+
+test('opaque task recovery backup survives healthy primary load and later save', () => {
+  const existing = makeImportTask('existing-task', 'Existing task');
+  const savedValue = JSON.stringify([existing]);
+  const opaqueBackup = '{legacy recovery bytes that are not parseable JSON';
+  const app = bootApp({ savedValue, savedBackupValue: opaqueBackup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), opaqueBackup, 'healthy primary data must not erase opaque recovery material at startup');
+  const incoming = JSON.stringify([makeImportTask('new-task', 'Imported task')]);
+  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), opaqueBackup, 'a successful save must not clear an opaque recovery backup');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
+});
+
+test('healthy task-array backup is cleared as stale when primary is healthy', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
 });
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
