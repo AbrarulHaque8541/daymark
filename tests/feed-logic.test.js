@@ -191,3 +191,8 @@ test('feed fetch parses a successful response and rejects non-success status', a
     ok: false, status: 503, text: async () => ''
   }), 1000), /HTTP 503/);
 });
+
+test('RSS camel-case pubDate element is matched case-insensitively', () => {
+  const parsed = feed.parseFeed(RSS);
+  assert.equal(parsed.items[0].publishedAt, '2026-10-26T10:00:00.000Z');
+});

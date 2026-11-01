@@ -153,7 +153,8 @@
   }
 
   function childElements(node, name) {
-    return node.children.filter((child) => localName(child.name).toLowerCase() === name);
+    const expectedName = String(name).toLowerCase();
+    return node.children.filter((child) => localName(child.name).toLowerCase() === expectedName);
   }
 
   function firstChild(node, name) {
