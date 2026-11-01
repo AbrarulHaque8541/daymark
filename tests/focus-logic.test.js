@@ -95,14 +95,18 @@ test('tick auto-completes exactly when the budget runs out', () => {
   assert.equal(focus.elapsedMs(session, T0 + 9 * 60 * 1000), 5 * 60 * 1000, 'done sessions stop accruing');
 });
 
-test('tick completion accounts for paused gaps in the end timestamp', () => {
-  const session = focus.createSession({ kind: 'focus' }, T0); // 25 min
+test('tick completion records exact wall-clock expiry after pauses, even when the tick is late', () => {
+  const session = focus.createSession({ kind: 'focus' }, T0); // 25 min active budget
   focus.pause(session, T0 + 10 * 60 * 1000);
   focus.resume(session, T0 + 70 * 60 * 1000); // 1 h pause
-  const { finished } = focus.tick(session, T0 + 70 * 60 * 1000 + 15 * 60 * 1000);
+  const exactExpiry = T0 + 85 * 60 * 1000; // 10 min before pause + 15 min after resume
+  const { finished } = focus.tick(session, T0 + 92 * 60 * 1000); // callback arrives 7 min late
   assert.equal(finished, true);
-  assert.equal(session.finalElapsedMs, 25 * 60 * 1000);
-  assert.equal(session.endedAtMs, T0 + 25 * 60 * 1000, 'expiry = start + active time, pauses excluded');
+  assert.equal(session.finalElapsedMs, 25 * 60 * 1000, 'paused wall-clock time is not counted as focused time');
+  assert.equal(session.endedAtMs, exactExpiry, 'expiry uses resumedAt + remaining active budget, not createdAt + total active time');
+  const entry = focus.makeLogEntry(session);
+  assert.equal(entry.elapsedMs, 25 * 60 * 1000);
+  assert.equal(entry.endedAt, new Date(exactExpiry).toISOString(), 'persisted log uses the correct wall-clock end');
 });
 
 test('finish with manual stop records a partial, incomplete session', () => {
@@ -145,6 +149,12 @@ test('restoreSession rejects invalid, finished, or expired sessions', () => {
 
   const expired = focus.createSession({ kind: 'short-break' }, T0); // 5 min
   assert.equal(focus.restoreSession(expired, T0 + 6 * 60 * 1000), null, 'a session that expired while closed is not revived');
+
+  const pausedThenExpired = focus.createSession({ kind: 'short-break' }, T0);
+  focus.pause(pausedThenExpired, T0 + 2 * 60 * 1000);
+  focus.resume(pausedThenExpired, T0 + 62 * 60 * 1000);
+  assert.equal(focus.restoreSession(pausedThenExpired, T0 + 66 * 60 * 1000), null,
+    'a resumed session that expired during the latest active segment is not revived');
 });
 
 test('isValidSession rejects malformed shapes', () => {
