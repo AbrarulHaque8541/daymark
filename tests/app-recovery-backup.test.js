@@ -417,3 +417,39 @@ test('app.js integrity guard rejects placeholder or truncated application source
   assert.doesNotMatch(APP_SOURCE, /PLACEHOLDER_FULL_CONTENT|full content would be here|\$\(cat \/tmp\/app\.js\)/,
     'app.js must never be replaced with a placeholder or shell substitution');
 });
+
+
+test('recovery export includes task and focus backup sources together without modifying either', () => {
+  const taskPrimary = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const focusBackup = '{opaque focus recovery + bytes\\nनमस्ते';
+  const storedValues = new Map([
+    [STORAGE_KEY, taskPrimary],
+    ['daymark.focus.v1.backup', focusBackup]
+  ]);
+  const app = bootApp(storedValues);
+  const taskBackup = storedValues.get(BACKUP_KEY);
+  const expected = JSON.stringify({
+    format: 'daymark-combined-recovery-v1',
+    taskBackup,
+    focusBackup
+  });
+
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false);
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], expected,
+    'the exported envelope must contain both exact recovery payload strings');
+  assert.equal(storedValues.get(BACKUP_KEY), taskBackup);
+  assert.equal(storedValues.get('daymark.focus.v1.backup'), focusBackup);
+
+  action.dispatch('click');
+  assert.equal(app.elements.get('#download-link').clicked, true);
+  assert.equal(app.elements.get('#download-link').download, 'daymark-recovery-backup.txt');
+  assert.equal(storedValues.get(BACKUP_KEY), taskBackup,
+    'export does not mutate the task recovery backup');
+  assert.equal(storedValues.get('daymark.focus.v1.backup'), focusBackup,
+    'export does not mutate the focus recovery backup');
+});

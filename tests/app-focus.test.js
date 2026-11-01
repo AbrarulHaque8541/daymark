@@ -68,7 +68,9 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
         querySelector: (childSelector) => element(`${selector} ${childSelector}`),
         focus() {},
         showModal() { this.open = true; },
-        close() { this.open = false; }
+        close() { this.open = false; },
+        click() { this.clicked = true; },
+        remove() { this.removed = true; }
       });
     }
     return elements.get(selector);
@@ -90,6 +92,8 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
     hidden: false,
     querySelector: element,
     querySelectorAll: () => [],
+    createElement: () => element('#download-link'),
+    body: { appendChild() {} },
     addEventListener() {}
   };
   const window = {
@@ -261,4 +265,29 @@ test('a malformed focus-recovery envelope is preserved when another source is ba
   assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
   assert.deepEqual(bundle.payloads, [earlier, current],
     'a malformed existing envelope must remain byte-for-byte available inside the new bundle');
+});
+
+
+test('focus recovery backup can be exported without changing its original bytes', () => {
+  const original = '{unreadable focus recovery + bytes\\nनमस्ते';
+  const { elements, storedValues } = bootApp({ savedFocus: original });
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
+    'the corrupt focus source must remain intact after recovery backup creation');
+
+  const action = elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'focus recovery should expose a manual export action');
+  assert.equal(action.textContent, 'Export recovery');
+
+  action.dispatch('click');
+  assert.match(elements.get('#toast').textContent,
+    /Recovery backup prepared\. Tap Download now to save the file\./);
+  assert.equal(action.textContent, 'Download now');
+
+  action.dispatch('click');
+  const link = elements.get('#download-link');
+  assert.equal(link.clicked, true, 'the second user gesture starts the download');
+  assert.equal(link.download, 'daymark-recovery-backup.txt');
+  assert.equal(link.href, 'data:text/plain;charset=utf-8,' + encodeURIComponent(original));
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
+    'export must never clear or rewrite the retained focus recovery source');
 });
