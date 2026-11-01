@@ -52,6 +52,9 @@ public final class BrowserHistorySmoke {
         check("https://xn--bcher-kva.de".equals(
                         BrowserHistory.sanitizeUrl("https://XN--BCHER-KVA.DE/")),
                 "ASCII punycode and Unicode IDN visits share one canonical history origin");
+        check("https://xn--r8jz45g.xn--zckzah".equals(
+                        BrowserHistory.sanitizeUrl("https://例え.テスト/path")),
+                "non-Latin IDN labels and Unicode top-level domains normalize to punycode");
         check("https://xn--bcher-kva.de:8443".equals(
                         BrowserHistory.sanitizeUrl("https://user:pass@bücher.de:8443/path")),
                 "userinfo is stripped and a non-default port survives IDN canonicalization");
