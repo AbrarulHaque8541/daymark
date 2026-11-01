@@ -340,3 +340,14 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .feed-item-summary { color: #9aa6af; }
   .feed-empty { border-color: #2c3640; background: rgba(26, 33, 40, .5); color: #7c8a94; }
 }
+
+/* Respect user motion preferences for a calmer, accessible experience. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .status-dot { animation: none; }
+}
