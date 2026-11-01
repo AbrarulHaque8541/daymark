@@ -90,7 +90,7 @@ public final class BrowserHistorySmoke {
                         .equals(Arrays.asList("https://beta.example")),
                 "remove deletes exactly one origin regardless of path");
         List<String> entries = BrowserHistory.decode(history);
-        check(BrowserHistory.filter(entries, "ALPHA").equals(Arrays.asList("https://Alpha.example")),
+        check(BrowserHistory.filter(entries, "ALPHA").equals(Arrays.asList("https://alpha.example")),
                 "filter matches case-insensitively");
         check(BrowserHistory.filter(entries, "").size() == 2 && BrowserHistory.filter(null, "x").isEmpty(),
                 "blank query keeps every entry and null entries filter to empty");
