@@ -209,6 +209,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .toast { max-width: min(420px, calc(100vw - 44px)); padding: 10px 14px; border: 1px solid rgba(219, 232, 228, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); color: #2c4a42; box-shadow: 0 8px 25px rgba(20, 34, 42, .12); font-size: 12px; }
 .toast-action { flex: 0 0 auto; height: 38px; padding: 0 14px; border: 1px solid rgba(219, 232, 228, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); color: var(--accent); box-shadow: 0 8px 25px rgba(20, 34, 42, .12); font-size: 12px; font-weight: 700; pointer-events: auto; transition: background .16s ease; }
 .toast-action:hover { background: var(--accent-soft); }
+.toast-action:active { transform: scale(0.97); background: var(--accent); color: #fff; }
 .toast-action[hidden] { display: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 900px) {
