@@ -957,7 +957,7 @@
         ? `${validated.rejectedCount} invalid record${validated.rejectedCount === 1 ? '' : 's'} will be skipped.`
         : '',
       'Your current tasks will not be replaced. Continue?'
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join('\n');
 
     if (typeof window.confirm !== 'function') {
       showToast('Import confirmation is unavailable. Nothing was changed.');
