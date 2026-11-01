@@ -53,6 +53,13 @@ assert "new DownloadManager.Query().setFilterById(id)" in active_check, \\
     "cancellation must re-query the exact download rather than trust stale list state"
 assert "DownloadManager.STATUS_SUCCESSFUL" not in active_check, \\
     "a completed file must never be offered for cancellation/removal"
+for marker, explanation in (
+    ("currentStatus == DownloadManager.STATUS_PENDING", "pending state must remain cancelable"),
+    ("currentStatus == DownloadManager.STATUS_RUNNING", "running state must remain cancelable"),
+    ("currentStatus == DownloadManager.STATUS_PAUSED", "paused state must remain cancelable"),
+    ("catch (RuntimeException providerUnavailable) {\\n            return false;", "provider/query errors must fail closed without removing a file"),
+):
+    assert marker in active_check, explanation
 normalized_activity = "".join(activity.split())
 assert "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))" in normalized_activity, \
     "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
