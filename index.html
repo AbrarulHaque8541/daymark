@@ -32,7 +32,7 @@
       <header class="topbar">
         <div class="workspace-label"><span class="status-dot" aria-hidden="true"></span> Personal workspace</div>
         <div class="topbar-right">
-          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
+          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite" aria-atomic="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
         </div>
       </header>
 
@@ -153,8 +153,8 @@
           <h2 id="focus-heading">One thing at a time</h2>
           <p class="focus-description">A simple local timer to work through a task. No network, no account — it keeps running while this tab is open.</p>
           <div class="focus-time-wrap">
-            <span class="focus-time" id="focus-time" role="timer">25:00</span>
-            <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite">Ready</span>
+            <span class="focus-time" id="focus-time" role="timer" aria-live="polite" aria-atomic="true">25:00</span>
+            <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite" aria-atomic="true">Ready</span>
           </div>
           <div class="focus-progress" aria-hidden="true"><div class="focus-progress-fill" id="focus-progress-fill"></div></div>
           <div class="focus-presets" role="group" aria-label="Timer length">
@@ -212,7 +212,7 @@
     </form>
   </dialog>
   <div class="toast-stack" id="toast-stack">
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
     <button class="toast-action" id="toast-action" type="button" hidden>Undo</button>
   </div>
 </body>
