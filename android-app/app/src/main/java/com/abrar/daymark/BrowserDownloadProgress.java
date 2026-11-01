@@ -2,26 +2,33 @@ package com.abrar.daymark;
 
 import java.math.BigInteger;
 
-/** Exact, overflow-safe progress percentage for untrusted provider byte counters. */
-final class BrowserDownloadProgress {
-    private static final long SAFE_MULTIPLY_LIMIT = Long.MAX_VALUE / 100L;
+/**
+ * Safe percentage calculation for DownloadManager byte counters.
+ * Avoids signed 64-bit overflow when computing downloaded * 100 / total
+ * for very large but valid transfers near Long.MAX_VALUE.
+ */
+public final class BrowserDownloadProgress {
+    private BrowserDownloadProgress() {}
 
-    private BrowserDownloadProgress() { }
-
-    static int percent(long downloaded, long total) {
-        if (downloaded <= 0L || total <= 0L) return 0;
+    /**
+     * Returns the floor percentage of downloaded/total, in 0..100.
+     * Negative or unknown (total <= 0) counters yield 0.
+     * Provider overshoot or exact completion is clamped to 100.
+     */
+    public static int percent(long downloaded, long total) {
+        if (downloaded < 0L || total <= 0L) return 0;
         if (downloaded >= total) return 100;
 
-        // The common path is exact integer arithmetic and cannot overflow.
-        if (downloaded <= SAFE_MULTIPLY_LIMIT) {
+        // Normal path: no overflow possible when downloaded * 100 fits in long.
+        if (downloaded <= Long.MAX_VALUE / 100L) {
             return (int) (downloaded * 100L / total);
         }
 
-        // DownloadManager exposes signed longs. Large valid files can overflow
-        // downloaded * 100 even though downloaded < total; use exact wide math.
-        return BigInteger.valueOf(downloaded)
+        // Rare large-counter path: exact BigInteger floor division.
+        BigInteger pct = BigInteger.valueOf(downloaded)
                 .multiply(BigInteger.valueOf(100L))
-                .divide(BigInteger.valueOf(total))
-                .intValue();
+                .divide(BigInteger.valueOf(total));
+        int result = pct.intValue();
+        return Math.max(0, Math.min(100, result));
     }
 }
