@@ -9,9 +9,12 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp({ savedValue, failBackup = false }) {
+function bootApp({ savedValue, failBackup = false, failPrimarySave = false, confirmResult = true, confirmThrows = false }) {
   const elements = new Map();
   const classSets = new Map();
+  const listeners = new Map();
+  const confirmMessages = [];
+  let fileReadCount = 0;
   const storedValues = new Map([[STORAGE_KEY, savedValue]]);
 
   function element(selector) {
@@ -37,7 +40,12 @@ function bootApp({ savedValue, failBackup = false }) {
             return enabled;
           }
         },
-        addEventListener() {},
+        addEventListener(type, handler) {
+          const key = `${selector}:${type}`;
+          const handlers = listeners.get(key) || [];
+          handlers.push(handler);
+          listeners.set(key, handlers);
+        },
         setAttribute: (name, value) => attributes.set(name, value),
         removeAttribute: (name) => attributes.delete(name),
         querySelector: (childSelector) => element(`${selector} ${childSelector}`),
@@ -54,7 +62,7 @@ function bootApp({ savedValue, failBackup = false }) {
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
-      if (key === BACKUP_KEY && failBackup) throw new Error('Quota exceeded');
+      if ((key === BACKUP_KEY && failBackup) || (key === STORAGE_KEY && failPrimarySave)) throw new Error('Quota exceeded');
       storedValues.set(key, String(value));
     }
   };
@@ -66,8 +74,20 @@ function bootApp({ savedValue, failBackup = false }) {
   };
   const window = {
     DaymarkLogic: logic,
+    confirm(message) {
+      confirmMessages.push(String(message));
+      if (confirmThrows) throw new Error('confirmation unavailable');
+      return confirmResult;
+    },
     addEventListener() {}
   };
+  class TestFileReader {
+    readAsText(file) {
+      fileReadCount += 1;
+      this.result = file.content;
+      if (typeof this.onload === 'function') this.onload();
+    }
+  }
 
   element('#storage-status').classList.add('is-checking');
 
@@ -79,13 +99,116 @@ function bootApp({ savedValue, failBackup = false }) {
     document,
     localStorage,
     window,
+    FileReader: TestFileReader,
     clearTimeout() {},
     setTimeout: () => 1,
     setInterval: () => 1
   }, { filename: 'app.js' });
 
-  return { elements, storedValues, classSets };
+  return {
+    elements,
+    storedValues,
+    classSets,
+    listeners,
+    confirmMessages,
+    get fileReadCount() { return fileReadCount; }
+  };
 }
+
+
+function makeImportTask(id, title) {
+  const timestamp = new Date().toISOString();
+  return {
+    id,
+    title,
+    dueDate: null,
+    priority: 'medium',
+    completed: false,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
+function triggerTaskImport(app, file) {
+  const input = app.elements.get('#import-file');
+  input.files = [file];
+  const handlers = app.listeners.get('#import-file:change') || [];
+  for (const handler of handlers) handler({ currentTarget: input });
+}
+
+test('task import previews additions, duplicates and invalid rows before appending', () => {
+  const existing = makeImportTask('same-id', 'Original task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue });
+  const importText = JSON.stringify([
+    makeImportTask('same-id', 'Imported duplicate must not overwrite'),
+    makeImportTask('new-id', 'New task'),
+    { id: 'invalid-id', title: '', priority: 'medium', completed: false }
+  ]);
+
+  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 1, 'the user must see a preview before data changes');
+  assert.match(app.confirmMessages[0], /1 new task will be added/);
+  assert.match(app.confirmMessages[0], /1 duplicate task will be skipped/);
+  assert.match(app.confirmMessages[0], /1 invalid record will be skipped/);
+  assert.match(app.confirmMessages[0], /current tasks will not be replaced/);
+
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 2);
+  assert.equal(saved[0].title, 'Original task', 'existing data must never be overwritten by an imported duplicate');
+  assert.equal(saved[1].id, 'new-id');
+  assert.equal(saved[1].title, 'New task');
+});
+
+test('declining task import confirmation leaves storage unchanged', () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue, confirmResult: false });
+  const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
+
+  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
+  assert.match(app.elements.get('#toast').textContent, /Import cancelled\. Nothing was changed/);
+});
+
+test('confirmation failure fails closed without mutating imported tasks', () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue, confirmThrows: true });
+  const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
+
+  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
+  assert.match(app.elements.get('#toast').textContent, /confirmation could not be displayed/);
+});
+
+test('failed task import save rolls back in-memory state and reports no import', () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue, failPrimarySave: true });
+  const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
+
+  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 1, 'the preview and confirmation still happen before saving');
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue, 'failed storage write must preserve the original payload');
+  assert.doesNotMatch(app.elements.get('#task-list').innerHTML, /Do not add/, 'failed import must roll back the visible in-memory state');
+  assert.match(app.elements.get('#toast').textContent, /No tasks were imported/);
+});
+
+test('oversized task backup is rejected before FileReader allocation', () => {
+  const app = bootApp({ savedValue: JSON.stringify([]) });
+  triggerTaskImport(app, { size: 8 * 1024 * 1024 + 1, content: '[]' });
+
+  assert.equal(app.fileReadCount, 0, 'oversized files must be rejected before reading into memory');
+  assert.equal(app.confirmMessages.length, 0);
+  assert.match(app.elements.get('#toast').textContent, /maximum 8 MiB/);
+});
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
   const corruptData = '{not valid JSON';
