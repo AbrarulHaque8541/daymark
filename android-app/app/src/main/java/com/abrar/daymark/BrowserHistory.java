@@ -1,5 +1,6 @@
 package com.abrar.daymark;
 
+import java.net.IDN;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -22,16 +23,50 @@ final class BrowserHistory {
             URI source = new URI(address.trim());
             String scheme = source.getScheme();
             if (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme)) return null;
-            String host = source.getHost();
-            if (host == null || host.trim().isEmpty()) return null;
+            if (source.isOpaque() || source.getRawAuthority() == null) return null;
 
-            int port = source.getPort();
-            if (port == 0 || port > 65535) return null;
+            // URI.getHost() is null for valid Unicode IDNs. Parse the raw authority
+            // without retaining userinfo, then canonicalize DNS names to ASCII.
+            String authority = source.getRawAuthority();
+            int userInfoEnd = authority.lastIndexOf('@');
+            String hostAndPort = authority.substring(userInfoEnd + 1);
+            if (hostAndPort.isEmpty()) return null;
 
-            host = host.toLowerCase(Locale.ROOT);
-            if (host.indexOf(':') >= 0 && !(host.startsWith("[") && host.endsWith("]"))) {
-                host = "[" + host + "]";
+            String host;
+            int port = -1;
+            if (hostAndPort.startsWith("[")) {
+                int closingBracket = hostAndPort.indexOf(']');
+                if (closingBracket <= 1) return null;
+                host = hostAndPort.substring(0, closingBracket + 1);
+                String suffix = hostAndPort.substring(closingBracket + 1);
+                if (!suffix.isEmpty()) {
+                    if (!suffix.startsWith(":")) return null;
+                    port = parsePort(suffix.substring(1));
+                }
+                URI ipv6 = new URI(scheme.toLowerCase(Locale.ROOT) + "://" + host);
+                if (ipv6.getHost() == null) return null;
+                host = ipv6.getHost().toLowerCase(Locale.ROOT);
+            } else {
+                int colon = hostAndPort.lastIndexOf(':');
+                if (colon >= 0) {
+                    // IPv6 literals must be bracketed; multiple unbracketed colons
+                    // are not a valid DNS host/port pair.
+                    if (hostAndPort.indexOf(':') != colon) return null;
+                    host = hostAndPort.substring(0, colon);
+                    port = parsePort(hostAndPort.substring(colon + 1));
+                } else {
+                    host = hostAndPort;
+                }
+                if (host.isEmpty()) return null;
+                // A single DNS root dot is equivalent; normalize it so duplicate
+                // visits to example.test and example.test. share one history entry.
+                if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
+                if (host.isEmpty() || host.endsWith(".")) return null;
+                host = IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
+                if (host.isEmpty() || host.length() > 253) return null;
             }
+
+            if (port == 0 || port > 65535) return null;
             int defaultPort = "https".equalsIgnoreCase(scheme) ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT;
             int storedPort = port > 0 && port != defaultPort ? port : -1;
             StringBuilder origin = new StringBuilder(scheme.toLowerCase(Locale.ROOT)).append("://").append(host);
@@ -50,6 +85,19 @@ final class BrowserHistory {
         } catch (Exception invalidUrl) {
             return null;
         }
+    }
+
+    /** Parses only an explicit decimal port in the valid TCP range. */
+    private static int parsePort(String value) {
+        if (value == null || value.isEmpty()) throw new IllegalArgumentException("empty port");
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) < '0' || value.charAt(i) > '9') {
+                throw new IllegalArgumentException("port must be decimal");
+            }
+        }
+        int port = Integer.parseInt(value);
+        if (port < 1 || port > 65535) throw new IllegalArgumentException("port out of range");
+        return port;
     }
 
     static List<String> decode(String serialized) {
