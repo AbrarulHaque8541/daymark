@@ -52,7 +52,7 @@ public final class BrowserAppLinkApprovalSmoke {
             check(!BrowserAppLinkApproval.isApproved(31, true, invalid, states),
                     "invalid host must not approve direct handoff: " + invalid);
         }
-        check(!BrowserAppLinkApproval.isApproved(31, true, "verified.example", 
+        check(!BrowserAppLinkApproval.isApproved(31, true, "verified.example",
                         Collections.singletonMap("verified.example", 99)),
                 "unknown platform state fails closed");
 
