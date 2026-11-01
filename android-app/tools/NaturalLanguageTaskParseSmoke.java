@@ -67,7 +67,15 @@ public final class NaturalLanguageTaskParseSmoke {
         check("2026-10-19".equals(parsed.dueDate), "next weekday abbreviation: " + parsed.dueDate);
         parsed = NaturalLanguageTaskParse.parse("standup Monday", today);
         check("2026-10-12".equals(parsed.dueDate), "plain Monday unchanged: " + parsed.dueDate);
-        System.out.println("PASS NaturalLanguageTaskParseSmoke (32 assertions)");
+
+        LocalDate monday = LocalDate.of(2026, 10, 12);
+        parsed = NaturalLanguageTaskParse.parse("plan sprint next Monday", monday);
+        check("2026-10-19".equals(parsed.dueDate),
+                "next Monday when today is Monday means seven days later, not fourteen: " + parsed.dueDate);
+        parsed = NaturalLanguageTaskParse.parse("retro next mon", monday);
+        check("2026-10-19".equals(parsed.dueDate),
+                "next weekday abbreviation uses the same strict following-week rule: " + parsed.dueDate);
+        System.out.println("PASS NaturalLanguageTaskParseSmoke (34 assertions)");
     }
 
     private static void check(boolean condition, String message) {
