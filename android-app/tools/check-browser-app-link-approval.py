@@ -26,6 +26,8 @@ for expected in (
     "BrowserAppLinkApproval.isApproved(",
     "resolved.activityInfo.packageName",
     "uri.getHost()",
+    "app link handoff declined origin=",
+    "reason=host-not-verified-or-user-selected",
 ):
     assert expected in webview, f"WebView direct handoff must use platform host approval: {expected}"
 
