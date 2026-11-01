@@ -102,6 +102,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserIntentLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserAddressSmoke.java" \
   "$ROOT/tools/BrowserDownloadFilenamePolicySmoke.java" \
+  "$ROOT/tools/BrowserDownloadProgressSmoke.java" \
   "$ROOT/tools/BrowserDownloadEnqueueGateSmoke.java" \
   "$ROOT/tools/BrowserExternalLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserLogPolicySmoke.java" \
