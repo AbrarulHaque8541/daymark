@@ -45,8 +45,10 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
           });
         },
         reset() {},
-        setAttribute() {},
-        removeAttribute() {},
+        attributes: new Map(),
+        getAttribute(name) { return this.attributes.has(name) ? this.attributes.get(name) : null; },
+        setAttribute(name, value) { this.attributes.set(name, String(value)); },
+        removeAttribute(name) { this.attributes.delete(name); },
         querySelector: (child) => element(`${selector} ${child}`),
         focus() {},
         showModal() { this.open = true; },
