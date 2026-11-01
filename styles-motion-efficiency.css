@@ -100,3 +100,25 @@
 @keyframes storage-pulse {
   50% { border-color: rgba(22, 112, 95, .45); }
 }
+
+/* Additional press feedback and a11y polish — Cycle B */
+.suggestion-item:active,
+.filter-button:active,
+.date-chip:active,
+.subtask-add-button:active,
+.toast-action:active {
+  transform: translateY(1px) scale(.985);
+}
+.dialog button:active,
+.dialog .button:active {
+  transform: translateY(1px) scale(.985);
+}
+/* Stronger focus ring for high-contrast and keyboard users */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(22, 112, 95, .55);
+  outline-offset: 3px;
+}
