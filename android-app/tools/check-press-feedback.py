@@ -41,12 +41,16 @@ def check(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def region(start_marker: str, end_marker: str, label: str) -> str:
+def source_region(source: str, start_marker: str, end_marker: str, label: str) -> str:
     """The source between two markers, for order-sensitive assertions."""
-    body = ACTIVITY.split(start_marker, 1)
+    body = source.split(start_marker, 1)
     if len(body) < 2 or end_marker not in body[1]:
         raise AssertionError(f"cannot locate {label} between {start_marker!r} and {end_marker!r}")
     return body[1].split(end_marker, 1)[0]
+
+
+def region(start_marker: str, end_marker: str, label: str) -> str:
+    return source_region(ACTIVITY, start_marker, end_marker, label)
 
 
 # --- 1. The pure press-surface helper stays pure and keeps its contract ------------------------
@@ -170,10 +174,33 @@ check("private static final Interpolator MOTION_EXIT = new AccelerateInterpolato
       "the shared exit curve is missing")
 task_chrome = region("private void setTaskChromeHidden(boolean hidden)",
                      "private void setTaskScrollReserve", "setTaskChromeHidden()")
-check("setInterpolator(MOTION_ENTER)" in task_chrome,
-      "the task brand/composer show animation must keep the shared enter curve")
-check("setInterpolator(MOTION_EXIT)" in task_chrome,
-      "the task brand/composer hide animation must keep the shared exit curve")
+brand_motion = source_region(task_chrome, "if (topBarBrand != null) {", "if (topBarMark != null",
+                            "topBarBrand motion")
+brand_hide = source_region(brand_motion, "if (hidden) {", "            } else {",
+                           "topBarBrand hide branch")
+brand_show = source_region(brand_motion, "            } else {", "        }",
+                           "topBarBrand show branch")
+check(bool(re.search(r"topBarBrand\.animate\(\)\.alpha\(0f\)\.setDuration\(120L\)\s*"
+                     r"\.setInterpolator\(MOTION_EXIT\)", brand_hide)),
+      "topBarBrand hide must use the shared exit curve in its own branch")
+check(bool(re.search(r"topBarBrand\.animate\(\)\.alpha\(1f\)\.setDuration\(180L\)\s*"
+                     r"\.setInterpolator\(MOTION_ENTER\)\.start\(\)", brand_show)),
+      "topBarBrand show must use the shared enter curve in its own branch")
+composer_start = task_chrome.find("sharedComposer.animate().cancel();")
+check(composer_start >= 0, "sharedComposer motion block is missing")
+composer_motion = task_chrome[composer_start:]
+composer_hide = source_region(composer_motion, "if (hidden) {", "        } else {",
+                              "sharedComposer hide branch")
+composer_show = source_region(composer_motion, "        } else {", "\n    }\n",
+                              "sharedComposer show branch")
+check(bool(re.search(r"sharedComposer\.animate\(\)\.translationY\(-reserve\)\s*"
+                     r"\.alpha\(0f\)\.setDuration\(180L\)\.setInterpolator\(MOTION_EXIT\)",
+                     composer_hide)),
+      "sharedComposer hide must use the shared exit curve in its own branch")
+check(bool(re.search(r"sharedComposer\.animate\(\)\.translationY\(0f\)\.alpha\(1f\)\."
+                     r"setDuration\(200L\)\s*\.setInterpolator\(MOTION_ENTER\)\.start\(\)",
+                     composer_show)),
+      "sharedComposer show must use the shared enter curve in its own branch")
 browser_chrome = region("private void setBrowserChromeHidden(boolean hidden)",
                         "private void scheduleBrowserChromeRestore", "setBrowserChromeHidden()")
 check("WorkspaceMotion.hideChrome(view, hiddenOffset, MOTION_EXIT," in browser_chrome,
