@@ -78,8 +78,10 @@ for marker, explanation in (
 ):
     assert marker in active_check, explanation
 normalized_activity = "".join(activity.split())
-assert "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))" in normalized_activity, \
-    "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
+assert (
+    "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))"
+    in normalized_activity
+), "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
 assert "openDownloadsFolder()" not in activity, "Downloads must not be a generic document picker"
 assert "ACTION_OPEN_DOCUMENT" not in method, "the downloads list must not be implemented as a generic file picker"
 assert "No Daymark browser downloads are available yet." in method, "empty state must be explicit"
