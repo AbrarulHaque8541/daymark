@@ -9,7 +9,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp(storedValues, failWrites = new Set()) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false) {
   const elements = new Map();
 
   function element(selector) {
@@ -45,8 +45,10 @@ function bootApp(storedValues, failWrites = new Set()) {
           });
         },
         reset() {},
-        setAttribute() {},
-        removeAttribute() {},
+        attributes: new Map(),
+        getAttribute(name) { return this.attributes.has(name) ? this.attributes.get(name) : null; },
+        setAttribute(name, value) { this.attributes.set(name, String(value)); },
+        removeAttribute(name) { this.attributes.delete(name); },
         querySelector: (child) => element(`${selector} ${child}`),
         focus() {},
         showModal() { this.open = true; },
@@ -68,6 +70,7 @@ function bootApp(storedValues, failWrites = new Set()) {
   }
   const mockURL = {
     createObjectURL(blob) {
+      if (failExport) throw new Error('Blob URL creation failed');
       lastBlob = blob;
       return 'blob:daymark-recovery-test';
     },
@@ -90,8 +93,10 @@ function bootApp(storedValues, failWrites = new Set()) {
     body: { appendChild() {} },
     addEventListener() {}
   };
+  const animationFrames = [];
   const window = {
     DaymarkLogic: logic,
+    requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
 
@@ -110,7 +115,14 @@ function bootApp(storedValues, failWrites = new Set()) {
     setInterval: () => 1
   }, { filename: 'app.js' });
 
-  return { elements, getLastBlob: () => lastBlob };
+  return {
+    elements,
+    getLastBlob: () => lastBlob,
+    flushAnimationFrame() {
+      const callback = animationFrames.shift();
+      if (callback) callback();
+    }
+  };
 }
 
 function validTask(id, title) {
@@ -266,14 +278,50 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.equal(action.textContent, 'Export recovery');
 
   action.dispatch('click');
+  const status = app.elements.get('#toast');
+  assert.equal(status.textContent, 'Preparing recovery export…');
+  assert.equal(status.getAttribute('aria-busy'), 'true',
+    'the live region announces that export preparation is in progress');
+  app.flushAnimationFrame();
+  assert.equal(status.getAttribute('aria-busy'), 'true',
+    'the preparation state remains visible through the first frame');
+  assert.equal(app.elements.has('#download-link'), false,
+    'download element is not created until the next frame');
+  app.flushAnimationFrame();
+
   const link = app.elements.get('#download-link');
   assert.equal(link.clicked, true, 'the browser download is triggered');
   assert.equal(link.download, 'daymark-recovery-backup.txt');
   assert.equal(link.href, 'blob:daymark-recovery-test');
   assert.equal(app.getLastBlob().parts[0], backupRaw,
     'export contains the exact retained recovery bundle bytes');
+  assert.match(status.textContent, /Recovery backup exported/);
+  assert.equal(status.getAttribute('aria-busy'), null,
+    'the live region clears its busy state after export');
 });
 
+
+test('recovery export clears its accessible busy state when browser download setup fails', () => {
+  const original = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const app = bootApp(storedValues, new Set(), true);
+  const action = app.elements.get('#toast-action');
+
+  action.dispatch('click');
+  const status = app.elements.get('#toast');
+  assert.equal(status.getAttribute('aria-busy'), 'true');
+  app.flushAnimationFrame();
+  assert.equal(status.getAttribute('aria-busy'), 'true');
+  app.flushAnimationFrame();
+
+  assert.equal(status.textContent, 'Recovery backup export is not available in this browser.');
+  assert.equal(status.getAttribute('aria-busy'), null,
+    'failed export must not leave the live region permanently busy');
+  assert.equal(status.classList.contains('is-exporting'), false);
+});
 
 test('app.js integrity guard rejects placeholder or truncated application source', () => {
   assert.ok(APP_SOURCE.length >= 50000,
