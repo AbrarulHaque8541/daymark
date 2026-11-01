@@ -18,20 +18,21 @@ test('daily repeat advances one day when the task is due today', () => {
   assert.equal(repeat.nextDueDate('2026-10-30', 'daily', '2026-10-30'), '2026-10-31');
 });
 
-test('daily repeat skips missed days forward to today', () => {
-  assert.equal(repeat.nextDueDate('2026-10-20', 'daily', '2026-10-30'), '2026-10-30');
+test('daily repeat skips missed occurrences to the first future date', () => {
+  assert.equal(repeat.nextDueDate('2026-10-20', 'daily', '2026-10-30'), '2026-10-31');
 });
 
-test('daily repeat never lands in the past even after a long gap', () => {
-  assert.equal(repeat.nextDueDate('2026-09-01', 'daily', '2026-10-30'), '2026-10-30');
+test('daily repeat jumps directly past very old occurrences', () => {
+  assert.equal(repeat.nextDueDate('2000-01-01', 'daily', '2026-10-30'), '2026-10-31');
+  assert.equal(repeat.nextDueDate('0001-01-01', 'daily', '2026-10-30'), '2026-10-31');
 });
 
 test('weekly repeat keeps the weekday and can land on today', () => {
   // Due Friday 2026-10-30, completed today: the next Friday is 2026-11-06.
   assert.equal(repeat.nextDueDate('2026-10-30', 'weekly', '2026-10-30'), '2026-11-06');
-  // Missed two Fridays from 2026-10-09; the next occurrence is Friday
-  // 2026-10-30 itself (today), consistent with the daily catch-up rule.
-  assert.equal(repeat.nextDueDate('2026-10-09', 'weekly', '2026-10-30'), '2026-10-30');
+  // Missed occurrences on or before today are skipped; completion never
+  // schedules a same-day recurrence.
+  assert.equal(repeat.nextDueDate('2026-10-09', 'weekly', '2026-10-30'), '2026-11-06');
 });
 
 test('monthly repeat lands on the same day of the next month', () => {
@@ -40,9 +41,11 @@ test('monthly repeat lands on the same day of the next month', () => {
   assert.equal(repeat.nextDueDate('2026-01-15', 'monthly', '2026-02-20'), '2026-03-15');
 });
 
-test('monthly repeat clamps month-end days', () => {
-  assert.equal(repeat.nextDueDate('2026-01-31', 'monthly', '2026-02-01'), '2026-02-28');
-  assert.equal(repeat.nextDueDate('2026-01-31', 'monthly', '2026-04-01'), '2026-04-30');
+test('monthly repeat clamps month-end days without losing its original anchor', () => {
+  assert.equal(repeat.nextDueDate('2026-01-31', 'monthly', '2026-02-01', 31), '2026-02-28');
+  assert.equal(repeat.nextDueDate('2026-01-31', 'monthly', '2026-04-01', 31), '2026-04-30');
+  assert.equal(repeat.nextDueDate('2026-02-28', 'monthly', '2026-02-28', 31), '2026-03-31');
+  assert.equal(repeat.nextDueDate('2026-02-28', 'monthly', '2026-03-31', 31), '2026-04-30');
 });
 
 test('weekday repeat skips weekends', () => {
@@ -54,13 +57,17 @@ test('weekday repeat skips weekends', () => {
   assert.equal(repeat.nextDueDate('2026-10-31', 'weekdays', '2026-10-31'), '2026-11-02');
   assert.equal(repeat.nextDueDate('2026-11-01', 'weekdays', '2026-11-01'), '2026-11-02');
   // Missed weekdays are skipped forward to the next occurrence.
-  assert.equal(repeat.nextDueDate('2026-10-26', 'weekdays', '2026-10-30'), '2026-10-30');
+  assert.equal(repeat.nextDueDate('2026-10-26', 'weekdays', '2026-10-30'), '2026-11-02');
+  // Even a multi-decade gap resolves to the next weekday, not a capped past date.
+  assert.equal(repeat.nextDueDate('2000-01-03', 'weekdays', '2026-10-30'), '2026-11-02');
 });
 
 test('yearly repeat keeps month and day and clamps the leap day', () => {
   assert.equal(repeat.nextDueDate('2026-10-05', 'yearly', '2026-10-05'), '2027-10-05');
   assert.equal(repeat.nextDueDate('2024-02-29', 'yearly', '2024-02-29'), '2025-02-28');
-  assert.equal(repeat.nextDueDate('2024-02-29', 'yearly', '2026-10-31'), '2027-02-28');
+  assert.equal(repeat.nextDueDate('2024-02-29', 'yearly', '2026-10-31', 29), '2027-02-28');
+  assert.equal(repeat.nextDueDate('2025-02-28', 'yearly', '2025-02-28', 29), '2026-02-28');
+  assert.equal(repeat.nextDueDate('2027-02-28', 'yearly', '2027-02-28', 29), '2028-02-29');
 });
 
 test('completing early keeps the rhythm anchored to the due date', () => {
@@ -77,5 +84,6 @@ test('invalid input returns null instead of a made-up date', () => {
   assert.equal(repeat.nextDueDate('2026-10-30', 'hourly', '2026-10-30'), null);
   assert.equal(repeat.nextDueDate('2026-10-30', null, '2026-10-30'), null);
   assert.equal(repeat.nextDueDate('2026-10-30', 'daily', 'not-a-date'), '2026-10-31');
+  assert.equal(repeat.nextDueDate('2026-10-30', 'monthly', '2026-10-30', 32), null);
 });
 
