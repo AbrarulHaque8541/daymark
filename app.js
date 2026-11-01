@@ -975,13 +975,19 @@
       return;
     }
 
-    state.tasks = state.tasks.concat(incoming);
+    const previousTasks = state.tasks;
+    state.tasks = previousTasks.concat(incoming);
     const saved = persistTasks();
+    if (!saved) state.tasks = previousTasks;
     render();
+    if (!saved) {
+      showToast('Import could not be saved. No tasks were imported.');
+      return;
+    }
     const parts = [`${incoming.length} restored`];
     if (duplicates) parts.push(`${duplicates} duplicate${duplicates === 1 ? '' : 's'} kept as your version`);
     if (validated.rejectedCount > 0) parts.push(`${validated.rejectedCount} skipped as invalid`);
-    showToast(saved ? `Import finished — ${parts.join(', ')}.` : 'Import finished, but saving to this browser failed.');
+    showToast(`Import finished — ${parts.join(', ')}.`);
   }
 
   function importTasks(file) {
