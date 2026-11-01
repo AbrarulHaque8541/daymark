@@ -3,7 +3,10 @@ package com.abrar.daymark;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -75,6 +78,8 @@ final class TaskLogic {
                 && (task.dueDate == null || !isRepeatRule(task.repeatRule))) return false;
         if (REPEAT_MONTHLY.equals(task.repeatRule)) {
             if (!isValidRepeatDayOfMonth(task.repeatDayOfMonth)) return false;
+        } else if (REPEAT_YEARLY.equals(task.repeatRule)) {
+            if (!isValidYearlyAnchor(task.dueDate, task.repeatDayOfMonth)) return false;
         } else if (task.repeatDayOfMonth != null) {
             return false;
         }
@@ -126,6 +131,15 @@ final class TaskLogic {
         return dayOfMonth != null && dayOfMonth >= 1 && dayOfMonth <= 31;
     }
 
+    /** Yearly anchors must match the date, except a preserved Feb 29 may clamp to Feb 28 in a short year. */
+    static boolean isValidYearlyAnchor(String dueDate, Integer dayOfMonth) {
+        if (!isDateOnly(dueDate) || !isValidRepeatDayOfMonth(dayOfMonth)) return false;
+        LocalDate date = LocalDate.parse(dueDate);
+        return date.getDayOfMonth() == dayOfMonth
+                || (date.getMonthValue() == 2 && date.getDayOfMonth() == 28
+                && dayOfMonth == 29 && !date.isLeapYear());
+    }
+
     /** A tag is lowercase alphanumerics, hyphens, or underscores; 1-24 characters. */
     static boolean isTag(String tag) {
         return tag != null && tag.matches("[a-z0-9][a-z0-9_-]{0,23}");
@@ -164,8 +178,8 @@ final class TaskLogic {
 
     /** Next occurrence date for a repeating task; the two-argument form anchors monthly rules to this date. */
     static String nextDueDate(String dueDate, String rule) {
-        Integer repeatDayOfMonth = REPEAT_MONTHLY.equals(rule) && isDateOnly(dueDate)
-                ? Integer.valueOf(dueDate.substring(8)) : null;
+        Integer repeatDayOfMonth = (REPEAT_MONTHLY.equals(rule) || REPEAT_YEARLY.equals(rule))
+                && isDateOnly(dueDate) ? Integer.valueOf(dueDate.substring(8)) : null;
         return nextDueDate(dueDate, rule, repeatDayOfMonth);
     }
 
@@ -187,7 +201,14 @@ final class TaskLogic {
             }
             return next.toString();
         }
-        if (REPEAT_YEARLY.equals(rule)) return date.plusYears(1).toString();
+        if (REPEAT_YEARLY.equals(rule)) {
+            int anchor = repeatDayOfMonth == null ? date.getDayOfMonth() : repeatDayOfMonth;
+            if (!isValidYearlyAnchor(dueDate, anchor)) {
+                throw new IllegalArgumentException("Choose a valid yearly repeat date.");
+            }
+            LocalDate nextYear = date.plusYears(1);
+            return nextYear.withDayOfMonth(Math.min(anchor, nextYear.lengthOfMonth())).toString();
+        }
         if (!isValidRepeatDayOfMonth(repeatDayOfMonth)) {
             throw new IllegalArgumentException("Choose a valid monthly repeat date.");
         }
@@ -373,29 +394,97 @@ final class TaskLogic {
     }
 
     /**
-     * Rolls a repeating task forward to its first occurrence strictly after now.
-     * Returns the same instance when nothing can advance: no rule, no due date,
-     * a still-future occurrence, or a bounded guard against runaway loops.
+     * Rolls a repeating task to its first occurrence strictly after the configured reminder trigger.
+     * Returns the same instance when there is no valid recurrence, the trigger is still
+     * future, or the next date cannot be represented. Calendar arithmetic avoids a fixed
+     * iteration cap for long-overdue daily, weekly, weekday, monthly, and yearly tasks.
      */
     static Task advanceRepeat(Task task, ZoneId zone, Instant now) {
         if (task == null || task.repeatRule == null || !isRepeatRule(task.repeatRule)
-                || !isDateOnly(task.dueDate)) {
+                || !isDateOnly(task.dueDate) || zone == null || now == null) {
             return task;
         }
         LocalTime time = TaskDuePresets.isTimeOnly(task.dueTime)
                 ? LocalTime.parse(task.dueTime, DateTimeFormatter.ISO_LOCAL_TIME)
                 : DEFAULT_REMINDER_TIME;
-        LocalDate date = LocalDate.parse(task.dueDate);
-        Instant dueMoment = LocalDateTime.of(date, time).atZone(zone).toInstant();
-        if (dueMoment.isAfter(now)) return task;
-        int steps = 0;
-        while (!dueMoment.isAfter(now)) {
-            steps++;
-            if (steps > 3660) return task; // bounded: ten years of daily repeats
-            date = LocalDate.parse(nextDueDate(date.toString(), task.repeatRule, task.repeatDayOfMonth));
-            dueMoment = LocalDateTime.of(date, time).atZone(zone).toInstant();
+        int leadMinutes = task.reminderLeadMinutes == null ? 0 : task.reminderLeadMinutes;
+        LocalDate start = LocalDate.parse(task.dueDate);
+        Instant currentTrigger = repeatTriggerMoment(start, time, leadMinutes, zone);
+        if (currentTrigger.isAfter(now)) return task;
+
+        LocalDate today = LocalDateTime.ofInstant(now, zone).toLocalDate();
+        LocalDate next;
+        try {
+            if (REPEAT_DAILY.equals(task.repeatRule)) {
+                long days = ChronoUnit.DAYS.between(start, today);
+                long steps = Math.max(1L, days);
+                next = start.plusDays(steps);
+                if (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) next = next.plusDays(1);
+            } else if (REPEAT_WEEKLY.equals(task.repeatRule)) {
+                long days = ChronoUnit.DAYS.between(start, today);
+                long steps = Math.max(1L, days / 7L);
+                next = start.plusWeeks(steps);
+                if (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) next = next.plusWeeks(1);
+            } else if (REPEAT_WEEKDAYS.equals(task.repeatRule)) {
+                LocalDate first = nextWeekday(start);
+                LocalDate afterToday = nextWeekday(today);
+                next = afterToday.isAfter(first) ? afterToday : first;
+                int guard = 0;
+                while (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now) && guard++ < 8) {
+                    next = nextWeekday(next);
+                }
+                if (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) return task;
+            } else if (REPEAT_MONTHLY.equals(task.repeatRule)) {
+                int anchor = task.repeatDayOfMonth == null ? start.getDayOfMonth() : task.repeatDayOfMonth;
+                if (!isValidRepeatDayOfMonth(anchor)) return task;
+                long monthDifference = ChronoUnit.MONTHS.between(YearMonth.from(start), YearMonth.from(today));
+                long steps = Math.max(1L, monthDifference);
+                next = monthlyOccurrence(start, anchor, steps);
+                if (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) {
+                    next = monthlyOccurrence(start, anchor, steps + 1L);
+                }
+            } else {
+                int anchor = task.repeatDayOfMonth == null ? start.getDayOfMonth() : task.repeatDayOfMonth;
+                if (!isValidYearlyAnchor(task.dueDate, anchor)) return task;
+                long yearDifference = (long) today.getYear() - start.getYear();
+                long steps = Math.max(1L, yearDifference);
+                next = yearlyOccurrence(start, anchor, steps);
+                if (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) {
+                    next = yearlyOccurrence(start, anchor, steps + 1L);
+                }
+            }
+        } catch (DateTimeException | ArithmeticException exception) {
+            return task;
         }
-        return task.withRepeatAdvanced(date.toString(), Instant.now().toString());
+        if (!isDateOnly(next.toString()) || !repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) {
+            return task;
+        }
+        return task.withRepeatAdvanced(next.toString(), now.toString());
+    }
+
+    private static Instant repeatTriggerMoment(LocalDate date, LocalTime dueTime,
+                                             int leadMinutes, ZoneId zone) {
+        return LocalDateTime.of(date, dueTime).minusMinutes(leadMinutes).atZone(zone).toInstant();
+    }
+
+    private static LocalDate nextWeekday(LocalDate date) {
+        LocalDate next = date.plusDays(1);
+        while (next.getDayOfWeek() == DayOfWeek.SATURDAY
+                || next.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            next = next.plusDays(1);
+        }
+        return next;
+    }
+
+    private static LocalDate monthlyOccurrence(LocalDate start, int anchor, long months) {
+        YearMonth target = YearMonth.from(start).plusMonths(months);
+        return target.atDay(Math.min(anchor, target.lengthOfMonth()));
+    }
+
+    private static LocalDate yearlyOccurrence(LocalDate start, int anchor, long years) {
+        int year = Math.toIntExact((long) start.getYear() + years);
+        YearMonth target = YearMonth.of(year, start.getMonth());
+        return target.atDay(Math.min(anchor, target.lengthOfMonth()));
     }
 
     private static String requireTitle(String title) {

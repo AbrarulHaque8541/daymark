@@ -103,18 +103,23 @@
     return session;
   }
 
-  // finish transitions a running/paused session to done. When the budget ran out
-  // naturally, endedAtMs is the exact moment it expired (createdAtMs + active
-  // time), not the moment tick() happened to run; a manual stop uses now.
+  // finish transitions a running/paused session to done. For natural expiry
+  // while running, endedAtMs is the wall-clock end of the current active segment
+  // plus the remaining active budget; paused wall-clock gaps are excluded. A late
+  // tick still records that exact expiry rather than its callback time. Manual
+  // stops use now.
   function finish(session, now, completed) {
     if (!session || session.state === 'done' || !isFiniteNumber(now)) return session;
     const total = durationMs(session);
     const spent = Math.min(elapsedMs(session, now), total);
     const natural = spent >= total;
+    const naturalEndMs = natural && session.state === 'running' && isFiniteNumber(session.startedAtMs)
+      ? session.startedAtMs + Math.max(0, total - session.accumulatedMs)
+      : now;
     session.finalElapsedMs = spent;
     session.completed = natural ? true : Boolean(completed);
+    session.endedAtMs = natural ? naturalEndMs : now;
     session.state = 'done';
-    session.endedAtMs = natural ? session.createdAtMs + spent : now;
     session.startedAtMs = null;
     session.updatedAtMs = now;
     return session;
@@ -178,7 +183,7 @@
     if (session.state === 'running' && elapsedMs(session, now) >= durationMs(session)) {
       // The budget ran out while the page was closed: complete it exactly at the
       // moment it expired rather than showing a negative clock.
-      finish(session, session.createdAtMs + durationMs(session), true);
+      finish(session, now, true);
       return null;
     }
     return session;
