@@ -55,15 +55,17 @@
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
         if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
       } else if (hasPartialRecoveryBackup()) {
-        // A prior backup may contain records rejected by validation. Keep it
-        // until the user can recover those originals; a healthy filtered store
-        // does not make that backup stale.
+        // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
         offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
+      } else if (hasRecoveryBackupNeedingPreservation()) {
+        // Opaque originals are retained only once grouped into an explicit recovery bundle.
+        setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
+        offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
       } else {
         setStorageStatus('Saved on this device');
-        // A backup of an unreadable payload is stale once the primary store is
-        // healthy. Backups containing rejected task records are retained above.
+        // Only a backup containing fully valid task arrays is stale. Partial or opaque
+        // originals remain recoverable even after the primary store becomes healthy.
         clearRecoveryBackup();
       }
       return validated.tasks;
@@ -162,6 +164,28 @@
     }
   }
 
+  function hasRecoveryBackupNeedingPreservation() {
+    let raw;
+    try {
+      raw = localStorage.getItem(BACKUP_KEY);
+    } catch (error) {
+      return true;
+    }
+    if (typeof raw !== 'string' || raw.length === 0) return false;
+    if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      // Raw malformed backup is stale once the primary store is healthy.
+      // Opaque sources are retained only after being grouped in a recovery bundle.
+      return false;
+    }
+    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
+    return parsed.payloads.some((payload) => typeof payload !== 'string'
+      || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
+  }
+
   function persistTasks() {
     try {
       if (state.recoveryBackupPendingPayload !== null) {
@@ -178,9 +202,11 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
       if (hasPartialRecoveryBackup()) {
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+      } else if (hasRecoveryBackupNeedingPreservation()) {
+        setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
       } else {
         setStorageStatus('Saved on this device');
-        // A full save can clear a stale backup, but not one with rejected records.
+        // A full save can clear only a stale backup of fully valid task arrays; partial or opaque originals stay.
         clearRecoveryBackup();
       }
       return true;
@@ -925,6 +951,248 @@
     }
   }
 
+  function readTaskRecoveryPayloads(raw) {
+    const result = { arrays: [], malformedCount: 0 };
+    if (typeof raw !== 'string' || raw.length === 0) return result;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      result.malformedCount = 1;
+      return result;
+    }
+    if (Array.isArray(parsed)) {
+      result.arrays.push(parsed);
+      return result;
+    }
+    if (parsed && parsed.format === 'daymark-recovery-bundle-v1' && Array.isArray(parsed.payloads)) {
+      parsed.payloads.forEach((payload) => {
+        if (typeof payload !== 'string') {
+          result.malformedCount += 1;
+          return;
+        }
+        try {
+          const records = JSON.parse(payload);
+          if (Array.isArray(records)) result.arrays.push(records);
+          else result.malformedCount += 1;
+        } catch (error) {
+          result.malformedCount += 1;
+        }
+      });
+      return result;
+    }
+    result.malformedCount = 1;
+    return result;
+  }
+
+  function readFocusRecoveryStates(raw) {
+    const result = { states: [], malformedCount: 0 };
+    if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (!focus) {
+      result.malformedCount = 1;
+      return result;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      result.malformedCount = 1;
+      return result;
+    }
+    if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1' && Array.isArray(parsed.payloads)) {
+      parsed.payloads.forEach((payload) => {
+        if (typeof payload !== 'string') {
+          result.malformedCount += 1;
+          return;
+        }
+        try {
+          const recovered = JSON.parse(payload);
+          if (recovered && typeof recovered === 'object' && !Array.isArray(recovered)) result.states.push(recovered);
+          else result.malformedCount += 1;
+        } catch (error) {
+          result.malformedCount += 1;
+        }
+      });
+      return result;
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      result.states.push(parsed);
+      return result;
+    }
+    result.malformedCount = 1;
+    return result;
+  }
+
+  function applyImportedRecovery(recovery, rawText) {
+    let taskRaw = null;
+    let focusRaw = null;
+    if (recovery.format === 'daymark-combined-recovery-v1') {
+      taskRaw = typeof recovery.taskBackup === 'string' ? recovery.taskBackup : null;
+      focusRaw = typeof recovery.focusBackup === 'string' ? recovery.focusBackup : null;
+    } else if (recovery.format === 'daymark-recovery-bundle-v1') {
+      taskRaw = rawText;
+    } else if (recovery.format === 'daymark-focus-recovery-bundle-v1'
+        || Object.prototype.hasOwnProperty.call(recovery, 'session')
+        || Object.prototype.hasOwnProperty.call(recovery, 'log')) {
+      focusRaw = rawText;
+    }
+
+    const taskPayloads = readTaskRecoveryPayloads(taskRaw);
+    const existingTaskIds = new Set(state.tasks.map((task) => task.id));
+    const incomingTasks = [];
+    let duplicateTasks = 0;
+    let invalidTasks = 0;
+    taskPayloads.arrays.forEach((records) => {
+      const validated = logic.validateStoredTasks(records);
+      invalidTasks += validated.rejectedCount;
+      validated.tasks.forEach((task) => {
+        if (existingTaskIds.has(task.id)) {
+          duplicateTasks += 1;
+          return;
+        }
+        existingTaskIds.add(task.id);
+        incomingTasks.push(task);
+      });
+    });
+
+    const focusPayloads = readFocusRecoveryStates(focusRaw);
+    const existingFocusIds = new Set(state.focusLog.map((entry) => entry.id));
+    const incomingFocusLog = [];
+    let duplicateFocusEntries = 0;
+    let invalidFocusRecords = 0;
+    let skippedFocusSessions = 0;
+    let incomingSession = null;
+    focusPayloads.states.forEach((recovered) => {
+      const validatedLog = focus.validateFocusLog(recovered.log);
+      invalidFocusRecords += validatedLog.rejectedCount;
+      validatedLog.entries.forEach((entry) => {
+        if (existingFocusIds.has(entry.id)) {
+          duplicateFocusEntries += 1;
+          return;
+        }
+        existingFocusIds.add(entry.id);
+        incomingFocusLog.push(entry);
+      });
+      const rawSession = recovered.session;
+      if (rawSession === null || rawSession === undefined) return;
+      if (!focus.isValidSession(rawSession)) {
+        invalidFocusRecords += 1;
+        return;
+      }
+      if (rawSession.state === 'done') {
+        const completedEntry = focus.makeLogEntry(rawSession);
+        if (completedEntry && !existingFocusIds.has(completedEntry.id)) {
+          existingFocusIds.add(completedEntry.id);
+          incomingFocusLog.push(completedEntry);
+        } else if (completedEntry) {
+          duplicateFocusEntries += 1;
+        }
+        return;
+      }
+      if (state.focusSession || incomingSession || existingFocusIds.has(rawSession.id)) {
+        skippedFocusSessions += 1;
+        return;
+      }
+      incomingSession = focus.restoreSession(rawSession, Date.now());
+      if (!incomingSession) skippedFocusSessions += 1;
+    });
+
+    const malformedRecovery = taskPayloads.malformedCount + focusPayloads.malformedCount;
+    if (!incomingTasks.length && !incomingFocusLog.length && !incomingSession) {
+      showToast(malformedRecovery
+        ? 'No valid recovery data could be restored. Existing data was kept.'
+        : 'All recovery records already exist or no new data was found. Nothing was changed.');
+      return;
+    }
+
+    const preview = [
+      `Recovery preview: ${incomingTasks.length} new task${incomingTasks.length === 1 ? '' : 's'} will be added.`,
+      duplicateTasks ? `${duplicateTasks} duplicate task ID${duplicateTasks === 1 ? '' : 's'} will be skipped; existing tasks stay unchanged.` : '',
+      invalidTasks ? `${invalidTasks} invalid task record${invalidTasks === 1 ? '' : 's'} will be skipped.` : '',
+      `Focus: ${incomingFocusLog.length} new log entr${incomingFocusLog.length === 1 ? 'y' : 'ies'} will be added.`,
+      incomingSession ? 'One Focus session will be restored.' : '',
+      skippedFocusSessions ? `${skippedFocusSessions} Focus session${skippedFocusSessions === 1 ? '' : 's'} will be skipped to preserve your current session or because it has expired.` : '',
+      duplicateFocusEntries ? `${duplicateFocusEntries} duplicate Focus log entr${duplicateFocusEntries === 1 ? 'y' : 'ies'} will be skipped.` : '',
+      invalidFocusRecords ? `${invalidFocusRecords} invalid Focus record${invalidFocusRecords === 1 ? '' : 's'} will be skipped.` : '',
+      malformedRecovery ? `${malformedRecovery} unreadable recovery payload${malformedRecovery === 1 ? '' : 's'} will be ignored.` : '',
+      'Existing tasks, Focus history, and a current Focus session will not be replaced. Continue?'
+    ].filter(Boolean).join('\n');
+
+    if (typeof window.confirm !== 'function') {
+      showToast('Recovery confirmation is unavailable. Nothing was changed.');
+      return;
+    }
+    let confirmed = false;
+    try {
+      confirmed = window.confirm(preview);
+    } catch (error) {
+      showToast('Recovery confirmation could not be displayed. Nothing was changed.');
+      return;
+    }
+    if (!confirmed) {
+      showToast('Recovery import cancelled. Nothing was changed.');
+      return;
+    }
+
+    let tasksSaved = null;
+    if (incomingTasks.length) {
+      const previousTasks = state.tasks;
+      state.tasks = previousTasks.concat(incomingTasks);
+      tasksSaved = persistTasks();
+      if (!tasksSaved) state.tasks = previousTasks;
+    }
+    let focusSaved = null;
+    if (incomingFocusLog.length || incomingSession) {
+      const previousSession = state.focusSession;
+      const previousLog = state.focusLog;
+      if (incomingSession) state.focusSession = incomingSession;
+      state.focusLog = previousLog.concat(incomingFocusLog);
+      focusSaved = persistFocusState();
+      if (!focusSaved) {
+        state.focusSession = previousSession;
+        state.focusLog = previousLog;
+      }
+    }
+    render();
+    renderFocus();
+
+    const outcomes = [];
+    let successCount = 0;
+    let failureCount = 0;
+    if (incomingTasks.length) {
+      if (tasksSaved) {
+        outcomes.push(`${incomingTasks.length} task${incomingTasks.length === 1 ? '' : 's'} restored`);
+        successCount += 1;
+      } else {
+        outcomes.push('task restore failed; no tasks were imported');
+        failureCount += 1;
+      }
+    }
+    if (incomingFocusLog.length) {
+      if (focusSaved) {
+        outcomes.push(`${incomingFocusLog.length} Focus log entr${incomingFocusLog.length === 1 ? 'y' : 'ies'} restored`);
+        successCount += 1;
+      } else {
+        outcomes.push('Focus log restore failed; current history was kept');
+        failureCount += 1;
+      }
+    }
+    if (incomingSession) {
+      if (focusSaved) {
+        outcomes.push('Focus session restored');
+        successCount += 1;
+      } else {
+        outcomes.push('Focus session restore failed; current session was kept');
+        failureCount += 1;
+      }
+    }
+    const message = outcomes.join('; ');
+    showToast(failureCount && successCount
+      ? `Recovery import partially completed — ${message}.`
+      : failureCount
+        ? `Recovery import failed — ${message}.`
+        : `Recovery import finished — ${message}.`);
+  }
   function applyImportedText(text) {
     let parsed;
     try {
@@ -934,7 +1202,18 @@
       return;
     }
     if (!Array.isArray(parsed)) {
-      showToast('That backup is not a task list. Nothing was changed.');
+      const isRecovery = parsed && typeof parsed === 'object' && (
+        parsed.format === 'daymark-combined-recovery-v1'
+        || parsed.format === 'daymark-recovery-bundle-v1'
+        || parsed.format === 'daymark-focus-recovery-bundle-v1'
+        || Object.prototype.hasOwnProperty.call(parsed, 'session')
+        || Object.prototype.hasOwnProperty.call(parsed, 'log')
+      );
+      if (isRecovery) {
+        applyImportedRecovery(parsed, text);
+        return;
+      }
+      showToast('That backup is not a task list or recovery bundle. Nothing was changed.');
       return;
     }
     const validated = logic.validateStoredTasks(parsed);
@@ -999,10 +1278,18 @@
       showToast('Import file is too large (maximum 8 MiB). Nothing was changed.');
       return;
     }
+    if (!file) {
+      showToast('No backup file was selected. Nothing was changed.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => applyImportedText(String(reader.result || ''));
     reader.onerror = () => showToast('That backup file could not be read.');
-    reader.readAsText(file);
+    try {
+      reader.readAsText(file);
+    } catch (error) {
+      showToast('That backup file could not be opened. Nothing was changed.');
+    }
   }
 
   function focusRecoveryPayloads(raw) {

@@ -4,18 +4,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
+const focus = require('../focus-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
+const FOCUS_KEY = 'daymark.focus.v1';
 
-function bootApp({ savedValue, failBackup = false, failPrimarySave = false, confirmResult = true, confirmThrows = false }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
   const confirmMessages = [];
   let fileReadCount = 0;
-  const storedValues = new Map([[STORAGE_KEY, savedValue]]);
+  const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
+  if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -62,8 +65,11 @@ function bootApp({ savedValue, failBackup = false, failPrimarySave = false, conf
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
-      if ((key === BACKUP_KEY && failBackup) || (key === STORAGE_KEY && failPrimarySave)) throw new Error('Quota exceeded');
+      if ((key === BACKUP_KEY && failBackup) || (key === STORAGE_KEY && failPrimarySave) || (key === FOCUS_KEY && failFocusSave)) throw new Error('Quota exceeded');
       storedValues.set(key, String(value));
+    },
+    removeItem(key) {
+      storedValues.delete(key);
     }
   };
   const document = {
@@ -74,6 +80,7 @@ function bootApp({ savedValue, failBackup = false, failPrimarySave = false, conf
   };
   const window = {
     DaymarkLogic: logic,
+    DaymarkFocus: focus,
     confirm(message) {
       confirmMessages.push(String(message));
       if (confirmThrows) throw new Error('confirmation unavailable');
@@ -129,6 +136,15 @@ function makeImportTask(id, title) {
   };
 }
 
+function makeFocusLogEntry(id, taskId = null) {
+  const endedAt = new Date().toISOString();
+  const startedAt = new Date(Date.now() - 60_000).toISOString();
+  return { id, taskId, kind: 'focus', durationMinutes: 25, startedAt, endedAt, elapsedMs: 60_000, completed: true };
+}
+
+function makeFocusSession(id) {
+  return focus.createSession({ id, kind: 'focus', durationMinutes: 25 }, Date.now());
+}
 function triggerTaskImport(app, file) {
   const input = app.elements.get('#import-file');
   input.files = [file];
@@ -208,6 +224,121 @@ test('oversized task backup is rejected before FileReader allocation', () => {
   assert.equal(app.fileReadCount, 0, 'oversized files must be rejected before reading into memory');
   assert.equal(app.confirmMessages.length, 0);
   assert.match(app.elements.get('#toast').textContent, /maximum 8 MiB/);
+});
+
+test('combined recovery import appends task and Focus logs while preserving current session', () => {
+  const existingTask = makeImportTask('task-existing', 'Existing task');
+  const incomingTask = makeImportTask('task-new', 'Recovered task');
+  const existingLog = makeFocusLogEntry('focus-log-existing');
+  const incomingLog = makeFocusLogEntry('focus-log-new');
+  const currentSession = makeFocusSession('current-focus-session');
+  const incomingSession = makeFocusSession('recovered-focus-session');
+  const taskBackup = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [JSON.stringify([existingTask, incomingTask])]
+  });
+  const focusBackup = JSON.stringify({
+    format: 'daymark-focus-recovery-bundle-v1',
+    payloads: [JSON.stringify({ session: incomingSession, log: [existingLog, incomingLog] })]
+  });
+  const combined = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup, focusBackup });
+  const app = bootApp({
+    savedValue: JSON.stringify([existingTask]),
+    savedFocusValue: JSON.stringify({ session: currentSession, log: [existingLog] })
+  });
+
+  triggerTaskImport(app, { size: Buffer.byteLength(combined), content: combined });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.match(app.confirmMessages[0], /1 new task will be added/);
+  assert.match(app.confirmMessages[0], /1 duplicate task ID will be skipped/);
+  assert.match(app.confirmMessages[0], /1 new log entry will be added/);
+  assert.match(app.confirmMessages[0], /current session/);
+  const tasks = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.deepEqual(tasks.map((task) => task.id), ['task-existing', 'task-new']);
+  const focusState = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.equal(focusState.session.id, 'current-focus-session', 'an active local session must never be replaced');
+  assert.deepEqual(focusState.log.map((entry) => entry.id), ['focus-log-existing', 'focus-log-new']);
+});
+
+test('Focus-only recovery import restores a session when no current session exists', () => {
+  const recoveredSession = makeFocusSession('recover-focus-session');
+  const focusBackup = JSON.stringify({ session: recoveredSession, log: [] });
+  const app = bootApp({ savedValue: JSON.stringify([]), savedFocusValue: JSON.stringify({ session: null, log: [] }) });
+
+  triggerTaskImport(app, { size: Buffer.byteLength(focusBackup), content: focusBackup });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.match(app.confirmMessages[0], /One Focus session will be restored/);
+  const restored = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.equal(restored.session.id, 'recover-focus-session');
+});
+
+test('declining combined recovery import leaves task and Focus storage unchanged', () => {
+  const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
+  const savedFocus = JSON.stringify({ session: null, log: [makeFocusLogEntry('keep-focus-log')] });
+  const incoming = JSON.stringify({
+    format: 'daymark-combined-recovery-v1',
+    taskBackup: JSON.stringify([makeImportTask('incoming-task', 'Do not add')]),
+    focusBackup: JSON.stringify({ session: null, log: [makeFocusLogEntry('incoming-focus-log')] })
+  });
+  const app = bootApp({ savedValue: savedTasks, savedFocusValue: savedFocus, confirmResult: false });
+
+  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
+  assert.equal(app.storedValues.get(FOCUS_KEY), savedFocus);
+  assert.match(app.elements.get('#toast').textContent, /Recovery import cancelled/);
+});
+
+test('Focus recovery storage failure rolls back in-memory history and preserves saved data', () => {
+  const savedFocus = JSON.stringify({ session: null, log: [] });
+  const incoming = JSON.stringify({ session: null, log: [makeFocusLogEntry('incoming-focus-log')] });
+  const app = bootApp({ savedValue: JSON.stringify([]), savedFocusValue: savedFocus, failFocusSave: true });
+
+  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.equal(app.storedValues.get(FOCUS_KEY), savedFocus, 'failed Focus write must preserve original storage');
+  assert.match(app.elements.get('#toast').textContent, /Focus log restore failed; current history was kept/);
+});
+
+test('malformed combined recovery bundle fails closed without prompting or mutation', () => {
+  const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
+  const savedFocus = JSON.stringify({ session: null, log: [] });
+  const malformed = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup: '{bad', focusBackup: '{bad' });
+  const app = bootApp({ savedValue: savedTasks, savedFocusValue: savedFocus });
+
+  triggerTaskImport(app, { size: Buffer.byteLength(malformed), content: malformed });
+
+  assert.equal(app.confirmMessages.length, 0);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
+  assert.equal(app.storedValues.get(FOCUS_KEY), savedFocus);
+  assert.match(app.elements.get('#toast').textContent, /No valid recovery data/);
+});
+
+test('opaque task recovery backup survives healthy primary load and later save', () => {
+  const existing = makeImportTask('existing-task', 'Existing task');
+  const savedValue = JSON.stringify([existing]);
+  const opaqueBackup = '{legacy recovery bytes that are not parseable JSON';
+  const recoveryBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [opaqueBackup] });
+  const app = bootApp({ savedValue, savedBackupValue: recoveryBundle });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), recoveryBundle, 'explicit recovery bundle must survive healthy primary data at startup');
+  const incoming = JSON.stringify([makeImportTask('new-task', 'Imported task')]);
+  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), recoveryBundle, 'a successful save must not clear an opaque payload inside a recovery bundle');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
+});
+
+test('healthy task-array backup is cleared as stale when primary is healthy', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
 });
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
