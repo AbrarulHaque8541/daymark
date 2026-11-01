@@ -176,19 +176,26 @@
   // session keeps counting across a reload using wall-clock time, which is the
   // honest behavior for a browser tab timer; finished sessions are never restored
   // as active. Returns null for anything invalid instead of guessing.
-  function restoreSession(value, now) {
-    if (!isValidSession(value) || value.state === 'done') return null;
-    if (!isFiniteNumber(now)) return null;
+  // Return a structured restore outcome so callers can persist a natural
+  // completion that happened while the page was closed without reviving it.
+  // completedSession is a valid, finished clone; the persisted active session
+  // remains untouched until the caller atomically saves the outcome.
+  function restoreSessionResult(value, now) {
+    if (!isValidSession(value) || value.state === 'done' || !isFiniteNumber(now)) {
+      return { session: null, completedSession: null };
+    }
     const session = serialize(value);
     if (session.state === 'running' && elapsedMs(session, now) >= durationMs(session)) {
-      // The budget ran out while the page was closed: complete it exactly at the
-      // moment it expired rather than showing a negative clock.
       finish(session, now, true);
-      return null;
+      return { session: null, completedSession: session };
     }
-    return session;
+    return { session, completedSession: null };
   }
 
+  // Backwards-compatible API for existing callers that only need a live session.
+  function restoreSession(value, now) {
+    return restoreSessionResult(value, now).session;
+  }
   function makeLogEntry(session) {
     if (!session || session.state !== 'done' || !isFiniteNumber(session.endedAtMs)) return null;
     return {
@@ -291,6 +298,7 @@
     isValidSession,
     serialize,
     restoreSession,
+    restoreSessionResult,
     makeLogEntry,
     isValidLogEntry,
     validateFocusLog,
