@@ -497,15 +497,13 @@
       return;
     }
 
-    // The toast is a polite live region. Mark it busy and defer the download
-    // until the next paint so assistive technology and slower devices can
-    // announce the preparation state before the synchronous Blob work begins.
+    // The toast is a polite live region. Keep the preparation message on
+    // screen for a rendered frame before synchronous Blob/download work starts.
     state.recoveryExportInProgress = true;
     const status = $('#toast');
     if (status) {
       status.textContent = 'Preparing recovery export…';
       status.setAttribute('aria-busy', 'true');
-      status.classList.add('is-exporting');
     }
 
     const finishExport = () => {
@@ -536,7 +534,6 @@
         state.recoveryExportInProgress = false;
         if (status) {
           status.removeAttribute('aria-busy');
-          status.classList.remove('is-exporting');
         }
         showToast(message);
       }
@@ -544,9 +541,17 @@
 
     try {
       if (window && typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(finishExport);
+        // First frame paints the busy state; the second frame performs the
+        // export. A single rAF would run before paint and could hide the state.
+        window.requestAnimationFrame(() => {
+          try {
+            window.requestAnimationFrame(finishExport);
+          } catch (error) {
+            setTimeout(finishExport, 0);
+          }
+        });
       } else {
-        setTimeout(finishExport, 0);
+        setTimeout(finishExport, 50);
       }
     } catch (error) {
       // A scheduler failure should not strand recovery data behind a busy UI.
