@@ -62,8 +62,14 @@ final class BrowserHistory {
                 // visits to example.test and example.test. share one history entry.
                 if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
                 if (host.isEmpty() || host.endsWith(".")) return null;
+                for (String label : host.split("\\.", -1)) {
+                    if (label.isEmpty() || label.length() > 63) return null;
+                }
                 host = IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
                 if (host.isEmpty() || host.length() > 253) return null;
+                for (String label : host.split("\\.", -1)) {
+                    if (label.isEmpty() || label.length() > 63) return null;
+                }
             }
 
             if (port == 0 || port > 65535) return null;
