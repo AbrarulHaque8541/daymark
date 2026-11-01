@@ -9,7 +9,7 @@
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, taskExportInProgress: false };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -476,7 +476,9 @@
       return;
     }
     if (typeof raw !== 'string' || raw.length === 0) return;
-    showToast(message, {
+    const kb = Math.max(1, Math.round(raw.length / 1024));
+    const sizeNote = ` (~${kb} KB)`;
+    showToast(message + sizeNote, {
       label: 'Export recovery',
       run: exportRecoveryBackup
     });
@@ -878,18 +880,58 @@
   function exportTasks() {
     // Portable local backup: same spirit as the Android app's encrypted backups,
     // scoped to what a static web page can honestly do — a JSON file you keep.
+    if (state.taskExportInProgress) return;
+    const count = Array.isArray(state.tasks) ? state.tasks.length : 0;
+    if (count === 0) {
+      showToast('No tasks to export.');
+      return;
+    }
+    state.taskExportInProgress = true;
+    const status = $('#toast');
+    if (status) {
+      status.textContent = `Preparing task backup (${count} task${count === 1 ? '' : 's'})…`;
+      status.setAttribute('aria-busy', 'true');
+    }
+    const finish = () => {
+      let message = 'Export is not available in this browser.';
+      try {
+        if (typeof document.createElement !== 'function') throw new Error('unsupported');
+        const payload = JSON.stringify(state.tasks, null, 2);
+        const link = document.createElement('a');
+        let objectUrl = null;
+        if (typeof Blob === 'function' && globalThis.URL && typeof globalThis.URL.createObjectURL === 'function') {
+          objectUrl = globalThis.URL.createObjectURL(new Blob([payload], { type: 'application/json;charset=utf-8' }));
+          link.href = objectUrl;
+        } else {
+          link.href = `data:application/json;charset=utf-8,${encodeURIComponent(payload)}`;
+        }
+        link.download = `daymark-backup-${logic.localDateString()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        if (objectUrl && typeof globalThis.URL.revokeObjectURL === 'function') {
+          setTimeout(() => globalThis.URL.revokeObjectURL(objectUrl), 1000);
+        }
+        message = `Backup downloaded (${count} task${count === 1 ? '' : 's'}).`;
+      } catch (error) {
+        message = 'Export is not available in this browser.';
+      } finally {
+        state.taskExportInProgress = false;
+        if (status) status.removeAttribute('aria-busy');
+        showToast(message);
+      }
+    };
     try {
-      if (typeof document.createElement !== 'function') throw new Error('unsupported');
-      const payload = JSON.stringify(state.tasks, null, 2);
-      const link = document.createElement('a');
-      link.href = `data:application/json;charset=utf-8,${encodeURIComponent(payload)}`;
-      link.download = `daymark-backup-${logic.localDateString()}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      showToast(`Backup downloaded (${state.tasks.length} task${state.tasks.length === 1 ? '' : 's'}).`);
+      if (window && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+          try { window.requestAnimationFrame(finish); }
+          catch (e) { setTimeout(finish, 0); }
+        });
+      } else {
+        setTimeout(finish, 50);
+      }
     } catch (error) {
-      showToast('Export is not available in this browser.');
+      finish();
     }
   }
 

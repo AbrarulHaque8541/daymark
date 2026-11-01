@@ -337,3 +337,18 @@ test('app.js integrity guard rejects placeholder or truncated application source
   assert.doesNotMatch(APP_SOURCE, /PLACEHOLDER_FULL_CONTENT|full content would be here|\$\(cat \/tmp\/app\.js\)/,
     'app.js must never be replaced with a placeholder or shell substitution');
 });
+
+test('task export announces preparation and clears busy state after download', () => {
+  const stored = JSON.stringify([validTask('t1', 'First task'), validTask('t2', 'Second task')]);
+  const app = bootApp(new Map([[STORAGE_KEY, stored]]));
+  const button = app.elements.get('#export-tasks');
+  button.dispatch('click');
+  const status = app.elements.get('#toast');
+  assert.equal(status.getAttribute('aria-busy'), 'true');
+  assert.match(status.textContent, /Preparing task backup \(2 tasks\)/);
+  app.flushAnimationFrame();
+  assert.equal(status.getAttribute('aria-busy'), 'true');
+  app.flushAnimationFrame();
+  assert.match(status.textContent, /Backup downloaded \(2 tasks\)/);
+  assert.equal(status.getAttribute('aria-busy'), null);
+});
