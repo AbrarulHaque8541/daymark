@@ -75,6 +75,75 @@ public final class BrowserDownloadTrackerSmoke {
         snapshot.clear();
         check(!tracker.snapshot().isEmpty(), "snapshot must be defensive");
 
+        // Null and overlong URLs must fail closed without retaining attacker-controlled text.
+        BrowserDownloadTracker.Entry nullUrl = tracker.start(
+                11L, null, "null-url.bin");
+        check("null".equals(nullUrl.url), "null URL must be represented safely");
+        StringBuilder overlongUrl = new StringBuilder("https://cdn.example.test/");
+        while (overlongUrl.length() <= BrowserDownloadTracker.MAX_URL_CHARS) {
+            overlongUrl.append('x');
+        }
+        BrowserDownloadTracker.Entry overlong = tracker.start(
+                12L, overlongUrl.toString(), "overlong.bin");
+        check("[redact-error]".equals(overlong.url),
+                "overlong URL must fail closed rather than be retained");
+
+        // Filename and failure metadata are untrusted; strip control/format characters and bound
+        // retained text so Logcat/UI strings cannot be multiline or bidi-spoofed.
+        String hostileName = "report\u202E\nfinal\u0000" + "x".repeat(200) + ".pdf";
+        BrowserDownloadTracker.Entry sanitized = tracker.start(
+                13L, "https://safe.example/file", hostileName);
+        check(!sanitized.fileName.contains("\u202E")
+                        && !sanitized.fileName.contains("\n")
+                        && !sanitized.fileName.contains("\u0000"),
+                "filename must strip bidi/control characters");
+        check(sanitized.fileName.codePointCount(0, sanitized.fileName.length())
+                        <= BrowserDownloadTracker.MAX_FILE_NAME_CHARS,
+                "filename must be bounded by code points");
+        String hostileReason = "failure\u202E\n" + "z".repeat(300);
+        tracker.onFailure(13L, hostileReason);
+        check(sanitized.failureReason.codePointCount(0, sanitized.failureReason.length())
+                        <= BrowserDownloadTracker.MAX_FAILURE_REASON_CHARS,
+                "failure reason must be bounded by code points");
+        for (int offset = 0; offset < sanitized.failureReason.length();) {
+            int cp = sanitized.failureReason.codePointAt(offset);
+            offset += Character.charCount(cp);
+            int type = Character.getType(cp);
+            check(type != Character.CONTROL && type != Character.FORMAT,
+                    "failure reason must not retain control/format characters");
+        }
+
+        // A duplicate provider callback for the same ID must not reset an active entry or replace
+        // its already-redacted URL/filename.
+        BrowserDownloadTracker bounded = new BrowserDownloadTracker();
+        BrowserDownloadTracker.Entry original = bounded.start(
+                200L, "https://first.example/path?token=secret", "first.bin");
+        bounded.onProgress(200L, 4L, 10L);
+        BrowserDownloadTracker.Entry duplicate = bounded.start(
+                200L, "https://second.example/path?token=other", "second.bin");
+        check(original == duplicate && original.status == BrowserDownloadTracker.Status.IN_PROGRESS
+                        && "https://first.example".equals(original.url)
+                        && "first.bin".equals(original.fileName),
+                "duplicate ID must preserve tracked state and safe metadata");
+
+        // At capacity, never evict active downloads; after a terminal entry exists, evict it first.
+        for (long id = 201L; id < 201L + BrowserDownloadTracker.MAX_TRACKED - 1; id++) {
+            bounded.start(id, "https://active.example/" + id, "active.bin");
+            bounded.onProgress(id, 1L, 10L);
+        }
+        check(bounded.activeCount() == BrowserDownloadTracker.MAX_TRACKED,
+                "fixture should fill the tracker with active downloads");
+        check(bounded.start(300L, "https://overflow.example/file", "overflow.bin") == null,
+                "tracker must refuse growth when all retained entries are active");
+        check(bounded.snapshot().size() == BrowserDownloadTracker.MAX_TRACKED,
+                "active-capacity refusal must keep the tracker bounded");
+        bounded.onComplete(200L);
+        BrowserDownloadTracker.Entry admitted = bounded.start(
+                300L, "https://admitted.example/file", "admitted.bin");
+        check(admitted != null && bounded.snapshot().size() == BrowserDownloadTracker.MAX_TRACKED
+                        && bounded.get(200L) == null,
+                "a terminal oldest entry must be evicted to admit the new download");
+
         System.out.println("PASS BrowserDownloadTrackerSmoke: origin-only redaction, malformed fail-closed, status/progress");
     }
 
