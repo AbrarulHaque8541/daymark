@@ -481,6 +481,11 @@ public final class TaskLogicSmoke {
         check("2026-10-31".equals(TaskLogic.advanceRepeat(longGapDaily, zone,
                         Instant.parse("2026-10-30T10:00:00Z")).dueDate),
                 "daily recurrence catches up across 26 years without a fixed iteration cap");
+        Task yearOneDaily = TaskLogic.create("Year one daily", "0001-01-01", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check("2026-10-31".equals(TaskLogic.advanceRepeat(yearOneDaily, zone,
+                        Instant.parse("2026-10-30T10:00:00Z")).dueDate),
+                "daily recurrence catches up from year 0001 without overflowing or a fixed iteration cap");
         Task longGapWeekly = TaskLogic.create("Long gap weekly", "2000-01-03", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKLY);
         check("2026-11-02".equals(TaskLogic.advanceRepeat(longGapWeekly, zone,
