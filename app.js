@@ -1409,7 +1409,7 @@
   function handleFeedSubmit(event) {
     event.preventDefault();
     if (!feed) return;
-    refreshFeed($('#feed-url').value);
+    return refreshFeed($('#feed-url').value);
   }
 
   function setUp() {
