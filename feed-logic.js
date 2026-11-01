@@ -8,6 +8,8 @@
   const MAX_XML_CHARS = 512 * 1024;
   // Bound network response allocation before parsing; UTF-8 uses at most 4 bytes per code point.
   const MAX_XML_BYTES = MAX_XML_CHARS * 4;
+  // Public RSS/Atom documents should be shallow; bound recursion before hostile XML exhausts the JS stack.
+  const MAX_XML_DEPTH = 64;
 
   function decodeEntities(text) {
     return String(text).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
@@ -72,7 +74,9 @@
       }
     }
 
-    function parseElement() {
+    function parseElement(depth) {
+      const level = Number.isInteger(depth) ? depth : 1;
+      if (level > MAX_XML_DEPTH) fail('XML nesting limit exceeded');
       i += 1; // consume '<'
       const nameMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/.exec(xml.slice(i));
       if (!nameMatch) fail('expected an element name');
@@ -137,7 +141,7 @@
           continue;
         }
         if (xml[i] === '<') {
-          children.push(parseElement());
+          children.push(parseElement(level + 1));
           continue;
         }
         const next = xml.indexOf('<', i);
@@ -148,7 +152,7 @@
 
     skipMisc();
     if (i >= len || xml[i] !== '<') fail('no root element');
-    const root = parseElement();
+    const root = parseElement(1);
     skipMisc();
     if (i < len) fail('trailing content after the root element');
     return root;
@@ -412,7 +416,8 @@
     MAX_ITEM_TITLE_CHARS,
     MAX_SUMMARY_CHARS,
     MAX_XML_CHARS,
-    MAX_XML_BYTES
+    MAX_XML_BYTES,
+    MAX_XML_DEPTH
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkFeed = api;
