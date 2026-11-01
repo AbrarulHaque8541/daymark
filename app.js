@@ -54,16 +54,14 @@
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
         if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
-      } else if (hasPartialRecoveryBackup()) {
-        // A prior backup may contain records rejected by validation. Keep it
-        // until the user can recover those originals; a healthy filtered store
-        // does not make that backup stale.
-        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
-        offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
+      } else if (hasRecoveryBackupNeedingPreservation()) {
+        // Keep partial, malformed, or opaque recovery material until the user can export/recover it.
+        setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
+        offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
       } else {
         setStorageStatus('Saved on this device');
-        // A backup of an unreadable payload is stale once the primary store is
-        // healthy. Backups containing rejected task records are retained above.
+        // Only a backup containing fully valid task arrays is stale. Partial or opaque
+        // originals remain recoverable even after the primary store becomes healthy.
         clearRecoveryBackup();
       }
       return validated.tasks;
@@ -153,12 +151,23 @@
     }
   }
 
-  function hasPartialRecoveryBackup() {
+  function recoveryPayloadNeedsPreservation(raw) {
+    if (typeof raw !== 'string' || raw.length === 0) return false;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return true;
+      return logic.validateStoredTasks(parsed).rejectedCount > 0;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function hasRecoveryBackupNeedingPreservation() {
     try {
       const raw = localStorage.getItem(BACKUP_KEY);
-      return recoveryBackupPayloads(raw).some(isPartialRecoveryPayload);
+      return recoveryBackupPayloads(raw).some(recoveryPayloadNeedsPreservation);
     } catch (error) {
-      return false;
+      return true;
     }
   }
 
@@ -176,11 +185,11 @@
         state.recoveryBackupPendingPayload = null;
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
-      if (hasPartialRecoveryBackup()) {
-        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+      if (hasRecoveryBackupNeedingPreservation()) {
+        setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
       } else {
         setStorageStatus('Saved on this device');
-        // A full save can clear a stale backup, but not one with rejected records.
+        // A full save can clear only a stale backup of fully valid task arrays; partial or opaque originals stay.
         clearRecoveryBackup();
       }
       return true;
