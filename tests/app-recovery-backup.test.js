@@ -381,7 +381,7 @@ test('recovery export uses encoded data URL when Blob URL APIs are unavailable',
   action.dispatch('click');
 
   const status = app.elements.get('#toast');
-  assert.match(status.textContent, /Recovery backup prepared\\. Tap Download now to save the file\\./);
+  assert.match(status.textContent, /Recovery backup prepared\. Tap Download now to save the file\./);
   assert.equal(action.textContent, 'Download now');
   assert.equal(app.getLastBlob(), null, 'fallback must not depend on Blob support');
 
