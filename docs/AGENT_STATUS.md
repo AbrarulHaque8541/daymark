@@ -1,7 +1,4 @@
-- [Daymark whole-project engineering status — 2026-11-01T17:30:00Z](./CURRENT_STATUS_20261101T173000Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T15:40:00Z](./CURRENT_STATUS_20261101T154000Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T09:56:00Z](./CURRENT_STATUS_20261101T095600Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T08:44:33Z](./CURRENT_STATUS_20261101T084433Z.md)
+- [Daymark whole-project engineering status — 2026-11-01T17:31:00Z](./CURRENT_STATUS_20261101T173100Z.md)
 
 - [Daymark whole-project engineering status — 2026-11-01T16:40:00Z](./CURRENT_STATUS_20261101T164000Z.md)
 
