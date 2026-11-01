@@ -9,7 +9,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp({ savedValue, failBackup = false, confirmResult = true }) {
+function bootApp({ savedValue, failBackup = false, confirmResult = true, confirmThrows = false }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -76,6 +76,7 @@ function bootApp({ savedValue, failBackup = false, confirmResult = true }) {
     DaymarkLogic: logic,
     confirm(message) {
       confirmMessages.push(String(message));
+      if (confirmThrows) throw new Error('confirmation unavailable');
       return confirmResult;
     },
     addEventListener() {}
@@ -171,6 +172,19 @@ test('declining task import confirmation leaves storage unchanged', () => {
   assert.equal(app.confirmMessages.length, 1);
   assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
   assert.match(app.elements.get('#toast').textContent, /Import cancelled\. Nothing was changed/);
+});
+
+test('confirmation failure fails closed without mutating imported tasks', () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue, confirmThrows: true });
+  const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
+
+  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 1);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
+  assert.match(app.elements.get('#toast').textContent, /confirmation could not be displayed/);
 });
 
 test('oversized task backup is rejected before FileReader allocation', () => {
