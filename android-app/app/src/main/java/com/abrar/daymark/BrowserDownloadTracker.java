@@ -97,8 +97,8 @@ final class BrowserDownloadTracker {
         Entry e = entries.get(id);
         if (e == null) return;
         e.status = Status.COMPLETED;
-        // Never regress the observed byte count; total size may be unknown (0).
-        e.bytesDownloaded = Math.max(e.bytesDownloaded, e.totalBytes);
+        // A known provider total is authoritative; an unknown total (0) must not erase progress.
+        if (e.totalBytes > 0L) e.bytesDownloaded = e.totalBytes;
         Log.i(TAG, "download-completed id=" + id + " size="
                 + (e.totalBytes > 0L ? Long.toString(e.totalBytes) : "unknown"));
     }
