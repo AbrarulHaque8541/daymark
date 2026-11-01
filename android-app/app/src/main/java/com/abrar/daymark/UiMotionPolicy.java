@@ -41,6 +41,7 @@ public final class UiMotionPolicy {
      */
     public static boolean shouldAcceptCollapse(long expandStartedAtMs, long nowMs) {
         if (expandStartedAtMs <= 0L) return true;
+        if (nowMs < expandStartedAtMs) return false;
         return nowMs - expandStartedAtMs >= EXPAND_DEBOUNCE_MS;
     }
 

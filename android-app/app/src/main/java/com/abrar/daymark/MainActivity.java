@@ -5659,10 +5659,13 @@ public final class MainActivity extends Activity {
     private void animateModeTransition(boolean enteringWeb) {
         View target = enteringWeb ? browserScreen : taskScreen;
         if (target == null) return;
+        // Cancel any stale tab animation before resetting properties; rapid switches must not
+        // allow an older animator to finish on top of the newest workspace state.
+        target.animate().cancel();
         target.setAlpha(0f);
         target.setTranslationY(enteringWeb ? dp(10) : -dp(6));
         target.animate().alpha(1f).translationY(0f)
-                .setDuration(180L).setInterpolator(MOTION_ENTER).start();
+                .setDuration(UiMotionPolicy.TAB_SWITCH_MS).setInterpolator(MOTION_ENTER).start();
     }
 
     private void setBrowserOnlineEnabled(boolean enabled) {
