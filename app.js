@@ -510,10 +510,33 @@
     return hasTaskBackup ? taskBackup : (hasFocusBackup ? focusBackup : null);
   }
 
+  function summarizeRecoveryExport(raw) {
+    if (typeof raw !== 'string' || !raw) return 'no recovery data';
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.format === 'daymark-combined-recovery-v1') {
+        const taskLen = typeof parsed.taskBackup === 'string' ? parsed.taskBackup.length : 0;
+        const focusLen = typeof parsed.focusBackup === 'string' ? parsed.focusBackup.length : 0;
+        return `combined recovery (task ~${taskLen} bytes, focus ~${focusLen} bytes)`;
+      }
+      if (parsed && parsed.format === 'daymark-recovery-bundle-v1' && Array.isArray(parsed.payloads)) {
+        return `task recovery bundle (${parsed.payloads.length} payload${parsed.payloads.length === 1 ? '' : 's'})`;
+      }
+      if (Array.isArray(parsed)) {
+        return `task list recovery (${parsed.length} record${parsed.length === 1 ? '' : 's'})`;
+      }
+    } catch (error) {
+      // Opaque or malformed: report only length so the user can decide without seeing contents.
+    }
+    return `opaque recovery (~${raw.length} bytes)`;
+  }
+
   function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
     const raw = readRecoveryExportPayload();
     if (typeof raw !== 'string' || raw.length === 0) return;
-    showToast(message, {
+    const summary = summarizeRecoveryExport(raw);
+    const fullMessage = `${message} Summary: ${summary}.`;
+    showToast(fullMessage, {
       label: 'Export recovery',
       run: exportRecoveryBackup
     });
