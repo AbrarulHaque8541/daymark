@@ -363,9 +363,17 @@ test('recovery export reports Blob preparation failure without offering a broken
 
 
 test('recovery export uses encoded data URL when Blob URL APIs are unavailable', () => {
-  const raw = '{"format":"daymark-recovery-bundle-v1","payloads":["legacy + recovery\\nनमस्ते"]}';
-  const storedValues = new Map([[BACKUP_KEY, raw]]);
+  const priorOpaque = '{older opaque + recovery bytes\\nनमस्ते';
+  const primary = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([
+    [STORAGE_KEY, primary],
+    [BACKUP_KEY, priorOpaque]
+  ]);
   const app = bootApp(storedValues, new Set(), false, false);
+  const raw = storedValues.get(BACKUP_KEY);
   const action = app.elements.get('#toast-action');
 
   assert.equal(action.hidden, false);
