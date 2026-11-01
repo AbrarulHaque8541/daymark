@@ -45,6 +45,8 @@ jobs:
           sh ./tools/check-v1-source.sh
           sh ./tools/run-storage-recovery-tests.sh
           sh ./tools/run-updater-picker-routing-tests.sh
+          sh ./tools/run-browser-app-link-approval-tests.sh
+          python3 ./tools/check-browser-app-link-approval.py "$PWD"
           python3 ./tools/check-ci-test-honesty.py "$GITHUB_WORKSPACE"
 
       - name: Run UiFeedbackPolicy host regression tests
