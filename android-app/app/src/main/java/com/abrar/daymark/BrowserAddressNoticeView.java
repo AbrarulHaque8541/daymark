@@ -3,6 +3,7 @@ package com.abrar.daymark;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -19,6 +20,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.Locale;
@@ -184,11 +186,32 @@ final class BrowserAddressNoticeView extends LinearLayout {
         if (panel != null && panel.isShowing()) return;
 
         BrowserAddressNotice.Notice notice = state.current();
-        if (notice == null) return;
+        if (notice == null) {
+            restoreInlineAfterUnshownPanel();
+            return;
+        }
 
-        LinearLayout content = buildPanelContent(notice);
-        panel = new PopupWindow(content, panelWidthPx(),
-                ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        int panelWidthPx = panelWidthPx();
+        int maxAvailableHeightPx = maxPanelHeightPx();
+        if (maxAvailableHeightPx <= 0) {
+            restoreInlineAfterUnshownPanel();
+            return;
+        }
+        ScrollView content = new ScrollView(getContext());
+        content.setFillViewport(false);
+        content.setVerticalScrollBarEnabled(true);
+        content.addView(buildPanelContent(notice), new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        content.measure(
+                View.MeasureSpec.makeMeasureSpec(panelWidthPx, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(maxAvailableHeightPx, View.MeasureSpec.AT_MOST));
+        int panelHeightPx = BrowserAddressNoticePanelPolicy.fitContentHeightPx(
+                content.getMeasuredHeight(), maxAvailableHeightPx);
+        if (panelHeightPx <= 0) {
+            restoreInlineAfterUnshownPanel();
+            return;
+        }
+        panel = new PopupWindow(content, panelWidthPx, panelHeightPx, true);
         panel.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         panel.setOutsideTouchable(true);
         panel.setClippingEnabled(true);
@@ -216,6 +239,14 @@ final class BrowserAddressNoticeView extends LinearLayout {
             renderInline(false);
             scheduleTimeoutIfNeeded();
         }
+    }
+
+    private void restoreInlineAfterUnshownPanel() {
+        if (state.presentation() == BrowserAddressNotice.Presentation.PANEL) {
+            state.collapsePanel();
+        }
+        renderInline(false);
+        scheduleTimeoutIfNeeded();
     }
 
     private LinearLayout buildPanelContent(BrowserAddressNotice.Notice notice) {
@@ -371,6 +402,17 @@ final class BrowserAddressNoticeView extends LinearLayout {
         if (windowWidth <= 0) windowWidth = getResources().getDisplayMetrics().widthPixels;
         int available = windowWidth - dp(24);
         return available > 0 ? Math.min(dp(320), available) : dp(240);
+    }
+
+    /** Caps the popup to the visible room below its anchor, matching showAsDropDown placement. */
+    private int maxPanelHeightPx() {
+        Rect visibleFrame = new Rect();
+        indicatorTarget.getWindowVisibleDisplayFrame(visibleFrame);
+        int[] anchorLocation = new int[2];
+        indicatorTarget.getLocationOnScreen(anchorLocation);
+        return BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                visibleFrame.top, visibleFrame.bottom, anchorLocation[1],
+                indicatorTarget.getHeight(), dp(4), dp(8));
     }
 
     private GradientDrawable circleBackground() {
