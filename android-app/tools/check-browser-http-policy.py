@@ -38,6 +38,8 @@ assert "QUEUED" in d and "IN_PROGRESS" in d and "COMPLETED" in d and "FAILED" in
 assert "redact(" in d, "URL redaction missing (privacy)"
 assert "synchronized" in d, "thread safety missing"
 assert "progress()" in d, "progress calculation missing"
+assert 'Log.i(TAG, "download-started id=" + id + " url=" + e.url + " file=" + e.fileName)' not in d, "download filenames must never be written to Logcat"
+assert 'Log.i(TAG, "download-completed id=" + id + " file=" + e.fileName' not in d, "download completion logs must not expose filenames"
 
 # Run the tracker regression on the same host JDK used by the other policy smokes.
 # This catches privacy regressions that source-only checks cannot detect.
