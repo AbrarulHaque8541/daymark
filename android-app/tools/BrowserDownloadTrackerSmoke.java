@@ -61,9 +61,11 @@ public final class BrowserDownloadTrackerSmoke {
         check("[redact-error]".equals(malformed.url), "malformed URL must fail closed");
 
         for (long id = 2L; id <= 10L; id++) tracker.onCancel(id);
+        tracker.onProgress(1L, 25L, 100L);
         tracker.onQueued(1L);
-        check(tracker.get(1L).status == BrowserDownloadTracker.Status.QUEUED,
-                "provider pending status must return tracked entry to queued");
+        check(tracker.get(1L).status == BrowserDownloadTracker.Status.QUEUED
+                        && tracker.get(1L).bytesDownloaded == 25L,
+                "provider pending status must preserve prior progress metadata");
         tracker.onProgress(1L, 50L, 100L);
         tracker.onPaused(1L);
         check(tracker.get(1L).status == BrowserDownloadTracker.Status.PAUSED
