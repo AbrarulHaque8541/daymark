@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Source guard: UiMotionPolicy must drive Tasks↔Web transition motion."""
+"""Source guard: UiMotionPolicy must drive Tasks\u2194Web transition motion."""
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTIVITY = (ROOT / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
@@ -20,11 +19,9 @@ check("shouldAcceptCollapse" in POLICY, "UiMotionPolicy.shouldAcceptCollapse mis
 check("UiMotionPolicy.TAB_SWITCH_MS" in ACTIVITY, "MainActivity must use UiMotionPolicy.TAB_SWITCH_MS")
 check("animateModeTransition" in ACTIVITY, "animateModeTransition missing")
 check("target.animate().cancel()" in ACTIVITY, "stale animator cancel missing")
-# Horizontal slide is the directional feel owner asked for; enforce once wired.
-# Until translationX + tabSlideFraction are both present this guard fails so the gap stays visible.
-has_slide = "tabSlideFraction" in ACTIVITY and "translationX" in ACTIVITY
-if not has_slide:
-    print("WARN: horizontal tab slide not yet wired (tabSlideFraction + translationX)")
-else:
-    check(True, "horizontal slide wired")
-print(f"PASS ui-motion wiring checks: {checks} assertions (slide_wired={has_slide})")
+check("tabSlideFraction" in ACTIVITY, "MainActivity must use UiMotionPolicy.tabSlideFraction for directional tab switch")
+check("translationX" in ACTIVITY and "animateModeTransition" in ACTIVITY,
+      "animateModeTransition must animate translationX for horizontal slide")
+check("UiMotionPolicy.CHROME_HIDE_MS" in ACTIVITY, "browser chrome hide must use UiMotionPolicy.CHROME_HIDE_MS")
+check("UiMotionPolicy.CHROME_SHOW_MS" in ACTIVITY, "browser chrome show must use UiMotionPolicy.CHROME_SHOW_MS")
+print(f"PASS ui-motion wiring checks: {checks} assertions")
