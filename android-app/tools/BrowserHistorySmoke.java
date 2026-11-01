@@ -60,6 +60,10 @@ public final class BrowserHistorySmoke {
                 "a single DNS root dot and default HTTPS port normalize away");
         check(BrowserHistory.sanitizeUrl("https://bücher.de..") == null,
                 "multiple trailing DNS root dots are rejected");
+        check(BrowserHistory.sanitizeUrl("https://example..com/") == null,
+                "empty interior DNS labels are rejected");
+        check(BrowserHistory.sanitizeUrl("https://" + "a".repeat(64) + ".example/") == null,
+                "overlong ASCII DNS labels are rejected");
         check(BrowserHistory.sanitizeUrl("https://bücher.de:0/") == null,
                 "zero port is rejected for Unicode hosts");
         check(BrowserHistory.sanitizeUrl("https://bücher.de:65536/") == null,
