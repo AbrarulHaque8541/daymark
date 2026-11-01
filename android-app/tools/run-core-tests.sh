@@ -96,6 +96,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/TaskListRenderGateSmoke.java" \
   "$ROOT/tools/TaskSnapshotCodecSmoke.java" \
   "$ROOT/tools/BrowserExtensionSmoke.java" \
+  "$ROOT/tools/BrowserHistorySmoke.java" \
   "$ROOT/tools/ActivityCallbackGateSmoke.java" \
   "$ROOT/tools/UpdaterSmoke.java" \
   "$ROOT/tools/GitHubTransportSmoke.java" \
@@ -142,6 +143,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.NaturalLanguageTaskParseSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskListRenderGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSnapshotCodecSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExtensionSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserHistorySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
