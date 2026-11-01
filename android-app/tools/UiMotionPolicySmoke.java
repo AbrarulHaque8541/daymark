@@ -23,7 +23,7 @@ public final class UiMotionPolicySmoke {
                 "collapse is rejected before the debounce boundary");
         check(UiMotionPolicy.shouldAcceptCollapse(1_000L, 1_120L),
                 "collapse is accepted exactly at the debounce boundary");
-        check(UiMotionPolicy.shouldAcceptCollapse(1_000L, 999L),
+        check(!UiMotionPolicy.shouldAcceptCollapse(1_000L, 999L),
                 "reversed small timestamps are not treated as a long elapsed duration");
         check(!UiMotionPolicy.shouldAcceptCollapse(Long.MAX_VALUE, Long.MIN_VALUE),
                 "reversed extreme timestamps cannot overflow into an accepted collapse");
