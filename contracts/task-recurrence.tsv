@@ -1,0 +1,11 @@
+# due_date	repeat_rule	anchor_day	expected_next_due_date
+2026-10-30	daily	-	2026-10-31
+2024-02-28	daily	-	2024-02-29
+2026-12-25	weekly	-	2027-01-01
+2021-12-31	weekdays	-	2022-01-03
+2026-01-31	monthly	31	2026-02-28
+2026-02-28	monthly	31	2026-03-31
+2024-01-31	monthly	31	2024-02-29
+2024-02-29	yearly	29	2025-02-28
+2025-02-28	yearly	29	2026-02-28
+2027-02-28	yearly	29	2028-02-29
