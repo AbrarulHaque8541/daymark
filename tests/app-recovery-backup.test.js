@@ -62,6 +62,9 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
   }
 
   let lastBlob = null;
+  const revokedObjectUrls = [];
+  const timers = new Map();
+  let nextTimerId = 1;
   class MockBlob {
     constructor(parts, options = {}) {
       this.parts = parts;
@@ -74,7 +77,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
       lastBlob = blob;
       return 'blob:daymark-recovery-test';
     },
-    revokeObjectURL() {}
+    revokeObjectURL(url) { revokedObjectUrls.push(url); }
   };
 
   const localStorage = {
@@ -110,14 +113,27 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
     window,
     Blob: MockBlob,
     URL: mockURL,
-    clearTimeout() {},
-    setTimeout: () => 1,
+    clearTimeout(id) { timers.delete(id); },
+    setTimeout(callback, delay = 0) {
+      const id = nextTimerId++;
+      timers.set(id, { callback, delay });
+      return id;
+    },
     setInterval: () => 1
   }, { filename: 'app.js' });
 
   return {
     elements,
     getLastBlob: () => lastBlob,
+    getRevokedObjectUrls: () => revokedObjectUrls.slice(),
+    getPendingTimeouts: () => Array.from(timers.entries()).map(([id, timer]) => ({ id, delay: timer.delay })),
+    lastTimeoutId: () => nextTimerId - 1,
+    runTimeout(id) {
+      const timer = timers.get(id);
+      if (!timer) return;
+      timers.delete(id);
+      timer.callback();
+    },
     flushAnimationFrame() {
       const callback = animationFrames.shift();
       if (callback) callback();
@@ -295,6 +311,34 @@ test('recovery backup export preserves a second user gesture for browser downloa
   assert.equal(link.download, 'daymark-recovery-backup.txt');
   assert.equal(link.href, 'blob:daymark-recovery-test');
   assert.match(status.textContent, /Recovery backup exported/);
+  const revokeTimer = app.getPendingTimeouts().find((timer) => timer.delay === 1000);
+  assert.ok(revokeTimer, 'successful download schedules object URL cleanup');
+  app.runTimeout(revokeTimer.id);
+  assert.deepEqual(app.getRevokedObjectUrls(), ['blob:daymark-recovery-test'],
+    'object URL is revoked after the browser has had time to consume the download');
+});
+
+
+test('recovery export releases its prepared object URL when the action expires', () => {
+  const original = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+
+  action.dispatch('click');
+  assert.equal(app.getRevokedObjectUrls().length, 0,
+    'the prepared URL remains available while the explicit download action is visible');
+  const expiryTimer = app.lastTimeoutId();
+  app.runTimeout(expiryTimer);
+
+  assert.deepEqual(app.getRevokedObjectUrls(), ['blob:daymark-recovery-test'],
+    'ignoring Download now must revoke the prepared object URL');
+  assert.match(app.elements.get('#toast').textContent, /Recovery export expired/);
+  assert.equal(action.hidden, true,
+    'the expired download action must no longer be available');
 });
 
 
