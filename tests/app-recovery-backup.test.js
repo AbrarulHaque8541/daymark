@@ -453,3 +453,20 @@ test('recovery export includes task and focus backup sources together without mo
   assert.equal(storedValues.get('daymark.focus.v1.backup'), focusBackup,
     'export does not mutate the focus recovery backup');
 });
+
+test('recovery offer toast includes a non-destructive summary without exposing raw data', () => {
+  const original = JSON.stringify([
+    validTask('valid-1', 'Keep valid task'),
+    validTask('invalid-1', 'x'.repeat(170))
+  ]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false);
+  assert.equal(action.textContent, 'Export recovery');
+  const toast = app.elements.get('#toast');
+  assert.match(toast.textContent, /Summary:/);
+  assert.match(toast.textContent, /task list recovery|opaque recovery|recovery bundle|combined recovery/);
+  // Must not leak the raw title or long invalid string into the summary.
+  assert.doesNotMatch(toast.textContent, /Keep valid task|x{10}/);
+});
