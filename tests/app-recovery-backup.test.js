@@ -9,7 +9,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
   const elements = new Map();
 
   function element(selector) {
@@ -111,8 +111,8 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false) {
     document,
     localStorage,
     window,
-    Blob: MockBlob,
-    URL: mockURL,
+    Blob: supportBlob ? MockBlob : undefined,
+    URL: supportBlob ? mockURL : { revokeObjectURL(url) { revokedObjectUrls.push(url); } },
     clearTimeout(id) { timers.delete(id); },
     setTimeout(callback, delay = 0) {
       const id = nextTimerId++;
@@ -361,6 +361,31 @@ test('recovery export reports Blob preparation failure without offering a broken
 });
 
 
+
+test('recovery export uses encoded data URL when Blob URL APIs are unavailable', () => {
+  const raw = '{"format":"daymark-recovery-bundle-v1","payloads":["legacy + recovery\\nनमस्ते"]}';
+  const storedValues = new Map([[BACKUP_KEY, raw]]);
+  const app = bootApp(storedValues, new Set(), false, false);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false);
+  assert.equal(action.textContent, 'Export recovery');
+  action.dispatch('click');
+
+  const status = app.elements.get('#toast');
+  assert.match(status.textContent, /Recovery backup prepared\\. Tap Download now to save the file\\./);
+  assert.equal(action.textContent, 'Download now');
+  assert.equal(app.getLastBlob(), null, 'fallback must not depend on Blob support');
+
+  action.dispatch('click');
+  const link = app.elements.get('#download-link');
+  assert.equal(link.clicked, true);
+  assert.equal(link.download, 'daymark-recovery-backup.txt');
+  assert.equal(link.href, 'data:text/plain;charset=utf-8,' + encodeURIComponent(raw),
+    'fallback URI must preserve the exact Unicode and punctuation payload');
+  assert.equal(app.getPendingTimeouts().some((timer) => timer.delay === 1000), false,
+    'data URLs do not need object-URL revocation');
+});
 
 test('app.js parses before browser runtime boot', () => {
   try {
