@@ -2619,19 +2619,12 @@ public final class MainActivity extends Activity {
             float hiddenOffset = (view == browserAddressBarView)
                     ? -Math.max(view.getHeight(), dp(40))
                     : Math.max(view.getHeight(), dp(40));
-            view.animate().cancel();
             if (hidden) {
-                view.setVisibility(View.VISIBLE);
-                view.animate().translationY(hiddenOffset)
-                        .alpha(0f).setDuration(160L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
-                            if (browserChromeHidden && webMode) view.setVisibility(View.GONE);
-                        }).start();
+                WorkspaceMotion.hideChrome(view, hiddenOffset, MOTION_EXIT, () -> {
+                    if (browserChromeHidden && webMode) view.setVisibility(View.GONE);
+                });
             } else {
-                view.setVisibility(View.VISIBLE);
-                view.setTranslationY(hiddenOffset);
-                view.setAlpha(0f);
-                view.animate().translationY(0f).alpha(1f).setDuration(190L)
-                        .setInterpolator(MOTION_ENTER).start();
+                WorkspaceMotion.showChrome(view, hiddenOffset, MOTION_ENTER);
             }
         }
     }
@@ -5657,15 +5650,8 @@ public final class MainActivity extends Activity {
     }
 
     private void animateModeTransition(boolean enteringWeb) {
-        View target = enteringWeb ? browserScreen : taskScreen;
-        if (target == null) return;
-        // Cancel any stale tab animation before resetting properties; rapid switches must not
-        // allow an older animator to finish on top of the newest workspace state.
-        target.animate().cancel();
-        target.setAlpha(0f);
-        target.setTranslationY(enteringWeb ? dp(10) : -dp(6));
-        target.animate().alpha(1f).translationY(0f)
-                .setDuration(UiMotionPolicy.TAB_SWITCH_MS).setInterpolator(MOTION_ENTER).start();
+        WorkspaceMotion.animateWorkspaceSwitch(
+                browserScreen, taskScreen, enteringWeb, dp(24), MOTION_ENTER);
     }
 
     private void setBrowserOnlineEnabled(boolean enabled) {
