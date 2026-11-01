@@ -45,7 +45,7 @@ final class BrowserDownloadTracker {
 
         double progress() {
             if (totalBytes <= 0 || bytesDownloaded <= 0) return 0;
-            return Math.min(1.0, (double) bytesDownloaded / (double) totalBytes);
+            return Math.min(1.0, BrowserDownloadProgress.percent(bytesDownloaded, totalBytes) / 100.0);
         }
     }
 
