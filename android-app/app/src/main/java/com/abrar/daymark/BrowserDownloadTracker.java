@@ -67,7 +67,7 @@ final class BrowserDownloadTracker {
         }
         Entry e = new Entry(id, redact(url), sanitizeText(fileName, MAX_FILE_NAME_CHARS, "download"));
         entries.put(id, e);
-        Log.i(TAG, "download-started id=" + id + " url=" + e.url + " file=" + e.fileName);
+        Log.i(TAG, "download-started id=" + id + " url=" + e.url);
         return e;
     }
 
@@ -84,7 +84,7 @@ final class BrowserDownloadTracker {
         if (e == null) return;
         e.status = Status.COMPLETED;
         e.bytesDownloaded = Math.max(0L, e.totalBytes);
-        Log.i(TAG, "download-completed id=" + id + " file=" + e.fileName + " size=" + e.totalBytes);
+        Log.i(TAG, "download-completed id=" + id + " size=" + e.totalBytes);
     }
 
     synchronized void onFailure(long id, String reason) {
