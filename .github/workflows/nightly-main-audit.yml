@@ -1,0 +1,54 @@
+name: Nightly main audit (scheduled)
+
+on:
+  schedule:
+    # 03:30 UTC = 09:00 IST, every day
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-main-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Nightly audit of main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Run Node contract and web tests
+        run: npm test
+      - name: Run Android production core host tests against shared fixtures
+        shell: bash
+        run: bash android-app/tools/run-core-tests.sh
+      - name: Guard - manifest permissions stay pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="android-app/app/src/main/AndroidManifest.xml"
+          for p in INTERNET POST_NOTIFICATIONS RECEIVE_BOOT_COMPLETED VIBRATE; do
+            grep -q "android.permission.$p" "$manifest"
+          done
+          count=$(grep -c "<uses-permission" "$manifest")
+          [ "$count" -eq 4 ]
+      - name: Guard - no service components declared
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -q "<service" "android-app/app/src/main/AndroidManifest.xml"
+      - name: Guard - no placeholders in web prototype sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -rniE "TODO|FIXME|lorem ipsum" --include="*.js" --include="*.html" --include="*.css" --exclude-dir=node_modules . | grep -v "tests/"
