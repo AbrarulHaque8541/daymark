@@ -489,13 +489,29 @@
     }, action ? 7000 : 2600);
   }
 
-  function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
-    let raw = null;
+  function readRecoveryExportPayload() {
+    let taskBackup = null;
+    let focusBackup = null;
     try {
-      raw = localStorage.getItem(BACKUP_KEY);
+      taskBackup = localStorage.getItem(BACKUP_KEY);
+      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
     } catch (error) {
-      return;
+      return null;
     }
+    const hasTaskBackup = typeof taskBackup === 'string' && taskBackup.length > 0;
+    const hasFocusBackup = typeof focusBackup === 'string' && focusBackup.length > 0;
+    if (hasTaskBackup && hasFocusBackup) {
+      return JSON.stringify({
+        format: 'daymark-combined-recovery-v1',
+        taskBackup,
+        focusBackup
+      });
+    }
+    return hasTaskBackup ? taskBackup : (hasFocusBackup ? focusBackup : null);
+  }
+
+  function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
+    const raw = readRecoveryExportPayload();
     if (typeof raw !== 'string' || raw.length === 0) return;
     showToast(message, {
       label: 'Export recovery',
@@ -506,13 +522,7 @@
   function exportRecoveryBackup() {
     if (state.recoveryExportInProgress) return;
 
-    let raw = null;
-    try {
-      raw = localStorage.getItem(BACKUP_KEY);
-    } catch (error) {
-      showToast('Recovery backup export is not available in this browser.');
-      return;
-    }
+    const raw = readRecoveryExportPayload();
     if (typeof raw !== 'string' || raw.length === 0) {
       showToast('No recovery backup is available to export.');
       return;
@@ -563,8 +573,10 @@
       if (state.recoveryExportUrl) {
         clearTimeout(state.recoveryExportTimer);
         state.recoveryExportTimer = setTimeout(releasePreparedRecoveryExport, 1000);
+      } else {
+        releasePreparedRecoveryExport();
       }
-      showToast('Recovery backup exported. Keep this file private; it may contain task data.');
+      showToast('Recovery backup exported. Keep this file private; it may contain task and Focus Timer data.');
     } catch (error) {
       releasePreparedRecoveryExport();
       showToast('Recovery backup export is not available in this browser.');
@@ -987,8 +999,11 @@
 
   function reportFocusRecovery(backupSaved) {
     setStorageStatus(backupSaved
-      ? 'Focus data recovery backup retained; review/export is not available yet'
+      ? 'Focus data recovery backup retained; export it for manual review'
       : 'Focus data recovery backup could not be created. Free browser storage before saving', true);
+    if (backupSaved) {
+      offerRecoveryExport('Focus recovery data was preserved on this device. Export it for manual review.');
+    }
   }
 
   function loadFocusState() {
