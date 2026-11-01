@@ -61,7 +61,7 @@ test('RSS 2.0 feeds parse channel metadata and items with CDATA and entities', (
   assert.equal(first.id, 'urn:example:first');
   assert.equal(first.summary, 'Breaking story here.');
   assert.equal(second.publishedAt, null, 'unparseable dates become null instead of breaking the feed');
-  assert.equal(second.summary, 'Plain <em>text</em> summary');
+  assert.equal(second.summary, 'Plain text summary', 'RSS description HTML is stripped to safe plain text');
 });
 
 test('Atom feeds parse entries, prefer rel=alternate links, and strip HTML content', () => {
