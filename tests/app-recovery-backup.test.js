@@ -4,10 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
+const feedLogic = require('../feed-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
+const FEED_KEY = 'daymark.feed.v1';
+const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
 
 function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
   const elements = new Map();
@@ -37,7 +40,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
         addEventListener: (type, listener) => listeners.set(type, listener),
         dispatch: (type, event = {}) => {
           const listener = listeners.get(type);
-          if (listener) listener({
+          if (listener) return listener({
             preventDefault() {},
             currentTarget: item,
             target: item,
@@ -99,6 +102,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   const animationFrames = [];
   const window = {
     DaymarkLogic: logic,
+    DaymarkFeed: feedLogic,
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
@@ -113,6 +117,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     window,
     Blob: supportBlob ? MockBlob : undefined,
     URL: supportBlob ? mockURL : { revokeObjectURL(url) { revokedObjectUrls.push(url); } },
+    fetch: async () => ({ ok: true, status: 200, text: async () => FEED_XML }),
     clearTimeout(id) { timers.delete(id); },
     setTimeout(callback, delay = 0) {
       const id = nextTimerId++;
@@ -452,4 +457,33 @@ test('recovery export includes task and focus backup sources together without mo
     'export does not mutate the task recovery backup');
   assert.equal(storedValues.get('daymark.focus.v1.backup'), focusBackup,
     'export does not mutate the focus recovery backup');
+});
+
+test('Briefing reports when browser storage cannot persist the offline cache', async () => {
+  const storedValues = new Map();
+  const failWrites = new Set([FEED_KEY]);
+  const app = bootApp(storedValues, failWrites);
+  app.elements.get('#feed-url').value = 'https://example.com/feed.xml';
+
+  await app.elements.get('#feed-form').dispatch('submit');
+
+  assert.equal(storedValues.has(FEED_KEY), false, 'quota failure must not claim a saved cache');
+  assert.match(app.elements.get('#feed-status').textContent,
+    /browser storage could not save an offline copy/,
+    'the status must distinguish a successful fetch from a durable offline save');
+  assert.match(app.elements.get('#feed-list').innerHTML, /Offline story/,
+    'the fetched items remain available in the current page session');
+});
+
+test('Briefing confirms when its cache was persisted for offline reading', async () => {
+  const storedValues = new Map();
+  const app = bootApp(storedValues);
+  app.elements.get('#feed-url').value = 'https://example.com/feed.xml';
+
+  await app.elements.get('#feed-form').dispatch('submit');
+
+  assert.ok(storedValues.has(FEED_KEY), 'successful localStorage write stores the validated cache');
+  assert.match(app.elements.get('#feed-status').textContent,
+    /Saved for offline reading/,
+    'the status only promises offline availability after persistence succeeds');
 });
