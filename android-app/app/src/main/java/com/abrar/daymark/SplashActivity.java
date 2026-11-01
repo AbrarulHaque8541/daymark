@@ -24,7 +24,7 @@ import android.widget.TextView;
  * attribution over a deep-green gradient, with a light sweep and entrance motion, then a
  * single safe handoff to {@link MainActivity}.
  *
- * <p>The splash owns no network, storage, permission or WebView behavior. It respects the
+ * <p>The splash owns no network, storage, permission or embedded-browser behavior. It respects the
  * system reduced-motion setting (transition animation scale) and always removes its pending
  * callbacks when destroyed.
  */
@@ -126,28 +126,43 @@ public final class SplashActivity extends Activity {
         handler.postDelayed(launchRunnable, SplashPolicy.splashHoldMs(animations));
     }
 
-    private void launchMain() {
-        if (launched || isFinishing() || isDestroyed()) return;
-        launched = true;
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(intent);
-        finish();
-    }
-
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 
+    private void launchMain() {
+        if (launched || isFinishing()) return;
+        launched = true;
+        Intent intent = new Intent(this, MainActivity.class);
+        // Preserve any launch intent data (e.g. cold-start deep links routed through the launcher).
+        Intent original = getIntent();
+        if (original != null) {
+            if (original.getAction() != null) intent.setAction(original.getAction());
+            if (original.getData() != null) intent.setData(original.getData());
+            if (original.getExtras() != null) intent.putExtras(original.getExtras());
+        }
+        startActivity(intent);
+        finish();
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+    }
+
     private static CharSequence spaced(String text) {
-        SpannableString span = new SpannableString(text);
-        span.setSpan(new ScaleXSpan(1.25f), 0, span.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return span;
+        if (text == null || text.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length(); i++) {
+            if (i > 0) sb.append('\u2009');
+            sb.append(text.charAt(i));
+        }
+        SpannableString spaced = new SpannableString(sb.toString());
+        for (int i = 1; i < spaced.length(); i += 2) {
+            spaced.setSpan(new ScaleXSpan(0.85f), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return spaced;
     }
 
     private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

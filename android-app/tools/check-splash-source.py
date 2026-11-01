@@ -75,8 +75,13 @@ for marker in (
     "@Override\n    protected void onCreate(Bundle savedInstanceState)",
 ):
     assert marker in source, f"missing splash source marker: {marker}"
+# Forbidden APIs/types must not appear in executable source. Strip block and line comments so
+# explanatory javadoc (e.g. "no embedded browser") cannot false-positive the contract.
+import re
+code_only = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+code_only = re.sub(r"//.*?$", "", code_only, flags=re.M)
 for forbidden in ("addJavascriptInterface(", "requestPermissions(", "WebView", "loadUrl("):
-    assert forbidden not in source, f"splash must not contain: {forbidden}"
+    assert forbidden not in code_only, f"splash executable source must not contain: {forbidden}"
 
 policy = (root / "app/src/main/java/com/abrar/daymark/SplashPolicy.java").read_text(encoding="utf-8")
 for marker in ('BRAND_TITLE = "DAYMARK"', 'BRAND_SUBTITLE = "BY ABRARUL HAQUE"', "animationsEnabled("):
