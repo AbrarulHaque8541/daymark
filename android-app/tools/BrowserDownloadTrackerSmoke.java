@@ -126,22 +126,22 @@ public final class BrowserDownloadTrackerSmoke {
                 "oversized URL must fail closed before retaining an unbounded origin");
 
         String hostileName = "x".repeat(BrowserDownloadTracker.MAX_FILE_NAME_CHARS + 100)
-                + "\\r\\nforged-log-line";
+                + "\r\nforged-log-line";
         BrowserDownloadTracker.Entry boundedName = tracker.start(
                 22L, "https://cdn.example.test/name", hostileName);
         check(boundedName.fileName.codePointCount(0, boundedName.fileName.length())
                         <= BrowserDownloadTracker.MAX_FILE_NAME_CHARS,
                 "retained filename must be bounded by code points");
-        check(!boundedName.fileName.contains("\\r") && !boundedName.fileName.contains("\\n"),
+        check(!boundedName.fileName.contains("\r") && !boundedName.fileName.contains("\n"),
                 "filename must not inject line breaks into logs");
 
-        tracker.onFailure(22L, "failure\\r\\n".repeat(1000));
+        tracker.onFailure(22L, "failure\r\n".repeat(1000));
         check(tracker.get(22L).failureReason.codePointCount(0,
                         tracker.get(22L).failureReason.length())
                         <= BrowserDownloadTracker.MAX_FAILURE_REASON_CHARS,
                 "failure diagnostic must be bounded");
-        check(!tracker.get(22L).failureReason.contains("\\r")
-                        && !tracker.get(22L).failureReason.contains("\\n"),
+        check(!tracker.get(22L).failureReason.contains("\r")
+                        && !tracker.get(22L).failureReason.contains("\n"),
                 "failure diagnostic must not inject log lines");
 
         BrowserDownloadTracker.Entry negativeProgress = tracker.start(
