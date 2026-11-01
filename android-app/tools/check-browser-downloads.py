@@ -30,6 +30,29 @@ for marker, explanation in (
     assert marker in method, explanation
 
 assert "showBrowserDownloadsDialog();" in activity, "the overflow Downloads action must open the download list"
+selection = activity.split("private void handleBrowserDownloadSelection", 1)[1].split(
+    "private boolean isBrowserDownloadActive", 1
+)[0]
+for marker, explanation in (
+    ("DownloadManager.STATUS_PENDING", "queued downloads must expose cancellation"),
+    ("DownloadManager.STATUS_RUNNING", "running downloads must expose cancellation"),
+    ("DownloadManager.STATUS_PAUSED", "paused downloads must expose cancellation"),
+    ('setTitle("Cancel download?")', "cancellation must be explicitly confirmed"),
+    ('setNegativeButton("Keep download"', "cancellation must offer a non-destructive escape"),
+    ('setPositiveButton("Cancel download"', "only an explicit positive action may cancel"),
+    ("manager.remove(id)", "cancellation must remove the provider entry and partial file"),
+    ("isBrowserDownloadActive(manager, id)", "a stale row must be rechecked before deletion"),
+):
+    assert marker in selection, explanation
+assert selection.index('setPositiveButton("Cancel download"') < selection.index("manager.remove(id)"), \\
+    "DownloadManager.remove must occur only inside the confirmed callback"
+active_check = activity.split("private boolean isBrowserDownloadActive", 1)[1].split(
+    "private void queueBrowserDownload", 1
+)[0]
+assert "new DownloadManager.Query().setFilterById(id)" in active_check, \\
+    "cancellation must re-query the exact download rather than trust stale list state"
+assert "DownloadManager.STATUS_SUCCESSFUL" not in active_check, \\
+    "a completed file must never be offered for cancellation/removal"
 normalized_activity = "".join(activity.split())
 assert "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))" in normalized_activity, \
     "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
