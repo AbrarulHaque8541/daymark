@@ -136,13 +136,42 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             }
         }
         if (!specificHost) {
-            return false; // Generic browser/wildcard filters never count as a verified App Link.
+            return false; // Generic browser/wildcard filters never count as App Links.
+        }
+        // A default/browsable filter is not proof of verified domain ownership.
+        // Android 12+ exposes the per-host verification and user-selection state.
+        // Direct handoff requires that state; otherwise the original URL stays in Daymark.
+        if (!isVerifiedAppLinkApproved(view.getContext(),
+                resolved.activityInfo.packageName, uri.getHost())) {
+            Log.i("DaymarkWebView", "app link handoff declined origin="
+                    + BrowserLogPolicy.redactedOrigin(uri.toString())
+                    + " reason=host-not-verified-or-user-selected");
+            return false;
         }
         try {
             view.getContext().startActivity(appLink);
             return true;
         } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
             return false; // Resolver changed or app declined: continue the original URL in WebView.
+        }
+    }
+
+    private boolean isVerifiedAppLinkApproved(android.content.Context context,
+                                             String packageName, String host) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false;
+        try {
+            android.content.pm.verify.domain.DomainVerificationManager manager =
+                    context.getSystemService(
+                            android.content.pm.verify.domain.DomainVerificationManager.class);
+            if (manager == null) return false;
+            android.content.pm.verify.domain.DomainVerificationUserState state =
+                    manager.getDomainVerificationUserState(packageName);
+            return state != null && BrowserAppLinkApproval.isApproved(
+                    Build.VERSION.SDK_INT, state.isLinkHandlingAllowed(),
+                    host, state.getHostToStateMap());
+        } catch (android.content.pm.PackageManager.NameNotFoundException
+                 | RuntimeException unavailable) {
+            return false;
         }
     }
 

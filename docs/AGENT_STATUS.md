@@ -1,3 +1,7 @@
+- [Daymark whole-project engineering status — 2026-11-01T14:36:00Z](./CURRENT_STATUS_20261101T143600Z.md)
+
+- [Daymark whole-project engineering status — 2026-11-01T14:07:18Z](./CURRENT_STATUS_20261101T140718Z.md)
+
 - [Daymark whole-project engineering status — 2026-11-01T11:05:00Z](./CURRENT_STATUS_20261101T110500Z.md)
 
 - [Daymark whole-project engineering status — 2026-11-01T12:57:00Z](./CURRENT_STATUS_20261101T125700Z.md)
@@ -15,6 +19,10 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+
+- [Daymark engineering status — 2026-11-01T14:36:00Z](./CURRENT_STATUS_20261101T143600Z.md)
+
+- [Daymark engineering status — 2026-11-01T14:07:18Z](./CURRENT_STATUS_20261101T140718Z.md)
 
 - [Daymark engineering status — 2026-11-01T12:57:00Z](./CURRENT_STATUS_20261101T125700Z.md)
 
