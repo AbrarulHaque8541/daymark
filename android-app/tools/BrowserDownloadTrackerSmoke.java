@@ -81,6 +81,35 @@ public final class BrowserDownloadTrackerSmoke {
         check(tracker.get(1L).status == BrowserDownloadTracker.Status.COMPLETED,
                 "completion status must be recorded");
         check(tracker.activeCount() == 0, "completed download must not count as active");
+        check(tracker.get(1L).bytesDownloaded == 100L,
+                "known-size completion must retain the completed byte count");
+        check(tracker.get(1L).progress() == 1.0d,
+                "known-size completion must report full progress");
+
+        BrowserDownloadTracker.Entry unknownSize = tracker.start(
+                24L, "https://cdn.example.test/unknown-size", "unknown.bin");
+        tracker.onProgress(24L, 64L, -1L);
+        check(unknownSize.bytesDownloaded == 64L && unknownSize.totalBytes == 0L,
+                "unknown provider size must preserve the observed byte count");
+        tracker.onComplete(24L);
+        check(unknownSize.bytesDownloaded == 64L,
+                "completion with unknown size must not erase observed bytes");
+        check(unknownSize.progress() == 1.0d,
+                "completed unknown-size download must report full progress");
+
+        BrowserDownloadTracker.Entry zeroSize = tracker.start(
+                25L, "https://cdn.example.test/zero-size", "empty.bin");
+        tracker.onProgress(25L, 0L, 0L);
+        tracker.onComplete(25L);
+        check(zeroSize.progress() == 1.0d,
+                "completed zero-byte download must report full progress");
+
+        BrowserDownloadTracker.Entry knownSize = tracker.start(
+                26L, "https://cdn.example.test/known-size", "known.bin");
+        tracker.onProgress(26L, 40L, 80L);
+        tracker.onComplete(26L);
+        check(knownSize.bytesDownloaded == 80L && knownSize.progress() == 1.0d,
+                "completion must advance a partially observed known-size download to total");
 
         List<BrowserDownloadTracker.Entry> snapshot = tracker.snapshot();
         snapshot.clear();
