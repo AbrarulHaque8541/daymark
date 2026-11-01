@@ -506,6 +506,28 @@ public final class TaskLogicSmoke {
                 Instant.parse("2026-10-07T14:30:00Z"));
         check("2026-10-09".equals(atDayLead.dueDate),
                 "a 24-hour reminder advances once at the previous-day trigger without repeating");
+        Task yearOneDaily = TaskLogic.create("Year one daily", "0001-01-01", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check("2026-10-31".equals(TaskLogic.advanceRepeat(yearOneDaily, zone,
+                        Instant.parse("2026-10-30T10:00:00Z")).dueDate),
+                "daily recurrence catches up from year 0001 without a fixed iteration cap");
+
+        ZoneId eastern = ZoneId.of("America/New_York");
+        Task springGapReminder = TaskLogic.create("Spring DST reminder", "2026-03-08", "medium", "",
+                "02:30", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check(TaskLogic.advanceRepeat(springGapReminder, eastern,
+                        Instant.parse("2026-03-08T06:59:00Z")) == springGapReminder,
+                "spring-forward reminder remains pending until the zone-resolved trigger");
+        check("2026-03-09".equals(TaskLogic.advanceRepeat(springGapReminder, eastern,
+                        Instant.parse("2026-03-08T07:00:00Z")).dueDate),
+                "spring-forward reminder advances exactly at the resolved 03:00 local trigger");
+
+        Task fallOverlapReminder = TaskLogic.create("Fall DST reminder", "2026-11-01", "medium", "",
+                "01:30", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check("2026-11-02".equals(TaskLogic.advanceRepeat(fallOverlapReminder, eastern,
+                        Instant.parse("2026-11-01T05:00:00Z")).dueDate),
+                "fall-back overlap uses the earlier 01:00 local offset for its reminder trigger");
+
         Task future = TaskLogic.create("Future", "2026-10-10", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
         check(TaskLogic.advanceRepeat(future, zone, now) == future,
