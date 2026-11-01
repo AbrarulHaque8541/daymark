@@ -6,6 +6,8 @@
   const MAX_ITEM_TITLE_CHARS = 200;
   const MAX_SUMMARY_CHARS = 280;
   const MAX_XML_CHARS = 512 * 1024;
+  // Bound network response allocation before parsing; UTF-8 uses at most 4 bytes per code point.
+  const MAX_XML_BYTES = MAX_XML_CHARS * 4;
 
   function decodeEntities(text) {
     return String(text).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
@@ -202,6 +204,59 @@
     return isValidFeedUrl(cachedUrl) ? String(cachedUrl).trim() : null;
   }
 
+  async function readResponseText(response, controller, setActiveReader, isTimedOut) {
+    const headers = response && response.headers;
+    const contentLength = headers && typeof headers.get === 'function'
+      ? Number(headers.get('content-length'))
+      : NaN;
+    if (Number.isFinite(contentLength) && contentLength > MAX_XML_BYTES) {
+      if (controller) controller.abort();
+      throw new Error('The feed response was too large to parse safely.');
+    }
+
+    const body = response && response.body;
+    if (!body || typeof body.getReader !== 'function' || typeof root.TextDecoder !== 'function') {
+      // Compatibility fallback for older/test Response implementations. Prefer
+      // streaming whenever the browser exposes a readable response body.
+      const xml = await response.text();
+      if (xml.length > MAX_XML_CHARS) throw new Error('The feed response was too large to parse safely.');
+      return xml;
+    }
+
+    const reader = body.getReader();
+    setActiveReader(reader);
+    const decoder = new root.TextDecoder('utf-8');
+    let xml = '';
+    let bytesRead = 0;
+    try {
+      for (;;) {
+        const part = await reader.read();
+        if (part.done) break;
+        const chunk = part.value;
+        const chunkBytes = chunk && Number.isFinite(chunk.byteLength) ? chunk.byteLength : 0;
+        bytesRead += chunkBytes;
+        if (bytesRead > MAX_XML_BYTES) {
+          if (controller) controller.abort();
+          try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+          throw new Error('The feed response was too large to parse safely.');
+        }
+        xml += decoder.decode(chunk, { stream: true });
+        if (xml.length > MAX_XML_CHARS) {
+          if (controller) controller.abort();
+          try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+          throw new Error('The feed response was too large to parse safely.');
+        }
+      }
+      xml += decoder.decode();
+      if (xml.length > MAX_XML_CHARS) throw new Error('The feed response was too large to parse safely.');
+      if (isTimedOut()) throw new Error('Feed request timed out.');
+      return xml;
+    } finally {
+      setActiveReader(null);
+      try { reader.releaseLock(); } catch (error) { /* minimal test readers may omit releaseLock */ }
+    }
+  }
+
   async function fetchFeed(url, fetchImpl, timeoutMs = 10000) {
     if (!isValidFeedUrl(url)) throw new Error('Enter a valid http(s) feed URL first.');
     if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
@@ -210,10 +265,17 @@
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     let timedOut = false;
     let timer = null;
+    let activeReader = null;
     const timeout = new Promise((resolve, reject) => {
       timer = root.setTimeout(() => {
         timedOut = true;
         if (controller) controller.abort();
+        if (activeReader && typeof activeReader.cancel === 'function') {
+          try {
+            const cancellation = activeReader.cancel();
+            if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+          } catch (error) { /* cancellation is best-effort */ }
+        }
         reject(new Error('Feed request timed out.'));
       }, duration);
     });
@@ -224,7 +286,12 @@
         redirect: 'follow'
       });
       if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
-      const xml = await response.text();
+      const xml = await readResponseText(
+        response,
+        controller,
+        (reader) => { activeReader = reader; },
+        () => timedOut
+      );
       if (timedOut) throw new Error('Feed request timed out.');
       return parseFeed(xml);
     })();
@@ -344,7 +411,8 @@
     MAX_FEED_TITLE_CHARS,
     MAX_ITEM_TITLE_CHARS,
     MAX_SUMMARY_CHARS,
-    MAX_XML_CHARS
+    MAX_XML_CHARS,
+    MAX_XML_BYTES
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkFeed = api;
