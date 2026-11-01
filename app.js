@@ -6,6 +6,7 @@
   const FOCUS_KEY = 'daymark.focus.v1';
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FEED_KEY = 'daymark.feed.v1';
+  const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
@@ -932,6 +933,10 @@
       showToast('That file is not valid JSON. Nothing was changed.');
       return;
     }
+    if (!Array.isArray(parsed)) {
+      showToast('That backup is not a task list. Nothing was changed.');
+      return;
+    }
     const validated = logic.validateStoredTasks(parsed);
     const existingIds = new Set(state.tasks.map((task) => task.id));
     const incoming = validated.tasks.filter((task) => !existingIds.has(task.id));
@@ -939,9 +944,37 @@
     if (!incoming.length) {
       showToast(duplicates
         ? 'Every task in that file already exists. Nothing was changed.'
-        : 'No valid tasks were found in that file. Nothing was changed.');
+        : 'No valid tasks were found in that file. Nothing was changed');
       return;
     }
+
+    const preview = [
+      `Import preview: ${incoming.length} new task${incoming.length === 1 ? '' : 's'} will be added.`,
+      duplicates
+        ? `${duplicates} duplicate task${duplicates === 1 ? '' : 's'} will be skipped; your existing versions stay unchanged.`
+        : '',
+      validated.rejectedCount
+        ? `${validated.rejectedCount} invalid record${validated.rejectedCount === 1 ? '' : 's'} will be skipped.`
+        : '',
+      'Your current tasks will not be replaced. Continue?'
+    ].filter(Boolean).join('\\n');
+
+    if (typeof window.confirm !== 'function') {
+      showToast('Import confirmation is unavailable. Nothing was changed.');
+      return;
+    }
+    let confirmed = false;
+    try {
+      confirmed = window.confirm(preview);
+    } catch (error) {
+      showToast('Import confirmation could not be displayed. Nothing was changed.');
+      return;
+    }
+    if (!confirmed) {
+      showToast('Import cancelled. Nothing was changed.');
+      return;
+    }
+
     state.tasks = state.tasks.concat(incoming);
     const saved = persistTasks();
     render();
@@ -954,6 +987,10 @@
   function importTasks(file) {
     if (typeof FileReader === 'undefined') {
       showToast('Import is not available in this browser.');
+      return;
+    }
+    if (file && Number.isFinite(file.size) && file.size > MAX_IMPORT_FILE_BYTES) {
+      showToast('Import file is too large (maximum 8 MiB). Nothing was changed.');
       return;
     }
     const reader = new FileReader();
