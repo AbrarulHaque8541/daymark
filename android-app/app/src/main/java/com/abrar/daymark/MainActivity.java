@@ -3958,7 +3958,7 @@ public final class MainActivity extends Activity {
             showToast("Downloads are unavailable on this device.");
             return;
         }
-        if (!browserDownloadEnqueueGate.tryAcquire(url, SystemClock.elapsedRealtime())) {
+        if (!browserDownloadEnqueueGate.tryAcquire(url, android.os.SystemClock.elapsedRealtime())) {
             showToast("This download was just started. Wait a moment before retrying.");
             return;
         }
