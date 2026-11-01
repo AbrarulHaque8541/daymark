@@ -482,6 +482,20 @@
     });
   }
 
+  function formatRecoverySize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return "unknown size";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function formatRecoverySize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return "unknown size";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
   function exportRecoveryBackup() {
     if (state.recoveryExportInProgress) return;
 
@@ -518,7 +532,8 @@
     }
 
     state.recoveryExportInProgress = true;
-    showToast('Recovery backup is ready. Keep this file private; tap Download now.', {
+    const sizeLabel = formatRecoverySize(raw.length);
+    showToast(`Recovery backup is ready (${sizeLabel}). Keep this file private; tap Download now.`, {
       label: 'Download now',
       run: () => downloadPreparedRecoveryBackup({ href, objectUrl })
     });

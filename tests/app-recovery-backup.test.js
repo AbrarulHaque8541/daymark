@@ -296,7 +296,7 @@ test('recovery backup export preserves a second user gesture for browser downloa
   // First tap prepares the Blob but does not attempt a delayed download.
   action.dispatch('click');
   const status = app.elements.get('#toast');
-  assert.match(status.textContent, /Recovery backup is ready/);
+  assert.match(status.textContent, /Recovery backup is ready (.*)/);
   assert.equal(action.hidden, false);
   assert.equal(action.textContent, 'Download now');
   assert.equal(app.elements.has('#download-link'), false,
