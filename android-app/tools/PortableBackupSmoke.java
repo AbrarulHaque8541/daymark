@@ -876,11 +876,15 @@ public final class PortableBackupSmoke {
         PortableBackupCodec.Manifest legacyYearly = PortableBackupCodec.decodeManifest(
                 legacyYearlyManifest, randomToken(), 1, "legacy-yearly");
         PortableBackupCodec.PortableTask legacyPortable = legacyYearly.tasks.get(0);
+        List<Subtask> legacySubtasks = new ArrayList<>();
+        for (PortableBackupCodec.PortableSubtask portableSubtask : legacyPortable.subtasks) {
+            legacySubtasks.add(new Subtask(UUID.randomUUID().toString(), portableSubtask.title, portableSubtask.done));
+        }
         Task legacyRestored = new Task("legacy-yearly", legacyPortable.title, legacyPortable.dueDate,
                 legacyPortable.priority, legacyPortable.completed, legacyPortable.createdAt,
                 legacyPortable.updatedAt, Collections.<AttachmentRef>emptyList(), legacyPortable.notes,
                 legacyPortable.dueTime, legacyPortable.reminderLeadMinutes, legacyPortable.reminderShownFire,
-                legacyPortable.repeatRule, legacyPortable.repeatDayOfMonth, legacyPortable.subtasks,
+                legacyPortable.repeatRule, legacyPortable.repeatDayOfMonth, legacySubtasks,
                 legacyPortable.tags);
         check(legacyPortable.repeatDayOfMonth == null && Integer.valueOf(29).equals(legacyRestored.repeatDayOfMonth)
                         && TaskLogic.isValid(legacyRestored),
