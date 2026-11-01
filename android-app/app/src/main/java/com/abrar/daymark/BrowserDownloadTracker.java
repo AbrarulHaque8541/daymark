@@ -75,8 +75,6 @@ final class BrowserDownloadTracker {
         Entry e = entries.get(id);
         if (e == null) return;
         e.status = Status.QUEUED;
-        e.bytesDownloaded = 0L;
-        e.totalBytes = 0L;
     }
 
     synchronized void onPaused(long id) {
