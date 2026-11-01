@@ -532,6 +532,40 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(reopened.loadTemplates().size() == 1
                             && reopened.loadTemplates().get(0).id.equals(template.id),
                     "saving a clip preserves existing templates");
+
+            byte[] recoveryKey = PortableBackupCodec.newRecoveryKey(new SecureRandom());
+            try {
+                ByteArrayOutputStream archive = new ByteArrayOutputStream();
+                PortableBackupCodec.writeArchive(archive, recoveryKey, tasks,
+                        (task, attachment) -> { throw new IOException("Unexpected attachment"); },
+                        new SecureRandom(), () -> false);
+                File targetRoot = new File(root, "backup-target");
+                check(targetRoot.mkdirs(), "clip backup target is isolated");
+                IsolatedContext targetContext = new IsolatedContext(getTargetContext(), targetRoot);
+                File targetFile = new File(targetContext.getFilesDir(), "tasks.enc");
+                EncryptedTaskStore targetStore = new EncryptedTaskStore(targetFile, new FixedTestKey());
+                check(targetStore.load().isEmpty(), "clip backup target starts empty");
+                Task targetExisting = TaskLogic.create("Existing target task", null, "medium");
+                TaskTemplate targetTemplate = TaskTemplateLogic.create("Existing target template", null, "low");
+                targetStore.saveSnapshot(Collections.singletonList(targetExisting),
+                        Collections.singletonList(targetTemplate));
+                new PortableBackupManager(targetContext).restore(new ByteArrayInputStream(archive.toByteArray()),
+                        recoveryKey.clone(), targetStore, new AndroidAttachmentStore(targetContext), () -> false);
+
+                EncryptedTaskStore targetReopened = new EncryptedTaskStore(targetFile, new FixedTestKey());
+                List<Task> restored = targetReopened.load();
+                check(restored.size() == 3 && restored.get(0).id.equals(targetExisting.id),
+                        "restoring the clip backup preserves the target's existing task");
+                check(targetReopened.loadTemplates().size() == 1
+                                && targetReopened.loadTemplates().get(0).id.equals(targetTemplate.id),
+                        "restoring the clip backup preserves the target's existing template");
+                Task restoredClip = restored.get(2);
+                check(!restoredClip.id.equals(clip.id) && restoredClip.title.equals(clip.title)
+                                && restoredClip.notes.equals(clip.notes) && restoredClip.tags.contains(WebClip.TAG),
+                        "clip source, multiline excerpt and tag survive encrypted export and restore");
+            } finally {
+                PortableBackupCodec.clear(recoveryKey);
+            }
         } finally {
             deleteTree(root);
         }

@@ -14,6 +14,7 @@ for marker, explanation in (
     ("DownloadManager.COLUMN_STATUS", "the list must read provider status"),
     ("DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR", "progress must use provider byte counts"),
     ("DownloadManager.COLUMN_TOTAL_SIZE_BYTES", "progress must account for known total size"),
+    ("BrowserDownloadProgress.percent(downloaded, total)", "download progress percentage must avoid signed-long multiplication overflow"),
     ("DownloadManager.STATUS_PENDING", "queued downloads need a visible status"),
     ("DownloadManager.STATUS_RUNNING", "running downloads need a visible status"),
     ("DownloadManager.STATUS_PAUSED", "paused downloads need a visible status"),

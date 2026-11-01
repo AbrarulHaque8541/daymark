@@ -3750,7 +3750,9 @@ public final class MainActivity extends Activity {
         List<String> mimeTypes = new ArrayList<>();
         List<Integer> statuses = new ArrayList<>();
         List<String> labels = new ArrayList<>();
-        boolean truncated = false;
+        BrowserDownloadListPolicy.Collector collector =
+                new BrowserDownloadListPolicy.Collector(BrowserDownloadListPolicy.MAX_VISIBLE);
+        boolean hasTimestampColumn = false;
         try (Cursor cursor = manager.query(new DownloadManager.Query())) {
             if (cursor != null) {
                 int idColumn = cursor.getColumnIndex(DownloadManager.COLUMN_ID);
@@ -3761,14 +3763,12 @@ public final class MainActivity extends Activity {
                 int reasonColumn = cursor.getColumnIndex(DownloadManager.COLUMN_REASON);
                 int downloadedColumn = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
                 int totalColumn = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
+                int lastModifiedColumn = cursor.getColumnIndex(DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP);
+                hasTimestampColumn = lastModifiedColumn >= 0;
                 if (idColumn < 0 || statusColumn < 0) {
                     throw new IllegalStateException("Download provider did not return required status columns.");
                 }
                 while (cursor.moveToNext()) {
-                    if (ids.size() >= 100) {
-                        truncated = true;
-                        break;
-                    }
                     long id = cursor.getLong(idColumn);
                     String title = titleColumn >= 0 ? cursor.getString(titleColumn) : null;
                     String url = urlColumn >= 0 ? cursor.getString(urlColumn) : null;
@@ -3777,7 +3777,12 @@ public final class MainActivity extends Activity {
                     int reason = reasonColumn >= 0 ? cursor.getInt(reasonColumn) : 0;
                     long downloaded = downloadedColumn >= 0 ? cursor.getLong(downloadedColumn) : 0;
                     long total = totalColumn >= 0 ? cursor.getLong(totalColumn) : -1;
+                    long lastModified = lastModifiedColumn >= 0
+                            ? cursor.getLong(lastModifiedColumn) : 0L;
                     if (title == null || title.trim().isEmpty()) title = "Download " + id;
+
+                    // Keep the bounded in-memory tracker synchronized for every Daymark-owned
+                    // ID, even when an old entry falls outside the visible newest-100 window.
                     BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id);
                     if (tracked != null) {
                         if (status == DownloadManager.STATUS_PENDING) {
@@ -3793,16 +3798,25 @@ public final class MainActivity extends Activity {
                             browserDownloadTracker.onFailure(id, Integer.toString(reason));
                         }
                     }
-                    ids.add(id);
-                    urls.add(url);
-                    mimeTypes.add(mime);
-                    statuses.add(status);
-                    labels.add(title + " — " + browserDownloadStatusLabel(status, reason, downloaded, total));
+
+                    collector.add(id, title, url, mime, status, reason,
+                            downloaded, total, lastModified);
                 }
             }
         } catch (RuntimeException queryFailed) {
             showToast("Could not read download status. Try again.");
             return;
+        }
+
+        BrowserDownloadListPolicy.Selection selection = collector.finish();
+        boolean truncated = selection.truncated;
+        for (BrowserDownloadListPolicy.Item item : selection.items) {
+            ids.add(item.id);
+            urls.add(item.url);
+            mimeTypes.add(item.mimeType);
+            statuses.add(item.status);
+            labels.add(item.title + " — "
+                    + browserDownloadStatusLabel(item.status, item.reason, item.downloaded, item.total));
         }
 
         if (ids.isEmpty()) {
@@ -3815,8 +3829,12 @@ public final class MainActivity extends Activity {
             return;
         }
 
+        String downloadsTitle = truncated
+                ? (hasTimestampColumn ? "Downloads (showing 100 most recent items)"
+                        : "Downloads (showing 100 items)")
+                : "Downloads";
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(truncated ? "Downloads (showing 100 items)" : "Downloads")
+                .setTitle(downloadsTitle)
                 .setItems(labels.toArray(new String[0]), (shown, selected) -> {
                     if (selected < 0 || selected >= ids.size()) return;
                     long id = ids.get(selected);
@@ -3837,7 +3855,7 @@ public final class MainActivity extends Activity {
                 return "Queued";
             case DownloadManager.STATUS_RUNNING:
                 if (total > 0) {
-                    long percent = Math.max(0, Math.min(100, downloaded * 100 / total));
+                    int percent = BrowserDownloadProgress.percent(downloaded, total);
                     return "Downloading " + percent + "%";
                 }
                 return "Downloading";
