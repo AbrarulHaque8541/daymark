@@ -161,6 +161,23 @@ public final class BrowserDownloadTrackerSmoke {
                         && negativeProgress.progress() == 0d,
                 "negative provider counters must be normalized to a safe zero state");
 
+        // Unicode FORMAT characters (including bidi overrides) and NUL are not line breaks, but
+        // can spoof diagnostic/UI text. They must be neutralized before metadata is retained.
+        BrowserDownloadTracker metadataTracker = new BrowserDownloadTracker();
+        String bidiOverride = Character.toString((char) 0x202E);
+        String nul = Character.toString((char) 0);
+        BrowserDownloadTracker.Entry nullUrl = metadataTracker.start(
+                1L, null, "plain.bin");
+        check("null".equals(nullUrl.url), "null URL must be represented safely");
+        BrowserDownloadTracker.Entry formattedName = metadataTracker.start(
+                2L, "https://safe.example/file", "safe" + bidiOverride + "name" + nul + "end.bin");
+        check(!formattedName.fileName.contains(bidiOverride) && !formattedName.fileName.contains(nul),
+                "filename must strip Unicode FORMAT and CONTROL characters");
+        metadataTracker.onFailure(2L, "failure" + bidiOverride + nul + "details");
+        check(!formattedName.failureReason.contains(bidiOverride)
+                        && !formattedName.failureReason.contains(nul),
+                "failure reason must strip Unicode FORMAT and CONTROL characters");
+
         System.out.println("PASS BrowserDownloadTrackerSmoke: origin-only redaction, malformed fail-closed, status/progress, bounded capacity");
     }
 
