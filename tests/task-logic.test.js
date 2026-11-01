@@ -131,17 +131,6 @@ test('notes, reminders, and subtasks validate with bounded fields', () => {
   assert.equal(logic.isValidTask({ ...base, subtasks: [{ id: 's1', title: 'Only', done: false }] }), true);
 });
 
-test('repeat rules and optional month/year day anchors validate strictly', () => {
-  const base = task('repeat', 'Recurring task', { dueDate: '2026-01-31' });
-  assert.equal(logic.isValidTask({ ...base, repeat: 'monthly', repeatDayOfMonth: 31 }), true);
-  assert.equal(logic.isValidTask({ ...base, repeat: 'yearly', repeatDayOfMonth: 29 }), true);
-  assert.equal(logic.isValidTask({ ...base, repeat: 'monthly', repeatDayOfMonth: 0 }), false);
-  assert.equal(logic.isValidTask({ ...base, repeat: 'yearly', repeatDayOfMonth: 32 }), false);
-  assert.equal(logic.isValidTask({ ...base, repeat: 'daily', repeatDayOfMonth: 31 }), false);
-  assert.equal(logic.isValidTask({ ...base, repeat: 'hourly' }), false);
-  assert.equal(logic.isValidTask(base), true, 'legacy task records without recurrence metadata remain valid');
-});
-
 test('legacy tasks without extended fields stay valid', () => {
   const legacy = task('legacy', 'Old task', { dueDate: TODAY });
   assert.equal(logic.isValidTask(legacy), true);

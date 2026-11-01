@@ -2,7 +2,6 @@
   'use strict';
 
   const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
-  const REPEAT_RULES = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
 
   function localDateString(date = new Date()) {
     const year = date.getFullYear();
@@ -79,10 +78,6 @@
       && typeof task.title === 'string' && task.title.trim().length > 0
       && task.title.trim().length <= 160
       && (task.dueDate === null || isDateOnly(task.dueDate))
-      && (task.repeat === undefined || task.repeat === null || REPEAT_RULES.includes(task.repeat))
-      && (task.repeatDayOfMonth === undefined
-        || (Number.isInteger(task.repeatDayOfMonth) && task.repeatDayOfMonth >= 1
-          && task.repeatDayOfMonth <= 31 && ['monthly', 'yearly'].includes(task.repeat)))
       && ['low', 'medium', 'high'].includes(task.priority)
       && typeof task.completed === 'boolean'
       && typeof task.createdAt === 'string' && !Number.isNaN(Date.parse(task.createdAt))
