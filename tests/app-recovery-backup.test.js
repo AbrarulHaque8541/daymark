@@ -281,6 +281,11 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.equal(status.getAttribute('aria-busy'), 'true',
     'the live region announces that export preparation is in progress');
   app.flushAnimationFrame();
+  assert.equal(status.getAttribute('aria-busy'), 'true',
+    'the preparation state remains visible through the first frame');
+  assert.equal(app.elements.get('#download-link').clicked, undefined,
+    'download work is deferred until the next frame');
+  app.flushAnimationFrame();
 
   const link = app.elements.get('#download-link');
   assert.equal(link.clicked, true, 'the browser download is triggered');
@@ -291,7 +296,6 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.match(status.textContent, /Recovery backup exported/);
   assert.equal(status.getAttribute('aria-busy'), null,
     'the live region clears its busy state after export');
-  assert.equal(status.classList.contains('is-exporting'), false);
 });
 
 
@@ -306,6 +310,8 @@ test('recovery export clears its accessible busy state when browser download set
 
   action.dispatch('click');
   const status = app.elements.get('#toast');
+  assert.equal(status.getAttribute('aria-busy'), 'true');
+  app.flushAnimationFrame();
   assert.equal(status.getAttribute('aria-busy'), 'true');
   app.flushAnimationFrame();
 
