@@ -1390,8 +1390,10 @@
       if (typeof fetch !== 'function') throw new Error('fetch unavailable');
       const parsed = await feed.fetchFeed(target, fetch);
       state.feedCache = { version: 1, url: target, fetchedAt: new Date().toISOString(), feed: parsed };
-      persistFeedCache();
-      state.feedNotice = `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}.`;
+      const savedOffline = persistFeedCache();
+      state.feedNotice = savedOffline
+        ? `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}. Saved for offline reading.`
+        : `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}, but browser storage could not save an offline copy.`;
       showToast(`Briefing updated — ${parsed.items.length} item${parsed.items.length === 1 ? '' : 's'} loaded.`);
     } catch (error) {
       state.feedNotice = state.feedCache && state.feedCache.url === target
