@@ -30,7 +30,7 @@
 - P2 cross-platform architecture #325 remains evidence-first; no speculative engine rewrite.
 
 ## Safety and identity
-- Root `AGENTS.md` and live Gradle source approve installed ID `com.abrar.daymark`; standing user safety text states `com.cue.daymark`. Contradiction unresolved; no identity change.
+- Root `AGENTS.md` and live Gradle source approve the installed identity. A separate standing user safety instruction conflicts with that repository policy; owner reconciliation is required. No identity change made.
 - No release/tag/version bump, signing-key change, manifest permission change, schema migration, or destructive data operation.
 - Branch-protection read denied (403); no merge attempted/bypassed. Physical-device testing **NOT TESTED**.
 
