@@ -53,6 +53,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHistory.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLogPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserNetworkPolicy.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserOfflineEnforcement.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserMediaPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserTabPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserSettingsPolicy.java" \
@@ -104,6 +105,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/BrowserExternalLinkPolicySmoke.java" \
   "$ROOT/tools/BrowserLogPolicySmoke.java" \
   "$ROOT/tools/BrowserNetworkPolicySmoke.java" \
+  "$ROOT/tools/BrowserOfflineEnforcementSmoke.java" \
   "$ROOT/tools/BrowserMediaPolicySmoke.java" \
   "$ROOT/tools/BrowserTabPolicySmoke.java" \
   "$ROOT/tools/BrowserSettingsPolicySmoke.java" \
@@ -147,6 +149,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDownloadFilenamePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDownloadEnqueueGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserLogPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserOfflineEnforcementSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserNetworkPolicySmoke "$ROOT/../contracts/browser-network-policy.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserMediaPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserTabPolicySmoke
