@@ -37,8 +37,8 @@ check("UiMotionPolicy.TAB_SWITCH_MS" in WORKSPACE,
       "WorkspaceMotion must use the shared tab-switch duration")
 check("UiMotionPolicy.tabSlideFraction()" in WORKSPACE,
       "WorkspaceMotion must use the shared directional slide fraction")
-check("translationX(slide)" in WORKSPACE and ".translationX(0f)" in WORKSPACE,
-      "WorkspaceMotion must animate horizontal translation in and back to zero")
+check("setTranslationX(slide)" in WORKSPACE and ".translationX(0f)" in WORKSPACE,
+      "WorkspaceMotion must set the horizontal slide offset and animate it back to zero")
 check("enteringWeb ? 1f : -1f" in WORKSPACE,
       "workspace slide direction must reverse between Tasks and Web")
 check("target.animate().cancel();" in WORKSPACE,
