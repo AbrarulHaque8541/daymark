@@ -76,7 +76,35 @@ public final class BrowserDownloadTrackerSmoke {
         snapshot.clear();
         check(!tracker.snapshot().isEmpty(), "snapshot must be defensive");
 
-        System.out.println("PASS BrowserDownloadTrackerSmoke: origin-only redaction, malformed fail-closed, status/progress");
+        // Capacity must remain hard-bounded even when every retained download is active.
+        BrowserDownloadTracker saturated = new BrowserDownloadTracker();
+        for (long id = 0; id < BrowserDownloadTracker.MAX_TRACKED; id++) {
+            check(saturated.start(id, "https://cdn.example.test/" + id, "download.bin") != null,
+                    "initial active downloads should be tracked");
+        }
+        check(saturated.activeCount() == BrowserDownloadTracker.MAX_TRACKED,
+                "all retained entries are active at the cap");
+        check(saturated.start(BrowserDownloadTracker.MAX_TRACKED,
+                        "https://cdn.example.test/overflow", "download.bin") == null,
+                "new active download must not exceed the tracking cap");
+        check(saturated.snapshot().size() == BrowserDownloadTracker.MAX_TRACKED,
+                "all-active saturation must remain bounded");
+        check(saturated.get(0L) != null,
+                "capacity pressure must not evict an active download");
+
+        // A terminal entry can be evicted to make room without losing active entries.
+        saturated.onComplete(0L);
+        BrowserDownloadTracker.Entry admitted = saturated.start(
+                BrowserDownloadTracker.MAX_TRACKED,
+                "https://cdn.example.test/next", "download.bin");
+        check(admitted != null, "a completed entry should be evicted to admit a new download");
+        check(saturated.snapshot().size() == BrowserDownloadTracker.MAX_TRACKED,
+                "admitting after terminal eviction must preserve the cap");
+        check(saturated.get(0L) == null, "oldest completed entry is evicted first");
+        check(saturated.get((long) BrowserDownloadTracker.MAX_TRACKED) != null,
+                "new entry is retained after terminal eviction");
+
+        System.out.println("PASS BrowserDownloadTrackerSmoke: origin-only redaction, malformed fail-closed, status/progress, bounded capacity");
     }
 
     private static void check(boolean condition, String message) {
