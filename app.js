@@ -54,8 +54,12 @@
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
         if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
+      } else if (hasPartialRecoveryBackup()) {
+        // Keep task records rejected by validation until the user can recover them.
+        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+        offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
       } else if (hasRecoveryBackupNeedingPreservation()) {
-        // Keep partial, malformed, or opaque recovery material until the user can export/recover it.
+        // Opaque originals are retained only once grouped into an explicit recovery bundle.
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
       } else {
@@ -151,21 +155,26 @@
     }
   }
 
-  function recoveryPayloadNeedsPreservation(raw) {
-    if (typeof raw !== 'string' || raw.length === 0) return false;
+  function hasOpaqueRecoveryBundle() {
     try {
+      const raw = localStorage.getItem(BACKUP_KEY);
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return true;
-      return logic.validateStoredTasks(parsed).rejectedCount > 0;
+      if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
+      return parsed.payloads.some((payload) => typeof payload !== 'string'
+        || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
     } catch (error) {
-      return true;
+      return false;
     }
   }
 
   function hasRecoveryBackupNeedingPreservation() {
     try {
       const raw = localStorage.getItem(BACKUP_KEY);
-      return recoveryBackupPayloads(raw).some(recoveryPayloadNeedsPreservation);
+      if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
+      return parsed.payloads.some((payload) => typeof payload !== 'string'
+        || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
     } catch (error) {
       return true;
     }
@@ -185,7 +194,9 @@
         state.recoveryBackupPendingPayload = null;
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
-      if (hasRecoveryBackupNeedingPreservation()) {
+      if (hasPartialRecoveryBackup()) {
+        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
+      } else if (hasRecoveryBackupNeedingPreservation()) {
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
       } else {
         setStorageStatus('Saved on this device');
