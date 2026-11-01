@@ -361,6 +361,15 @@ test('recovery export reports Blob preparation failure without offering a broken
 });
 
 
+
+test('app.js parses before browser runtime boot', () => {
+  try {
+    new vm.Script(APP_SOURCE, { filename: 'app.js' });
+  } catch (error) {
+    assert.fail(`app.js syntax error: ${error.stack || error.message}`);
+  }
+});
+
 test('app.js integrity guard rejects placeholder or truncated application source', () => {
   assert.ok(APP_SOURCE.length >= 50000,
     `app.js must retain the complete task/focus application (got ${APP_SOURCE.length} bytes)`);
