@@ -15,6 +15,7 @@ public final class BrowserHistorySmoke {
 
     public static void main(String[] args) {
         sanitizeUrlKeepsOnlyOrigins();
+        normalizeInternationalizedHosts();
         encodeDecodeRoundTripAndBounds();
         addDedupesAndCapsAtFifty();
         removeFilterAndClear();
@@ -42,6 +43,36 @@ public final class BrowserHistorySmoke {
         check(BrowserHistory.sanitizeUrl("not a url") == null, "relative junk is rejected");
         check(BrowserHistory.sanitizeUrl("") == null && BrowserHistory.sanitizeUrl(null) == null,
                 "blank and null input are rejected");
+    }
+
+    private static void normalizeInternationalizedHosts() {
+        check("https://xn--bcher-kva.de".equals(
+                        BrowserHistory.sanitizeUrl("https://bücher.de/Path?q=secret#fragment")),
+                "Unicode DNS names are canonicalized to punycode without retaining path/query/fragment");
+        check("https://xn--bcher-kva.de".equals(
+                        BrowserHistory.sanitizeUrl("https://XN--BCHER-KVA.DE/")),
+                "ASCII punycode and Unicode IDN visits share one canonical history origin");
+        check("https://xn--bcher-kva.de:8443".equals(
+                        BrowserHistory.sanitizeUrl("https://user:pass@bücher.de:8443/path")),
+                "userinfo is stripped and a non-default port survives IDN canonicalization");
+        check("https://xn--bcher-kva.de".equals(
+                        BrowserHistory.sanitizeUrl("https://bücher.de.:443/")),
+                "a single DNS root dot and default HTTPS port normalize away");
+        check(BrowserHistory.sanitizeUrl("https://bücher.de..") == null,
+                "multiple trailing DNS root dots are rejected");
+        check(BrowserHistory.sanitizeUrl("https://bücher.de:0/") == null,
+                "zero port is rejected for Unicode hosts");
+        check(BrowserHistory.sanitizeUrl("https://bücher.de:65536/") == null,
+                "out-of-range port is rejected for Unicode hosts");
+        check(BrowserHistory.sanitizeUrl("https://bücher.de:/") == null,
+                "empty explicit port is rejected for Unicode hosts");
+        check(BrowserHistory.sanitizeUrl("https://" + "ü".repeat(64) + ".example/") == null,
+                "overlong IDN label is rejected");
+        String deduped = BrowserHistory.add(
+                BrowserHistory.add("", "https://xn--bcher-kva.de/one"),
+                "https://bücher.de/two");
+        check(BrowserHistory.decode(deduped).equals(List.of("https://xn--bcher-kva.de")),
+                "Unicode and punycode visits deduplicate to one privacy-safe origin");
     }
 
     private static void encodeDecodeRoundTripAndBounds() {
