@@ -5,13 +5,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const focus = require('../focus-logic.js');
+const repeat = require('../repeat-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -78,9 +79,13 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     querySelectorAll: () => [],
     addEventListener() {}
   };
+  const appLogic = fixedToday
+    ? Object.assign({}, logic, { localDateString: () => fixedToday })
+    : logic;
   const window = {
-    DaymarkLogic: logic,
+    DaymarkLogic: appLogic,
     DaymarkFocus: focus,
+    DaymarkRepeat: repeat,
     confirm(message) {
       confirmMessages.push(String(message));
       if (confirmThrows) throw new Error('confirmation unavailable');
@@ -145,12 +150,44 @@ function makeFocusLogEntry(id, taskId = null) {
 function makeFocusSession(id) {
   return focus.createSession({ id, kind: 'focus', durationMinutes: 25 }, Date.now());
 }
+function triggerTaskCompletion(app, taskId) {
+  const handlers = app.listeners.get('#task-list:click') || [];
+  const button = {
+    dataset: { action: 'toggle' },
+    closest(selector) {
+      return selector === '[data-task-id]' ? { dataset: { taskId } } : null;
+    }
+  };
+  const target = {
+    closest(selector) {
+      return selector === 'button[data-action]' ? button : null;
+    }
+  };
+  for (const handler of handlers) handler({ target });
+}
+
 function triggerTaskImport(app, file) {
   const input = app.elements.get('#import-file');
   input.files = [file];
   const handlers = app.listeners.get('#import-file:change') || [];
   for (const handler of handlers) handler({ currentTarget: input });
 }
+
+test('monthly task completed on a clamped date retains its original day anchor', () => {
+  const recurring = makeImportTask('monthly-31', 'Month-end task');
+  recurring.dueDate = '2026-02-28';
+  recurring.repeat = 'monthly';
+  recurring.repeatDayOfMonth = 31;
+  const app = bootApp({ savedValue: JSON.stringify([recurring]), fixedToday: '2026-02-28' });
+
+  triggerTaskCompletion(app, recurring.id);
+
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 2);
+  assert.equal(saved[0].completed, true);
+  assert.equal(saved[1].dueDate, '2026-03-31', 'the next occurrence returns to day 31 after February');
+  assert.equal(saved[1].repeatDayOfMonth, 31, 'the recurring series anchor is carried forward');
+});
 
 test('task import previews additions, duplicates and invalid rows before appending', () => {
   const existing = makeImportTask('same-id', 'Original task');

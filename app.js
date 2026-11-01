@@ -795,6 +795,9 @@
     titleInput.removeAttribute('aria-invalid');
     const task = state.tasks.find((item) => item.id === $('#edit-id').value);
     if (!task) return closeEditor();
+    const originalDueDate = task.dueDate;
+    const originalRepeatRule = taskRepeat(task);
+    const originalRepeatDay = task.repeatDayOfMonth;
     task.title = title;
     const dueDateValue = $('#edit-due-date').value;
     task.dueDate = logic.isDateOnly(dueDateValue) ? dueDateValue : null;
@@ -808,8 +811,20 @@
       delete task.reminderShownFire;
     }
     const repeatRule = readRepeatRule($('#edit-repeat'));
-    if (task.dueDate && repeatRule) task.repeat = repeatRule;
-    else delete task.repeat;
+    if (task.dueDate && repeatRule) {
+      task.repeat = repeatRule;
+      if (repeatRule === 'monthly' || repeatRule === 'yearly') {
+        const sameSeries = originalDueDate === task.dueDate && originalRepeatRule === repeatRule;
+        task.repeatDayOfMonth = sameSeries && Number.isInteger(originalRepeatDay)
+          ? originalRepeatDay
+          : Number(task.dueDate.slice(8));
+      } else {
+        delete task.repeatDayOfMonth;
+      }
+    } else {
+      delete task.repeat;
+      delete task.repeatDayOfMonth;
+    }
     task.priority = readPriority($('#edit-priority'));
     const notes = $('#edit-notes').value;
     task.notes = notes.trim() ? notes : undefined;
@@ -829,7 +844,11 @@
   function scheduleNextOccurrence(task) {
     const rule = taskRepeat(task);
     if (!repeat || !rule || !logic.isDateOnly(task.dueDate)) return null;
-    const nextDue = repeat.nextDueDate(task.dueDate, rule, logic.localDateString());
+    const usesDayAnchor = rule === 'monthly' || rule === 'yearly';
+    const repeatDayOfMonth = usesDayAnchor
+      ? (Number.isInteger(task.repeatDayOfMonth) ? task.repeatDayOfMonth : Number(task.dueDate.slice(8)))
+      : undefined;
+    const nextDue = repeat.nextDueDate(task.dueDate, rule, logic.localDateString(), repeatDayOfMonth);
     if (!nextDue) return null;
     const now = new Date().toISOString();
     const next = {
@@ -851,6 +870,7 @@
       next.reminderLeadMinutes = task.reminderLeadMinutes;
     }
     next.repeat = rule;
+    if (usesDayAnchor) next.repeatDayOfMonth = repeatDayOfMonth;
     state.tasks.push(next);
     return `Task completed — next one is scheduled for ${formatDate(nextDue)}.`;
   }

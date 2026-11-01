@@ -23,6 +23,7 @@ public final class TaskLogicSmoke {
     public static void main(String[] args) throws IOException {
         datesAreStrictAndDateOnly();
         if (args.length > 0) sharedDateContract(Path.of(args[0]));
+        if (args.length > 1) sharedRecurrenceContract(Path.of(args[1]));
         CRUDKeepsStableIdentityAndTimestamps();
         templatesValidateAndCreateFreshTasks();
         templateListsRejectDuplicatesAndExcess();
@@ -438,6 +439,14 @@ public final class TaskLogicSmoke {
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKLY);
         check("2026-10-15".equals(TaskLogic.advanceRepeat(weekly, zone, now).dueDate),
                 "weekly repeat advances a whole week past the due moment");
+        Task yearOneWeekdays = TaskLogic.create("Year-one weekdays", "0001-01-01", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        check("2026-10-09".equals(TaskLogic.advanceRepeat(yearOneWeekdays, zone, now).dueDate),
+                "weekday recurrence jumps to the next weekday after today across a multi-millennial gap");
+        Task yearOneMonthly = TaskLogic.create("Year-one monthly", "0001-01-31", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_MONTHLY);
+        check("2026-10-31".equals(TaskLogic.advanceRepeat(yearOneMonthly, zone, now).dueDate),
+                "monthly recurrence catches up arithmetically across two millennia and retains day-31 anchor");
         Task monthly = TaskLogic.create("Monthly", "2026-09-01", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_MONTHLY);
         check("2026-11-01".equals(TaskLogic.advanceRepeat(monthly, zone, now).dueDate),
@@ -624,5 +633,29 @@ public final class TaskLogicSmoke {
             // Expected validation failure.
         }
     }
-}
 
+    private static void sharedRecurrenceContract(Path fixture) throws IOException {
+        int cases = 0;
+        try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
+            String line;
+            int lineNumber = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\t", -1);
+                check(fields.length == 4, "recurrence contract fixture line " + lineNumber + " has four columns");
+                String dueDate = fields[0];
+                String rule = fields[1];
+                String anchorRaw = fields[2];
+                String expected = fields[3];
+                Integer anchor = "-".equals(anchorRaw) ? null : Integer.valueOf(anchorRaw);
+                String actual = TaskLogic.nextDueDate(dueDate, rule, anchor);
+                check(expected.equals(actual),
+                        "Android recurrence matches shared fixture line " + lineNumber
+                        + " (expected " + expected + ", got " + actual + ")");
+                cases++;
+            }
+        }
+        check(cases == 10, "shared recurrence contract fixture contains all ten cases");
+    }
+}
