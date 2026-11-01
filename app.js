@@ -5,11 +5,13 @@
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
   const FOCUS_KEY = 'daymark.focus.v1';
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
+  const FEED_KEY = 'daymark.feed.v1';
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null };
+  const feed = window.DaymarkFeed || null;
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -445,6 +447,7 @@
       ? suggestions.map(({ task, reason }, index) => `<div class="suggestion-item"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></div>`).join('')
       : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
     renderFocus();
+    renderFeed();
   }
 
   function releasePreparedRecoveryExport() {
@@ -1308,11 +1311,113 @@
     }
   }
 
+
+  function formatFeedTime(value) {
+    const time = Date.parse(value);
+    if (Number.isNaN(time)) return '';
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(time));
+  }
+
+  function feedHost(url) {
+    try {
+      return new URL(url).host;
+    } catch (error) {
+      return url;
+    }
+  }
+
+  function loadFeedCache() {
+    if (!feed) return null;
+    try {
+      const raw = localStorage.getItem(FEED_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return feed.validateFeedCache(parsed) ? parsed : null;
+    } catch (error) {
+      console.warn('Could not load the saved Daymark feed cache:', error);
+      return null;
+    }
+  }
+
+  function persistFeedCache() {
+    if (!feed || !state.feedCache) return false;
+    try {
+      localStorage.setItem(FEED_KEY, JSON.stringify(state.feedCache));
+      return true;
+    } catch (error) {
+      console.warn('Could not save the Daymark feed cache:', error);
+      return false;
+    }
+  }
+
+  function renderFeed() {
+    if (!feed) return;
+    const status = $('#feed-status');
+    const list = $('#feed-list');
+    if (!status || !list) return;
+    const input = $('#feed-url');
+    const button = $('#feed-refresh');
+    if (input && state.feedCache && !input.value) input.value = state.feedCache.url;
+    if (button) {
+      button.disabled = state.feedLoading;
+      button.textContent = state.feedLoading ? 'Loading…' : 'Refresh';
+    }
+    status.textContent = state.feedNotice || (state.feedCache
+      ? `Saved on this device · ${formatFeedTime(state.feedCache.fetchedAt)}`
+      : 'No feed loaded yet. Paste an RSS or Atom URL and tap Refresh.');
+    const cache = state.feedCache;
+    list.innerHTML = cache && cache.feed ? cache.feed.items.map((item) => {
+      const when = item.publishedAt ? formatFeedTime(item.publishedAt) : '';
+      const heading = item.link
+        ? `<a class="feed-item-link" href="${escapeHTML(item.link)}" target="_blank" rel="noopener noreferrer">${escapeHTML(item.title)}</a>`
+        : `<span class="feed-item-title">${escapeHTML(item.title)}</span>`;
+      return `<div class="feed-item">${heading}${when ? `<span class="feed-item-date">${escapeHTML(when)}</span>` : ''}${item.summary ? `<p class="feed-item-summary">${escapeHTML(item.summary)}</p>` : ''}</div>`;
+    }).join('') : '<div class="feed-empty">Items from the feed will appear here after a successful refresh.</div>';
+  }
+
+  async function refreshFeed(rawUrl) {
+    if (!feed || state.feedLoading) return;
+    const target = feed.resolveFeedTarget(rawUrl, state.feedCache ? state.feedCache.url : null);
+    if (!target || !feed.isValidFeedUrl(target)) {
+      state.feedNotice = 'Enter a valid http(s) feed URL first.';
+      renderFeed();
+      return;
+    }
+    state.feedLoading = true;
+    state.feedNotice = 'Fetching feed…';
+    renderFeed();
+    try {
+      if (typeof fetch !== 'function') throw new Error('fetch unavailable');
+      const parsed = await feed.fetchFeed(target, fetch);
+      state.feedCache = { version: 1, url: target, fetchedAt: new Date().toISOString(), feed: parsed };
+      const savedOffline = persistFeedCache();
+      state.feedNotice = savedOffline
+        ? `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}. Saved for offline reading.`
+        : `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}, but browser storage could not save an offline copy.`;
+      showToast(`Briefing updated — ${parsed.items.length} item${parsed.items.length === 1 ? '' : 's'} loaded.`);
+    } catch (error) {
+      state.feedNotice = state.feedCache && state.feedCache.url === target
+        ? 'Could not reach the feed — showing items saved on this device.'
+        : 'Could not load that feed. Check the URL or your connection.';
+      showToast(state.feedNotice);
+    } finally {
+      state.feedLoading = false;
+      renderFeed();
+    }
+  }
+
+  function handleFeedSubmit(event) {
+    event.preventDefault();
+    if (!feed) return;
+    return refreshFeed($('#feed-url').value);
+  }
+
   function setUp() {
     state.tasks = loadTasks();
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
+    state.feedCache = loadFeedCache();
     render();
     $('#add-form').addEventListener('submit', addTask);
     $('#new-title').addEventListener('input', () => {
@@ -1387,6 +1492,7 @@
         render();
       }
     });
+    $('#feed-form').addEventListener('submit', handleFeedSubmit);
     $('#focus-start').addEventListener('click', () => startFocus(null));
     $('#focus-pause').addEventListener('click', toggleFocusPause);
     $('#focus-stop').addEventListener('click', () => endFocusSession(false));

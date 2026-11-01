@@ -13,6 +13,7 @@
   <script src="task-logic.js" defer></script>
   <script src="repeat-logic.js" defer></script>
   <script src="focus-logic.js" defer></script>
+  <script src="feed-logic.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -170,6 +171,19 @@
             <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
           </div>
           <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
+        </aside>
+
+        <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">BRIEFING</span></div>
+          <h2 id="briefing-heading">RSS / Atom briefing</h2>
+          <p class="briefing-description">Read a public news feed you choose. It is fetched only when you tap Refresh; the latest items are cached on this device and stay available offline. Some publishers block direct browser requests (CORS), so those feeds cannot be fetched here.</p>
+          <form id="feed-form" class="feed-form" novalidate>
+            <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
+            <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>
+            <button class="button button-primary feed-refresh" id="feed-refresh" type="submit">Refresh</button>
+          </form>
+          <p class="feed-status" id="feed-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="feed-list" aria-live="polite"></div>
         </aside>
         </div>
       </div>
