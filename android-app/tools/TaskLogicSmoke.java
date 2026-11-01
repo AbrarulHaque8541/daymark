@@ -630,13 +630,24 @@ public final class TaskLogicSmoke {
         int cases = 0;
         try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
             String line;
+            int lineNumber = 0;
             while ((line = reader.readLine()) != null) {
+                lineNumber++;
                 if (line.isEmpty() || line.startsWith("#")) continue;
                 String[] fields = line.split("\t", -1);
-                check(fields.length >= 2, "recurrence contract fixture has columns");
+                check(fields.length == 4, "recurrence contract fixture line " + lineNumber + " has four columns");
+                String dueDate = fields[0];
+                String rule = fields[1];
+                String anchorRaw = fields[2];
+                String expected = fields[3];
+                Integer anchor = "-".equals(anchorRaw) ? null : Integer.valueOf(anchorRaw);
+                String actual = TaskLogic.nextDueDate(dueDate, rule, anchor);
+                check(expected.equals(actual),
+                        "Android recurrence matches shared fixture line " + lineNumber
+                        + " (expected " + expected + ", got " + actual + ")");
                 cases++;
             }
         }
-        check(cases >= 1, "shared recurrence contract fixture is non-empty");
+        check(cases == 10, "shared recurrence contract fixture contains all ten cases");
     }
 }
