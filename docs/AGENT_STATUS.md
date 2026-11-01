@@ -1,9 +1,10 @@
-- [Daymark status snapshot — 2026-11-01T01:33:10Z](./CURRENT_STATUS_20261101T013310Z.md)
 # Agent status index
 
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+
+- [Daymark status snapshot — 2026-11-01T03:02:00Z](./CURRENT_STATUS_20261101T030200Z.md)
 
 - [Daymark status snapshot — 2026-11-01T02:37:00Z](./CURRENT_STATUS_20261101T023700Z.md)
 
