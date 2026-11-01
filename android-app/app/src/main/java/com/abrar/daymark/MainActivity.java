@@ -3905,7 +3905,8 @@ public final class MainActivity extends Activity {
             new AlertDialog.Builder(this)
                     .setTitle("Cancel download?")
                     .setMessage("This will cancel the " + state
-                            + " download and remove its partial file. This cannot be undone.")
+                            + " download and remove its entry/file. If it finishes before cancellation, "
+                            + "the completed file will also be deleted. This cannot be undone.")
                     .setNegativeButton("Keep download", null)
                     .setPositiveButton("Cancel download", (dialog, which) -> {
                         // The row can finish while its dialog is open. Re-query before remove so a
