@@ -1,4 +1,4 @@
-# Daymark whole-project engineering status — 2026-11-01T07:08:00Z
+# Daymark whole-project engineering status — 2026-11-01T07:10:00Z
 
 ## Fresh live baseline
 - Repository: `AbrarulHaque8541/daymark`; default branch: `main`.
@@ -37,7 +37,7 @@
 - Unknown status now says status unavailable rather than incorrectly mapping to paused.
 - Added canonical `check-browser-downloads.py` assertions for status branches, confirmation/negative escape, exact-ID re-query, and remove ordering.
 - Commit: [e58a8b6](https://github.com/AbrarulHaque8541/daymark/commit/e58a8b6189692d0249e967b749be7a7b80fc610a); guard commit: [e4783d6](https://github.com/AbrarulHaque8541/daymark/commit/e4783d6888f65432fa326591e9e9acc1a403837d).
-- PR #471 **code/test head**: `6d59bc59d83f1c3bcbc4d22bd086ba1c4c8339ea`; base: `157f3c007570e1e2d3cd8d1cb63462fe165d04c6`.
+- PR #471 **final code/test head**: `8f90ba340c64245816ecd48482b98a17584d9083`; base: `157f3c007570e1e2d3cd8d1cb63462fe165d04c6`.
 - Checks: Cross-platform contracts **QUEUED** (run 41283226397); Focus Timer UI/Sound **QUEUED** (41283226393); device acceptance artifact **QUEUED** (41283226523). Android CI not present in the first workflow-run page; verify it is triggered/required.
 - Reviews/inline threads: **NONE**.
 
