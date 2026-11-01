@@ -273,3 +273,19 @@ test('recovery backup toast exports the exact retained bytes for manual review',
   assert.equal(app.getLastBlob().parts[0], backupRaw,
     'export contains the exact retained recovery bundle bytes');
 });
+
+
+test('app.js integrity guard rejects placeholder or truncated application source', () => {
+  assert.ok(APP_SOURCE.length >= 50000,
+    `app.js must retain the complete task/focus application (got ${APP_SOURCE.length} bytes)`);
+  for (const marker of [
+    'function loadTasks(',
+    'function render(',
+    'function exportRecoveryBackup(',
+    'function loadFocusState('
+  ]) {
+    assert.ok(APP_SOURCE.includes(marker), `app.js is missing core behavior: ${marker}`);
+  }
+  assert.doesNotMatch(APP_SOURCE, /PLACEHOLDER_FULL_CONTENT|full content would be here|\$\(cat \/tmp\/app\.js\)/,
+    'app.js must never be replaced with a placeholder or shell substitution');
+});
