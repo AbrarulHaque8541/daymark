@@ -304,3 +304,39 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .focus-task-select { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }
 }
+
+/* Briefing (RSS/Atom feed) card */
+.briefing-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.briefing-card[hidden] { display: none; }
+.briefing-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
+.briefing-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
+.briefing-description { margin: 0 0 12px; color: #52616b; font-size: 12px; line-height: 1.55; }
+.feed-form { display: flex; gap: 7px; }
+.feed-form input { flex: 1 1 auto; min-width: 0; height: 40px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); color: var(--ink); padding: 0 12px; font-size: 12px; transition: border-color .16s ease, box-shadow .16s ease; }
+.feed-form input:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(22, 112, 95, .12); outline: none; }
+.feed-form input::placeholder { color: #9aa6af; }
+.feed-refresh { flex: 0 0 auto; height: 40px; }
+.feed-refresh:disabled { opacity: .65; cursor: wait; }
+.feed-status { min-height: 16px; margin: 9px 0 4px; color: #63707a; font-size: 10px; }
+.feed-list { display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
+.feed-item { padding: 9px 10px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.feed-item:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
+.feed-item-link, .feed-item-title { display: block; color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }
+.feed-item-link:hover { color: var(--accent); text-decoration: underline; }
+.feed-item-date { display: block; margin-top: 2px; color: #7c8a94; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.feed-item-summary { margin: 5px 0 0; color: #63707a; font-size: 11px; line-height: 1.5; }
+.feed-empty { border: 1px dashed #b9d2ca; border-radius: 12px; background: rgba(255, 255, 255, .5); color: #5f6c76; font-size: 11px; text-align: center; padding: 14px; }
+@media (prefers-color-scheme: dark) {
+  .briefing-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
+  .briefing-description { color: #9aa6af; }
+  .feed-form input { border-color: #2c3640; background: rgba(26, 33, 40, .85); color: #e8eef2; }
+  .feed-form input::placeholder { color: #5f6c76; }
+  .feed-status { color: #7c8a94; }
+  .feed-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
+  .feed-item:hover { border-color: rgba(42, 143, 122, .5); }
+  .feed-item-link, .feed-item-title { color: #e8eef2; }
+  .feed-item-date { color: #7c8a94; }
+  .feed-item-summary { color: #9aa6af; }
+  .feed-empty { border-color: #2c3640; background: rgba(26, 33, 40, .5); color: #7c8a94; }
+}
