@@ -32,6 +32,8 @@ public final class PortableBackupSmoke {
     public static void main(String[] args) throws Exception {
         recoveryKeyEncodingRoundTripsAndChecksErrors();
         archiveRoundTripsWithoutExposingTaskData();
+        webClipsAndMultilineNotesRoundTrip();
+        multilineNoteValidationStaysScoped();
         manifestV3RoundTripsExtendedTaskFieldsAndRepeatAnchor();
         manifestV3RoundTripsWeekdayAndYearlyRepeatRules();
         legacyV1ManifestStillDecodesWithDefaults();
@@ -109,6 +111,134 @@ public final class PortableBackupSmoke {
         zeroProgress.clearStagedPlaintext();
         deleteTree(zeroProgressStage);
         PortableBackupCodec.clear(key);
+    }
+
+    /** Reader clips and ordinary notes must survive the same portable archive path as other tasks. */
+    private static void webClipsAndMultilineNotesRoundTrip() throws Exception {
+        WebClip.Draft draft = WebClip.fromReader("Offline article",
+                "First paragraph\nSecond paragraph with café and 🚀",
+                "https://example.com/story?token=private#section");
+        Task clip = WebClip.createTask(draft);
+        check(clip.notes.contains("\n\n") && clip.tags.contains(WebClip.TAG),
+                "real Reader clip has the source separator and offline tag");
+        String multilineNotes = "First line\r\n\tIndented\nनमस्ते and 🚀\rLast line\n";
+        Task multiline = TaskLogic.create("Multiline notes", null, "medium", multilineNotes,
+                null, null, null);
+        String maxNotes = "x".repeat(TaskLogic.MAX_NOTES_CHARS - 4) + "\n\t🚀";
+        Task boundary = TaskLogic.create("Full notes", null, "low", maxNotes, null, null, null);
+        Task whitespace = TaskLogic.create("Whitespace notes", null, "low", "\n\r\t", null, null, null);
+        check(maxNotes.length() == TaskLogic.MAX_NOTES_CHARS, "multiline fixture reaches the note limit");
+
+        byte[] key = PortableBackupCodec.newRecoveryKey(new SecureRandom());
+        File stage = Files.createTempDirectory("portable-backup-multiline").toFile();
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            PortableBackupCodec.writeArchive(bytes, key, Arrays.asList(clip, multiline, boundary, whitespace),
+                    (task, attachment) -> { throw new IOException("Unexpected attachment"); },
+                    new SecureRandom(), () -> false);
+            byte[] archive = bytes.toByteArray();
+            check(!contains(archive, "First paragraph".getBytes(StandardCharsets.UTF_8)),
+                    "Reader excerpt stays encrypted in the portable archive");
+            PortableBackupCodec.VerifiedArchive opened = PortableBackupCodec.readArchive(
+                    new ByteArrayInputStream(archive), key, stage, id -> { }, () -> false);
+            try {
+                check(opened.tasks.size() == 4, "all tasks, including the clip, are present");
+                check(clip.notes.equals(opened.tasks.get(0).notes)
+                                && opened.tasks.get(0).tags.contains(WebClip.TAG),
+                        "Reader source, paragraphs, Unicode and tag round-trip exactly");
+                check(multilineNotes.equals(opened.tasks.get(1).notes),
+                        "LF, CRLF, tabs and Unicode round-trip exactly without normalization");
+                check(maxNotes.equals(opened.tasks.get(2).notes),
+                        "whitespace and supplementary characters survive at the 4,000-unit limit");
+                check(whitespace.notes.equals(opened.tasks.get(3).notes),
+                        "a note containing only line breaks and tabs is not discarded");
+            } finally {
+                opened.clearStagedPlaintext();
+            }
+
+            byte[] legacy = buildV2Manifest(out -> {
+                writeManifestString(out, multilineNotes);
+                out.writeByte(0); // no due time
+                out.writeByte(0); // no reminder
+                out.writeByte(0); // no reminder shown
+                out.writeByte(0); // no subtasks
+                return null;
+            });
+            check(multilineNotes.equals(PortableBackupCodec.decodeManifest(
+                            legacy, randomToken(), 1, "legacy-multiline").tasks.get(0).notes),
+                    "DMM2 manifests also restore valid multiline notes");
+        } finally {
+            PortableBackupCodec.clear(key);
+            deleteTree(stage);
+        }
+    }
+
+    private static void multilineNoteValidationStaysScoped() throws Exception {
+        byte[] key = PortableBackupCodec.newRecoveryKey(new SecureRandom());
+        try {
+            for (char control : new char[] { '\u0000', '\u0007', '\u000b', '\u007f', '\u0085' }) {
+                String unsafeNotes = "before" + control + "after";
+                Task unsafe = TaskLogic.create("Unsafe note", null, "medium", unsafeNotes,
+                        null, null, null);
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                expectIOException(() -> PortableBackupCodec.writeArchive(output, key,
+                                Collections.singletonList(unsafe), (task, ref) -> new ByteArrayInputStream(new byte[0]),
+                                new SecureRandom(), () -> false),
+                        "non-whitespace ISO control remains rejected on export");
+                check(output.size() == 0, "invalid note is rejected before archive output begins");
+                byte[] manifest = buildV2Manifest(out -> {
+                    writeManifestString(out, unsafeNotes);
+                    out.writeByte(0);
+                    out.writeByte(0);
+                    out.writeByte(0);
+                    out.writeByte(0);
+                    return null;
+                });
+                expectManifestFailure(manifest, "non-whitespace ISO control remains rejected on import");
+            }
+            for (String malformed : Arrays.asList("bad\uD800", "bad\uDC00")) {
+                Task unsafe = TaskLogic.create("Malformed note", null, "medium", malformed,
+                        null, null, null);
+                expectIOException(() -> PortableBackupCodec.writeArchive(new ByteArrayOutputStream(), key,
+                                Collections.singletonList(unsafe), (task, ref) -> new ByteArrayInputStream(new byte[0]),
+                                new SecureRandom(), () -> false),
+                        "unpaired Unicode surrogates still fail export instead of being replaced");
+            }
+            Task unsafeTitle = TaskLogic.create("Title\nsecond line", null, "medium");
+            expectIOException(() -> PortableBackupCodec.writeArchive(new ByteArrayOutputStream(), key,
+                            Collections.singletonList(unsafeTitle), (task, ref) -> new ByteArrayInputStream(new byte[0]),
+                            new SecureRandom(), () -> false),
+                    "line breaks remain rejected in titles");
+            Task unsafeSubtask = TaskLogic.create("Task", null, "medium", "valid\nnotes", null, null,
+                    Collections.singletonList(new Subtask("step", "Step\tname", false)));
+            expectIOException(() -> PortableBackupCodec.writeArchive(new ByteArrayOutputStream(), key,
+                            Collections.singletonList(unsafeSubtask), (task, ref) -> new ByteArrayInputStream(new byte[0]),
+                            new SecureRandom(), () -> false),
+                    "tabs remain rejected in subtask titles");
+
+            byte[] badTitle = buildV2Manifest(null);
+            byte[] titleBytes = "Manifest task".getBytes(StandardCharsets.UTF_8);
+            for (int offset = 0; offset <= badTitle.length - titleBytes.length; offset++) {
+                if (Arrays.equals(Arrays.copyOfRange(badTitle, offset, offset + titleBytes.length), titleBytes)) {
+                    badTitle[offset + 4] = '\n';
+                    break;
+                }
+            }
+            expectManifestFailure(badTitle, "line breaks remain rejected in imported titles");
+            byte[] malformedUtf8 = buildV2Manifest(out -> {
+                out.writeInt(2);
+                out.writeByte(0xc0); // overlong UTF-8 sequence, never a valid note
+                out.writeByte(0xaf);
+                out.writeByte(0);
+                out.writeByte(0);
+                out.writeByte(0);
+                out.writeByte(0);
+                return null;
+            });
+            expectManifestFailure(malformedUtf8, "malformed UTF-8 remains rejected in imported notes");
+        } finally {
+            PortableBackupCodec.clear(key);
+        }
     }
 
     private static void rejectsWrongKeyTamperAndMalformedFraming() throws Exception {

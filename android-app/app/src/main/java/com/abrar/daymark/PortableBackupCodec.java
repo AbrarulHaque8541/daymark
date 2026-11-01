@@ -334,8 +334,7 @@ final class PortableBackupCodec {
                 writeString(out, attachment.reference.mimeType, 129, 516);
             }
             // Manifest v2 extension: notes, due time, reminder, and subtasks travel with the task.
-            writeString(out, task.notes == null ? "" : task.notes, TaskLogic.MAX_NOTES_CHARS,
-                    TaskLogic.MAX_NOTES_CHARS * 4);
+            writeNotes(out, task.notes == null ? "" : task.notes);
             out.writeByte(task.dueTime == null ? 0 : 1);
             if (task.dueTime != null) writeString(out, task.dueTime, 5, 8);
             out.writeByte(reminderLeadCode(task.reminderLeadMinutes));
@@ -461,7 +460,7 @@ final class PortableBackupCodec {
                 attachments.add(attachment);
             }
             if (manifestV2) {
-                String notes = readString(in, TaskLogic.MAX_NOTES_CHARS, TaskLogic.MAX_NOTES_CHARS * 4);
+                String notes = readNotes(in);
                 int dueTimeFlag = in.readUnsignedByte();
                 if (dueTimeFlag > 1) throw new IOException("The manifest due-time flag is invalid.");
                 String dueTime = dueTimeFlag == 0 ? null : readString(in, 5, 8);
@@ -902,8 +901,21 @@ final class PortableBackupCodec {
         return bytes;
     }
 
+    private static void writeNotes(DataOutputStream out, String notes) throws IOException {
+        writeString(out, notes, TaskLogic.MAX_NOTES_CHARS, TaskLogic.MAX_NOTES_CHARS * 4, true);
+    }
+
+    private static String readNotes(DataInputStream in) throws IOException {
+        return readString(in, TaskLogic.MAX_NOTES_CHARS, TaskLogic.MAX_NOTES_CHARS * 4, true);
+    }
+
     private static void writeString(DataOutputStream out, String text, int maxChars, int maxBytes) throws IOException {
-        requireSafeText(text, maxChars, true);
+        writeString(out, text, maxChars, maxBytes, false);
+    }
+
+    private static void writeString(DataOutputStream out, String text, int maxChars, int maxBytes,
+                                    boolean allowNoteWhitespace) throws IOException {
+        requireSafeText(text, maxChars, true, allowNoteWhitespace);
         byte[] encoded = text.getBytes(StandardCharsets.UTF_8);
         if (encoded.length > maxBytes) throw new IOException("A task field exceeds the portable format limit.");
         out.writeInt(encoded.length);
@@ -912,6 +924,11 @@ final class PortableBackupCodec {
     }
 
     private static String readString(DataInputStream in, int maxChars, int maxBytes) throws IOException {
+        return readString(in, maxChars, maxBytes, false);
+    }
+
+    private static String readString(DataInputStream in, int maxChars, int maxBytes,
+                                     boolean allowNoteWhitespace) throws IOException {
         int size = in.readInt();
         if (size < 0 || size > maxBytes) throw new IOException("A manifest text field exceeds its size limit.");
         byte[] encoded = new byte[size];
@@ -921,7 +938,7 @@ final class PortableBackupCodec {
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(encoded)).toString();
-            requireSafeText(decoded, maxChars, true);
+            requireSafeText(decoded, maxChars, true, allowNoteWhitespace);
             return decoded;
         } catch (CharacterCodingException exception) {
             throw new IOException("The manifest contains invalid UTF-8.", exception);
@@ -930,12 +947,24 @@ final class PortableBackupCodec {
         }
     }
 
+    private static void requireSafeNotes(String notes) throws IOException {
+        requireSafeText(notes, TaskLogic.MAX_NOTES_CHARS, true, true);
+    }
+
     private static void requireSafeText(String text, int maxChars, boolean allowEmpty) throws IOException {
+        requireSafeText(text, maxChars, allowEmpty, false);
+    }
+
+    private static void requireSafeText(String text, int maxChars, boolean allowEmpty,
+                                        boolean allowNoteWhitespace) throws IOException {
         if (text == null || (!allowEmpty && text.trim().isEmpty()) || text.length() > maxChars) {
             throw new IOException("A task field is empty or exceeds its length limit.");
         }
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
+            // Notes are multiline user text; retain their formatting without allowing controls
+            // in titles, attachment metadata, or other fields. All other controls remain rejected.
+            if (allowNoteWhitespace && (c == '\n' || c == '\r' || c == '\t')) continue;
             if (Character.isISOControl(c) || Character.isSurrogate(c)) {
                 if (Character.isHighSurrogate(c) && i + 1 < text.length()
                         && Character.isLowSurrogate(text.charAt(i + 1))) {
@@ -956,7 +985,7 @@ final class PortableBackupCodec {
         if (task.attachments == null || task.attachments.size() > AttachmentLogic.MAX_PER_TASK) {
             throw new IOException("A task has an invalid attachment list.");
         }
-        requireSafeText(task.notes == null ? "" : task.notes, TaskLogic.MAX_NOTES_CHARS, true);
+        requireSafeNotes(task.notes == null ? "" : task.notes);
         if (task.dueTime != null && (task.dueDate == null || !TaskDuePresets.isTimeOnly(task.dueTime))) {
             throw new IOException("A task has an invalid due time.");
         }
