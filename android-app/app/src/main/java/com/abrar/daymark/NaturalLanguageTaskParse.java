@@ -117,10 +117,15 @@ final class NaturalLanguageTaskParse {
             String dayToken = weekday.group(2).toLowerCase(Locale.ROOT);
             DayOfWeek target = dayOfWeek(dayToken);
             long days = (target.getValue() - today.getDayOfWeek().getValue() + 7) % 7;
-            if (days == 0) days = 7;
-            // "next Monday" means the Monday of the following week, not merely the
-            // nearest Monday; without this, "Monday" and "next Monday" were identical.
-            if (weekday.group(1) != null) days += 7;
+            if (weekday.group(1) != null) {
+                // "Next Monday" is in the following week. When today is Monday,
+                // the nearest weekday is today, so the next one is exactly 7 days
+                // away—not 14 days after applying both adjustments.
+                days = days == 0 ? 7 : days + 7;
+            } else if (days == 0) {
+                // Plain weekday names always mean a strictly future occurrence.
+                days = 7;
+            }
             dueDate = today.plusDays(days).toString();
             working = working.substring(0, weekday.start()) + " " + working.substring(weekday.end());
         }
