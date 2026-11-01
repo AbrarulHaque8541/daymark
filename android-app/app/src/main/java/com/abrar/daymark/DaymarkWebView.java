@@ -143,6 +143,9 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         // Direct handoff requires that state; otherwise the original URL stays in Daymark.
         if (!isVerifiedAppLinkApproved(view.getContext(),
                 resolved.activityInfo.packageName, uri.getHost())) {
+            Log.i("DaymarkWebView", "app link handoff declined origin="
+                    + BrowserLogPolicy.redactedOrigin(uri.toString())
+                    + " reason=host-not-verified-or-user-selected");
             return false;
         }
         try {
