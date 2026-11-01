@@ -61,3 +61,15 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6
 Tooling: GitHub MCP repository/contents/PR/Actions APIs; local JDK 21 (`javac --release 17`)
 Timestamp (UTC): 2026-11-01T15:07:00.429Z
+
+
+## Follow-up performance refinement — 2026-11-01T15:09:05.640Z
+- Added a primitive-field collector overload so MainActivity does not allocate a temporary `BrowserDownloadListPolicy.Item` for every DownloadManager cursor row. Only candidates entering the bounded top-100 heap allocate retained items.
+- Regression smoke now exercises the primitive path and verifies selected title/URL/MIME/status/reason/byte metadata.
+- Local JDK 21 compile with `--release 17` and smoke: **PASS — 117 assertions**.
+- New code/test head and exact-head GitHub Actions status must be rechecked; no merge or device acceptance claim.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub MCP contents/PR/Actions; local JDK 21
+Timestamp (UTC): 2026-11-01T15:09:05.640Z
