@@ -46,6 +46,8 @@ for marker, explanation in (
     assert marker in selection, explanation
 assert selection.index('setPositiveButton("Cancel download"') < selection.index("manager.remove(id)"), \\
     "DownloadManager.remove must occur only inside the confirmed callback"
+assert 'Download status unavailable. Refresh to check again.' in selection, \\
+    "unknown provider states must not be mislabeled as paused"
 active_check = activity.split("private boolean isBrowserDownloadActive", 1)[1].split(
     "private void queueBrowserDownload", 1
 )[0]
