@@ -38,11 +38,6 @@ final class BrowserWorkspaceController {
     }
 
     static void enforceOffline(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
-        if (policy == null || policy.allowsRemoteLoads() || tabs == null) return;
-        for (DaymarkWebView tab : tabs) {
-            if (tab == null) continue;
-            tab.stopLoading();
-            tab.getSettings().setBlockNetworkLoads(true);
-        }
+        BrowserOfflineEnforcement.enforceOffline(policy, tabs);
     }
 }

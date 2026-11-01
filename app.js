@@ -1380,7 +1380,10 @@
       const log = focus.validateFocusLog(parsed.log);
       const invalidSession = parsed.session !== null && parsed.session !== undefined
         && !focus.isValidSession(parsed.session);
-      const session = parsed.session ? focus.restoreSession(parsed.session, Date.now()) : null;
+      const restoreResult = parsed.session
+        ? focus.restoreSessionResult(parsed.session, Date.now())
+        : { session: null, completedSession: null };
+      const session = restoreResult.session;
       if (log.rejectedCount > 0 || invalidSession) {
         // Keep the complete source whenever validation rejects any focus record.
         // Valid sessions/log entries can still be used, but rejected originals
@@ -1390,6 +1393,41 @@
         reportFocusRecovery(backupSaved);
       } else if (hasFocusRecoveryBackup()) {
         reportFocusRecovery(true);
+      }
+
+      const completedSession = restoreResult.completedSession;
+      if (completedSession) {
+        const entry = focus.makeLogEntry(completedSession);
+        const alreadyLogged = entry && log.entries.some((item) => item.id === entry.id);
+        const entries = entry && !alreadyLogged
+          ? focus.appendLogEntry(log.entries, entry)
+          : log.entries;
+
+        // If validation already found rejected data and its backup could not
+        // be written, retry that backup before replacing the primary payload.
+        if (state.focusRecoveryBackupPendingPayload !== null) {
+          const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
+          if (!backupSaved) {
+            reportFocusRecovery(false);
+            return { session, log: entries };
+          }
+          state.focusRecoveryBackupPendingPayload = null;
+        }
+
+        // One localStorage key write atomically stores session:null and its
+        // completion log. On quota failure the original primary value remains.
+        try {
+          localStorage.setItem(FOCUS_KEY, JSON.stringify({ session: null, log: entries }));
+          if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
+        } catch (saveError) {
+          const backupSaved = backUpRawFocusPayload(saved);
+          if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
+          setStorageStatus(
+            'Focus session completed while Daymark was closed, but its history could not be saved. Original data was preserved; keep this page open and retry',
+            true
+          );
+        }
+        return { session, log: entries };
       }
       return { session, log: log.entries };
     } catch (error) {

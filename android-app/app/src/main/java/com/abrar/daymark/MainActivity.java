@@ -231,6 +231,7 @@ public final class MainActivity extends Activity {
     private PendingSaveTransaction pendingSaveTransaction;
     private boolean webMode;
     private final BrowserDownloadEnqueueGate browserDownloadEnqueueGate = new BrowserDownloadEnqueueGate();
+    private final BrowserDownloadTracker browserDownloadTracker = new BrowserDownloadTracker();
     private BrowserNetworkPolicy browserNetworkPolicy = new BrowserNetworkPolicy();
     private BrowserSettingsPolicy browserSettingsPolicy = new BrowserSettingsPolicy();
     private boolean browserImagesBlocked;
@@ -3777,6 +3778,21 @@ public final class MainActivity extends Activity {
                     long downloaded = downloadedColumn >= 0 ? cursor.getLong(downloadedColumn) : 0;
                     long total = totalColumn >= 0 ? cursor.getLong(totalColumn) : -1;
                     if (title == null || title.trim().isEmpty()) title = "Download " + id;
+                    BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id);
+                    if (tracked != null) {
+                        if (status == DownloadManager.STATUS_PENDING) {
+                            browserDownloadTracker.onQueued(id);
+                        } else if (status == DownloadManager.STATUS_RUNNING) {
+                            browserDownloadTracker.onProgress(id, downloaded, total);
+                        } else if (status == DownloadManager.STATUS_PAUSED) {
+                            browserDownloadTracker.onProgress(id, downloaded, total);
+                            browserDownloadTracker.onPaused(id);
+                        } else if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            browserDownloadTracker.onComplete(id);
+                        } else if (status == DownloadManager.STATUS_FAILED) {
+                            browserDownloadTracker.onFailure(id, Integer.toString(reason));
+                        }
+                    }
                     ids.add(id);
                     urls.add(url);
                     mimeTypes.add(mime);
@@ -3923,6 +3939,7 @@ public final class MainActivity extends Activity {
                             removed = 0;
                         }
                         if (removed > 0) {
+                            browserDownloadTracker.onCancel(id);
                             showToast("Download cancelled and removed.");
                         } else {
                             showToast("Download could not be cancelled. Refresh to check its status.");
@@ -3984,7 +4001,8 @@ public final class MainActivity extends Activity {
             } else {
                 request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, filename);
             }
-            manager.enqueue(request);
+            long downloadId = manager.enqueue(request);
+            if (downloadId > 0L) browserDownloadTracker.start(downloadId, url, filename);
             showToast(Build.VERSION.SDK_INT >= 29
                     ? "Download started. Check Downloads for progress."
                     : "Download started. Check Daymark's app Downloads folder.");

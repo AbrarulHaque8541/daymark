@@ -24,6 +24,23 @@ assert 'setNeutralButton("Refresh"' in method, \
     "the list must expose a refresh action"
 assert "DownloadManager.ACTION_VIEW_DOWNLOADS" not in method, \
     "the status list must not silently hand off to another screen"
+assert "private final BrowserDownloadTracker browserDownloadTracker" in activity, \
+    "the bounded in-memory tracker must be owned by the Activity"
+queue = activity.split("private void queueBrowserDownload(", 1)[1].split("private void exitBrowserFullscreen", 1)[0]
+assert "long downloadId = manager.enqueue(request);" in queue and \
+    "browserDownloadTracker.start(downloadId, url, filename)" in queue, \
+    "only successfully enqueued Daymark browser downloads should enter the tracker"
+assert "BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id)" in method, \
+    "the Downloads list should update only entries already owned by Daymark browser enqueue"
+for expected in ("browserDownloadTracker.onQueued(id)", "browserDownloadTracker.onProgress(id, downloaded, total)", \
+                 "browserDownloadTracker.onPaused(id)", "browserDownloadTracker.onComplete(id)", \
+                 "browserDownloadTracker.onFailure(id, Integer.toString(reason))"):
+    assert expected in method, f"provider status must update the bounded tracker: {expected}"
+handler = activity.split("private void handleBrowserDownloadSelection(", 1)[1].split( \
+    "private boolean isBrowserDownloadActive", 1
+)[0]
+assert "browserDownloadTracker.onCancel(id)" in handler, \
+    "confirmed DownloadManager removal must be reflected in the tracker"
 print("PASS browser Downloads destination: in-app DownloadManager list, explicit empty state and refresh")
 
 # Work by: ChatGPT
