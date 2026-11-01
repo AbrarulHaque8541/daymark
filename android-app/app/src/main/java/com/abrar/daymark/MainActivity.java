@@ -3799,8 +3799,8 @@ public final class MainActivity extends Activity {
                         }
                     }
 
-                    collector.add(new BrowserDownloadListPolicy.Item(id, title, url, mime,
-                            status, reason, downloaded, total, lastModified));
+                    collector.add(id, title, url, mime, status, reason,
+                            downloaded, total, lastModified);
                 }
             }
         } catch (RuntimeException queryFailed) {
