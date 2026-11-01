@@ -32,7 +32,7 @@
 - Cross-platform contracts [41295596477](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596477): **PENDING**.
 - Device-test APK [41295596512](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596512): **PENDING**.
 - Non-publishing device QA APK [41295596611](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596611): **PENDING**.
-- Focus timer UI/Sound [41295596528](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596528]: **IN PROGRESS**.
+- Focus timer UI/Sound [41295596528](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596528): **IN PROGRESS**.
 - Focus timer Live Update adapter [41295596471](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596471): **IN PROGRESS**.
 - Focus timer emulator lifecycle [41295596472](https://github.com/AbrarulHaque8541/daymark/actions/runs/41295596472): **IN PROGRESS**.
 - These workflow runs have not yet validated the documentation-only new PR head; re-check exact head and fresh runs before merge.
