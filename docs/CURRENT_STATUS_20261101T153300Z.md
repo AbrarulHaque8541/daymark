@@ -5,7 +5,7 @@
 - Main SHA: `e16d254bc375caba18486880cff1f20754fc9b57` (PR #489 merged).
 - Root `AGENTS.md` read in full; `docs/AGENT_STATUS.md` and the previously latest indexed snapshot read. No `android-app/AGENTS.md` or `android-app/tools/AGENTS.md` exists.
 - Main reports `protected:false`. No merge attempted unless CI/review/device gates are met.
-- App identity per durable policy/build source: `com.abrar.daymark`. External user constraint says `com.cue.daymark`; conflict is unresolved. No identity change made.
+- App identity per durable policy/build source is `com.abrar.daymark`. An external constraint conflicts with this repository invariant; discrepancy remains unresolved. No identity change made.
 
 ## Open PRs / ownership / review
 ### PR #490 — newest-first bounded browser Downloads list
@@ -54,6 +54,10 @@
 3. **P1 #475/#476 — Recurrence parity.** Reconcile diverged base; rerun Android host + Node + Ubuntu/Windows contract + APK checks. Preserve all original smoke assertions.
 4. **P1 #348 — Browser reliability.** Redirect/cookies/forms/back-forward, renderer recovery, SAF/DownloadManager provider races, cancel/retry/unknown MIME, external-app return journey, accessibility/keyboard/insets; device evidence required.
 5. **P2 #325 — Cross-platform architecture.** Measured domain-core reuse and small prototype only; no speculative rewrite.
+
+## Follow-up exact-head CI failure and correction
+- Android CI [41321783986](https://github.com/AbrarulHaque8541/daymark/actions/runs/41321783986) failed in the canonical source guard because this snapshot included a forbidden retired package-namespace literal in documentation. This is a documentation/source-policy failure, not runtime Java.
+- Removed the literal from this snapshot without weakening the guard or changing package identity. The final documentation commit must receive fresh exact-head CI; previous run is not green evidence.
 
 ## Execution record
 - Changed: `android-app/tools/check-browser-downloads-entry.py`.
