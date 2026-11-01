@@ -14,7 +14,7 @@ const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
 function bootApp({ savedFocusValue, failFocusSave = false }) {
   const elements = new Map();
   const listeners = new Map();
-  const storedValues = new Map([[TASK_KEY, '[]'], [FOCUS_KEY, savedFocusValue]];
+  const storedValues = new Map([[TASK_KEY, '[]'], [FOCUS_KEY, savedFocusValue]]);
 
   function element(selector) {
     if (!elements.has(selector)) {
