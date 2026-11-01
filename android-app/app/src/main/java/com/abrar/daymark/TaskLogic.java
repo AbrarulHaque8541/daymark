@@ -382,20 +382,29 @@ final class TaskLogic {
                 || !isDateOnly(task.dueDate)) {
             return task;
         }
+        if (zone == null || now == null) return task;
         LocalTime time = TaskDuePresets.isTimeOnly(task.dueTime)
                 ? LocalTime.parse(task.dueTime, DateTimeFormatter.ISO_LOCAL_TIME)
                 : DEFAULT_REMINDER_TIME;
+        int leadMinutes = task.reminderLeadMinutes == null ? 0 : task.reminderLeadMinutes;
         LocalDate date = LocalDate.parse(task.dueDate);
-        Instant dueMoment = LocalDateTime.of(date, time).atZone(zone).toInstant();
-        if (dueMoment.isAfter(now)) return task;
+        LocalDateTime dueLocal = LocalDateTime.of(date, time);
+        // Repeating reminders are consumed when their configured lead-time fires,
+        // not at the later due moment. Otherwise the same alarm remains eligible
+        // and can be presented repeatedly until the task's due time.
+        LocalDateTime triggerLocal = dueLocal.minusMinutes(leadMinutes);
+        Instant triggerMoment = triggerLocal.atZone(zone).toInstant();
+        if (triggerMoment.isAfter(now)) return task;
         int steps = 0;
-        while (!dueMoment.isAfter(now)) {
+        while (!triggerMoment.isAfter(now)) {
             steps++;
             if (steps > 3660) return task; // bounded: ten years of daily repeats
             date = LocalDate.parse(nextDueDate(date.toString(), task.repeatRule, task.repeatDayOfMonth));
-            dueMoment = LocalDateTime.of(date, time).atZone(zone).toInstant();
+            dueLocal = LocalDateTime.of(date, time);
+            triggerLocal = dueLocal.minusMinutes(leadMinutes);
+            triggerMoment = triggerLocal.atZone(zone).toInstant();
         }
-        return task.withRepeatAdvanced(date.toString(), Instant.now().toString());
+        return task.withRepeatAdvanced(date.toString(), now.toString());
     }
 
     private static String requireTitle(String title) {

@@ -439,6 +439,23 @@ public final class TaskLogicSmoke {
         check("2026-03-31".equals(afterShortMonth.dueDate)
                         && Integer.valueOf(31).equals(afterShortMonth.repeatDayOfMonth),
                 "missed monthly occurrence keeps its anchor when advanced after February");
+        Task reminderRepeat = TaskLogic.create("Reminder repeat", "2026-10-08", "medium", "",
+                "14:30", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Task beforeReminder = TaskLogic.advanceRepeat(reminderRepeat, zone,
+                Instant.parse("2026-10-08T13:59:00Z"));
+        check(beforeReminder == reminderRepeat,
+                "a repeating task stays on its current occurrence before the reminder lead fires");
+        Task atReminder = TaskLogic.advanceRepeat(reminderRepeat, zone,
+                Instant.parse("2026-10-08T14:00:00Z"));
+        check("2026-10-09".equals(atReminder.dueDate)
+                        && atReminder.reminderShownFire == null,
+                "a repeating task advances exactly when its 30-minute reminder fires, before the due time");
+        Task dayLeadRepeat = TaskLogic.create("Day lead repeat", "2026-10-08", "medium", "",
+                "14:30", 1440, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Task atDayLead = TaskLogic.advanceRepeat(dayLeadRepeat, zone,
+                Instant.parse("2026-10-07T14:30:00Z"));
+        check("2026-10-09".equals(atDayLead.dueDate),
+                "a 24-hour reminder advances once at the previous-day trigger without repeating");
         Task future = TaskLogic.create("Future", "2026-10-10", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
         check(TaskLogic.advanceRepeat(future, zone, now) == future,
