@@ -268,6 +268,42 @@ test('non-streaming response fallback still enforces the decoded XML limit', asy
   );
 });
 
+test('feed timeout cancels an active streaming reader after headers', async () => {
+  let capturedSignal = null;
+  let cancelled = false;
+  let released = false;
+  let finishRead;
+  const pendingRead = new Promise((resolve) => { finishRead = resolve; });
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader: () => ({
+        read: () => pendingRead,
+        cancel: async () => {
+          cancelled = true;
+          finishRead({ done: true });
+        },
+        releaseLock: () => { released = true; }
+      })
+    },
+    text: async () => { throw new Error('stream path should not call response.text()'); }
+  };
+  await assert.rejects(
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 30),
+    /timed out/
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(capturedSignal, 'AbortController signal is passed to fetch');
+  assert.equal(capturedSignal.aborted, true, 'timeout aborts the network request');
+  assert.equal(cancelled, true, 'timeout cancels a reader after headers');
+  assert.equal(released, true, 'reader lock is released after cancellation');
+});
+
 test('feed fetch parses a successful response and rejects non-success status', async () => {
   const parsed = await feed.fetchFeed('https://example.com/feed.xml', async () => ({
     ok: true, status: 200, text: async () => RSS
