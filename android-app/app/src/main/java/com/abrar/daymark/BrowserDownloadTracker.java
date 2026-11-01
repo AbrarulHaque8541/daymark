@@ -48,8 +48,18 @@ final class BrowserDownloadTracker {
 
     private final Map<Long, Entry> entries = new LinkedHashMap<>();
 
+    /**
+     * Starts tracking a download without allowing the in-memory history to grow without bound.
+     * If the cap is reached and every retained entry is active, returns null rather than
+     * evicting an active download or exceeding MAX_TRACKED. Callers may still enqueue the
+     * system download; this helper only declines to retain another tracking entry.
+     */
     synchronized Entry start(long id, String url, String fileName) {
         evictIfNeeded();
+        if (entries.size() >= MAX_TRACKED) {
+            Log.w(TAG, "download-not-tracked id=" + id + " reason=active-capacity");
+            return null;
+        }
         Entry e = new Entry(id, redact(url), fileName != null ? fileName : "download");
         entries.put(id, e);
         Log.i(TAG, "download-started id=" + id + " url=" + e.url + " file=" + e.fileName);
