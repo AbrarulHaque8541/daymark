@@ -10,6 +10,10 @@ package com.abrar.daymark;
  * <p>Used by bottom-nav tab switches, task-card expand panels, settings sheet and chrome
  * auto-hide. Callers remain free to use ViewPropertyAnimator, TransitionManager or any other
  * mechanism; this class only owns the durations and easing intent.
+ *
+ * <p>Reduced-motion support is provided via {@link #durationFor(long, boolean)} so production
+ * callers can respect system Settings.Global.TRANSITION_ANIMATION_SCALE == 0 without embedding
+ * Android APIs here.
  */
 public final class UiMotionPolicy {
     private UiMotionPolicy() {}
@@ -35,6 +39,9 @@ public final class UiMotionPolicy {
     /** Minimum time a newly expanded panel stays open before a rapid re-collapse is allowed. */
     public static final long EXPAND_DEBOUNCE_MS = 120L;
 
+    /** Floor used when reduced-motion is requested; keeps a tiny visual cue without long animation. */
+    public static final long REDUCED_MOTION_FLOOR_MS = 50L;
+
     /**
      * Whether a rapid re-collapse request should be accepted given the expand start time.
      * Prevents accidental flicker when the user double-taps.
@@ -51,5 +58,15 @@ public final class UiMotionPolicy {
      */
     public static float tabSlideFraction() {
         return 0.18f;
+    }
+
+    /**
+     * Returns the effective duration for a motion, collapsing to a short floor when reduced-motion
+     * is requested. Callers should query the system reduced-motion setting and pass it here.
+     * A non-positive base is returned unchanged so callers can still disable motion entirely.
+     */
+    public static long durationFor(long baseMs, boolean reducedMotion) {
+        if (!reducedMotion || baseMs <= 0L) return baseMs;
+        return Math.min(baseMs, REDUCED_MOTION_FLOOR_MS);
     }
 }

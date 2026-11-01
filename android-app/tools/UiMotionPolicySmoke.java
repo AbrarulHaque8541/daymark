@@ -14,6 +14,7 @@ public final class UiMotionPolicySmoke {
         check(UiMotionPolicy.CHROME_HIDE_MS == 160L, "chrome hide duration is pinned");
         check(UiMotionPolicy.CHROME_SHOW_MS == 180L, "chrome show duration is pinned");
         check(UiMotionPolicy.EXPAND_DEBOUNCE_MS == 120L, "expand debounce duration is pinned");
+        check(UiMotionPolicy.REDUCED_MOTION_FLOOR_MS == 50L, "reduced-motion floor is pinned");
         check(UiMotionPolicy.tabSlideFraction() > 0f && UiMotionPolicy.tabSlideFraction() < 1f,
                 "tab slide fraction remains subtle and bounded");
 
@@ -29,6 +30,17 @@ public final class UiMotionPolicySmoke {
                 "reversed extreme timestamps cannot overflow into an accepted collapse");
         check(UiMotionPolicy.shouldAcceptCollapse(Long.MAX_VALUE - 120L, Long.MAX_VALUE),
                 "elapsed-time comparison remains correct near the long limit");
+
+        check(UiMotionPolicy.durationFor(220L, false) == 220L,
+                "normal motion keeps the full base duration");
+        check(UiMotionPolicy.durationFor(220L, true) == 50L,
+                "reduced motion collapses long animations to the floor");
+        check(UiMotionPolicy.durationFor(30L, true) == 30L,
+                "reduced motion does not lengthen already-short animations");
+        check(UiMotionPolicy.durationFor(0L, true) == 0L,
+                "zero base remains zero under reduced motion");
+        check(UiMotionPolicy.durationFor(-1L, true) == -1L,
+                "negative base is returned unchanged");
 
         System.out.println("PASS UiMotionPolicy host regression tests: " + assertions + " assertions");
     }
