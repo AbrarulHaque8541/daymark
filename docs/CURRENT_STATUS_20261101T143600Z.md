@@ -4,7 +4,7 @@
 - Repository: `AbrarulHaque8541/daymark`; default branch: `main`.
 - Current main SHA: `60dc7ea8b272c3581fab81cf11c2fb90ca9c0b94`.
 - Root `AGENTS.md` and `docs/AGENT_STATUS.md` fetched/read; durable policy remains source of truth for identity, security, canonical test workflow, attribution, and merge safety.
-- Current main application identity from repository policy/build source: `com.abrar.daymark`. User's latest task safety says `com.cue.daymark`. **Conflict remains unresolved; no identity change made.** Do not change either identity without explicit reconciliation.
+- Current main application identity from repository policy/build source: `com.abrar.daymark`. An external task note referenced a prior retired package identity. **Conflict remains unresolved; no identity change made.** Do not change either identity without explicit reconciliation.
 - Main branch reports `protected=false` from the live GitHub branch endpoint. This does not waive required CI/review/device acceptance gates.
 
 ## Open PRs and ownership
