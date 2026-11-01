@@ -28,6 +28,8 @@ check(transition_start >= 0 and transition_end > transition_start,
 transition = ACTIVITY[transition_start:transition_end]
 check("WorkspaceMotion.animateWorkspaceSwitch(" in transition,
       "MainActivity must delegate workspace motion to WorkspaceMotion")
+check("animateModeTransition(enabled);" in ACTIVITY,
+      "setWebMode must invoke the guarded workspace transition")
 check("dp(24)" in transition,
       "workspace transition must use a bounded, nonzero horizontal travel distance")
 
