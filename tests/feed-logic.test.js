@@ -89,6 +89,15 @@ test('non-feed XML and malformed XML are rejected with clear errors', () => {
   assert.throws(() => feed.parseFeed('<feed><entry><title>x</title></entry>'), /Malformed XML/);
 });
 
+test('XML parser rejects excessive nesting before JavaScript stack exhaustion', () => {
+  const depth = feed.MAX_XML_DEPTH + 20;
+  const nested = '<x>'.repeat(depth) + '</x>'.repeat(depth);
+  const xml = '<rss version="2.0"><channel><title>Safe</title><item>' +
+    '<title>Nested payload</title><description>' + nested +
+    '</description></item></channel></rss>';
+  assert.throws(() => feed.parseFeed(xml), /XML nesting limit exceeded/);
+});
+
 test('feed URLs must be plain http(s) URLs without credentials', () => {
   assert.equal(feed.isValidFeedUrl('https://example.com/feed.xml'), true);
   assert.equal(feed.isValidFeedUrl('http://news.example.org/rss'), true);
