@@ -73,17 +73,27 @@ final class BrowserDownloadListPolicy {
 
         void add(Item item) {
             if (item == null) return;
+            add(item.id, item.title, item.url, item.mimeType, item.status, item.reason,
+                    item.downloaded, item.total, item.lastModified);
+        }
+
+        /** Avoid allocating an Item for every cursor row; allocate only when it enters top-K. */
+        void add(long id, String title, String url, String mimeType, int status, int reason,
+                 long downloaded, long total, long lastModified) {
             if (totalCount < Integer.MAX_VALUE) totalCount++;
             if (limit == 0) return;
 
+            Item oldest = oldestFirst.peek();
             if (oldestFirst.size() < limit) {
-                oldestFirst.add(item);
+                oldestFirst.add(new Item(id, title, url, mimeType, status, reason,
+                        downloaded, total, lastModified));
                 return;
             }
-            Item oldest = oldestFirst.peek();
-            if (oldest != null && OLDEST_FIRST.compare(item, oldest) > 0) {
+            Item candidate = new Item(id, title, url, mimeType, status, reason,
+                    downloaded, total, lastModified);
+            if (oldest != null && OLDEST_FIRST.compare(candidate, oldest) > 0) {
                 oldestFirst.poll();
-                oldestFirst.add(item);
+                oldestFirst.add(candidate);
             }
         }
 
