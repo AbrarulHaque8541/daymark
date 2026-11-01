@@ -22,7 +22,7 @@ import android.os.SystemClock;
 import android.util.Log;
 
 /** A narrow wrapper around Android System WebView; no native bridge or request interception is used. */
-final class DaymarkWebView extends WebView {
+final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.Tab {
     interface Listener {
         void onPageStarted(String url);
         void onPageFinished(String url);
@@ -43,6 +43,10 @@ final class DaymarkWebView extends WebView {
      * boundary, so without this a tab blocked by enforceOffline() would silently drop
      * every load with no callback (#221 white viewport signature).
      */
+    @Override public void blockNetworkLoads(boolean blocked) {
+        getSettings().setBlockNetworkLoads(blocked);
+    }
+
     private void syncNetworkBlockWithPolicy(WebView view) {
         if (!networkPolicy.allowsRemoteLoads()) return;
         try {
