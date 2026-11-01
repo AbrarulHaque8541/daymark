@@ -70,7 +70,6 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     removeItem(key) {
       storedValues.delete(key);
     }
-    }
   };
   const document = {
     hidden: false,
