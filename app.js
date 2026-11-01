@@ -168,16 +168,25 @@
   }
 
   function hasRecoveryBackupNeedingPreservation() {
+    let raw;
     try {
-      const raw = localStorage.getItem(BACKUP_KEY);
-      if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
-      return parsed.payloads.some((payload) => typeof payload !== 'string'
-        || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
+      raw = localStorage.getItem(BACKUP_KEY);
     } catch (error) {
       return true;
     }
+    if (typeof raw !== 'string' || raw.length === 0) return false;
+    if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      // Raw malformed backup is stale once the primary store is healthy.
+      // Opaque sources are retained only after being grouped in a recovery bundle.
+      return false;
+    }
+    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
+    return parsed.payloads.some((payload) => typeof payload !== 'string'
+      || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
   }
 
   function persistTasks() {
