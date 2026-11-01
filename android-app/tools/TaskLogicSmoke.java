@@ -411,6 +411,22 @@ public final class TaskLogicSmoke {
                 Collections.<AttachmentRef>emptyList(), "", null, null, null,
                 TaskLogic.REPEAT_MONTHLY, Integer.valueOf(32), Collections.<Subtask>emptyList());
         check(!TaskLogic.isValid(persistedBadAnchor), "persisted monthly anchor outside 1-31 fails validation");
+        Task persistedBadYearlyAnchor = new Task("bad-yearly-anchor", "Bad", "2024-02-29", "medium", false,
+                "2026-10-05T00:00:42Z", "2026-10-05T00:00:42Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_YEARLY, Integer.valueOf(32), Collections.<Subtask>emptyList());
+        check(!TaskLogic.isValid(persistedBadYearlyAnchor), "persisted yearly anchor outside 1-31 fails validation");
+        Task mismatchedYearlyAnchor = new Task("mismatch-yearly-anchor", "Bad", "2024-02-29", "medium", false,
+                "2026-10-05T00:00:42Z", "2026-10-05T00:00:42Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_YEARLY, Integer.valueOf(28), Collections.<Subtask>emptyList());
+        check(!TaskLogic.isValid(mismatchedYearlyAnchor), "yearly anchor must match due date except a preserved Feb 29 clamp");
+        Task shortYearLeapAnchor = new Task("short-year-leap-anchor", "Leap", "2025-02-28", "medium", false,
+                "2026-10-05T00:00:42Z", "2026-10-05T00:00:42Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_YEARLY, Integer.valueOf(29), Collections.<Subtask>emptyList());
+        check(TaskLogic.isValid(shortYearLeapAnchor),
+                "yearly Feb 29 anchor remains valid when its due date is clamped to Feb 28 in a non-leap year");
 
         ZoneId zone = ZoneId.of("UTC");
         Instant now = Instant.parse("2026-10-08T11:00:00Z");
@@ -439,6 +455,79 @@ public final class TaskLogicSmoke {
         check("2026-03-31".equals(afterShortMonth.dueDate)
                         && Integer.valueOf(31).equals(afterShortMonth.repeatDayOfMonth),
                 "missed monthly occurrence keeps its anchor when advanced after February");
+        Task longGapDaily = TaskLogic.create("Long gap daily", "2000-01-01", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check("2026-10-31".equals(TaskLogic.advanceRepeat(longGapDaily, zone,
+                        Instant.parse("2026-10-30T10:00:00Z")).dueDate),
+                "daily recurrence catches up across 26 years without a fixed iteration cap");
+        Task longGapWeekly = TaskLogic.create("Long gap weekly", "2000-01-03", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKLY);
+        check("2026-11-02".equals(TaskLogic.advanceRepeat(longGapWeekly, zone,
+                        Instant.parse("2026-10-30T10:00:00Z")).dueDate),
+                "weekly recurrence catches up across 26 years to its original weekday");
+        Task longGapWeekdays = TaskLogic.create("Long gap weekdays", "2000-01-03", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        check("2026-11-02".equals(TaskLogic.advanceRepeat(longGapWeekdays, zone,
+                        Instant.parse("2026-10-30T10:00:00Z")).dueDate),
+                "weekday recurrence catches up across 26 years without iterating every missed day");
+        Task longGapMonthly = TaskLogic.create("Long gap month end", "2000-01-31", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_MONTHLY);
+        check("2026-11-30".equals(TaskLogic.advanceRepeat(longGapMonthly, zone,
+                        Instant.parse("2026-11-01T10:00:00Z")).dueDate)
+                        && Integer.valueOf(31).equals(longGapMonthly.repeatDayOfMonth),
+                "monthly recurrence catches up across 26 years while retaining its month-end anchor");
+        Task longGapYearlyLeap = TaskLogic.create("Long gap yearly leap", "2000-02-29", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_YEARLY);
+        Task afterLongGapYearly = TaskLogic.advanceRepeat(longGapYearlyLeap, zone,
+                Instant.parse("2026-02-28T10:00:00Z"));
+        check("2027-02-28".equals(afterLongGapYearly.dueDate)
+                        && Integer.valueOf(29).equals(afterLongGapYearly.repeatDayOfMonth),
+                "yearly recurrence catches up across 26 years and retains the Feb 29 anchor in a short year");
+        Task leapReturns = TaskLogic.advanceRepeat(afterLongGapYearly, zone,
+                Instant.parse("2027-03-01T10:00:00Z"));
+        check("2028-02-29".equals(leapReturns.dueDate)
+                        && Integer.valueOf(29).equals(leapReturns.repeatDayOfMonth),
+                "yearly Feb 29 recurrence returns to the leap day in 2028");
+
+        Task reminderRepeat = TaskLogic.create("Reminder repeat", "2026-10-08", "medium", "",
+                "14:30", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Task beforeReminder = TaskLogic.advanceRepeat(reminderRepeat, zone,
+                Instant.parse("2026-10-08T13:59:00Z"));
+        check(beforeReminder == reminderRepeat,
+                "a repeating task stays on its current occurrence before the reminder lead fires");
+        Task atReminder = TaskLogic.advanceRepeat(reminderRepeat, zone,
+                Instant.parse("2026-10-08T14:00:00Z"));
+        check("2026-10-09".equals(atReminder.dueDate)
+                        && atReminder.reminderShownFire == null,
+                "a repeating task advances exactly when its 30-minute reminder fires, before the due time");
+        Task dayLeadRepeat = TaskLogic.create("Day lead repeat", "2026-10-08", "medium", "",
+                "14:30", 1440, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Task atDayLead = TaskLogic.advanceRepeat(dayLeadRepeat, zone,
+                Instant.parse("2026-10-07T14:30:00Z"));
+        check("2026-10-09".equals(atDayLead.dueDate),
+                "a 24-hour reminder advances once at the previous-day trigger without repeating");
+        Task yearOneDaily = TaskLogic.create("Year one daily", "0001-01-01", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check("2026-10-31".equals(TaskLogic.advanceRepeat(yearOneDaily, zone,
+                        Instant.parse("2026-10-30T10:00:00Z")).dueDate),
+                "daily recurrence catches up from year 0001 without a fixed iteration cap");
+
+        ZoneId eastern = ZoneId.of("America/New_York");
+        Task springGapReminder = TaskLogic.create("Spring DST reminder", "2026-03-08", "medium", "",
+                "02:30", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check(TaskLogic.advanceRepeat(springGapReminder, eastern,
+                        Instant.parse("2026-03-08T06:59:00Z")) == springGapReminder,
+                "spring-forward reminder remains pending until the zone-resolved trigger");
+        check("2026-03-09".equals(TaskLogic.advanceRepeat(springGapReminder, eastern,
+                        Instant.parse("2026-03-08T07:00:00Z")).dueDate),
+                "spring-forward reminder advances exactly at the resolved 03:00 local trigger");
+
+        Task fallOverlapReminder = TaskLogic.create("Fall DST reminder", "2026-11-01", "medium", "",
+                "01:30", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check("2026-11-02".equals(TaskLogic.advanceRepeat(fallOverlapReminder, eastern,
+                        Instant.parse("2026-11-01T05:00:00Z")).dueDate),
+                "fall-back overlap uses the earlier 01:00 local offset for its reminder trigger");
+
         Task future = TaskLogic.create("Future", "2026-10-10", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
         check(TaskLogic.advanceRepeat(future, zone, now) == future,
@@ -486,11 +575,21 @@ public final class TaskLogicSmoke {
                 "weekday repeat rolls forward across missed weekdays and weekends to Friday");
         Task yearlyTask = TaskLogic.create("Yearly review", "2025-10-05", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_YEARLY);
-        check(TaskLogic.isValid(yearlyTask) && TaskLogic.REPEAT_YEARLY.equals(yearlyTask.repeatRule),
-                "a yearly repeat creates a valid task");
+        check(TaskLogic.isValid(yearlyTask) && TaskLogic.REPEAT_YEARLY.equals(yearlyTask.repeatRule)
+                        && Integer.valueOf(5).equals(yearlyTask.repeatDayOfMonth),
+                "a yearly repeat creates a valid task with its day-of-month anchor");
+        Task yearlyLeap = TaskLogic.create("Leap review", "2024-02-29", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_YEARLY);
+        check(Integer.valueOf(29).equals(yearlyLeap.repeatDayOfMonth),
+                "a yearly Feb 29 series captures its original day anchor");
+        Task keptYearlyAnchor = TaskLogic.update(yearlyLeap, "Leap review renamed", "2024-02-29", "medium");
+        Task changedYearlyAnchor = TaskLogic.update(yearlyLeap, "Leap review moved", "2024-02-28", "medium");
+        check(Integer.valueOf(29).equals(keptYearlyAnchor.repeatDayOfMonth)
+                        && Integer.valueOf(28).equals(changedYearlyAnchor.repeatDayOfMonth),
+                "editing a yearly task preserves its anchor unless the due date changes");
         check("2027-10-05".equals(TaskLogic.nextDueDate("2026-10-05", TaskLogic.REPEAT_YEARLY, null))
-                        && "2025-02-28".equals(TaskLogic.nextDueDate("2024-02-29", TaskLogic.REPEAT_YEARLY, null))
-                        && "2028-02-28".equals(TaskLogic.nextDueDate("2027-02-28", TaskLogic.REPEAT_YEARLY, null)),
+                        && "2025-02-28".equals(TaskLogic.nextDueDate("2024-02-29", TaskLogic.REPEAT_YEARLY, 29))
+                        && "2028-02-29".equals(TaskLogic.nextDueDate("2027-02-28", TaskLogic.REPEAT_YEARLY, 29)),
                 "yearly repeat keeps month and day and clamps Feb 29 in short years");
         Task yearlyAdvanced = TaskLogic.advanceRepeat(yearlyTask, zone, now);
         check("2027-10-05".equals(yearlyAdvanced.dueDate),

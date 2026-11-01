@@ -37,7 +37,7 @@ final class PortableBackupCodec {
     private static final int MAGIC = 0x444d424b; // DMBK
     private static final int MANIFEST_MAGIC_V1 = 0x444d4d31; // DMM1
     private static final int MANIFEST_MAGIC_V2 = 0x444d4d32; // DMM2 (adds notes, due time, reminder, subtasks)
-    private static final int MANIFEST_MAGIC_V3 = 0x444d4d33; // DMM3 (adds repeat rule, monthly anchor, and tags)
+    private static final int MANIFEST_MAGIC_V3 = 0x444d4d33; // DMM3 (adds repeat rule, day-of-month anchor, and tags)
     private static final int MANIFEST_MAGIC = MANIFEST_MAGIC_V3;
     private static final int VERSION = 1;
     private static final int SUITE_AES_256_GCM_HKDF_SHA256 = 1;
@@ -488,10 +488,12 @@ final class PortableBackupCodec {
                 if (manifestV3) {
                     String repeatRule = repeatRuleFromCode(in.readUnsignedByte());
                     int repeatDayOfMonth = in.readUnsignedByte();
+                    boolean monthlyOrYearly = TaskLogic.REPEAT_MONTHLY.equals(repeatRule)
+                            || TaskLogic.REPEAT_YEARLY.equals(repeatRule);
                     if (repeatDayOfMonth > 31
                             || (TaskLogic.REPEAT_MONTHLY.equals(repeatRule) && repeatDayOfMonth == 0)
-                            || (!TaskLogic.REPEAT_MONTHLY.equals(repeatRule) && repeatDayOfMonth != 0)) {
-                        throw new IOException("The manifest contains an invalid monthly repeat date.");
+                            || (!monthlyOrYearly && repeatDayOfMonth != 0)) {
+                        throw new IOException("The manifest contains an invalid repeat day-of-month anchor.");
                     }
                     task.setRepeatFields(repeatRule,
                             repeatDayOfMonth == 0 ? null : Integer.valueOf(repeatDayOfMonth));
