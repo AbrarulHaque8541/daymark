@@ -80,7 +80,9 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     addEventListener() {}
   };
   const appLogic = fixedToday
-    ? Object.assign({}, logic, { localDateString: () => fixedToday })
+    ? Object.assign({}, logic, {
+      localDateString: (date) => date === undefined ? fixedToday : logic.localDateString(date)
+    })
     : logic;
   const window = {
     DaymarkLogic: appLogic,
