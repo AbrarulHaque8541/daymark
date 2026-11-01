@@ -104,6 +104,53 @@ public final class BrowserDownloadTrackerSmoke {
         check(saturated.get((long) BrowserDownloadTracker.MAX_TRACKED) != null,
                 "new entry is retained after terminal eviction");
 
+        // Duplicate provider callbacks must not reset the original active record.
+        BrowserDownloadTracker.Entry duplicate = tracker.start(
+                20L, "https://cdn.example.test/original", "original.bin");
+        tracker.onProgress(20L, 25L, 100L);
+        BrowserDownloadTracker.Entry duplicateAgain = tracker.start(
+                20L, "https://other.example.test/replacement?token=secret", "replacement.bin");
+        check(duplicateAgain == duplicate, "duplicate id must return the existing tracker entry");
+        check(duplicateAgain.status == BrowserDownloadTracker.Status.IN_PROGRESS
+                        && duplicateAgain.bytesDownloaded == 25L,
+                "duplicate start must not reset progress/status");
+        check("original.bin".equals(duplicateAgain.fileName)
+                        && "https://cdn.example.test".equals(duplicateAgain.url),
+                "duplicate start must not replace retained metadata");
+
+        // Entry count alone is not enough: bound each untrusted string too.
+        String oversizedUrl = "https://" + "a".repeat(BrowserDownloadTracker.MAX_URL_CHARS + 50)
+                + "/?token=must-not-be-retained";
+        BrowserDownloadTracker.Entry boundedUrl = tracker.start(21L, oversizedUrl, "url.bin");
+        check("[redact-error]".equals(boundedUrl.url),
+                "oversized URL must fail closed before retaining an unbounded origin");
+
+        String hostileName = "x".repeat(BrowserDownloadTracker.MAX_FILE_NAME_CHARS + 100)
+                + "\\r\\nforged-log-line";
+        BrowserDownloadTracker.Entry boundedName = tracker.start(
+                22L, "https://cdn.example.test/name", hostileName);
+        check(boundedName.fileName.codePointCount(0, boundedName.fileName.length())
+                        <= BrowserDownloadTracker.MAX_FILE_NAME_CHARS,
+                "retained filename must be bounded by code points");
+        check(!boundedName.fileName.contains("\\r") && !boundedName.fileName.contains("\\n"),
+                "filename must not inject line breaks into logs");
+
+        tracker.onFailure(22L, "failure\\r\\n".repeat(1000));
+        check(tracker.get(22L).failureReason.codePointCount(0,
+                        tracker.get(22L).failureReason.length())
+                        <= BrowserDownloadTracker.MAX_FAILURE_REASON_CHARS,
+                "failure diagnostic must be bounded");
+        check(!tracker.get(22L).failureReason.contains("\\r")
+                        && !tracker.get(22L).failureReason.contains("\\n"),
+                "failure diagnostic must not inject log lines");
+
+        BrowserDownloadTracker.Entry negativeProgress = tracker.start(
+                23L, "https://cdn.example.test/progress", "progress.bin");
+        tracker.onProgress(23L, -5L, -1L);
+        check(negativeProgress.bytesDownloaded == 0L && negativeProgress.totalBytes == 0L
+                        && negativeProgress.progress() == 0d,
+                "negative provider counters must be normalized to a safe zero state");
+
         System.out.println("PASS BrowserDownloadTrackerSmoke: origin-only redaction, malformed fail-closed, status/progress, bounded capacity");
     }
 
