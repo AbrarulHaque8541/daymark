@@ -79,7 +79,7 @@ public final class BrowserHistorySmoke {
         String capped = BrowserHistory.add(full, "https://new.example");
         List<String> decoded = BrowserHistory.decode(capped);
         check(decoded.size() == BrowserHistory.MAX_ENTRIES && "https://new.example".equals(decoded.get(0))
-                        && !decoded.contains("https://host" + (BrowserHistory.MAX_ENTRIES - 1) + ".example"),
+                        && !decoded.contains("https://host0.example"),
                 "adding past the cap keeps fifty entries and drops the oldest");
     }
 
