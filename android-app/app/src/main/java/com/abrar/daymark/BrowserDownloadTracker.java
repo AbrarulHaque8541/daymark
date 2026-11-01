@@ -21,6 +21,9 @@ import java.util.Map;
 final class BrowserDownloadTracker {
     private static final String TAG = "DaymarkDownload";
     static final int MAX_TRACKED = 20;
+    static final int MAX_URL_CHARS = 2048;
+    static final int MAX_FILE_NAME_CHARS = 128;
+    static final int MAX_FAILURE_REASON_CHARS = 160;
 
     enum Status { QUEUED, IN_PROGRESS, PAUSED, COMPLETED, FAILED, CANCELLED }
 
@@ -41,16 +44,28 @@ final class BrowserDownloadTracker {
         }
 
         double progress() {
-            if (totalBytes <= 0) return 0;
+            if (totalBytes <= 0 || bytesDownloaded <= 0) return 0;
             return Math.min(1.0, (double) bytesDownloaded / (double) totalBytes);
         }
     }
 
     private final Map<Long, Entry> entries = new LinkedHashMap<>();
 
+    /**
+     * Starts tracking a download without allowing the in-memory history to grow without bound.
+     * If the cap is reached and every retained entry is active, returns null rather than
+     * evicting an active download or exceeding MAX_TRACKED. Callers may still enqueue the
+     * system download; this helper only declines to retain another tracking entry.
+     */
     synchronized Entry start(long id, String url, String fileName) {
+        Entry existing = entries.get(id);
+        if (existing != null) return existing; // duplicate callbacks must not reset active state
         evictIfNeeded();
-        Entry e = new Entry(id, redact(url), fileName != null ? fileName : "download");
+        if (entries.size() >= MAX_TRACKED) {
+            Log.w(TAG, "download-not-tracked id=" + id + " reason=active-capacity");
+            return null;
+        }
+        Entry e = new Entry(id, redact(url), sanitizeText(fileName, MAX_FILE_NAME_CHARS, "download"));
         entries.put(id, e);
         Log.i(TAG, "download-started id=" + id + " url=" + e.url + " file=" + e.fileName);
         return e;
@@ -59,8 +74,8 @@ final class BrowserDownloadTracker {
     synchronized void onProgress(long id, long downloaded, long total) {
         Entry e = entries.get(id);
         if (e == null) return;
-        e.bytesDownloaded = downloaded;
-        e.totalBytes = total;
+        e.bytesDownloaded = Math.max(0L, downloaded);
+        e.totalBytes = Math.max(0L, total);
         e.status = Status.IN_PROGRESS;
     }
 
@@ -68,7 +83,7 @@ final class BrowserDownloadTracker {
         Entry e = entries.get(id);
         if (e == null) return;
         e.status = Status.COMPLETED;
-        e.bytesDownloaded = e.totalBytes;
+        e.bytesDownloaded = Math.max(0L, e.totalBytes);
         Log.i(TAG, "download-completed id=" + id + " file=" + e.fileName + " size=" + e.totalBytes);
     }
 
@@ -76,7 +91,7 @@ final class BrowserDownloadTracker {
         Entry e = entries.get(id);
         if (e == null) return;
         e.status = Status.FAILED;
-        e.failureReason = reason != null ? reason.replaceAll("[\r\n]", " ") : "unknown";
+        e.failureReason = sanitizeText(reason, MAX_FAILURE_REASON_CHARS, "unknown");
         Log.w(TAG, "download-failed id=" + id + " reason=" + e.failureReason);
     }
 
@@ -120,12 +135,33 @@ final class BrowserDownloadTracker {
     }
 
     /**
+     * Bound and neutralize untrusted diagnostic metadata before retaining or logging it.
+     * Unicode control/format characters include line separators and bidi controls.
+     */
+    private static String sanitizeText(String value, int maxCodePoints, String fallback) {
+        if (value == null || value.isEmpty()) return fallback;
+        StringBuilder safe = new StringBuilder(Math.min(value.length(), maxCodePoints));
+        int count = 0;
+        for (int offset = 0; offset < value.length() && count < maxCodePoints;) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            int type = Character.getType(codePoint);
+            if (type == Character.CONTROL || type == Character.FORMAT) codePoint = ' ';
+            safe.appendCodePoint(codePoint);
+            count++;
+        }
+        String result = safe.toString().trim();
+        return result.isEmpty() ? fallback : result;
+    }
+
+    /**
      * Keep only the HTTP(S) origin in diagnostics. Parsing the URI (rather than searching for a
      * slash) is important: a URL such as https://example.test?token=... has no path slash before
      * its query, so delimiter scanning alone would accidentally retain the query in Logcat.
      */
     private static String redact(String url) {
         if (url == null) return "null";
+        if (url.length() > MAX_URL_CHARS) return "[redact-error]";
         try {
             URI uri = new URI(url);
             String scheme = uri.getScheme();
