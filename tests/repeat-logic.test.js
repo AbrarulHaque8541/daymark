@@ -29,7 +29,7 @@ test('daily repeat jumps directly past very old occurrences', () => {
   assert.equal(repeat.nextDueDate('0099-12-31', 'weekly', '0099-12-31'), '0100-01-07');
 });
 
-test('weekly repeat keeps the weekday and can land on today', () => {
+test('weekly repeat keeps its weekday and skips same-day occurrences', () => {
   // Due Friday 2026-10-30, completed today: the next Friday is 2026-11-06.
   assert.equal(repeat.nextDueDate('2026-10-30', 'weekly', '2026-10-30'), '2026-11-06');
   // Missed occurrences on or before today are skipped; completion never
