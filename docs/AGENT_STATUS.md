@@ -4,6 +4,8 @@
 
 ## Latest reviewed snapshot
 
+- [Daymark engineering status — 2026-11-01T06:28:00Z](./CURRENT_STATUS_20261101T062800Z.md)
+
 - [Daymark engineering status — 2026-11-01T05:58:24Z](./CURRENT_STATUS_20261101T055824Z.md)
 
 - [Daymark status snapshot — 2026-11-01T05:05:00Z](./CURRENT_STATUS_20261101T050500Z.md)
