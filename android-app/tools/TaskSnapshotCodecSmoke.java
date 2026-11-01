@@ -246,6 +246,19 @@ public final class TaskSnapshotCodecSmoke {
                 "monthly anchor above 31 is rejected");
         expectDecodeFailure(monthlyJson.replace(",\"repeatDayOfMonth\":31", ""),
                 "v5 snapshot missing its monthly anchor is rejected");
+        String yearlyJson = monthlyJson
+                .replace('"dueDate":"2026-01-31"', '"dueDate":"2024-02-29"')
+                .replace('"repeatRule":"monthly"', '"repeatRule":"yearly"')
+                .replace('"repeatDayOfMonth":31', '"repeatDayOfMonth":29');
+        Task yearlyDecoded = TaskSnapshotCodec.decode(yearlyJson.getBytes(StandardCharsets.UTF_8)).tasks.get(0);
+        check(TaskLogic.REPEAT_YEARLY.equals(yearlyDecoded.repeatRule)
+                        && Integer.valueOf(29).equals(yearlyDecoded.repeatDayOfMonth),
+                "yearly Feb 29 anchor round-trips through the encrypted snapshot");
+        Task legacyYearlyDecoded = TaskSnapshotCodec.decode(
+                yearlyJson.replace('"repeatDayOfMonth":29', '"repeatDayOfMonth":null')
+                        .getBytes(StandardCharsets.UTF_8)).tasks.get(0);
+        check(Integer.valueOf(29).equals(legacyYearlyDecoded.repeatDayOfMonth),
+                "legacy v5 yearly record without an anchor defaults to its original due-date day");
         expectDecodeFailure(monthlyJson.replace(",\"tags\":[\"bills\",\"home\"]", ""),
                 "v5 snapshot missing its tags field is rejected");
 

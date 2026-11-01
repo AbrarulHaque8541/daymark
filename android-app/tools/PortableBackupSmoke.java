@@ -851,7 +851,7 @@ public final class PortableBackupSmoke {
                 Collections.<AttachmentRef>emptyList(), "", null, null, null,
                 TaskLogic.REPEAT_WEEKDAYS, null, Collections.<Subtask>emptyList(),
                 Collections.<String>emptyList());
-        Task yearly = new Task(UUID.randomUUID().toString(), "Tax review", "2026-04-15", "high", false,
+        Task yearly = new Task(UUID.randomUUID().toString(), "Tax review", "2024-02-29", "high", false,
                 "2026-01-01T10:15:30Z", "2026-01-01T10:15:30Z",
                 Collections.<AttachmentRef>emptyList(), "", null, null, null,
                 TaskLogic.REPEAT_YEARLY, null, Collections.<Subtask>emptyList(),
@@ -870,11 +870,50 @@ public final class PortableBackupSmoke {
                         && byTitle.get("Gym").repeatDayOfMonth == null,
                 "weekday repeat rule round-trips in DMM3 without a monthly anchor");
         check(TaskLogic.REPEAT_YEARLY.equals(byTitle.get("Tax review").repeatRule)
-                        && byTitle.get("Tax review").repeatDayOfMonth == null,
-                "yearly repeat rule round-trips in DMM3 without a monthly anchor");
+                        && Integer.valueOf(29).equals(byTitle.get("Tax review").repeatDayOfMonth),
+                "yearly Feb 29 rule and anchor round-trip in DMM3");
+        byte[] legacyYearlyManifest = legacyDmm3YearlyManifestWithoutAnchor();
+        PortableBackupCodec.Manifest legacyYearly = PortableBackupCodec.decodeManifest(
+                legacyYearlyManifest, randomToken(), 1, "legacy-yearly");
+        PortableBackupCodec.PortableTask legacyPortable = legacyYearly.tasks.get(0);
+        Task legacyRestored = new Task("legacy-yearly", legacyPortable.title, legacyPortable.dueDate,
+                legacyPortable.priority, legacyPortable.completed, legacyPortable.createdAt,
+                legacyPortable.updatedAt, Collections.<AttachmentRef>emptyList(), legacyPortable.notes,
+                legacyPortable.dueTime, legacyPortable.reminderLeadMinutes, legacyPortable.reminderShownFire,
+                legacyPortable.repeatRule, legacyPortable.repeatDayOfMonth, legacyPortable.subtasks,
+                legacyPortable.tags);
+        check(legacyPortable.repeatDayOfMonth == null && Integer.valueOf(29).equals(legacyRestored.repeatDayOfMonth)
+                        && TaskLogic.isValid(legacyRestored),
+                "legacy DMM3 yearly archive with zero anchor remains importable and defaults to its due-date day");
         opened.clearStagedPlaintext();
         deleteTree(stage);
         PortableBackupCodec.clear(key);
+    }
+
+    private static byte[] legacyDmm3YearlyManifestWithoutAnchor() throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeInt(0x444d4d33); // DMM3, pre-anchor yearly encoding (day byte 0)
+        out.writeInt(1);
+        out.write(randomToken());
+        writeManifestString(out, "Legacy leap review");
+        out.writeByte(1);
+        writeManifestString(out, "2024-02-29");
+        out.writeByte(1); // medium
+        out.writeByte(0); // open
+        writeManifestString(out, "2024-01-01T00:00:00Z");
+        writeManifestString(out, "2024-01-01T00:00:00Z");
+        out.writeByte(0); // no attachments
+        writeManifestString(out, "");
+        out.writeByte(0); // no due time
+        out.writeByte(0); // no reminder lead
+        out.writeByte(0); // no shown reminder
+        out.writeByte(0); // no subtasks
+        out.writeByte(5); // yearly
+        out.writeByte(0); // legacy yearly anchor absent
+        out.writeByte(0); // no tags
+        out.flush();
+        return bytes.toByteArray();
     }
 
     private static void legacyV1ManifestStillDecodesWithDefaults() throws Exception {
@@ -922,7 +961,10 @@ public final class PortableBackupSmoke {
         expectManifestFailure(buildV3Manifest(3, 32), "monthly DMM3 anchor above 31 is rejected");
         expectManifestFailure(buildV3Manifest(0, 1), "DMM3 anchor without a monthly rule is rejected");
         expectManifestFailure(buildV3Manifest(4, 31), "weekday DMM3 repeat with a monthly anchor is rejected");
-        expectManifestFailure(buildV3Manifest(5, 31), "yearly DMM3 repeat with a monthly anchor is rejected");
+        expectManifestFailure(buildV3Manifest(5, 31), "yearly DMM3 anchor inconsistent with its due date is rejected");
+        check(PortableBackupCodec.decodeManifest(buildV3Manifest(5, 6), randomToken(), 1,
+                        "yearly-anchor-valid").tasks.size() == 1,
+                "yearly DMM3 anchor matching the due date is accepted");
         expectManifestFailure(buildV3Manifest(0, 0, "BadTag"), "noncanonical DMM3 tags are rejected");
         expectManifestFailure(buildV3Manifest(0, 0, "same", "same"), "duplicate DMM3 tags are rejected");
         expectManifestFailure(buildV3Manifest(0, 0, "a", "b", "c", "d", "e", "f"),

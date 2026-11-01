@@ -23,7 +23,7 @@ final class Task {
     final String reminderShownFire;
     /** Optional repeat rule that rolls the due date forward: null, "daily", "weekly", or "monthly". Requires dueDate. */
     final String repeatRule;
-    /** Original calendar day for a monthly series (1–31); short months clamp without changing this anchor. */
+    /** Original calendar day for monthly/yearly series (1–31); short months clamp without changing this anchor. */
     final Integer repeatDayOfMonth;
     final List<Subtask> subtasks;
     /** Optional tags for search and grouping: lowercase, hyphenated, at most 5. Empty when unset. */
@@ -94,7 +94,8 @@ final class Task {
         this.reminderLeadMinutes = reminderLeadMinutes;
         this.reminderShownFire = reminderShownFire == null || reminderShownFire.isEmpty() ? null : reminderShownFire;
         this.repeatRule = repeatRule == null || repeatRule.isEmpty() ? null : repeatRule;
-        this.repeatDayOfMonth = repeatDayOfMonth;
+        this.repeatDayOfMonth = repeatDayOfMonth == null
+                ? defaultRepeatDayOfMonth(dueDate, repeatRule) : repeatDayOfMonth;
         this.subtasks = subtasks == null ? null
                 : Collections.unmodifiableList(new ArrayList<>(subtasks));
         this.tags = tags == null ? Collections.emptyList()
@@ -102,7 +103,8 @@ final class Task {
     }
 
     private static Integer defaultRepeatDayOfMonth(String dueDate, String repeatRule) {
-        if (!"monthly".equals(repeatRule) || dueDate == null || dueDate.length() != 10) return null;
+        if (!("monthly".equals(repeatRule) || "yearly".equals(repeatRule))
+                || dueDate == null || dueDate.length() != 10) return null;
         try {
             return Integer.valueOf(dueDate.substring(8));
         } catch (NumberFormatException exception) {
@@ -111,8 +113,9 @@ final class Task {
     }
 
     private Integer repeatDayAfterEdit(String nextDueDate, String nextRepeatRule) {
-        if (!"monthly".equals(nextRepeatRule)) return null;
-        if ("monthly".equals(repeatRule) && dueDate != null && dueDate.equals(nextDueDate)) {
+        if (!("monthly".equals(nextRepeatRule) || "yearly".equals(nextRepeatRule))) return null;
+        if (repeatRule != null && repeatRule.equals(nextRepeatRule)
+                && dueDate != null && dueDate.equals(nextDueDate)) {
             return repeatDayOfMonth;
         }
         return defaultRepeatDayOfMonth(nextDueDate, nextRepeatRule);
