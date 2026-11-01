@@ -10,7 +10,7 @@ import android.view.animation.Interpolator;
 public final class WorkspaceMotion {
     private WorkspaceMotion() {}
 
-    /** Tasks \u2194 Web content transition with subtle horizontal slide. */
+    /** Tasks ↔ Web content transition with subtle horizontal slide. */
     public static void animateWorkspaceSwitch(
             View browserScreen,
             View taskScreen,
@@ -36,6 +36,7 @@ public final class WorkspaceMotion {
     /** Soft browser chrome hide (scroll down). */
     public static void hideChrome(View view, float hiddenOffset, Interpolator exitInterpolator, Runnable endAction) {
         if (view == null) return;
+        view.animate().cancel();
         view.setVisibility(View.VISIBLE);
         view.animate().translationY(hiddenOffset)
                 .alpha(0f)
@@ -48,6 +49,7 @@ public final class WorkspaceMotion {
     /** Soft browser chrome show (scroll up / top). */
     public static void showChrome(View view, float hiddenOffset, Interpolator enterInterpolator) {
         if (view == null) return;
+        view.animate().cancel();
         view.setVisibility(View.VISIBLE);
         view.setTranslationY(hiddenOffset);
         view.setAlpha(0f);
