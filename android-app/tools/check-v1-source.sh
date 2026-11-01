@@ -319,7 +319,11 @@ assert "BrowserHistory.sanitizeUrl(url)" in activity and "BrowserHistory.add(cur
 history_dialog = re.search(r"private void showBrowserHistoryDialog\(\)\s*\{(.*?)\n    \}", activity, re.S)
 assert history_dialog and 'setTitle("Site history (HTTPS origins only)")' in history_dialog.group(1)
 assert history_dialog and "String url = history.get(matchedIndices.get(position));" in history_dialog.group(1) and "navigateBrowserTo(url)" in history_dialog.group(1), "reopening a saved site must navigate to its origin"
-for expected in ("source.getHost()", "source.getPort()", "port != defaultPort", "HTTPS_DEFAULT_PORT = 443", "HTTP_DEFAULT_PORT = 80",
+for expected in ("source.getRawAuthority()", "authority.lastIndexOf('@')",
+                 "hostAndPort.lastIndexOf(':')", "IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES)",
+                 "hostAndPort.startsWith(", "closingBracket",
+                 "parsePort(suffix.substring(1))", "port != defaultPort",
+                 "HTTPS_DEFAULT_PORT = 443", "HTTP_DEFAULT_PORT = 80",
                  "sanitized.getRawUserInfo()", "sanitized.getRawQuery()", "sanitized.getRawFragment()", "sanitized.getRawPath()"):
     assert expected in history_source, f"history sanitizer must handle {expected}"
 assert "source.getRawPath()" not in history_source, "site history must not read or persist a page path"
