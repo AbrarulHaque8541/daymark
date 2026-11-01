@@ -9,7 +9,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 
-function bootApp({ savedValue, failBackup = false, confirmResult = true, confirmThrows = false }) {
+function bootApp({ savedValue, failBackup = false, failPrimarySave = false, confirmResult = true, confirmThrows = false }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -62,7 +62,7 @@ function bootApp({ savedValue, failBackup = false, confirmResult = true, confirm
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
-      if (key === BACKUP_KEY && failBackup) throw new Error('Quota exceeded');
+      if ((key === BACKUP_KEY && failBackup) || (key === STORAGE_KEY && failPrimarySave)) throw new Error('Quota exceeded');
       storedValues.set(key, String(value));
     }
   };
@@ -185,6 +185,20 @@ test('confirmation failure fails closed without mutating imported tasks', () => 
   assert.equal(app.confirmMessages.length, 1);
   assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
   assert.match(app.elements.get('#toast').textContent, /confirmation could not be displayed/);
+});
+
+test('failed task import save rolls back in-memory state and reports no import', () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue, failPrimarySave: true });
+  const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
+
+  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 1, 'the preview and confirmation still happen before saving');
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue, 'failed storage write must preserve the original payload');
+  assert.doesNotMatch(app.elements.get('#task-list').innerHTML, /Do not add/, 'failed import must roll back the visible in-memory state');
+  assert.match(app.elements.get('#toast').textContent, /No tasks were imported/);
 });
 
 test('oversized task backup is rejected before FileReader allocation', () => {
