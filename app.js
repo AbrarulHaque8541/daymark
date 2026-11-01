@@ -392,6 +392,7 @@
       button.setAttribute('aria-pressed', String(active));
     });
 
+    updateRecoveryButton();
     taskList.innerHTML = filteredTasks.map((task) => taskMarkup(task, today)).join('');
     // The first render is the reliable completion signal for the initial skeleton.
     taskList.classList.add('is-ready');
@@ -891,6 +892,67 @@
     });
   }
 
+
+  function updateRecoveryButton() {
+    const button = $('#recovery-preview');
+    if (!button) return;
+    let has = false;
+    try {
+      has = Boolean(localStorage.getItem(BACKUP_KEY));
+    } catch (error) {
+      has = false;
+    }
+    button.hidden = !has;
+    button.setAttribute('aria-label', has ? 'Preview and optionally restore tasks from recovery backup' : 'No recovery backup available');
+  }
+
+  function collectRecoverableTasks() {
+    const existingIds = new Set(state.tasks.map((task) => task.id));
+    const recoverable = [];
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      const payloads = recoveryBackupPayloads(raw);
+      for (const payload of payloads) {
+        try {
+          const parsed = JSON.parse(payload);
+          const validated = logic.validateStoredTasks(parsed);
+          for (const task of validated.tasks) {
+            if (!existingIds.has(task.id)) recoverable.push(task);
+          }
+        } catch (error) {
+          // Opaque or malformed payload: skip for preview, preserve for export.
+        }
+      }
+    } catch (error) {
+      return [];
+    }
+    return recoverable;
+  }
+
+  function offerRecoveryPreview() {
+    const recoverable = collectRecoverableTasks();
+    if (!recoverable.length) {
+      showToast('No recoverable tasks found in the recovery backup. The original data is still preserved for export.');
+      return;
+    }
+    showToast(`Found ${recoverable.length} recoverable task${recoverable.length === 1 ? '' : 's'} in recovery backup. Restore them?`, {
+      label: 'Restore now',
+      run: () => restoreRecoverableTasks(recoverable)
+    });
+  }
+
+  function restoreRecoverableTasks(recoverable) {
+    if (!recoverable.length) return;
+    const before = state.tasks.length;
+    state.tasks = state.tasks.concat(recoverable);
+    const saved = persistTasks();
+    render();
+    const added = state.tasks.length - before;
+    showToast(saved
+      ? `Restored ${added} task${added === 1 ? '' : 's'} from recovery. Original recovery data was not cleared.`
+      : `Restored for this session, but saving failed. Recovery data remains intact.`);
+  }
+
   function exportTasks() {
     // Portable local backup: same spirit as the Android app's encrypted backups,
     // scoped to what a static web page can honestly do — a JSON file you keep.
@@ -1318,6 +1380,7 @@
     });
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
+    $('#recovery-preview').addEventListener('click', offerRecoveryPreview);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', (event) => {
