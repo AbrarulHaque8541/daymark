@@ -2623,14 +2623,14 @@ public final class MainActivity extends Activity {
             if (hidden) {
                 view.setVisibility(View.VISIBLE);
                 view.animate().translationY(hiddenOffset)
-                        .alpha(0f).setDuration(160L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
+                        .alpha(0f).setDuration(UiMotionPolicy.CHROME_HIDE_MS).setInterpolator(MOTION_EXIT).withEndAction(() -> {
                             if (browserChromeHidden && webMode) view.setVisibility(View.GONE);
                         }).start();
             } else {
                 view.setVisibility(View.VISIBLE);
                 view.setTranslationY(hiddenOffset);
                 view.setAlpha(0f);
-                view.animate().translationY(0f).alpha(1f).setDuration(190L)
+                view.animate().translationY(0f).alpha(1f).setDuration(UiMotionPolicy.CHROME_SHOW_MS)
                         .setInterpolator(MOTION_ENTER).start();
             }
         }

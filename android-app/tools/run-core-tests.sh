@@ -175,5 +175,8 @@ sh "$ROOT/tools/run-focus-timer-persistence-tests.sh"
 # UI feedback timing policy (cherry-picked from feat/ui-feedback-policy-20261031).
 javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/UiFeedbackPolicy.java" \
-  "$ROOT/tools/UiFeedbackPolicySmoke.java"
+  "$ROOT/app/src/main/java/com/abrar/daymark/UiMotionPolicy.java" \
+  "$ROOT/tools/UiFeedbackPolicySmoke.java" \
+  "$ROOT/tools/UiMotionPolicySmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UiFeedbackPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.UiMotionPolicySmoke
