@@ -25,6 +25,8 @@ test('daily repeat skips missed occurrences to the first future date', () => {
 test('daily repeat jumps directly past very old occurrences', () => {
   assert.equal(repeat.nextDueDate('2000-01-01', 'daily', '2026-10-30'), '2026-10-31');
   assert.equal(repeat.nextDueDate('0001-01-01', 'daily', '2026-10-30'), '2026-10-31');
+  assert.equal(repeat.nextDueDate('0001-01-01', 'daily', '0001-01-01'), '0001-01-02');
+  assert.equal(repeat.nextDueDate('0099-12-31', 'weekly', '0099-12-31'), '0100-01-07');
 });
 
 test('weekly repeat keeps the weekday and can land on today', () => {
