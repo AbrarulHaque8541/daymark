@@ -155,13 +155,10 @@
     }
   }
 
-  function hasOpaqueRecoveryBundle() {
+  function hasPartialRecoveryBackup() {
     try {
       const raw = localStorage.getItem(BACKUP_KEY);
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
-      return parsed.payloads.some((payload) => typeof payload !== 'string'
-        || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
+      return recoveryBackupPayloads(raw).some(isPartialRecoveryPayload);
     } catch (error) {
       return false;
     }
