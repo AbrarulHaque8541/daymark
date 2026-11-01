@@ -7,6 +7,7 @@ policy = (root / "app/src/main/java/com/abrar/daymark/BrowserAppLinkApproval.jav
 webview = (root / "app/src/main/java/com/abrar/daymark/DaymarkWebView.java").read_text(encoding="utf-8")
 smoke = (root / "tools/BrowserAppLinkApprovalSmoke.java").read_text(encoding="utf-8")
 runner = (root / "tools/run-browser-app-link-approval-tests.sh").read_text(encoding="utf-8")
+canonical = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
 workflow = (root.parent / ".github/workflows/android.yml").read_text(encoding="utf-8")
 
 for expected in (
@@ -47,8 +48,10 @@ for expected in (
 
 assert "BrowserAppLinkApprovalSmoke.java" in runner and "BrowserAppLinkApprovalSmoke" in runner, \
     "dedicated JDK regression runner must compile and execute the smoke"
-assert "run-browser-app-link-approval-tests.sh" in workflow, \
-    "Android CI must execute App Link approval regressions"
-assert "check-browser-app-link-approval.py" in workflow, \
-    "Android CI must enforce runtime integration guard"
+assert "run-browser-app-link-approval-tests.sh" in canonical, \
+    "canonical source guard must execute App Link approval regressions"
+assert "check-browser-app-link-approval.py" in canonical, \
+    "canonical source guard must enforce App Link runtime integration"
+assert "sh ./tools/check-v1-source.sh" in workflow, \
+    "Android CI must execute the canonical source guard"
 print("PASS browser App Link approval source guard")
