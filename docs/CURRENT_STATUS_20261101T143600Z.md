@@ -20,7 +20,7 @@
   - Cross-platform contracts [41316896666](https://github.com/AbrarulHaque8541/daymark/actions/runs/41316896666): **IN PROGRESS**.
   - Non-publishing QA APK [41316896670](https://github.com/AbrarulHaque8541/daymark/actions/runs/41316896670): **IN PROGRESS**.
   - Device-test APK [41316896758](https://github.com/AbrarulHaque8541/daymark/actions/runs/41316896758): **IN PROGRESS**.
-  - Focus Live Update [41316896763](https://github.com/AbrarulHaque8541/daymark/actions/runs/41316896763] (status queried as in progress).
+  - Focus Live Update [41316896763](https://github.com/AbrarulHaque8541/daymark/actions/runs/41316896763) (status queried as in progress).
   - Focus lifecycle [41316896647](https://github.com/AbrarulHaque8541/daymark/actions/runs/41316896647): **QUEUED**.
 - Earlier exact-head Android CI #41314527850, QA #41314527839 and device-test #41314527860 failed solely at the erroneous source-guard assertion after all preceding host/source checks, including `BrowserAppLinkApprovalSmoke`, passed. No runtime tests were weakened.
 - Physical App Link resolver/chooser/return-flow matrix on API 26/30/31+: **NOT TESTED**; tracked under #160.
