@@ -74,9 +74,12 @@ for marker, explanation in (
     ("currentStatus == DownloadManager.STATUS_PENDING", "pending state must remain cancelable"),
     ("currentStatus == DownloadManager.STATUS_RUNNING", "running state must remain cancelable"),
     ("currentStatus == DownloadManager.STATUS_PAUSED", "paused state must remain cancelable"),
-    ("catch (RuntimeException providerUnavailable) {\\n            return false;", "provider/query errors must fail closed without removing a file"),
+    ("catch (RuntimeException providerUnavailable)", "provider/query errors must fail closed without removing a file"),
 ):
     assert marker in active_check, explanation
+provider_error_catch = active_check.index("catch (RuntimeException providerUnavailable)")
+assert "return false;" in active_check[provider_error_catch:provider_error_catch + 120], \
+    "provider/query errors must fail closed without removing a file"
 normalized_activity = "".join(activity.split())
 assert (
     "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))"
