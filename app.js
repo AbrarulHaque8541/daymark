@@ -575,11 +575,6 @@
     $('#toast-action').hidden = true;
     action.run();
   }
-stAction;
-    if (!action) return;
-    dismissToast();
-    action.run();
-  }
 
   function scheduleNextDayRefresh() {
     clearTimeout(state.dayTimer);
