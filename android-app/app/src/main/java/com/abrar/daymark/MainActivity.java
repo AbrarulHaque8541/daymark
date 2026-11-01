@@ -3837,7 +3837,7 @@ public final class MainActivity extends Activity {
                 return "Queued";
             case DownloadManager.STATUS_RUNNING:
                 if (total > 0) {
-                    long percent = Math.max(0, Math.min(100, downloaded * 100 / total));
+                    int percent = BrowserDownloadProgress.percent(downloaded, total);
                     return "Downloading " + percent + "%";
                 }
                 return "Downloading";
