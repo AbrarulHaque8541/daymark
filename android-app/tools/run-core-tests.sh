@@ -121,7 +121,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.CalendarEventDraftSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.OAuthCredentialCodecSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.GitHubPublicIssuesClientSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskWebhookClientSmoke
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv"
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv" "$ROOT/../contracts/task-recurrence.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollChromeReserveSmoke
