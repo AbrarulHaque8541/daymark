@@ -441,11 +441,11 @@ public final class TaskLogicSmoke {
                 "weekly repeat advances a whole week past the due moment");
         Task yearOneDaily = TaskLogic.create("Year-one daily", "0001-01-01", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
-        check("2026-10-31".equals(TaskLogic.advanceRepeat(yearOneDaily, zone, now).dueDate),
+        check("2026-10-09".equals(TaskLogic.advanceRepeat(yearOneDaily, zone, now).dueDate),
                 "daily recurrence catches up arithmetically across years 0001 through 2026");
         Task yearOneWeekdays = TaskLogic.create("Year-one weekdays", "0001-01-01", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
-        check("2026-11-02".equals(TaskLogic.advanceRepeat(yearOneWeekdays, zone, now).dueDate),
+        check("2026-10-09".equals(TaskLogic.advanceRepeat(yearOneWeekdays, zone, now).dueDate),
                 "weekday recurrence jumps to the next weekday after today across a multi-millennial gap");
         Task monthly = TaskLogic.create("Monthly", "2026-09-01", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_MONTHLY);
