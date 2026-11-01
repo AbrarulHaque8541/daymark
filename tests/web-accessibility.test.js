@@ -146,6 +146,7 @@ const mutedSmallTextSelectors = [
   '.task-row.is-complete .task-title',
   '.empty-state p',
   '.suggestion-empty',
+  '.suggestion-description',
   '.subtask-row.is-done .subtask-title',
   '.subtask-remove',
   '.subtask-empty',
