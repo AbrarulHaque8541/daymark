@@ -18,15 +18,15 @@ assert "private void openDownloadsFolder()" not in activity, \
     "the obsolete generic/system downloads destination must not shadow the in-app list"
 assert "manager.query(new DownloadManager.Query())" in method, \
     "the in-app list must query Android DownloadManager"
-assert "BrowserDownloadListPolicy.Collector(BrowserDownloadListPolicy.MAX_VISIBLE)" in method, \\
+assert "BrowserDownloadListPolicy.Collector(BrowserDownloadListPolicy.MAX_VISIBLE)" in method, \
     "the in-app list must retain only a bounded newest-download window"
-assert "DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP" in method, \\
+assert "DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP" in method, \
     "the list must use provider modification timestamps when available"
-assert "collector.add(new BrowserDownloadListPolicy.Item" in method, \\
+assert "collector.add(new BrowserDownloadListPolicy.Item" in method, \
     "provider rows must flow through the streaming bounded selector"
-assert "for (BrowserDownloadListPolicy.Item item : selection.items)" in method, \\
+assert "for (BrowserDownloadListPolicy.Item item : selection.items)" in method, \
     "the UI must render the selected newest-first bounded window"
-assert "Downloads (showing 100 most recent items)" in method, \\
+assert "Downloads (showing 100 most recent items)" in method, \
     "truncated history must disclose that the most recent items are shown"
 assert "No Daymark browser downloads are available yet." in method, \
     "the list must explain the empty state"
