@@ -162,6 +162,33 @@ test('existing log ID is deduplicated while expired session is cleared', () => {
   assert.equal(saved.log[0].id, session.id);
 });
 
+test('paused session remains paused and does not create a completion log', () => {
+  const start = Date.now() - 60_000;
+  const session = focus.createSession({ id: 'focus-paused-restore', kind: 'focus', durationMinutes: 1 }, start);
+  focus.pause(session, start + 30_000);
+  const original = rawFocusPayload(session);
+  const app = bootApp({ savedFocusValue: original });
+  const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
+
+  assert.equal(saved.session.state, 'paused');
+  assert.equal(saved.session.accumulatedMs, 30_000);
+  assert.equal(saved.log.length, 0);
+  assert.equal(app.storedValues.get(FOCUS_KEY), original, 'restoring a paused session should not rewrite it');
+});
+
+test('unexpired running session remains active across reload', () => {
+  const start = Date.now() - 30_000;
+  const session = expiredRunningSession('focus-running-restore', start);
+  const original = rawFocusPayload(session);
+  const app = bootApp({ savedFocusValue: original });
+  const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
+
+  assert.equal(saved.session.state, 'running');
+  assert.equal(saved.session.startedAtMs, start);
+  assert.equal(saved.log.length, 0);
+  assert.equal(app.storedValues.get(FOCUS_KEY), original, 'an unexpired running session should remain unchanged');
+});
+
 test('quota failure preserves original focus payload and recovery backup', () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-storage-failure', start);
