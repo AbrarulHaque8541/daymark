@@ -87,6 +87,7 @@ public final class TaskLogicSmoke {
         check(cases == 10, "shared recurrence contract contains all ten edge cases");
     }
 
+    private static void CRUDKeepsStableIdentityAndTimestamps() {
     Task created = TaskLogic.create("  Call the dentist  ", null, "medium");
         check("Call the dentist".equals(created.title), "new titles are trimmed");
         check(TaskLogic.isValid(created) && !created.completed, "new task has valid model fields");
