@@ -421,6 +421,12 @@ public final class TaskLogicSmoke {
                 Collections.<AttachmentRef>emptyList(), "", null, null, null,
                 TaskLogic.REPEAT_YEARLY, Integer.valueOf(28), Collections.<Subtask>emptyList());
         check(!TaskLogic.isValid(mismatchedYearlyAnchor), "yearly anchor must match due date except a preserved Feb 29 clamp");
+        Task shortYearLeapAnchor = new Task("short-year-leap-anchor", "Leap", "2025-02-28", "medium", false,
+                "2026-10-05T00:00:42Z", "2026-10-05T00:00:42Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_YEARLY, Integer.valueOf(29), Collections.<Subtask>emptyList());
+        check(TaskLogic.isValid(shortYearLeapAnchor),
+                "yearly Feb 29 anchor remains valid when its due date is clamped to Feb 28 in a non-leap year");
 
         ZoneId zone = ZoneId.of("UTC");
         Instant now = Instant.parse("2026-10-08T11:00:00Z");

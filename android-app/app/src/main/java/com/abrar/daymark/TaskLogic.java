@@ -394,14 +394,10 @@ final class TaskLogic {
     }
 
     /**
-     * Rolls a repeating task forward to its first occurrence strictly after now.
-     * Returns the same instance when nothing can advance: no rule, no due date,
-     * a still-future occurrence, or a bounded guard against runaway loops.
-     */
-    /**
-     * Rolls a repeating task to its first occurrence strictly after the reminder trigger.
-     * Calendar arithmetic avoids the former 3,660-iteration cap, so long-overdue
-     * daily/weekday/monthly/yearly tasks still recover to a future occurrence.
+     * Rolls a repeating task to its first occurrence strictly after the configured reminder trigger.
+     * Returns the same instance when there is no valid recurrence, the trigger is still
+     * future, or the next date cannot be represented. Calendar arithmetic avoids a fixed
+     * iteration cap for long-overdue daily, weekly, weekday, monthly, and yearly tasks.
      */
     static Task advanceRepeat(Task task, ZoneId zone, Instant now) {
         if (task == null || task.repeatRule == null || !isRepeatRule(task.repeatRule)
