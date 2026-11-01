@@ -44,6 +44,8 @@ final class BrowserDownloadTracker {
         }
 
         double progress() {
+            // Completion is definitive even when DownloadManager never reports a size.
+            if (status == Status.COMPLETED) return 1.0;
             if (totalBytes <= 0 || bytesDownloaded <= 0) return 0;
             return Math.min(1.0, (double) bytesDownloaded / (double) totalBytes);
         }
@@ -95,8 +97,10 @@ final class BrowserDownloadTracker {
         Entry e = entries.get(id);
         if (e == null) return;
         e.status = Status.COMPLETED;
-        e.bytesDownloaded = Math.max(0L, e.totalBytes);
-        Log.i(TAG, "download-completed id=" + id + " size=" + e.totalBytes);
+        // Never regress the observed byte count; total size may be unknown (0).
+        e.bytesDownloaded = Math.max(e.bytesDownloaded, e.totalBytes);
+        Log.i(TAG, "download-completed id=" + id + " size="
+                + (e.totalBytes > 0L ? Long.toString(e.totalBytes) : "unknown"));
     }
 
     synchronized void onFailure(long id, String reason) {
