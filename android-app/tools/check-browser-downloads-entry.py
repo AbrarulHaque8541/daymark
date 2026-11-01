@@ -22,8 +22,10 @@ assert "BrowserDownloadListPolicy.Collector(BrowserDownloadListPolicy.MAX_VISIBL
     "the in-app list must retain only a bounded newest-download window"
 assert "DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP" in method, \
     "the list must use provider modification timestamps when available"
-assert "collector.add(new BrowserDownloadListPolicy.Item" in method, \
-    "provider rows must flow through the streaming bounded selector"
+assert "collector.add(id, title, url, mime, status, reason," in method, \
+    "provider rows must flow through the allocation-conscious streaming selector"
+assert "BrowserDownloadListPolicy.Selection selection = collector.finish();" in method, \
+    "the provider scan must finish through the bounded collector"
 assert "for (BrowserDownloadListPolicy.Item item : selection.items)" in method, \
     "the UI must render the selected newest-first bounded window"
 assert "Downloads (showing 100 most recent items)" in method, \
@@ -53,7 +55,7 @@ assert "browserDownloadTracker.onCancel(id)" in handler, \
     "confirmed DownloadManager removal must be reflected in the tracker"
 print("PASS browser Downloads destination: in-app DownloadManager list, explicit empty state and refresh")
 
-# Work by: ChatGPT
+# Work by: ChatGPT (OpenAI)
 # Model: GPT-6
-# Tooling: GitHub MCP tools
-# Timestamp (UTC): 2026-10-09T17:44:30Z
+# Tooling: GitHub MCP repository contents and Actions logs
+# Timestamp (UTC): 2026-11-01T15:32:00Z
