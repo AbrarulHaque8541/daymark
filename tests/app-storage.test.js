@@ -17,7 +17,8 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   const listeners = new Map();
   const confirmMessages = [];
   let fileReadCount = 0;
-  const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue], [BACKUP_KEY, savedBackupValue]]);
+  const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
+  if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -321,13 +322,14 @@ test('opaque task recovery backup survives healthy primary load and later save',
   const existing = makeImportTask('existing-task', 'Existing task');
   const savedValue = JSON.stringify([existing]);
   const opaqueBackup = '{legacy recovery bytes that are not parseable JSON';
-  const app = bootApp({ savedValue, savedBackupValue: opaqueBackup });
+  const recoveryBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [opaqueBackup] });
+  const app = bootApp({ savedValue, savedBackupValue: recoveryBundle });
 
-  assert.equal(app.storedValues.get(BACKUP_KEY), opaqueBackup, 'healthy primary data must not erase opaque recovery material at startup');
+  assert.equal(app.storedValues.get(BACKUP_KEY), recoveryBundle, 'explicit recovery bundle must survive healthy primary data at startup');
   const incoming = JSON.stringify([makeImportTask('new-task', 'Imported task')]);
   triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
 
-  assert.equal(app.storedValues.get(BACKUP_KEY), opaqueBackup, 'a successful save must not clear an opaque recovery backup');
+  assert.equal(app.storedValues.get(BACKUP_KEY), recoveryBundle, 'a successful save must not clear an opaque payload inside a recovery bundle');
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
