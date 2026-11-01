@@ -356,7 +356,14 @@ enforce_offline = re.search(r"static void enforceOffline\(BrowserNetworkPolicy p
 assert load_address and "BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView)" in load_address.group(1), "only validated, tapped navigation may release WebView network blocking"
 assert load_address and load_address.group(1).index("prepareForExplicitNavigation") < load_address.group(1).index("browserWebView.loadUrl(address)"), "explicit navigation must be policy-checked before loadUrl"
 assert prepare_navigation and "!policy.allowsRemoteLoads()" in prepare_navigation.group(1) and "setBlockNetworkLoads(false)" in prepare_navigation.group(1), "controller must fail closed unless explicit Online consent exists"
-assert enforce_offline and "tab.stopLoading()" in enforce_offline.group(1) and "tab.getSettings().setBlockNetworkLoads(true)" in enforce_offline.group(1), "Offline transition must stop and block every retained tab"
+offline_enforcement = (main / "java/com/abrar/daymark/BrowserOfflineEnforcement.java").read_text(encoding="utf-8")
+daymark_webview = (main / "java/com/abrar/daymark/DaymarkWebView.java").read_text(encoding="utf-8")
+runner = (root / "tools/run-core-tests.sh").read_text(encoding="utf-8")
+assert enforce_offline and "BrowserOfflineEnforcement.enforceOffline(policy, tabs)" in enforce_offline.group(1), "Offline controller must delegate to the isolated enforcer"
+assert "interface Tab" in offline_enforcement and "tab.blockNetworkLoads(true)" in offline_enforcement and "tab.stopLoading()" in offline_enforcement, "Offline enforcer must independently attempt block and stop for every tab"
+assert offline_enforcement.count("catch (RuntimeException rendererUnavailable)") == 2, "Offline teardown must isolate both renderer failure points"
+assert "implements BrowserOfflineEnforcement.Tab" in daymark_webview and "blockNetworkLoads(boolean blocked)" in daymark_webview, "WebView must adapt to the platform-neutral Offline enforcer"
+assert "BrowserOfflineEnforcement.java" in runner and "BrowserOfflineEnforcementSmoke.java" in runner and "BrowserOfflineEnforcementSmoke" in runner, "Offline renderer regression smoke must run in canonical core tests"
 assert "BrowserWorkspaceController.enforceOffline(browserNetworkPolicy, browserTabs)" in online_setting.group(1), "Offline toggle must enforce policy before browser teardown"
 assert online_setting and "loadUrl(" not in online_setting.group(1) and "loadBrowserAddress(" not in online_setting.group(1), "enabling Online must not itself load or reload a page"
 assert load_address and "browserWebView.loadUrl(address)" in load_address.group(1), "active browsing must retain the full validated route/query"
