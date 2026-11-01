@@ -48,6 +48,8 @@ assert selection.index('setPositiveButton("Cancel download"') < selection.index(
     "DownloadManager.remove must occur only inside the confirmed callback"
 assert 'Download status unavailable. Refresh to check again.' in selection, \\
     "unknown provider states must not be mislabeled as paused"
+assert "the completed file will also be deleted" in selection, \\
+    "the UI must disclose DownloadManager.remove's completed-file deletion race"
 active_check = activity.split("private boolean isBrowserDownloadActive", 1)[1].split(
     "private void queueBrowserDownload", 1
 )[0]
