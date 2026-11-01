@@ -90,7 +90,7 @@ public final class BrowserDownloadTrackerSmoke {
 
         // Filename and failure metadata are untrusted; strip control/format characters and bound
         // retained text so Logcat/UI strings cannot be multiline or bidi-spoofed.
-        String hostileName = "report\u202E\nfinal\u0000" + "x".repeat(200) + ".pdf";
+        String hostileName = "report" + (char) 0x202E + "\\nfinal" + (char) 0 + "x".repeat(200) + ".pdf";
         BrowserDownloadTracker.Entry sanitized = tracker.start(
                 13L, "https://safe.example/file", hostileName);
         check(!sanitized.fileName.contains("\u202E")
@@ -100,7 +100,7 @@ public final class BrowserDownloadTrackerSmoke {
         check(sanitized.fileName.codePointCount(0, sanitized.fileName.length())
                         <= BrowserDownloadTracker.MAX_FILE_NAME_CHARS,
                 "filename must be bounded by code points");
-        String hostileReason = "failure\u202E\n" + "z".repeat(300);
+        String hostileReason = "failure" + (char) 0x202E + "\\n" + "z".repeat(300);
         tracker.onFailure(13L, hostileReason);
         check(sanitized.failureReason.codePointCount(0, sanitized.failureReason.length())
                         <= BrowserDownloadTracker.MAX_FAILURE_REASON_CHARS,
