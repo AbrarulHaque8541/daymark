@@ -73,6 +73,15 @@ public final class BrowserHistorySmoke {
                 "out-of-range port is rejected for Unicode hosts");
         check(BrowserHistory.sanitizeUrl("https://bücher.de:/") == null,
                 "empty explicit port is rejected for Unicode hosts");
+        check("https://xn--bcher-kva.de:65535".equals(
+                        BrowserHistory.sanitizeUrl("https://bücher.de:65535/")),
+                "maximum valid decimal TCP port survives IDN normalization");
+        check(BrowserHistory.sanitizeUrl("https://bücher.de:+443/") == null,
+                "signed explicit ports are rejected rather than parsed as decimal");
+        check(BrowserHistory.sanitizeUrl("https://bücher.de:-1/") == null,
+                "negative explicit ports are rejected");
+        check(BrowserHistory.sanitizeUrl("https://:443/") == null,
+                "empty DNS authority host is rejected");
         check(BrowserHistory.sanitizeUrl("https://" + "ü".repeat(64) + ".example/") == null,
                 "overlong IDN label is rejected");
         String deduped = BrowserHistory.add(
