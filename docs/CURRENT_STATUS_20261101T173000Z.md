@@ -45,7 +45,7 @@
 4. **P2 #325:** measured cross-platform/engine prototype; no speculative rewrite.
 
 ## Identity and safety
-- Root `AGENTS.md` and Gradle source approve installed identity `com.abrar.daymark`; the user's standing safety text says `com.cue.daymark`. This contradiction is unresolved. **No identity change made**.
+- Root `AGENTS.md` and live Gradle source approve the installed identity. A separate standing user safety instruction conflicts with that repository policy; owner reconciliation is required. No identity change made.
 - No release/tag/version bump, signing-key change, manifest permission change, schema migration, or destructive user-data action.
 - No force update/merge, branch-protection bypass, or physical-device acceptance claim.
 
