@@ -3897,8 +3897,53 @@ public final class MainActivity extends Activity {
                     .show();
             return;
         }
-        showToast("Download status: " + (status == DownloadManager.STATUS_PENDING ? "queued"
-                : status == DownloadManager.STATUS_RUNNING ? "downloading" : "paused") + ". Refresh to check again.");
+        if (status == DownloadManager.STATUS_PENDING
+                || status == DownloadManager.STATUS_RUNNING
+                || status == DownloadManager.STATUS_PAUSED) {
+            String state = status == DownloadManager.STATUS_PENDING ? "queued"
+                    : status == DownloadManager.STATUS_RUNNING ? "downloading" : "paused";
+            new AlertDialog.Builder(this)
+                    .setTitle("Cancel download?")
+                    .setMessage("This will cancel the " + state
+                            + " download and remove its partial file. This cannot be undone.")
+                    .setNegativeButton("Keep download", null)
+                    .setPositiveButton("Cancel download", (dialog, which) -> {
+                        // The row can finish while its dialog is open. Re-query before remove so a
+                        // stale "running" selection cannot delete a completed file.
+                        if (!isBrowserDownloadActive(manager, id)) {
+                            showToast("This download is no longer active. Refresh to check its status.");
+                            return;
+                        }
+                        int removed;
+                        try {
+                            removed = manager.remove(id);
+                        } catch (RuntimeException providerUnavailable) {
+                            removed = 0;
+                        }
+                        if (removed > 0) {
+                            showToast("Download cancelled and removed.");
+                        } else {
+                            showToast("Download could not be cancelled. Refresh to check its status.");
+                        }
+                    })
+                    .show();
+            return;
+        }
+        showToast("Download status unavailable. Refresh to check again.");
+    }
+
+    private boolean isBrowserDownloadActive(DownloadManager manager, long id) {
+        try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(id))) {
+            if (cursor == null || !cursor.moveToFirst()) return false;
+            int statusColumn = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
+            if (statusColumn < 0) return false;
+            int currentStatus = cursor.getInt(statusColumn);
+            return currentStatus == DownloadManager.STATUS_PENDING
+                    || currentStatus == DownloadManager.STATUS_RUNNING
+                    || currentStatus == DownloadManager.STATUS_PAUSED;
+        } catch (RuntimeException providerUnavailable) {
+            return false;
+        }
     }
 
     private void queueBrowserDownload(String url, String userAgent, String contentDisposition, String mimeType) {
