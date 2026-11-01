@@ -50,7 +50,8 @@ public final class BrowserDownloadListPolicySmoke {
         collector.add(item(2, 20));
         collector.add(item(100, 100));
         collector.add(item(7, 7));
-        collector.add(item(50, 50));
+        collector.add(50L, "Provider title", "https://example.test/metadata",
+                "application/pdf", 3, 4, 123L, 456L, 50L);
         collector.add(item(3, 30));
         BrowserDownloadListPolicy.Selection selection = collector.finish();
         check(selection.items.size() == 3 && selection.truncated,
@@ -59,6 +60,13 @@ public final class BrowserDownloadListPolicySmoke {
                         && selection.items.get(1).id == 50L
                         && selection.items.get(2).id == 3L,
                 "top-K selection is independent of cursor arrival order");
+        BrowserDownloadListPolicy.Item retained = selection.items.get(1);
+        check("Provider title".equals(retained.title)
+                        && "https://example.test/metadata".equals(retained.url)
+                        && "application/pdf".equals(retained.mimeType)
+                        && retained.status == 3 && retained.reason == 4
+                        && retained.downloaded == 123L && retained.total == 456L,
+                "primitive cursor overload preserves selected row metadata");
     }
 
     private static void timestampTiesUseStableDownloadIdOrder() {
