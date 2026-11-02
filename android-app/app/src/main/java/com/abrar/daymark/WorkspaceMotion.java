@@ -1,6 +1,7 @@
 package com.abrar.daymark;
 
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.provider.Settings;
 import android.view.View;
 import android.view.animation.Interpolator;
@@ -16,6 +17,7 @@ public final class WorkspaceMotion {
 
     private static final int ACCENT = 0xFF16705F;
     private static final int GLASS_ALPHA = 0x18; // ~9% for subtle glass
+    private static final int GLASS_COLOR = Color.argb(GLASS_ALPHA, Color.red(ACCENT), Color.green(ACCENT), Color.blue(ACCENT));
 
     private static boolean isReducedMotion(View view) {
         if (view == null || view.getContext() == null) return false;
@@ -29,11 +31,14 @@ public final class WorkspaceMotion {
         }
     }
 
-    /** Apply subtle glass background using accent tint. */
+    /** Apply subtle glass background using accent tint. Idempotent to avoid redundant work. */
     public static void applyGlassBackground(View view) {
         if (view == null) return;
-        int glass = Color.argb(GLASS_ALPHA, Color.red(ACCENT), Color.green(ACCENT), Color.blue(ACCENT));
-        view.setBackgroundColor(glass);
+        if (view.getBackground() instanceof ColorDrawable) {
+            ColorDrawable current = (ColorDrawable) view.getBackground();
+            if (current.getColor() == GLASS_COLOR) return;
+        }
+        view.setBackgroundColor(GLASS_COLOR);
     }
 
     /** Tasks ↔ Web content transition with subtle horizontal slide. */
