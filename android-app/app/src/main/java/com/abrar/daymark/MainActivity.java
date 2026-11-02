@@ -1754,6 +1754,7 @@ public final class MainActivity extends Activity {
         addTaskButton = compactButton("Add task", false);
         addTaskButton.setContentDescription("Add this task in the full editor with the captured text");
         addTaskButton.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             String draft = quickCaptureInput.getText() == null
                     ? "" : quickCaptureInput.getText().toString();
             showTaskEditor(null, draft);
