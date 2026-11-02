@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/focus-timer-emulator.yml"
       - "android-app/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/UiMotionPolicy.java"
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusSessionRuntime.java"
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerNotification.java"
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerStore.java"

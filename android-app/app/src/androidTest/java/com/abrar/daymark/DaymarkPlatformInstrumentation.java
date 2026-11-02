@@ -78,6 +78,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
             // Exercise the real Android Keystore, AtomicFile and NotificationManager on API 29 and 36 emulators.
             runPhase("focus-timer-keystore-notification-lifecycle", this::focusTimerKeystoreAndNotificationLifecycle);
+            runPhase("main-activity-tabs-transition", this::mainActivityTaskWebTransitionAndRapidToggle);
+            result.putString("main_activity_tabs_transition", "passed");
+            result.putInt("api_level", android.os.Build.VERSION.SDK_INT);
             marker("all phases passed; " + assertions + " assertions");
             result.putString("result", "passed");
             result.putInt("assertions", assertions);
@@ -117,6 +120,171 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     @FunctionalInterface
     private interface PhaseAction {
         void run() throws Exception;
+    }
+
+    /** Exercises actual bottom-nav taps and observable workspace changes on the API 29/36 CI matrix. */
+    private void mainActivityTaskWebTransitionAndRapidToggle() throws Exception {
+        int apiLevel = android.os.Build.VERSION.SDK_INT;
+        check(apiLevel == 29 || apiLevel == 36,
+                "MainActivity tab transition runs on API 29 or 36 (observed " + apiLevel + ")");
+
+        Activity activity = null;
+        try {
+            android.content.Intent launch = new android.content.Intent(getTargetContext(), MainActivity.class);
+            launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity = startActivitySync(launch);
+            check(activity instanceof MainActivity, "instrumentation launches the real MainActivity");
+            Activity mainActivity = activity;
+            android.view.View[] controls = new android.view.View[4];
+            long startupDeadline = android.os.SystemClock.uptimeMillis() + 10000L;
+            while (android.os.SystemClock.uptimeMillis() < startupDeadline) {
+                runOnMainSync(() -> {
+                    android.view.View root = mainActivity.getWindow().getDecorView();
+                    controls[0] = findViewByContentDescription(root, "Tasks page, selected.");
+                    controls[1] = findViewByContentDescription(
+                            root, "Web browser page. Switch to web browser and search.");
+                    controls[2] = findViewByContentDescription(root, "Browser address and search field");
+                    controls[3] = findViewByText(root, "Your tasks");
+                });
+                if (controls[0] != null && controls[1] != null && controls[2] != null && controls[3] != null) break;
+                android.os.SystemClock.sleep(50L);
+            }
+            check(controls[0] != null && controls[1] != null && controls[2] != null && controls[3] != null,
+                    "real MainActivity exposes Tasks/Web navigation and visible task/browser content anchors");
+
+            android.view.View tasksTab = controls[0];
+            android.view.View webTab = controls[1];
+            android.view.View browserAddress = controls[2];
+            android.view.View taskAnchor = controls[3];
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false,
+                    "fresh MainActivity starts on Tasks");
+
+            clickWorkspaceTab(webTab, "Tasks to Web");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, true,
+                    "Web tab makes browser content visible");
+            awaitMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, true, "Tasks to Web");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, true,
+                    "Web workspace remains selected after its transition window");
+
+            clickWorkspaceTab(tasksTab, "Web to Tasks");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false,
+                    "Tasks tab restores task content");
+            awaitMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false, "Web to Tasks");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false,
+                    "Tasks workspace remains selected after its transition window");
+
+            boolean[] webTasksWebClicks = new boolean[3];
+            runOnMainSync(() -> {
+                webTasksWebClicks[0] = webTab.performClick();
+                webTasksWebClicks[1] = tasksTab.performClick();
+                webTasksWebClicks[2] = webTab.performClick();
+            });
+            check(webTasksWebClicks[0] && webTasksWebClicks[1] && webTasksWebClicks[2],
+                    "rapid Web-Tasks-Web taps are accepted by the real navigation views");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, true,
+                    "rapid Web-Tasks-Web toggle leaves Web visible");
+            awaitMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, true,
+                    "rapid Web-Tasks-Web");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, true,
+                    "rapid Web-Tasks-Web toggle settles on Web without stale visibility");
+
+            boolean[] tasksWebTasksClicks = new boolean[3];
+            runOnMainSync(() -> {
+                tasksWebTasksClicks[0] = tasksTab.performClick();
+                tasksWebTasksClicks[1] = webTab.performClick();
+                tasksWebTasksClicks[2] = tasksTab.performClick();
+            });
+            check(tasksWebTasksClicks[0] && tasksWebTasksClicks[1] && tasksWebTasksClicks[2],
+                    "rapid Tasks-Web-Tasks taps are accepted by the real navigation views");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false,
+                    "rapid Tasks-Web-Tasks toggle leaves Tasks visible");
+            awaitMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false,
+                    "rapid Tasks-Web-Tasks");
+            checkMainActivityWorkspaceMode(taskAnchor, browserAddress, tasksTab, webTab, false,
+                    "rapid Tasks-Web-Tasks toggle settles on Tasks without stale visibility");
+        } finally {
+            if (activity != null && !activity.isFinishing()) {
+                Activity closingActivity = activity;
+                runOnMainSync(closingActivity::finish);
+                waitForIdleSync();
+            }
+        }
+    }
+
+    private android.view.View findViewByContentDescription(android.view.View root, String expected) {
+        CharSequence description = root.getContentDescription();
+        if (description != null && expected.contentEquals(description)) return root;
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                android.view.View match = findViewByContentDescription(group.getChildAt(index), expected);
+                if (match != null) return match;
+            }
+        }
+        return null;
+    }
+
+    private android.view.View findViewByText(android.view.View root, String expected) {
+        if (root instanceof android.widget.TextView) {
+            CharSequence text = ((android.widget.TextView) root).getText();
+            if (text != null && expected.contentEquals(text)) return root;
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                android.view.View match = findViewByText(group.getChildAt(index), expected);
+                if (match != null) return match;
+            }
+        }
+        return null;
+    }
+
+    private void clickWorkspaceTab(android.view.View tab, String transition) throws Exception {
+        AtomicBoolean clicked = new AtomicBoolean();
+        runOnMainSync(() -> clicked.set(tab.performClick()));
+        check(clicked.get(), transition + " tab click is accepted by the real MainActivity view");
+    }
+
+    private boolean mainActivityWorkspaceModeMatches(android.view.View taskAnchor, android.view.View browserAddress,
+            android.view.View tasksTab, android.view.View webTab, boolean webMode) throws Exception {
+        boolean[] shown = new boolean[4];
+        String[] descriptions = new String[2];
+        runOnMainSync(() -> {
+            shown[0] = taskAnchor.isShown();
+            shown[1] = browserAddress.isShown();
+            shown[2] = tasksTab.isShown();
+            shown[3] = webTab.isShown();
+            descriptions[0] = String.valueOf(tasksTab.getContentDescription());
+            descriptions[1] = String.valueOf(webTab.getContentDescription());
+        });
+        String expectedTasks = webMode
+                ? "Tasks page. Switch to tasks and dashboard." : "Tasks page, selected.";
+        String expectedWeb = webMode
+                ? "Web browser page, selected." : "Web browser page. Switch to web browser and search.";
+        return shown[0] == !webMode && shown[1] == webMode && shown[2] && shown[3]
+                && expectedTasks.equals(descriptions[0]) && expectedWeb.equals(descriptions[1]);
+    }
+
+    private void checkMainActivityWorkspaceMode(android.view.View taskAnchor, android.view.View browserAddress,
+            android.view.View tasksTab, android.view.View webTab, boolean webMode, String message) throws Exception {
+        check(mainActivityWorkspaceModeMatches(taskAnchor, browserAddress, tasksTab, webTab, webMode),
+                message + ": selected accessibility state and visible task/browser content match");
+    }
+
+    private void awaitMainActivityWorkspaceMode(android.view.View taskAnchor, android.view.View browserAddress,
+            android.view.View tasksTab, android.view.View webTab, boolean webMode, String transition) throws Exception {
+        long startedAt = android.os.SystemClock.uptimeMillis();
+        long transitionWindowEnds = startedAt + UiMotionPolicy.TAB_SWITCH_MS + 50L;
+        long deadline = startedAt + 2000L;
+        boolean settled = false;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            settled = mainActivityWorkspaceModeMatches(taskAnchor, browserAddress, tasksTab, webTab, webMode);
+            if (settled && android.os.SystemClock.uptimeMillis() >= transitionWindowEnds) break;
+            android.os.SystemClock.sleep(50L);
+        }
+        check(settled && android.os.SystemClock.uptimeMillis() >= transitionWindowEnds,
+                transition + " settles on the expected visible/accessibility state after the tab transition window");
     }
 
     private void reminderNotificationLifecycleUsesCurrentTaskState() throws Exception {

@@ -20,7 +20,12 @@ check("CONSUME_IME_INSETS = true" in POLICY, "the IME inset must be consumed")
 check("Math.max(systemBarsBottom, imeBottom)" in POLICY, "bottom padding must be the larger of system bars and the keyboard")
 android_ns = "{http://schemas.android.com/apk/res/android}"
 manifest_root = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
-activity = manifest_root.find("application/activity")
+# Locate MainActivity by name so declaration order (e.g. SplashActivity first) cannot break the contract.
+activity = None
+for candidate in manifest_root.findall("application/activity"):
+    if candidate.get(android_ns + "name") == ".MainActivity":
+        activity = candidate
+        break
 check(activity is not None, "MainActivity must be declared in the manifest")
 check(activity.get(android_ns + "windowSoftInputMode") == "adjustResize", "MainActivity must use adjustResize")
 check("if (Build.VERSION.SDK_INT >= 29)" in ACTIVITY and "Api29Window.relaxBarContrast(window);" in ACTIVITY,
