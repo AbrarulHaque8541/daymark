@@ -4,6 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
+python3 ./tools/check-ui-motion-wiring.py "$ROOT"
 sh ./tools/run-browser-address-notice-tests.sh
 python3 ./tools/check-browser-address-notice-integration.py
 sh ./tools/run-activity-request-code-tests.sh

@@ -6,6 +6,7 @@ import sys
 root = Path(sys.argv[1])
 activity = (root / "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
 policy = (root / "android-app/app/src/main/java/com/abrar/daymark/UiMotionPolicy.java").read_text(encoding="utf-8")
+workspace = (root / "android-app/app/src/main/java/com/abrar/daymark/WorkspaceMotion.java").read_text(encoding="utf-8")
 runner = (root / "android-app/tools/run-ui-motion-policy-tests.sh").read_text(encoding="utf-8")
 workflow = (root / ".github/workflows/android.yml").read_text(encoding="utf-8")
 
@@ -14,10 +15,12 @@ end = activity.find("private void setBrowserOnlineEnabled", start)
 if start < 0 or end < 0:
     raise SystemExit("FAIL: workspace transition method not found")
 method = activity[start:end]
-if "target.animate().cancel();" not in method:
-    raise SystemExit("FAIL: workspace transition must cancel a stale animator before resetting properties")
-if "setDuration(UiMotionPolicy.TAB_SWITCH_MS)" not in method:
-    raise SystemExit("FAIL: production workspace transition must use the shared motion duration")
+if "WorkspaceMotion.animateWorkspaceSwitch(" not in method:
+    raise SystemExit("FAIL: workspace transition must delegate to WorkspaceMotion.animateWorkspaceSwitch")
+if "target.animate().cancel();" not in workspace:
+    raise SystemExit("FAIL: WorkspaceMotion must cancel a stale animator before resetting properties")
+if "setDuration(UiMotionPolicy.TAB_SWITCH_MS)" not in workspace:
+    raise SystemExit("FAIL: WorkspaceMotion must use the shared motion duration")
 if "animateModeTransition(enabled);" not in activity:
     raise SystemExit("FAIL: setWebMode must invoke the transition")
 if "nowMs < expandStartedAtMs" not in policy:
