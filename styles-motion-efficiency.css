@@ -131,3 +131,18 @@
 @keyframes storage-pulse {
   50% { border-color: rgba(22, 112, 95, .45); }
 }
+
+/* Dark-mode glass skeleton matching empty-state professional depth (accent #16705f). */
+@media (prefers-color-scheme: dark) {
+  .skeleton-row {
+    background: linear-gradient(90deg,
+      rgba(26, 33, 40, .55) 0%,
+      rgba(22, 112, 95, .18) 40%,
+      rgba(26, 33, 40, .55) 80%);
+    border-color: rgba(22, 112, 95, .28);
+  }
+  .local-badge.is-checking {
+    background: rgba(26, 33, 40, .72);
+    border-color: rgba(22, 112, 95, .35);
+  }
+}
