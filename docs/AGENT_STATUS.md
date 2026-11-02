@@ -1,4 +1,4 @@
-- [Daymark whole-project engineering status — 2026-11-02T15:50:00Z](./CURRENT_STATUS_20261102T1550Z.md)
+- [Daymark whole-project engineering status — 2026-11-02T16:20:00Z](./CURRENT_STATUS_20261102T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-02T15:50:00Z](./CURRENT_STATUS_20261102T1550Z.md)
 - [Daymark whole-project engineering status — 2026-11-02T14:10:00Z](./CURRENT_STATUS_20261102T1410Z.md)
 - [Daymark whole-project engineering status — 2026-11-02T13:30:00Z](./CURRENT_STATUS_20261102T1330Z.md)
@@ -29,7 +29,7 @@
 
 1. Open the latest snapshot for context.
 2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
-3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they are current.
+3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they were current.
 
 ## Snapshot maintenance
 
