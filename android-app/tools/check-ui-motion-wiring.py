@@ -43,6 +43,8 @@ check("enteringWeb ? 1f : -1f" in WORKSPACE,
       "workspace slide direction must reverse between Tasks and Web")
 check("target.animate().cancel();" in WORKSPACE,
       "workspace transition must cancel stale target animators")
+check("isReducedMotion" in WORKSPACE and "ANIMATOR_DURATION_SCALE" in WORKSPACE,
+      "WorkspaceMotion must explicitly respect system reduced-motion (animator duration scale 0)")
 
 chrome_start = ACTIVITY.find("private void setBrowserChromeHidden(boolean hidden)")
 chrome_end = ACTIVITY.find("private void ", chrome_start + len("private void setBrowserChromeHidden(boolean hidden)"))
