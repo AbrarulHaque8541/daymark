@@ -52,6 +52,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -324,6 +325,7 @@ public final class MainActivity extends Activity {
     private Button browserBackButton;
     private Button browserForwardButton;
     private Button browserReloadButton;
+    private ProgressBar browserProgressBar;
     private LinearLayout bottomNavigationBar;
     private View navTasksTab;
     private View navWebTab;
@@ -2003,6 +2005,13 @@ public final class MainActivity extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         browserAddressBarView = buildBrowserAddressBar();
+        browserProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        browserProgressBar.setMax(100);
+        browserProgressBar.setProgress(0);
+        browserProgressBar.setVisibility(View.GONE);
+        browserProgressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF16705f));
+        browserProgressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x3316705f));
+        panel.addView(browserProgressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(3)));
         panel.addView(browserAddressBarView, bottomMargin(dp(5)));
         panel.setPadding(dp(8), dp(0), dp(8), dp(2));
 
@@ -2035,6 +2044,7 @@ public final class MainActivity extends Activity {
             if (browserWebView == null) return;
             if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) {
                 browserWebView.stopLoading();
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
             } else {
                 browserWebView.reload();
             }
@@ -2514,6 +2524,10 @@ public final class MainActivity extends Activity {
         lastBrowserAddress = address;
         browserLoadFailed = false;
         browserPageLoading = true;
+                if (browserProgressBar != null) {
+                    browserProgressBar.setProgress(0);
+                    browserProgressBar.setVisibility(View.VISIBLE);
+                }
         browserNavigationGeneration++;
         Log.i(BROWSER_LOG_TAG, "load requested: " + BrowserLogPolicy.redactedOrigin(address));
         browserDiagnostics.record(System.currentTimeMillis(), "load requested", address, null);
@@ -2555,6 +2569,10 @@ public final class MainActivity extends Activity {
         if (restored && BrowserAddress.isAllowedWebUrl(browserWebView.getUrl())) {
             lastBrowserAddress = browserWebView.getUrl();
             browserPageLoading = true;
+                if (browserProgressBar != null) {
+                    browserProgressBar.setProgress(0);
+                    browserProgressBar.setVisibility(View.VISIBLE);
+                }
             browserLoadFailed = false;
             persistLastBrowserAddress();
             scheduleBrowserLoadWatchdog(lastBrowserAddress);
@@ -2591,6 +2609,7 @@ public final class MainActivity extends Activity {
                         showBrowserStatus("Page stalled. Daymark is retrying once...");
                         try {
                             browserWebView.stopLoading();
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                             browserWebView.loadUrl(address);
                             // Re-arm without refreshing the recovery budget (bounded one retry).
                             stagedLoadWatchdog.onLoadRequested(address, false);
@@ -2601,6 +2620,7 @@ public final class MainActivity extends Activity {
                     }
                     StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
                     browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                     browserLoadFailed = true;
                     showBrowserStatus("Page is taking too long. Tap Retry to try again.");
                 }
@@ -2610,7 +2630,9 @@ public final class MainActivity extends Activity {
                             + BrowserLogPolicy.redactedOrigin(stageAddress));
                     browserDiagnostics.record(System.currentTimeMillis(), "watchdog timeout (no page callback)", stageAddress, null);
                     if (browserWebView != null) browserWebView.stopLoading();
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                     browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                     browserLoadFailed = true;
                     showBrowserRetryNotice("load-timeout", "Page load timed out",
                             "The page did not finish loading. You can retry the current HTTPS address.");
@@ -2673,6 +2695,10 @@ public final class MainActivity extends Activity {
                 resolveBrowserAddressNotice();
                 cancelBrowserLoadWatchdog();
                 browserPageLoading = true;
+                if (browserProgressBar != null) {
+                    browserProgressBar.setProgress(0);
+                    browserProgressBar.setVisibility(View.VISIBLE);
+                }
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page started", url, null);
                 showBrowserStatus("Loading page. Embedded resources may also make network requests.");
@@ -2699,6 +2725,7 @@ public final class MainActivity extends Activity {
                 cancelBrowserLoadWatchdog();
                 if (stagedLoadWatchdog != null) stagedLoadWatchdog.onPageFinished(url);
                 browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                 browserLoadFailed = false;
                 Log.i(BROWSER_LOG_TAG, "page finished: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page finished", url, null);
@@ -2711,6 +2738,7 @@ public final class MainActivity extends Activity {
             @Override public void onNavigationBlocked(String url) {
                 if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
                 browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                 cancelBrowserLoadWatchdog();
                 showBrowserNotice(nextBrowserNoticeId("navigation-blocked"),
                         "Navigation blocked", "Daymark only opens HTTPS pages. This link was not opened.",
@@ -2723,6 +2751,7 @@ public final class MainActivity extends Activity {
             @Override public void onOfflineNavigationBlocked() {
                 if (targetRef[0] == browserWebView) {
                     browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                     cancelBrowserLoadWatchdog();
                 }
                 postActivityCallback(() -> {
@@ -2736,6 +2765,7 @@ public final class MainActivity extends Activity {
             @Override public void onHttpNavigationBlocked(String url, boolean redirect) {
                 if (targetRef[0] == browserWebView) {
                     browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                     cancelBrowserLoadWatchdog();
                 }
                 String message = redirect
@@ -2756,6 +2786,7 @@ public final class MainActivity extends Activity {
                 cancelBrowserLoadWatchdog();
                 if (stagedLoadWatchdog != null) stagedLoadWatchdog.onReceivedError(failingUrl, errorCode, description);
                 browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                 browserLoadFailed = true;
                 if (errorCode == -1) {
                     showBrowserNotice(nextBrowserNoticeId("certificate-error"),
@@ -2806,6 +2837,14 @@ public final class MainActivity extends Activity {
                 exitBrowserFullscreen();
             }
 
+            @Override public void onProgressChanged(int progress) {
+                if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
+                if (browserProgressBar != null) {
+                    browserProgressBar.setProgress(progress);
+                    browserProgressBar.setVisibility(progress >= 100 ? View.GONE : View.VISIBLE);
+                }
+            }
+
             @Override public void onRendererGone() {
                 if (!isActivityCallbackCurrent()) return;
                 if (targetRef[0] != browserWebView) {
@@ -2817,6 +2856,7 @@ public final class MainActivity extends Activity {
                 }
                 String recoveryAddress = lastBrowserAddress;
                 browserPageLoading = false;
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                 Log.e(BROWSER_LOG_TAG, "renderer gone; discarding failed WebView");
                 browserDiagnostics.record(System.currentTimeMillis(), "renderer gone", lastBrowserAddress, null);
                 discardBrowserWebView(false);
@@ -3200,6 +3240,7 @@ public final class MainActivity extends Activity {
                         case 22:
                             if (browserWebView != null) {
                                 if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) browserWebView.stopLoading();
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
                                 else browserWebView.reload();
                             }
                             break;
