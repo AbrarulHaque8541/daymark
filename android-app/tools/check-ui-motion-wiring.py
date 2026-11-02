@@ -63,3 +63,10 @@ check(WORKSPACE.count("view.animate().cancel();") >= 2,
       "hide and show must cancel stale chrome animators before resetting properties")
 
 print(f"PASS UI motion integration source guard: {checks} assertions")
+
+# Additional assertion for reduced-motion path in WorkspaceMotion (added Cycle A 2026-11-02).
+MOTION = (ROOT / "app/src/main/java/com/abrar/daymark/WorkspaceMotion.java").read_text(encoding="utf-8")
+check("isReducedMotion" in MOTION, "WorkspaceMotion must implement isReducedMotion")
+check("Settings.Global.ANIMATOR_DURATION_SCALE" in MOTION, "reduced-motion must read ANIMATOR_DURATION_SCALE")
+check("if (isReducedMotion" in MOTION, "reduced-motion early-return must be present")
+print("PASS reduced-motion wiring assertions added")
