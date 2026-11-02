@@ -51,8 +51,8 @@ public final class TaskOpenExportSmoke {
                 "icsDateStamp renders the UTC basic-format instant");
         check("a\\\\b\\;c\\,d\\ne\\nf\\ng".equals(TaskOpenExport.icsEscapeText("a\\b;c,d\r\ne\nf\rg")),
                 "icsEscapeText escapes backslash, semicolon, comma and all newline forms");
-        check("\"a,b\"\"c\"\r\n".equals(TaskOpenExport.csvQuote("a,b\"c\r\n")),
-                "csvQuote wraps and doubles quotes only when needed");
+        check("\"a,b\"\"c\r\n\"".equals(TaskOpenExport.csvQuote("a,b\"c\r\n")),
+                "csvQuote wraps and doubles quotes only when needed, newlines inside the quotes");
         check("plain".equals(TaskOpenExport.csvQuote("plain")), "csvQuote leaves plain values untouched");
         check("a\\\\b\\*c".equals(TaskOpenExport.mdEscape("a\\b*c")), "mdEscape escapes backslash and asterisk");
         check("[{\"id\":\"s1\",\"title\":\"Step \\\"one\\\"\",\"done\":true}]"
@@ -62,7 +62,7 @@ public final class TaskOpenExportSmoke {
         check("\"\\u0001\"".equals(TaskOpenExport.jsonStringEscape("\u0001")),
                 "jsonStringEscape emits \\u00xx for control characters");
 
-        String longLine = repeat('x', 70) + repeat('\uD83C', 0) + "🎉".repeat(10) + repeat('y', 40);
+        String longLine = repeat('x', 70) + "🎉".repeat(10) + repeat('y', 40);
         List<String> folded = TaskOpenExport.foldLine(longLine);
         boolean allWithinLimit = true;
         for (String physical : folded) {
