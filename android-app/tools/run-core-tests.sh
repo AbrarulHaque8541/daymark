@@ -6,6 +6,7 @@ trap 'rm -rf "$BUILD_DIR"' EXIT HUP INT TERM
 python3 "$ROOT/tools/check-backup-rules.py"
 python3 "$ROOT/tools/check-task-template-source.py" "$ROOT"
 python3 "$ROOT/tools/check-splash-source.py" "$ROOT"
+python3 "$ROOT/tools/check-task-open-export.py" "$ROOT"
 javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/host-stubs/android/content/Context.java" \
   "$ROOT/tools/host-stubs/org/json/JSONObject.java" \
@@ -44,6 +45,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskTemplateLogic.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskSnapshotSchema.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/TaskSnapshotCodec.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/TaskOpenExport.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Subtask.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserExtension.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java" \
@@ -96,6 +98,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/NaturalLanguageTaskParseSmoke.java" \
   "$ROOT/tools/TaskListRenderGateSmoke.java" \
   "$ROOT/tools/TaskSnapshotCodecSmoke.java" \
+  "$ROOT/tools/TaskOpenExportSmoke.java" \
   "$ROOT/tools/BrowserExtensionSmoke.java" \
   "$ROOT/tools/BrowserHistorySmoke.java" \
   "$ROOT/tools/ActivityCallbackGateSmoke.java" \
@@ -143,6 +146,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ShareIntakeSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.NaturalLanguageTaskParseSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskListRenderGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSnapshotCodecSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskOpenExportSmoke "$ROOT/../contracts/task-export-fixture.json"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExtensionSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserHistorySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
