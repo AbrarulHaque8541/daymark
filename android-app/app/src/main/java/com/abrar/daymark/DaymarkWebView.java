@@ -26,6 +26,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
     interface Listener {
         void onPageStarted(String url);
         void onPageFinished(String url);
+        void onProgressChanged(int progress);
         void onNavigationBlocked(String url);
         void onOfflineNavigationBlocked();
         void onHttpNavigationBlocked(String url, boolean redirect);
@@ -410,6 +411,11 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         });
 
         setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onProgressChanged(WebView view, int newProgress) {
+                listener.onProgressChanged(newProgress);
+            }
+
             @Override
             public void onShowCustomView(View view, CustomViewCallback callback) {
                 if (fullscreenView != null) {

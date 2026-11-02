@@ -54,6 +54,7 @@ import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -307,6 +308,7 @@ public final class MainActivity extends Activity {
     private FrameLayout browserViewport;
     private View browserHomeView;
     private View browserAddressBarView;
+    private ProgressBar browserProgressBar;
     private BrowserAddressNoticeView browserAddressNoticeView;
     private HorizontalScrollView browserToolbarScroll;
     private Runnable browserChromeRestoreRunnable;
@@ -2004,6 +2006,17 @@ public final class MainActivity extends Activity {
         panel.setOrientation(LinearLayout.VERTICAL);
         browserAddressBarView = buildBrowserAddressBar();
         panel.addView(browserAddressBarView, bottomMargin(dp(5)));
+        browserProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        browserProgressBar.setMax(100);
+        browserProgressBar.setProgress(0);
+        browserProgressBar.setVisibility(View.GONE);
+        browserProgressBar.setContentDescription("Page loading progress");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            browserProgressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(palette.accent));
+            browserProgressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(palette.line));
+        }
+        panel.addView(browserProgressBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
         panel.setPadding(dp(8), dp(0), dp(8), dp(2));
 
         // Owner feedback (#222): the previous top row (Tasks | ‹ | › | ↻ | + | Site history |
@@ -2035,6 +2048,7 @@ public final class MainActivity extends Activity {
             if (browserWebView == null) return;
             if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) {
                 browserWebView.stopLoading();
+                if (browserProgressBar != null) browserProgressBar.setVisibility(View.GONE);
             } else {
                 browserWebView.reload();
             }
@@ -2673,6 +2687,10 @@ public final class MainActivity extends Activity {
                 resolveBrowserAddressNotice();
                 cancelBrowserLoadWatchdog();
                 browserPageLoading = true;
+                if (browserProgressBar != null) {
+                    browserProgressBar.setProgress(5);
+                    browserProgressBar.setVisibility(View.VISIBLE);
+                }
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page started", url, null);
                 showBrowserStatus("Loading page. Embedded resources may also make network requests.");
@@ -2684,6 +2702,10 @@ public final class MainActivity extends Activity {
 
             @Override public void onPageFinished(String url) {
                 if (!isActivityCallbackCurrent()) return;
+                if (browserProgressBar != null) {
+                    browserProgressBar.setProgress(100);
+                    browserProgressBar.setVisibility(View.GONE);
+                }
                 String safeHistoryUrl = BrowserHistory.sanitizeUrl(url);
                 if (browserNetworkPolicy.allowsRemoteLoads() && safeHistoryUrl != null) {
                     String current = browserPreferences.getString(BROWSER_HISTORY_KEY, "");
@@ -2804,6 +2826,14 @@ public final class MainActivity extends Activity {
 
             @Override public void onHideFullscreen() {
                 exitBrowserFullscreen();
+            }
+
+            @Override public void onProgressChanged(int progress) {
+                if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
+                if (browserProgressBar == null) return;
+                browserProgressBar.setProgress(progress);
+                browserProgressBar.setVisibility(progress >= 100 ? View.GONE : View.VISIBLE);
+                browserPageLoading = progress < 100;
             }
 
             @Override public void onRendererGone() {
