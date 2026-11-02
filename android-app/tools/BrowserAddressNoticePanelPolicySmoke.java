@@ -1,19 +1,38 @@
 package com.abrar.daymark;
 
-/** Host smoke for the pure address-notice panel layout policy. */
-final class BrowserAddressNoticePanelPolicySmoke {
+public final class BrowserAddressNoticePanelPolicySmoke {
     public static void main(String[] args) {
-        assertEquals(0, BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(0, 0, 0, 0, 0, 0));
-        assertEquals(0, BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(0, 100, -1, 10, 0, 0));
-        assertEquals(0, BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(0, 100, 95, 10, 0, 0));
-        assertEquals(80, BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(0, 100, 10, 10, 0, 0));
-        assertEquals(70, BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(0, 100, 10, 10, 5, 5));
-        assertEquals(50, BrowserAddressNoticePanelPolicy.fitContentHeightPx(50, 100));
-        assertEquals(100, BrowserAddressNoticePanelPolicy.fitContentHeightPx(200, 100));
-        System.out.println("PASS BrowserAddressNoticePanelPolicySmoke");
+        assert BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                100, 900, 140, 48, 4, 8) == 700;
+        assert BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                100, 900, 820, 48, 4, 8) == 20;
+        assert BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                100, 900, 850, 48, 4, 8) == 0 : "anchor below the visible frame has no room";
+        assert BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                100, 900, 90, 48, 4, 8) == 0 : "partly hidden anchor must not produce a clipped panel";
+        assert BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                900, 100, 140, 48, 4, 8) == 0 : "inverted visible frame has no room";
+        assert BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                100, 900, 200, 0, 4, 8) == 0 : "unmeasured anchor has no room";
+
+        assert BrowserAddressNoticePanelPolicy.fitContentHeightPx(240, 700) == 240;
+        assert BrowserAddressNoticePanelPolicy.fitContentHeightPx(900, 700) == 700;
+        assert BrowserAddressNoticePanelPolicy.fitContentHeightPx(100, 0) == 0;
+
+        expectIllegalArgument(() -> BrowserAddressNoticePanelPolicy.maxHeightBelowAnchorPx(
+                100, 900, 140, -1, 4, 8));
+        expectIllegalArgument(() -> BrowserAddressNoticePanelPolicy.fitContentHeightPx(-1, 700));
+        expectIllegalArgument(() -> BrowserAddressNoticePanelPolicy.fitContentHeightPx(1, -1));
+        System.out.println("PASS address notice panel height policy: visible space below anchor, clipping, and content caps");
     }
 
-    private static void assertEquals(int expected, int actual) {
-        if (expected != actual) throw new AssertionError(expected + " != " + actual);
+    private static void expectIllegalArgument(Runnable action) {
+        boolean rejected = false;
+        try {
+            action.run();
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        assert rejected : "invalid dimensions must be rejected";
     }
 }
