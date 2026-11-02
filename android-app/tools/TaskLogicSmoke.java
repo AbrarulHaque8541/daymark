@@ -566,8 +566,8 @@ public final class TaskLogicSmoke {
 
         check(TaskLogic.isRepeatRule(TaskLogic.REPEAT_WEEKDAYS) && TaskLogic.isRepeatRule(TaskLogic.REPEAT_YEARLY),
                 "weekday and yearly repeat rules are recognized");
-        Task weekdaysTask = TaskLogic.create("Weekday standup", "2026-10-30", "medium", "",
-                null, null, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        Task weekdaysTask = TaskLogic.create("Weekday standup", "2026-10-30", "medium", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
         check(TaskLogic.isValid(weekdaysTask) && TaskLogic.REPEAT_WEEKDAYS.equals(weekdaysTask.repeatRule)
                         && weekdaysTask.repeatDayOfMonth == null,
                 "a weekday repeat creates a valid task without a monthly anchor");
@@ -656,6 +656,6 @@ public final class TaskLogicSmoke {
                 cases++;
             }
         }
-        check(cases == 10, "shared recurrence contract fixture contains all ten cases");
+        check(cases == 12, "shared recurrence contract fixture contains all twelve cases");
     }
 }

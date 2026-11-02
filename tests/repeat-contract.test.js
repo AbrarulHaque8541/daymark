@@ -16,7 +16,7 @@ const cases = fs.readFileSync(fixturePath, 'utf8')
   });
 
 test('web recurrence matches the shared Android/web next-occurrence contract', () => {
-  assert.equal(cases.length, 10, 'the shared contract includes leap-year, month-end, weekday, and year-boundary cases');
+  assert.equal(cases.length, 12, 'shared contract covers leap years, ancient dates, month-end, weekdays, and year boundaries');
   for (const item of cases) {
     assert.equal(
       repeat.nextDueDate(item.dueDate, item.rule, item.dueDate, item.anchorDay),
