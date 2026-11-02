@@ -1,7 +1,7 @@
 # Daymark whole-project engineering status — 2026-11-03T04:30:00Z
 
 ## Current main
-- SHA: (to be updated after push)
+- SHA: 0d37e9b (restore complete styles.css + glass polish)
 - Open PRs: none
 - Source guards / CI: expected PASS after CSS restoration + glass polish
 
