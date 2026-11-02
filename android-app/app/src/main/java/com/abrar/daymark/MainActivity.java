@@ -1704,6 +1704,7 @@ public final class MainActivity extends Activity {
         Button searchTasksShortcut = compactButton("⌕ Search", false);
         searchTasksShortcut.setContentDescription("Expand task search by title and words");
         searchTasksShortcut.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             if (searchControlView == null) return;
             searchControlView.setVisibility(searchControlView.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
             if (searchControlView.getVisibility() == View.VISIBLE && searchInput != null) {
