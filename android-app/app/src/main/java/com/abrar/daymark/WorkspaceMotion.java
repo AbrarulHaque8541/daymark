@@ -1,5 +1,6 @@
 package com.abrar.daymark;
 
+import android.graphics.Color;
 import android.provider.Settings;
 import android.view.View;
 import android.view.animation.Interpolator;
@@ -8,9 +9,13 @@ import android.view.animation.Interpolator;
  * Shared workspace / chrome motion helpers driven by {@link UiMotionPolicy}.
  * Keeps MainActivity animate blocks small and consistent.
  * Explicitly respects system animator duration scale of 0 (reduced motion).
+ * Includes subtle glass polish using accent color with low alpha.
  */
 public final class WorkspaceMotion {
     private WorkspaceMotion() {}
+
+    private static final int ACCENT = 0xFF16705F;
+    private static final int GLASS_ALPHA = 0x18; // ~9% for subtle glass
 
     private static boolean isReducedMotion(View view) {
         if (view == null || view.getContext() == null) return false;
@@ -22,6 +27,13 @@ public final class WorkspaceMotion {
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    /** Apply subtle glass background using accent tint. */
+    public static void applyGlassBackground(View view) {
+        if (view == null) return;
+        int glass = Color.argb(GLASS_ALPHA, Color.red(ACCENT), Color.green(ACCENT), Color.blue(ACCENT));
+        view.setBackgroundColor(glass);
     }
 
     /** Tasks ↔ Web content transition with subtle horizontal slide. */
@@ -77,6 +89,7 @@ public final class WorkspaceMotion {
         if (view == null) return;
         view.animate().cancel();
         view.setVisibility(View.VISIBLE);
+        applyGlassBackground(view); // subtle glass polish
         if (isReducedMotion(view)) {
             view.setTranslationY(0f);
             view.setAlpha(1f);
