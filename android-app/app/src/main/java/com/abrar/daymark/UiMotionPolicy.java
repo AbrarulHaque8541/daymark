@@ -52,4 +52,14 @@ public final class UiMotionPolicy {
     public static float tabSlideFraction() {
         return 0.18f;
     }
+
+    /**
+     * Whether system reduced-motion / animator-scale is active.
+     * Pure policy returns false by default so host tests stay deterministic.
+     * Production callers in MainActivity should pass the real Accessibility or
+     * Settings.Global.ANIMATOR_DURATION_SCALE == 0 value.
+     */
+    public static boolean isReducedMotion() {
+        return false;
+    }
 }
