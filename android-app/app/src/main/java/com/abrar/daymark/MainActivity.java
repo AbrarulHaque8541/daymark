@@ -58,6 +58,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -310,6 +311,7 @@ public final class MainActivity extends Activity {
     private BrowserAddressNoticeView browserAddressNoticeView;
     private HorizontalScrollView browserToolbarScroll;
     private Runnable browserChromeRestoreRunnable;
+    private ProgressBar browserProgressBar;
     private boolean browserChromeHidden;
     private DaymarkWebView browserWebView;
     private final List<DaymarkWebView> browserTabs = new ArrayList<>();
@@ -2587,7 +2589,7 @@ public final class MainActivity extends Activity {
                             && browserSelfHealingPolicy.shouldRecover(address)) {
                         Log.w(BROWSER_LOG_TAG, "attempting one automatic recovery for stalled page");
                         browserDiagnostics.record(System.currentTimeMillis(), "automatic recovery retry", address, null);
-                        StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_ATTEMPTED, null);
+                        REMOVED_BY_META_TESTStartupDiagnostics.BROWSER_RECOVERY_ATTEMPTED, null);
                         showBrowserStatus("Page stalled. Daymark is retrying once...");
                         try {
                             browserWebView.stopLoading();
@@ -2596,10 +2598,10 @@ public final class MainActivity extends Activity {
                             stagedLoadWatchdog.onLoadRequested(address, false);
                             return;
                         } catch (RuntimeException failure) {
-                            StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_RETRY_FAILED, failure);
+                            REMOVED_BY_META_TESTStartupDiagnostics.BROWSER_RECOVERY_RETRY_FAILED, failure);
                         }
                     }
-                    StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
+                    REMOVED_BY_META_TESTStartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
                     browserPageLoading = false;
                     browserLoadFailed = true;
                     showBrowserStatus("Page is taking too long. Tap Retry to try again.");
@@ -2823,22 +2825,34 @@ public final class MainActivity extends Activity {
                 if (webMode && browserNetworkPolicy.allowsRemoteLoads()
                         && BrowserAddress.isAllowedWebUrl(recoveryAddress)
                         && browserSelfHealingPolicy.shouldRecover(recoveryAddress)) {
-                    StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_ATTEMPTED, null);
+                    REMOVED_BY_META_TESTStartupDiagnostics.BROWSER_RECOVERY_ATTEMPTED, null);
                     showBrowserStatus("The page stopped unexpectedly. Rebuilding the browser and retrying once...");
                     if (ensureBrowserWebView()) {
                         loadBrowserAddress(recoveryAddress);
                         return;
                     }
-                    StartupDiagnostics.record(StartupDiagnostics.BROWSER_RENDERER_RECREATE_FAILED,
+                    REMOVED_BY_META_TESTStartupDiagnostics.BROWSER_RENDERER_RECREATE_FAILED,
                             new IllegalStateException("A replacement WebView could not be created."));
                 }
                 if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
                 if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
                 if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
-                StartupDiagnostics.record(StartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
+                REMOVED_BY_META_TESTStartupDiagnostics.BROWSER_RECOVERY_EXHAUSTED, null);
                 browserDiagnostics.record(System.currentTimeMillis(), "renderer gone; automatic recovery budget spent", lastBrowserAddress, null);
                 browserLoadFailed = true;
                 showBrowserStatus("The page stopped unexpectedly. Automatic recovery was limited; tap Retry to try again.");
+            }
+
+            @Override public void onProgressChanged(int progress) {
+                if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
+                if (browserProgressBar == null) return;
+                if (progress >= 100) {
+                    browserProgressBar.setVisibility(View.GONE);
+                    browserProgressBar.setProgress(0);
+                } else {
+                    browserProgressBar.setVisibility(View.VISIBLE);
+                    browserProgressBar.setProgress(progress);
+                }
             }
         });
         targetRef[0] = browserWebView;
@@ -2859,6 +2873,19 @@ public final class MainActivity extends Activity {
         browserWebView.setVisibility(View.GONE);
         browserViewport.addView(browserWebView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (browserProgressBar == null) {
+            browserProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            browserProgressBar.setMax(100);
+            browserProgressBar.setProgress(0);
+            browserProgressBar.setVisibility(View.GONE);
+            int accent = palette.accent;
+            browserProgressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
+            browserProgressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(palette.line));
+            FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(3));
+            progressParams.gravity = Gravity.TOP;
+            browserViewport.addView(browserProgressBar, progressParams);
+        }
         browserTabs.add(browserWebView);
         browserTabQueries.put(browserWebView, browserLastSearchQuery);
         updateBrowserTabButton();
@@ -5167,7 +5194,7 @@ public final class MainActivity extends Activity {
                     portableSelectionPreserved = portableBackupManager.reconcileStartupImportUri(
                             loaded, attachmentStore, restoredSelection);
                     try { attachmentStore.cleanupOrphans(attachmentIds(loaded)); }
-                    catch (Exception exception) { StartupDiagnostics.record(StartupDiagnostics.ORPHAN_CLEANUP_FAILED, exception); }
+                    catch (Exception exception) { REMOVED_BY_META_TESTStartupDiagnostics.ORPHAN_CLEANUP_FAILED, exception); }
                     portableBackupManager.cleanupTransientFiles();
                 }
             } catch (Exception exception) {
@@ -8226,7 +8253,7 @@ public final class MainActivity extends Activity {
     private boolean deleteCreatedDocument(Uri uri) {
         try { return DocumentsContract.deleteDocument(getContentResolver(), uri); }
         catch (Exception exception) {
-            StartupDiagnostics.record(StartupDiagnostics.EXPORT_STAGE_CLEANUP_FAILED, exception);
+            REMOVED_BY_META_TESTStartupDiagnostics.EXPORT_STAGE_CLEANUP_FAILED, exception);
             return false;
         }
     }
@@ -9153,7 +9180,7 @@ public final class MainActivity extends Activity {
             }
             if (failure != null || (result != null && result.status == UpdaterCore.VerificationStatus.CANCELLED)) {
                 try { updaterRecoveryStore.clearIfNoVerifiedArtifact(release); }
-                catch (Exception exception) { StartupDiagnostics.record(StartupDiagnostics.UPDATER_RECOVERY_CLEAR_FAILED, exception); }
+                catch (Exception exception) { REMOVED_BY_META_TESTStartupDiagnostics.UPDATER_RECOVERY_CLEAR_FAILED, exception); }
             }
             final UpdaterCore.VerificationResult completedResult = result;
             final UpdaterCore.UpdateException completedFailure = failure;
@@ -9194,7 +9221,7 @@ public final class MainActivity extends Activity {
                     offerUnrecoverableArtifact(orphanedArtifacts.get(0));
                     return true;
                 }
-            } catch (IOException exception) { StartupDiagnostics.record(StartupDiagnostics.UPDATER_ARTIFACT_LIST_FAILED, exception); }
+            } catch (IOException exception) { REMOVED_BY_META_TESTStartupDiagnostics.UPDATER_ARTIFACT_LIST_FAILED, exception); }
             return false;
         }
         if (recoveryCheckRunning) return true;
@@ -9263,7 +9290,7 @@ public final class MainActivity extends Activity {
                 offerUnrecoverableArtifact(artifacts.get(0));
                 return;
             }
-        } catch (IOException exception) { StartupDiagnostics.record(StartupDiagnostics.UPDATER_ARTIFACT_LIST_FAILED, exception); }
+        } catch (IOException exception) { REMOVED_BY_META_TESTStartupDiagnostics.UPDATER_ARTIFACT_LIST_FAILED, exception); }
         if (recoveryPromptShowing) return;
         recoveryPromptShowing = true;
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -9440,7 +9467,7 @@ public final class MainActivity extends Activity {
         String version = "unknown";
         try {
             version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception exception) { StartupDiagnostics.record(StartupDiagnostics.PACKAGE_INFO_FAILED, exception); }
+        } catch (Exception exception) { REMOVED_BY_META_TESTStartupDiagnostics.PACKAGE_INFO_FAILED, exception); }
         String distributionDetails = BuildConfig.UPDATER_ENABLED
                 ? "GitHub sideload distribution: declares INTERNET and ACCESS_NETWORK_STATE for foreground checks and consented, Wi-Fi/mobile-choice downloads. Verified APKs can be saved for manual opening; Daymark does not launch an installer. The protected publisher release gate is closed."
                 : "Play distribution: no network or package-install permissions are declared. Tasks remain local and offline.";
@@ -9471,7 +9498,7 @@ public final class MainActivity extends Activity {
         String version = "unknown";
         try {
             version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception exception) { StartupDiagnostics.record(StartupDiagnostics.PACKAGE_INFO_FAILED, exception); }
+        } catch (Exception exception) { REMOVED_BY_META_TESTStartupDiagnostics.PACKAGE_INFO_FAILED, exception); }
         String report = "Daymark " + version + " | Android API " + Build.VERSION.SDK_INT
                 + " | theme " + themeLabel() + " | tasks " + tasks.size()
                 + " | encrypted storage " + (storageReady ? "ready" : "unavailable");

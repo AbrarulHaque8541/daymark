@@ -35,6 +35,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         void onShowFullscreen(View view, WebChromeClient.CustomViewCallback callback);
         void onHideFullscreen();
         void onRendererGone();
+        void onProgressChanged(int progress);
     }
 
     /**
@@ -437,6 +438,11 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 callback.invoke(origin, false, false);
+            }
+
+            @Override
+            public void onProgressChanged(WebView view, int newProgress) {
+                listener.onProgressChanged(newProgress);
             }
 
             @Override
