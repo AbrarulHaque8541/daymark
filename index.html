@@ -15,6 +15,7 @@
   <script src="focus-logic.js" defer></script>
   <script src="feed-logic.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="export-ui.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -120,7 +121,14 @@
             <input id="task-search" type="search" placeholder="Search your tasks…" autocomplete="off" aria-describedby="visible-count">
             <button class="tool-button clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
             <button class="tool-button" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart</button>
-            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
+            <label class="sr-only" for="export-format">Export format</label>
+      <select id="export-format" class="sort-select" aria-label="Choose export format">
+        <option value="json" selected>Backup (JSON)</option>
+        <option value="markdown">Markdown (.md)</option>
+        <option value="csv">CSV (.csv)</option>
+        <option value="ics">Calendar (.ics)</option>
+      </select>
+      <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
             <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
             <input id="import-file" type="file" accept="application/json,.json" hidden>
           </div>
