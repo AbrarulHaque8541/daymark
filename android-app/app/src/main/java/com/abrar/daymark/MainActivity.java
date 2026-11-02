@@ -1695,7 +1695,10 @@ public final class MainActivity extends Activity {
         quickActions.setGravity(Gravity.CENTER_VERTICAL);
         Button addTaskShortcut = compactButton("+ Task", false);
         addTaskShortcut.setContentDescription("Open the task editor to create a task with date, priority, notes and other options");
-        addTaskShortcut.setOnClickListener(view -> showTaskEditor(null, ""));
+        addTaskShortcut.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            showTaskEditor(null, "");
+        });
         quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button searchTasksShortcut = compactButton("⌕ Search", false);
