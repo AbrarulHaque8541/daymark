@@ -17,3 +17,4 @@ output="$(adb shell am instrument -w -r "$instrumentation" 2>&1)" || {
 }
 printf '%s\n' "$output"
 printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: result=passed'
+printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: main_activity_tabs_transition=passed'
