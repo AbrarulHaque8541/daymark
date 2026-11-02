@@ -292,7 +292,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 
 /* Focus timer card */
-.focus-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); }
+.focus-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 .focus-card[hidden] { display: none; }
 .focus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .focus-header h3 { margin: 0; font-size: 14px; }
@@ -303,7 +303,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .focus-controls { display: flex; justify-content: center; gap: 8px; }
 .focus-task-select { width: 100%; height: 36px; margin-bottom: 10px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 10px; background: rgba(255, 255, 255, .75); padding: 0 10px; font-size: 12px; }
 @media (prefers-color-scheme: dark) {
-  .focus-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
+  .focus-card { border-color: rgba(22, 112, 95, .28); background: rgba(26, 58, 50, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
   .focus-preset { color: #9aa6af; }
   .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .focus-task-select { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }

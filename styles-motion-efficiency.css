@@ -60,7 +60,9 @@
 }
 .button-primary::after,
 .card::after,
-.task-row::after {
+.task-row::after,
+.focus-card::after,
+.briefing-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -72,7 +74,9 @@
 }
 .button-primary:hover::after,
 .card:hover::after,
-.task-row:hover::after {
+.task-row:hover::after,
+.focus-card:hover::after,
+.briefing-card:hover::after {
   opacity: 1;
 }
 
