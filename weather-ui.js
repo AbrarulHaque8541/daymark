@@ -43,6 +43,15 @@
         if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
           buttonEl.classList.toggle('is-busy', isBusy);
         }
+        // Accessibility: expose busy state to assistive tech and restore label.
+        if (typeof buttonEl.setAttribute === 'function') {
+          buttonEl.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+          if (isBusy) {
+            buttonEl.setAttribute('aria-label', 'Refreshing…');
+          } else if (typeof buttonEl.removeAttribute === 'function') {
+            buttonEl.removeAttribute('aria-label');
+          }
+        }
       }
     }
 
