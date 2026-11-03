@@ -16,6 +16,8 @@
   <script src="feed-logic.js" defer></script>
   <script src="weather-logic.js" defer></script>
   <script src="weather-ui.js" defer></script>
+  <script src="currency-logic.js" defer></script>
+  <script src="currency-ui.js" defer></script>
   <script src="app.js" defer></script>
   <script src="export-ui.js" defer></script>
 </head>
@@ -36,8 +38,7 @@
       <header class="topbar">
         <div class="workspace-label"><span class="status-dot" aria-hidden="true"></span> Personal workspace</div>
         <div class="topbar-right">
-          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite"><sv
-g viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
+          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
         </div>
       </header>
 
@@ -68,8 +69,7 @@ g viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 
           <label class="sr-only" for="new-reminder">Reminder (optional)</label>
           <select id="new-reminder" name="reminder" aria-label="Reminder (optional)" disabled>
             <option value="">No reminder</option>
-            <option value="0">Remind at due time</opt
-ion>
+            <option value="0">Remind at due time</option>
             <option value="30">30 min before</option>
             <option value="60">1 hour before</option>
             <option value="1440">1 day before</option>
@@ -104,8 +104,7 @@ ion>
           <div class="section-heading">
             <div><p class="eyebrow">YOUR LIST</p><h2 id="tasks-heading">Tasks</h2></div>
             <div class="section-heading-tools">
-              <sp
-an class="task-total" id="visible-count">0 tasks</span>
+              <span class="task-total" id="visible-count">0 tasks</span>
               <button class="clear-completed" id="clear-completed" type="button" hidden>Clear completed</button>
             </div>
           </div>
@@ -125,8 +124,7 @@ an class="task-total" id="visible-count">0 tasks</span>
             <label class="sr-only" for="task-search">Search tasks by title</label>
             <input id="task-search" type="search" placeholder="Search your tasks…" autocomplete="off" aria-describedby="visible-count">
             <button class="tool-button clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
-            <button class="tool-but
-ton" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart</button>
+            <button class="tool-button" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart</button>
             <label class="sr-only" for="export-format">Export format</label>
       <select id="export-format" class="sort-select" aria-label="Choose export format">
         <option value="json" selected>Backup (JSON)</option>
@@ -154,8 +152,7 @@ ton" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart
           <p class="storage-note"><span class="storage-dot" aria-hidden="true"></span> This prototype stores tasks only in this browser — no account or cross-device sync.</p>
         </section>
 
-        <div cla
-ss="side-column">
+        <div class="side-column">
         <aside class="suggestion-card" aria-labelledby="suggestion-title">
           <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span><span class="demo-label">DEMO SUGGESTION</span></div>
           <h2 id="suggestion-title">A good place to begin</h2>
@@ -178,8 +175,7 @@ ss="side-column">
             <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
             <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
           </div>
-          <label class="
-field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
+          <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
           <select id="focus-task"><option value="">No task</option></select>
           <div class="focus-actions">
             <button class="button button-primary" id="focus-start" type="button">Start</button>
@@ -212,6 +208,72 @@ field-label" for="focus-task">Link to an open task <span>(optional)</span></labe
           </form>
           <p class="weather-status" id="weather-status" role="status" aria-live="polite"></p>
           <div class="weather-now" id="weather-now" aria-live="polite"></div>
+        </aside>
+        <aside class="currency-card" id="currency-card" aria-labelledby="currency-heading">
+          <div class="currency-topline"><span class="currency-dot" aria-hidden="true"></span><span class="demo-label">CURRENCY GLANCE</span></div>
+          <h2 id="currency-heading">Quick currency check</h2>
+          <p class="currency-description">Convert any amount between common currencies using the free Frankfurter API (European Central Bank reference rates) — no account, no API key. Fetched only when you tap Refresh; the last rate is cached here and stays readable offline.</p>
+          <form id="currency-form" class="feed-form" novalidate>
+            <label class="sr-only" for="currency-amount">Amount</label>
+            <input id="currency-amount" name="amount" type="text" inputmode="decimal" maxlength="12" placeholder="Amount, e.g. 10" autocomplete="off" aria-describedby="currency-status">
+            <label class="sr-only" for="currency-from">From currency</label>
+            <select id="currency-from" name="from" aria-label="From currency">
+            <option value="USD" selected>USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="INR">INR — Indian Rupee</option>
+            <option value="JPY">JPY — Japanese Yen</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="CAD">CAD — Canadian Dollar</option>
+            <option value="CHF">CHF — Swiss Franc</option>
+            <option value="CNY">CNY — Chinese Yuan</option>
+            <option value="SGD">SGD — Singapore Dollar</option>
+            <option value="HKD">HKD — Hong Kong Dollar</option>
+            <option value="NZD">NZD — New Zealand Dollar</option>
+            <option value="SEK">SEK — Swedish Krona</option>
+            <option value="NOK">NOK — Norwegian Krone</option>
+            <option value="DKK">DKK — Danish Krone</option>
+            <option value="PLN">PLN — Polish Zloty</option>
+            <option value="CZK">CZK — Czech Koruna</option>
+            <option value="HUF">HUF — Hungarian Forint</option>
+            <option value="ILS">ILS — Israeli Shekel</option>
+            <option value="MXN">MXN — Mexican Peso</option>
+            <option value="BRL">BRL — Brazilian Real</option>
+            <option value="ZAR">ZAR — South African Rand</option>
+            <option value="KRW">KRW — South Korean Won</option>
+            <option value="THB">THB — Thai Baht</option>
+            </select>
+            <label class="sr-only" for="currency-to">To currency</label>
+            <select id="currency-to" name="to" aria-label="To currency">
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="INR" selected>INR — Indian Rupee</option>
+            <option value="JPY">JPY — Japanese Yen</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="CAD">CAD — Canadian Dollar</option>
+            <option value="CHF">CHF — Swiss Franc</option>
+            <option value="CNY">CNY — Chinese Yuan</option>
+            <option value="SGD">SGD — Singapore Dollar</option>
+            <option value="HKD">HKD — Hong Kong Dollar</option>
+            <option value="NZD">NZD — New Zealand Dollar</option>
+            <option value="SEK">SEK — Swedish Krona</option>
+            <option value="NOK">NOK — Norwegian Krone</option>
+            <option value="DKK">DKK — Danish Krone</option>
+            <option value="PLN">PLN — Polish Zloty</option>
+            <option value="CZK">CZK — Czech Koruna</option>
+            <option value="HUF">HUF — Hungarian Forint</option>
+            <option value="ILS">ILS — Israeli Shekel</option>
+            <option value="MXN">MXN — Mexican Peso</option>
+            <option value="BRL">BRL — Brazilian Real</option>
+            <option value="ZAR">ZAR — South African Rand</option>
+            <option value="KRW">KRW — South Korean Won</option>
+            <option value="THB">THB — Thai Baht</option>
+            </select>
+            <button class="button button-primary currency-refresh" id="currency-refresh" type="submit">Refresh</button>
+          </form>
+          <p class="currency-status" id="currency-status" role="status" aria-live="polite"></p>
+          <div class="currency-now" id="currency-now" aria-live="polite"></div>
         </aside>
         </div>
       </div>
