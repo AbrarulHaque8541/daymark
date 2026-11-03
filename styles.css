@@ -405,3 +405,111 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 @media (prefers-color-scheme: dark) {
   .skeleton-row { border-color: #2c3640; background: linear-gradient(100deg, rgba(26, 33, 40, .65) 32%, rgba(26, 58, 50, .85) 50%, rgba(26, 33, 40, .65) 68%); background-size: 220% 100%; }
 }
+
+/* ---------- Currency glance card ---------- */
+.currency-card {
+  position: relative;
+  margin-top: 18px;
+  border: 1px solid rgba(22, 112, 95, 0.18);
+  border-radius: 18px;
+  padding: 22px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(242, 245, 247, 0.78));
+  box-shadow: 0 18px 40px rgba(15, 26, 32, 0.10);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+.currency-card::before {
+  content: "";
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(22, 112, 95, 0.16), transparent 70%);
+  pointer-events: none;
+}
+
+.currency-topline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.currency-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #16705f;
+  box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.18);
+}
+
+.currency-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.currency-description {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted-text);
+}
+
+.currency-card .feed-form {
+  display: grid;
+  gap: 10px;
+}
+
+.currency-card .feed-form select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 26, 32, 0.14);
+  background: rgba(255, 255, 255, 0.85);
+  font: inherit;
+  color: inherit;
+}
+
+.currency-status {
+  margin: 12px 0 0;
+  min-height: 1.2em;
+  font-size: 0.8rem;
+  color: var(--muted-text);
+}
+
+.currency-now { padding: 10px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.currency-now:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
+.currency-now:empty {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .currency-card {
+    border-color: rgba(125, 224, 203, 0.14);
+    background: linear-gradient(160deg, rgba(24, 31, 37, 0.92), rgba(14, 18, 22, 0.85));
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .currency-dot {
+    box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.28);
+  }
+
+  .currency-card .feed-form select {
+    border-color: rgba(125, 224, 203, 0.16);
+    background: rgba(14, 18, 22, 0.7);
+  }
+
+  .currency-now {
+    border-color: #2c3640;
+    background: rgba(26, 33, 40, .65);
+    color: #e8eef2;
+  }
+
+  .currency-now:hover {
+    border-color: rgba(42, 143, 122, .5);
+  }
+}
