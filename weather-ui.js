@@ -40,7 +40,17 @@
       busy = isBusy;
       if (buttonEl) {
         buttonEl.disabled = isBusy;
-        buttonEl.classList.toggle('is-busy', isBusy);
+        // classList may be absent in host/node test doubles; guard before use.
+        if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
+          buttonEl.classList.toggle('is-busy', isBusy);
+        }
+        // Expose busy state to assistive tech while the fetch is in flight.
+        if (typeof buttonEl.setAttribute === 'function') {
+          if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
+          else if (typeof buttonEl.removeAttribute === 'function') {
+            buttonEl.removeAttribute('aria-busy');
+          }
+        }
       }
     }
 
