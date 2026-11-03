@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -80,6 +81,16 @@
     function persistCache(cache) {
       if (!storage || typeof storage.setItem !== 'function') return;
       storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    }
+
+    function updateLive() {
+      if (!currencyApi || !cached) return;
+      const { amountText, from, to } = readInputs();
+      const amount = currencyApi.normalizeAmount(amountText);
+      if (amount === null || !from || !to || from === to) return;
+      if (cached.from === from && cached.to === to) {
+        render(cached, amount);
+      }
     }
 
     async function onRefresh() {
@@ -140,6 +151,24 @@
 
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
+    }
+    if (amountEl && typeof amountEl.addEventListener === 'function') {
+      amountEl.addEventListener('input', updateLive);
+    }
+    if (fromEl && typeof fromEl.addEventListener === 'function') {
+      fromEl.addEventListener('change', updateLive);
+    }
+    if (toEl && typeof toEl.addEventListener === 'function') {
+      toEl.addEventListener('change', updateLive);
+    }
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', () => {
+        if (!fromEl || !toEl) return;
+        const tmp = fromEl.value;
+        fromEl.value = toEl.value;
+        toEl.value = tmp;
+        updateLive();
+      });
     }
 
     return {
