@@ -127,6 +127,16 @@
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
 
+    // Enter on the place field starts the same refresh (keyboard efficiency).
+    if (inputEl && typeof inputEl.addEventListener === 'function') {
+      inputEl.addEventListener('keydown', (event) => {
+        if (event && (event.key === 'Enter' || event.keyCode === 13)) {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          onRefresh();
+        }
+      });
+    }
+
     return {
       onRefresh,
       readCache,
