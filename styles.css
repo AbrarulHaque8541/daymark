@@ -375,6 +375,26 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .focus-progress { background: rgba(22, 112, 95, .18); border-color: rgba(22, 112, 95, .22); }
 }
 
+/* Weather glance card (Open-Meteo, keyless) */
+.weather-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.weather-card[hidden] { display: none; }
+.weather-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.weather-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
+.weather-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
+.weather-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
+.weather-card .feed-form input { font-size: 12px; }
+.weather-status { min-height: 16px; margin: 9px 0 4px; color: var(--muted-text); font-size: 10px; }
+.weather-now { padding: 10px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.weather-now:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
+.weather-now:empty { display: none; }
+@media (prefers-color-scheme: dark) {
+  .weather-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
+  .weather-description { color: var(--muted-text); }
+  .weather-status { color: var(--muted-text); }
+  .weather-now { border-color: #2c3640; background: rgba(26, 33, 40, .65); color: #e8eef2; }
+  .weather-now:hover { border-color: rgba(42, 143, 122, .5); }
+}
+
 
 /* Initial task-list skeleton shimmer (restored polish, reduced-motion safe) */
 .task-list-skeleton { display: grid; gap: 8px; }
