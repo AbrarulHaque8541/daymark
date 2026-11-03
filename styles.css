@@ -354,6 +354,10 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 .focus-card { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 .focus-card:hover { border-color: rgba(22, 112, 95, .35); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px rgba(22, 112, 95, .08); }
+.focus-card.is-running {
+  border-color: rgba(22, 112, 95, .45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 0 0 1px rgba(22, 112, 95, .12);
+}
 .focus-card.is-running .focus-dot {
   animation: focus-dot-pulse 1.8s ease-in-out infinite;
 }

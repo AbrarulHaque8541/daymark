@@ -1534,13 +1534,24 @@
     }
     // Small improvement: keep browser tab title in sync with running timer
     // so the user can see remaining time without switching back.
+    // Also set an accessible label on the clock so assistive tech can announce
+    // remaining time on demand without flooding live regions every second.
     // Guarded so host/node tests without a full document do not throw.
     if (typeof document !== 'undefined' && document.title != null) {
       if (session && session.state === 'running') {
         const remaining = focus.formatClock(focus.remainingMs(session, now));
         document.title = `${remaining} · Daymark Focus`;
-      } else if (document.title.includes('· Daymark Focus')) {
+      } else if (document.title.includes('· Daymark Focus') && !document.title.startsWith('Complete')) {
         document.title = 'Daymark — personal tasks';
+      }
+    }
+    if (timeEl && typeof timeEl.setAttribute === 'function') {
+      if (session) {
+        const remaining = focus.formatClock(focus.remainingMs(session, now));
+        const stateWord = session.state === 'paused' ? 'Paused' : (session.kind === 'focus' ? 'Focusing' : 'On break');
+        timeEl.setAttribute('aria-label', `${stateWord}, ${remaining} remaining`);
+      } else {
+        timeEl.removeAttribute('aria-label');
       }
     }
   }
@@ -1611,6 +1622,18 @@
     stopFocusTimer();
     renderFocus();
     render();
+    // Brief completion title so the tab shows success even if the user is in another window.
+    // Cleared after a short delay so it does not linger. Guarded for tests.
+    if (completed && typeof document !== 'undefined' && document.title != null) {
+      document.title = 'Complete · Daymark Focus';
+      if (typeof setTimeout === 'function') {
+        setTimeout(() => {
+          if (document.title === 'Complete · Daymark Focus') {
+            document.title = 'Daymark — personal tasks';
+          }
+        }, 4000);
+      }
+    }
     if (entry) {
       const minutes = Math.max(1, Math.round(entry.elapsedMs / 60000));
       showToast(saved
