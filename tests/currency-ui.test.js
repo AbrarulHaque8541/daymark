@@ -13,6 +13,7 @@ const RATES_BODY = JSON.stringify({
 });
 
 function fakeElement(tag) {
+  const classes = new Set();
   return {
     tagName: tag,
     id: '',
@@ -20,6 +21,16 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
+    classList: {
+      toggle(name, force) {
+        if (force === true) classes.add(name);
+        else if (force === false) classes.delete(name);
+        else classes.has(name) ? classes.delete(name) : classes.add(name);
+        return classes.has(name);
+      },
+      contains(name) { return classes.has(name); }
+    },
+    setAttribute(name, value) { this[name] = value; },
     addEventListener(type, handler) { this.listeners.push({ type, handler }); }
   };
 }
@@ -172,4 +183,3 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.DEFAULT_TO, 'INR');
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
-
