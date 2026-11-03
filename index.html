@@ -131,6 +131,19 @@
           <p class="feed-status" id="feed-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="feed-list" aria-live="polite"></div>
         </aside>
+
+        <aside class="weather-card" id="weather-card" aria-labelledby="weather-heading">
+          <div class="weather-topline"><span class="weather-dot" aria-hidden="true"></span><span class="demo-label">WEATHER GLANCE</span></div>
+          <h2 id="weather-heading">Weather for today</h2>
+          <p class="weather-description">Current conditions for any place, from the free Open-Meteo public API — no account, no API key, no data leaving this device beyond the place name you type. Fetched only when you tap Refresh; the last result is cached here and stays readable offline.</p>
+          <form id="weather-form" class="feed-form" novalidate>
+            <label class="sr-only" for="weather-place">Place name</label>
+            <input id="weather-place" name="place" type="text" maxlength="80" placeholder="City, e.g. Kolkata" autocomplete="off">
+            <button class="button button-primary weather-refresh" id="weather-refresh" type="button">Refresh</button>
+          </form>
+          <p class="weather-status" id="weather-status" role="status" aria-live="polite"></p>
+          <div class="weather-now" id="weather-now" aria-live="polite"></div>
+        </aside>
         </div>
       </div>
       <footer class="page-footer"><span>DAYMARK <span aria-hidden="true">·</span> PERSONAL TASKS</span><span>Made for a calmer kind of productive.</span></footer>
@@ -182,6 +195,8 @@
   <script src="feed-logic.js"></script>
   <script src="export-logic.js"></script>
   <script src="export-ui.js"></script>
+  <script src="weather-logic.js"></script>
+  <script src="weather-ui.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
