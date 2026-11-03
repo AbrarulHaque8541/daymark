@@ -144,6 +144,7 @@
   position: relative;
   pointer-events: none;
   opacity: 0.9;
+  padding-left: 28px;
 }
 .button.is-busy::before,
 .feed-refresh.is-busy::before,
