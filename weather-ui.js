@@ -1,1 +1,149 @@
-PLACEHOLDER_WILL_FAIL
+/*
+ * Daymark weather glance UI wiring for the web prototype.
+ *
+ * A small offline-first card: the user types a place name and taps Refresh;
+ * the current conditions come from the keyless Open-Meteo public API and the
+ * last successful result stays cached on this device, so the card keeps
+ * working offline with a "cached" note. Nothing ever refreshes on its own —
+ * no polling, no timers, no battery drain. Mirrors the export-ui.js module
+ * style: attachWeatherUi(env) is fully injectable for unit tests.
+ */
+((root) => {
+  'use strict';
+
+  const STORAGE_KEY = 'daymark.weather.v1';
+
+  function attachWeatherUi(env) {
+    if (!env || !env.document) throw new Error('attachWeatherUi requires a document.');
+    const doc = env.document;
+    const win = env.window || root;
+    const storage = env.localStorage || (win && win.localStorage) || null;
+    const weatherApi = env.weatherApi || root.DaymarkWeather || null;
+    const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
+    const fetchImpl = env.fetch
+      || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
+
+    const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
+    const inputEl = element('weather-place');
+    const buttonEl = element('weather-refresh');
+    const statusEl = element('weather-status');
+    const nowEl = element('weather-now');
+
+    let busy = false;
+    let cached = null;
+
+    function status(message) {
+      if (statusEl) statusEl.textContent = message;
+    }
+
+    function render(cache) {
+      if (!nowEl || !cache) return;
+      const place = cache.place;
+      const weather = cache.weather;
+      const placeLine = place.country ? `${place.name}, ${place.country}` : place.name;
+      nowEl.textContent = `${placeLine} · ${Math.round(weather.temperatureC)}°C · ${weather.label}`
+        + ` · Feels ${Math.round(weather.feelsLikeC)}°C · Wind ${Math.round(weather.windKph)} km/h`
+        + ` · Humidity ${Math.round(weather.humidityPercent)}%`;
+    }
+
+    function readCache() {
+      if (!storage || typeof storage.getItem !== 'function') return null;
+      const raw = storage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (weatherApi && typeof weatherApi.validateWeatherCache === 'function'
+          && weatherApi.validateWeatherCache(parsed)) return parsed;
+      } catch (error) { /* a corrupt cache is treated as absent */ }
+      return null;
+    }
+
+    function persistCache(cache) {
+      if (!storage || typeof storage.setItem !== 'function') return;
+      try {
+        storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      } catch (error) { /* storage full or unavailable; the in-memory result still renders */ }
+    }
+
+    async function onRefresh() {
+      if (busy) return;
+      if (!weatherApi || typeof weatherApi.fetchWeatherByPlace !== 'function') {
+        status('Weather is unavailable.');
+        return;
+      }
+      if (!fetchImpl) {
+        status('Could not refresh: fetch is unavailable in this browser.');
+        return;
+      }
+      const typed = inputEl && typeof inputEl.value === 'string' ? inputEl.value : '';
+      let query = typed;
+      if (!query.trim() && cached) query = cached.place.name;
+      if (!query.trim()) {
+        status('Type a place name first.');
+        return;
+      }
+      busy = true;
+      if (buttonEl) {
+        buttonEl.disabled = true;
+        buttonEl._daymarkOriginalLabel = buttonEl.textContent;
+        buttonEl.textContent = 'Refreshing…';
+        if (buttonEl.classList && typeof buttonEl.classList.add === 'function') buttonEl.classList.add('is-busy');
+      }
+      try {
+        const result = await weatherApi.fetchWeatherByPlace(query, fetchImpl, { now });
+        cached = result;
+        persistCache(cached);
+        render(cached);
+        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      } catch (error) {
+        const message = error && error.message ? error.message : 'unknown error';
+        if (cached) {
+          render(cached);
+          status(`Could not refresh: ${message} — showing cached weather.`);
+        } else {
+          status(`Could not refresh: ${message}`);
+        }
+      } finally {
+        busy = false;
+        if (buttonEl) {
+          buttonEl.disabled = false;
+          if (buttonEl._daymarkOriginalLabel) buttonEl.textContent = buttonEl._daymarkOriginalLabel;
+          if (buttonEl.classList && typeof buttonEl.classList.remove === 'function') buttonEl.classList.remove('is-busy');
+        }
+      }
+    }
+
+    cached = readCache();
+    if (cached) {
+      render(cached);
+      if (inputEl && !inputEl.value) inputEl.value = cached.place.name;
+      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+    } else {
+      status('Type a place name and tap Refresh.');
+    }
+
+    if (buttonEl && typeof buttonEl.addEventListener === 'function') {
+      buttonEl.addEventListener('click', () => { onRefresh(); });
+    }
+
+    return {
+      onRefresh,
+      readCache,
+      detach() {
+        // No document-level listener is registered; the button reference is
+        // dropped when the returned handle goes out of scope.
+        busy = false;
+      }
+    };
+  }
+
+  const api = { attachWeatherUi, STORAGE_KEY };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.DaymarkWeatherUi = api;
+
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const boot = () => attachWeatherUi({ document, window, localStorage: window.localStorage });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
