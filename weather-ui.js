@@ -40,7 +40,13 @@
       busy = isBusy;
       if (buttonEl) {
         buttonEl.disabled = isBusy;
-        buttonEl.classList.toggle('is-busy', isBusy);
+        if (typeof buttonEl.setAttribute === 'function') {
+          if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
+          else buttonEl.removeAttribute('aria-busy');
+        }
+        if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
+          buttonEl.classList.toggle('is-busy', isBusy);
+        }
       }
     }
 

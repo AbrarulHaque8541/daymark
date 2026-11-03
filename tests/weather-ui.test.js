@@ -16,6 +16,7 @@ const FORECAST_BODY = JSON.stringify({
 });
 
 function fakeElement(tag) {
+  const classes = new Set();
   return {
     tagName: tag,
     id: '',
@@ -23,6 +24,21 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+    getAttribute(name) { return this.attributes[name] || null; },
+    classList: {
+      toggle(name, force) {
+        if (force === true) classes.add(name);
+        else if (force === false) classes.delete(name);
+        else classes.has(name) ? classes.delete(name) : classes.add(name);
+        return classes.has(name);
+      },
+      contains(name) { return classes.has(name); },
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); }
+    },
     addEventListener(type, handler) { this.listeners.push({ type, handler }); }
   };
 }
