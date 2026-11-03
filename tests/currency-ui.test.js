@@ -80,12 +80,28 @@ const STORED = JSON.stringify({
   fetchedAt: '2026-11-02T09:30:00.000Z'
 });
 
+test('the module exposes its API and stays inert under Node', () => {
+  assert.equal(typeof ui.attachCurrencyUi, 'function');
+  assert.equal(ui.STORAGE_KEY, 'daymark.currency.v1');
+});
+
+test('attachCurrencyUi throws without a document', () => {
+  assert.throws(() => ui.attachCurrencyUi({}), /requires a document/);
+});
+
+test('a cached conversion is rendered on boot', () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  const handle = ui.attachCurrencyUi(env);
+  assert.match(elements['currency-now'].textContent, /1 USD = 94.91 INR/);
+  assert.match(elements['currency-status'].textContent, /Cached/);
+  handle.detach();
+});
+
 test('swap button exchanges from/to and updates status', () => {
   const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
   const handle = ui.attachCurrencyUi(env);
   const swapBtn = elements['currency-swap'];
   assert.ok(swapBtn.listeners.some(l => l.type === 'click'));
-  // Simulate click
   swapBtn.listeners.find(l => l.type === 'click').handler();
   assert.equal(elements['currency-from'].value, 'INR');
   assert.equal(elements['currency-to'].value, 'USD');
