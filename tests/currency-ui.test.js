@@ -31,6 +31,7 @@ function fakeEnv(options) {
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
   };
@@ -173,3 +174,25 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
 
+test('amount input live-updates the displayed conversion when a matching rate is cached', () => {
+  const { env, elements } = fakeEnv({ amount: '1', from: 'USD', to: 'INR', stored: STORED });
+  ui.attachCurrencyUi(env);
+  const amountEl = elements['currency-amount'];
+  amountEl.value = '10';
+  const inputListener = amountEl.listeners.find((l) => l.type === 'input');
+  assert.ok(inputListener, 'amount input listener should be attached');
+  inputListener.handler();
+  assert.equal(elements['currency-now'].textContent,
+    '10 USD = 949.1 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
+});
+
+test('swap button exchanges the from and to currency selects', () => {
+  const { env, elements } = fakeEnv({ amount: '1', from: 'USD', to: 'INR', stored: STORED });
+  ui.attachCurrencyUi(env);
+  const swapEl = elements['currency-swap'];
+  const swapListener = swapEl.listeners.find((l) => l.type === 'click');
+  assert.ok(swapListener, 'swap click listener should be attached');
+  swapListener.handler();
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+});
