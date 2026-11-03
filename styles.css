@@ -293,6 +293,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 /* Focus timer card */
 .focus-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.focus-card:hover { border-color: rgba(22, 112, 95, .35); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px rgba(22, 112, 95, .08); }
 .focus-card[hidden] { display: none; }
 .focus-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
 .focus-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
@@ -323,6 +324,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 /* Briefing (RSS/Atom feed) card */
 .briefing-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.briefing-card:hover { border-color: rgba(22, 112, 95, .35); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px rgba(22, 112, 95, .08); }
 .briefing-card[hidden] { display: none; }
 .briefing-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
 .briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
