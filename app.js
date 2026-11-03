@@ -1799,7 +1799,14 @@
     if (input && state.feedCache && !input.value) input.value = state.feedCache.url;
     if (button) {
       button.disabled = state.feedLoading;
-      button.textContent = state.feedLoading ? 'Loading…' : 'Refresh';
+      button.textContent = 'Refresh';
+      if (button.classList && typeof button.classList.toggle === 'function') {
+        button.classList.toggle('is-busy', state.feedLoading);
+      }
+      if (typeof button.setAttribute === 'function') {
+        if (state.feedLoading) button.setAttribute('aria-busy', 'true');
+        else button.removeAttribute('aria-busy');
+      }
     }
     status.textContent = state.feedNotice || (state.feedCache
       ? `Saved on this device · ${formatFeedTime(state.feedCache.fetchedAt)}`

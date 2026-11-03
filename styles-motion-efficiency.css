@@ -190,6 +190,7 @@
     border-color: rgba(22, 112, 95, .35);
   }
   .button.is-busy::before,
+  .feed-refresh.is-busy::before,
   .weather-refresh.is-busy::before,
   .currency-refresh.is-busy::before {
     border-color: rgba(42, 143, 122, 0.35);
