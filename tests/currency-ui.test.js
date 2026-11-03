@@ -80,7 +80,15 @@ const STORED = JSON.stringify({
   fetchedAt: '2026-11-02T09:30:00.000Z'
 });
 
-// ... existing tests omitted for brevity in this example, but full file would be included
+test('renders a cached conversion on boot without a network call', async () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  const handle = ui.attachCurrencyUi(env);
+  await new Promise((r) => setImmediate(r));
+  assert.match(elements['currency-now'].innerHTML || elements['currency-now'].textContent, /94.91|INR/);
+  assert.match(elements['currency-status'].textContent, /Cached/);
+  handle.detach();
+});
+
 test('swap button exchanges from and to currency values', () => {
   const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
   const handle = ui.attachCurrencyUi(env);
@@ -90,4 +98,12 @@ test('swap button exchanges from and to currency values', () => {
   assert.equal(elements['currency-from'].value, 'INR');
   assert.equal(elements['currency-to'].value, 'USD');
   handle.detach();
+});
+
+test('the module exposes its API and stays inert under Node', () => {
+  assert.equal(typeof ui.attachCurrencyUi, 'function');
+  assert.equal(ui.STORAGE_KEY, 'daymark.currency.v1');
+  assert.equal(ui.DEFAULT_FROM, 'USD');
+  assert.equal(ui.DEFAULT_TO, 'INR');
+  assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
