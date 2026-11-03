@@ -178,7 +178,7 @@ test('refresh failure with no cache reports the error plainly', async () => {
   const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: failing });
   const handle = ui.attachWeatherUi(env);
   await handle.onRefresh();
-  assert.equal(elements['currency-status'] ? elements['currency-status'].textContent : elements['weather-status'].textContent, 'Could not refresh: offline');
+  assert.equal(elements['weather-status'].textContent, 'Could not refresh: offline');
   assert.equal(elements['weather-now'].textContent, '');
 });
 
