@@ -20,7 +20,8 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    classList: { toggle() {} }
   };
 }
 
@@ -32,7 +33,8 @@ function fakeEnv(options) {
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
-    'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
+    'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' }),
+    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy', hidden: true })
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
@@ -173,3 +175,25 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
 
+
+test('copy button appears after render and copies text when available', async () => {
+  let copied = null;
+  const { env, elements } = fakeEnv({ stored: STORED });
+  env.window.navigator = {
+    clipboard: {
+      writeText(text) { copied = text; return Promise.resolve(); }
+    }
+  };
+  const handle = ui.attachCurrencyUi(env);
+  assert.equal(elements['currency-copy'].hidden, false);
+  await handle.onCopy();
+  assert.ok(copied && copied.includes('USD'));
+  assert.equal(elements['currency-status'].textContent, 'Copied to clipboard.');
+});
+
+test('copy reports unavailable when clipboard is missing', async () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  const handle = ui.attachCurrencyUi(env);
+  await handle.onCopy();
+  assert.equal(elements['currency-status'].textContent, 'Copy is not available in this browser.');
+});

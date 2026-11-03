@@ -26,6 +26,7 @@
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const inputEl = element('weather-place');
     const buttonEl = element('weather-refresh');
+    const copyEl = element('weather-copy');
     const statusEl = element('weather-status');
     const nowEl = element('weather-now');
 
@@ -49,9 +50,11 @@
       const place = cache.place;
       const weather = cache.weather;
       const placeLine = place.country ? `${place.name}, ${place.country}` : place.name;
-      nowEl.textContent = `${placeLine} · ${Math.round(weather.temperatureC)}°C · ${weather.label}`
+      const text = `${placeLine} · ${Math.round(weather.temperatureC)}°C · ${weather.label}`
         + ` · Feels ${Math.round(weather.feelsLikeC)}°C · Wind ${Math.round(weather.windKph)} km/h`
         + ` · Humidity ${Math.round(weather.humidityPercent)}%`;
+      nowEl.textContent = text;
+      if (copyEl) copyEl.hidden = false;
     }
 
     function readCache() {
@@ -119,9 +122,29 @@
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
+
+    async function onCopy() {
+      if (!nowEl || !nowEl.textContent) return;
+      const text = nowEl.textContent.trim();
+      if (!text) return;
+      try {
+        if (win && win.navigator && win.navigator.clipboard && typeof win.navigator.clipboard.writeText === 'function') {
+          await win.navigator.clipboard.writeText(text);
+          status('Copied to clipboard.');
+        } else {
+          status('Copy is not available in this browser.');
+        }
+      } catch (error) {
+        status('Could not copy.');
+      }
+    }
 
     return {
       onRefresh,
+      onCopy,
       readCache,
       detach() {
         // No document-level listener is registered; the button reference is

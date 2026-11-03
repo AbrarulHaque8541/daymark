@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const copyEl = element('currency-copy');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -68,9 +69,11 @@
       const amountText = currencyApi.formatAmount(amount);
       const convertedText = currencyApi.formatAmount(converted);
       const rateText = currencyApi.formatAmount(cache.rate);
-      nowEl.textContent = `${amountText} ${cache.from} = ${convertedText} ${cache.to}`
+      const text = `${amountText} ${cache.from} = ${convertedText} ${cache.to}`
         + ` · 1 ${cache.from} = ${rateText} ${cache.to}`
         + ` · ECB reference rates, as of ${cache.asOfDate}`;
+      nowEl.textContent = text;
+      if (copyEl) copyEl.hidden = false;
     }
 
     function readCache() {
@@ -147,9 +150,29 @@
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
+
+    async function onCopy() {
+      if (!nowEl || !nowEl.textContent) return;
+      const text = nowEl.textContent.trim();
+      if (!text) return;
+      try {
+        if (win && win.navigator && win.navigator.clipboard && typeof win.navigator.clipboard.writeText === 'function') {
+          await win.navigator.clipboard.writeText(text);
+          status('Copied to clipboard.');
+        } else {
+          status('Copy is not available in this browser.');
+        }
+      } catch (error) {
+        status('Could not copy.');
+      }
+    }
 
     return {
       onRefresh,
+      onCopy,
       readCache,
       detach() {
         // No document-level listener is registered; the button reference is

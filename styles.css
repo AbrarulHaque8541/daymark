@@ -513,3 +513,14 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     border-color: rgba(42, 143, 122, .5);
   }
 }
+
+/* Glance copy buttons — quiet secondary action under the result */
+.glance-copy {
+  margin-top: 10px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 11px;
+  border-radius: 10px;
+}
+.glance-copy[hidden] { display: none; }
+.glance-copy:active { transform: translateY(1px) scale(.98); }

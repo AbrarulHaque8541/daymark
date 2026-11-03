@@ -23,7 +23,8 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    classList: { toggle() {} }
   };
 }
 
@@ -33,7 +34,8 @@ function fakeEnv(options) {
     'weather-place': Object.assign(fakeElement('input'), { id: 'weather-place', value: opts.place || '' }),
     'weather-refresh': Object.assign(fakeElement('button'), { id: 'weather-refresh' }),
     'weather-status': Object.assign(fakeElement('p'), { id: 'weather-status' }),
-    'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' })
+    'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' }),
+    'weather-copy': Object.assign(fakeElement('button'), { id: 'weather-copy', hidden: true })
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
@@ -182,4 +184,44 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachWeatherUi, 'function');
   assert.equal(ui.STORAGE_KEY, 'daymark.weather.v1');
   assert.equal(typeof globalThis.DaymarkWeatherUi, 'object');
+});
+
+test('copy button appears after render and copies text when available', async () => {
+  const stored = JSON.stringify({
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 28.4, feelsLikeC: 31.2, windKph: 11.3, humidityPercent: 64,
+      isDay: true, weatherCode: 2, label: 'Partly cloudy'
+    },
+    fetchedAt: '2026-11-02T09:30:00.000Z'
+  });
+  let copied = null;
+  const { env, elements } = fakeEnv({ stored });
+  env.window.navigator = {
+    clipboard: {
+      writeText(text) { copied = text; return Promise.resolve(); }
+    }
+  };
+  const handle = ui.attachWeatherUi(env);
+  assert.equal(elements['weather-copy'].hidden, false);
+  await handle.onCopy();
+  assert.ok(copied && copied.includes('Kolkata'));
+  assert.equal(elements['weather-status'].textContent, 'Copied to clipboard.');
+});
+
+test('copy reports unavailable when clipboard is missing', async () => {
+  const stored = JSON.stringify({
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 28.4, feelsLikeC: 31.2, windKph: 11.3, humidityPercent: 64,
+      isDay: true, weatherCode: 2, label: 'Partly cloudy'
+    },
+    fetchedAt: '2026-11-02T09:30:00.000Z'
+  });
+  const { env, elements } = fakeEnv({ stored });
+  const handle = ui.attachWeatherUi(env);
+  await handle.onCopy();
+  assert.equal(elements['weather-status'].textContent, 'Copy is not available in this browser.');
 });
