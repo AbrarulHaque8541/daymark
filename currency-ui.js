@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -57,43 +58,31 @@
       if (!nowEl || !cache) return;
       if (!currencyApi) return;
       const converted = currencyApi.convertAmount(amount, cache.rate);
-      const amountText = currencyApi.formatAmount(amount);
-      const convertedText = currencyApi.formatAmount(converted);
-      const rateText = currencyApi.formatAmount(cache.rate);
-      nowEl.textContent = `${amountText} ${cache.from} = ${convertedText} ${cache.to}`
-        + ` · 1 ${cache.from} = ${rateText} ${cache.to}`
-        + ` · ECB reference rates, as of ${cache.asOfDate}`;
-    }
-
-    function readCache() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw);
-        if (currencyApi && typeof currencyApi.validateCurrencyCache === 'function'
-          && currencyApi.validateCurrencyCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
-      return null;
+      const formatted = currencyApi.formatAmount(converted, cache.to);
+      const rateText = currencyApi.formatRate(cache.rate, cache.from, cache.to);
+      nowEl.innerHTML = `<div class="currency-result"><strong>${formatted}</strong><span class="currency-rate">${rateText}</span><span class="currency-asof">as of ${cache.asOfDate}</span></div>`;
     }
 
     function persistCache(cache) {
       if (!storage || typeof storage.setItem !== 'function') return;
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      try { storage.setItem(STORAGE_KEY, JSON.stringify(cache)); } catch (e) { /* quota */ }
+    }
+
+    function readCache() {
+      if (!storage || typeof storage.getItem !== 'function') return null;
+      try {
+        const raw = storage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.version !== 1 || !parsed.from || !parsed.to || typeof parsed.rate !== 'number') return null;
+        return parsed;
+      } catch (e) { return null; }
     }
 
     async function onRefresh() {
       if (busy) return;
-      if (!currencyApi || typeof currencyApi.fetchLatestRates !== 'function') {
-        status('Currency conversion is unavailable.');
-        return;
-      }
-      if (!fetchImpl) {
-        status('Could not refresh: fetch is unavailable in this browser.');
-        return;
-      }
       const { amountText, from, to } = readInputs();
-      const amount = currencyApi.normalizeAmount(amountText);
+      const amount = currencyApi ? currencyApi.normalizeAmount(amountText) : null;
       if (amount === null) {
         status('Enter a positive amount to convert.');
         return;
@@ -140,6 +129,16 @@
 
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
+    }
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', () => {
+        if (busy) return;
+        const fromVal = fromEl ? fromEl.value : '';
+        const toVal = toEl ? toEl.value : '';
+        if (fromEl) fromEl.value = toVal;
+        if (toEl) toEl.value = fromVal;
+        status('Currencies swapped. Tap Refresh to update.');
+      });
     }
 
     return {
