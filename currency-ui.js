@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -140,6 +141,36 @@
 
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
+    }
+
+    function onSwap() {
+      if (busy) return;
+      if (!fromEl || !toEl || typeof fromEl.value !== 'string' || typeof toEl.value !== 'string') return;
+      const prevFrom = fromEl.value;
+      const prevTo = toEl.value;
+      if (prevFrom === prevTo) return;
+      fromEl.value = prevTo;
+      toEl.value = prevFrom;
+      // If the cached rate is exactly the reverse of the new pair, invert it so
+      // the displayed conversion stays accurate without a network round-trip.
+      if (cached && currencyApi && cached.from === prevFrom && cached.to === prevTo && cached.rate > 0) {
+        const inverted = 1 / cached.rate;
+        if (Number.isFinite(inverted) && inverted > 0) {
+          cached = Object.assign({}, cached, { from: prevTo, to: prevFrom, rate: inverted });
+          const amount = currencyApi.normalizeAmount(
+            amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
+          ) || 1;
+          render(cached, amount);
+          status('Currencies swapped · using inverted cached rate');
+          return;
+        }
+      }
+      if (nowEl) nowEl.textContent = '';
+      status('Currencies swapped — tap Refresh for the new rate.');
+    }
+
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', () => { onSwap(); });
     }
 
     return {
