@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -128,6 +129,28 @@
       }
     }
 
+    function onSwap() {
+      if (busy) return;
+      if (!fromEl || !toEl) return;
+      const fromVal = fromEl.value;
+      const toVal = toEl.value;
+      fromEl.value = toVal;
+      toEl.value = fromVal;
+      const { amountText, from, to } = readInputs();
+      const amount = currencyApi ? currencyApi.normalizeAmount(amountText) : null;
+      if (cached && cached.from === to && cached.to === from && amount !== null) {
+        // Reuse cache if the swapped pair matches (rare, but possible after previous swap)
+        render(cached, amount);
+        status('Currencies swapped · using cached rate.');
+      } else if (cached && amount !== null) {
+        // Clear display until next refresh for the new pair
+        if (nowEl) nowEl.textContent = '';
+        status('Currencies swapped. Tap Refresh for the new pair.');
+      } else {
+        status('Currencies swapped.');
+      }
+    }
+
     cached = readCache();
     if (cached) {
       render(cached, currencyApi ? currencyApi.normalizeAmount(
@@ -141,9 +164,13 @@
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', () => { onSwap(); });
+    }
 
     return {
       onRefresh,
+      onSwap,
       readCache,
       detach() {
         // No document-level listener is registered; the button reference is
