@@ -154,6 +154,19 @@
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
 
+    // Enter in any of the currency fields starts the same refresh (keyboard efficiency).
+    const enterRefresh = (event) => {
+      if (event && (event.key === 'Enter' || event.keyCode === 13)) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        onRefresh();
+      }
+    };
+    [amountEl, fromEl, toEl].forEach((el) => {
+      if (el && typeof el.addEventListener === 'function') {
+        el.addEventListener('keydown', enterRefresh);
+      }
+    });
+
     return {
       onRefresh,
       readCache,
