@@ -136,6 +136,45 @@
   50% { border-color: rgba(22, 112, 95, .45); }
 }
 
+/* Glance card refresh busy indicator (accent #16705f spinner, reduced-motion safe). */
+.button.is-busy,
+.feed-refresh.is-busy,
+.weather-refresh.is-busy,
+.currency-refresh.is-busy {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.9;
+}
+.button.is-busy::before,
+.feed-refresh.is-busy::before,
+.weather-refresh.is-busy::before,
+.currency-refresh.is-busy::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(22, 112, 95, 0.25);
+  border-top-color: #16705f;
+  animation: glance-spin 0.75s linear infinite;
+}
+@keyframes glance-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button.is-busy::before,
+  .feed-refresh.is-busy::before,
+  .weather-refresh.is-busy::before,
+  .currency-refresh.is-busy::before {
+    animation: none;
+    border-color: #16705f;
+    border-top-color: #16705f;
+  }
+}
+
 /* Dark-mode glass skeleton matching empty-state professional depth (accent #16705f). */
 @media (prefers-color-scheme: dark) {
   .skeleton-row {
@@ -148,5 +187,11 @@
   .local-badge.is-checking {
     background: rgba(26, 33, 40, .72);
     border-color: rgba(22, 112, 95, .35);
+  }
+  .button.is-busy::before,
+  .weather-refresh.is-busy::before,
+  .currency-refresh.is-busy::before {
+    border-color: rgba(42, 143, 122, 0.35);
+    border-top-color: #2a8f7a;
   }
 }

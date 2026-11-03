@@ -36,6 +36,14 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function setBusy(isBusy) {
+      busy = isBusy;
+      if (buttonEl) {
+        buttonEl.disabled = isBusy;
+        buttonEl.classList.toggle('is-busy', isBusy);
+      }
+    }
+
     function render(cache) {
       if (!nowEl || !cache) return;
       const place = cache.place;
@@ -80,8 +88,7 @@
         status('Type a place name first.');
         return;
       }
-      busy = true;
-      if (buttonEl) buttonEl.disabled = true;
+      setBusy(true);
       try {
         const result = await weatherApi.fetchWeatherByPlace(query, fetchImpl, { now });
         cached = result;
@@ -97,8 +104,7 @@
           status(`Could not refresh: ${message}`);
         }
       } finally {
-        busy = false;
-        if (buttonEl) buttonEl.disabled = false;
+        setBusy(false);
       }
     }
 
@@ -120,7 +126,7 @@
       detach() {
         // No document-level listener is registered; the button reference is
         // dropped when the returned handle goes out of scope.
-        busy = false;
+        setBusy(false);
       }
     };
   }

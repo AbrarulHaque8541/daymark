@@ -42,6 +42,14 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function setBusy(isBusy) {
+      busy = isBusy;
+      if (buttonEl) {
+        buttonEl.disabled = isBusy;
+        buttonEl.classList.toggle('is-busy', isBusy);
+      }
+    }
+
     function readInputs() {
       const amountText = amountEl && typeof amountEl.value === 'string' && amountEl.value.trim()
         ? amountEl.value
@@ -106,8 +114,7 @@
         status('Choose two different currencies.');
         return;
       }
-      busy = true;
-      if (buttonEl) buttonEl.disabled = true;
+      setBusy(true);
       try {
         const result = await currencyApi.fetchLatestRates(from, to, fetchImpl, { now });
         cached = result;
@@ -123,8 +130,7 @@
           status(`Could not refresh: ${message}`);
         }
       } finally {
-        busy = false;
-        if (buttonEl) buttonEl.disabled = false;
+        setBusy(false);
       }
     }
 
@@ -148,7 +154,7 @@
       detach() {
         // No document-level listener is registered; the button reference is
         // dropped when the returned handle goes out of scope.
-        busy = false;
+        setBusy(false);
       }
     };
   }
