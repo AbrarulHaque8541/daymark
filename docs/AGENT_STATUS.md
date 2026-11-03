@@ -1,43 +1,10 @@
-- [Daymark whole-project engineering status — 2026-11-04T00:05:00Z (Cycle B)](./CURRENT_STATUS_20261104T000500Z.md)
-- [Daymark whole-project engineering status — 2026-11-04T00:05:00Z (Cycle B)](./CURRENT_STATUS_20261104T000500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T07:45:00Z (midday audit)](./CURRENT_STATUS_20261103T074500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T06:00:00Z](./CURRENT_STATUS_20261103T060000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T08:45:00Z](./CURRENT_STATUS_20261103T084500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T08:30:00Z](./CURRENT_STATUS_20261103T083000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T08:30:00Z](./CURRENT_STATUS_20261103T083000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T07:15:00Z](./CURRENT_STATUS_20261103T071000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T00:50:00Z](./CURRENT_STATUS_20261103T005000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T00:45:00Z](./CURRENT_STATUS_20261103T004500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T06:05:00Z](./CURRENT_STATUS_20261103T060500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T05:08:00Z](./CURRENT_STATUS_20261103T050800Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T04:45:00Z](./CURRENT_STATUS_20261103T050800Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T04:30:00Z](./CURRENT_STATUS_20261103T043000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T21:30:00Z](./CURRENT_STATUS_20261102T213000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T16:20:00Z](./CURRENT_STATUS_20261102T162000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T15:50:00Z](./CURRENT_STATUS_20261102T1550Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T14:10:00Z](./CURRENT_STATUS_20261102T1410Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T13:30:00Z](./CURRENT_STATUS_20261102T1330Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T11:45:00Z](./CURRENT_STATUS_20261102T1145Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T05:20:00Z](./CURRENT_STATUS_20261102T052000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T05:00:00Z](./CURRENT_STATUS_20261102T050000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T02:45:00Z](./CURRENT_STATUS_20261102T024500Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T00:45:00Z](./CURRENT_STATUS_20261102T004500Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T05:30:00Z](./CURRENT_STATUS_20261102T053000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T00:05:00Z](./CURRENT_STATUS_20261102T000500Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T18:25:23Z](./CURRENT_STATUS_20261101T182523Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T17:47:00Z](./CURRENT_STATUS_20261101T174700Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T17:30:00Z](./CURRENT_STATUS_20261101T173000Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T15:40:00Z](./CURRENT_STATUS_20261101T154000Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T09:56:00Z](./CURRENT_STATUS_20261101T095600Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T08:44:33Z](./CURRENT_STATUS_20261101T084433Z.md)
-
 # Agent status index
 
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
 
-- [Daymark whole-project engineering status — 2026-11-03T21:40:00Z (Cycle B)](./CURRENT_STATUS_20261103T214000Z.md)
+- [Daymark whole-project engineering status — 2026-11-04T05:05:00Z (Cycle A)](./CURRENT_STATUS_20261104T050500Z.md)
 
 ## Before acting
 
