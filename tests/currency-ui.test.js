@@ -173,3 +173,33 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
 
+test('swap button exchanges from/to and inverts a matching cached rate', () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  // inject swap element
+  elements['currency-swap'] = Object.assign(fakeElement('button'), { id: 'currency-swap' });
+  const handle = ui.attachCurrencyUi(env);
+  const swap = elements['currency-swap'];
+  const listener = swap.listeners.find((l) => l.type === 'click');
+  assert.ok(listener, 'swap click listener registered');
+  // initial state
+  assert.equal(elements['currency-from'].value, 'USD');
+  assert.equal(elements['currency-to'].value, 'INR');
+  listener.handler();
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  assert.ok(elements['currency-status'].textContent.includes('inverted cached rate'));
+  assert.ok(elements['currency-now'].textContent.includes('1 INR ='));
+  assert.ok(elements['currency-now'].textContent.includes('USD'));
+});
+
+test('swap without a reverse cache clears the result and prompts for refresh', () => {
+  const { env, elements } = fakeEnv({ from: 'EUR', to: 'GBP' });
+  elements['currency-swap'] = Object.assign(fakeElement('button'), { id: 'currency-swap' });
+  ui.attachCurrencyUi(env);
+  const listener = elements['currency-swap'].listeners.find((l) => l.type === 'click');
+  listener.handler();
+  assert.equal(elements['currency-from'].value, 'GBP');
+  assert.equal(elements['currency-to'].value, 'EUR');
+  assert.equal(elements['currency-now'].textContent, '');
+  assert.ok(elements['currency-status'].textContent.includes('tap Refresh'));
+});
