@@ -55,6 +55,8 @@
 .task-row,
 .suggestion-card,
 .focus-card,
+.weather-card,
+.currency-card,
 .briefing-card {
   position: relative;
 }
@@ -62,6 +64,8 @@
 .card::after,
 .task-row::after,
 .focus-card::after,
+.weather-card::after,
+.currency-card::after,
 .briefing-card::after {
   content: '';
   position: absolute;
@@ -76,6 +80,8 @@
 .card:hover::after,
 .task-row:hover::after,
 .focus-card:hover::after,
+.weather-card:hover::after,
+.currency-card:hover::after,
 .briefing-card:hover::after {
   opacity: 1;
 }
