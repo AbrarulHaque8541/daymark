@@ -116,6 +116,15 @@
       status('Could not ask for confirmation. Nothing was cleared.');
     }
 
+    function setBusy(busy) {
+      if (clearAllEl) clearAllEl.disabled = busy;
+      if (refreshEl) refreshEl.disabled = busy;
+      if (listEl) listEl.setAttribute('aria-busy', busy ? 'true' : 'false');
+      if (typeof doc.querySelectorAll === 'function') {
+        doc.querySelectorAll('#data-list .tool-button').forEach(btn => { if (btn) btn.disabled = busy; });
+      }
+    }
+
     function onClearCategory(categoryId) {
       if (!storageApi || !storageAvailable()) {
         status('Browser storage is unavailable. Nothing was cleared.');
@@ -136,14 +145,17 @@
         status('Cancelled. Nothing was cleared.');
         return;
       }
+      setBusy(true);
       let result = null;
       try {
         result = storageApi.clearCategory(storage, categoryId);
       } catch (error) {
+        setBusy(false);
         status('Could not clear ' + category.label + ': '
           + (error && error.message ? error.message : 'storage is unavailable.'));
         return;
       }
+      setBusy(false);
       if (result.failed.length > 0) {
         const message = 'Cleared ' + category.label + ', but ' + result.failed.length
           + ' item(s) could not be removed by the browser.';
@@ -173,14 +185,17 @@
         status('Cancelled. Nothing was cleared.');
         return;
       }
+      setBusy(true);
       let result = null;
       try {
         result = storageApi.clearAll(storage);
       } catch (error) {
+        setBusy(false);
         status('Could not clear all data: '
           + (error && error.message ? error.message : 'storage is unavailable.'));
         return;
       }
+      setBusy(false);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
           + result.failedKeys.length + ' item(s) could not be removed by the browser.';
