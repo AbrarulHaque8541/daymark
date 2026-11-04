@@ -142,12 +142,13 @@
   50% { border-color: rgba(22, 112, 95, .45); }
 }
 
-/* Glance card refresh busy indicator (accent #16705f spinner, reduced-motion safe).
-   Primary buttons use white spinner; quiet/secondary keep accent. Label stays visible with padding. */
+/* Glance card refresh + data-controls busy indicator (accent #16705f spinner, reduced-motion safe).
+   Primary buttons use white spinner; quiet/secondary/tool-button keep accent. Label stays visible with padding. */
 .button.is-busy,
 .feed-refresh.is-busy,
 .weather-refresh.is-busy,
-.currency-refresh.is-busy {
+.currency-refresh.is-busy,
+.tool-button.is-busy {
   position: relative;
   pointer-events: none;
   opacity: 0.92;
@@ -156,7 +157,8 @@
 .button.is-busy::before,
 .feed-refresh.is-busy::before,
 .weather-refresh.is-busy::before,
-.currency-refresh.is-busy::before {
+.currency-refresh.is-busy::before,
+.tool-button.is-busy::before {
   content: '';
   position: absolute;
   left: 10px;
@@ -170,7 +172,8 @@
   animation: glance-spin 0.7s linear infinite;
 }
 .button-quiet.is-busy::before,
-.feed-refresh.button-quiet.is-busy::before {
+.feed-refresh.button-quiet.is-busy::before,
+.tool-button.is-busy::before {
   border-color: rgba(22, 112, 95, 0.25);
   border-top-color: #16705f;
 }
@@ -181,11 +184,13 @@
   .button.is-busy::before,
   .feed-refresh.is-busy::before,
   .weather-refresh.is-busy::before,
-  .currency-refresh.is-busy::before {
+  .currency-refresh.is-busy::before,
+  .tool-button.is-busy::before {
     animation: none;
     border-top-color: #ffffff;
   }
-  .button-quiet.is-busy::before {
+  .button-quiet.is-busy::before,
+  .tool-button.is-busy::before {
     border-top-color: #16705f;
     border-color: #16705f;
   }
@@ -206,7 +211,8 @@
   }
   .button.is-busy::before,
   .weather-refresh.is-busy::before,
-  .currency-refresh.is-busy::before {
+  .currency-refresh.is-busy::before,
+  .tool-button.is-busy::before {
     border-color: rgba(42, 143, 122, 0.35);
     border-top-color: #2a8f7a;
   }
