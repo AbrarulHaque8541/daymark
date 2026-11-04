@@ -295,108 +295,46 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 /* Focus timer card */
 .focus-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); }
 .focus-card[hidden] { display: none; }
-.focus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.focus-header h3 { margin: 0; font-size: 14px; }
-.focus-presets { display: flex; gap: 6px; }
-.focus-preset { height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #5f6c76; font-size: 10px; font-weight: 700; }
+.focus-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.focus-dot { width: 7px; height: 7px; border-radius: 50%; background: #3f9a82; box-shadow: 0 0 0 4px rgba(63, 154, 130, .14); }
+.focus-card h2 { margin: 0 0 6px; font-size: 16px; letter-spacing: -.03em; }
+.focus-description { margin: 0 0 14px; color: var(--muted-text); font-size: 11px; line-height: 1.5; }
+.focus-time-wrap { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.focus-time { font: 700 36px Manrope, sans-serif; letter-spacing: -.04em; color: var(--accent); }
+.focus-state-label { color: var(--muted-text); font-size: 11px; font-weight: 700; }
+.focus-progress { height: 6px; border-radius: 999px; background: rgba(219, 226, 232, .6); overflow: hidden; margin-bottom: 12px; }
+.focus-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #1d7f6c, #2a8f7a); border-radius: 999px; transition: width .3s ease; }
+.focus-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.focus-timer-display { font: 700 32px Manrope, sans-serif; letter-spacing: -.04em; color: var(--accent); text-align: center; margin: 8px 0; }
-.focus-controls { display: flex; justify-content: center; gap: 8px; }
-.focus-task-select { width: 100%; height: 36px; margin-bottom: 10px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 10px; background: rgba(255, 255, 255, .75); padding: 0 10px; font-size: 12px; }
+.focus-actions { display: flex; gap: 8px; margin: 12px 0 8px; }
+.focus-today { margin: 0; color: var(--muted-text); font-size: 11px; }
 @media (prefers-color-scheme: dark) {
   .focus-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
-  .focus-preset { color: #9aa6af; }
-  .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-  .focus-task-select { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }
+  .focus-progress { background: #2c3640; }
 }
 
-/* Briefing (RSS/Atom feed) card */
-.briefing-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
-.briefing-card[hidden] { display: none; }
-.briefing-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
-.briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
-.briefing-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
-.briefing-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
-.feed-form { display: flex; gap: 7px; }
-.feed-form input { flex: 1 1 auto; min-width: 0; height: 40px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); color: var(--ink); padding: 0 12px; font-size: 12px; transition: border-color .16s ease, box-shadow .16s ease; }
-.feed-form input:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(22, 112, 95, .12); outline: none; }
-.feed-form input::placeholder { color: var(--muted-text); }
-.feed-refresh { flex: 0 0 auto; height: 40px; }
-.feed-refresh:disabled { opacity: .65; cursor: wait; }
-.feed-status { min-height: 16px; margin: 9px 0 4px; color: var(--muted-text); font-size: 10px; }
-.feed-list { display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
-.feed-item { padding: 9px 10px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
-.feed-item:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
-.feed-item-link, .feed-item-title { display: block; color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }
-.feed-item-link:hover { color: var(--accent); text-decoration: underline; }
-.feed-item-date { display: block; margin-top: 2px; color: var(--muted-text); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.feed-item-summary { margin: 5px 0 0; color: var(--muted-text); font-size: 11px; line-height: 1.5; }
-.feed-empty { border: 1px dashed #b9d2ca; border-radius: 12px; background: rgba(255, 255, 255, .5); color: var(--muted-text); font-size: 11px; text-align: center; padding: 14px; }
-@media (prefers-color-scheme: dark) {
-  .briefing-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
-  .briefing-description { color: var(--muted-text); }
-  .feed-form input { border-color: #2c3640; background: rgba(26, 33, 40, .85); color: #e8eef2; }
-  .feed-form input::placeholder { color: var(--muted-text); }
-  .feed-status { color: var(--muted-text); }
-  .feed-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
-  .feed-item:hover { border-color: rgba(42, 143, 122, .5); }
-  .feed-item-link, .feed-item-title { color: #e8eef2; }
-  .feed-item-date { color: var(--muted-text); }
-  .feed-item-summary { color: var(--muted-text); }
-  .feed-empty { border-color: #2c3640; background: rgba(26, 33, 40, .5); color: var(--muted-text); }
-}
+/* Weather and briefing cards */
+.weather-card, .briefing-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .28); }
+.weather-topline, .briefing-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.weather-dot, .briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: #3f9a82; }
+.weather-card h2, .briefing-card h2 { margin: 0 0 6px; font-size: 16px; }
+.weather-description, .briefing-description { margin: 0 0 12px; color: var(--muted-text); font-size: 11px; line-height: 1.5; }
+.feed-form { display: flex; gap: 8px; align-items: center; }
+.feed-form input { flex: 1; min-width: 0; height: 40px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); padding: 0 12px; font-size: 13px; }
+.weather-status, .feed-status { margin: 10px 0 0; color: var(--muted-text); font-size: 11px; min-height: 1.2em; }
+.weather-now { margin-top: 10px; }
+.feed-list { margin-top: 10px; display: grid; gap: 8px; }
 
-/* Focus timer progress + running-state polish (Cycle A) */
-.focus-progress { height: 6px; border-radius: 999px; background: rgba(22, 112, 95, .12); overflow: hidden; margin: 0 0 12px; border: 1px solid rgba(22, 112, 95, .08); }
-.focus-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-bright)); border-radius: inherit; transition: width .28s var(--ease-spring); }
-@media (prefers-reduced-motion: reduce) {
-  .focus-progress-fill { transition: none; }
-}
-.focus-card { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
-.focus-card:hover { border-color: rgba(22, 112, 95, .35); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px rgba(22, 112, 95, .08); }
-.focus-card.is-running {
-  border-color: rgba(22, 112, 95, .45);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 0 0 1px rgba(22, 112, 95, .12);
-}
-.focus-card.is-running .focus-dot {
-  animation: focus-dot-pulse 1.8s ease-in-out infinite;
-}
-@keyframes focus-dot-pulse {
-  50% { box-shadow: 0 0 0 6px rgba(42, 143, 122, .22); }
-}
-.focus-card.is-running .focus-progress-fill {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
-}
-@media (prefers-reduced-motion: reduce) {
-  .focus-card.is-running .focus-dot { animation: none; }
-}
-@media (prefers-color-scheme: dark) {
-  .focus-card { border-color: rgba(22, 112, 95, .28); background: rgba(26, 58, 50, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
-  .focus-progress { background: rgba(22, 112, 95, .18); border-color: rgba(22, 112, 95, .22); }
-}
+/* Data controls card */
+.data-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .28); }
+.data-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.data-dot { width: 7px; height: 7px; border-radius: 50%; background: #3f9a82; }
+.data-card h2 { margin: 0 0 6px; font-size: 16px; }
+.data-description { margin: 0 0 12px; color: var(--muted-text); font-size: 11px; }
+.data-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.data-status { margin: 10px 0 0; color: var(--muted-text); font-size: 11px; min-height: 1.2em; }
 
-/* Weather glance card (Open-Meteo, keyless) */
-.weather-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
-.weather-card[hidden] { display: none; }
-.weather-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
-.weather-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
-.weather-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
-.weather-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
-.weather-card .feed-form input { font-size: 12px; }
-.weather-status { min-height: 16px; margin: 9px 0 4px; color: var(--muted-text); font-size: 10px; }
-.weather-now { padding: 10px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
-.weather-now:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
-.weather-now:empty { display: none; }
-@media (prefers-color-scheme: dark) {
-  .weather-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
-  .weather-description { color: var(--muted-text); }
-  .weather-status { color: var(--muted-text); }
-  .weather-now { border-color: #2c3640; background: rgba(26, 33, 40, .65); color: #e8eef2; }
-  .weather-now:hover { border-color: rgba(42, 143, 122, .5); }
-}
-
-
-/* Initial task-list skeleton shimmer (restored polish, reduced-motion safe) */
+/* Skeleton loading */
 .task-list-skeleton { display: grid; gap: 8px; }
 .task-list.is-ready .task-list-skeleton { display: none; }
 .skeleton-row { height: 64px; border: 1px solid rgba(219, 226, 232, .75); border-radius: 16px; background: linear-gradient(100deg, rgba(255, 255, 255, .55) 32%, rgba(226, 240, 235, .85) 50%, rgba(255, 255, 255, .55) 68%); background-size: 220% 100%; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); animation: skeleton-shimmer 1.6s ease-in-out infinite; }
@@ -531,10 +469,10 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(22, 112, 95, 0.08), transparent 60%);
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.22s ease;
+  background: linear-gradient(135deg, transparent 40%, rgba(22, 112, 95, .06) 100%);
+  opacity: 0;
+  transition: opacity .2s ease;
 }
 .weather-card:hover::after,
 .currency-card:hover::after,
@@ -548,5 +486,49 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .briefing-card::after,
   .focus-card::after {
     transition: none;
+  }
+}
+
+/* Currency swap control — professional glass, accent #16705f */
+.currency-swap {
+  justify-self: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(22, 112, 95, 0.22);
+  background: rgba(255, 255, 255, 0.75);
+  color: #16705f;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.currency-swap:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  transform: translateY(-1px) rotate(8deg);
+  box-shadow: 0 4px 12px rgba(22, 112, 95, .15);
+}
+.currency-swap:active {
+  transform: translateY(1px) scale(.97);
+  background: var(--accent);
+  color: #fff;
+}
+.currency-swap:focus-visible {
+  outline: 3px solid rgba(22, 112, 95, .45);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .currency-swap, .currency-swap:hover, .currency-swap:active { transition: none; transform: none; }
+}
+@media (prefers-color-scheme: dark) {
+  .currency-swap {
+    border-color: rgba(125, 224, 203, 0.22);
+    background: rgba(26, 33, 40, .75);
+    color: #7de0cb;
+  }
+  .currency-swap:hover {
+    background: rgba(26, 58, 50, .8);
+    border-color: #7de0cb;
   }
 }
