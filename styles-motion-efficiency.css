@@ -57,7 +57,8 @@
 .focus-card,
 .weather-card,
 .currency-card,
-.briefing-card {
+.briefing-card,
+.webhook-card {
   position: relative;
 }
 .button-primary::after,
@@ -66,7 +67,8 @@
 .focus-card::after,
 .weather-card::after,
 .currency-card::after,
-.briefing-card::after {
+.briefing-card::after,
+.webhook-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -82,7 +84,8 @@
 .focus-card:hover::after,
 .weather-card:hover::after,
 .currency-card:hover::after,
-.briefing-card:hover::after {
+.briefing-card:hover::after,
+.webhook-card:hover::after {
   opacity: 1;
 }
 
@@ -147,7 +150,10 @@
 .button.is-busy,
 .feed-refresh.is-busy,
 .weather-refresh.is-busy,
-.currency-refresh.is-busy {
+.currency-refresh.is-busy,
+.webhook-save.is-busy,
+.webhook-test.is-busy,
+.webhook-flush.is-busy {
   position: relative;
   pointer-events: none;
   opacity: 0.92;
@@ -156,7 +162,10 @@
 .button.is-busy::before,
 .feed-refresh.is-busy::before,
 .weather-refresh.is-busy::before,
-.currency-refresh.is-busy::before {
+.currency-refresh.is-busy::before,
+.webhook-save.is-busy::before,
+.webhook-test.is-busy::before,
+.webhook-flush.is-busy::before {
   content: '';
   position: absolute;
   left: 10px;
@@ -170,7 +179,9 @@
   animation: glance-spin 0.7s linear infinite;
 }
 .button-quiet.is-busy::before,
-.feed-refresh.button-quiet.is-busy::before {
+.feed-refresh.button-quiet.is-busy::before,
+.webhook-test.is-busy::before,
+.webhook-flush.is-busy::before {
   border-color: rgba(22, 112, 95, 0.25);
   border-top-color: #16705f;
 }
@@ -181,11 +192,16 @@
   .button.is-busy::before,
   .feed-refresh.is-busy::before,
   .weather-refresh.is-busy::before,
-  .currency-refresh.is-busy::before {
+  .currency-refresh.is-busy::before,
+  .webhook-save.is-busy::before,
+  .webhook-test.is-busy::before,
+  .webhook-flush.is-busy::before {
     animation: none;
     border-top-color: #ffffff;
   }
-  .button-quiet.is-busy::before {
+  .button-quiet.is-busy::before,
+  .webhook-test.is-busy::before,
+  .webhook-flush.is-busy::before {
     border-top-color: #16705f;
     border-color: #16705f;
   }
@@ -206,17 +222,19 @@
   }
   .button.is-busy::before,
   .weather-refresh.is-busy::before,
-  .currency-refresh.is-busy::before {
+  .currency-refresh.is-busy::before,
+  .webhook-save.is-busy::before {
     border-color: rgba(42, 143, 122, 0.35);
     border-top-color: #2a8f7a;
   }
 }
 
-/* Focus-within accent edge for glance/focus cards — keyboard navigation polish. */
+/* Focus-within accent edge for glance/focus/automation cards — keyboard navigation polish. */
 .focus-card:focus-within,
 .weather-card:focus-within,
 .currency-card:focus-within,
-.briefing-card:focus-within {
+.briefing-card:focus-within,
+.webhook-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
