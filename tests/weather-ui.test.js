@@ -23,7 +23,13 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    dispatchEvent(event) {
+      for (const listener of this.listeners) {
+        if (listener.type === event.type) listener.handler(event);
+      }
+      return !event.defaultPrevented;
+    }
   };
 }
 
@@ -31,7 +37,8 @@ function fakeEnv(options) {
   const opts = options || {};
   const elements = {
     'weather-place': Object.assign(fakeElement('input'), { id: 'weather-place', value: opts.place || '' }),
-    'weather-refresh': Object.assign(fakeElement('button'), { id: 'weather-refresh' }),
+    'weather-refresh': Object.assign(fakeElement('button'), { id: 'weather-refresh', type: 'button' }),
+    'weather-form': Object.assign(fakeElement('form'), { id: 'weather-form' }),
     'weather-status': Object.assign(fakeElement('p'), { id: 'weather-status' }),
     'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' })
   };
@@ -176,6 +183,23 @@ test('missing fetch support is reported instead of throwing', async () => {
   const handle = ui.attachWeatherUi(env);
   await handle.onRefresh();
   assert.ok(elements['weather-status'].textContent.includes('fetch is unavailable'));
+});
+
+
+test('weather form submission prevents navigation and refreshes', async () => {
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: fetchImpl });
+  ui.attachWeatherUi(env);
+  const submit = elements['weather-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'weather form should handle native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation should be prevented');
+  assert.equal(fetchImpl.seen.length, 2);
+  assert.ok(elements['weather-now'].textContent.includes('Kolkata'));
 });
 
 test('the module exposes its API and stays inert under Node', () => {

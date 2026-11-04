@@ -20,7 +20,13 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    dispatchEvent(event) {
+      for (const listener of this.listeners) {
+        if (listener.type === event.type) listener.handler(event);
+      }
+      return !event.defaultPrevented;
+    }
   };
 }
 
@@ -30,10 +36,12 @@ function fakeEnv(options) {
     'currency-amount': Object.assign(fakeElement('input'), { id: 'currency-amount', value: opts.amount || '1' }),
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
-    'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh', type: 'submit' }),
+    'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form', submitCount: 0, navigationCount: 0 }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
   };
+  elements['currency-refresh'].form = elements['currency-form'];
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
@@ -163,6 +171,35 @@ test('missing fetch support is reported instead of throwing', async () => {
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
   assert.ok(elements['currency-status'].textContent.includes('fetch is unavailable'));
+});
+
+
+test('form submission prevents navigation and refreshes the selected conversion', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const submit = elements['currency-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'currency form should handle native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation should be prevented');
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+  assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
+});
+
+test('activating the Refresh submit button sends one form event and prevents navigation', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  // Simulate native submit via form listener
+  const submit = elements['currency-form'].listeners.find((l) => l.type === 'submit');
+  assert.ok(submit);
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
 });
 
 test('the module exposes its API and stays inert under Node', () => {
