@@ -196,6 +196,26 @@ test('muted small-copy colors meet WCAG AA in the effective light and dark casca
   }
 });
 
+test('task titles wrap fully instead of relying on clipped text or hover-only titles', () => {
+  const titleRules = rules.filter((rule) => rule.selector === '.task-title' || rule.selector.endsWith(' .task-title'));
+  const baseRule = titleRules.find((rule) => rule.declarations.has('white-space'));
+
+  assert.ok(baseRule, 'the task title needs a base layout rule');
+  assert.equal(baseRule.declarations.get('white-space'), 'normal', 'titles must wrap on narrow screens');
+  assert.equal(baseRule.declarations.get('overflow-wrap'), 'anywhere', 'unbroken titles must wrap too');
+  assert.equal(baseRule.declarations.get('font-size'), '0.8125rem', 'title text should respond to root text scaling');
+  for (const rule of titleRules) {
+    if (rule.declarations.has('white-space')) {
+      assert.equal(rule.declarations.get('white-space'), 'normal', 'responsive/title-state overrides must keep wrapping enabled');
+    }
+    if (rule.declarations.has('overflow-wrap')) {
+      assert.equal(rule.declarations.get('overflow-wrap'), 'anywhere', 'title overrides must continue breaking long words');
+    }
+    assert.equal(rule.declarations.has('overflow'), false, 'a task-title rule must not clip overflowing text');
+    assert.equal(rule.declarations.has('text-overflow'), false, 'a task-title rule must not ellipsize its text');
+  }
+});
+
 test('the dark subtask regression clears the 4.48:1 #77848e on #161c22 edge case', () => {
   const knownFailingRatio = contrastRatio('#77848e', '#161c22');
   assert.equal(Number(knownFailingRatio.toFixed(2)), 4.48);
