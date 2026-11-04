@@ -162,6 +162,25 @@
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
   }
 
+  function daysBetween(from, to) {
+    if (!isDateOnly(from) || !isDateOnly(to)) return null;
+    const [fy, fm, fd] = from.split('-').map(Number);
+    const [ty, tm, td] = to.split('-').map(Number);
+    const fromUtc = Date.UTC(fy, fm - 1, fd);
+    const toUtc = Date.UTC(ty, tm - 1, td);
+    return Math.round((toUtc - fromUtc) / 86400000);
+  }
+
+  function formatRelativeDue(dueDate, today) {
+    const days = daysBetween(today, dueDate);
+    if (days === null) return null;
+    if (days === 0) return 'today';
+    if (days === 1) return 'tomorrow';
+    if (days === -1) return 'yesterday';
+    if (days > 1) return `in ${days} days`;
+    return `${Math.abs(days)} days overdue`;
+  }
+
   const api = {
     localDateString,
     isDateOnly,
@@ -175,6 +194,8 @@
     validateStoredTasks,
     getFilteredTasks,
     getSuggestions,
+    daysBetween,
+    formatRelativeDue,
     MAX_NOTES_CHARS,
     MAX_SUBTASKS,
     MAX_SUBTASK_TITLE,
