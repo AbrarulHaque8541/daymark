@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: eb0f595c316ed8e60987b4a19aac39e4881c4203)
 /*
  * Daymark task-completion webhook logic for the web prototype.
  *
@@ -44,7 +45,7 @@
   }
 
   function isTimeOnly(value) {
-    return typeof value === 'string' && /^\d{2}:\d{2}$/.test(value);
+    return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   }
 
   function isIsoTimestamp(value) {

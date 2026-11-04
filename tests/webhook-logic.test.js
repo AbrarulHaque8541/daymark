@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: e60b1096d70733be70cb05c1eeba81be2ab432b0)
 successfully downloaded text file (SHA: 0398da4470125a5f06de56b9450a86ee881f5e2a)
 'use strict';
 
@@ -74,6 +75,9 @@ test('payload fields are sanitized and overlong titles are clipped', () => {
   assert.equal(payload.task.tags.length, webhook.MAX_TAGS, 'tag lists are capped');
   assert.ok(payload.task.tags.every((tag) => typeof tag === 'string'));
   assert.equal(webhook.buildTaskCompletedPayload({ title: '   ' }, 'nope').task.title, 'Untitled task');
+  const edgeTimes = webhook.buildTaskCompletedPayload({ title: 't', dueTime: '23:59' }, '2026-11-04T10:05:00.000Z');
+  assert.equal(edgeTimes.task.dueTime, '23:59', 'a real 24-hour clock time is kept');
+  assert.equal(webhook.buildTaskCompletedPayload({ title: 't', dueTime: '09:60' }, '2026-11-04T10:05:00.000Z').task.dueTime, null, 'minutes above 59 are rejected');
 });
 
 test('queue events are well-formed, bounded, and validated', () => {
