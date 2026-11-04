@@ -24,6 +24,37 @@ required_panel = [
 for token in required_panel:
     assert token in panel, f"Focus Timer panel missing contract: {token}"
 
+required_accessibility = [
+    "info.setClassName(android.widget.Button.class.getName());",
+    "info.setClassName(RadioButton.class.getName());",
+    "info.setClassName(android.widget.CheckBox.class.getName());",
+    "info.setCheckable(true);",
+    "info.setChecked(host.isSelected());",
+    "configureChoiceAccessibility(view);",
+    "configureChoiceAccessibility(choice);",
+    "configureChoiceAccessibility(preset);",
+    "configureToggleAccessibility(view);",
+    "setToggleState(soundToggle, \"Soft interaction sounds\", soundEnabled);",
+    "setToggleState(tickToggle, \"Final 10-second ticks\", finalTicksEnabled);",
+    "modeStopwatch.setSelected(mode == TaskFocusTimer.Mode.STOPWATCH);",
+    "modeCountdown.setSelected(mode == TaskFocusTimer.Mode.COUNTDOWN);",
+    "displayUnitButtons[i].setSelected(selected);",
+    "preset.setSelected(selected);",
+    "new LayoutParams(0, dp(48), 1)",
+    "tickToggle.setEnabled(soundEnabled);",
+    "view.setMinimumHeight(dp(48));",
+    "taskName.setMinimumHeight(dp(48));",
+    "customDuration.setMinimumHeight(dp(48));",
+    "primaryAction.setContentDescription(running ? \"Pause focus timer\"",
+    "taskName.setContentDescription(\"Focus task: \" + taskLabel);",
+]
+for token in required_accessibility:
+    assert token in panel, f"Focus Timer accessibility regression: {token}"
+assert 'timeValue.setContentDescription("Focus timer value");' not in panel, (
+    "a generic timer description must not hide the displayed time from screen readers"
+)
+print("PASS Focus Timer accessible control roles, selected/checkable states and 48dp targets")
+
 required_sound = [
     "ToneGenerator", "AudioManager.STREAM_NOTIFICATION",
     "void onAction()", "void onSelection()", "void onCountdownSecond(int remainingSeconds)",
