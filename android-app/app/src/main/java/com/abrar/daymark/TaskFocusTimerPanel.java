@@ -12,6 +12,7 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -105,9 +106,10 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         taskName = label(taskLabel + "  ›", 13, TEXT, true);
         taskName.setGravity(Gravity.CENTER);
         taskName.setPadding(dp(16), dp(10), dp(16), dp(10));
+        taskName.setMinimumHeight(dp(48));
         taskName.setBackground(round(SURFACE_HI, 22));
-        taskName.setClickable(true);
-        taskName.setFocusable(true);
+        configureButtonAccessibility(taskName);
+        taskName.setContentDescription("Focus task: " + taskLabel);
         taskName.setOnClickListener(v -> { if (closed) return; sounds.onSelection(); listener.onChooseTask(); });
         LayoutParams taskLp = wrapWrap();
         taskLp.gravity = Gravity.CENTER_HORIZONTAL;
@@ -165,12 +167,15 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         DisplayUnit[] displayValues = DisplayUnit.values();
         for (int i = 0; i < displayNames.length; i++) {
             final DisplayUnit unit = displayValues[i];
-            TextView choice = label(displayNames[i], 11, unit == displayUnit ? TEXT : MUTED, true);
+            boolean selected = unit == displayUnit;
+            TextView choice = label(displayNames[i], 11, selected ? TEXT : MUTED, true);
             choice.setGravity(Gravity.CENTER);
             choice.setPadding(dp(5), dp(11), dp(5), dp(11));
-            choice.setBackground(round(unit == displayUnit ? ACCENT_SOFT : SURFACE, 14));
+            choice.setBackground(round(selected ? ACCENT_SOFT : SURFACE, 14));
+            choice.setSelected(selected);
+            configureChoiceAccessibility(choice);
             displayUnitButtons[i] = choice;
-            displayModes.addView(choice, new LayoutParams(0, dp(42), 1));
+            displayModes.addView(choice, new LayoutParams(0, dp(48), 1));
             choice.setOnClickListener(v -> chooseDisplayUnit(unit));
         }
         LayoutParams displayModesLp = matchWrap();
@@ -194,7 +199,9 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         customDuration = label("＋   Custom duration", 14, TEXT, true);
         customDuration.setGravity(Gravity.CENTER);
         customDuration.setPadding(dp(14), dp(14), dp(14), dp(14));
+        customDuration.setMinimumHeight(dp(48));
         customDuration.setBackground(round(SURFACE_HI, 18));
+        configureButtonAccessibility(customDuration);
         LayoutParams customLp = matchWrap();
         customLp.topMargin = dp(10);
         addView(customDuration, customLp);
@@ -212,9 +219,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         LayoutParams stopLp = new LayoutParams(0, dp(58), 1);
         stopLp.leftMargin = dp(10);
         actions.addView(stopAction, stopLp);
-        primaryAction.setContentDescription("Start, pause, or resume focus timer");
         stopAction.setContentDescription("Finish focus session");
-        timeValue.setContentDescription("Focus timer value");
         primaryAction.setOnClickListener(v -> performPrimaryAction());
         stopAction.setOnClickListener(v -> {
             if (!closed && timer != null && !timer.isFinished()) {
@@ -245,19 +250,21 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         tickLp.topMargin = dp(7);
         addView(tickToggle, tickLp);
         sounds.setEnabled(soundEnabled);
-        tickToggle.setAlpha(0.45f);
+        tickToggle.setEnabled(soundEnabled);
+        tickToggle.setAlpha(soundEnabled ? 1f : 0.45f);
         soundToggle.setOnClickListener(v -> {
             soundEnabled = !soundEnabled;
             sounds.setEnabled(soundEnabled);
-            soundToggle.setText((soundEnabled ? "●  " : "○  ") + "Soft interaction sounds");
+            setToggleState(soundToggle, "Soft interaction sounds", soundEnabled);
             if (soundEnabled) sounds.onSelection();
+            tickToggle.setEnabled(soundEnabled);
             tickToggle.setAlpha(soundEnabled ? 1f : 0.45f);
         });
         tickToggle.setOnClickListener(v -> {
             if (!soundEnabled) return;
             finalTicksEnabled = !finalTicksEnabled;
             sounds.setFinalTicksEnabled(finalTicksEnabled);
-            tickToggle.setText((finalTicksEnabled ? "●  " : "○  ") + "Final 10-second ticks");
+            setToggleState(tickToggle, "Final 10-second ticks", finalTicksEnabled);
             sounds.onSelection();
         });
 
@@ -268,6 +275,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         if (closed) return;
         taskLabel = value == null || value.trim().isEmpty() ? "Choose a task" : value.trim();
         taskName.setText(taskLabel + "  ›");
+        taskName.setContentDescription("Focus task: " + taskLabel);
     }
 
     void setDailySummary(long focusDurationMs, int sessionCount) {
@@ -281,7 +289,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         if (closed) return;
         soundEnabled = enabled;
         sounds.setEnabled(enabled);
-        soundToggle.setText((enabled ? "●  " : "○  ") + "Soft interaction sounds");
+        setToggleState(soundToggle, "Soft interaction sounds", enabled);
+        tickToggle.setEnabled(enabled);
         tickToggle.setAlpha(enabled ? 1f : 0.45f);
     }
 
@@ -289,7 +298,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         if (closed) return;
         finalTicksEnabled = enabled;
         sounds.setFinalTicksEnabled(enabled);
-        tickToggle.setText((enabled ? "●  " : "○  ") + "Final 10-second ticks");
+        setToggleState(tickToggle, "Final 10-second ticks", enabled);
     }
 
     void render(TaskFocusTimer value, long nowElapsedRealtimeMs) {
@@ -321,6 +330,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         boolean running = value != null && value.isRunning();
         boolean paused = value != null && value.isPaused();
         primaryAction.setText(running ? "Ⅱ   Pause" : paused ? "▶   Resume" : "▶   Start focus");
+        primaryAction.setContentDescription(running ? "Pause focus timer"
+                : paused ? "Resume focus timer" : "Start focus timer");
         primaryAction.setEnabled(true);
         stopAction.setEnabled(active);
         stopAction.setAlpha(active ? 1f : 0.55f);
@@ -351,6 +362,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private void chooseMode(TaskFocusTimer.Mode mode) {
         if (closed || timer != null && !timer.isFinished()) return;
         selectedMode = mode;
+        modeStopwatch.setSelected(mode == TaskFocusTimer.Mode.STOPWATCH);
+        modeCountdown.setSelected(mode == TaskFocusTimer.Mode.COUNTDOWN);
         sounds.onSelection();
         modeStopwatch.setBackground(round(mode == TaskFocusTimer.Mode.STOPWATCH ? ACCENT_SOFT : SURFACE, 18));
         modeCountdown.setBackground(round(mode == TaskFocusTimer.Mode.COUNTDOWN ? ACCENT_SOFT : SURFACE, 18));
@@ -369,7 +382,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             boolean selected = values[i] == unit;
             displayUnitButtons[i].setBackground(round(selected ? ACCENT_SOFT : SURFACE, 14));
             displayUnitButtons[i].setTextColor(selected ? TEXT : MUTED);
-            displayUnitButtons[i].setContentDescription(names[i] + (selected ? ", selected" : ""));
+            displayUnitButtons[i].setSelected(selected);
+            displayUnitButtons[i].setContentDescription(names[i]);
         }
         render(timer, timer == null ? 0 : android.os.SystemClock.elapsedRealtime());
     }
@@ -378,17 +392,21 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         TextView view = label(text, 13, selected ? TEXT : MUTED, true);
         view.setGravity(Gravity.CENTER);
         view.setBackground(round(selected ? ACCENT_SOFT : SURFACE, 18));
+        view.setSelected(selected);
+        configureChoiceAccessibility(view);
         return view;
     }
 
     private void rebuildPresets() {
         presetRow.removeAllViews();
         for (long minutes : PRESETS_MINUTES) {
-            TextView preset = label(minutes + "\nmin", 12,
-                    selectedDurationMs == minutes * 60_000L ? TEXT : MUTED, true);
+            boolean selected = selectedDurationMs == minutes * 60_000L;
+            TextView preset = label(minutes + "\nmin", 12, selected ? TEXT : MUTED, true);
             preset.setGravity(Gravity.CENTER);
-            preset.setBackground(round(selectedDurationMs == minutes * 60_000L
-                    ? ACCENT_SOFT : SURFACE_HI, 16));
+            preset.setBackground(round(selected ? ACCENT_SOFT : SURFACE_HI, 16));
+            preset.setSelected(selected);
+            preset.setContentDescription(minutes + " minutes");
+            configureChoiceAccessibility(preset);
             LayoutParams lp = new LayoutParams(0, dp(62), 1);
             if (presetRow.getChildCount() > 0) lp.leftMargin = dp(6);
             presetRow.addView(preset, lp);
@@ -455,18 +473,63 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private TextView settingRow(String text, boolean selected) {
-        TextView view = label((selected ? "●  " : "○  ") + text, 13, TEXT, true);
+        TextView view = label(text, 13, TEXT, true);
         view.setPadding(dp(14), dp(13), dp(14), dp(13));
+        view.setMinimumHeight(dp(48));
         view.setBackground(round(SURFACE_HI, 16));
+        configureToggleAccessibility(view);
+        setToggleState(view, text, selected);
         return view;
+    }
+
+    private void configureButtonAccessibility(TextView view) {
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setClassName(android.widget.Button.class.getName());
+            }
+        });
+    }
+
+    private void configureChoiceAccessibility(TextView view) {
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setClassName(RadioButton.class.getName());
+                info.setCheckable(true);
+                info.setChecked(host.isSelected());
+            }
+        });
+    }
+
+    private void configureToggleAccessibility(TextView view) {
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setClassName(android.widget.CheckBox.class.getName());
+                info.setCheckable(true);
+                info.setChecked(host.isSelected());
+            }
+        });
+    }
+
+    private void setToggleState(TextView view, String text, boolean checked) {
+        view.setText((checked ? "●  " : "○  ") + text);
+        view.setContentDescription(text);
+        view.setSelected(checked);
     }
 
     private TextView actionButton(String text, int color) {
         TextView view = label(text, 14, TEXT, true);
         view.setGravity(Gravity.CENTER);
         view.setBackground(round(color, 22));
-        view.setClickable(true);
-        view.setFocusable(true);
+        configureButtonAccessibility(view);
         return view;
     }
 
