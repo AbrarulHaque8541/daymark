@@ -108,11 +108,11 @@
     async function onRefresh() {
       if (busy) return;
       if (!currencyApi || typeof currencyApi.fetchLatestRates !== 'function') {
-        status('Currency conversion is unavailable in this environment.');
+        status('Currency conversion is unavailable.');
         return;
       }
       if (!fetchImpl) {
-        status('Network access is unavailable for currency refresh.');
+        status('Could not refresh: fetch is unavailable in this browser.');
         return;
       }
       const { amountText, from, to } = readInputs();

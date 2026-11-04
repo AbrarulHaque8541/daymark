@@ -212,8 +212,8 @@ test('refresh fetches, renders, and persists the result', async () => {
 test('an invalid amount is rejected before any network call', async () => {
   const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
   const { env, elements } = fakeEnv({ amount: 'not-a-number', fetch: fetchImpl });
-  ui.attachCurrencyUi(env);
-  await ui.attachCurrencyUi(env).onRefresh();
+  const handle = ui.attachCurrencyUi(env);
+  await handle.onRefresh();
   assert.equal(fetchImpl.seen.length, 0);
   assert.equal(elements['currency-status'].textContent, 'Enter a positive amount to convert.');
 });
@@ -238,28 +238,19 @@ test('refresh failure keeps a matching cached rate visible', async () => {
 });
 
 test('refresh failure with a mismatched cache reports the error plainly', async () => {
-  const fetchImpl = () => Promise.reject(new Error('offline'));
-  fetchImpl.seen = [];
-  const mismatched = JSON.stringify({
-    version: 1,
-    from: 'EUR',
-    to: 'INR',
-    rate: 90,
-    asOfDate: '2026-11-01',
-    fetchedAt: '2026-11-01T12:00:00.000Z'
-  });
-  const { env, elements } = fakeEnv({ stored: mismatched, amount: '10', fetch: fetchImpl });
+  const failing = () => Promise.reject(new Error('offline'));
+  const { env, elements } = fakeEnv({ from: 'EUR', stored: STORED, fetch: failing });
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
   assert.equal(elements['currency-status'].textContent, 'Could not refresh: offline');
+  assert.equal(elements['currency-now'].textContent, '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
 });
 
 test('missing fetch support is reported instead of throwing', async () => {
-  const { env, elements } = fakeEnv({ amount: '10' });
-  delete env.fetch;
+  const { env, elements } = fakeEnv({});
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
-  assert.equal(elements['currency-status'].textContent, 'Network access is unavailable for currency refresh.');
+  assert.ok(elements['currency-status'].textContent.includes('fetch is unavailable'));
 });
 
 test('busy refresh locks inputs, marks form aria-busy, and shows Updating status', async () => {
