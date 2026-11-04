@@ -278,7 +278,7 @@
           <div class="currency-now" id="currency-now" aria-live="polite"></div>
         </aside>
 
-        <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
+        <aside class="briefing-card webhook-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
           <h2 id="webhook-heading">Task-completion webhook</h2>
           <p class="briefing-description">Send a minimal JSON event to any https:// webhook you choose when a task is completed - Discord, Slack, n8n, Home Assistant, or your own script. Delivery is opt-in and HTTPS-only; failures queue on this device and send on the next connection or Retry. No polling, no timers, no maintainer backend.</p>
@@ -286,38 +286,31 @@
             <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
             <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
             <button class="button button-primary webhook-save" id="webhook-save" type="submit">Save</button>
-          </form>
-          <div class="focus-actions">
             <button class="button button-quiet" id="webhook-test" type="button">Send test</button>
             <button class="button button-quiet" id="webhook-flush" type="button" disabled>Retry queued</button>
-          </div>
+          </form>
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
         </aside>
-        </div>
-      </div>
-      <footer class="page-footer"><span>DAYMARK <span aria-hidden="true">·</span> PERSONAL TASKS</span><span>Made for a calmer kind of productive.</span></footer>
-    </main>
-  
-</div>
 
-  <dialog id="edit-dialog" class="edit-dialog" aria-labelledby="edit-heading">
-    <form id="edit-form" method="dialog" novalidate>
-      <div class="dialog-header"><div><p class="eyebrow">UPDATE YOUR LIST</p><h2 id="edit-heading">Edit task</h2></div><button class="icon-button close-dialog" type="button" aria-label="Close edit dialog">×</button></div>
-      <input type="hidden" name="id" id="edit-id">
-      <label class="field-label" for="edit-title">Task title</label>
-      <input id="edit-title" name="title" type="text" maxlength="160" aria-describedby="edit-error" required>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="edit-dialog" id="edit-dialog" aria-labelledby="edit-heading">
+    <form id="edit-form" class="edit-form" novalidate>
+      <h2 id="edit-heading">Edit task</h2>
       <div class="dialog-fields">
+        <div><label class="field-label" for="edit-title">Title</label><input id="edit-title" name="title" type="text" maxlength="160" required></div>
         <div><label class="field-label" for="edit-due-date">Due date <span>(optional)</span></label><input id="edit-due-date" name="dueDate" type="date"></div>
         <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
+        <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">Remind at due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
       </div>
       <div class="dialog-fields">
-        <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">At due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
         <div><label class="field-label" for="edit-priority">Priority</label><select id="edit-priority" name="priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
       </div>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
-        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" 
-name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
+        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
       </div>
       <p class="reminder-note-standalone">Reminders show on this page while it is open. Completing a repeating task automatically schedules its next occurrence.</p>
       <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
@@ -341,4 +334,3 @@ name="repeat" disabled><option value="">No repeat</option><option value="daily">
   </div>
 </body>
 </html>
-
