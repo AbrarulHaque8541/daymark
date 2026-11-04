@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
@@ -141,6 +142,32 @@
       }
     }
 
+    function onSwap() {
+      if (busy) return;
+      if (!fromEl || !toEl || typeof fromEl.value !== 'string' || typeof toEl.value !== 'string') return;
+      const oldFrom = fromEl.value;
+      fromEl.value = toEl.value;
+      toEl.value = oldFrom;
+      const { amountText, from, to } = readInputs();
+      const amount = currencyApi ? currencyApi.normalizeAmount(amountText) : null;
+      if (cached && cached.from === from && cached.to === to && amount !== null) {
+        render(cached, amount);
+        status(`Swapped · showing cached ${from} → ${to} rate.`);
+      } else if (cached && cached.from === to && cached.to === from && amount !== null && currencyApi) {
+        // Approximate inverse for immediate feedback; exact rate still requires Refresh.
+        const inverseRate = 1 / cached.rate;
+        if (Number.isFinite(inverseRate) && inverseRate >= currencyApi.MIN_RATE && inverseRate <= currencyApi.MAX_RATE) {
+          const tempCache = { ...cached, from, to, rate: inverseRate };
+          render(tempCache, amount);
+          status(`Swapped · approximate inverse of cached rate. Tap Refresh for the exact ECB rate.`);
+        } else {
+          status('Swapped currencies. Tap Refresh for the new rate.');
+        }
+      } else {
+        status('Swapped currencies. Tap Refresh for the new rate.');
+      }
+    }
+
     cached = readCache();
     if (cached) {
       render(cached, currencyApi ? currencyApi.normalizeAmount(
@@ -155,6 +182,13 @@
       formEl.addEventListener('submit', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
         return onRefresh();
+      });
+    }
+
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        onSwap();
       });
     }
 
@@ -173,6 +207,7 @@
 
     return {
       onRefresh,
+      onSwap,
       readCache,
       detach() {
         // No document-level listener is registered; the button reference is

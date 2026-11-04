@@ -51,6 +51,7 @@ function fakeEnv(options) {
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
@@ -251,4 +252,16 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.DEFAULT_FROM, 'USD');
   assert.equal(ui.DEFAULT_TO, 'INR');
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
+});
+
+test('swap button exchanges from and to and shows approximate inverse when cached', () => {
+  const { env, elements } = fakeEnv({ stored: STORED, amount: '10' });
+  const handle = ui.attachCurrencyUi(env);
+  assert.equal(elements['currency-from'].value, 'USD');
+  assert.equal(elements['currency-to'].value, 'INR');
+  handle.onSwap();
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  assert.ok(elements['currency-status'].textContent.includes('approximate inverse') || elements['currency-status'].textContent.includes('Swapped'));
+  assert.ok(elements['currency-now'].textContent.includes('INR') && elements['currency-now'].textContent.includes('USD'));
 });
