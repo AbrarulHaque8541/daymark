@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: b4ab2b6d28d81b41967104c3640ac67570499432)
 <!doctype html>
 <html lang="en">
 <head>
@@ -18,6 +19,8 @@
   <script src="weather-ui.js" defer></script>
   <script src="currency-logic.js" defer></script>
   <script src="currency-ui.js" defer></script>
+  <script src="webhook-logic.js" defer></script>
+  <script src="webhook-ui.js" defer></script>
   <script src="app.js" defer></script>
   <script src="export-ui.js" defer></script>
 </head>
@@ -274,6 +277,22 @@
           </form>
           <p class="currency-status" id="currency-status" role="status" aria-live="polite"></p>
           <div class="currency-now" id="currency-now" aria-live="polite"></div>
+        </aside>
+
+        <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
+          <h2 id="webhook-heading">Task-completion webhook</h2>
+          <p class="briefing-description">Send a minimal JSON event to any https:// webhook you choose when a task is completed - Discord, Slack, n8n, Home Assistant, or your own script. Delivery is opt-in and HTTPS-only; failures queue on this device and send on the next connection or Retry. No polling, no timers, no maintainer backend.</p>
+          <form id="webhook-form" class="feed-form" novalidate>
+            <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
+            <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
+            <button class="button button-primary webhook-save" id="webhook-save" type="submit">Save</button>
+          </form>
+          <div class="focus-actions">
+            <button class="button button-quiet" id="webhook-test" type="button">Send test</button>
+            <button class="button button-quiet" id="webhook-flush" type="button" disabled>Retry queued</button>
+          </div>
+          <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
         </aside>
         </div>
       </div>

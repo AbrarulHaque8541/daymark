@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: 8df8bc499534317b9fcf47067ce482d3aaae7333)
 (() => {
   'use strict';
 
@@ -882,6 +883,16 @@
     syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'));
   }
 
+  function notifyWebhookTaskCompleted(task) {
+    const webhookUi = window.DaymarkWebhookUi;
+    if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
+    try {
+      webhookUi.notifyTaskCompleted(task);
+    } catch (error) {
+      console.warn('Could not queue the Daymark task-completed webhook:', error);
+    }
+  }
+
   function handleTaskAction(event) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
@@ -891,6 +902,7 @@
     if (button.dataset.action === 'toggle') {
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
+      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
       render();
