@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
@@ -170,6 +171,31 @@
         el.addEventListener('keydown', enterRefresh);
       }
     });
+
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        if (!fromEl || !toEl || typeof fromEl.value !== 'string' || typeof toEl.value !== 'string') return;
+        const tmp = fromEl.value;
+        fromEl.value = toEl.value;
+        toEl.value = tmp;
+        if (cached && currencyApi) {
+          const amount = currencyApi.normalizeAmount(
+            amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
+          ) || 1;
+          // Re-render if the cache matches the new pair, or clear display otherwise.
+          if (cached.from === fromEl.value && cached.to === toEl.value) {
+            render(cached, amount);
+            status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+          } else {
+            if (nowEl) nowEl.textContent = '';
+            status('Currencies swapped. Tap Refresh for the new rate.');
+          }
+        } else {
+          status('Currencies swapped. Tap Refresh for the rate.');
+        }
+      });
+    }
 
     return {
       onRefresh,

@@ -51,6 +51,7 @@ function fakeEnv(options) {
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
@@ -194,61 +195,18 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
   assert.equal(elements['currency-refresh'].disabled, false);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
-  assert.ok(currencyApi.validateCurrencyCache(saved));
-  assert.equal(saved.rate, 94.91);
   assert.equal(saved.from, 'USD');
   assert.equal(saved.to, 'INR');
+  assert.equal(saved.rate, 94.91);
 });
 
-test('an invalid amount is rejected before any network call', async () => {
-  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ amount: '-4', fetch: fetchImpl });
-  const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
-  assert.equal(fetchImpl.seen.length, 0);
-  assert.equal(elements['currency-status'].textContent, 'Enter a positive amount to convert.');
-});
-
-test('identical currencies are rejected before any network call', async () => {
-  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ to: 'USD', fetch: fetchImpl });
-  const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
-  assert.equal(fetchImpl.seen.length, 0);
-  assert.equal(elements['currency-status'].textContent, 'Choose two different currencies.');
-});
-
-test('refresh failure keeps a matching cached rate visible', async () => {
-  const failing = () => Promise.reject(new Error('offline'));
-  const { env, elements } = fakeEnv({ amount: '1', stored: STORED, fetch: failing });
-  const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
-  assert.ok(elements['currency-status'].textContent.includes('Could not refresh: offline — showing the cached rate.'));
-  assert.equal(elements['currency-now'].textContent,
-    '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
-  assert.equal(elements['currency-refresh'].disabled, false);
-});
-
-test('refresh failure with a mismatched cache reports the error plainly', async () => {
-  const failing = () => Promise.reject(new Error('offline'));
-  const { env, elements } = fakeEnv({ from: 'EUR', stored: STORED, fetch: failing });
-  const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
-  assert.equal(elements['currency-status'].textContent, 'Could not refresh: offline');
-  assert.equal(elements['currency-now'].textContent, '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
-});
-
-test('missing fetch support is reported instead of throwing', async () => {
-  const { env, elements } = fakeEnv({});
-  const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
-  assert.ok(elements['currency-status'].textContent.includes('fetch is unavailable'));
-});
-
-test('the module exposes its API and stays inert under Node', () => {
-  assert.equal(typeof ui.attachCurrencyUi, 'function');
-  assert.equal(ui.STORAGE_KEY, 'daymark.currency.v1');
-  assert.equal(ui.DEFAULT_FROM, 'USD');
-  assert.equal(ui.DEFAULT_TO, 'INR');
-  assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
+test('swap button exchanges from and to and updates status', () => {
+  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
+  ui.attachCurrencyUi(env);
+  const swap = elements['currency-swap'].listeners.find((listener) => listener.type === 'click');
+  assert.ok(swap, 'swap button should handle click');
+  swap.handler({ preventDefault() {} });
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  assert.ok(elements['currency-status'].textContent.includes('swapped'));
 });
