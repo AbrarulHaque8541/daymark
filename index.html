@@ -20,6 +20,8 @@
   <script src="currency-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
+  <script src="storage-logic.js" defer></script>
+  <script src="storage-ui.js" defer></script>
   <script src="app.js" defer></script>
   <script src="export-ui.js" defer></script>
 </head>
@@ -292,6 +294,17 @@
             <button class="button button-quiet" id="webhook-flush" type="button" disabled>Retry queued</button>
           </div>
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
+        </aside>
+        <aside class="briefing-card" id="data-card" aria-labelledby="data-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">DATA CONTROLS</span></div>
+          <h2 id="data-heading">Your data, explained</h2>
+          <p class="briefing-description">Everything this prototype stores lives only in this browser — tasks, Focus history, caches, and automation settings. Each Clear button below removes exactly what its row describes and nothing else, after asking you once. Nothing here uses the network.</p>
+          <div class="focus-actions" role="group" aria-label="Data controls actions">
+            <button class="button button-quiet" id="data-refresh" type="button">Refresh sizes</button>
+            <button class="button button-quiet" id="data-clear-all" type="button">Clear all local data</button>
+          </div>
+          <p class="feed-status" id="data-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="data-list" aria-label="Stored data categories"></div>
         </aside>
         </div>
       </div>
