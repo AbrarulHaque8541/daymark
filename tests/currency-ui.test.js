@@ -51,6 +51,7 @@ function fakeEnv(options) {
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
@@ -252,3 +253,17 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.DEFAULT_TO, 'INR');
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
+
+test('swap button exchanges from/to and updates status without auto-refresh', () => {
+  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
+  const handle = ui.attachCurrencyUi(env);
+  const swap = elements['currency-swap'];
+  assert.ok(swap.listeners.some((l) => l.type === 'click'), 'swap button should listen for clicks');
+  const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+  swap.listeners.find((l) => l.type === 'click').handler(click);
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  assert.ok(elements['currency-status'].textContent.includes('swapped'), 'status should mention swap');
+  assert.equal(click.prevented, true);
+});
+
