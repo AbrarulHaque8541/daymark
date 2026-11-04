@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-04T04:45:00Z (Cycle B)](./CURRENT_STATUS_20261104T044500Z_CYCLEB.md)
 - [Daymark whole-project engineering status — 2026-11-04T04:45:00Z (web automation cycle)](./CURRENT_STATUS_20261104T044500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T08:50:00Z (Cycle B)](./CURRENT_STATUS_20261104T085000Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T08:15:00Z (Cycle A)](./CURRENT_STATUS_20261104T081500Z.md)
@@ -40,11 +41,11 @@
 
 ## Latest reviewed snapshot
 
+- [Daymark whole-project engineering status — 2026-11-04T04:45:00Z (Cycle B)](./CURRENT_STATUS_20261104T044500Z_CYCLEB.md)
+
 - [Daymark whole-project engineering status — 2026-11-04T04:45:00Z (web automation cycle)](./CURRENT_STATUS_20261104T044500Z.md)
 
 - [Daymark whole-project engineering status — 2026-11-04T08:50:00Z (Cycle B)](./CURRENT_STATUS_20261104T085000Z.md)
-
-- [Daymark whole-project engineering status — 2026-11-04T07:15:00Z (Cycle B)](./CURRENT_STATUS_20261104T071500Z.md)
 
 ## Before acting
 
