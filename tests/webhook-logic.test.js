@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: 0398da4470125a5f06de56b9450a86ee881f5e2a)
 'use strict';
 
 const test = require('node:test');
@@ -54,7 +55,7 @@ test('completed-task payloads are minimal and never export IDs or notes', () => 
   const serialized = JSON.stringify(payload);
   assert.equal(serialized.includes('secret-internal-id'), false, 'internal task IDs must never be exported');
   assert.equal(serialized.includes('private note'), false, 'task notes must never be exported');
-  assert.equal(webhook.buildTaskCompletedPayload(null), undefined);
+  assert.throws(() => webhook.buildTaskCompletedPayload(null), /task object/);
   assert.throws(() => webhook.buildTaskCompletedPayload('nope'), /task object/);
 });
 
