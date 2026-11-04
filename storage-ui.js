@@ -117,11 +117,28 @@
     }
 
     function setBusy(busy) {
-      if (clearAllEl) clearAllEl.disabled = busy;
-      if (refreshEl) refreshEl.disabled = busy;
+      if (clearAllEl) {
+        clearAllEl.disabled = busy;
+        if (typeof clearAllEl.classList !== 'undefined') {
+          clearAllEl.classList.toggle('is-busy', busy);
+        }
+      }
+      if (refreshEl) {
+        refreshEl.disabled = busy;
+        if (typeof refreshEl.classList !== 'undefined') {
+          refreshEl.classList.toggle('is-busy', busy);
+        }
+      }
       if (listEl) listEl.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (typeof doc.querySelectorAll === 'function') {
-        doc.querySelectorAll('#data-list .tool-button').forEach(btn => { if (btn) btn.disabled = busy; });
+        doc.querySelectorAll('#data-list .tool-button').forEach(btn => {
+          if (btn) {
+            btn.disabled = busy;
+            if (typeof btn.classList !== 'undefined') {
+              btn.classList.toggle('is-busy', busy);
+            }
+          }
+        });
       }
     }
 
