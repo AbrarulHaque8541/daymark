@@ -268,8 +268,6 @@ public final class MainActivity extends Activity {
     private LinearLayout root;
     private View appTopBar;
     private View sharedComposer;
-    private LinearLayout topBarMark;
-    private View topBarBrand;
     private LinearLayout taskList;
     private LinearLayout suggestionList;
     private LinearLayout undoBar;
@@ -297,8 +295,6 @@ public final class MainActivity extends Activity {
     private View searchControlView;
     private View taskScreen;
     private ScrollView taskScrollView;
-    private Runnable taskChromeRestoreRunnable;
-    private boolean taskChromeHidden;
     private LinearLayout taskActions;
     private LinearLayout webActions;
     private EditText browserAddressInput;
@@ -1050,7 +1046,6 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (taskChromeRestoreRunnable != null) mainHandler.removeCallbacks(taskChromeRestoreRunnable);
         if (browserChromeRestoreRunnable != null) mainHandler.removeCallbacks(browserChromeRestoreRunnable);
         unregisterDaymarkBackCallback();
         activityCallbackGate.close();
@@ -1410,25 +1405,11 @@ public final class MainActivity extends Activity {
         root.addView(appTopBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         sharedComposer = buildSharedComposer();
-        root.addView(sharedComposer, bottomMargin(dp(8)));
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(false);
         scrollView.setClipToPadding(false);
         taskScrollView = scrollView;
-        scrollView.setOnScrollChangeListener((View view, int x, int y, int oldX, int oldY) -> {
-            if (webMode) return;
-            int delta = y - oldY;
-            // Use a meaningful threshold and no timed auto-restore: tiny scroll noise must
-            // not make the header blink in and out. Returning to the top always restores it.
-            if (y <= dp(24) || delta < -dp(10)) {
-                if (taskChromeRestoreRunnable != null) mainHandler.removeCallbacks(taskChromeRestoreRunnable);
-                setTaskChromeHidden(false);
-            } else if (y > dp(120) && delta > dp(8)) {
-                if (taskChromeRestoreRunnable != null) mainHandler.removeCallbacks(taskChromeRestoreRunnable);
-                setTaskChromeHidden(true);
-            }
-        });
         LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         taskScreen = scrollView;
@@ -1458,6 +1439,7 @@ public final class MainActivity extends Activity {
         contentFrame.addView(content, contentParams);
         scrollView.addView(contentFrame, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        content.addView(sharedComposer, bottomMargin(dp(8)));
 
         addDashboardHeading(content);
         addPrivacyCard(content);
@@ -1605,7 +1587,6 @@ public final class MainActivity extends Activity {
         bar.setPadding(dp(18), dp(12), dp(18), dp(8));
 
         LinearLayout mark = new LinearLayout(this);
-        topBarMark = mark;
         mark.setGravity(Gravity.CENTER);
         TextView markText = text("d", 20, Color.WHITE, Typeface.BOLD);
         mark.setBackground(shape(palette.accent, 22, palette.accent));
@@ -1614,7 +1595,6 @@ public final class MainActivity extends Activity {
         bar.addView(mark, markParams);
 
         LinearLayout brand = new LinearLayout(this);
-        topBarBrand = brand;
         brand.setOrientation(LinearLayout.VERTICAL);
         brand.setPadding(dp(10), 0, 0, 0);
         TextView brandName = text("daymark", 16, palette.text, Typeface.BOLD);
@@ -1692,30 +1672,25 @@ public final class MainActivity extends Activity {
         card.setElevation(dp(1));
 
         LinearLayout quickActions = new LinearLayout(this);
-        quickActions.setGravity(Gravity.CENTER_VERTICAL);
-        Button addTaskShortcut = compactButton("+ Task", false);
-        addTaskShortcut.setContentDescription("Open the task editor to create a task with date, priority, notes and other options");
-        addTaskShortcut.setOnClickListener(view -> {
-            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            showTaskEditor(null, "");
-        });
-        quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        Button searchTasksShortcut = compactButton("⌕ Search", false);
-        searchTasksShortcut.setContentDescription("Expand task search by title and words");
+        quickActions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        Button searchTasksShortcut = compactButton("⌕", false);
+        searchTasksShortcut.setContentDescription("Show task search");
         searchTasksShortcut.setOnClickListener(view -> {
             if (searchControlView == null) return;
             searchControlView.setVisibility(searchControlView.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
-            if (searchControlView.getVisibility() == View.VISIBLE && searchInput != null) {
+            boolean searchVisible = searchControlView.getVisibility() == View.VISIBLE;
+            view.setContentDescription(searchVisible ? "Hide task search" : "Show task search");
+            if (searchVisible && searchInput != null) {
                 searchInput.requestFocus();
-                if (taskScrollView != null) taskScrollView.post(() -> taskScrollView.smoothScrollTo(0, searchControlView.getTop()));
             }
         });
-        LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        searchShortcutParams.leftMargin = dp(6);
-        quickActions.addView(searchTasksShortcut, searchShortcutParams);
+        quickActions.addView(searchTasksShortcut);
         card.addView(quickActions, bottomMargin(dp(7)));
+        LinearLayout searchHost = new LinearLayout(this);
+        searchHost.setOrientation(LinearLayout.VERTICAL);
+        searchHost.setVisibility(View.GONE);
+        searchControlView = searchHost;
+        card.addView(searchHost, bottomMargin(dp(7)));
 
         quickCaptureInput = new EditText(this);
         quickCaptureInput.setSingleLine(true);
@@ -5044,9 +5019,12 @@ public final class MainActivity extends Activity {
         });
         searchRow.addView(searchClear, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        searchControlView = searchRow;
-        searchRow.setVisibility(View.GONE);
-        content.addView(searchRow, bottomMargin(dp(11)));
+        if (searchControlView instanceof LinearLayout) {
+            ((LinearLayout) searchControlView).addView(searchRow,
+                    new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
 
         tagFilterRow = new LinearLayout(this);
         tagFilterRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -5553,79 +5531,7 @@ public final class MainActivity extends Activity {
         scheduleFocusTimerTick();
     }
 
-    private void setTaskChromeHidden(boolean hidden) {
-        if (webMode || appTopBar == null || sharedComposer == null) return;
-        if (taskChromeHidden == hidden) return;
-        taskChromeHidden = hidden;
-
-        // Keep a small Daymark mark visible while scrolling; hide only the full brand
-        // label and composer. This preserves a workspace anchor without a tall header.
-        appTopBar.animate().cancel();
-        appTopBar.setVisibility(View.VISIBLE);
-        appTopBar.setTranslationY(0f);
-        appTopBar.setAlpha(1f);
-        if (topBarBrand != null) {
-            topBarBrand.animate().cancel();
-            if (hidden) {
-                topBarBrand.animate().alpha(0f).setDuration(120L).setInterpolator(MOTION_EXIT)
-                        .withEndAction(() -> {
-                            if (taskChromeHidden && !webMode && topBarBrand != null) {
-                                topBarBrand.setVisibility(View.GONE);
-                            }
-                        }).start();
-            } else {
-                topBarBrand.setVisibility(View.VISIBLE);
-                topBarBrand.setAlpha(0f);
-                topBarBrand.animate().alpha(1f).setDuration(180L)
-                        .setInterpolator(MOTION_ENTER).start();
-            }
-        }
-        if (topBarMark != null && topBarMark.getLayoutParams() instanceof LinearLayout.LayoutParams) {
-            LinearLayout.LayoutParams markParams = (LinearLayout.LayoutParams) topBarMark.getLayoutParams();
-            markParams.width = dp(hidden ? 30 : 38);
-            markParams.height = dp(hidden ? 30 : 38);
-            topBarMark.setLayoutParams(markParams);
-        }
-        appTopBar.setPadding(dp(hidden ? 12 : 18), dp(hidden ? 6 : 12),
-                dp(hidden ? 12 : 18), dp(hidden ? 6 : 8));
-
-        sharedComposer.animate().cancel();
-        // dp(8) mirrors the composer's bottom margin in buildRoot(); a GONE view drops both.
-        int reserve = ScrollChromeReserve.reserveFor(sharedComposer.getHeight(), dp(8), dp(48));
-        if (hidden) {
-            sharedComposer.setVisibility(View.VISIBLE);
-            sharedComposer.animate().translationY(-reserve)
-                    .alpha(0f).setDuration(180L).setInterpolator(MOTION_EXIT).withEndAction(() -> {
-                        if (taskChromeHidden && !webMode) {
-                            sharedComposer.setVisibility(View.GONE);
-                            // The weighted ScrollView grows by exactly this much once the composer
-                            // leaves the layout. Reserve the same space as bottom padding in the
-                            // same pass, or the shorter scroll range re-clamps the offset and the
-                            // list jumps upward while the reader is still dragging.
-                            setTaskScrollReserve(reserve);
-                        }
-                    }).start();
-        } else {
-            setTaskScrollReserve(0);
-            sharedComposer.setVisibility(View.VISIBLE);
-            sharedComposer.setTranslationY(-reserve);
-            sharedComposer.setAlpha(0f);
-            sharedComposer.animate().translationY(0f).alpha(1f).setDuration(200L)
-                    .setInterpolator(MOTION_ENTER).start();
-        }
-    }
-
-    /** Applies the task list's bottom reserve so hiding the composer never moves the content. */
-    private void setTaskScrollReserve(int reservePx) {
-        if (taskScrollView == null) return;
-        int wanted = Math.max(reservePx, 0);
-        if (!ScrollChromeReserve.changesReserve(taskScrollView.getPaddingBottom(), wanted)) return;
-        taskScrollView.setPadding(taskScrollView.getPaddingLeft(), taskScrollView.getPaddingTop(),
-                taskScrollView.getPaddingRight(), wanted);
-    }
-
     private void syncModeUi() {
-        if (!webMode && taskChromeHidden) setTaskChromeHidden(false);
         if (taskScreen == null || browserScreen == null || quickCaptureInput == null) return;
         syncBottomNavSelection();
         if (webMode && browserChromeHidden) setBrowserChromeHidden(false);

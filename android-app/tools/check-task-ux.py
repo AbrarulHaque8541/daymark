@@ -78,8 +78,8 @@ check("private HorizontalScrollView tagFilterScroll;" in ACTIVITY, "tag chip scr
 check("private LinearLayout tagFilterRow;" in ACTIVITY, "tag chip row missing")
 check("tagFilterScroll = new HorizontalScrollView(this);" in ACTIVITY, "tag chip scroller not built")
 check("content.addView(tagFilterScroll, bottomMargin(dp(9)));" in ACTIVITY,
-      "tag chip row not attached under the search field")
-render = region("private void render()", "private void setTaskChromeHidden", "render()")
+      "tag chip row must remain attached to Tasks content")
+render = region("private void render()", "private void syncModeUi()", "render()")
 check("renderTagFilters();" in render, "render() must refresh the tag chips")
 chips = region("private void renderTagFilters()", "private Button tagChip", "renderTagFilters")
 check("boolean show = powerMode && !webMode && !storageLoading && !storageLoadFailed"
@@ -140,12 +140,24 @@ composer = region("private View buildSharedComposer()", "private View buildBrows
 check("quickCaptureInput.setMinHeight(dp(48))" in composer
       and "quickCaptureInput.setMinimumHeight(dp(48))" in composer,
       "quick capture input must retain a 48 dp minimum target")
-check("quickActions.addView(addTaskShortcut, new LinearLayout.LayoutParams(\n"
-      "                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))" in composer,
-      "task-editor shortcut must not force a shorter fixed height")
-check("LinearLayout.LayoutParams searchShortcutParams = new LinearLayout.LayoutParams(\n"
-      "                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)" in composer,
-      "search shortcut must not force a shorter fixed height")
+check(composer.count('compactButton("Add task", false)') == 1
+      and 'compactButton("+ Task"' not in composer,
+      "the composer must have one task-create action, not duplicate Add task shortcuts")
+check('Button searchTasksShortcut = compactButton("⌕", false)' in composer
+      and "quickActions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);" in composer,
+      "the expandable search icon must be right-aligned in the composer")
+check('searchTasksShortcut.setContentDescription("Show task search")' in composer
+      and 'view.setContentDescription(searchVisible ? "Hide task search" : "Show task search")' in composer,
+      "the search icon must expose an accessible label for its expanded state")
+check("searchControlView.setVisibility(searchControlView.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);" in composer
+      and "searchHost.setVisibility(View.GONE);" in composer,
+      "the search icon must expand and collapse the existing search field in place")
+check('searchInput.setHint("Search tasks")' in search_controls
+      and '((LinearLayout) searchControlView).addView(searchRow,' in search_controls
+      and "content.addView(searchRow" not in search_controls,
+      "the existing Search tasks input must live inside the collapsed composer host")
+check("searchHost.setVisibility(View.GONE);" in composer,
+      "task search host must start collapsed until the upper-right icon is tapped")
 check("addTaskButton.setMinHeight(dp(40))" not in composer,
       "Add task must inherit the compact button's 48 dp minimum")
 task_row = region("private View buildTaskRow(Task task)", "private void showSwipeTaskActions",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the scroll-responsive theme wiring and its host regression coverage."""
+"""Guard the scroll-responsive theme and natural Tasks-home scrolling."""
 from pathlib import Path
 import sys
 
@@ -11,7 +11,9 @@ assert (root / "app/src/main/java/com/abrar/daymark/ScrollThemeColor.java").is_f
 assert (root / "tools/ScrollThemeColorSmoke.java").is_file(), "scroll theme smoke test is missing"
 assert "ScrollThemeColor.gradientColors(" in activity, "task content must use the scroll gradient"
 assert "palette.background, palette.accentSoft, palette.surfaceAlt, highContrast" in activity, "gradient must honor active palette and high-contrast mode"
-assert "setOnScrollChangeListener" in activity and "setTaskChromeHidden(true)" in activity, "existing task scroll chrome behavior must remain wired"
+assert "content.addView(sharedComposer, bottomMargin(dp(8)));" in activity, "the composer must scroll as part of Tasks content"
+assert "root.addView(sharedComposer" not in activity, "the composer must not remain pinned above the task ScrollView"
+assert "scrollView.setOnScrollChangeListener" not in activity and "setTaskChromeHidden" not in activity, "task scrolling must not trigger composer hide/show flicker"
 assert "ScrollThemeColor.java" in core and "ScrollThemeColorSmoke.java" in core, "core test script must compile helper and smoke test"
 assert "com.abrar.daymark.ScrollThemeColorSmoke" in core, "core test script must execute the smoke test"
 assert "check-scroll-theme.py" in source_guard, "canonical source checks must run the scroll theme guard"
@@ -30,4 +32,4 @@ assert "@media (prefers-reduced-motion: reduce)" in motion_css, "motion layer mu
 assert "content-visibility: auto" in motion_css, "motion layer must retain list rendering optimization"
 assert "touch-action: manipulation" in motion_css, "motion layer must retain responsive tap behavior"
 
-print("PASS scroll theme wiring and regression guard")
+print("PASS scroll theme and natural Tasks-home scrolling guard")

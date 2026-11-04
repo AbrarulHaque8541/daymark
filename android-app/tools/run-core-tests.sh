@@ -29,7 +29,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/EncryptedBlobStore.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/WebClip.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ScrollThemeColor.java" \
-  "$ROOT/app/src/main/java/com/abrar/daymark/ScrollChromeReserve.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/PressSurface.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/NoteFormat.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/KeyShortcuts.java" \
@@ -88,7 +87,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/TaskLogicSmoke.java" \
   "$ROOT/tools/ReminderSchedulePolicySmoke.java" \
   "$ROOT/tools/ScrollThemeColorSmoke.java" \
-  "$ROOT/tools/ScrollChromeReserveSmoke.java" \
   "$ROOT/tools/PressSurfaceSmoke.java" \
   "$ROOT/tools/TaskFilterSmoke.java" \
   "$ROOT/tools/TaskSearchSmoke.java" \
@@ -136,7 +134,6 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskWebhookClientSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskLogicSmoke "$ROOT/../contracts/task-date-validation.tsv" "$ROOT/../contracts/task-recurrence.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ReminderSchedulePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollThemeColorSmoke
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.ScrollChromeReserveSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.PressSurfaceSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskFilterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSearchSmoke
