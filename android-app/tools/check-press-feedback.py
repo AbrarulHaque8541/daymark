@@ -156,23 +156,21 @@ check("return super.onTouchEvent(event);" not in swipe,
       "delegating to View would double-handle the gesture this row owns; keep the explicit "
       "pressed-state calls and update this guard deliberately if that ever changes")
 
-# --- 5. Motion easing: curves present, no second animator-scale application --------------------
+# --- 5. Motion easing: browser curves present, no second animator-scale application -------------
 check("import android.view.animation.DecelerateInterpolator;" in ACTIVITY,
-      "entering chrome must decelerate into place")
+      "entering browser chrome must decelerate into place")
 check("import android.view.animation.AccelerateInterpolator;" in ACTIVITY,
-      "leaving chrome must accelerate away")
+      "leaving browser chrome must accelerate away")
 check("private static final Interpolator MOTION_ENTER = new DecelerateInterpolator(" in ACTIVITY,
       "the shared enter curve is missing")
 check("private static final Interpolator MOTION_EXIT = new AccelerateInterpolator(" in ACTIVITY,
       "the shared exit curve is missing")
-check(ACTIVITY.count("setInterpolator(MOTION_ENTER)") >= 3,
-      "brand label and composer must still use the enter curve in MainActivity")
-check(ACTIVITY.count("setInterpolator(MOTION_EXIT)") >= 2,
-      "brand label and composer hide must still use the exit curve in MainActivity")
-check("WorkspaceMotion.hideChrome(" in ACTIVITY,
-      "browser chrome hide must delegate to WorkspaceMotion")
-check("WorkspaceMotion.showChrome(" in ACTIVITY,
-      "browser chrome show must delegate to WorkspaceMotion")
+check(ACTIVITY.count("setInterpolator(MOTION_ENTER)") >= 1,
+      "remaining app surfaces must still use the enter curve in MainActivity")
+check("WorkspaceMotion.hideChrome(view, hiddenOffset, MOTION_EXIT" in ACTIVITY,
+      "browser chrome hide must use the exit curve through WorkspaceMotion")
+check("WorkspaceMotion.showChrome(view, hiddenOffset, MOTION_ENTER" in ACTIVITY,
+      "browser chrome show must use the enter curve through WorkspaceMotion")
 check("WorkspaceMotion.animateWorkspaceSwitch(" in ACTIVITY,
       "workspace/tab switch must delegate to WorkspaceMotion")
 check("ANIMATOR_DURATION_SCALE" not in ACTIVITY,
