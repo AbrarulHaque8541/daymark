@@ -23,7 +23,13 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    dispatchEvent(event) {
+      for (const listener of this.listeners) {
+        if (listener.type === event.type) listener.handler(event);
+      }
+      return !event.defaultPrevented;
+    }
   };
 }
 
@@ -32,6 +38,7 @@ function fakeEnv(options) {
   const elements = {
     'weather-place': Object.assign(fakeElement('input'), { id: 'weather-place', value: opts.place || '' }),
     'weather-refresh': Object.assign(fakeElement('button'), { id: 'weather-refresh' }),
+    'weather-form': Object.assign(fakeElement('form'), { id: 'weather-form' }),
     'weather-status': Object.assign(fakeElement('p'), { id: 'weather-status' }),
     'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' })
   };
@@ -94,6 +101,23 @@ test('attach with no cache prompts the user to type a place', () => {
   ui.attachWeatherUi(env);
   assert.equal(elements['weather-now'].textContent, '');
   assert.equal(elements['weather-status'].textContent, 'Type a place name and tap Refresh.');
+});
+
+test('form submission prevents navigation and refreshes the forecast', async () => {
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: fetchImpl });
+  ui.attachWeatherUi(env);
+  const submit = elements['weather-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'weather form should handle native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation should be prevented');
+  assert.equal(fetchImpl.seen.length, 2);
+  assert.ok(elements['weather-now'].textContent.startsWith('Kolkata, India'));
+  assert.equal(elements['weather-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
 });
 
 test('a corrupt cache is ignored instead of crashing', () => {
