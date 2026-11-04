@@ -103,6 +103,10 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .task-tools input::placeholder { color: var(--muted-text); }
 .tool-button { flex: 0 0 auto; height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #5f6c76; font-size: 11px; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
 .tool-button:hover { border-color: rgba(219, 226, 232, .9); background: rgba(255, 255, 255, .8); color: var(--accent); transform: translateY(-1px); }
+.tool-button:active { transform: translateY(1px) scale(.97); background: var(--accent-soft); color: var(--accent); }
+.filter-button:active { color: var(--accent-dark); }
+.complete-button:active { transform: scale(.92); border-color: var(--accent); }
+.tag-pill:active { transform: scale(.97); }
 .tool-button:focus-visible { outline-offset: 1px; }
 .empty-clear-search { margin-top: 12px; height: 36px; font-size: 11px; }
 .clear-search[hidden], .empty-clear-search[hidden], .tool-button[hidden] { display: none; }
@@ -136,6 +140,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .task-row:hover .task-actions, .task-row:focus-within .task-actions { opacity: 1; }
 .icon-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #5f6c76; transition: background .16s ease, color .16s ease, transform .16s ease; }
 .icon-button:hover { color: var(--accent); background: #e8eef2; transform: translateY(-1px); }
+.icon-button:active { transform: scale(.94); background: var(--accent-soft); color: var(--accent); }
 .icon-button.delete-button:hover { color: var(--red); background: var(--red-soft); }
 .icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .task-row.is-complete .task-title { color: var(--muted-text); text-decoration: line-through; text-decoration-color: #b9c4cc; }
