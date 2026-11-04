@@ -142,14 +142,15 @@
   50% { border-color: rgba(22, 112, 95, .45); }
 }
 
-/* Glance card refresh busy indicator (accent #16705f spinner, reduced-motion safe). */
+/* Glance card refresh busy indicator (accent #16705f spinner, reduced-motion safe).
+   Primary buttons use white spinner; quiet/secondary keep accent. Label stays visible with padding. */
 .button.is-busy,
 .feed-refresh.is-busy,
 .weather-refresh.is-busy,
 .currency-refresh.is-busy {
   position: relative;
   pointer-events: none;
-  opacity: 0.9;
+  opacity: 0.92;
   padding-left: 28px;
 }
 .button.is-busy::before,
@@ -160,13 +161,18 @@
   position: absolute;
   left: 10px;
   top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-top: -5px;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
   border-radius: 50%;
-  border: 2px solid rgba(22, 112, 95, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  animation: glance-spin 0.7s linear infinite;
+}
+.button-quiet.is-busy::before,
+.feed-refresh.button-quiet.is-busy::before {
+  border-color: rgba(22, 112, 95, 0.25);
   border-top-color: #16705f;
-  animation: glance-spin 0.75s linear infinite;
 }
 @keyframes glance-spin {
   to { transform: rotate(360deg); }
@@ -177,8 +183,11 @@
   .weather-refresh.is-busy::before,
   .currency-refresh.is-busy::before {
     animation: none;
-    border-color: #16705f;
+    border-top-color: #ffffff;
+  }
+  .button-quiet.is-busy::before {
     border-top-color: #16705f;
+    border-color: #16705f;
   }
 }
 
@@ -201,4 +210,13 @@
     border-color: rgba(42, 143, 122, 0.35);
     border-top-color: #2a8f7a;
   }
+}
+
+/* Focus-within accent edge for glance/focus cards — keyboard navigation polish. */
+.focus-card:focus-within,
+.weather-card:focus-within,
+.currency-card:focus-within,
+.briefing-card:focus-within {
+  border-color: rgba(22, 112, 95, 0.45);
+  box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
