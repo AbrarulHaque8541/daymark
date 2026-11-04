@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -150,8 +151,11 @@
       status('Pick two currencies and tap Refresh.');
     }
 
-    if (buttonEl && typeof buttonEl.addEventListener === 'function') {
-      buttonEl.addEventListener('click', () => { onRefresh(); });
+    if (formEl && typeof formEl.addEventListener === 'function') {
+      formEl.addEventListener('submit', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        return onRefresh();
+      });
     }
 
     // Enter in any of the currency fields starts the same refresh (keyboard efficiency).
