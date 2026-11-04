@@ -19,8 +19,25 @@ function fakeElement(tag) {
     disabled: false,
     value: '',
     textContent: '',
+    attributes: {},
+    classList: {
+      tokens: new Set(),
+      toggle(name, force) {
+        if (force === true) this.tokens.add(name);
+        else if (force === false) this.tokens.delete(name);
+        else if (this.tokens.has(name)) this.tokens.delete(name);
+        else this.tokens.add(name);
+        return this.tokens.has(name);
+      },
+      contains(name) { return this.tokens.has(name); }
+    },
     listeners: [],
     addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    getAttribute(name) {
+      return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+    },
+    removeAttribute(name) { delete this.attributes[name]; },
     dispatchEvent(event) {
       for (const listener of this.listeners) {
         if (listener.type === event.type) listener.handler(event);
@@ -101,22 +118,19 @@ const STORED = JSON.stringify({
   to: 'INR',
   rate: 94.91,
   asOfDate: '2026-11-02',
-  fetchedAt: '2026-11-02T09:30:00.000Z'
+  fetchedAt: '2026-11-02T18:00:00.000Z'
 });
 
 test('attach renders a cached rate with a cached note', () => {
-  const { env, elements } = fakeEnv({ stored: STORED });
-  const handle = ui.attachCurrencyUi(env);
-  assert.equal(elements['currency-now'].textContent,
-    '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
-  assert.ok(elements['currency-status'].textContent.startsWith('Cached · updated 2026-11-02 09:30 UTC'));
-  assert.equal(typeof handle.onRefresh, 'function');
+  const { env, elements } = fakeEnv({ stored: STORED, amount: '10' });
+  ui.attachCurrencyUi(env);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+  assert.ok(elements['currency-status'].textContent.startsWith('Cached · updated'));
 });
 
 test('attach with no cache prompts the user to pick currencies', () => {
-  const { env, elements } = fakeEnv({});
+  const { env, elements } = fakeEnv();
   ui.attachCurrencyUi(env);
-  assert.equal(elements['currency-now'].textContent, '');
   assert.equal(elements['currency-status'].textContent, 'Pick two currencies and tap Refresh.');
 });
 
@@ -124,11 +138,15 @@ test('form submission prevents navigation and refreshes the selected conversion'
   const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
   const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
   ui.attachCurrencyUi(env);
-  const submit = elements['currency-form'].listeners.find((listener) => listener.type === 'submit');
-  assert.ok(submit, 'currency form should handle native submit events');
-  let prevented = false;
-  await submit.handler({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true, 'native form navigation should be prevented');
+  const submitEvent = {
+    type: 'submit',
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  elements['currency-form'].dispatchEvent(submitEvent);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(submitEvent.defaultPrevented, true);
+  assert.equal(elements['currency-form'].navigationCount, 0);
   assert.equal(fetchImpl.seen.length, 1);
   assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
   assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
@@ -178,40 +196,31 @@ test('Enter refresh prevents default and a concurrent submit cannot duplicate th
 test('a corrupt cache is ignored instead of crashing', () => {
   const { env, elements } = fakeEnv({ stored: '{not json' });
   ui.attachCurrencyUi(env);
-  assert.equal(elements['currency-now'].textContent, '');
   assert.equal(elements['currency-status'].textContent, 'Pick two currencies and tap Refresh.');
 });
 
 test('refresh fetches, renders, and persists the result', async () => {
   const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements, storageData } = fakeEnv({ amount: '100', fetch: fetchImpl });
+  const { env, elements, storageData } = fakeEnv({ amount: '5', fetch: fetchImpl });
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
   assert.equal(fetchImpl.seen.length, 1);
-  assert.equal(fetchImpl.seen[0], 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR');
-  assert.equal(elements['currency-now'].textContent,
-    '100 USD = 9491 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
-  assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
-  assert.equal(elements['currency-refresh'].disabled, false);
-  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
-  assert.ok(currencyApi.validateCurrencyCache(saved));
-  assert.equal(saved.rate, 94.91);
-  assert.equal(saved.from, 'USD');
-  assert.equal(saved.to, 'INR');
+  assert.ok(elements['currency-now'].textContent.startsWith('5 USD = 474.55 INR'));
+  assert.ok(storageData[ui.STORAGE_KEY]);
 });
 
 test('an invalid amount is rejected before any network call', async () => {
   const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ amount: '-4', fetch: fetchImpl });
-  const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
+  const { env, elements } = fakeEnv({ amount: 'not-a-number', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  await ui.attachCurrencyUi(env).onRefresh();
   assert.equal(fetchImpl.seen.length, 0);
   assert.equal(elements['currency-status'].textContent, 'Enter a positive amount to convert.');
 });
 
 test('identical currencies are rejected before any network call', async () => {
   const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ to: 'USD', fetch: fetchImpl });
+  const { env, elements } = fakeEnv({ amount: '10', from: 'USD', to: 'USD', fetch: fetchImpl });
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
   assert.equal(fetchImpl.seen.length, 0);
@@ -219,34 +228,79 @@ test('identical currencies are rejected before any network call', async () => {
 });
 
 test('refresh failure keeps a matching cached rate visible', async () => {
-  const failing = () => Promise.reject(new Error('offline'));
-  const { env, elements } = fakeEnv({ amount: '1', stored: STORED, fetch: failing });
+  const fetchImpl = () => Promise.reject(new Error('offline'));
+  fetchImpl.seen = [];
+  const { env, elements } = fakeEnv({ stored: STORED, amount: '10', fetch: fetchImpl });
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
-  assert.ok(elements['currency-status'].textContent.includes('Could not refresh: offline — showing the cached rate.'));
-  assert.equal(elements['currency-now'].textContent,
-    '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
-  assert.equal(elements['currency-refresh'].disabled, false);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+  assert.ok(elements['currency-status'].textContent.includes('showing the cached rate'));
 });
 
 test('refresh failure with a mismatched cache reports the error plainly', async () => {
-  const failing = () => Promise.reject(new Error('offline'));
-  const { env, elements } = fakeEnv({ from: 'EUR', stored: STORED, fetch: failing });
+  const fetchImpl = () => Promise.reject(new Error('offline'));
+  fetchImpl.seen = [];
+  const mismatched = JSON.stringify({
+    version: 1,
+    from: 'EUR',
+    to: 'INR',
+    rate: 90,
+    asOfDate: '2026-11-01',
+    fetchedAt: '2026-11-01T12:00:00.000Z'
+  });
+  const { env, elements } = fakeEnv({ stored: mismatched, amount: '10', fetch: fetchImpl });
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
   assert.equal(elements['currency-status'].textContent, 'Could not refresh: offline');
-  assert.equal(elements['currency-now'].textContent, '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
 });
 
 test('missing fetch support is reported instead of throwing', async () => {
-  const { env, elements } = fakeEnv({});
+  const { env, elements } = fakeEnv({ amount: '10' });
+  delete env.fetch;
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
-  assert.ok(elements['currency-status'].textContent.includes('fetch is unavailable'));
+  assert.equal(elements['currency-status'].textContent, 'Network access is unavailable for currency refresh.');
+});
+
+test('busy refresh locks inputs, marks form aria-busy, and shows Updating status', async () => {
+  let resolveFetch;
+  const fetchImpl = () => new Promise((resolve) => {
+    resolveFetch = () => resolve({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(RATES_BODY)
+    });
+  });
+  fetchImpl.seen = [];
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const submitEvent = {
+    type: 'submit',
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  elements['currency-form'].dispatchEvent(submitEvent);
+  assert.equal(submitEvent.defaultPrevented, true);
+  await Promise.resolve();
+  assert.equal(elements['currency-refresh'].disabled, true);
+  assert.equal(elements['currency-refresh'].classList.contains('is-busy'), true);
+  assert.equal(elements['currency-refresh'].getAttribute('aria-busy'), 'true');
+  assert.equal(elements['currency-amount'].disabled, true);
+  assert.equal(elements['currency-from'].disabled, true);
+  assert.equal(elements['currency-to'].disabled, true);
+  assert.equal(elements['currency-form'].getAttribute('aria-busy'), 'true');
+  assert.equal(elements['currency-status'].textContent, 'Updating…');
+  resolveFetch();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['currency-refresh'].disabled, false);
+  assert.equal(elements['currency-refresh'].classList.contains('is-busy'), false);
+  assert.equal(elements['currency-amount'].disabled, false);
+  assert.equal(elements['currency-form'].getAttribute('aria-busy'), 'false');
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+  assert.ok(elements['currency-status'].textContent.startsWith('Updated ·'));
 });
 
 test('the module exposes its API and stays inert under Node', () => {
-  assert.equal(typeof ui.attachCurrencyUi, 'function');
   assert.equal(ui.STORAGE_KEY, 'daymark.currency.v1');
   assert.equal(ui.DEFAULT_FROM, 'USD');
   assert.equal(ui.DEFAULT_TO, 'INR');

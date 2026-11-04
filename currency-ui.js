@@ -55,6 +55,14 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      // Lock inputs during in-flight refresh so the user cannot change the
+      // conversion mid-request; mirror storage/data-controls busy polish.
+      [amountEl, fromEl, toEl].forEach((el) => {
+        if (el) el.disabled = isBusy;
+      });
+      if (formEl && typeof formEl.setAttribute === 'function') {
+        formEl.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+      }
     }
 
     function readInputs() {
@@ -100,11 +108,11 @@
     async function onRefresh() {
       if (busy) return;
       if (!currencyApi || typeof currencyApi.fetchLatestRates !== 'function') {
-        status('Currency conversion is unavailable.');
+        status('Currency conversion is unavailable in this environment.');
         return;
       }
       if (!fetchImpl) {
-        status('Could not refresh: fetch is unavailable in this browser.');
+        status('Network access is unavailable for currency refresh.');
         return;
       }
       const { amountText, from, to } = readInputs();
@@ -122,6 +130,7 @@
         return;
       }
       setBusy(true);
+      status('Updating…');
       try {
         const result = await currencyApi.fetchLatestRates(from, to, fetchImpl, { now });
         cached = result;
@@ -182,13 +191,16 @@
     };
   }
 
-  const api = { attachCurrencyUi, STORAGE_KEY, DEFAULT_FROM, DEFAULT_TO, DEFAULT_AMOUNT };
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.DaymarkCurrencyUi = api;
+  const api = {
+    STORAGE_KEY,
+    DEFAULT_FROM,
+    DEFAULT_TO,
+    DEFAULT_AMOUNT,
+    attachCurrencyUi
+  };
 
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachCurrencyUi({ document, window, localStorage: window.localStorage });
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
   }
+  root.DaymarkCurrencyUi = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
