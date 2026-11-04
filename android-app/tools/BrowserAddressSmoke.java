@@ -19,6 +19,11 @@ public final class BrowserAddressSmoke {
                 .startsWith("https://kagi.com/search?q=");
         assert BrowserAddress.resolveInput("privacy search", BrowserAddress.SearchEngine.YANDEX)
                 .startsWith("https://yandex.com/search/?text=");
+        String retainedProviderQuery = "y";
+        assert BrowserAddress.SearchEngine.GOOGLE.searchUrl(retainedProviderQuery)
+                .equals("https://www.google.com/search?q=y");
+        assert BrowserAddress.SearchEngine.YANDEX.searchUrl(retainedProviderQuery)
+                .equals("https://yandex.com/search/?text=y");
 
         assert BrowserAddress.resolveInput("example.com/path", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://example.com/path");
