@@ -127,6 +127,15 @@ public final class GitHubTransportSmoke {
         expectFailure(UpdaterCore.Failure.INVALID_METADATA,
                 () -> GitHubReleaseClient.parseRelease(fixture(false, false, publisher, APK.length,
                         "sha256:bad", assetUrl(), false)), "malformed digest is rejected");
+        String publisherMissingSigner = "{\"applicationId\":\"com.abrar.daymark\",\"versionCode\":2,\"minSdkVersion\":26}";
+        expectFailure(UpdaterCore.Failure.INVALID_METADATA,
+                () -> GitHubReleaseClient.parseRelease(fixture(false, false, publisherMissingSigner,
+                        APK.length, "sha256:" + sha256(APK), assetUrl(), false)),
+                "missing publisher signer fingerprint is rejected");
+        expectFailure(UpdaterCore.Failure.INVALID_METADATA,
+                () -> GitHubReleaseClient.parseRelease(fixture(false, false, publisher,
+                        APK.length, null, assetUrl(), false)),
+                "missing GitHub asset digest is rejected");
         expectFailure(UpdaterCore.Failure.INVALID_METADATA,
                 () -> GitHubReleaseClient.parseRelease(fixture(false, false, publisher, APK.length,
                         "sha256:" + sha256(APK), "https://evil.example/Daymark.apk", false)),
@@ -206,6 +215,18 @@ public final class GitHubTransportSmoke {
         check(UpdaterCore.check(() -> release, UpdaterCore.APPLICATION_ID, 11L).status
                 == UpdaterCore.CheckStatus.UPDATE_AVAILABLE,
                 "the currently published v1.5 release passes update policy when version 11 is installed");
+        UpdaterCore.CheckResult alreadyCurrent = UpdaterCore.check(
+                () -> release, UpdaterCore.APPLICATION_ID, 12L);
+        check(alreadyCurrent.status == UpdaterCore.CheckStatus.NO_UPDATE,
+                "the currently published release is not offered when its version code is installed");
+        check(alreadyCurrent.release == release,
+                "the current published release metadata remains available for display without an update");
+        UpdaterCore.CheckResult sourceAhead = UpdaterCore.check(
+                () -> release, UpdaterCore.APPLICATION_ID, 13L);
+        check(sourceAhead.status == UpdaterCore.CheckStatus.NO_UPDATE,
+                "a source build ahead of the latest published APK never receives a downgrade offer");
+        check(sourceAhead.release == release,
+                "latest published metadata remains displayable when the installed build is newer");
     }
 
     private static void updaterClassifiesIncompatibleInstalledPackage() throws Exception {
@@ -677,8 +698,9 @@ public final class GitHubTransportSmoke {
     private static String fixture(boolean draft, boolean prerelease, String publisherJson,
             int size, String digest, String asset, boolean duplicateApk) {
         String notes = "<!-- daymark-updater-v1\n" + publisherJson + "\n-->\nCritical fixes and offline reliability.";
+        String digestProperty = digest == null ? "" : ",\"digest\":" + quote(digest);
         String assetEntry = "{\"name\":\"Daymark-v1.5-githubSideload.apk\",\"size\":" + size
-                + ",\"digest\":" + quote(digest) + ",\"browser_download_url\":" + quote(asset) + "}";
+                + digestProperty + ",\"browser_download_url\":" + quote(asset) + "}";
         String assets = duplicateApk ? "[" + assetEntry + "," + assetEntry + "]" : "[" + assetEntry + "]";
         return "{\"draft\":" + draft + ",\"prerelease\":" + prerelease
                 + ",\"tag_name\":\"v1.5\",\"name\":\"Daymark v1.5\",\"body\":"

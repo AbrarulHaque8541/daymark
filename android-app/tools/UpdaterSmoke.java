@@ -26,6 +26,7 @@ public final class UpdaterSmoke {
         offlineHttpRateLimitAndInvalidMetadataAreHandled();
         missingAndUnstableReleasesAreIgnored();
         stableNewerReleaseIsFound();
+        latestStableReleaseIsRetainedWhenNoUpdateExists();
         cancellationDoesNotDownload();
         cancellationAfterTransferStillDeletesTemporary();
         sizeMismatchFailsClosed();
@@ -101,14 +102,20 @@ public final class UpdaterSmoke {
     }
 
     private static void missingAndUnstableReleasesAreIgnored() throws Exception {
-        check(UpdaterCore.check(() -> null, UpdaterCore.APPLICATION_ID, 1L).status
-                == UpdaterCore.CheckStatus.NO_UPDATE, "empty releases mean no update");
-        check(UpdaterCore.check(() -> release("v1.1.0", 2L, hash(APK_BYTES), SIGNER, true, false),
-                UpdaterCore.APPLICATION_ID, 1L).status == UpdaterCore.CheckStatus.NO_UPDATE,
-                "draft release is ignored");
-        check(UpdaterCore.check(() -> release("v1.1.0", 2L, hash(APK_BYTES), SIGNER, false, true),
-                UpdaterCore.APPLICATION_ID, 1L).status == UpdaterCore.CheckStatus.NO_UPDATE,
-                "prerelease is ignored");
+        UpdaterCore.CheckResult missing = UpdaterCore.check(
+                () -> null, UpdaterCore.APPLICATION_ID, 1L);
+        check(missing.status == UpdaterCore.CheckStatus.NO_UPDATE && missing.release == null,
+                "empty releases mean no update candidate");
+        UpdaterCore.CheckResult draft = UpdaterCore.check(
+                () -> release("v1.1.0", 2L, hash(APK_BYTES), SIGNER, true, false),
+                UpdaterCore.APPLICATION_ID, 1L);
+        check(draft.status == UpdaterCore.CheckStatus.NO_UPDATE && draft.release == null,
+                "draft release is ignored and never exposed as latest stable");
+        UpdaterCore.CheckResult prerelease = UpdaterCore.check(
+                () -> release("v1.1.0", 2L, hash(APK_BYTES), SIGNER, false, true),
+                UpdaterCore.APPLICATION_ID, 1L);
+        check(prerelease.status == UpdaterCore.CheckStatus.NO_UPDATE && prerelease.release == null,
+                "prerelease is ignored and never exposed as latest stable");
         check(UpdaterCore.check(() -> release("v1.0.0", 1L, hash(APK_BYTES), SIGNER, false, false),
                 UpdaterCore.APPLICATION_ID, 1L).status == UpdaterCore.CheckStatus.NO_UPDATE,
                 "same version is not offered again");
@@ -119,6 +126,29 @@ public final class UpdaterSmoke {
         UpdaterCore.CheckResult result = UpdaterCore.check(() -> stable, UpdaterCore.APPLICATION_ID, 1L);
         check(result.status == UpdaterCore.CheckStatus.UPDATE_AVAILABLE, "stable newer release is offered");
         check(result.release == stable, "the stable release details are retained for consent UI");
+    }
+
+    private static void latestStableReleaseIsRetainedWhenNoUpdateExists() throws Exception {
+        UpdaterCore.Release latest = release("v1.5", 12L, hash(APK_BYTES), SIGNER, false, false);
+        UpdaterCore.CheckResult sameVersion = UpdaterCore.check(
+                () -> latest, UpdaterCore.APPLICATION_ID, 12L);
+        check(sameVersion.status == UpdaterCore.CheckStatus.NO_UPDATE,
+                "same installed version code is not offered as an update");
+        check(sameVersion.release == latest,
+                "latest stable release remains available to show the published version");
+
+        UpdaterCore.CheckResult installedIsNewer = UpdaterCore.check(
+                () -> latest, UpdaterCore.APPLICATION_ID, 13L);
+        check(installedIsNewer.status == UpdaterCore.CheckStatus.NO_UPDATE,
+                "newer installed version code is never downgraded");
+        check(installedIsNewer.release == latest,
+                "latest published stable version remains visible for a newer installation");
+
+        expectFailure(UpdaterCore.Failure.INVALID_METADATA,
+                () -> UpdaterCore.check(
+                        () -> release("v1.5", 12L, "not-a-digest", SIGNER, false, false),
+                        UpdaterCore.APPLICATION_ID, 13L),
+                "invalid latest metadata still fails closed when installed version code is newer");
     }
 
     private static void cancellationDoesNotDownload() throws Exception {
