@@ -6,13 +6,25 @@ const storageApi = require('../storage-logic.js');
 const ui = require('../storage-ui.js');
 
 function fakeElement(tag) {
-  return {
+  const el = {
     tagName: tag,
     id: '',
     disabled: false,
     textContent: '',
     children: [],
     listeners: [],
+    classList: {
+      classes: new Set(),
+      add(c) { this.classes.add(c); },
+      remove(c) { this.classes.delete(c); },
+      toggle(c, force) {
+        if (force === true) this.classes.add(c);
+        else if (force === false) this.classes.delete(c);
+        else this.classes.has(c) ? this.classes.delete(c) : this.classes.add(c);
+        return this.classes.has(c);
+      },
+      contains(c) { return this.classes.has(c); }
+    },
     addEventListener(type, handler) { this.listeners.push({ type, handler }); },
     setAttribute(name, value) { this[name] = value; },
     removeAttribute() {},
@@ -24,6 +36,7 @@ function fakeElement(tag) {
     },
     get firstChild() { return this.children[0] || null; }
   };
+  return el;
 }
 
 function fakeEnv(options) {
@@ -189,4 +202,27 @@ test('the refresh button rescans without confirmation and without changing data'
   assert.equal(confirmations.length, 0, 'a read-only scan never asks for confirmation');
   assert.equal(storageData['daymark.feed.v1'], '{}');
   assert.equal(storageData['daymark.weather.v1'], '{}');
+});
+
+test('clear actions set busy state (disabled + aria-busy + is-busy) while operating', () => {
+  const { env, elements } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' }
+  });
+  // Spy on clear to observe intermediate state
+  const originalClear = env.storageApi.clearCategory;
+  let sawBusy = false;
+  env.storageApi.clearCategory = function(...args) {
+    // During the call, buttons should be busy
+    const clearAll = elements['data-clear-all'];
+    const list = elements['data-list'];
+    if (clearAll.disabled && clearAll.classList.contains('is-busy') && list['aria-busy'] === 'true') {
+      sawBusy = true;
+    }
+    return originalClear.apply(this, args);
+  };
+  const handle = ui.attachStorageUi(env);
+  handle.onClearCategory('tasks');
+  assert.equal(sawBusy, true, 'busy state is active during clear');
+  // After, busy should be cleared
+  assert.equal(elements['data-list']['aria-busy'], 'false');
 });
