@@ -20,7 +20,27 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    dispatchEvent(event) {
+      for (const listener of this.listeners) {
+        if (listener.type === event.type) listener.handler(event);
+      }
+      return !event.defaultPrevented;
+    },
+    click() {
+      const clickEvent = { type: 'click', defaultPrevented: false };
+      this.dispatchEvent(clickEvent);
+      if (this.tagName !== 'button' || this.type !== 'submit' || !this.form) return clickEvent;
+      this.form.submitCount += 1;
+      const submitEvent = {
+        type: 'submit',
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+      };
+      this.form.dispatchEvent(submitEvent);
+      if (!submitEvent.defaultPrevented) this.form.navigationCount += 1;
+      return submitEvent;
+    }
   };
 }
 
@@ -31,9 +51,14 @@ function fakeEnv(options) {
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
   };
+  elements['currency-refresh'].type = 'submit';
+  elements['currency-refresh'].form = elements['currency-form'];
+  elements['currency-form'].submitCount = 0;
+  elements['currency-form'].navigationCount = 0;
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
@@ -93,6 +118,61 @@ test('attach with no cache prompts the user to pick currencies', () => {
   ui.attachCurrencyUi(env);
   assert.equal(elements['currency-now'].textContent, '');
   assert.equal(elements['currency-status'].textContent, 'Pick two currencies and tap Refresh.');
+});
+
+test('form submission prevents navigation and refreshes the selected conversion', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const submit = elements['currency-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'currency form should handle native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation should be prevented');
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+  assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
+});
+
+test('activating the Refresh submit button sends one form event, refreshes once, and prevents navigation', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const submitEvent = elements['currency-refresh'].click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['currency-form'].submitCount, 1);
+  assert.equal(submitEvent.defaultPrevented, true);
+  assert.equal(elements['currency-form'].navigationCount, 0);
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+});
+
+test('Enter refresh prevents default and a concurrent submit cannot duplicate the request', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const enter = elements['currency-amount'].listeners.find((listener) => listener.type === 'keydown');
+  assert.ok(enter, 'amount input should handle Enter');
+  const enterEvent = {
+    key: 'Enter',
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  enter.handler(enterEvent);
+  assert.equal(enterEvent.defaultPrevented, true, 'Enter must suppress the browser default form submit');
+  assert.equal(fetchImpl.seen.length, 1);
+
+  const duplicateSubmit = {
+    type: 'submit',
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  elements['currency-form'].dispatchEvent(duplicateSubmit);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(duplicateSubmit.defaultPrevented, true);
+  assert.equal(fetchImpl.seen.length, 1, 'the busy guard must prevent a duplicate refresh');
+  assert.equal(elements['currency-form'].navigationCount, 0);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
 });
 
 test('a corrupt cache is ignored instead of crashing', () => {
@@ -172,4 +252,3 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.DEFAULT_TO, 'INR');
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
-

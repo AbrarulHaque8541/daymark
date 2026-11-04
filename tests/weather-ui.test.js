@@ -23,7 +23,27 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); }
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    dispatchEvent(event) {
+      for (const listener of this.listeners) {
+        if (listener.type === event.type) listener.handler(event);
+      }
+      return !event.defaultPrevented;
+    },
+    click() {
+      const clickEvent = { type: 'click', defaultPrevented: false };
+      this.dispatchEvent(clickEvent);
+      if (this.tagName !== 'button' || this.type !== 'submit' || !this.form) return clickEvent;
+      this.form.submitCount += 1;
+      const submitEvent = {
+        type: 'submit',
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+      };
+      this.form.dispatchEvent(submitEvent);
+      if (!submitEvent.defaultPrevented) this.form.navigationCount += 1;
+      return submitEvent;
+    }
   };
 }
 
@@ -32,9 +52,14 @@ function fakeEnv(options) {
   const elements = {
     'weather-place': Object.assign(fakeElement('input'), { id: 'weather-place', value: opts.place || '' }),
     'weather-refresh': Object.assign(fakeElement('button'), { id: 'weather-refresh' }),
+    'weather-form': Object.assign(fakeElement('form'), { id: 'weather-form' }),
     'weather-status': Object.assign(fakeElement('p'), { id: 'weather-status' }),
     'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' })
   };
+  elements['weather-refresh'].type = 'submit';
+  elements['weather-refresh'].form = elements['weather-form'];
+  elements['weather-form'].submitCount = 0;
+  elements['weather-form'].navigationCount = 0;
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
@@ -176,6 +201,37 @@ test('missing fetch support is reported instead of throwing', async () => {
   const handle = ui.attachWeatherUi(env);
   await handle.onRefresh();
   assert.ok(elements['weather-status'].textContent.includes('fetch is unavailable'));
+});
+
+test('form submission prevents navigation and refreshes the forecast', async () => {
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: fetchImpl });
+  ui.attachWeatherUi(env);
+  const submit = elements['weather-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'weather form should handle native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation should be prevented');
+  assert.equal(fetchImpl.seen.length, 2);
+  assert.ok(elements['weather-now'].textContent.includes('Kolkata'));
+});
+
+test('activating the Refresh submit button sends one form event and prevents navigation', async () => {
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: fetchImpl });
+  ui.attachWeatherUi(env);
+  const submitEvent = elements['weather-refresh'].click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['weather-form'].submitCount, 1);
+  assert.equal(submitEvent.defaultPrevented, true);
+  assert.equal(elements['weather-form'].navigationCount, 0);
+  assert.equal(fetchImpl.seen.length, 2);
 });
 
 test('the module exposes its API and stays inert under Node', () => {

@@ -32,6 +32,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
 
@@ -54,6 +55,13 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (formEl && typeof formEl.setAttribute === 'function') {
+        if (isBusy) formEl.setAttribute('aria-busy', 'true');
+        else formEl.removeAttribute('aria-busy');
+      }
+      [amountEl, fromEl, toEl].forEach((el) => {
+        if (el) el.disabled = isBusy;
+      });
     }
 
     function readInputs() {
@@ -150,8 +158,11 @@
       status('Pick two currencies and tap Refresh.');
     }
 
-    if (buttonEl && typeof buttonEl.addEventListener === 'function') {
-      buttonEl.addEventListener('click', () => { onRefresh(); });
+    if (formEl && typeof formEl.addEventListener === 'function') {
+      formEl.addEventListener('submit', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        return onRefresh();
+      });
     }
 
     // Enter in any of the currency fields starts the same refresh (keyboard efficiency).

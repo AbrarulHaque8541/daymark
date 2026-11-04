@@ -26,6 +26,7 @@
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const inputEl = element('weather-place');
     const buttonEl = element('weather-refresh');
+    const formEl = element('weather-form');
     const statusEl = element('weather-status');
     const nowEl = element('weather-now');
 
@@ -49,6 +50,11 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (formEl && typeof formEl.setAttribute === 'function') {
+        if (isBusy) formEl.setAttribute('aria-busy', 'true');
+        else formEl.removeAttribute('aria-busy');
+      }
+      if (inputEl) inputEl.disabled = isBusy;
     }
 
     function render(cache) {
@@ -123,8 +129,11 @@
       status('Type a place name and tap Refresh.');
     }
 
-    if (buttonEl && typeof buttonEl.addEventListener === 'function') {
-      buttonEl.addEventListener('click', () => { onRefresh(); });
+    if (formEl && typeof formEl.addEventListener === 'function') {
+      formEl.addEventListener('submit', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        return onRefresh();
+      });
     }
 
     // Enter on the place field starts the same refresh (keyboard efficiency).
