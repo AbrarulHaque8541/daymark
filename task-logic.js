@@ -162,6 +162,17 @@
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
   }
 
+  /** Advances a valid due date by one calendar day. Returns null for missing or invalid dates. */
+  function postponeDueDate(dueDate) {
+    if (!isDateOnly(dueDate)) return null;
+    const [year, month, day] = dueDate.split('-').map(Number);
+    const date = new Date(0);
+    date.setHours(0, 0, 0, 0);
+    date.setFullYear(year, month - 1, day);
+    date.setDate(date.getDate() + 1);
+    return localDateString(date);
+  }
+
   const api = {
     localDateString,
     isDateOnly,
@@ -175,6 +186,7 @@
     validateStoredTasks,
     getFilteredTasks,
     getSuggestions,
+    postponeDueDate,
     MAX_NOTES_CHARS,
     MAX_SUBTASKS,
     MAX_SUBTASK_TITLE,
