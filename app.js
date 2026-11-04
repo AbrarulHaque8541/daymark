@@ -1,4 +1,3 @@
-successfully downloaded text file (SHA: 8df8bc499534317b9fcf47067ce482d3aaae7333)
 (() => {
   'use strict';
 
