@@ -1,0 +1,57 @@
+name: Capture npm test diagnostics
+
+on:
+  push:
+    branches: ["feat/web-task-completed-webhook-20261104"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: capture-npm-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Capture and publish npm test output
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact event SHA
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run npm test and capture the full output
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/npm-test-output.txt 2>&1
+          code=$?
+          {
+            echo ""
+            echo "exit_code=$code"
+            echo "captured_for_sha=${{ github.sha }}"
+          } >> /tmp/npm-test-output.txt
+          exit 0
+
+      - name: Publish diagnostics to the scratch branch
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "daymark-ci-diagnostics"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin
+          git push origin --delete ci-diagnostics || true
+          git checkout -B ci-diagnostics
+          cp /tmp/npm-test-output.txt npm-test-output.txt
+          git add npm-test-output.txt
+          git commit -m "chore(ci): capture npm test diagnostics for ${{ github.sha }}"
+          git push origin ci-diagnostics
