@@ -104,6 +104,11 @@ public final class UpdaterCore {
         public static CheckResult noUpdate() {
             return new CheckResult(CheckStatus.NO_UPDATE, null);
         }
+
+        /** Latest validated stable release, when present, for display even if already current. */
+        private static CheckResult noUpdate(Release latestStableRelease) {
+            return new CheckResult(CheckStatus.NO_UPDATE, latestStableRelease);
+        }
     }
 
     public enum VerificationStatus { CANCELLED, VERIFIED }
@@ -185,7 +190,7 @@ public final class UpdaterCore {
         final Release release = client.fetchLatestStable();
         if (release == null || release.draft || release.prerelease) return CheckResult.noUpdate();
         validateRelease(release);
-        if (release.versionCode <= installedVersionCode) return CheckResult.noUpdate();
+        if (release.versionCode <= installedVersionCode) return CheckResult.noUpdate(release);
         return CheckResult.available(release);
     }
 
