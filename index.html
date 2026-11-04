@@ -249,6 +249,7 @@
             <option value="KRW">KRW — South Korean Won</option>
             <option value="THB">THB — Thai Baht</option>
             </select>
+            <button class="tool-button currency-swap" id="currency-swap" type="button" aria-label="Swap currencies" title="Swap from and to">⇄</button>
             <label class="sr-only" for="currency-to">To currency</label>
             <select id="currency-to" name="to" aria-label="To currency">
             <option value="USD">USD — US Dollar</option>
@@ -281,42 +282,27 @@
           <p class="currency-status" id="currency-status" role="status" aria-live="polite"></p>
           <div class="currency-now" id="currency-now" aria-live="polite"></div>
         </aside>
-
-        <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
-          <h2 id="webhook-heading">Task-completion webhook</h2>
-          <p class="briefing-description">Send a minimal JSON event to any https:// webhook you choose when a task is completed - Discord, Slack, n8n, Home Assistant, or your own script. Delivery is opt-in and HTTPS-only; failures queue on this device and send on the next connection or Retry. No polling, no timers, no maintainer backend.</p>
-          <form id="webhook-form" class="feed-form" novalidate>
-            <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
-            <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
-            <button class="button button-primary webhook-save" id="webhook-save" type="submit">Save</button>
-          </form>
-          <div class="focus-actions">
-            <button class="button button-quiet" id="webhook-test" type="button">Send test</button>
-            <button class="button button-quiet" id="webhook-flush" type="button" disabled>Retry queued</button>
-          </div>
-          <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
-        </aside>
-        <aside class="briefing-card" id="data-card" aria-labelledby="data-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">DATA CONTROLS</span></div>
+        <aside class="data-card" id="data-card" aria-labelledby="data-heading">
+          <div class="data-topline"><span class="data-dot" aria-hidden="true"></span><span class="demo-label">YOUR DATA</span></div>
           <h2 id="data-heading">Your data, explained</h2>
-          <p class="briefing-description">Everything this prototype stores lives only in this browser — tasks, Focus history, caches, and automation settings. Each Clear button below removes exactly what its row describes and nothing else, after asking you once. Nothing here uses the network.</p>
-          <div class="focus-actions" role="group" aria-label="Data controls actions">
-            <button class="button button-quiet" id="data-refresh" type="button">Refresh sizes</button>
-            <button class="button button-quiet" id="data-clear-all" type="button">Clear all local data</button>
+          <p class="data-description">Tasks live only in this browser. Clear them here if you want a fresh start. Export first if you need a backup.</p>
+          <div class="data-controls" id="data-controls" aria-live="polite">
+            <button class="tool-button" id="data-clear-all" type="button">Clear all tasks</button>
+            <button class="tool-button" id="data-refresh" type="button">Refresh view</button>
           </div>
-          <p class="feed-status" id="data-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="data-list" aria-label="Stored data categories"></div>
+          <p class="data-status" id="data-status" role="status" aria-live="polite"></p>
         </aside>
-        </div>
       </div>
-      <footer class="page-footer"><span>DAYMARK <span aria-hidden="true">·</span> PERSONAL TASKS</span><span>Made for a calmer kind of productive.</span></footer>
     </main>
-  
-</div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" hidden>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <button class="toast-action" id="toast-undo" type="button" hidden>Undo</button>
+  </div>
 
   <dialog id="edit-dialog" class="edit-dialog" aria-labelledby="edit-heading">
-    <form id="edit-form" method="dialog" novalidate>
+    <form id="edit-form" class="edit-form" novalidate>
       <div class="dialog-header"><div><p class="eyebrow">UPDATE YOUR LIST</p><h2 id="edit-heading">Edit task</h2></div><button class="icon-button close-dialog" type="button" aria-label="Close edit dialog">×</button></div>
       <input type="hidden" name="id" id="edit-id">
       <label class="field-label" for="edit-title">Task title</label>
@@ -326,34 +312,22 @@
         <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
       </div>
       <div class="dialog-fields">
-        <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">At due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
+        <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">Remind at due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
         <div><label class="field-label" for="edit-priority">Priority</label><select id="edit-priority" name="priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
       </div>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
-        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" 
-name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
+        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
       </div>
       <p class="reminder-note-standalone">Reminders show on this page while it is open. Completing a repeating task automatically schedules its next occurrence.</p>
       <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
-      <textarea id="edit-notes" name="notes" rows="3" maxlength="4000" placeholder="Add details, links, or context…"></textarea>
-      <div class="subtask-editor">
-        <label class="field-label" for="new-subtask">Steps <span id="subtask-count-label">(optional, up to 20)</span></label>
-        <div class="subtask-list" id="subtask-list"></div>
-        <div class="subtask-add-row">
-          <label class="sr-only" for="new-subtask">Add a step</label>
-          <input id="new-subtask" type="text" maxlength="120" placeholder="Add a step…" autocomplete="off">
-          <button class="button button-quiet subtask-add-button" id="add-subtask" type="button">Add step</button>
-        </div>
-      </div>
+      <textarea id="edit-notes" name="notes" maxlength="2000" rows="3"></textarea>
       <p class="form-error" id="edit-error" role="alert" hidden>Please enter a task title.</p>
-      <div class="dialog-actions"><button class="button button-quiet cancel-edit" type="button">Cancel</button><button class="button button-primary" type="submit">Save changes</button></div>
+      <div class="dialog-actions">
+        <button class="button button-quiet" id="edit-cancel" type="button">Cancel</button>
+        <button class="button button-primary" type="submit">Save changes</button>
+      </div>
     </form>
   </dialog>
-  <div class="toast-stack" id="toast-stack">
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <button class="toast-action" id="toast-action" type="button" hidden>Undo</button>
-  </div>
 </body>
 </html>
-
