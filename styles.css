@@ -549,3 +549,40 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   border-color: rgba(22, 112, 95, 0.25);
   border-top-color: #16705f;
 }
+
+/* Consistent professional glass hover edge for glance and focus cards (Cycle A).
+   Accent #16705f gradient overlay, pointer-events none, reduced-motion safe. */
+.weather-card,
+.currency-card,
+.briefing-card,
+.focus-card {
+  position: relative;
+  overflow: hidden;
+}
+.weather-card::after,
+.currency-card::after,
+.briefing-card::after,
+.focus-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(22, 112, 95, 0.08), transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+.weather-card:hover::after,
+.currency-card:hover::after,
+.briefing-card:hover::after,
+.focus-card:hover::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-card::after,
+  .currency-card::after,
+  .briefing-card::after,
+  .focus-card::after {
+    transition: none;
+  }
+}
