@@ -18,6 +18,17 @@
   .local-badge.is-checking {
     animation: none !important;
   }
+  .task-row:hover,
+  .button-primary:hover,
+  .button-quiet:hover,
+  .tool-button:hover,
+  .icon-button:hover,
+  .suggestion-item:hover,
+  .tag-pill:hover,
+  .date-chip:hover,
+  .focus-preset:hover {
+    transform: none !important;
+  }
 }
 
 /* Instant press feedback — same spring language, no cartoon bounce. */
@@ -45,42 +56,82 @@
 .card,
 .task-row,
 .suggestion-card,
-.edit-dialog,
+.focus-card,
 .weather-card,
 .currency-card,
-.briefing-card,
-.focus-card {
-  box-shadow: 0 4px 16px rgba(24, 40, 48, .04), inset 0 1px 0 rgba(255, 255, 255, .45);
+.briefing-card {
+  position: relative;
+}
+.button-primary::after,
+.card::after,
+.task-row::after,
+.focus-card::after,
+.weather-card::after,
+.currency-card::after,
+.briefing-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(22, 112, 95, .08) 0%, transparent 42%);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.button-primary:hover::after,
+.card:hover::after,
+.task-row:hover::after,
+.focus-card:hover::after,
+.weather-card:hover::after,
+.currency-card:hover::after,
+.briefing-card:hover::after {
+  opacity: 1;
 }
 
-/* Faster list paint: avoid stacking expensive effects on every row in long lists. */
-.task-list:has(.task-row:nth-child(n+24)) .task-row {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: var(--surface-solid);
+/* Faster first paint on lists; avoids layout thrash on long task lists. */
+.task-list {
+  contain: content;
+}
+.task-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 76px;
 }
 
-/* Skeleton rows while the list is still hydrating from storage. */
+/* Touch efficiency: larger hit area, no 300ms delay residue. */
+.button,
+.tool-button,
+.icon-button,
+.filter-button,
+.date-chip,
+.focus-preset,
+.complete-button,
+.task-row {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Initial loading skeleton for the task list (hidden once list is ready). */
 .task-list-skeleton {
   display: grid;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
-.task-list-skeleton[hidden] { display: none; }
 .skeleton-row {
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   height: 76px;
   border-radius: 16px;
-  border: 1px solid rgba(219, 226, 232, .55);
   background: linear-gradient(90deg,
-    rgba(232, 238, 242, .55) 0%,
-    rgba(22, 112, 95, .08) 40%,
-    rgba(232, 238, 242, .55) 80%);
+    rgba(255, 255, 255, .55) 0%,
+    rgba(22, 112, 95, .12) 40%,
+    rgba(255, 255, 255, .55) 80%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border: 1px solid rgba(22, 112, 95, .18);
 }
 @keyframes skeleton-shimmer {
-  0% { background-position: 120% 0; }
-  100% { background-position: -20% 0; }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 .task-list.is-ready .task-list-skeleton {
   display: none;
