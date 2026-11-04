@@ -483,6 +483,38 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 .currency-now { padding: 10px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
 .currency-now:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
+
+.currency-swap {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(210, 228, 222, .8);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .65);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.currency-swap:hover {
+  transform: translateY(-1px) rotate(180deg);
+  border-color: rgba(42, 143, 122, .4);
+  background: var(--accent-soft);
+  box-shadow: 0 6px 16px rgba(24, 40, 48, .06);
+}
+.currency-swap:active {
+  transform: scale(0.96);
+}
+.currency-swap:focus-visible {
+  outline: 3px solid rgba(22, 112, 95, .55);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .currency-swap:hover { transform: none; }
+}
+
 .currency-now:empty {
   display: none;
 }
