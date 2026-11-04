@@ -920,7 +920,9 @@
     } else if (button.dataset.action === 'focus') {
       startFocus(task.id);
       const card = $('#focus-card');
-      if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (card && typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ behavior: window.DaymarkMotionPolicy.focusScrollBehavior(), block: 'center' });
+      }
     } else if (button.dataset.action === 'tag') {
       state.query = button.dataset.tag;
       $('#task-search').value = button.dataset.tag;
