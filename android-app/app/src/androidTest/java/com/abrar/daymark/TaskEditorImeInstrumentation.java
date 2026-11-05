@@ -22,7 +22,13 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.TextView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -57,12 +63,17 @@ final class TaskEditorImeInstrumentation {
             require(started instanceof MainActivity, "instrumentation launches the real MainActivity", assertions);
             activity = (MainActivity) started;
             instrumentation.waitForIdleSync();
+            ensureTasksMode(instrumentation, activity, assertions);
+            awaitStorageReady(instrumentation, activity, assertions);
+            byte[] storageBeforeCancel = encryptedTaskStorageSnapshot(activity);
 
             openEditor(instrumentation, activity, assertions);
             exerciseImeActions(instrumentation, cancelledTitle, assertions);
             tapDialogAction(instrumentation, EDITOR_TITLE, "Cancel", assertions);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
             awaitImeHidden(instrumentation);
+            require(Arrays.equals(storageBeforeCancel, encryptedTaskStorageSnapshot(activity)),
+                    "Cancel leaves encrypted task storage byte-for-byte unchanged", assertions);
             require(!taskTitleVisible(instrumentation, activity, cancelledTitle),
                     "Cancel closes the editor without creating the typed task", assertions);
 
@@ -74,6 +85,8 @@ final class TaskEditorImeInstrumentation {
             awaitImeHidden(instrumentation);
             require(awaitTaskTitleVisible(instrumentation, activity, savedTitle),
                     "Add Task saves and renders the typed task", assertions);
+            require(awaitPersistedTaskTitle(activity, savedTitle),
+                    "Add Task persists the typed task in encrypted storage", assertions);
 
             deleteSavedTask(instrumentation, activity, savedTitle, assertions);
             savedTaskMayExist = false;
@@ -210,8 +223,8 @@ final class TaskEditorImeInstrumentation {
         root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
-        AccessibilityNodeInfo cancel = findActionNodeByText(root, "Cancel");
-        AccessibilityNodeInfo add = findActionNodeByText(root, "Add task");
+        AccessibilityNodeInfo cancel = findButtonByText(root, "Cancel");
+        AccessibilityNodeInfo add = findButtonByText(root, "Add task");
         require(hasVisibleTouchBounds(cancel), "the Cancel dialog action has a visible touch target", assertions);
         require(hasVisibleTouchBounds(add), "the Add Task dialog action has a visible touch target", assertions);
         if (imeBounds != null) {
@@ -247,12 +260,12 @@ final class TaskEditorImeInstrumentation {
     private static void tapDialogAction(Instrumentation instrumentation, String dialogTitle, String label,
                                         int[] assertions) throws Exception {
         AccessibilityNodeInfo root = awaitDialogRoot(instrumentation, dialogTitle);
-        AccessibilityNodeInfo button = findActionNodeByText(root, label);
-        require(hasVisibleTouchBounds(button), label + " action has a visible touch target before tapping", assertions);
+        AccessibilityNodeInfo button = findButtonByText(root, label);
+        require(hasVisibleTouchBounds(button), label + " button has visible touch bounds before tapping", assertions);
         Rect bounds = new Rect();
         button.getBoundsInScreen(bounds);
-        boolean tapped = tapNode(instrumentation, button);
-        require(tapped, label + " action accepts a real touch or accessibility click at its visible center", assertions);
+        boolean tapped = injectTap(instrumentation, bounds);
+        require(tapped, label + " button accepts exactly one real touch at its visible bounds", assertions);
         instrumentation.waitForIdleSync();
     }
 
@@ -332,6 +345,52 @@ final class TaskEditorImeInstrumentation {
             SystemClock.sleep(50L);
         }
         return false;
+    }
+
+    private static boolean awaitPersistedTaskTitle(MainActivity activity, String title) throws Exception {
+        EncryptedTaskStore store = getTaskStore(activity);
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            for (Task task : store.load()) {
+                if (title.equals(task.title)) return true;
+            }
+            SystemClock.sleep(50L);
+        }
+        return false;
+    }
+
+    private static EncryptedTaskStore getTaskStore(MainActivity activity) {
+        try {
+            Field storeField = MainActivity.class.getDeclaredField("taskStore");
+            storeField.setAccessible(true);
+            Object store = storeField.get(activity);
+            if (store instanceof EncryptedTaskStore) return (EncryptedTaskStore) store;
+            throw new AssertionError("MainActivity has no ready encrypted task store.");
+        } catch (ReflectiveOperationException failure) {
+            throw new AssertionError("Could not access MainActivity.taskStore for instrumentation.", failure);
+        }
+    }
+
+    private static byte[] encryptedTaskStorageSnapshot(Activity activity) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream output = new DataOutputStream(bytes);
+        String[] names = { "tasks.enc", "tasks.enc.bak", "tasks.enc.new" };
+        for (String name : names) {
+            File file = new File(activity.getFilesDir(), name);
+            output.writeUTF(name);
+            output.writeBoolean(file.isFile());
+            if (!file.isFile()) continue;
+            output.writeLong(file.length());
+            try (FileInputStream input = new FileInputStream(file)) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                }
+            }
+        }
+        output.flush();
+        return bytes.toByteArray();
     }
 
     private static boolean awaitTaskTitleGone(Instrumentation instrumentation, Activity activity, String title)
@@ -460,7 +519,22 @@ final class TaskEditorImeInstrumentation {
         return null;
     }
 
+    private static AccessibilityNodeInfo findButtonByText(AccessibilityNodeInfo root, String text) {
+        if (root == null) return null;
+        CharSequence className = root.getClassName();
+        if (className != null && className.toString().endsWith("Button") && findByText(root, text) != null) {
+            return root;
+        }
+        for (int i = 0; i < root.getChildCount(); i++) {
+            AccessibilityNodeInfo found = findButtonByText(root.getChild(i), text);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private static AccessibilityNodeInfo findActionNodeByText(AccessibilityNodeInfo root, String text) {
+        AccessibilityNodeInfo button = findButtonByText(root, text);
+        if (button != null) return button;
         AccessibilityNodeInfo clickable = findClickableByText(root, text);
         return clickable != null ? clickable : findByText(root, text);
     }
