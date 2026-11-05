@@ -45,4 +45,4 @@ assert 'Log.i(TAG, "download-completed id=" + id + " file=" + e.fileName' not in
 # This catches privacy regressions that source-only checks cannot detect.
 subprocess.run(["sh", str(root / "tools/run-browser-download-tracker-tests.sh")], check=True)
 
-print("PASS browser address-policy/history/download source guards; HTTP WebView runtime and UI labeling NOT TESTED")
+print("PASS browser address-policy/history/download source guards; HTTP WebView runtime BLOCKED by manifest pending integration; UI label NOT WIRED")

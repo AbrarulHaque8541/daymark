@@ -296,13 +296,11 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 // In-WebView navigations bypass MainActivity's unblock boundary; re-assert it
                 // here so a tab left blocked by enforceOffline() cannot silently drop loads.
                 syncNetworkBlockWithPolicy(view);
-                // HTTP and HTTPS are both allowed in the browser (BrowserHttpPolicy.ALLOW_HTTP).
-                // HTTP pages show "Not encrypted" in the UI. Updater stays HTTPS-only (separate path).
-                // HTTPS→HTTP redirect downgrades are still blocked below for safety.
-                if (request.isForMainFrame() && request.isRedirect()
-                        && "http".equalsIgnoreCase(request.getUrl().getScheme())
-                        && view.getUrl() != null
-                        && "https".equalsIgnoreCase(android.net.Uri.parse(view.getUrl()).getScheme())) {
+                // The URL policy accepts explicit HTTP and HTTPS. The manifest continues to
+                // block cleartext runtime loads until the legacy download path is safely replaced.
+                // Top-level HTTPS→HTTP redirects remain blocked; final committed URL drives the label.
+                if (BrowserHttpPolicy.shouldBlockTopLevelRedirect(
+                        view.getUrl(), url, request.isForMainFrame(), request.isRedirect())) {
                     listener.onHttpNavigationBlocked(url, true);
                     return true;
                 }

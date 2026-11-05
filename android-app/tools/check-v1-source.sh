@@ -57,6 +57,8 @@ python3 ./tools/check-browser-site-info.py "$ROOT"
 python3 ./tools/check-browser-history.py "$ROOT"
 python3 ./tools/check-browser-http-policy.py "$ROOT"
 python3 ./tools/check-updater-https-only.py "$ROOT"
+python3 ./tools/check-browser-network-security.py "$ROOT"
+python3 ./tools/test-browser-network-security-guard.py
 python3 ./tools/test-updater-https-guard.py
 python3 ./tools/check-browser-diagnostics.py "$ROOT"
 python3 ./tools/check-browser-log-privacy.py "$ROOT"
@@ -94,7 +96,8 @@ assert permission_names(sideload_manifest) == {
     "android.permission.POST_PROMOTED_NOTIFICATIONS",
 }, "GitHub sideload may declare only network/connectivity plus optional Android 16 Live Update promotion"
 assert app.get("{http://schemas.android.com/apk/res/android}allowBackup") == "false", "backup must stay disabled"
-assert app.get("{http://schemas.android.com/apk/res/android}usesCleartextTraffic") == "false", "cleartext must stay disabled"
+assert app.get("{http://schemas.android.com/apk/res/android}usesCleartextTraffic") == "false", \
+    "cleartext remains blocked until the Activity's legacy DownloadManager path is replaced or constrained"
 assert not list(app.findall("service")), "V1 must not add services"
 receivers = app.findall("receiver")
 assert len(receivers) == 1, "only the task-reminder boot receiver is allowed"
@@ -592,7 +595,7 @@ print("PASS lifecycle policy: task/storage/attachment/browser callbacks are supp
 print("PASS portable backup policy: bounded AES-GCM format, SAF create-only export, snapshot-last restore journal")
 print("PASS task/browser separation: web input does not create tasks or receive task-draft prefill")
 print("PASS browser policy: fresh installs Online like mainstream browsers; a saved Offline choice still fails closed behind the explicit Enable Online disclosure; HTTP/HTTPS navigation still requires a separate Go/site tap")
-print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, downgrade guard, no JS bridge/interceptor; HTTP runtime and visible label NOT TESTED")
+print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, downgrade guard, no JS bridge/interceptor; HTTP runtime BLOCKED by manifest pending integration; final label policy NOT WIRED")
 print("PASS browser settings: Safe Browsing defaults on, confirmed opt-out persists, and current/future WebViews track the preference")
 print("PASS WebView source security: Safe Browsing, mixed-content/file-access restrictions, SSL cancel, site permission denial, pop-up/download handling")
 print("PASS local browser data: capped origin-only site history, legacy-origin migration, reopen/dedup, secret redaction, and explicit history/cookie/cache/WebStorage clear")

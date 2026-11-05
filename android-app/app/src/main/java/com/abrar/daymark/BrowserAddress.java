@@ -105,9 +105,9 @@ final class BrowserAddress {
         try {
             URI uri = new URI(toAsciiHostUrl(candidate));
             String scheme = uri.getScheme();
-            // HTTP and HTTPS are both allowed in the browser (BrowserHttpPolicy.ALLOW_HTTP).
-            // HTTP pages are labelled "Not encrypted" in the UI via BrowserHttpPolicy.securityLabel().
-            // Updater and other app network clients remain HTTPS-only (separate code path).
+            // The address policy accepts explicit HTTP and HTTPS. Actual HTTP WebView loads
+            // remain blocked by the manifest until the serialized Activity/download integration
+            // can safely replace or constrain the legacy DownloadManager path.
             if (!BrowserHttpPolicy.isAllowedWebScheme(candidate)) {
                 if ("http".equalsIgnoreCase(scheme)) {
                     // unreachable when ALLOW_HTTP=true, but kept for policy-toggle safety

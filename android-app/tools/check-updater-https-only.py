@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Static guards for the current HTTPS-only app clients and cleartext manifest setting.
+"""Static guards for HTTPS-only native clients and the current browser cleartext restriction.
 
-These source assertions do not prove Android WebView HTTP behavior. WebView honors the current
-manifest's cleartext restriction for this target SDK; see docs/BROWSER_HTTP_POLICY_AUDIT.md.
+Android's cleartext opt-in is application-wide and would also affect the legacy browser
+DownloadManager route. Keep it disabled until that route is replaced or strictly contained.
+These assertions do not prove integrated WebView HTTP behavior.
 """
 import pathlib
 import re
@@ -52,17 +53,17 @@ for marker in ('"https".equalsIgnoreCase(uri.getScheme())', "url = validateEndpo
                "HttpsURLConnection", "connection.setInstanceFollowRedirects(false);"):
     assert marker in webhook, f"Webhook HTTPS boundary missing: {marker}"
 
-# Preserve the existing app-wide platform defense. It also affects WebView; do not assert
-# that HTTP browsing works until a reviewed policy change and runtime tests establish it.
+# Keep the app-wide restriction until the Activity's DownloadManager path has a safe replacement.
+# Native clients above still enforce HTTPS independently of this platform defense.
 manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
 application = manifest.find("application")
 assert application is not None
 android = "{http://schemas.android.com/apk/res/android}"
 assert application.get(android + "usesCleartextTraffic") == "false", \
-    "Main manifest must keep usesCleartextTraffic=false pending security review"
+    "cleartext must remain blocked until the legacy browser DownloadManager path is replaced or constrained"
 
 http_policy = (base / "BrowserHttpPolicy.java").read_text(encoding="utf-8")
 assert "ALLOW_HTTP = true" in http_policy, "Browser address policy should accept HTTP"
 assert '"Not encrypted"' in http_policy, "The intended HTTP label must remain defined"
 
-print("PASS HTTPS client and manifest source guards; HTTP WebView runtime/label NOT TESTED")
+print("PASS HTTPS native-client and cleartext restriction source guards; WebView HTTP runtime BLOCKED pending integration")

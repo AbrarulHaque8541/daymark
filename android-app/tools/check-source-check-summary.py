@@ -32,8 +32,9 @@ for stale in ("no permissions/network", "no permissions, network"):
 
 check(any("INTERNET for browsing and app network clients" in line for line in summaries),
       "the summary must state the real INTERNET permission without asserting HTTP runtime behavior")
-check(any("HTTP runtime and visible label NOT TESTED" in line for line in summaries),
-      "the summary must not treat the HTTP policy helper as Android runtime or UI evidence")
+check(any("HTTP runtime BLOCKED by manifest pending integration" in line
+          and "final label policy NOT WIRED" in line for line in summaries),
+      "the summary must state HTTP runtime is blocked and the final label is not wired")
 check(any("optional POST_PROMOTED_NOTIFICATIONS" in line and "Play adds no permissions" in line for line in summaries),
       "the summary must state that Live Update permission is sideload-only and Play remains permission-minimal")
 

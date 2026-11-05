@@ -49,6 +49,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/Subtask.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserExtension.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpsDownloader.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserAddress.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadFilenamePolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadProgress.java" \
@@ -99,6 +100,8 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/TaskSnapshotCodecSmoke.java" \
   "$ROOT/tools/TaskOpenExportSmoke.java" \
   "$ROOT/tools/BrowserExtensionSmoke.java" \
+  "$ROOT/tools/BrowserHttpPolicySmoke.java" \
+  "$ROOT/tools/BrowserHttpsDownloaderSmoke.java" \
   "$ROOT/tools/BrowserHistorySmoke.java" \
   "$ROOT/tools/ActivityCallbackGateSmoke.java" \
   "$ROOT/tools/UpdaterSmoke.java" \
@@ -146,6 +149,8 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskListRenderGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSnapshotCodecSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskOpenExportSmoke "$ROOT/../contracts/task-export-fixture.json"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExtensionSmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserHttpPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserHttpsDownloaderSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserHistorySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
