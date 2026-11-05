@@ -58,6 +58,13 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (swapEl) {
+        swapEl.disabled = isBusy;
+        if (typeof swapEl.setAttribute === 'function') {
+          if (isBusy) swapEl.setAttribute('aria-busy', 'true');
+          else swapEl.removeAttribute('aria-busy');
+        }
+      }
     }
 
     function readInputs() {
@@ -222,6 +229,24 @@
           if (cached.from === fromEl.value && cached.to === toEl.value) {
             render(cached, amount);
             status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+          } else if (cached.from === toEl.value && cached.to === fromEl.value) {
+            // Offline inverse of the cached pair — useful glance without a network call.
+            const inverseRate = 1 / cached.rate;
+            if (Number.isFinite(inverseRate) && inverseRate >= currencyApi.MIN_RATE && inverseRate <= currencyApi.MAX_RATE) {
+              const inverseCache = {
+                version: 1,
+                from: fromEl.value,
+                to: toEl.value,
+                rate: inverseRate,
+                asOfDate: cached.asOfDate,
+                fetchedAt: cached.fetchedAt
+              };
+              render(inverseCache, amount);
+              status('Inverse of cached rate · tap Refresh for the official ECB rate.');
+            } else {
+              if (nowEl) nowEl.textContent = '';
+              status('Currencies swapped. Tap Refresh for the new rate.');
+            }
           } else {
             if (nowEl) nowEl.textContent = '';
             status('Currencies swapped. Tap Refresh for the new rate.');

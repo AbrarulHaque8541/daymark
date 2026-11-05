@@ -507,6 +507,11 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .currency-swap:active {
   transform: scale(0.96);
 }
+.currency-swap:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
 .currency-swap:focus-visible {
   outline: 3px solid rgba(22, 112, 95, .55);
   outline-offset: 2px;
@@ -542,6 +547,17 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   }
 
   .currency-now:hover {
+    border-color: rgba(42, 143, 122, .5);
+  }
+
+  .currency-swap {
+    border-color: rgba(125, 224, 203, 0.2);
+    background: rgba(26, 33, 40, .7);
+    color: #7de0cb;
+  }
+
+  .currency-swap:hover {
+    background: rgba(22, 112, 95, 0.25);
     border-color: rgba(42, 143, 122, .5);
   }
 }
