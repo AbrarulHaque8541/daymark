@@ -5,13 +5,15 @@
  * the current conditions come from the keyless Open-Meteo public API and the
  * last successful result stays cached on this device, so the card keeps
  * working offline with a "cached" note. Nothing ever refreshes on its own —
- * no polling, no timers, no battery drain. Mirrors the export-ui.js module
+ * no polling, no timers, no battery drain. Remembers the last place name
+ * across sessions (localStorage only). Mirrors the export-ui.js module
  * style: attachWeatherUi(env) is fully injectable for unit tests.
  */
 ((root) => {
   'use strict';
 
   const STORAGE_KEY = 'daymark.weather.v1';
+  const PREFS_KEY = 'daymark.weather.prefs.v1';
 
   function attachWeatherUi(env) {
     if (!env || !env.document) throw new Error('attachWeatherUi requires a document.');
@@ -79,6 +81,22 @@
       storage.setItem(STORAGE_KEY, JSON.stringify(cache));
     }
 
+    function readPrefs() {
+      if (!storage || typeof storage.getItem !== 'function') return null;
+      const raw = storage.getItem(PREFS_KEY);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.place === 'string' && parsed.place.trim()) return parsed;
+      } catch (error) { /* ignore corrupt prefs */ }
+      return null;
+    }
+
+    function persistPrefs(place) {
+      if (!storage || typeof storage.setItem !== 'function' || !place || !place.trim()) return;
+      storage.setItem(PREFS_KEY, JSON.stringify({ place: place.trim() }));
+    }
+
     async function onRefresh() {
       if (busy) return;
       if (!weatherApi || typeof weatherApi.fetchWeatherByPlace !== 'function') {
@@ -101,6 +119,7 @@
         const result = await weatherApi.fetchWeatherByPlace(query, fetchImpl, { now });
         cached = result;
         persistCache(cached);
+        persistPrefs(query);
         render(cached);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
       } catch (error) {
@@ -117,9 +136,15 @@
     }
 
     cached = readCache();
+    const prefs = readPrefs();
+    if (prefs && inputEl && typeof inputEl.value === 'string') {
+      inputEl.value = prefs.place;
+    }
     if (cached) {
       render(cached);
       status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+    } else if (prefs) {
+      status('Last place restored. Tap Refresh for current conditions.');
     } else {
       status('Type a place name and tap Refresh.');
     }
@@ -130,7 +155,6 @@
         return onRefresh();
       });
     }
-
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
@@ -142,6 +166,9 @@
           if (typeof event.preventDefault === 'function') event.preventDefault();
           onRefresh();
         }
+      });
+      inputEl.addEventListener('input', () => {
+        if (typeof inputEl.value === 'string') persistPrefs(inputEl.value);
       });
     }
 
@@ -156,7 +183,7 @@
     };
   }
 
-  const api = { attachWeatherUi, STORAGE_KEY };
+  const api = { attachWeatherUi, STORAGE_KEY, PREFS_KEY };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkWeatherUi = api;
 

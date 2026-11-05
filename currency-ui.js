@@ -6,6 +6,7 @@
  * (European Central Bank data) and the last successful result stays cached on
  * this device, so the card keeps working offline with a "cached" note. Nothing
  * ever refreshes on its own — no polling, no timers, no battery drain.
+ * Remembers the last amount and currency pair across sessions (localStorage only).
  * Mirrors the weather-ui.js module style: attachCurrencyUi(env) is fully
  * injectable for unit tests.
  */
@@ -13,6 +14,7 @@
   'use strict';
 
   const STORAGE_KEY = 'daymark.currency.v1';
+  const PREFS_KEY = 'daymark.currency.prefs.v1';
   const DEFAULT_FROM = 'USD';
   const DEFAULT_TO = 'INR';
   const DEFAULT_AMOUNT = '1';
@@ -32,6 +34,7 @@
     const fromEl = element('currency-from');
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
+    const swapEl = element('currency-swap');
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
@@ -97,6 +100,35 @@
       storage.setItem(STORAGE_KEY, JSON.stringify(cache));
     }
 
+    function readPrefs() {
+      if (!storage || typeof storage.getItem !== 'function') return null;
+      const raw = storage.getItem(PREFS_KEY);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.amount === 'string' && typeof parsed.from === 'string' && typeof parsed.to === 'string') {
+          return parsed;
+        }
+      } catch (error) { /* ignore corrupt prefs */ }
+      return null;
+    }
+
+    function persistPrefs() {
+      if (!storage || typeof storage.setItem !== 'function') return;
+      const { amountText, from, to } = readInputs();
+      if (!from || !to) return;
+      const prefs = { amount: amountText, from, to };
+      storage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    }
+
+    function restorePrefs() {
+      const prefs = readPrefs();
+      if (!prefs) return;
+      if (amountEl && typeof amountEl.value === 'string') amountEl.value = prefs.amount || DEFAULT_AMOUNT;
+      if (fromEl && typeof fromEl.value === 'string') fromEl.value = prefs.from || DEFAULT_FROM;
+      if (toEl && typeof toEl.value === 'string') toEl.value = prefs.to || DEFAULT_TO;
+    }
+
     async function onRefresh() {
       if (busy) return;
       if (!currencyApi || typeof currencyApi.fetchLatestRates !== 'function') {
@@ -126,6 +158,7 @@
         const result = await currencyApi.fetchLatestRates(from, to, fetchImpl, { now });
         cached = result;
         persistCache(cached);
+        persistPrefs();
         render(cached, amount);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
       } catch (error) {
@@ -141,6 +174,7 @@
       }
     }
 
+    restorePrefs();
     cached = readCache();
     if (cached) {
       render(cached, currencyApi ? currencyApi.normalizeAmount(
@@ -158,10 +192,6 @@
       });
     }
 
-    if (buttonEl && typeof buttonEl.addEventListener === 'function') {
-      buttonEl.addEventListener('click', () => { onRefresh(); });
-    }
-
     // Enter in any of the currency fields starts the same refresh (keyboard efficiency).
     const enterRefresh = (event) => {
       if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -172,8 +202,35 @@
     [amountEl, fromEl, toEl].forEach((el) => {
       if (el && typeof el.addEventListener === 'function') {
         el.addEventListener('keydown', enterRefresh);
+        el.addEventListener('change', persistPrefs);
+        el.addEventListener('input', persistPrefs);
       }
     });
+
+    if (swapEl && typeof swapEl.addEventListener === 'function') {
+      swapEl.addEventListener('click', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        if (!fromEl || !toEl || typeof fromEl.value !== 'string' || typeof toEl.value !== 'string') return;
+        const tmp = fromEl.value;
+        fromEl.value = toEl.value;
+        toEl.value = tmp;
+        persistPrefs();
+        if (cached && currencyApi) {
+          const amount = currencyApi.normalizeAmount(
+            amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
+          ) || 1;
+          if (cached.from === fromEl.value && cached.to === toEl.value) {
+            render(cached, amount);
+            status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+          } else {
+            if (nowEl) nowEl.textContent = '';
+            status('Currencies swapped. Tap Refresh for the new rate.');
+          }
+        } else {
+          status('Currencies swapped. Tap Refresh for the rate.');
+        }
+      });
+    }
 
     return {
       onRefresh,
@@ -186,7 +243,7 @@
     };
   }
 
-  const api = { attachCurrencyUi, STORAGE_KEY, DEFAULT_FROM, DEFAULT_TO, DEFAULT_AMOUNT };
+  const api = { attachCurrencyUi, STORAGE_KEY, PREFS_KEY, DEFAULT_FROM, DEFAULT_TO, DEFAULT_AMOUNT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkCurrencyUi = api;
 

@@ -26,6 +26,20 @@ function fakeElement(tag) {
         if (listener.type === event.type) listener.handler(event);
       }
       return !event.defaultPrevented;
+    },
+    click() {
+      const clickEvent = { type: 'click', defaultPrevented: false };
+      this.dispatchEvent(clickEvent);
+      if (this.tagName !== 'button' || this.type !== 'submit' || !this.form) return clickEvent;
+      this.form.submitCount += 1;
+      const submitEvent = {
+        type: 'submit',
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+      };
+      this.form.dispatchEvent(submitEvent);
+      if (!submitEvent.defaultPrevented) this.form.navigationCount += 1;
+      return submitEvent;
     }
   };
 }
@@ -36,12 +50,16 @@ function fakeEnv(options) {
     'currency-amount': Object.assign(fakeElement('input'), { id: 'currency-amount', value: opts.amount || '1' }),
     'currency-from': Object.assign(fakeElement('select'), { id: 'currency-from', value: opts.from || 'USD' }),
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
-    'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh', type: 'submit' }),
-    'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form', submitCount: 0, navigationCount: 0 }),
+    'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
+    'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
+    'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
   };
+  elements['currency-refresh'].type = 'submit';
   elements['currency-refresh'].form = elements['currency-form'];
+  elements['currency-form'].submitCount = 0;
+  elements['currency-form'].navigationCount = 0;
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
@@ -101,6 +119,61 @@ test('attach with no cache prompts the user to pick currencies', () => {
   ui.attachCurrencyUi(env);
   assert.equal(elements['currency-now'].textContent, '');
   assert.equal(elements['currency-status'].textContent, 'Pick two currencies and tap Refresh.');
+});
+
+test('form submission prevents navigation and refreshes the selected conversion', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const submit = elements['currency-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'currency form should handle native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation should be prevented');
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+  assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
+});
+
+test('activating the Refresh submit button sends one form event, refreshes once, and prevents navigation', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const submitEvent = elements['currency-refresh'].click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['currency-form'].submitCount, 1);
+  assert.equal(submitEvent.defaultPrevented, true);
+  assert.equal(elements['currency-form'].navigationCount, 0);
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
+});
+
+test('Enter refresh prevents default and a concurrent submit cannot duplicate the request', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  ui.attachCurrencyUi(env);
+  const enter = elements['currency-amount'].listeners.find((listener) => listener.type === 'keydown');
+  assert.ok(enter, 'amount input should handle Enter');
+  const enterEvent = {
+    key: 'Enter',
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  enter.handler(enterEvent);
+  assert.equal(enterEvent.defaultPrevented, true, 'Enter must suppress the browser default form submit');
+  assert.equal(fetchImpl.seen.length, 1);
+
+  const duplicateSubmit = {
+    type: 'submit',
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  elements['currency-form'].dispatchEvent(duplicateSubmit);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(duplicateSubmit.defaultPrevented, true);
+  assert.equal(fetchImpl.seen.length, 1, 'the busy guard must prevent a duplicate refresh');
+  assert.equal(elements['currency-form'].navigationCount, 0);
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
 });
 
 test('a corrupt cache is ignored instead of crashing', () => {
@@ -173,35 +246,6 @@ test('missing fetch support is reported instead of throwing', async () => {
   assert.ok(elements['currency-status'].textContent.includes('fetch is unavailable'));
 });
 
-
-test('form submission prevents navigation and refreshes the selected conversion', async () => {
-  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
-  ui.attachCurrencyUi(env);
-  const submit = elements['currency-form'].listeners.find((listener) => listener.type === 'submit');
-  assert.ok(submit, 'currency form should handle native submit events');
-  let prevented = false;
-  await submit.handler({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true, 'native form navigation should be prevented');
-  assert.equal(fetchImpl.seen.length, 1);
-  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
-  assert.equal(elements['currency-status'].textContent, 'Updated · 2026-11-03 12:00 UTC');
-});
-
-test('activating the Refresh submit button sends one form event and prevents navigation', async () => {
-  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
-  ui.attachCurrencyUi(env);
-  // Simulate native submit via form listener
-  const submit = elements['currency-form'].listeners.find((l) => l.type === 'submit');
-  assert.ok(submit);
-  let prevented = false;
-  await submit.handler({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true);
-  assert.equal(fetchImpl.seen.length, 1);
-  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'));
-});
-
 test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachCurrencyUi, 'function');
   assert.equal(ui.STORAGE_KEY, 'daymark.currency.v1');
@@ -210,3 +254,46 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
 
+test('swap button exchanges from/to and updates status without auto-refresh', () => {
+  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
+  const handle = ui.attachCurrencyUi(env);
+  const swap = elements['currency-swap'];
+  assert.ok(swap.listeners.some((l) => l.type === 'click'), 'swap button should listen for clicks');
+  const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+  swap.listeners.find((l) => l.type === 'click').handler(click);
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  assert.ok(elements['currency-status'].textContent.includes('swapped'), 'status should mention swap');
+  assert.equal(click.prevented, true);
+});
+
+
+test('restores last amount and currency pair from localStorage prefs', () => {
+  const prefs = JSON.stringify({ amount: '25', from: 'EUR', to: 'GBP' });
+  const { env, elements, storageData } = fakeEnv({});
+  storageData[ui.PREFS_KEY] = prefs;
+  ui.attachCurrencyUi(env);
+  assert.equal(elements['currency-amount'].value, '25');
+  assert.equal(elements['currency-from'].value, 'EUR');
+  assert.equal(elements['currency-to'].value, 'GBP');
+});
+
+test('persists prefs on swap and on input change', () => {
+  const { env, elements, storageData } = fakeEnv({ from: 'USD', to: 'INR', amount: '5' });
+  ui.attachCurrencyUi(env);
+  // simulate input
+  elements['currency-amount'].value = '42';
+  const inputListener = elements['currency-amount'].listeners.find((l) => l.type === 'input');
+  if (inputListener) inputListener.handler({});
+  let saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
+  assert.equal(saved.amount, '42');
+  assert.equal(saved.from, 'USD');
+
+  // swap
+  const swap = elements['currency-swap'];
+  const click = { preventDefault() {}, defaultPrevented: false };
+  swap.listeners.find((l) => l.type === 'click').handler(click);
+  saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
+  assert.equal(saved.from, 'INR');
+  assert.equal(saved.to, 'USD');
+});
