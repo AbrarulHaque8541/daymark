@@ -54,7 +54,8 @@ final class TaskEditorImeInstrumentation {
             AccessibilityServiceInfo serviceInfo = automation.getServiceInfo();
             if (serviceInfo == null) throw new AssertionError("UiAutomation has no accessibility service info.");
             // UiAutomation.getWindows() returns no interactive windows until this flag is enabled.
-            serviceInfo.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+            serviceInfo.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                    | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
             automation.setServiceInfo(serviceInfo);
 
             Intent launch = new Intent(instrumentation.getTargetContext(), MainActivity.class);
@@ -69,7 +70,7 @@ final class TaskEditorImeInstrumentation {
 
             openEditor(instrumentation, activity, assertions);
             exerciseImeActions(instrumentation, cancelledTitle, assertions);
-            tapDialogAction(instrumentation, EDITOR_TITLE, "Cancel", assertions);
+            tapDialogAction(instrumentation, EDITOR_TITLE, "android:id/button2", "Cancel", assertions);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
             awaitImeHidden(instrumentation);
             require(Arrays.equals(storageBeforeCancel, encryptedTaskStorageSnapshot(activity)),
@@ -80,7 +81,7 @@ final class TaskEditorImeInstrumentation {
             openEditor(instrumentation, activity, assertions);
             exerciseImeActions(instrumentation, savedTitle, assertions);
             savedTaskMayExist = true;
-            tapDialogAction(instrumentation, EDITOR_TITLE, "Add task", assertions);
+            tapDialogAction(instrumentation, EDITOR_TITLE, "android:id/button1", "Add task", assertions);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
             awaitImeHidden(instrumentation);
             require(awaitTaskTitleVisible(instrumentation, activity, savedTitle),
@@ -223,8 +224,10 @@ final class TaskEditorImeInstrumentation {
         root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
-        AccessibilityNodeInfo cancel = findButtonByText(root, "Cancel");
-        AccessibilityNodeInfo add = findButtonByText(root, "Add task");
+        AccessibilityNodeInfo cancel = awaitDialogButton(
+                instrumentation, EDITOR_TITLE, "android:id/button2", "Cancel");
+        AccessibilityNodeInfo add = awaitDialogButton(
+                instrumentation, EDITOR_TITLE, "android:id/button1", "Add task");
         require(hasVisibleTouchBounds(cancel), "the Cancel dialog action has a visible touch target", assertions);
         require(hasVisibleTouchBounds(add), "the Add Task dialog action has a visible touch target", assertions);
         if (imeBounds != null) {
@@ -238,6 +241,55 @@ final class TaskEditorImeInstrumentation {
         require(titleField != null && titleField.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, text),
                 "the focused title field accepts test text", assertions);
         instrumentation.waitForIdleSync();
+    }
+
+    private static AccessibilityNodeInfo awaitDialogButton(Instrumentation instrumentation, String dialogTitle,
+                                                            String viewId, String label) throws Exception {
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null || findByText(root, dialogTitle) == null) continue;
+                AccessibilityNodeInfo button = findByViewId(root, viewId);
+                if (button == null) button = findButtonByText(root, label);
+                if (button != null && findByText(button, label) != null && hasVisibleTouchBounds(button)) {
+                    return button;
+                }
+            }
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for visible " + label + " button " + viewId
+                + "; accessibility nodes: " + describeDialogButtonNodes(instrumentation, dialogTitle, viewId, label));
+    }
+
+    private static String describeDialogButtonNodes(Instrumentation instrumentation, String dialogTitle,
+                                                     String viewId, String label) {
+        StringBuilder summary = new StringBuilder();
+        for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+            AccessibilityNodeInfo root = window.getRoot();
+            if (root == null) continue;
+            AccessibilityNodeInfo titleNode = findByText(root, dialogTitle);
+            AccessibilityNodeInfo labelNode = findByText(root, label);
+            AccessibilityNodeInfo idNode = findByViewId(root, viewId);
+            AccessibilityNodeInfo buttonNode = findButtonByText(root, label);
+            if (titleNode == null && labelNode == null && idNode == null && buttonNode == null) continue;
+            if (summary.length() > 0) summary.append("; ");
+            summary.append("windowType=").append(window.getType())
+                    .append(" title=").append(describeNode(titleNode))
+                    .append(" label=").append(describeNode(labelNode))
+                    .append(" id=").append(describeNode(idNode))
+                    .append(" button=").append(describeNode(buttonNode));
+        }
+        return summary.length() == 0 ? "no matching nodes in interactive windows" : summary.toString();
+    }
+
+    private static String describeNode(AccessibilityNodeInfo node) {
+        if (node == null) return "none";
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        return "class=" + node.getClassName() + ",text=" + node.getText()
+                + ",viewId=" + node.getViewIdResourceName() + ",visible=" + node.isVisibleToUser()
+                + ",clickable=" + node.isClickable() + ",bounds=" + bounds.toShortString();
     }
 
     private static void checkVisibleAboveIme(Instrumentation instrumentation, AccessibilityNodeInfo button,
@@ -257,10 +309,9 @@ final class TaskEditorImeInstrumentation {
         require(!Rect.intersects(bounds, imeBounds), label + " is not covered by the IME", assertions);
     }
 
-    private static void tapDialogAction(Instrumentation instrumentation, String dialogTitle, String label,
-                                        int[] assertions) throws Exception {
-        AccessibilityNodeInfo root = awaitDialogRoot(instrumentation, dialogTitle);
-        AccessibilityNodeInfo button = findButtonByText(root, label);
+    private static void tapDialogAction(Instrumentation instrumentation, String dialogTitle, String viewId,
+                                        String label, int[] assertions) throws Exception {
+        AccessibilityNodeInfo button = awaitDialogButton(instrumentation, dialogTitle, viewId, label);
         require(hasVisibleTouchBounds(button), label + " button has visible touch bounds before tapping", assertions);
         Rect bounds = new Rect();
         button.getBoundsInScreen(bounds);
@@ -514,6 +565,16 @@ final class TaskEditorImeInstrumentation {
         }
         for (int i = 0; i < root.getChildCount(); i++) {
             AccessibilityNodeInfo found = findClickableByText(root.getChild(i), text);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static AccessibilityNodeInfo findByViewId(AccessibilityNodeInfo root, String viewId) {
+        if (root == null) return null;
+        if (viewId.equals(root.getViewIdResourceName())) return root;
+        for (int i = 0; i < root.getChildCount(); i++) {
+            AccessibilityNodeInfo found = findByViewId(root.getChild(i), viewId);
             if (found != null) return found;
         }
         return null;
