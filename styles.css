@@ -744,3 +744,21 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .subtask-remove:hover { background: #4a2220; color: #ffb0a8; }
   .page-footer { border-top-color: #232d35; color: #7c8a94; }
 }
+
+/* Cycle B: enhanced press feedback and glass consistency (accent #16705f) */
+.button:active, .tool-button:active, .filter-button:active {
+  transform: translateY(1px) scale(0.985);
+  transition-duration: 0.08s;
+}
+.button-primary:active {
+  background: linear-gradient(145deg, #0d5449, #0a4238);
+  box-shadow: 0 3px 8px rgba(22, 112, 95, .2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button:active, .tool-button:active, .filter-button:active {
+    transform: none;
+  }
+}
+.card:hover {
+  border-color: rgba(22, 112, 95, .18);
+}
