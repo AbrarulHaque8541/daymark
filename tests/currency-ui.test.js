@@ -54,7 +54,8 @@ function fakeEnv(options) {
     'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
-    'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
+    'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' }),
+    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy', hidden: true })
   };
   elements['currency-refresh'].type = 'submit';
   elements['currency-refresh'].form = elements['currency-form'];
@@ -296,4 +297,19 @@ test('persists prefs on swap and on input change', () => {
   saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
   assert.equal(saved.from, 'INR');
   assert.equal(saved.to, 'USD');
+});
+
+test('copy button copies the main conversion line and updates status', async () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  let copied = null;
+  env.clipboard = { writeText: async (text) => { copied = text; } };
+  const handle = ui.attachCurrencyUi(env);
+  const copy = elements['currency-copy'];
+  assert.ok(copy.listeners.some((l) => l.type === 'click'), 'copy button should listen for clicks');
+  assert.equal(copy.hidden, false, 'copy button should be visible when a result is shown');
+  const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+  await copy.listeners.find((l) => l.type === 'click').handler(click);
+  assert.equal(copied, '1 USD = 94.91 INR');
+  assert.ok(elements['currency-status'].textContent.includes('Copied'));
+  assert.equal(click.prevented, true);
 });
