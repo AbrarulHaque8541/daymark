@@ -38,12 +38,22 @@
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
+    const copyEl = element('currency-copy');
 
     let busy = false;
     let cached = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+
+    function updateCopyVisibility() {
+      if (!copyEl) return;
+      const hasResult = nowEl && nowEl.textContent && nowEl.textContent.trim().length > 0;
+      if (typeof copyEl.hidden !== 'undefined') copyEl.hidden = !hasResult;
+      if (copyEl.classList && typeof copyEl.classList.toggle === 'function') {
+        copyEl.classList.toggle('is-hidden', !hasResult);
+      }
     }
 
     function setBusy(isBusy) {
@@ -81,6 +91,7 @@
       nowEl.textContent = `${amountText} ${cache.from} = ${convertedText} ${cache.to}`
         + ` · 1 ${cache.from} = ${rateText} ${cache.to}`
         + ` · ECB reference rates, as of ${cache.asOfDate}`;
+      updateCopyVisibility();
     }
 
     function readCache() {
@@ -181,8 +192,10 @@
         amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
       ) || 1 : 1);
       status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      updateCopyVisibility();
     } else {
       status('Pick two currencies and tap Refresh.');
+      updateCopyVisibility();
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -224,6 +237,7 @@
             status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
           } else {
             if (nowEl) nowEl.textContent = '';
+            updateCopyVisibility();
             status('Currencies swapped. Tap Refresh for the new rate.');
           }
         } else {
@@ -232,9 +246,46 @@
       });
     }
 
+    async function onCopy() {
+      if (!nowEl || !nowEl.textContent || !nowEl.textContent.trim()) return;
+      const text = nowEl.textContent.split(' · ')[0].trim(); // main conversion line
+      const clipboard = (win && win.navigator && win.navigator.clipboard) || (env.clipboard);
+      try {
+        if (clipboard && typeof clipboard.writeText === 'function') {
+          await clipboard.writeText(text);
+        } else {
+          // fallback for older environments / tests
+          if (typeof document !== 'undefined' && document.createElement) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+        }
+        const prev = statusEl ? statusEl.textContent : '';
+        status('Copied conversion to clipboard.');
+        setTimeout(() => { if (statusEl && statusEl.textContent === 'Copied conversion to clipboard.') status(prev); }, 1800);
+      } catch (err) {
+        status('Could not copy. Select the text manually.');
+      }
+    }
+
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        onCopy();
+      });
+    }
+
     return {
       onRefresh,
       readCache,
+      onCopy,
       detach() {
         // No document-level listener is registered; the button reference is
         // dropped when the returned handle goes out of scope.
