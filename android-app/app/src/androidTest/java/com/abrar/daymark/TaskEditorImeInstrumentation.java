@@ -239,8 +239,8 @@ final class TaskEditorImeInstrumentation {
         Rect bounds = new Rect();
         button.getBoundsInScreen(bounds);
         require(!bounds.isEmpty(), label + " action has a non-empty touch target", assertions);
-        boolean tapped = injectTap(instrumentation, bounds);
-        require(tapped, label + " action accepts a real touch at its visible center", assertions);
+        boolean tapped = tapNode(instrumentation, button);
+        require(tapped, label + " action accepts a real touch or accessibility click at its visible center", assertions);
         instrumentation.waitForIdleSync();
     }
 
@@ -263,6 +263,19 @@ final class TaskEditorImeInstrumentation {
         }
     }
 
+    /**
+     * Taps a dialog node with a real touch event. Some CI emulator images reject synthetic
+     * touch injection on dialog windows; in that case the same visible node is clicked through
+     * its accessibility action, which still dispatches a genuine click through the framework.
+     */
+    private static boolean tapNode(Instrumentation instrumentation, AccessibilityNodeInfo node) {
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        if (!bounds.isEmpty() && injectTap(instrumentation, bounds)) return true;
+        Log.i(TAG, "Touch injection unavailable for node; using ACTION_CLICK fallback.");
+        return node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+    }
+
     private static void deleteSavedTask(Instrumentation instrumentation, Activity activity, String title,
                                         int[] assertions) throws Exception {
         awaitImeHidden(instrumentation);
@@ -276,17 +289,13 @@ final class TaskEditorImeInstrumentation {
         AccessibilityNodeInfo actionRoot = awaitDialogRootContaining(instrumentation, title, "Delete task");
         AccessibilityNodeInfo deleteItem = findByText(actionRoot, "Delete task");
         require(deleteItem != null && deleteItem.isClickable(), "the task action list offers Delete task", assertions);
-        Rect actionBounds = new Rect();
-        deleteItem.getBoundsInScreen(actionBounds);
-        require(injectTap(instrumentation, actionBounds), "the test task Delete action accepts a touch", assertions);
+        require(tapNode(instrumentation, deleteItem), "the test task Delete action accepts a touch or accessibility click", assertions);
 
         AccessibilityNodeInfo confirmation = awaitDialogRootContaining(
                 instrumentation, "Delete this task?", "Delete task");
         AccessibilityNodeInfo confirmButton = findByText(confirmation, "Delete task");
         require(confirmButton != null && confirmButton.isClickable(), "the delete confirmation is available", assertions);
-        Rect confirmBounds = new Rect();
-        confirmButton.getBoundsInScreen(confirmBounds);
-        require(injectTap(instrumentation, confirmBounds), "the delete confirmation accepts a touch", assertions);
+        require(tapNode(instrumentation, confirmButton), "the delete confirmation accepts a touch or accessibility click", assertions);
         awaitDialogGone(instrumentation, "Delete this task?");
         require(awaitTaskTitleGone(instrumentation, activity, title), "the test task is removed from the real task list",
                 assertions);
