@@ -28,6 +28,7 @@
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const inputEl = element('wiki-query');
     const buttonEl = element('wiki-search');
+    const clearEl = element('wiki-clear');
     const statusEl = element('wiki-status');
     const listEl = element('wiki-list');
 
@@ -124,6 +125,29 @@
       storage.setItem(PREFS_KEY, JSON.stringify({ query: query.trim() }));
     }
 
+    function clearStorage() {
+      if (!storage) return;
+      if (typeof storage.removeItem === 'function') {
+        storage.removeItem(STORAGE_KEY);
+        storage.removeItem(PREFS_KEY);
+      }
+    }
+
+    function onClear() {
+      if (busy) return;
+      if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
+      if (listEl) {
+        if (typeof listEl.removeChild === 'function') {
+          while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        } else {
+          listEl.textContent = '';
+        }
+      }
+      clearStorage();
+      cached = null;
+      status('Cleared. Type a topic and tap Search.');
+    }
+
     async function onSearch() {
       if (busy) return;
       if (!wikiApi || typeof wikiApi.searchWikipedia !== 'function') {
@@ -180,6 +204,10 @@
       buttonEl.addEventListener('click', () => { onSearch(); });
     }
 
+    if (clearEl && typeof clearEl.addEventListener === 'function') {
+      clearEl.addEventListener('click', () => { onClear(); });
+    }
+
     // Enter on the query field starts the same search (keyboard efficiency).
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
@@ -197,6 +225,7 @@
 
     return {
       onSearch,
+      onClear,
       readCache,
       detach() {
         // No document-level listener is registered; the button reference is
