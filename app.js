@@ -1897,6 +1897,20 @@
     return refreshFeed($('#feed-url').value);
   }
 
+  function clearFeed() {
+    if (state.feedLoading) return;
+    const input = $('#feed-url');
+    if (input) input.value = '';
+    state.feedCache = null;
+    state.feedNotice = '';
+    try {
+      localStorage.removeItem(FEED_KEY);
+    } catch (error) {
+      console.warn('Could not clear the Daymark feed cache:', error);
+    }
+    renderFeed();
+  }
+
   function setUp() {
     state.tasks = loadTasks();
     const focusState = loadFocusState();
@@ -1980,6 +1994,8 @@
       }
     });
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
+    const feedClear = $('#feed-clear');
+    if (feedClear) feedClear.addEventListener('click', clearFeed);
     $('#focus-start').addEventListener('click', () => startFocus(null));
     $('#focus-pause').addEventListener('click', toggleFocusPause);
     $('#focus-stop').addEventListener('click', () => endFocusSession(false));
