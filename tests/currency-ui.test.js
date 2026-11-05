@@ -267,3 +267,15 @@ test('swap button exchanges from/to and updates status without auto-refresh', ()
   assert.equal(click.prevented, true);
 });
 
+test('amount input live-updates the display from a matching cached rate', () => {
+  const { env, elements } = fakeEnv({ stored: STORED, amount: '1' });
+  ui.attachCurrencyUi(env);
+  assert.ok(elements['currency-now'].textContent.startsWith('1 USD = 94.91 INR'));
+  const inputListener = elements['currency-amount'].listeners.find((l) => l.type === 'input');
+  assert.ok(inputListener, 'amount field should listen for input');
+  elements['currency-amount'].value = '10';
+  inputListener.handler();
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'), 'display should update from cache without refresh');
+  assert.ok(elements['currency-status'].textContent.startsWith('Cached'), 'status remains the cached note');
+});
+
