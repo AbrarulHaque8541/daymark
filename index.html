@@ -19,6 +19,8 @@
   <script src="weather-ui.js" defer></script>
   <script src="currency-logic.js" defer></script>
   <script src="currency-ui.js" defer></script>
+  <script src="wiki-logic.js" defer></script>
+  <script src="wiki-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="storage-logic.js" defer></script>
@@ -283,6 +285,19 @@
           <div class="currency-now" id="currency-now" aria-live="polite"></div>
         </aside>
 
+        <aside class="wiki-card" id="wiki-card" aria-labelledby="wiki-heading">
+          <div class="wiki-topline"><span class="wiki-dot" aria-hidden="true"></span><span class="demo-label">KNOWLEDGE GLANCE</span></div>
+          <h2 id="wiki-heading">Look it up on Wikipedia</h2>
+          <p class="wiki-description">Search the free public Wikipedia encyclopedia — no account, no API key, no data leaving this device beyond the topic you type. Fetched only when you tap Search; the last results are cached here and stay readable offline.</p>
+          <form id="wiki-form" class="feed-form" novalidate>
+            <label class="sr-only" for="wiki-query">Search topic</label>
+            <input id="wiki-query" name="query" type="text" maxlength="120" placeholder="Topic, e.g. Kanyakumari" autocomplete="off">
+            <button class="button button-primary wiki-search" id="wiki-search" type="button">Search</button>
+          </form>
+          <p class="wiki-status" id="wiki-status" role="status" aria-live="polite"></p>
+          <div class="wiki-list" id="wiki-list" aria-live="polite"></div>
+        </aside>
+
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
           <h2 id="webhook-heading">Task-completion webhook</h2>
@@ -357,4 +372,5 @@ name="repeat" disabled><option value="">No repeat</option><option value="daily">
   </div>
 </body>
 </html>
+
 

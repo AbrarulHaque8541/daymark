@@ -1,0 +1,222 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const wikiApi = require('../wiki-logic.js');
+const ui = require('../wiki-ui.js');
+
+const SEARCH_BODY = JSON.stringify({
+  query: {
+    search: [
+      {
+        title: 'Kanyakumari',
+        snippet: '<span class="searchmatch">Kanyakumari</span> is a coastal town in Tamil Nadu.',
+        pageid: 2285632
+      }
+    ]
+  }
+});
+
+function fakeElement(tag) {
+  const listeners = [];
+  const children = [];
+  const attributes = {};
+  return {
+    tagName: tag,
+    id: '',
+    className: '',
+    href: '',
+    disabled: false,
+    value: '',
+    textContent: '',
+    listeners,
+    children,
+    attributes,
+    firstChild: null,
+    addEventListener(type, handler) { listeners.push({ type, handler }); },
+    appendChild(child) { children.push(child); this.firstChild = children[0]; return child; },
+    removeChild(child) {
+      const index = children.indexOf(child);
+      if (index >= 0) children.splice(index, 1);
+      this.firstChild = children[0] || null;
+      return child;
+    },
+    setAttribute(name, value) { attributes[name] = String(value); },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(attributes, name) ? attributes[name] : null; },
+    removeAttribute(name) { delete attributes[name]; }
+  };
+}
+
+function fakeEnv(options) {
+  const opts = options || {};
+  const elements = {
+    'wiki-query': Object.assign(fakeElement('input'), { id: 'wiki-query', value: opts.query || '' }),
+    'wiki-search': Object.assign(fakeElement('button'), { id: 'wiki-search' }),
+    'wiki-status': Object.assign(fakeElement('p'), { id: 'wiki-status' }),
+    'wiki-list': Object.assign(fakeElement('div'), { id: 'wiki-list' })
+  };
+  const storageData = {};
+  if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    setItem(key, value) { storageData[key] = String(value); }
+  };
+  const env = {
+    document: {
+      readyState: 'complete',
+      getElementById(id) { return elements[id] || null; },
+      createElement(tag) { return fakeElement(tag); }
+    },
+    window: {},
+    localStorage: storage,
+    wikiApi,
+    fetch: opts.fetch,
+    now: () => '2026-11-05T12:00:00.000Z'
+  };
+  return { env, elements, storageData };
+}
+
+function okFetch(body) {
+  const seen = [];
+  const impl = (url, init) => {
+    seen.push(url);
+    assert.ok(!init || typeof init === 'object', 'fetch init must be an options object when provided');
+    return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
+  };
+  impl.seen = seen;
+  return impl;
+}
+
+test('attach renders a cached search with a cached note', () => {
+  const stored = JSON.stringify({
+    version: 1,
+    query: 'kanyakumari',
+    results: [{
+      title: 'Kanyakumari',
+      snippet: 'A coastal town in Tamil Nadu.',
+      pageId: 2285632,
+      url: 'https://en.wikipedia.org/?curid=2285632'
+    }],
+    fetchedAt: '2026-11-04T09:30:00.000Z'
+  });
+  const { env, elements } = fakeEnv({ stored });
+  ui.attachWikiUi(env);
+  assert.equal(elements['wiki-list'].children.length, 1);
+  const item = elements['wiki-list'].children[0];
+  assert.equal(item.children.length, 2);
+  assert.equal(item.children[0].tagName, 'a');
+  assert.equal(item.children[0].textContent, 'Kanyakumari');
+  assert.equal(item.children[0].attributes['href'], 'https://en.wikipedia.org/?curid=2285632');
+  assert.equal(item.children[0].attributes['rel'], 'noopener noreferrer');
+  assert.equal(item.children[1].tagName, 'p');
+  assert.equal(item.children[1].textContent, 'A coastal town in Tamil Nadu.');
+  assert.ok(elements['wiki-status'].textContent.startsWith('Cached · updated 2026-11-04 09:30 UTC'));
+});
+
+test('search fetches, renders, persists, and reports the update', async () => {
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements, storageData } = fakeEnv({ query: ' kanyakumari ', fetch: fetchImpl });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.ok(fetchImpl.seen[0].includes('srsearch=kanyakumari'));
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.equal(elements['wiki-list'].children[0].children[0].textContent, 'Kanyakumari');
+  assert.equal(elements['wiki-status'].textContent, 'Updated · 2026-11-05 12:00 UTC');
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.equal(saved.version, 1);
+  assert.equal(saved.query, 'kanyakumari');
+  assert.equal(saved.results.length, 1);
+  assert.equal(JSON.parse(storageData[ui.PREFS_KEY]).query, 'kanyakumari');
+});
+
+test('search failure keeps the cached results visible', async () => {
+  const stored = JSON.stringify({
+    version: 1,
+    query: 'kanyakumari',
+    results: [{
+      title: 'Kanyakumari',
+      snippet: 'A coastal town in Tamil Nadu.',
+      pageId: 2285632,
+      url: 'https://en.wikipedia.org/?curid=2285632'
+    }],
+    fetchedAt: '2026-11-04T09:30:00.000Z'
+  });
+  const failing = () => Promise.reject(new Error('offline'));
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', stored, fetch: failing });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.equal(elements['wiki-status'].textContent, 'Could not search: offline — showing cached results.');
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.equal(elements['wiki-search'].disabled, false);
+});
+
+test('search failure with no cache reports the error plainly', async () => {
+  const failing = () => Promise.reject(new Error('offline'));
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', fetch: failing });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.equal(elements['wiki-status'].textContent, 'Could not search: offline');
+  assert.equal(elements['wiki-list'].children.length, 0);
+});
+
+test('missing fetch support is reported instead of throwing', async () => {
+  const { env, elements } = fakeEnv({ query: 'kanyakumari' });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.ok(elements['wiki-status'].textContent.includes('fetch is unavailable'));
+});
+
+test('empty query asks for a search term without touching the network', async () => {
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements } = fakeEnv({ fetch: fetchImpl });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.equal(elements['wiki-status'].textContent, 'Type a search term first.');
+  assert.equal(fetchImpl.seen.length, 0);
+});
+
+test('a corrupt cache is ignored instead of crashing attach', () => {
+  const { env, elements } = fakeEnv({ stored: '{not json' });
+  ui.attachWikiUi(env);
+  assert.equal(elements['wiki-list'].children.length, 0);
+  assert.equal(elements['wiki-status'].textContent, 'Type a topic and tap Search.');
+});
+
+test('the module exposes its API and stays inert under Node', () => {
+  assert.equal(typeof ui.attachWikiUi, 'function');
+  assert.equal(ui.STORAGE_KEY, 'daymark.wiki.v1');
+  assert.equal(ui.PREFS_KEY, 'daymark.wiki.prefs.v1');
+  assert.equal(typeof globalThis.DaymarkWikiUi, 'object');
+});
+
+test('a saved search term from a previous visit is restored on attach', () => {
+  const { env, elements, storageData } = fakeEnv({});
+  storageData[ui.PREFS_KEY] = JSON.stringify({ query: 'Kanyakumari' });
+  ui.attachWikiUi(env);
+  assert.equal(elements['wiki-query'].value, 'Kanyakumari');
+  assert.equal(elements['wiki-status'].textContent, 'Last search restored. Tap Search to look it up again.');
+});
+
+test('typing a search term persists it for the next visit', () => {
+  const { env, elements, storageData } = fakeEnv({});
+  ui.attachWikiUi(env);
+  const input = elements['wiki-query'];
+  input.value = 'solar power';
+  const inputListener = input.listeners.find((l) => l.type === 'input');
+  assert.ok(inputListener, 'input listener registered');
+  inputListener.handler();
+  assert.equal(JSON.parse(storageData[ui.PREFS_KEY]).query, 'solar power');
+});
+
+test('Enter in the query field triggers a search', async () => {
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', fetch: fetchImpl });
+  ui.attachWikiUi(env);
+  const keydown = elements['wiki-query'].listeners.find((l) => l.type === 'keydown');
+  assert.ok(keydown, 'keydown listener registered');
+  let prevented = false;
+  await keydown.handler({ key: 'Enter', preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.equal(elements['wiki-status'].textContent, 'Updated · 2026-11-05 12:00 UTC');
+});
