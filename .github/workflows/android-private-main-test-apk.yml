@@ -1,0 +1,201 @@
+name: Android private main test APK (manual)
+
+# Owner-authorized private testing only. Normal production publication remains
+# tag-gated in android-production-release.yml. Never upload a plaintext APK here.
+on:
+  workflow_dispatch:
+    inputs:
+      age_recipient:
+        description: 'One-time age public recipient (age1...) for private transfer'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-private-main-test-apk
+  cancel-in-progress: false
+
+jobs:
+  private-main-test:
+    if: >-
+      github.repository == 'AbrarulHaque8541/daymark' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'AbrarulHaque8541' &&
+      github.triggering_actor == 'AbrarulHaque8541'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: android-app
+    steps:
+      - name: Check out dispatched main commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require the current live main tip
+        run: |
+          set -euo pipefail
+          live_main="$(git ls-remote https://github.com/AbrarulHaque8541/daymark.git refs/heads/main | awk '{print $1}')"
+          [[ "$GITHUB_SHA" == "$live_main" ]] || {
+            echo '::error::Main moved after dispatch; dispatch again against its current tip.'
+            exit 1
+          }
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+
+      - name: Install age and validate the public recipient before signing
+        env:
+          AGE_RECIPIENT: ${{ inputs.age_recipient }}
+        run: |
+          set -euo pipefail
+          [[ "$AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]] || {
+            echo '::error::A single native age public recipient is required.'
+            exit 1
+          }
+          sudo apt-get update -qq
+          sudo apt-get install -y age
+          age --encrypt --recipient "$AGE_RECIPIENT" \
+            --output "$RUNNER_TEMP/recipient-validation.age" < /dev/null
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - name: Set up Android SDK API 36
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: 'platforms;android-36 build-tools;35.0.0'
+
+      - name: Run source and host regression checks before signing
+        run: |
+          set -euo pipefail
+          sh ./tools/check-v1-source.sh
+          sh ./tools/run-storage-recovery-tests.sh
+          sh ./tools/run-updater-picker-routing-tests.sh
+          python3 ./tools/check-ci-test-honesty.py "$GITHUB_WORKSPACE"
+          (cd .. && npm test)
+
+      - name: Validate signing secrets and restore production keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [[ -n "${!name:-}" ]] || {
+              echo "::error::Missing required signing secret: $name"
+              exit 1
+            }
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/daymark-release.keystore"
+          test -s "$RUNNER_TEMP/daymark-release.keystore"
+
+      - name: Build the unchanged production-signed sideload APK
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/daymark-private-gradle
+          KEYSTORE_PATH: ${{ runner.temp }}/daymark-release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-build-cache --no-configuration-cache \
+            assembleGithubSideloadRelease lintGithubSideloadRelease
+
+      - name: Verify package, source version, and pinned production signer
+        run: |
+          set -euo pipefail
+          apk='app/build/outputs/apk/githubSideload/release/app-githubSideload-release.apk'
+          test -s "$apk"
+          apk_bytes="$(stat -c%s "$apk")"
+          [[ "$apk_bytes" -ge 100000 && "$apk_bytes" -le 100000000 ]]
+          unzip -tqq "$apk"
+          entries="$(unzip -Z1 "$apk")"
+          for entry in AndroidManifest.xml resources.arsc classes.dex; do
+            grep -Fxq "$entry" <<< "$entries"
+          done
+          dex_bytes="$(unzip -p "$apk" classes.dex | wc -c)"
+          [[ "$dex_bytes" -ge 50000 ]]
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          aapt="$sdk_root/build-tools/35.0.0/aapt"
+          apksigner="$sdk_root/build-tools/35.0.0/apksigner"
+          test -x "$aapt" && test -x "$apksigner"
+          badging="$("$aapt" dump badging "$apk")"
+          package_line="$(grep '^package: ' <<< "$badging")"
+          package_id="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<< "$package_line")"
+          version_name="$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<< "$package_line")"
+          version_code="$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<< "$package_line")"
+          expected_name="$(sed -n 's/^[[:space:]]*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          expected_code="$(sed -n 's/^[[:space:]]*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)"
+          [[ "$package_id" == 'com.abrar.daymark' ]]
+          [[ -n "$expected_name" && "$expected_code" =~ ^[0-9]+$ ]]
+          [[ "$version_name" == "$expected_name" && "$version_code" == "$expected_code" ]]
+          grep -q "^launchable-activity: name='com.abrar.daymark.MainActivity'" <<< "$badging"
+          if grep -q '^application-debuggable' <<< "$badging"; then
+            echo '::error::Debuggable APK rejected; a production-signed release variant is required.'
+            exit 1
+          fi
+          grep -q "^sdkVersion:'26'" <<< "$badging"
+          grep -q "^targetSdkVersion:'36'" <<< "$badging"
+          expected_signer='ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580'
+          grep -Fq "$expected_signer" app/src/main/java/com/abrar/daymark/updater/UpdaterPublisherConfig.java
+          certs="$("$apksigner" verify --verbose --print-certs "$apk")"
+          mapfile -t signers < <(sed -n 's/.*certificate SHA-256 digest:[[:space:]]*\([0-9A-Fa-f]*\).*/\1/p' <<< "$certs" | tr 'A-F' 'a-f')
+          [[ "${#signers[@]}" -eq 1 && "${signers[0]}" == "$expected_signer" ]]
+          apk_sha="$(sha256sum "$apk" | awk '{print $1}')"
+          {
+            echo '## Private main test APK — not a release'
+            echo "- Build SHA: \`$GITHUB_SHA\`"
+            echo "- Package: \`$package_id\`"
+            echo "- Version: $version_name (code $version_code)"
+            echo "- Signer SHA-256: \`$expected_signer\`"
+            echo "- APK SHA-256: \`$apk_sha\`"
+            echo "- APK bytes: $apk_bytes"
+            echo '- Only age ciphertext is uploaded. No tag, draft, or release is created.'
+            echo '- Operator must decrypt and verify locally, upload privately to the owner, then delete the encrypted artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf 'Verified %s %s (%s); APK SHA-256: %s\n' "$package_id" "$version_name" "$version_code" "$apk_sha"
+
+      - name: Encrypt the verified APK for the one-time recipient
+        env:
+          AGE_RECIPIENT: ${{ inputs.age_recipient }}
+        run: |
+          set -euo pipefail
+          live_main="$(git ls-remote https://github.com/AbrarulHaque8541/daymark.git refs/heads/main | awk '{print $1}')"
+          [[ "$GITHUB_SHA" == "$live_main" ]] || {
+            echo '::error::Main moved during the build; no artifact will be uploaded. Dispatch again against its current tip.'
+            exit 1
+          }
+          umask 077
+          mkdir -p "$RUNNER_TEMP/private-test-transfer"
+          age --encrypt --recipient "$AGE_RECIPIENT" \
+            --output "$RUNNER_TEMP/private-test-transfer/Daymark-main-$GITHUB_SHA.apk.age" \
+            app/build/outputs/apk/githubSideload/release/app-githubSideload-release.apk
+          test -s "$RUNNER_TEMP/private-test-transfer/Daymark-main-$GITHUB_SHA.apk.age"
+
+      - name: Upload only the short-lived encrypted transfer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Daymark-private-main-${{ github.run_id }}
+          path: ${{ runner.temp }}/private-test-transfer/Daymark-main-${{ github.sha }}.apk.age
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Remove the keystore and local transfer material
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          rm -f "$RUNNER_TEMP/daymark-release.keystore" "$RUNNER_TEMP/recipient-validation.age"
+          rm -rf "$GITHUB_WORKSPACE/android-app/app/build" "$GITHUB_WORKSPACE/android-app/build" "$GITHUB_WORKSPACE/android-app/.gradle"
+          rm -rf "$RUNNER_TEMP/daymark-private-gradle" "$RUNNER_TEMP/private-test-transfer"
