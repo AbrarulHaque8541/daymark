@@ -255,18 +255,19 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         tickLp.topMargin = dp(7);
         addView(tickToggle, tickLp);
         sounds.setEnabled(soundEnabled);
-        tickToggle.setEnabled(soundEnabled);
+        tickToggle.setEnabled(!actionPending && soundEnabled);
         tickToggle.setAlpha(soundEnabled ? 1f : 0.45f);
         soundToggle.setOnClickListener(v -> {
+            if (closed || actionPending) return;
             soundEnabled = !soundEnabled;
             sounds.setEnabled(soundEnabled);
             setToggleState(soundToggle, "Soft interaction sounds", soundEnabled);
             if (soundEnabled) sounds.onSelection();
-            tickToggle.setEnabled(soundEnabled);
+            tickToggle.setEnabled(!actionPending && soundEnabled);
             tickToggle.setAlpha(soundEnabled ? 1f : 0.45f);
         });
         tickToggle.setOnClickListener(v -> {
-            if (!soundEnabled) return;
+            if (closed || actionPending || !soundEnabled) return;
             finalTicksEnabled = !finalTicksEnabled;
             sounds.setFinalTicksEnabled(finalTicksEnabled);
             setToggleState(tickToggle, "Final 10-second ticks", finalTicksEnabled);
@@ -301,7 +302,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         soundEnabled = enabled;
         sounds.setEnabled(enabled);
         setToggleState(soundToggle, "Soft interaction sounds", enabled);
-        tickToggle.setEnabled(enabled);
+        tickToggle.setEnabled(!actionPending && enabled);
         tickToggle.setAlpha(enabled ? 1f : 0.45f);
     }
 
@@ -344,13 +345,6 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         primaryAction.setContentDescription(running ? "Pause focus timer"
                 : paused ? "Resume focus timer" : "Start focus timer");
         updateActionControls(active);
-        modeStopwatch.setEnabled(!active);
-        modeCountdown.setEnabled(!active);
-        customDuration.setEnabled(!active && selectedMode == TaskFocusTimer.Mode.COUNTDOWN);
-        for (int i = 0; i < presetRow.getChildCount(); i++) {
-            presetRow.getChildAt(i).setEnabled(!active && selectedMode == TaskFocusTimer.Mode.COUNTDOWN);
-            presetRow.getChildAt(i).setAlpha(selectedMode == TaskFocusTimer.Mode.COUNTDOWN ? 1f : 0.42f);
-        }
     }
 
     private void performPrimaryAction() {
@@ -370,16 +364,29 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
 
     private void updateActionControls(boolean active) {
         boolean enabled = !actionPending;
+        boolean configurationEnabled = enabled && !active;
         taskName.setEnabled(enabled);
         taskName.setAlpha(enabled ? 1f : 0.58f);
         primaryAction.setEnabled(enabled);
         primaryAction.setAlpha(enabled ? 1f : 0.58f);
         stopAction.setEnabled(enabled && active);
         stopAction.setAlpha(enabled && active ? 1f : 0.55f);
+        modeStopwatch.setEnabled(configurationEnabled);
+        modeCountdown.setEnabled(configurationEnabled);
+        customDuration.setEnabled(configurationEnabled
+                && selectedMode == TaskFocusTimer.Mode.COUNTDOWN);
+        for (int i = 0; i < presetRow.getChildCount(); i++) {
+            presetRow.getChildAt(i).setEnabled(configurationEnabled
+                    && selectedMode == TaskFocusTimer.Mode.COUNTDOWN);
+            presetRow.getChildAt(i).setAlpha(selectedMode == TaskFocusTimer.Mode.COUNTDOWN ? 1f : 0.42f);
+        }
+        for (TextView button : displayUnitButtons) button.setEnabled(enabled);
+        soundToggle.setEnabled(enabled);
+        tickToggle.setEnabled(enabled && soundEnabled);
     }
 
     private void chooseMode(TaskFocusTimer.Mode mode) {
-        if (closed || timer != null && !timer.isFinished()) return;
+        if (closed || actionPending || timer != null && !timer.isFinished()) return;
         selectedMode = mode;
         modeStopwatch.setSelected(mode == TaskFocusTimer.Mode.STOPWATCH);
         modeCountdown.setSelected(mode == TaskFocusTimer.Mode.COUNTDOWN);
@@ -392,7 +399,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private void chooseDisplayUnit(DisplayUnit unit) {
-        if (closed || unit == null) return;
+        if (closed || actionPending || unit == null) return;
         displayUnit = unit;
         sounds.onSelection();
         String[] names = {"Auto", "Seconds", "Minutes", "Hours"};
@@ -430,7 +437,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             if (presetRow.getChildCount() > 0) lp.leftMargin = dp(6);
             presetRow.addView(preset, lp);
             preset.setOnClickListener(v -> {
-                if (timer != null && !timer.isFinished()) return;
+                if (closed || actionPending || timer != null && !timer.isFinished()) return;
                 selectedDurationMs = minutes * 60_000L;
                 sounds.onSelection();
                 rebuildPresets();
@@ -440,7 +447,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     }
 
     private void showCustomDuration() {
-        if (closed || timer != null && !timer.isFinished()) return;
+        if (closed || actionPending || timer != null && !timer.isFinished()) return;
         EditText input = new EditText(getContext());
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setSingleLine(true);
@@ -471,7 +478,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(v -> {
-                    if (closed) { dialog.dismiss(); return; }
+                    if (closed || actionPending) { dialog.dismiss(); return; }
                     try {
                         long amount = Long.parseLong(input.getText().toString().trim());
                         long multiplier = units.getCheckedRadioButtonId() == unitIds[0] ? 1000L
