@@ -255,6 +255,23 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
 
+test('swap shows inverse of cached reverse pair without a network call', () => {
+  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR', stored: STORED });
+  ui.attachCurrencyUi(env);
+  // Initial render is the cached USD→INR
+  assert.ok(elements['currency-now'].textContent.includes('1 USD = 94.91 INR'));
+  const swap = elements['currency-swap'];
+  const click = { preventDefault() {}, defaultPrevented: false };
+  swap.listeners.find((l) => l.type === 'click').handler(click);
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  // Inverse of 94.91 ≈ 0.010536 — rendered offline, no fetch call.
+  assert.ok(elements['currency-now'].textContent.includes('INR'), 'should show inverted pair');
+  assert.ok(elements['currency-now'].textContent.includes('USD'));
+  assert.ok(elements['currency-status'].textContent.includes('Inverse of cached rate'));
+  assert.ok(elements['currency-status'].textContent.includes('official ECB rate'));
+});
+
 test('swap button exchanges from/to and updates status without auto-refresh', () => {
   const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
   const handle = ui.attachCurrencyUi(env);
