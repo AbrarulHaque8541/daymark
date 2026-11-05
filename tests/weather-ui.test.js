@@ -183,3 +183,24 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.STORAGE_KEY, 'daymark.weather.v1');
   assert.equal(typeof globalThis.DaymarkWeatherUi, 'object');
 });
+
+test('a saved place from a previous visit is restored on attach', () => {
+  const storedPrefs = JSON.stringify({ place: 'Tokyo' });
+  const { env, elements, storageData } = fakeEnv({});
+  storageData[ui.PREFS_KEY] = storedPrefs;
+  ui.attachWeatherUi(env);
+  assert.equal(elements['weather-place'].value, 'Tokyo');
+  assert.equal(elements['weather-status'].textContent, 'Last place restored. Tap Refresh for current conditions.');
+});
+
+test('typing a place persists it for the next visit', () => {
+  const { env, elements, storageData } = fakeEnv({});
+  ui.attachWeatherUi(env);
+  const input = elements['weather-place'];
+  input.value = 'Berlin';
+  const inputListener = input.listeners.find((l) => l.type === 'input');
+  assert.ok(inputListener, 'input listener registered');
+  inputListener.handler();
+  const saved = JSON.parse(storageData[ui.PREFS_KEY]);
+  assert.equal(saved.place, 'Berlin');
+});
