@@ -47,3 +47,10 @@ test('currency form keeps From, swap and To on one row', () => {
   assert.ok(css.includes('.currency-card .feed-form > .currency-swap { justify-self: center; }'),
     'swap must be centered between the two selects');
 });
+
+test('secondary controls share a consistent press feedback scale', () => {
+  assert.ok(css.includes('.tool-button:active,'), 'tool-button active rule missing');
+  assert.ok(css.includes('.icon-button:active,'), 'icon-button active rule missing');
+  assert.ok(css.includes('.filter-button:active { transform: scale(0.97); }'),
+    'filter-button active scale missing');
+});
