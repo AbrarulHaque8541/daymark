@@ -17,9 +17,11 @@ checks = [
      and "android.permission.POST_PROMOTED_NOTIFICATIONS" not in manifest
      and "android.permission.POST_PROMOTED_NOTIFICATIONS" not in play_manifest,
      "Live Update promotion permission remains limited to the GitHub sideload flavor"),
-    ("Notification.ProgressStyle" in source and "setShortCriticalText(" in source
-     and '"Paused" : "Focus"' in source,
-     "countdown focus notifications build an API 36 ProgressStyle with a stable status-bar chip label"),
+    ("state.countdown && state.running && Build.VERSION.SDK_INT >= 36" in source
+     and "Notification.ProgressStyle" in source and "setShortCriticalText(" in source
+     and 'setShortCriticalText("Focus")' in source
+     and '"Paused" : "Focus"' not in source,
+     "running countdown notifications build an API 36 ProgressStyle chip; paused keeps the compat bar"),
     ('EXTRA_REQUEST_PROMOTED_ONGOING_KEY = "android.requestPromotedOngoing"' in source
      and "promotion.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING_KEY, true);" in source
      and "builder.addExtras(promotion);" in source,
