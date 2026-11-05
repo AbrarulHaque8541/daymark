@@ -12,7 +12,7 @@ const css = ['styles.css', 'styles-motion-efficiency.css', 'motion-accessibility
 
 /* Classes whose styling is intentionally inherited from shared button classes. */
 const INHERITED_HOOKS = new Set([
-  'weather-clear', 'wiki-search', 'wiki-clear', 'webhook-save', 'cancel-edit',
+  'weather-clear', 'feed-clear', 'wiki-search', 'wiki-clear', 'webhook-save', 'cancel-edit',
 ]);
 
 test('every class used by index.html has a CSS rule', () => {
