@@ -19,11 +19,14 @@ import java.util.Collections;
  * numeric text is paired with that moving clock. A paused countdown may show
  * its frozen time and determinate progress together. Paused sessions expose Resume and Finish.
  *
- * <p>On Android 16 (API 36) countdown sessions also carry a {@link Notification.ProgressStyle}
+ * <p>On Android 16 (API 36) running countdown sessions also carry a {@link Notification.ProgressStyle}
  * and a stable status-bar chip label, and request promotion into a Live Update island when the
  * platform admits promoted ongoing notifications (owner request 2026-11-05: glanceable chip with
- * expanded Pause/Resume/Finish controls). The bar position is set only at publish time — Daymark
- * keeps its no-polling-loop doctrine, so the live chronometer remains the sole displayed clock.
+ * expanded controls). Paused countdowns deliberately keep the pinned shade contract (frozen text
+ * plus a determinate Builder progress bar): ProgressStyle overrides the Builder.setProgress
+ * extras at build time, so the island is a running-session surface only. The bar position is set
+ * only at publish time — Daymark keeps its no-polling-loop doctrine, so the live chronometer
+ * remains the sole displayed clock.
  */
 final class TaskFocusTimerNotification {
     static final String CHANNEL_ID = "daymark_focus_sessions";
@@ -104,10 +107,12 @@ final class TaskFocusTimerNotification {
         if (state.shouldShowProgressBar()) {
             builder.setProgress(PROGRESS_MAX, state.progressPermille, false);
         }
-        if (state.countdown && Build.VERSION.SDK_INT >= 36) {
+        if (state.countdown && state.running && Build.VERSION.SDK_INT >= 36) {
             // Stable chip label: a snapshot of remaining time would go stale between lifecycle
             // transitions, so the island shows a truthful constant and the chronometer stays live.
-            builder.setShortCriticalText(state.paused ? "Paused" : "Focus");
+            // Running only: ProgressStyle overrides the Builder.setProgress extras at build time,
+            // and paused countdowns must keep the pinned determinate shade bar on every API level.
+            builder.setShortCriticalText("Focus");
             builder.setStyle(new Notification.ProgressStyle()
                     .setProgress(Math.round(state.progressPermille / 10f))
                     .setProgressSegments(Collections.singletonList(
@@ -115,9 +120,10 @@ final class TaskFocusTimerNotification {
         }
 
         Notification built = builder.build();
-        // Promotion is requested only when the platform admits promoted ongoing notifications,
-        // and only after the built notification confirms the promotable characteristics.
-        if (state.countdown && Build.VERSION.SDK_INT >= 36
+        // Promotion is requested only while the island styling is active (running countdowns),
+        // only when the platform admits promoted ongoing notifications, and only after the built
+        // notification confirms the promotable characteristics (fail-closed).
+        if (state.countdown && state.running && Build.VERSION.SDK_INT >= 36
                 && manager.canPostPromotedNotifications()
                 && built.hasPromotableCharacteristics()) {
             Bundle promotion = new Bundle();
