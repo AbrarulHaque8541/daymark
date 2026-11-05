@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="DaymarkSplashTheme" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/daymark_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
+        <!-- Platform-defined API 31+ attribute; keep it in this version-qualified resource. -->
+        <item name="android:windowSplashScreenBrandingImage">@drawable/daymark_splash_branding</item>
+        <item name="postSplashScreenTheme">@style/AppTheme</item>
+    </style>
+</resources>

@@ -129,7 +129,9 @@ for path in main.rglob("*"):
 
 build = (root / "app/build.gradle.kts").read_text(encoding="utf-8")
 deps = build.split("dependencies {", 1)[1].split("}", 1)[0]
-assert "implementation(" not in deps and "api(" not in deps and "runtimeOnly(" not in deps, "unexpected app runtime dependency"
+dependency_lines = [line.strip() for line in deps.splitlines() if line.strip()]
+assert dependency_lines == ['implementation("androidx.core:core-splashscreen:1.2.0")'], \
+    "only the official AndroidX SplashScreen compatibility library is allowed as an app runtime dependency"
 activity = (main / "java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
 render_suggestions = re.search(r"private void renderSuggestions\(LocalDate today\)\s*\{(.*?)\n    \}", activity, re.S)
 assert render_suggestions and re.match(r"\s*if \(suggestionList == null\) return;", render_suggestions.group(1)), \
@@ -584,7 +586,7 @@ assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")
 # verbatim and still claimed "no permissions/network" for a manifest that declares
 # INTERNET for the browser and app clients (issue #45) — a stale summary that contradicted
 # the assertions above it. This is not a runtime HTTP-browsing assertion.
-print("PASS manifest/permissions: main declares INTERNET for browsing and app network clients plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot receiver, no runtime dependencies, no optional media/model binaries")
+print("PASS manifest/permissions: main declares INTERNET for browsing and app network clients plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot receiver, only the approved AndroidX SplashScreen runtime dependency, no optional media/model binaries")
 print("PASS permission policy: manifest-backed browser status plus a notification permission prompt only when a reminder is enabled; no other runtime permission prompt code")
 print("PASS encrypted task-store policy: writer and reader share invalid/duplicate-task rejection")
 print("PASS lifecycle policy: task/storage/attachment/browser callbacks are suppressed after Activity destruction")
