@@ -174,11 +174,33 @@ final class TaskFocusSessionCoordinator {
         return snapshot(false);
     }
 
-    synchronized Snapshot resumeFromUserAction(String currentTaskTitle) throws Exception {
+    /** Rebinds a paused session to the newly selected task, durably, without resuming it. */
+    synchronized Snapshot switchTaskWhilePausedFromUserAction(String taskId, String currentTaskTitle)
+            throws Exception {
+        requireInitialized();
+        requireCurrent();
+        if (!current.isPaused()) {
+            throw new IllegalStateException("Only a paused focus session can switch tasks.");
+        }
+
+        ClockReading now = readClock();
+        TaskFocusTimer next = current.switchTaskWhilePaused(taskId);
+        store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
+        current = next;
+        this.currentTaskTitle = currentTaskTitle;
+        notifications.cancel();
+        notificationPublished = false;
+        return snapshot(false);
+    }
+
+    synchronized Snapshot resumeFromUserAction(String taskId, String currentTaskTitle) throws Exception {
         requireInitialized();
         requireCurrent();
         if (!current.isPaused()) {
             throw new IllegalStateException("Only a paused focus session can be resumed.");
+        }
+        if (taskId == null || !taskId.equals(current.taskId())) {
+            throw new IllegalStateException("Save the selected focus task before resuming the session.");
         }
 
         ClockReading now = readClock();

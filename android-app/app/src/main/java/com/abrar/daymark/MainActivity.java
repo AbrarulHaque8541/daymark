@@ -260,6 +260,7 @@ public final class MainActivity extends Activity {
     private TaskFocusTimerPanel focusTimerPanel;
     private TaskFocusSessionCoordinator.Snapshot focusSnapshot;
     private String selectedFocusTaskId;
+    private boolean focusActionInProgress;
     private boolean focusStorageUnavailable;
     private boolean focusTimerTickScheduled;
     private boolean focusExpiryRefreshPending;
@@ -5357,6 +5358,10 @@ public final class MainActivity extends Activity {
             showToast("Load your encrypted tasks before starting a focus session.");
             return;
         }
+        if (focusActionInProgress) {
+            showToast("The focus timer is saving. Please wait before changing tasks.");
+            return;
+        }
         if (focusSnapshot != null && focusSnapshot.isRunning()) {
             showToast("Pause or finish the current focus session before switching tasks.");
             return;
@@ -5376,6 +5381,11 @@ public final class MainActivity extends Activity {
                 .setItems(labels, (dialog, which) -> {
                     if (which < 0 || which >= eligible.size()) return;
                     Task chosen = eligible.get(which);
+                    if (focusSnapshot != null && focusSnapshot.isPaused()) {
+                        runFocusAction(() -> focusSessionRuntime.switchTaskWhilePausedFromUserAction(
+                                chosen.id, chosen.title));
+                        return;
+                    }
                     selectedFocusTaskId = chosen.id;
                     if (focusTimerPanel != null) focusTimerPanel.setTaskLabel(chosen.title);
                     renderFocusTimerPanel();
@@ -5408,7 +5418,7 @@ public final class MainActivity extends Activity {
             showFocusTaskPicker();
             return;
         }
-        runFocusAction(() -> focusSessionRuntime.resumeFromUserAction(selected.title));
+        runFocusAction(() -> focusSessionRuntime.resumeFromUserAction(selected.id, selected.title));
     }
 
     private void finishFocusSession() {
@@ -5416,15 +5426,23 @@ public final class MainActivity extends Activity {
     }
 
     private void runFocusAction(FocusAction action) {
+        if (focusActionInProgress) {
+            showToast("The focus timer is saving. Please wait.");
+            return;
+        }
         if (!canEdit() || webMode || focusStorageUnavailable || focusSessionRuntime == null
                 || storageExecutor == null) {
             showToast("Focus timer is unavailable until encrypted task storage is ready.");
             return;
         }
+        focusActionInProgress = true;
+        if (focusTimerPanel != null) focusTimerPanel.setActionPending(true);
         storageExecutor.execute(() -> {
             try {
                 TaskFocusSessionCoordinator.Snapshot result = action.run();
                 postActivityCallback(() -> {
+                    focusActionInProgress = false;
+                    if (focusTimerPanel != null) focusTimerPanel.setActionPending(false);
                     applyFocusSnapshot(result);
                     if (result != null && result.isRunning() && !result.notificationPublished) {
                         showToast("Focus is running and saved. Notifications are disabled, so the timer stays in Daymark.");
@@ -5434,7 +5452,11 @@ public final class MainActivity extends Activity {
                 });
             } catch (Exception failure) {
                 Log.w("DaymarkFocus", "Focus action was not committed", failure);
-                postActivityCallback(() -> showToast("Focus timer could not be saved. Your task data is unchanged."));
+                postActivityCallback(() -> {
+                    focusActionInProgress = false;
+                    if (focusTimerPanel != null) focusTimerPanel.setActionPending(false);
+                    showToast("Focus timer could not be saved. Your task data is unchanged.");
+                });
             }
         });
     }
@@ -9602,6 +9624,5 @@ public final class MainActivity extends Activity {
         }
     }
 }
-
 
 

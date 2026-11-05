@@ -103,6 +103,16 @@ final class TaskFocusTimer {
                 accumulatedElapsedMs, nowElapsedRealtimeMs);
     }
 
+    /** Changes the linked task without changing timer progress, only while the session is paused. */
+    TaskFocusTimer switchTaskWhilePaused(String newTaskId) {
+        requireStatus(Status.PAUSED, "Only a paused focus timer can switch tasks.");
+        if (newTaskId == null || newTaskId.trim().isEmpty() || newTaskId.length() > 128) {
+            throw new IllegalArgumentException("A valid task id is required.");
+        }
+        return new TaskFocusTimer(newTaskId, mode, Status.PAUSED, targetDurationMs,
+                accumulatedElapsedMs, 0);
+    }
+
     /** Finishes the focus session only; task completion remains an explicit separate action. */
     TaskFocusTimer finish(long nowElapsedRealtimeMs) {
         if (status == Status.FINISHED) return this;

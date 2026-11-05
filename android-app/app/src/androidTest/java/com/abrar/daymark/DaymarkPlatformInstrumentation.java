@@ -477,10 +477,12 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         final String taskId = "focus-instrumentation-" + UUID.randomUUID();
         Task task = new Task(taskId, "Focus instrumentation task", null, "medium", false,
                 "2026-10-30T18:00:00Z", "2026-10-30T18:00:00Z");
+        Task alternateTask = new Task(taskId + "-alternate", "Alternate focus task", null, "medium", false,
+                "2026-10-30T18:00:00Z", "2026-10-30T18:00:00Z");
         try {
             EncryptedTaskStore taskStore = new EncryptedTaskStore(isolated);
             check(taskStore.load().isEmpty(), "isolated task store is verified empty before the test task is saved");
-            taskStore.save(Collections.singletonList(task));
+            taskStore.save(Arrays.asList(task, alternateTask));
             File taskSnapshot = new File(isolated.getFilesDir(), "tasks.enc");
             byte[] taskBytesBefore = readFile(taskSnapshot);
 
@@ -522,7 +524,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             // A second runtime instance exercises the same restore boundary used after process recreation.
             TaskFocusSessionRuntime restoredRuntime = new TaskFocusSessionRuntime(isolated);
             TaskFocusSessionCoordinator.Snapshot restored =
-                    restoredRuntime.restoreAfterProcessStart(Collections.singletonList(task));
+                    restoredRuntime.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
             check(restored != null && restored.isRunning() && restored.restored,
                     "a still-existing task restores its persisted running focus session");
             check(awaitNotificationState(manager, notificationId, true),
@@ -533,19 +535,51 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "Pause durably changes the focus session to PAUSED");
             check(awaitNotificationState(manager, notificationId, false),
                     "Pause removes the ongoing notification");
+
+            TaskFocusSessionCoordinator.Snapshot switched =
+                    restoredRuntime.switchTaskWhilePausedFromUserAction(
+                            alternateTask.id, alternateTask.title);
+            check(switched != null && switched.isPaused()
+                            && alternateTask.id.equals(switched.timer.taskId()),
+                    "choosing task B changes the paused session identity without resuming it");
+            TaskFocusTimer persistedSwitch = new TaskFocusTimerStore(isolated).load(
+                    android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis(), -1);
+            check(persistedSwitch != null && persistedSwitch.isPaused()
+                            && alternateTask.id.equals(persistedSwitch.taskId()),
+                    "the encrypted focus record durably stores the newly selected task ID");
+            byte[] switchedFocusCiphertext = readFile(focusFile);
+            check(!new String(switchedFocusCiphertext, StandardCharsets.ISO_8859_1).contains(taskId)
+                            && !new String(switchedFocusCiphertext, StandardCharsets.ISO_8859_1)
+                                    .contains(alternateTask.id),
+                    "the switched task identity remains protected inside the encrypted focus record");
+            check(awaitNotificationState(manager, notificationId, false),
+                    "switching a paused session does not publish or restore its notification");
+
+            TaskFocusSessionRuntime pausedAfterProcessRestart = new TaskFocusSessionRuntime(isolated);
+            TaskFocusSessionCoordinator.Snapshot restoredPaused =
+                    pausedAfterProcessRestart.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
+            check(restoredPaused != null && restoredPaused.isPaused() && restoredPaused.restored
+                            && alternateTask.id.equals(restoredPaused.timer.taskId()),
+                    "the switched task ID survives process recreation while the session remains paused");
+            check(awaitNotificationState(manager, notificationId, false),
+                    "restoring the switched paused session leaves the notification cancelled");
+
             TaskFocusSessionCoordinator.Snapshot resumed =
-                    restoredRuntime.resumeFromUserAction(task.title);
-            check(resumed != null && resumed.isRunning(),
-                    "Resume restores monotonic running state");
-            check(awaitNotificationState(manager, notificationId, true),
-                    "Resume republishes the ongoing notification");
-            TaskFocusSessionCoordinator.Snapshot finished = restoredRuntime.finishFromUserAction();
+                    pausedAfterProcessRestart.resumeFromUserAction(alternateTask.id, alternateTask.title);
+            check(resumed != null && resumed.isRunning()
+                            && alternateTask.id.equals(resumed.timer.taskId()),
+                    "Resume restores monotonic state under task B's identity");
+            check(awaitNotificationTitle(manager, notificationId, alternateTask.title) != null,
+                    "resuming after task switch publishes the notification with task B's title");
+            TaskFocusSessionCoordinator.Snapshot finished = pausedAfterProcessRestart.finishFromUserAction();
             check(finished != null && finished.isFinished(),
                     "Finish durably ends the focus session without completing the task");
             check(awaitNotificationState(manager, notificationId, false),
                     "Finish cancels only the focus notification");
-            check(taskStore.load().size() == 1 && taskStore.load().get(0).id.equals(task.id),
-                    "focus timer lifecycle preserves the original task record");
+            check(taskStore.load().size() == 2
+                            && taskStore.load().get(0).id.equals(task.id)
+                            && taskStore.load().get(1).id.equals(alternateTask.id),
+                    "focus timer lifecycle preserves both task records without modifying task data");
 
             TaskFocusSessionRuntime deletedTaskRuntime = new TaskFocusSessionRuntime(isolated);
             check(deletedTaskRuntime.restoreAfterProcessStart(Collections.emptyList()) == null,
@@ -1399,4 +1433,3 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         InputStream open() throws IOException;
     }
 }
-

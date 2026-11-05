@@ -11,8 +11,14 @@ required_panel = [
     "STOPWATCH", "COUNTDOWN", "onStart(TaskFocusTimer.Mode mode, long targetDurationMs)",
     "onPause()", "onResume()", "onStop()", "onChooseTask()",
     "setDailySummary", "setSoundEnabled", "setFinalTicksEnabled",
+    "void setActionPending(boolean pending)", "private boolean actionPending;",
+    "primaryAction.setEnabled(enabled);", "stopAction.setEnabled(enabled && active);",
+    "boolean configurationEnabled = enabled && !active;",
+    "modeStopwatch.setEnabled(configurationEnabled);",
+    "customDuration.setEnabled(configurationEnabled",
+    "for (TextView button : displayUnitButtons) button.setEnabled(enabled);",
+    "soundToggle.setEnabled(enabled);", "tickToggle.setEnabled(enabled && soundEnabled);",
     "showCustomDuration", "ProgressRing", "ValueAnimator",
-    "primaryAction.setEnabled(true)",
     "int background, int surface, int surfaceAlt, int text, int muted",
     "int accent, int accentSoft, int warning",
     "ACCENT_SOFT", "DisplayUnit { AUTO, SECONDS, MINUTES, HOURS }",
@@ -41,7 +47,7 @@ required_accessibility = [
     "displayUnitButtons[i].setSelected(selected);",
     "preset.setSelected(selected);",
     "new LayoutParams(0, dp(48), 1)",
-    "tickToggle.setEnabled(soundEnabled);",
+    "tickToggle.setEnabled(!actionPending && enabled);",
     "view.setMinimumHeight(dp(48));",
     "taskName.setMinimumHeight(dp(48));",
     "customDuration.setMinimumHeight(dp(48));",
@@ -77,7 +83,7 @@ assert "while (" not in sound and "Thread.sleep" not in sound, "Sound must not u
 assert "RECORD_AUDIO" not in sound and "MODIFY_AUDIO_SETTINGS" not in sound, "Sound effects must not request microphone/audio-control permissions"
 assert "onChooseTask" in panel and "listener.onChooseTask()" in panel
 assert "if (closed) return;" in panel, "disposed panel must ignore render and public state updates"
-assert "if (!closed && timer != null && !timer.isFinished())" in panel, "disposed panel must not dispatch Finish"
+assert "if (!closed && !actionPending && timer != null && !timer.isFinished())" in panel, "disposed or pending panel must not dispatch Finish"
 assert "private boolean released;" in sound and "|| released" in sound, "released soundscape must never recreate audio resources"
 
 print("PASS focus timer UI/sound source guard")
@@ -93,6 +99,9 @@ required_integration = [
     "focusTimerPanel.close()",
     "stopFocusTimerTick()",
     "showFocusTaskPicker()",
+    "focusSessionRuntime.switchTaskWhilePausedFromUserAction(",
+    "focusSessionRuntime.resumeFromUserAction(selected.id, selected.title)",
+    "focusTimerPanel.setActionPending(true)",
 ]
 for token in required_integration:
     assert token in activity, f"Focus Timer Activity integration missing: {token}"
@@ -107,12 +116,30 @@ assert "if (focusSnapshot != null && focusSnapshot.isRunning())" in picker_gate,
 assert "isPaused()" not in picker_gate and "!focusSnapshot.isFinished()" not in picker_gate, (
     "PAUSED and FINISHED Focus Timer sessions must not block task switching"
 )
+selection_start = picker.index("Task chosen = eligible.get(which);")
+selection_end = picker.index("selectedFocusTaskId = chosen.id;", selection_start)
+selection = picker[selection_start:selection_end]
+assert "if (focusSnapshot != null && focusSnapshot.isPaused())" in selection, (
+    "paused task selection must take the durable session-switch path"
+)
+assert "runFocusAction(() -> focusSessionRuntime.switchTaskWhilePausedFromUserAction(" in selection, (
+    "paused task selection must persist the task ID before updating the panel"
+)
+assert "return;" in selection, "paused task selection must not fall through to the UI-only selection path"
 assert "selectedFocusTaskId = chosen.id;" in picker, (
     "the task picker must still apply the selected task"
 )
-print("PASS task-chip regression guard: PAUSED/FINISHED selectable; RUNNING blocked")
+resume_start = activity.index("    private void resumeFocusSession()")
+resume_end = activity.index("    private void finishFocusSession()", resume_start)
+resume = activity[resume_start:resume_end]
+assert "resumeFromUserAction(selected.id, selected.title)" in resume, (
+    "resume must identify the exact selected task so stale UI identity cannot publish a mismatched title"
+)
+print("PASS task-chip regression guard: paused selection is persisted before resume; RUNNING blocked")
 
 assert "coordinator.startFromUserAction(" in runtime
+assert "coordinator.switchTaskWhilePausedFromUserAction(taskId, title)" in runtime
+assert "coordinator.resumeFromUserAction(taskId, title)" in runtime
 assert "store.save(timer, elapsed, wall, boot)" in runtime
 assert "TaskFocusTimerNotification.publish(" in runtime
 assert "findTask(tasks, saved == null ? null : saved.taskId())" in runtime
