@@ -20,6 +20,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.TextView;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
 
@@ -87,8 +88,55 @@ final class TaskEditorImeInstrumentation {
         }
     }
 
-    private static void openEditor(Instrumentation instrumentation, Activity activity, int[] assertions)
+    private static void ensureTasksMode(Instrumentation instrumentation, MainActivity activity, int[] assertions)
             throws Exception {
+        boolean[] selected = { false };
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline && !selected[0]) {
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(() -> {
+                View root = activity.getWindow().getDecorView();
+                View selectedTasks = findByDescription(root, "Tasks page, selected.");
+                if (selectedTasks != null && selectedTasks.isShown()) {
+                    selected[0] = true;
+                    return;
+                }
+                View switchTasks = findByDescription(root, "Tasks page. Switch to tasks and dashboard.");
+                if (switchTasks != null && switchTasks.isShown() && switchTasks.isEnabled()) {
+                    switchTasks.performClick();
+                }
+            });
+            if (!selected[0]) SystemClock.sleep(50L);
+        }
+        require(selected[0], "the visible Tasks workspace is selected before opening the task editor", assertions);
+    }
+
+    private static void awaitStorageReady(Instrumentation instrumentation, MainActivity activity, int[] assertions)
+            throws Exception {
+        boolean[] ready = { false };
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline && !ready[0]) {
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(() -> ready[0] = isStorageReady(activity));
+            if (!ready[0]) SystemClock.sleep(50L);
+        }
+        require(ready[0], "MainActivity reports encrypted storage ready before opening the task editor", assertions);
+    }
+
+    private static boolean isStorageReady(MainActivity activity) {
+        try {
+            Field readyField = MainActivity.class.getDeclaredField("storageReady");
+            readyField.setAccessible(true);
+            return readyField.getBoolean(activity);
+        } catch (ReflectiveOperationException failure) {
+            throw new AssertionError("Could not read MainActivity.storageReady for instrumentation.", failure);
+        }
+    }
+
+    private static void openEditor(Instrumentation instrumentation, MainActivity activity, int[] assertions)
+            throws Exception {
+        ensureTasksMode(instrumentation, activity, assertions);
+        awaitStorageReady(instrumentation, activity, assertions);
         View[] addTask = { null };
         boolean[] enabled = { false };
         long deadline = SystemClock.uptimeMillis() + WAIT_MS;
@@ -96,14 +144,14 @@ final class TaskEditorImeInstrumentation {
             instrumentation.waitForIdleSync();
             instrumentation.runOnMainSync(() -> {
                 addTask[0] = findTextView(activity.getWindow().getDecorView(), "Add task");
-                if (addTask[0] != null && addTask[0].isEnabled()) {
+                if (addTask[0] != null && addTask[0].isShown() && addTask[0].isEnabled()) {
                     enabled[0] = true;
                 }
             });
             if (!enabled[0]) SystemClock.sleep(50L);
         }
         require(addTask[0] != null && enabled[0],
-                "the Add task button becomes enabled after storage loads", assertions);
+                "the visible Add task button becomes enabled after storage loads", assertions);
 
         // Retry click + dialog appearance: API 29 a11y tree and first paint can lag.
         long openDeadline = SystemClock.uptimeMillis() + WAIT_MS;
@@ -111,7 +159,7 @@ final class TaskEditorImeInstrumentation {
         while (SystemClock.uptimeMillis() < openDeadline && root == null) {
             instrumentation.runOnMainSync(() -> {
                 View btn = findTextView(activity.getWindow().getDecorView(), "Add task");
-                if (btn != null && btn.isEnabled()) {
+                if (btn != null && btn.isShown() && btn.isEnabled()) {
                     btn.performClick();
                 }
             });
