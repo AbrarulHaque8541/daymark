@@ -57,16 +57,29 @@ for flavor in ("play", "githubSideload"):
     flavor_app = ET.parse(root / f"app/src/{flavor}/AndroidManifest.xml").getroot().find("application")
     assert flavor_app is not None and not list(flavor_app), f"{flavor} flavor must not add components"
 
-# The AndroidX theme supplies the icon, stable brand colors/copy, and normal post-splash app theme.
-styles = ET.parse(root / "app/src/main/res/values/styles.xml").getroot()
+# AndroidX owns the compatibility attributes. The native branding-image attribute is API 31+ only.
+res_dir = root / "app/src/main/res"
+styles = ET.parse(res_dir / "values/styles.xml").getroot()
 splash_theme = next((style for style in styles.findall("style") if style.get("name") == "DaymarkSplashTheme"), None)
 assert splash_theme is not None and splash_theme.get("parent") == "Theme.SplashScreen", \
     "DaymarkSplashTheme must inherit from AndroidX Theme.SplashScreen"
 theme_items = {item.get("name"): (item.text or "").strip() for item in splash_theme.findall("item")}
 assert theme_items.get("windowSplashScreenBackground") == "@color/daymark_splash_background"
 assert theme_items.get("windowSplashScreenAnimatedIcon") == "@drawable/ic_launcher"
-assert theme_items.get("windowSplashScreenBrandingImage") == "@drawable/daymark_splash_branding"
 assert theme_items.get("postSplashScreenTheme") == "@style/AppTheme", "router must restore the real app theme"
+assert "windowSplashScreenBrandingImage" not in theme_items, \
+    "the platform-only branding attribute must not be in unqualified values"
+
+styles_v31 = ET.parse(res_dir / "values-v31/styles.xml").getroot()
+splash_theme_v31 = next((style for style in styles_v31.findall("style") if style.get("name") == "DaymarkSplashTheme"), None)
+assert splash_theme_v31 is not None and splash_theme_v31.get("parent") == "Theme.SplashScreen", \
+    "API 31+ splash theme must inherit from AndroidX Theme.SplashScreen"
+theme_items_v31 = {item.get("name"): (item.text or "").strip() for item in splash_theme_v31.findall("item")}
+assert theme_items_v31.get("windowSplashScreenBackground") == "@color/daymark_splash_background"
+assert theme_items_v31.get("windowSplashScreenAnimatedIcon") == "@drawable/ic_launcher"
+assert theme_items_v31.get("postSplashScreenTheme") == "@style/AppTheme"
+assert theme_items_v31.get("android:windowSplashScreenBrandingImage") == "@drawable/daymark_splash_branding", \
+    "API 31+ must use the platform branding attribute in its Android namespace"
 
 colors = ET.parse(root / "app/src/main/res/values/colors.xml").getroot()
 color_values = {color.get("name"): (color.text or "").strip().upper() for color in colors.findall("color")}

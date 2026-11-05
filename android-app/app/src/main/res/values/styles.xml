@@ -21,8 +21,6 @@
     <style name="DaymarkSplashTheme" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/daymark_splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
-        <!-- Keep the established title and creator line without reintroducing a splash activity UI. -->
-        <item name="windowSplashScreenBrandingImage">@drawable/daymark_splash_branding</item>
         <item name="postSplashScreenTheme">@style/AppTheme</item>
     </style>
 </resources>
