@@ -5357,7 +5357,7 @@ public final class MainActivity extends Activity {
             showToast("Load your encrypted tasks before starting a focus session.");
             return;
         }
-        if (focusSnapshot != null && !focusSnapshot.isFinished()) {
+        if (focusSnapshot != null && focusSnapshot.isRunning()) {
             showToast("Pause or finish the current focus session before switching tasks.");
             return;
         }
