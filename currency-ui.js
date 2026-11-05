@@ -172,6 +172,23 @@
       }
     });
 
+    // Live update the display from cache when the amount changes and the pair matches.
+    // No network call; pure offline responsiveness for the common case.
+    if (amountEl && typeof amountEl.addEventListener === 'function') {
+      amountEl.addEventListener('input', () => {
+        if (busy || !cached || !currencyApi) return;
+        const { from, to } = readInputs();
+        if (from !== cached.from || to !== cached.to) return;
+        const amount = currencyApi.normalizeAmount(
+          amountEl.value && typeof amountEl.value === 'string' && amountEl.value.trim()
+            ? amountEl.value
+            : DEFAULT_AMOUNT
+        );
+        if (amount === null) return;
+        render(cached, amount);
+      });
+    }
+
     if (swapEl && typeof swapEl.addEventListener === 'function') {
       swapEl.addEventListener('click', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
