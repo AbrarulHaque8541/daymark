@@ -134,7 +134,6 @@ function contrastRatio(first, second) {
 }
 
 const mutedSmallTextSelectors = [
-  '.rail-label',
   '.topbar',
   '.eyebrow',
   '.stat-label',
