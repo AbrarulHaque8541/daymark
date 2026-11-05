@@ -11,6 +11,7 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
+const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
 
 // A Date whose clock is frozen at nowMs, so tests that assert on wall-clock
 // derived values (remaining time, progress) stay exact even on slow runners
@@ -27,12 +28,13 @@ function frozenDate(nowMs) {
   };
 }
 
-function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null, failWrites = new Set(), withFocus = true, now = null } = {}) {
+function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null, savedPreset = null, failWrites = new Set(), withFocus = true, now = null } = {}) {
   const elements = new Map();
   const storedValues = new Map();
   if (savedValue !== null) storedValues.set(STORAGE_KEY, savedValue);
   if (savedFocus !== null) storedValues.set(FOCUS_KEY, savedFocus);
   if (savedFocusBackup !== null) storedValues.set(FOCUS_BACKUP_KEY, savedFocusBackup);
+  if (savedPreset !== null) storedValues.set(FOCUS_PRESET_KEY, savedPreset);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -88,10 +90,19 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
       storedValues.delete(key);
     }
   };
+  const presetButtons = [
+    ['focus', 'Focus · 25 min'],
+    ['short-break', 'Break · 5 min'],
+    ['long-break', 'Long break · 15 min']
+  ].map(([preset]) => {
+    const button = element(`.focus-preset[data-focus-preset="${preset}"]`);
+    button.dataset.focusPreset = preset;
+    return button;
+  });
   const document = {
     hidden: false,
     querySelector: element,
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => (selector === '.focus-preset' ? presetButtons : []),
     createElement: () => element('#download-link'),
     body: { appendChild() {} },
     addEventListener() {}
@@ -290,4 +301,44 @@ test('focus recovery backup can be exported without changing its original bytes'
   assert.equal(link.href, 'data:text/plain;charset=utf-8,' + encodeURIComponent(original));
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
     'export must never clear or rewrite the retained focus recovery source');
+});
+
+test('a saved focus preset is restored across sessions', () => {
+  const { elements } = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] }),
+    savedPreset: JSON.stringify({ preset: 'long-break' })
+  });
+  assert.equal(elements.get('#focus-time').textContent, '15:00');
+  assert.equal(elements.get('#focus-state-label').textContent, 'Ready');
+});
+
+test('an unknown saved focus preset falls back to the default clock', () => {
+  const { elements } = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] }),
+    savedPreset: JSON.stringify({ preset: 'nap' })
+  });
+  assert.equal(elements.get('#focus-time').textContent, '25:00');
+});
+
+test('a corrupt focus preset preference is ignored', () => {
+  const { elements } = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] }),
+    savedPreset: '{not json'
+  });
+  assert.equal(elements.get('#focus-time').textContent, '25:00');
+});
+
+test('choosing a focus preset persists it for the next visit', () => {
+  const { elements, storedValues } = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] })
+  });
+  elements.get('.focus-preset[data-focus-preset="short-break"]').dispatch('click');
+  assert.equal(JSON.parse(storedValues.get(FOCUS_PRESET_KEY)).preset, 'short-break');
+  assert.equal(elements.get('#focus-time').textContent, '05:00');
+
+  const reloaded = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] }),
+    savedPreset: storedValues.get(FOCUS_PRESET_KEY)
+  });
+  assert.equal(reloaded.elements.get('#focus-time').textContent, '05:00');
 });

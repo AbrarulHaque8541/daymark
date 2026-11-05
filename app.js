@@ -5,6 +5,7 @@
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
   const FOCUS_KEY = 'daymark.focus.v1';
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
+  const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
   const FEED_KEY = 'daymark.feed.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
@@ -1372,6 +1373,31 @@
     }
   }
 
+  function loadFocusPreset() {
+    if (!focus) return null;
+    let raw = null;
+    try {
+      raw = localStorage.getItem(FOCUS_PRESET_KEY);
+    } catch (error) {
+      // A storage failure just means the default preset stays in use.
+      return null;
+    }
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.preset === 'string' && focus.isKind(parsed.preset)) return parsed.preset;
+    } catch (error) { /* a corrupt preference is treated as no preference */ }
+    return null;
+  }
+
+  function persistFocusPreset() {
+    try {
+      localStorage.setItem(FOCUS_PRESET_KEY, JSON.stringify({ preset: state.focusPreset }));
+    } catch (error) {
+      console.warn('Could not save the Daymark focus preset preference:', error);
+    }
+  }
+
   function loadFocusState() {
     const empty = { session: null, log: [] };
     if (!focus) return empty;
@@ -1876,6 +1902,8 @@
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
+    const savedPreset = loadFocusPreset();
+    if (savedPreset) state.focusPreset = savedPreset;
     state.feedCache = loadFeedCache();
     render();
     $('#add-form').addEventListener('submit', addTask);
@@ -1961,6 +1989,7 @@
     document.querySelectorAll('.focus-preset').forEach((button) => button.addEventListener('click', () => {
       if (state.focusSession) return;
       state.focusPreset = button.dataset.focusPreset;
+      persistFocusPreset();
       renderFocus();
     }));
     window.addEventListener('focus', () => {
