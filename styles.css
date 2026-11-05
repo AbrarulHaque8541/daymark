@@ -748,3 +748,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .subtask-remove:hover { background: #4a2220; color: #ffb0a8; }
   .page-footer { border-top-color: #232d35; color: #7c8a94; }
 }
+
+.field-hint { margin: 4px 0 0; font-size: 11px; color: var(--muted-text); line-height: 1.4; }
+.field-hint[hidden] { display: none; }

@@ -3,6 +3,7 @@ package com.abrar.daymark;
 import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
@@ -47,6 +48,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private final int ACCENT_SOFT;
     private final int WARNING;
     private static final long[] PRESETS_MINUTES = {5, 15, 25, 45, 60};
+    private static final String FOCUS_PREFS = "daymark.focus.v1";
+    private static final String KEY_DISPLAY_UNIT = "display_unit";
     private enum DisplayUnit { AUTO, SECONDS, MINUTES, HOURS }
     private DisplayUnit displayUnit = DisplayUnit.AUTO;
     private final TextView[] displayUnitButtons = new TextView[4];
@@ -91,6 +94,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         ACCENT = accent;
         ACCENT_SOFT = accentSoft;
         WARNING = warning;
+        loadDisplayUnit(context);
         setOrientation(VERTICAL);
         setPadding(dp(18), dp(20), dp(18), dp(18));
         setBackground(round(BG, 30));
@@ -401,6 +405,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private void chooseDisplayUnit(DisplayUnit unit) {
         if (closed || actionPending || unit == null) return;
         displayUnit = unit;
+        saveDisplayUnit(unit);
         sounds.onSelection();
         String[] names = {"Auto", "Seconds", "Minutes", "Hours"};
         DisplayUnit[] values = DisplayUnit.values();
@@ -412,6 +417,24 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             displayUnitButtons[i].setContentDescription(names[i]);
         }
         render(timer, timer == null ? 0 : android.os.SystemClock.elapsedRealtime());
+    }
+
+    private void loadDisplayUnit(Context context) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(FOCUS_PREFS, Context.MODE_PRIVATE);
+            String saved = prefs.getString(KEY_DISPLAY_UNIT, DisplayUnit.AUTO.name());
+            displayUnit = DisplayUnit.valueOf(saved);
+        } catch (IllegalArgumentException | NullPointerException ignored) {
+            displayUnit = DisplayUnit.AUTO;
+        }
+    }
+
+    private void saveDisplayUnit(DisplayUnit unit) {
+        if (unit == null) return;
+        getContext().getSharedPreferences(FOCUS_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_DISPLAY_UNIT, unit.name())
+                .apply();
     }
 
     private TextView modeButton(String text, boolean selected) {

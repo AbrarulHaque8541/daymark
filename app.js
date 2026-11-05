@@ -711,6 +711,7 @@
     $('#edit-due-date').value = task.dueDate || '';
     $('#edit-due-time').disabled = !task.dueDate;
     $('#edit-due-time').value = task.dueTime && logic.isTimeOnly(task.dueTime) ? task.dueTime : '';
+    syncDueInputs($('#edit-due-date'), $('#edit-due-time'), $('#edit-reminder'), $('#edit-repeat'));
     const reminderSelect = $('#edit-reminder');
     reminderSelect.disabled = !task.dueDate;
     reminderSelect.value = logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null
@@ -1787,6 +1788,13 @@
       repeatSelect.disabled = !hasDate;
       if (repeatSelect.disabled) repeatSelect.value = '';
     }
+    // Disclose the 9:00 AM default used for date-only reminders (see app.js reminder scheduling).
+    const hintId = dateInput.id === 'new-due-date' ? 'new-date-only-hint' : 'edit-date-only-hint';
+    const hint = document.getElementById(hintId);
+    if (hint) {
+      const show = hasDate && !timeInput.value;
+      hint.hidden = !show;
+    }
   }
 
 
@@ -1926,6 +1934,7 @@
       $('#new-title').removeAttribute('aria-invalid');
     });
     $('#new-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#new-due-time'), $('#new-reminder'), $('#new-repeat')));
+    $('#new-due-time').addEventListener('input', () => syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat')));
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
       render();
@@ -1957,6 +1966,7 @@
       $('#edit-title').removeAttribute('aria-invalid');
     });
     $('#edit-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#edit-due-time'), $('#edit-reminder'), $('#edit-repeat')));
+    $('#edit-due-time').addEventListener('input', () => syncDueInputs($('#edit-due-date'), $('#edit-due-time'), $('#edit-reminder'), $('#edit-repeat')));
     $('#add-subtask').addEventListener('click', addSubtaskFromInput);
     $('#new-subtask').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {

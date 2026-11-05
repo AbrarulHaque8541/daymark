@@ -75,6 +75,7 @@
           <input id="new-due-date" name="dueDate" type="date" aria-label="Due date (optional)">
           <label class="sr-only" for="new-due-time">Due time (optional)</label>
           <input id="new-due-time" name="dueTime" type="time" aria-label="Due time (optional)" disabled>
+          <p id="new-date-only-hint" class="field-hint" hidden>Date-only reminders use 9:00 AM local time.</p>
           <label class="sr-only" for="new-reminder">Reminder (optional)</label>
           <select id="new-reminder" name="reminder" aria-label="Reminder (optional)" disabled>
             <option value="">No reminder</option>
@@ -364,7 +365,7 @@
       <input id="edit-title" name="title" type="text" maxlength="160" aria-describedby="edit-error" required>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-due-date">Due date <span>(optional)</span></label><input id="edit-due-date" name="dueDate" type="date"></div>
-        <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
+        <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled><p id="edit-date-only-hint" class="field-hint" hidden>Date-only reminders use 9:00 AM local time.</p></div>
       </div>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">At due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>

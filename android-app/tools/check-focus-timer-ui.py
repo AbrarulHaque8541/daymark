@@ -23,6 +23,7 @@ required_panel = [
     "int accent, int accentSoft, int warning",
     "ACCENT_SOFT", "DisplayUnit { AUTO, SECONDS, MINUTES, HOURS }",
     "TIME DISPLAY", "chooseDisplayUnit", "formatFixedUnit",
+    "loadDisplayUnit", "saveDisplayUnit", "daymark.focus.v1", "display_unit",
     "return totalSeconds + \" sec\";", "\"min\"", "\"hr\"",
     "RadioGroup units", "Maximum duration is 24 hours.",
     "TaskFocusTimer.MAX_COUNTDOWN_MS / multiplier",
