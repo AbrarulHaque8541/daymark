@@ -843,13 +843,8 @@ public final class MainActivity extends Activity {
 
     private boolean readBrowserOnlinePreference() {
         try {
-            boolean savedOnlineChoice = browserPreferences.getBoolean(BROWSER_ONLINE_ENABLED_KEY, false);
-            boolean explicitConsent = browserPreferences.getBoolean(BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY, false);
-            if (!explicitConsent && browserPreferences.contains(BROWSER_ONLINE_ENABLED_KEY)) {
-                // Earlier builds wrote Online as a default. That value is not consent.
-                browserPreferences.edit().remove(BROWSER_ONLINE_ENABLED_KEY).apply();
-            }
-            return BrowserNetworkPolicy.hasExplicitOptIn(savedOnlineChoice, explicitConsent);
+            return browserPreferences.getBoolean(BROWSER_ONLINE_ENABLED_KEY,
+                    BrowserNetworkPolicy.DEFAULT_ONLINE_ENABLED);
         } catch (ClassCastException invalidPreference) {
             browserPreferences.edit().remove(BROWSER_ONLINE_ENABLED_KEY)
                     .remove(BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY).apply();
@@ -1757,7 +1752,7 @@ public final class MainActivity extends Activity {
                 12, palette.muted, Typeface.NORMAL);
         connectionHint.setPadding(dp(2), dp(5), dp(2), dp(5));
         connectionHint.setContentDescription(
-                "Daymark asks before the first online page request. No website opens until you submit a search or tap a site.");
+                "Daymark opens a website only when you submit a search or tap a site. Online browsing is on by default.");
         webActions.addView(connectionHint, bottomMargin(dp(2)));
         LinearLayout providerRow = new LinearLayout(this);
         providerRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2407,7 +2402,7 @@ public final class MainActivity extends Activity {
         detail.setLineSpacing(dp(3), 1f);
         home.addView(detail, bottomMargin(dp(18)));
 
-        TextView privacyHint = text("Offline until you enable Online. Privacy details are above.", 11,
+        TextView privacyHint = text("Online browsing is on by default. Privacy details are above.", 11,
                 palette.muted, Typeface.NORMAL);
         privacyHint.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(

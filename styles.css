@@ -268,8 +268,15 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 
 /* ── v1.3 additions: repeat rules, quick due dates, stats, sort, duplicate ── */
-@media (min-width: 721px) {
+@media (min-width: 1000px) {
   .add-form { grid-template-columns: minmax(100px, 1fr) 112px 88px 96px 100px 100px auto; }
+}
+/* 721-999px: the seven composer controls wrap in three columns. The old 721px
+   breakpoint forced a ~740px row into a narrower container and clipped it. */
+@media (min-width: 721px) and (max-width: 999px) {
+  .add-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .add-form input[type="text"] { grid-column: 1 / -1; }
+  .add-form .add-button { grid-column: 1 / -1; }
 }
 .date-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
 .date-chip { height: 30px; padding: 0 12px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 999px; background: rgba(255, 255, 255, .6); color: #5f6c76; font-size: 10px; font-weight: 700; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
@@ -507,6 +514,11 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .currency-swap:active {
   transform: scale(0.96);
 }
+.currency-swap:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
 .currency-swap:focus-visible {
   outline: 3px solid rgba(22, 112, 95, .55);
   outline-offset: 2px;
@@ -542,6 +554,17 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   }
 
   .currency-now:hover {
+    border-color: rgba(42, 143, 122, .5);
+  }
+
+  .currency-swap {
+    border-color: rgba(125, 224, 203, 0.2);
+    background: rgba(26, 33, 40, .7);
+    color: #7de0cb;
+  }
+
+  .currency-swap:hover {
+    background: rgba(22, 112, 95, 0.25);
     border-color: rgba(42, 143, 122, .5);
   }
 }
@@ -623,4 +646,105 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .wiki-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
   .wiki-item:hover { border-color: rgba(42, 143, 122, .5); }
   .wiki-item-link { color: #7ee0cb; }
+}
+
+/* Currency glance: keep the converted value and its Copy button side by side. */
+.currency-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.currency-result-row .currency-now {
+  flex: 1;
+  min-width: 0;
+}
+.tool-button.currency-copy {
+  flex: none;
+  white-space: nowrap;
+}
+.tool-button.currency-copy[hidden] {
+  display: none;
+}
+
+/* ---------- Style-coverage pass (2026-11-05) ----------
+   Every class referenced by index.html now has a rule, so no element renders
+   with raw browser defaults. Dark-mode parity included; reduced-motion safe. */
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.tasks-panel { min-width: 0; }
+.side-column { min-width: 0; display: flex; flex-direction: column; }
+
+/* Focus timer card internals */
+.focus-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.focus-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
+.focus-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
+.focus-time-wrap { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 10px 0 12px; }
+.focus-time { font: 700 32px Manrope, sans-serif; letter-spacing: -.04em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.focus-state-label { color: var(--muted-text); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.field-label { display: block; margin: 12px 0 6px; color: var(--muted-text); font-size: 11px; font-weight: 700; }
+.field-label span { font-weight: 500; opacity: .8; }
+#focus-task { width: 100%; height: 36px; margin: 0 0 4px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 10px; background: rgba(255, 255, 255, .75); color: var(--ink); padding: 0 10px; font-size: 12px; }
+#focus-task:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(22, 112, 95, .12); outline: none; }
+.focus-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+.focus-today { margin: 12px 0 0; color: var(--muted-text); font-size: 11px; }
+
+/* Suggestion footnote */
+.suggestion-footnote { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0 0; padding: 10px 11px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .5); }
+.suggestion-footnote > span { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+.suggestion-footnote p { margin: 0; color: var(--muted-text); font-size: 10px; line-height: 1.5; }
+
+/* Edit dialog */
+.edit-dialog { width: min(560px, calc(100vw - 32px)); padding: 22px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 20px; background: var(--surface-solid); box-shadow: var(--shadow); color: var(--ink); }
+.edit-dialog::backdrop { background: rgba(15, 26, 32, .45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.dialog-header .eyebrow { margin: 0 0 2px; }
+.dialog-header h2 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
+.close-dialog { flex: none; font-size: 20px; line-height: 1; }
+.dialog-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 12px 0; }
+.edit-dialog textarea { width: 100%; min-height: 84px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); color: var(--ink); padding: 10px 12px; font-size: 13px; line-height: 1.5; resize: vertical; transition: border-color .16s ease, box-shadow .16s ease; }
+.reminder-note-standalone { margin: 12px 0 0; padding: 9px 11px; border: 1px dashed rgba(210, 228, 222, .9); border-radius: 10px; background: var(--accent-soft); color: #1e6b58; font-size: 10px; line-height: 1.55; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 16px; }
+@media (max-width: 560px) { .dialog-fields { grid-template-columns: 1fr; } }
+
+/* Subtask editor */
+.subtask-editor { margin: 14px 0 0; }
+.subtask-list { display: grid; gap: 6px; margin: 4px 0 10px; }
+.subtask-list:empty { display: none; }
+.subtask-row { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 1px solid rgba(219, 226, 232, .8); border-radius: 10px; background: rgba(255, 255, 255, .55); }
+.subtask-title { flex: 1; min-width: 0; color: #33454e; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.subtask-row.is-done .subtask-title { text-decoration: line-through; text-decoration-color: #b9c4cc; }
+.subtask-remove { display: grid; place-items: center; flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted-text); font-size: 13px; line-height: 1; }
+.subtask-remove:hover { background: var(--red-soft); color: var(--red); }
+.subtask-empty { margin: 4px 0 10px; color: var(--muted-text); font-size: 11px; }
+.subtask-add-row { display: flex; gap: 8px; }
+.subtask-add-row input { flex: 1 1 auto; }
+.subtask-add-button { flex: none; }
+
+/* Page footer */
+.page-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted-text); font-size: 9px; font-weight: 700; letter-spacing: .14em; }
+@media (max-width: 480px) { .page-footer { flex-direction: column; align-items: flex-start; gap: 4px; } }
+
+/* Currency form: amount full width, From and To share a row with the swap
+   centered between them, Refresh full width. */
+.currency-card .feed-form {
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.currency-card .feed-form > input { grid-column: 1 / -1; }
+.currency-card .feed-form > .currency-swap { justify-self: center; }
+.currency-card .feed-form > .currency-refresh { grid-column: 1 / -1; }
+
+/* Dark-mode parity for the coverage pass */
+@media (prefers-color-scheme: dark) {
+  .field-label, .focus-state-label, .focus-today, .focus-description { color: var(--muted-text); }
+  #focus-task { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }
+  .suggestion-footnote { border-color: #2c3640; background: rgba(26, 33, 40, .5); }
+  .suggestion-footnote > span { background: #1a3a32; color: #8fd4c0; }
+  .edit-dialog { border-color: #2c3640; background: #1a2128; }
+  .edit-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+  .edit-dialog textarea { border-color: #2c3640; background: rgba(26, 33, 40, .85); color: #e8eef2; }
+  .reminder-note-standalone { border-color: rgba(125, 224, 203, .2); background: #1a3a32; color: #8fd4c0; }
+  .subtask-row { border-color: #2c3640; background: rgba(26, 33, 40, .55); }
+  .subtask-title { color: #e8eef2; }
+  .subtask-remove:hover { background: #4a2220; color: #ffb0a8; }
+  .page-footer { border-top-color: #232d35; color: #7c8a94; }
 }

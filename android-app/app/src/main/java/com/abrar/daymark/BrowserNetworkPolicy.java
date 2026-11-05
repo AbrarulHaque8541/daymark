@@ -2,7 +2,7 @@ package com.abrar.daymark;
 
 /** Local, user-controlled network mode for the embedded browser. */
 final class BrowserNetworkPolicy {
-    static final boolean DEFAULT_ONLINE_ENABLED = false;
+    static final boolean DEFAULT_ONLINE_ENABLED = true;
 
     static boolean hasExplicitOptIn(boolean savedOnlineChoice, boolean savedConsent) {
         return savedOnlineChoice && savedConsent;

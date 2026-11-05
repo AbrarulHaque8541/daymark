@@ -15,9 +15,9 @@ public final class BrowserNetworkPolicySmoke {
 
     public static void main(String[] args) throws IOException {
         BrowserNetworkPolicy policy = new BrowserNetworkPolicy();
-        assert !policy.isOnlineEnabled() : "fresh installs must start Offline";
-        assert !policy.allowsRemoteLoads() : "fresh installs must block remote loads";
-        assert policy.shouldBlockWebViewLoads() : "fresh installs must block WebView resources";
+        assert policy.isOnlineEnabled() : "fresh installs must start Online like mainstream browsers";
+        assert policy.allowsRemoteLoads() : "fresh installs must allow direct remote loads";
+        assert !policy.shouldBlockWebViewLoads() : "fresh installs must not block WebView resources";
 
         assert !BrowserNetworkPolicy.hasExplicitOptIn(false, false)
                 : "missing preferences must remain Offline";
@@ -44,7 +44,7 @@ public final class BrowserNetworkPolicySmoke {
         if (args.length > 0) {
             runSharedContract(Path.of(args[0]));
         }
-        System.out.println("PASS browser network policy: fresh Offline default, explicit-consent restoration, legacy-online fail-closed behavior, page/resource-load blocking"
+        System.out.println("PASS browser network policy: fresh Online default like mainstream browsers, explicit-consent restoration of deliberately saved choices, legacy-online fail-closed truth table, user-switchable mode, page/resource-load blocking"
                 + (args.length > 0 ? ", shared cross-platform fixtures" : ""));
     }
 

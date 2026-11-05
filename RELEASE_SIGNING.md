@@ -2,7 +2,7 @@
 
 This document describes durable release rules plus a dated source/release snapshot. Verify the live `main` branch, GitHub Releases, and exact workflow run before acting.
 
-## Current source and published release (checked 2026-10-26)
+## Historical source and published-release snapshot (checked 2026-10-26)
 
 - Live `main` is `cac2d7524491a3fce488e57b5cf810dc7b5c5017`. Source uses application ID `com.abrar.daymark`, `versionName = 1.5`, `versionCode = 12`, `compileSdk = 36`, and `targetSdk = 36`, with AGP 8.12.2 and Gradle 8.13.
 - Latest published release is [**v1.5**](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.5), published 2026-10-23. Its tag points to `ca6453374c46a1449c8bbec09a27a218d127d8e4`; the release contains one APK (`Daymark-v1.5-githubSideload.apk`, 253,936 bytes, SHA-256 `496280987fc910d3a9dde9e4ecac79c5f9286b6c2a88f2f18df75e45d9702bc8`) targeting API 36 with versionCode 12. The release metadata records the pinned production signer. The v1.4 release remains a draft and is not the latest published release.

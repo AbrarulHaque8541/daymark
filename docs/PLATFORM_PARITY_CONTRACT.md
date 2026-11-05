@@ -48,7 +48,7 @@ Shared product semantics do not require identical pixels. The UI must provide eq
 
 The browser is a separately replaceable engine adapter behind a common policy boundary. Test policy independently of the engine, then test engine integration separately. The adapter contract covers:
 
-- HTTPS-only navigation and downgrade rejection.
+- Explicit HTTP and HTTPS navigation, a visible **Not encrypted** state for HTTP, and reviewed downgrade/redirect behavior. Android's current app-wide cleartext restriction and browser UI disagree with the source policy, so HTTP runtime support is not accepted until device tests pass.
 - Explicit online consent and offline behavior.
 - Redirects, external intents, `target=_blank`, popups, downloads, permission prompts, and error/retry.
 - Clear site data/history and lifecycle/recovery.
