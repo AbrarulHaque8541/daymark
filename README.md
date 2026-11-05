@@ -34,7 +34,7 @@
 - Local, typo-tolerant task search with category and exact tag filters — see [task search](android-app/TASK_SEARCH.md) for behavior and limits
 - Task reminders: in-app dialog plus best-effort OS notifications, daily/weekly/monthly repeat rules, custom notification sound — see [docs/TASK_REMINDERS.md](docs/TASK_REMINDERS.md) for the honest limits
 - Encrypted portable backup / restore
-- In-app browser: starts Offline; first remote navigation requires an explicit disclosure and opt-in. Source includes search engines, AI site shortcuts, tabs, origin-only bookmarks, find-in-page, downloads, Reader Mode (local text extract), and page-local extensions. HTTP address handling conflicts with the platform cleartext setting and warning UI; see the [HTTP policy audit](docs/BROWSER_HTTP_POLICY_AUDIT.md)
+- In-app browser: networking defaults to Online, but each page/search still requires a user tap; a saved Offline choice fails closed until the **Enable Online** disclosure is accepted. The address parser accepts HTTP and HTTPS, but Android's app-wide cleartext setting remains disabled and the current browser UI says HTTP is blocked, so actual HTTP loading and its warning label are unresolved and not device-verified. Prefer HTTPS while [issue #348](https://github.com/AbrarulHaque8541/daymark/issues/348) and the [HTTP policy audit](docs/BROWSER_HTTP_POLICY_AUDIT.md) remain open. Source also includes search engines, AI site shortcuts, tabs, origin-only bookmarks, find-in-page, downloads, Reader Mode (local text extract), and page-local extensions.
 - Review and save an offline Reader Mode excerpt as an encrypted task note — see [offline web clips](android-app/WEB_CLIPPING.md)
 - Optional in-app update check against signed GitHub Releases (sideload flavor)
 
