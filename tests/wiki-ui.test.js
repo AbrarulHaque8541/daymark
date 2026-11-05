@@ -52,6 +52,7 @@ function fakeEnv(options) {
   const elements = {
     'wiki-query': Object.assign(fakeElement('input'), { id: 'wiki-query', value: opts.query || '' }),
     'wiki-search': Object.assign(fakeElement('button'), { id: 'wiki-search' }),
+    'wiki-clear': Object.assign(fakeElement('button'), { id: 'wiki-clear' }),
     'wiki-status': Object.assign(fakeElement('p'), { id: 'wiki-status' }),
     'wiki-list': Object.assign(fakeElement('div'), { id: 'wiki-list' })
   };
@@ -59,7 +60,8 @@ function fakeEnv(options) {
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); }
+    setItem(key, value) { storageData[key] = String(value); },
+    removeItem(key) { delete storageData[key]; }
   };
   const env = {
     document: {
@@ -219,4 +221,40 @@ test('Enter in the query field triggers a search', async () => {
   assert.equal(prevented, true);
   assert.equal(fetchImpl.seen.length, 1);
   assert.equal(elements['wiki-status'].textContent, 'Updated · 2026-11-05 12:00 UTC');
+});
+
+test('Clear button empties the query, list, cache and prefs', () => {
+  const stored = JSON.stringify({
+    version: 1,
+    query: 'kanyakumari',
+    results: [{
+      title: 'Kanyakumari',
+      snippet: 'A coastal town in Tamil Nadu.',
+      pageId: 2285632,
+      url: 'https://en.wikipedia.org/?curid=2285632'
+    }],
+    fetchedAt: '2026-11-04T09:30:00.000Z'
+  });
+  const { env, elements, storageData } = fakeEnv({ stored, query: 'kanyakumari' });
+  storageData[ui.PREFS_KEY] = JSON.stringify({ query: 'kanyakumari' });
+  const handle = ui.attachWikiUi(env);
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.equal(elements['wiki-query'].value, 'kanyakumari');
+  handle.onClear();
+  assert.equal(elements['wiki-query'].value, '');
+  assert.equal(elements['wiki-list'].children.length, 0);
+  assert.equal(elements['wiki-status'].textContent, 'Cleared. Type a topic and tap Search.');
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
+});
+
+test('Clear button click listener is wired', () => {
+  const { env, elements } = fakeEnv({ query: 'something' });
+  ui.attachWikiUi(env);
+  const clearBtn = elements['wiki-clear'];
+  const listener = clearBtn.listeners.find((l) => l.type === 'click');
+  assert.ok(listener, 'clear click listener registered');
+  listener.handler();
+  assert.equal(elements['wiki-query'].value, '');
+  assert.equal(elements['wiki-status'].textContent, 'Cleared. Type a topic and tap Search.');
 });
