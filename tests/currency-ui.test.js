@@ -267,15 +267,46 @@ test('swap button exchanges from/to and updates status without auto-refresh', ()
   assert.equal(click.prevented, true);
 });
 
+
+test('restores last amount and currency pair from localStorage prefs', () => {
+  const prefs = JSON.stringify({ amount: '25', from: 'EUR', to: 'GBP' });
+  const { env, elements, storageData } = fakeEnv({});
+  storageData[ui.PREFS_KEY] = prefs;
+  ui.attachCurrencyUi(env);
+  assert.equal(elements['currency-amount'].value, '25');
+  assert.equal(elements['currency-from'].value, 'EUR');
+  assert.equal(elements['currency-to'].value, 'GBP');
+});
+
+test('persists prefs on swap and on input change', () => {
+  const { env, elements, storageData } = fakeEnv({ from: 'USD', to: 'INR', amount: '5' });
+  ui.attachCurrencyUi(env);
+  // simulate input
+  elements['currency-amount'].value = '42';
+  const inputListener = elements['currency-amount'].listeners.find((l) => l.type === 'input');
+  if (inputListener) inputListener.handler({});
+  let saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
+  assert.equal(saved.amount, '42');
+  assert.equal(saved.from, 'USD');
+
+  // swap
+  const swap = elements['currency-swap'];
+  const click = { preventDefault() {}, defaultPrevented: false };
+  swap.listeners.find((l) => l.type === 'click').handler(click);
+  saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
+  assert.equal(saved.from, 'INR');
+  assert.equal(saved.to, 'USD');
+});
+
 test('amount input live-updates the display from a matching cached rate', () => {
   const { env, elements } = fakeEnv({ stored: STORED, amount: '1' });
   ui.attachCurrencyUi(env);
   assert.ok(elements['currency-now'].textContent.startsWith('1 USD = 94.91 INR'));
-  const inputListener = elements['currency-amount'].listeners.find((l) => l.type === 'input');
-  assert.ok(inputListener, 'amount field should listen for input');
+  const inputListeners = elements['currency-amount'].listeners.filter((l) => l.type === 'input');
+  const live = inputListeners[inputListeners.length - 1];
+  assert.ok(live, 'amount field should listen for input');
   elements['currency-amount'].value = '10';
-  inputListener.handler();
+  live.handler();
   assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'), 'display should update from cache without refresh');
   assert.ok(elements['currency-status'].textContent.startsWith('Cached'), 'status remains the cached note');
 });
-
