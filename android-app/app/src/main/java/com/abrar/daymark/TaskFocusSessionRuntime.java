@@ -107,8 +107,14 @@ final class TaskFocusSessionRuntime {
         return coordinator.pauseFromUserAction();
     }
 
-    TaskFocusSessionCoordinator.Snapshot resumeFromUserAction(String title) throws Exception {
-        return coordinator.resumeFromUserAction(title);
+    TaskFocusSessionCoordinator.Snapshot switchTaskWhilePausedFromUserAction(
+            String taskId, String title) throws Exception {
+        return coordinator.switchTaskWhilePausedFromUserAction(taskId, title);
+    }
+
+    TaskFocusSessionCoordinator.Snapshot resumeFromUserAction(String taskId, String title)
+            throws Exception {
+        return coordinator.resumeFromUserAction(taskId, title);
     }
 
     TaskFocusSessionCoordinator.Snapshot finishFromUserAction() throws Exception {

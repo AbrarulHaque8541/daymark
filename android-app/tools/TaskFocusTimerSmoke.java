@@ -11,6 +11,7 @@ public final class TaskFocusTimerSmoke {
         sameBootRestoreUsesMonotonicClock();
         rebootRestoreUsesBoundedWallClockDelta();
         unsafeClockAndUnknownBootFailClosed();
+        pausedTaskSwitchPreservesTimerProgress();
         invalidInputsAndTransitionsAreRejected();
         System.out.println("PASS task focus timer smoke tests: " + assertions + " assertions");
     }
@@ -95,6 +96,27 @@ public final class TaskFocusTimerSmoke {
         TaskFocusTimer safe = TaskFocusTimer.restore(unknown, 10, 900_000, -1);
         check(safe.isPaused() && safe.elapsedMsAt(10) == 10_000,
                 "unknown boot identity restores running timer as paused without guessing elapsed time");
+    }
+
+    private static void pausedTaskSwitchPreservesTimerProgress() {
+        long target = 25L * 60_000L;
+        TaskFocusTimer running = TaskFocusTimer.start(
+                "task-a", TaskFocusTimer.Mode.COUNTDOWN, target, 1_000);
+        TaskFocusTimer paused = running.pause(6_000);
+        TaskFocusTimer switched = paused.switchTaskWhilePaused("task-b");
+        check("task-b".equals(switched.taskId()) && switched.isPaused(),
+                "paused task switch returns a paused timer linked to the selected task");
+        check("task-a".equals(paused.taskId()), "task switching leaves the original immutable timer unchanged");
+        check(switched.mode() == TaskFocusTimer.Mode.COUNTDOWN
+                        && switched.targetDurationMs() == target
+                        && switched.elapsedMsAt(90_000) == 5_000,
+                "task switching preserves countdown mode, target and frozen elapsed progress");
+        expectIllegalArgument(() -> paused.switchTaskWhilePaused(" "),
+                "paused task switch rejects a blank task ID");
+        expectIllegalState(() -> running.switchTaskWhilePaused("task-b"),
+                "running session cannot switch tasks");
+        expectIllegalState(() -> paused.finish(6_000).switchTaskWhilePaused("task-b"),
+                "finished session cannot switch tasks");
     }
 
     private static void invalidInputsAndTransitionsAreRejected() {

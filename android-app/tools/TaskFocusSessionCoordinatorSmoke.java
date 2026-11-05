@@ -12,6 +12,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
     public static void main(String[] args) throws Exception {
         restoreMustPrecedeAnyUserStart();
         explicitStartPauseResumeFinishIsDurableAndOrdered();
+        pausedTaskSwitchPersistsIdentityAcrossRestoreAndResume();
+        failedPausedTaskSwitchLeavesOriginalSessionUntouched();
         anActiveSessionCannotBeReplaced();
         processRestorePublishesOnlyAnExistingRunningSession();
         aMissingTaskClearsOnlyTheFocusRecord();
@@ -61,7 +63,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         fixture.notifications.events.clear();
         fixture.store.events.clear();
         TaskFocusSessionCoordinator.Snapshot resumed =
-                fixture.coordinator.resumeFromUserAction("Write project notes");
+                fixture.coordinator.resumeFromUserAction("task-1", "Write project notes");
         check(resumed.isRunning(), "Resume returns the session to running");
         check(resumed.timer.elapsedMsAt(fixture.clock.elapsed) == 4_500,
                 "paused wall time is not counted as focus time");
@@ -89,6 +91,82 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check(fixture.coordinator.currentSnapshot() == null, "clearing removes the in-memory focus session");
         check(fixture.events().equals(list("cancel", "clear")),
                 "clearing cancels only the focus notification and then clears its separate record");
+    }
+
+    private static void pausedTaskSwitchPersistsIdentityAcrossRestoreAndResume() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.initializeWithoutSession();
+        fixture.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0);
+        fixture.clock.advance(4_500);
+        fixture.coordinator.pauseFromUserAction();
+        fixture.clock.advance(60_000);
+        fixture.notifications.events.clear();
+        fixture.store.events.clear();
+
+        TaskFocusSessionCoordinator.Snapshot switched =
+                fixture.coordinator.switchTaskWhilePausedFromUserAction("task-b", "Task B");
+        check(switched.isPaused() && "task-b".equals(switched.timer.taskId()),
+                "choosing another task while paused updates the session identity without resuming it");
+        check(switched.timer.elapsedMsAt(fixture.clock.elapsed) == 4_500,
+                "paused task switch preserves accumulated focus time");
+        check("task-b".equals(fixture.store.saved.taskId)
+                        && fixture.store.saved.status == TaskFocusTimer.Status.PAUSED,
+                "the selected task ID and paused state are durably saved before returning");
+        check(fixture.events().equals(list("save", "cancel"))
+                        && !fixture.notifications.active,
+                "switch persists first, keeps notifications cancelled, and never resumes in the background");
+
+        int savesBeforeRejectedResume = fixture.store.saveCount;
+        int publicationsBeforeRejectedResume = fixture.notifications.publishCount;
+        expectIllegalState(() -> fixture.coordinator.resumeFromUserAction("task-a", "Task A"),
+                "a stale task ID cannot resume a session after another task has been selected");
+        check(fixture.store.saveCount == savesBeforeRejectedResume
+                        && fixture.notifications.publishCount == publicationsBeforeRejectedResume
+                        && "task-b".equals(fixture.coordinator.currentSnapshot().timer.taskId()),
+                "a mismatched resume cannot overwrite the switched task or publish a wrong-title notification");
+
+        Fixture afterProcessDeath = new Fixture(fixture.clock, fixture.store);
+        TaskFocusSessionCoordinator.Snapshot restored =
+                afterProcessDeath.coordinator.restoreAfterProcessStart("task-b", "Task B");
+        check(restored != null && restored.isPaused() && restored.restored
+                        && "task-b".equals(restored.timer.taskId()),
+                "the switched task identity survives process death and restores as paused");
+        check(!restored.notificationPublished && !afterProcessDeath.notifications.active,
+                "restoring a switched paused session still does not publish a notification");
+
+        afterProcessDeath.store.events.clear();
+        afterProcessDeath.notifications.events.clear();
+        TaskFocusSessionCoordinator.Snapshot resumed =
+                afterProcessDeath.coordinator.resumeFromUserAction("task-b", "Task B");
+        check(resumed.isRunning() && "task-b".equals(resumed.timer.taskId()),
+                "the selected task resumes the same persisted focus session");
+        check("Task B".equals(afterProcessDeath.notifications.lastTitle)
+                        && afterProcessDeath.notifications.active,
+                "the resumed notification title belongs to the newly selected task");
+        check(afterProcessDeath.events().equals(list("save", "publish")),
+                "resume writes the selected task before publishing its notification");
+    }
+
+    private static void failedPausedTaskSwitchLeavesOriginalSessionUntouched() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.initializeWithoutSession();
+        fixture.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0);
+        fixture.coordinator.pauseFromUserAction();
+        fixture.notifications.events.clear();
+        fixture.store.events.clear();
+        fixture.store.failNextSave = true;
+
+        expectIOException(() -> fixture.coordinator.switchTaskWhilePausedFromUserAction(
+                "task-b", "Task B"), "a failed task rebind is reported");
+        TaskFocusSessionCoordinator.Snapshot current = fixture.coordinator.currentSnapshot();
+        check(current.isPaused() && "task-a".equals(current.timer.taskId())
+                        && "task-a".equals(fixture.store.saved.taskId),
+                "a failed rebind leaves both memory and persisted session linked to the original task");
+        check(fixture.events().equals(java.util.Collections.singletonList("save"))
+                        && !fixture.notifications.active,
+                "a failed rebind performs no notification-side effect and does not resume the timer");
     }
 
     private static void anActiveSessionCannotBeReplaced() throws Exception {
