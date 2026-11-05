@@ -40,7 +40,7 @@ test('current browser documentation keeps the HTTP cleartext mismatch explicit a
   assert.match(acceptance, /usesCleartextTraffic=false/);
   assert.match(design, /HTTP WebView loading and a visible .*? label remain unresolved/);
   assert.match(plan, /treat HTTP runtime support as unverified/);
-  assert.match(parity, /HTTP runtime support is not accepted until device tests pass/);
+  assert.match(parity, /runtime support remains blocked until the serialized integration replaces or strictly contains that path, wires the final-URL label, and passes device tests/);
 });
 
 test('dated status snapshots are labeled historical and Android design scopes are distinct', () => {
