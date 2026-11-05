@@ -30,6 +30,7 @@
     const buttonEl = element('weather-refresh');
     const statusEl = element('weather-status');
     const nowEl = element('weather-now');
+    const clearEl = element('weather-clear');
 
     let busy = false;
     let cached = null;
@@ -134,6 +135,18 @@
       }
     }
 
+    function onClear() {
+      // Explicit, scoped removal: only this card's cache and place preference.
+      if (storage && typeof storage.removeItem === 'function') {
+        storage.removeItem(STORAGE_KEY);
+        storage.removeItem(PREFS_KEY);
+      }
+      cached = null;
+      if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
+      if (nowEl) nowEl.textContent = '';
+      status('Weather cleared on this device. Type a place name and tap Refresh.');
+    }
+
     cached = readCache();
     const prefs = readPrefs();
     if (prefs && inputEl && typeof inputEl.value === 'string') {
@@ -152,6 +165,11 @@
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
 
+    // Clear removes this card's cached forecast and saved place on demand.
+    if (clearEl && typeof clearEl.addEventListener === 'function') {
+      clearEl.addEventListener('click', () => { onClear(); });
+    }
+
     // Enter on the place field starts the same refresh (keyboard efficiency).
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
@@ -167,6 +185,7 @@
 
     return {
       onRefresh,
+      onClear,
       readCache,
       detach() {
         // No document-level listener is registered; the button reference is
