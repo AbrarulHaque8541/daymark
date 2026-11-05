@@ -1,0 +1,10 @@
+/* Priority accent bars for task rows — professional visual cue */
+.task-row.priority-high { border-left: 3px solid #a3281f; }
+.task-row.priority-medium { border-left: 3px solid #94581e; }
+.task-row.priority-low { border-left: 3px solid #1e6b58; }
+
+@media (prefers-color-scheme: dark) {
+  .task-row.priority-high { border-left-color: #ffb0a8; }
+  .task-row.priority-medium { border-left-color: #f0c48a; }
+  .task-row.priority-low { border-left-color: #8fd4c0; }
+}
