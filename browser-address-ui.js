@@ -39,8 +39,14 @@
       if (statusEl) statusEl.textContent = message;
     }
 
-    function detail(message) {
-      if (resultEl) resultEl.textContent = message;
+    function detail(message, security) {
+      if (!resultEl) return;
+      resultEl.textContent = message;
+      if (resultEl.classList && typeof resultEl.classList.remove === 'function') {
+        resultEl.classList.remove('security-encrypted', 'security-not-encrypted');
+        if (security === 'encrypted') resultEl.classList.add('security-encrypted');
+        else if (security === 'not-encrypted') resultEl.classList.add('security-not-encrypted');
+      }
     }
 
     function currentProvider() {
@@ -93,7 +99,7 @@
       if (result.kind === 'navigate') {
         status('Opens a page · ' + securityLabel(result.security));
         const idn = result.idn ? ' (Unicode domain, punycode host ' + result.host + ')' : '';
-        detail('Navigate to ' + result.url + idn);
+        detail('Navigate to ' + result.url + idn, result.security);
       } else if (result.kind === 'search') {
         status('Runs a search with ' + result.providerName + '.');
         detail('Search for "' + result.searchQuery + '" · ' + result.url);
