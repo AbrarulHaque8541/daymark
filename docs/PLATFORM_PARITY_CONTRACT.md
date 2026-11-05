@@ -48,7 +48,7 @@ Shared product semantics do not require identical pixels. The UI must provide eq
 
 The browser is a separately replaceable engine adapter behind a common policy boundary. Test policy independently of the engine, then test engine integration separately. The adapter contract covers:
 
-- Explicit HTTP and HTTPS navigation, a visible **Not encrypted** state for HTTP, and reviewed downgrade/redirect behavior. Android keeps app-wide cleartext disabled because the current Activity browser-download path uses `DownloadManager` without app-visible redirect validation. Policy helpers alone do not enable HTTP; runtime support remains blocked until the serialized integration replaces or strictly contains that path, wires the final-URL label, and passes device tests.
+- Explicit HTTP and HTTPS navigation, a visible **Not encrypted** state for HTTP, and reviewed downgrade/redirect behavior. Android keeps app-wide cleartext disabled because the current Activity browser-download path uses `DownloadManager` without app-visible redirect validation. Policy helpers alone do not enable HTTP. HTTP runtime support is not accepted until device tests pass; runtime remains blocked until the serialized integration replaces or strictly contains that path and wires the final-URL label.
 - Explicit online consent and offline behavior.
 - Redirects, external intents, `target=_blank`, popups, downloads, permission prompts, and error/retry.
 - Clear site data/history and lifecycle/recovery.
