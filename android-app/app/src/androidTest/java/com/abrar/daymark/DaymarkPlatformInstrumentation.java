@@ -533,8 +533,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             TaskFocusSessionCoordinator.Snapshot paused = restoredRuntime.pauseFromUserAction();
             check(paused != null && paused.isPaused(),
                     "Pause durably changes the focus session to PAUSED");
-            check(awaitNotificationState(manager, notificationId, false),
-                    "Pause removes the ongoing notification");
+            checkPausedNotification(manager, notificationId, task.title, "pausing");
 
             TaskFocusSessionCoordinator.Snapshot switched =
                     restoredRuntime.switchTaskWhilePausedFromUserAction(
@@ -552,8 +551,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                             && !new String(switchedFocusCiphertext, StandardCharsets.ISO_8859_1)
                                     .contains(alternateTask.id),
                     "the switched task identity remains protected inside the encrypted focus record");
-            check(awaitNotificationState(manager, notificationId, false),
-                    "switching a paused session does not publish or restore its notification");
+            checkPausedNotification(manager, notificationId, alternateTask.title,
+                    "switching a paused session");
 
             TaskFocusSessionRuntime pausedAfterProcessRestart = new TaskFocusSessionRuntime(isolated);
             TaskFocusSessionCoordinator.Snapshot restoredPaused =
@@ -561,8 +560,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(restoredPaused != null && restoredPaused.isPaused() && restoredPaused.restored
                             && alternateTask.id.equals(restoredPaused.timer.taskId()),
                     "the switched task ID survives process recreation while the session remains paused");
-            check(awaitNotificationState(manager, notificationId, false),
-                    "restoring the switched paused session leaves the notification cancelled");
+            checkPausedNotification(manager, notificationId, alternateTask.title,
+                    "restoring a paused session");
 
             TaskFocusSessionCoordinator.Snapshot resumed =
                     pausedAfterProcessRestart.resumeFromUserAction(alternateTask.id, alternateTask.title);
@@ -641,6 +640,63 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             if (posted.getId() == id) return posted.getNotification();
         }
         return null;
+    }
+
+    private static android.app.Notification awaitPausedNotification(
+            android.app.NotificationManager manager, int id, String expectedTitle)
+            throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            android.app.Notification notification = activeNotification(manager, id);
+            if (isExpectedPausedNotification(notification, expectedTitle)) return notification;
+            Thread.sleep(100L);
+        }
+        return activeNotification(manager, id);
+    }
+
+    private static boolean isExpectedPausedNotification(android.app.Notification notification,
+            String expectedTitle) {
+        if (notification == null || notification.extras == null
+                || !expectedTitle.equals(notification.extras.getString(
+                        android.app.Notification.EXTRA_TITLE))) return false;
+        String text = notification.extras.getString(android.app.Notification.EXTRA_TEXT);
+        if (text == null || !text.startsWith("Paused · ")
+                || (notification.flags & android.app.Notification.FLAG_ONGOING_EVENT) == 0
+                || notification.extras.getBoolean(android.app.Notification.EXTRA_SHOW_CHRONOMETER, false)
+                || notification.extras.getInt(android.app.Notification.EXTRA_PROGRESS_MAX, 0) <= 0
+                || notification.extras.getBoolean(
+                        android.app.Notification.EXTRA_PROGRESS_INDETERMINATE, true)
+                || notification.actions == null || notification.actions.length != 2) return false;
+        return "Resume".contentEquals(notification.actions[0].title)
+                && "Finish".contentEquals(notification.actions[1].title);
+    }
+
+    private void checkPausedNotification(android.app.NotificationManager manager,
+            int id, String expectedTitle, String lifecycleAction) throws InterruptedException {
+        android.app.Notification notification = awaitPausedNotification(manager, id, expectedTitle);
+        check(isExpectedPausedNotification(notification, expectedTitle),
+                lifecycleAction + " eventually publishes the expected paused notification state");
+        check(notification != null && notification.extras != null
+                        && expectedTitle.equals(notification.extras.getString(
+                                android.app.Notification.EXTRA_TITLE)),
+                lifecycleAction + " displays the current task title");
+        check(notification != null && notification.extras != null
+                        && notification.extras.getString(android.app.Notification.EXTRA_TEXT) != null
+                        && notification.extras.getString(android.app.Notification.EXTRA_TEXT)
+                                .startsWith("Paused · "),
+                lifecycleAction + " displays frozen paused-time text");
+        check(notification != null && notification.extras != null
+                        && (notification.flags & android.app.Notification.FLAG_ONGOING_EVENT) != 0
+                        && !notification.extras.getBoolean(
+                                android.app.Notification.EXTRA_SHOW_CHRONOMETER, false)
+                        && notification.extras.getInt(android.app.Notification.EXTRA_PROGRESS_MAX, 0) > 0
+                        && !notification.extras.getBoolean(
+                                android.app.Notification.EXTRA_PROGRESS_INDETERMINATE, true),
+                lifecycleAction + " keeps determinate progress without a live chronometer");
+        check(notification != null && notification.actions != null
+                        && notification.actions.length == 2
+                        && "Resume".contentEquals(notification.actions[0].title)
+                        && "Finish".contentEquals(notification.actions[1].title),
+                lifecycleAction + " exposes Resume and Finish actions");
     }
 
     /** Exercises filter semantics, touch-target minima and real catalog action gates on Android. */

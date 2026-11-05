@@ -8,7 +8,7 @@ package com.abrar.daymark;
  * layer supplies a monotonic clock, the independent focus-session store and a notification sink.
  * A new session can only be created through startFromUserAction(). Process restoration never
  * starts or resumes a timer; it only restores a previously persisted session and republishes a
- * notification when that session is still running and its task still exists.
+ * notification when that session is still running or paused and its task still exists.
  *
  * <p>The Store must be private to this coordinator. It must not be used by startup code to create
  * sessions or by task CRUD code to write task snapshots. The focus record is separate from task
@@ -32,8 +32,8 @@ final class TaskFocusSessionCoordinator {
 
     interface NotificationSink {
         /**
-         * Publishes an already-running session. Return false when notification access is not
-         * available; this must not change the persisted timer state.
+         * Publishes an already-persisted running or paused session. Return false when notification
+         * access is not available; this must not change the persisted timer state.
          */
         boolean publish(TaskFocusTimer timer, String currentTaskTitle,
                         long nowElapsedRealtimeMs);
@@ -95,7 +95,7 @@ final class TaskFocusSessionCoordinator {
 
         current = started;
         currentTaskTitle = taskTitle;
-        notificationPublished = notifications.publish(
+        notificationPublished = publishOrCancel(
                 started, currentTaskTitle, now.elapsedRealtimeMs);
         return snapshot(false);
     }
@@ -105,9 +105,9 @@ final class TaskFocusSessionCoordinator {
      *
      * <p>currentTaskId must be the ID of the task resolved from the current task snapshot. Passing
      * null, or a different ID, clears only the stale focus-session record and its notification.
-     * The method never creates a timer. A restored RUNNING record is eligible for notification
-     * publication because this coordinator is the only writer and new records are created only by
-     * startFromUserAction().
+     * The method never creates a timer. Restored RUNNING and PAUSED records are eligible for
+     * notification publication because this coordinator is the only writer and new records are
+     * created only by startFromUserAction().
      */
     synchronized Snapshot restoreAfterProcessStart(String currentTaskId, String currentTaskTitle)
             throws Exception {
@@ -143,8 +143,8 @@ final class TaskFocusSessionCoordinator {
         this.currentTaskTitle = currentTaskTitle;
         initialized = true;
 
-        if (restored.isRunning()) {
-            notificationPublished = notifications.publish(
+        if (restored.isRunning() || restored.isPaused()) {
+            notificationPublished = publishOrCancel(
                     restored, currentTaskTitle, now.elapsedRealtimeMs);
         } else {
             notifications.cancel();
@@ -169,8 +169,13 @@ final class TaskFocusSessionCoordinator {
         }
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
-        notifications.cancel();
-        notificationPublished = false;
+        if (next.isPaused()) {
+            notificationPublished = publishOrCancel(
+                    next, currentTaskTitle, now.elapsedRealtimeMs);
+        } else {
+            notifications.cancel();
+            notificationPublished = false;
+        }
         return snapshot(false);
     }
 
@@ -188,8 +193,8 @@ final class TaskFocusSessionCoordinator {
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
         this.currentTaskTitle = currentTaskTitle;
-        notifications.cancel();
-        notificationPublished = false;
+        notificationPublished = publishOrCancel(
+                next, currentTaskTitle, now.elapsedRealtimeMs);
         return snapshot(false);
     }
 
@@ -212,7 +217,7 @@ final class TaskFocusSessionCoordinator {
         this.currentTaskTitle = currentTaskTitle;
 
         if (next.isRunning()) {
-            notificationPublished = notifications.publish(
+            notificationPublished = publishOrCancel(
                     next, currentTaskTitle, now.elapsedRealtimeMs);
         } else {
             notifications.cancel();
@@ -236,19 +241,20 @@ final class TaskFocusSessionCoordinator {
     }
 
     /**
-     * Refreshes an existing notification after a task-title change or a UI lifecycle return.
-     * It never starts a session and never promotes a paused/finished timer.
+     * Refreshes a running or paused notification after a task-title change or lifecycle return.
+     * It never starts a session or republishes a finished timer.
      */
     synchronized Snapshot refreshNotification(String currentTaskTitle) throws Exception {
         requireInitialized();
-        if (current == null || !current.isRunning()) {
-            notifications.cancel();
+        if (current == null || current.isFinished()) {
+            if (notificationPublished) notifications.cancel();
             notificationPublished = false;
             return snapshot(false);
         }
 
         ClockReading now = readClock();
-        if (current.isCountdown() && current.isExpiredAt(now.elapsedRealtimeMs)) {
+        if (current.isRunning() && current.isCountdown()
+                && current.isExpiredAt(now.elapsedRealtimeMs)) {
             TaskFocusTimer finished = current.finish(now.elapsedRealtimeMs);
             store.save(finished, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
             current = finished;
@@ -258,7 +264,7 @@ final class TaskFocusSessionCoordinator {
         }
 
         this.currentTaskTitle = currentTaskTitle;
-        notificationPublished = notifications.publish(
+        notificationPublished = publishOrCancel(
                 current, currentTaskTitle, now.elapsedRealtimeMs);
         return snapshot(false);
     }
@@ -314,6 +320,12 @@ final class TaskFocusSessionCoordinator {
 
     private void requireCurrent() {
         if (current == null) throw new IllegalStateException("There is no active focus session.");
+    }
+
+    private boolean publishOrCancel(TaskFocusTimer timer, String taskTitle, long nowElapsedRealtimeMs) {
+        boolean published = notifications.publish(timer, taskTitle, nowElapsedRealtimeMs);
+        if (!published) notifications.cancel();
+        return published;
     }
 
     private ClockReading readClock() {

@@ -43,8 +43,8 @@ public final class BrowserLoadWatchdogSmoke {
         Events success = new Events();
         BrowserLoadWatchdog watchdog = create(success);
         watchdog.onLoadRequested(URL);
-        advance(5_000L);
-        assert success.hints == 1 : "5s hint must fire once";
+        advance(2_000L);
+        assert success.hints == 1 : "2s hint must fire once";
         assert "https://example.com".equals(success.lastAddress) : "diagnostics must redact path/query";
         watchdog.onPageStarted(URL);
         watchdog.onPageFinished(URL);

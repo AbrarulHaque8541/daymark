@@ -40,7 +40,6 @@
       </a>
       <div class="rail-bottom">
         <span class="rail-avatar" aria-label="Personal workspace">A</span>
-        <span class="rail-label">PERSONAL SPACE</span>
       </div>
     </aside>
 
@@ -54,8 +53,8 @@
 
       <section class="page-heading" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow" id="today-label">YOUR DAY, AT A GLANCE</p>
-          <h1 id="page-title">A little more <em>in focus.</em></h1>
+          <p class="eyebrow" id="today-label">TODAY</p>
+          <h1 id="page-title">Your day, <em>at a glance.</em></h1>
         </div>
         <div class="heading-stat" aria-live="polite">
           <span class="stat-number" id="open-count">0</span>
@@ -159,21 +158,20 @@
             <p id="empty-copy">Add your first task above. Small steps count.</p>
             <button class="button button-quiet empty-clear-search" id="empty-clear-search" type="button" hidden>Clear search</button>
           </div>
-          <p class="storage-note"><span class="storage-dot" aria-hidden="true"></span> This prototype stores tasks only in this browser — no account or cross-device sync.</p>
         </section>
 
         <div class="side-column">
         <aside class="suggestion-card" aria-labelledby="suggestion-title">
-          <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span><span class="demo-label">DEMO SUGGESTION</span></div>
+          <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span></div>
           <h2 id="suggestion-title">A good place to begin</h2>
-          <p class="suggestion-description">Local due-date and priority rules pick your next tasks — no AI service.</p>
+          <p class="suggestion-description">Local rules pick your next tasks — no AI service.</p>
           <div class="suggestion-list" id="suggestion-list" aria-live="polite"></div>
         </aside>
 
         <aside class="focus-card" id="focus-card" aria-labelledby="focus-heading">
-          <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span><span class="demo-label">FOCUS TIMER</span></div>
+          <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span></div>
           <h2 id="focus-heading">One thing at a time</h2>
-          <p class="focus-description">A local timer for one task at a time. No network, no account.</p>
+          <p class="focus-description">No network, no account.</p>
           <div class="focus-time-wrap">
             <span class="focus-time" id="focus-time" role="timer">25:00</span>
             <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite" aria-atomic="true">Ready</span>
@@ -195,9 +193,9 @@
         </aside>
 
         <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">BRIEFING</span></div>
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="briefing-heading">RSS / Atom briefing</h2>
-          <p class="briefing-description">Read a public feed you choose. Fetched only on Refresh, cached offline. Some feeds block direct browser requests (CORS).</p>
+          <p class="briefing-description">Fetched on Refresh, cached offline. Some feeds block browser requests.</p>
           <form id="feed-form" class="feed-form" novalidate>
             <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
             <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>
@@ -208,9 +206,9 @@
           <div class="feed-list" id="feed-list" aria-live="polite"></div>
         </aside>
         <aside class="weather-card" id="weather-card" aria-labelledby="weather-heading">
-          <div class="weather-topline"><span class="weather-dot" aria-hidden="true"></span><span class="demo-label">WEATHER GLANCE</span></div>
+          <div class="weather-topline"><span class="weather-dot" aria-hidden="true"></span></div>
           <h2 id="weather-heading">Weather for today</h2>
-          <p class="weather-description">Conditions for any place via Open-Meteo — no account, no API key. Fetched on Refresh, cached offline.</p>
+          <p class="weather-description">Open-Meteo — no account, no API key. Cached offline.</p>
           <form id="weather-form" class="feed-form" novalidate>
             <label class="sr-only" for="weather-place">Place name</label>
             <input id="weather-place" name="place" type="text" maxlength="80" placeholder="City, e.g. Kolkata" autocomplete="off">
@@ -221,9 +219,9 @@
           <div class="weather-now" id="weather-now" aria-live="polite"></div>
         </aside>
         <aside class="currency-card" id="currency-card" aria-labelledby="currency-heading">
-          <div class="currency-topline"><span class="currency-dot" aria-hidden="true"></span><span class="demo-label">CURRENCY GLANCE</span></div>
+          <div class="currency-topline"><span class="currency-dot" aria-hidden="true"></span></div>
           <h2 id="currency-heading">Quick currency check</h2>
-          <p class="currency-description">Common currencies via Frankfurter (ECB reference rates) — no account, no API key. Fetched on Refresh, cached offline.</p>
+          <p class="currency-description">Frankfurter (ECB rates) — no account, no API key. Cached offline.</p>
           <form id="currency-form" class="feed-form" novalidate>
             <label class="sr-only" for="currency-amount">Amount</label>
             <input id="currency-amount" name="amount" type="text" inputmode="decimal" maxlength="12" placeholder="Amount, e.g. 10" autocomplete="off" aria-describedby="currency-status">
@@ -292,9 +290,9 @@
         </aside>
 
         <aside class="wiki-card" id="wiki-card" aria-labelledby="wiki-heading">
-          <div class="wiki-topline"><span class="wiki-dot" aria-hidden="true"></span><span class="demo-label">KNOWLEDGE GLANCE</span></div>
+          <div class="wiki-topline"><span class="wiki-dot" aria-hidden="true"></span></div>
           <h2 id="wiki-heading">Look it up on Wikipedia</h2>
-          <p class="wiki-description">Search Wikipedia — only your query leaves this device. Fetched on Search, cached offline.</p>
+          <p class="wiki-description">Only your query leaves this device. Cached offline.</p>
           <form id="wiki-form" class="feed-form" novalidate>
             <label class="sr-only" for="wiki-query">Search topic</label>
             <input id="wiki-query" name="query" type="text" maxlength="120" placeholder="Topic, e.g. Kanyakumari" autocomplete="off">
@@ -306,9 +304,9 @@
         </aside>
 
         <aside class="briefing-card" id="browser-address-card" aria-labelledby="browser-address-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">BROWSER ADDRESS</span></div>
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="browser-address-heading">Address-bar preview</h2>
-          <p class="briefing-description">See how Daymark's browser reads what you type — http(s) URLs with an honest security label, Unicode domains, ports, IPv4/IPv6 literals, malformed input, search-provider switching and safe external handoff. Classified locally; nothing loads here.</p>
+          <p class="briefing-description">Classified locally; nothing loads here.</p>
           <form id="browser-address-form" class="feed-form" novalidate>
             <label class="sr-only" for="browser-address-input">Address or search text</label>
             <input id="browser-address-input" name="address" type="text" maxlength="2048" placeholder="URL or search, e.g. example.com" autocomplete="off" aria-describedby="browser-address-status">
@@ -326,9 +324,9 @@
           <div class="feed-list" id="browser-address-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="webhook-heading">Task-completion webhook</h2>
-          <p class="briefing-description">Send task completions to an https:// webhook you choose — Discord, Slack, n8n, or your own script. Opt-in and HTTPS-only; failures queue here and retry. No maintainer backend.</p>
+          <p class="briefing-description">HTTPS-only, opt-in. Failed sends queue and retry.</p>
           <form id="webhook-form" class="feed-form" novalidate>
             <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
             <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
@@ -341,9 +339,9 @@
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
         </aside>
         <aside class="briefing-card" id="data-card" aria-labelledby="data-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">DATA CONTROLS</span></div>
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="data-heading">Your data, explained</h2>
-          <p class="briefing-description">Everything lives only in this browser. Each Clear removes exactly what its row describes, after one confirmation. No network here.</p>
+          <p class="briefing-description">Everything stays in this browser; each Clear asks first.</p>
           <div class="focus-actions" role="group" aria-label="Data controls actions">
             <button class="button button-quiet" id="data-refresh" type="button">Refresh sizes</button>
             <button class="button button-quiet" id="data-clear-all" type="button">Clear all local data</button>

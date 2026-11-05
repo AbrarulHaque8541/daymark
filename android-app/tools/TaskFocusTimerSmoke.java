@@ -47,6 +47,13 @@ public final class TaskFocusTimerSmoke {
         check(timer.isExpiredAt(25L * 60_000L + 10_000L), "countdown expires at its target");
         check(timer.progressPermilleAt(30L * 60_000L + 10_000L) == 1000,
                 "progress is capped after expiry");
+        TaskFocusTimer finishedAtZero = timer.finish(25L * 60_000L + 10_000L);
+        check(finishedAtZero.isFinished() && finishedAtZero.remainingMsAt(90L * 60_000L) == 0L,
+                "finishing at zero freezes the terminal countdown state");
+        check(finishedAtZero.finish(90L * 60_000L) == finishedAtZero,
+                "repeated completion is idempotent and returns the same finished state");
+        check(finishedAtZero.progressPermilleAt(90L * 60_000L) == 1000,
+                "terminal countdown progress stays complete on later renders");
 
         TaskFocusTimer.SavedState saved = timer.save(25L * 60_000L + 10_000L,
                 1_800_000L, 3);

@@ -15,7 +15,7 @@ import java.util.List;
  *
  * <p>Addresses the white-viewport symptom (#221) by making load progress visible and bounded:
  * <ul>
- *   <li>5s after {@code loadUrl} with no {@code onPageStarted}: status hint "Still opening…"</li>
+ *   <li>2s after {@code loadUrl} with no {@code onPageStarted}: status hint "Still opening…"</li>
  *   <li>15s with no {@code onPageFinished}: one automatic reload (if {@link BrowserSelfHealingPolicy} allows)</li>
  *   <li>25s with no {@code onPageFinished}: final "The page did not open" with tap-to-retry callback</li>
  * </ul>
@@ -26,7 +26,10 @@ import java.util.List;
 final class BrowserLoadWatchdog {
     private static final String TAG = "DaymarkBrowser";
     private static final int MAX_EVENTS = 50;
-    private static final long STAGE_HINT_MS = 5_000L;
+    // Owner decision 2026-11-05: 5s of silence after "Opening page…" reads as a slow or
+    // hung browser on the owner's device. Surface the hint at 2s so reassurance arrives
+    // while the load is still establishing. Retry (15s) and fail (25s) stay unchanged.
+    private static final long STAGE_HINT_MS = 2_000L;
     private static final long STAGE_RETRY_MS = 15_000L;
     private static final long STAGE_FAIL_MS = 25_000L;
 
@@ -198,7 +201,7 @@ final class BrowserLoadWatchdog {
             hintFired = true;
             address = pendingAddress;
             record("watchdog-hint: " + address);
-            Log.i(TAG, "watchdog-hint (5s): " + address);
+            Log.i(TAG, "watchdog-hint (2s): " + address);
         }
         if (listener != null) listener.onStageHint(address);
     }

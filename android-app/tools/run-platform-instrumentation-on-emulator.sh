@@ -4,14 +4,29 @@ set -eu
 # Emits the real instrumentation failure lines and the app-local phase log as
 # workflow error annotations so the failing phase/assertion is visible from the
 # public annotations API without sign-in. Pure diagnostics: no check is weakened.
+read_phase_log() {
+  pkg="$1"
+  # adb can remain blocked after an instrumentation process has already failed.
+  # Bound each best-effort read so diagnostics never outlive the test command.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --signal=TERM --kill-after=2s 8s \
+      adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null \
+      | tr -d '\r' || true
+  fi
+  return 0
+}
+
 report_failure() {
   body="$1"
   phase_log="${2:-}"
   if [ -z "$phase_log" ]; then
     for pkg in com.abrar.daymark com.abrar.daymark.debug; do
-      phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
+      phase_log="$(read_phase_log "$pkg")"
       [ -n "$phase_log" ] && break
     done
+  fi
+  if [ -z "$phase_log" ]; then
+    phase_log="INSTRUMENTATION_PHASE_LOG: unavailable (missing file or bounded adb read timed out)."
   fi
   {
     printf '%s\n' "$body" | grep -E 'INSTRUMENTATION_|AssertionError|Exception|Error|failed' | tail -n 6
@@ -49,9 +64,12 @@ output="$(cat "$instrumentation_output")"
 if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
   phase_log=""
   for pkg in com.abrar.daymark com.abrar.daymark.debug; do
-    phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
+    phase_log="$(read_phase_log "$pkg")"
     [ -n "$phase_log" ] && break
   done
+  if [ -z "$phase_log" ]; then
+    phase_log="INSTRUMENTATION_PHASE_LOG: unavailable (missing file or bounded adb read timed out)."
+  fi
   printf '%s\n' "$phase_log" >"$phase_log_path"
   output="${output}
 INSTRUMENTATION_ERROR: host command exceeded its 300-second timeout (exit $instrument_status)."

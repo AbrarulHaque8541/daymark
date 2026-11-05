@@ -1442,7 +1442,6 @@ public final class MainActivity extends Activity {
         // DEMO SUGGESTION home card removed (#225); ranking still available in task list.
         // addSuggestionCard(content);
         addTaskSection(content);
-        addLocalStorageNote(content);
 
         browserScreen = buildBrowserScreen();
         browserScreen.setVisibility(View.GONE);
@@ -1649,6 +1648,14 @@ public final class MainActivity extends Activity {
         storageStatus = text("Opening encrypted storage…", 11, palette.muted, Typeface.NORMAL);
         storageStatus.setGravity(Gravity.CENTER_VERTICAL);
         storageStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        storageStatus.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
+                storageStatus.setVisibility("Encrypted storage ready".contentEquals(text)
+                        ? View.GONE : View.VISIBLE);
+            }
+            @Override public void afterTextChanged(Editable text) { }
+        });
         statusRow.addView(storageStatus, new LinearLayout.LayoutParams(0, dp(28), 1f));
 
         cancelAttachmentButton = compactButton("Cancel", true);
@@ -1739,7 +1746,7 @@ public final class MainActivity extends Activity {
         addDetailsButton = null;
         captureFeedback = text(powerMode
                         ? "Power path adds search, filters, and ranked demo suggestions. It uses the same tasks."
-                        : "New tasks start with no due date and medium priority. You can change both later.",
+                        : "",
                 12, palette.muted, Typeface.NORMAL);
         captureFeedback.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         taskActions.addView(captureFeedback);
@@ -5066,14 +5073,6 @@ public final class MainActivity extends Activity {
     }
 
     private View emptyStateView;
-
-    private void addLocalStorageNote(LinearLayout content) {
-        TextView note = text("Tasks and attachments stay encrypted in this app on this device. No cloud sync or automatic backup.",
-                12, palette.muted, Typeface.NORMAL);
-        note.setGravity(Gravity.CENTER);
-        note.setPadding(dp(4), dp(10), dp(4), dp(6));
-        content.addView(note);
-    }
 
     private void addUndoBar() {
         undoBar = new LinearLayout(this);
