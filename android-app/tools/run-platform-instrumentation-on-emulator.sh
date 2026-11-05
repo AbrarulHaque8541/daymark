@@ -1,6 +1,26 @@
 #!/usr/bin/env sh
 set -eu
 
+# Emits the real instrumentation failure lines and the app-local phase log as
+# workflow error annotations so the failing phase/assertion is visible from the
+# public annotations API without sign-in. Pure diagnostics: no check is weakened.
+report_failure() {
+  body="$1"
+  phase_log=""
+  for pkg in com.abrar.daymark com.abrar.daymark.debug; do
+    phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
+    [ -n "$phase_log" ] && break
+  done
+  {
+    printf '%s\n' "$body" | grep -E 'INSTRUMENTATION_|AssertionError|Exception|Error|failed' | tail -n 6
+    printf '%s\n' "$phase_log" | tail -n 10
+  } | tail -n 14 | while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    msg="$(printf '%s' "$line" | cut -c1-200 | sed 's/%/%25/g; s/\r//g; s/::/%3A%3A/g')"
+    printf '::error title=instrumentation-diagnostics::%s\n' "$msg"
+  done
+}
+
 ./gradlew --no-daemon installGithubSideloadDebug installGithubSideloadDebugAndroidTest
 
 instrumentation="$(adb shell pm list instrumentation | tr -d '\r' | sed -n 's/^instrumentation:\([^ ]*DaymarkPlatformInstrumentation\).*/\1/p' | head -n 1)"
@@ -22,23 +42,3 @@ if [ "$instrument_status" -ne 0 ] \
   report_failure "$output"
   exit 1
 fi
-
-# Emits the real instrumentation failure lines and the app-local phase log as
-# workflow error annotations so the failing phase/assertion is visible from the
-# public annotations API without sign-in. Pure diagnostics: no check is weakened.
-report_failure() {
-  body="$1"
-  phase_log=""
-  for pkg in com.abrar.daymark com.abrar.daymark.debug; do
-    phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
-    [ -n "$phase_log" ] && break
-  done
-  {
-    printf '%s\n' "$body" | grep -E 'INSTRUMENTATION_|AssertionError|Exception|Error|failed' | tail -n 6
-    printf '%s\n' "$phase_log" | tail -n 10
-  } | tail -n 14 | while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    msg="$(printf '%s' "$line" | cut -c1-200 | sed 's/%/%25/g; s/\r//g; s/::/%3A%3A/g')"
-    printf '::error title=instrumentation-diagnostics::%s\n' "$msg"
-  done
-}
