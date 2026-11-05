@@ -32,8 +32,18 @@ fi
 
 echo "Running Android instrumentation component: $instrumentation"
 set +e
-output="$(adb shell am instrument -w -r "$instrumentation" 2>&1)"
-instrument_status=$?
+if command -v timeout >/dev/null 2>&1; then
+  output="$(timeout --kill-after=15s 8m adb shell am instrument -w -r "$instrumentation" 2>&1)"
+  instrument_status=$?
+  if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
+    output="${output}
+INSTRUMENTATION_ERROR: host instrumentation command exceeded its 8-minute timeout."
+  fi
+else
+  echo "WARNING: timeout utility unavailable; running instrumentation without host-side timeout." >&2
+  output="$(adb shell am instrument -w -r "$instrumentation" 2>&1)"
+  instrument_status=$?
+fi
 set -e
 printf '%s\n' "$output"
 if [ "$instrument_status" -ne 0 ] \

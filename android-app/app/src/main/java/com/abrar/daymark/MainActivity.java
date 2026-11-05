@@ -7574,11 +7574,15 @@ public final class MainActivity extends Activity {
                 });
             }
         });
-        dialog.show();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+        Window dialogWindow = dialog.getWindow();
+        if (dialogWindow != null) {
+            if (Build.VERSION.SDK_INT >= 30) {
+                Api30Window.setDecorFits(dialogWindow, true);
+            }
+            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
                     | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         }
+        dialog.show();
         titleInput.requestFocus();
     }
 
@@ -9602,7 +9606,6 @@ public final class MainActivity extends Activity {
         }
     }
 }
-
 
 
 

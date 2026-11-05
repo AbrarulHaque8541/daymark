@@ -544,10 +544,13 @@ final class TaskEditorImeInstrumentation {
         return null;
     }
 
+    private static boolean textMatches(CharSequence value, String expected) {
+        return value != null && expected.equalsIgnoreCase(value.toString().trim());
+    }
+
     private static AccessibilityNodeInfo findByText(AccessibilityNodeInfo root, String text) {
         if (root == null) return null;
-        CharSequence value = root.getText();
-        if (value != null && text.contentEquals(value)) return root;
+        if (textMatches(root.getText(), text)) return root;
         for (int i = 0; i < root.getChildCount(); i++) {
             AccessibilityNodeInfo found = findByText(root.getChild(i), text);
             if (found != null) return found;
@@ -557,8 +560,7 @@ final class TaskEditorImeInstrumentation {
 
     private static AccessibilityNodeInfo findClickableByText(AccessibilityNodeInfo root, String text) {
         if (root == null) return null;
-        CharSequence value = root.getText();
-        if (value != null && text.contentEquals(value)) {
+        if (textMatches(root.getText(), text)) {
             AccessibilityNodeInfo node = root;
             while (node != null && !node.isClickable()) node = node.getParent();
             if (node != null) return node;
