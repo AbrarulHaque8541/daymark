@@ -240,11 +240,10 @@ assert "webGoButton.setOnClickListener(view -> navigateFromInput())" in activity
 assert "browserNetworkPolicy = new BrowserNetworkPolicy(readBrowserOnlinePreference());" in activity
 network_policy = (main / "java/com/abrar/daymark/BrowserNetworkPolicy.java").read_text(encoding="utf-8")
 online_pref = activity.split("private boolean readBrowserOnlinePreference()", 1)[1].split("private boolean readSafeBrowsingPreference()", 1)[0]
-assert "static final boolean DEFAULT_ONLINE_ENABLED = false;" in network_policy, "fresh installs must default to Offline"
-assert "getBoolean(BROWSER_ONLINE_ENABLED_KEY, false)" in online_pref and "getBoolean(BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY, false)" in online_pref
-assert "BrowserNetworkPolicy.hasExplicitOptIn(savedOnlineChoice, explicitConsent)" in online_pref, "restoration must require the current explicit-consent marker"
-assert "browserPreferences.edit().remove(BROWSER_ONLINE_ENABLED_KEY).apply();" in online_pref, "legacy implicit Online state must be discarded, not migrated"
-assert "browserPreferences.edit().putBoolean" not in online_pref, "preference reads must never grant Online automatically"
+assert "static final boolean DEFAULT_ONLINE_ENABLED = true;" in network_policy, "fresh installs must default to Online like mainstream browsers (owner decision 2026-11-05)"
+assert "getBoolean(BROWSER_ONLINE_ENABLED_KEY," in online_pref and "BrowserNetworkPolicy.DEFAULT_ONLINE_ENABLED" in online_pref, "preference reads must fall back to the Online default"
+assert ".remove(BROWSER_ONLINE_ENABLED_KEY)" in online_pref and ".remove(BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY)" in online_pref, "a corrupt preference must reset to the Online default instead of trusting stale state"
+assert "browserPreferences.edit().putBoolean" not in online_pref, "preference reads must never write the Online choice"
 assert "static boolean hasExplicitOptIn(boolean savedOnlineChoice, boolean savedConsent)" in network_policy
 assert "browserOnlineToggle = null;" in activity and "Internet access is requested when you search or open a site." in activity, "browser UI must not expose an Online/Offline toggle"
 assert "new CheckBox(this)" not in activity[activity.index("private View buildBrowserAddressBar()"):activity.index("private void navigateFromBrowserInput()")], "address bar must not create an Online/Offline checkbox"
@@ -592,7 +591,7 @@ print("PASS encrypted task-store policy: writer and reader share invalid/duplica
 print("PASS lifecycle policy: task/storage/attachment/browser callbacks are suppressed after Activity destruction")
 print("PASS portable backup policy: bounded AES-GCM format, SAF create-only export, snapshot-last restore journal")
 print("PASS task/browser separation: web input does not create tasks or receive task-draft prefill")
-print("PASS browser policy: fresh installs Offline; legacy implicit Online is rejected; explicit disclosure opt-in is required; HTTP/HTTPS navigation still requires a separate Go/site tap")
+print("PASS browser policy: fresh installs Online like mainstream browsers; a saved Offline choice still fails closed behind the explicit Enable Online disclosure; HTTP/HTTPS navigation still requires a separate Go/site tap")
 print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, downgrade guard, no JS bridge/interceptor; HTTP runtime and visible label NOT TESTED")
 print("PASS browser settings: Safe Browsing defaults on, confirmed opt-out persists, and current/future WebViews track the preference")
 print("PASS WebView source security: Safe Browsing, mixed-content/file-access restrictions, SSL cancel, site permission denial, pop-up/download handling")
