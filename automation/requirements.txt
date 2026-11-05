@@ -1,0 +1,2 @@
+mistralai-workflows[mistralai]>=3.10
+pydantic>=2.5
