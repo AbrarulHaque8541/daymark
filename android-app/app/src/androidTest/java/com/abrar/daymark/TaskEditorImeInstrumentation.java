@@ -26,7 +26,9 @@ import java.util.UUID;
 final class TaskEditorImeInstrumentation {
     private static final String EDITOR_TITLE = "Add task details";
     private static final String TITLE_FIELD_DESCRIPTION = "Task name. You can edit this before saving.";
+    /** API 29 emulators can take longer for storage readiness + dialog a11y tree. */
     private static final long WAIT_MS = 15000L;
+    private static final long OPEN_RETRY_MS = 400L;
 
     private TaskEditorImeInstrumentation() { }
 
@@ -86,7 +88,6 @@ final class TaskEditorImeInstrumentation {
     private static void openEditor(Instrumentation instrumentation, Activity activity, int[] assertions)
             throws Exception {
         View[] addTask = { null };
-        boolean[] opened = { false };
         boolean[] enabled = { false };
         long deadline = SystemClock.uptimeMillis() + WAIT_MS;
         while (SystemClock.uptimeMillis() < deadline && !enabled[0]) {
@@ -95,14 +96,33 @@ final class TaskEditorImeInstrumentation {
                 addTask[0] = findTextView(activity.getWindow().getDecorView(), "Add task");
                 if (addTask[0] != null && addTask[0].isEnabled()) {
                     enabled[0] = true;
-                    opened[0] = addTask[0].performClick();
-                    SystemClock.sleep(200L);
                 }
             });
             if (!enabled[0]) SystemClock.sleep(50L);
         }
-        require(addTask[0] != null && enabled[0] && opened[0],
-                "the Add task button becomes enabled after storage loads and opens the full editor", assertions);
+        require(addTask[0] != null && enabled[0],
+                "the Add task button becomes enabled after storage loads", assertions);
+
+        // Retry click + dialog appearance: API 29 a11y tree and first paint can lag.
+        long openDeadline = SystemClock.uptimeMillis() + WAIT_MS;
+        AccessibilityNodeInfo root = null;
+        while (SystemClock.uptimeMillis() < openDeadline && root == null) {
+            instrumentation.runOnMainSync(() -> {
+                View btn = findTextView(activity.getWindow().getDecorView(), "Add task");
+                if (btn != null && btn.isEnabled()) {
+                    btn.performClick();
+                }
+            });
+            instrumentation.waitForIdleSync();
+            SystemClock.sleep(OPEN_RETRY_MS);
+            root = findDialogRoot(instrumentation, EDITOR_TITLE);
+            if (root == null) {
+                // Secondary signal: title field content description may appear before title text.
+                root = findDialogRootByDescription(instrumentation, TITLE_FIELD_DESCRIPTION);
+            }
+        }
+        require(root != null, "the Add task button opens the full editor dialog", assertions);
+        // Ensure the canonical title is eventually visible for subsequent steps.
         awaitDialogRoot(instrumentation, EDITOR_TITLE);
     }
 
@@ -323,10 +343,20 @@ final class TaskEditorImeInstrumentation {
         return null;
     }
 
+    private static AccessibilityNodeInfo findDialogRootByDescription(Instrumentation instrumentation,
+                                                                     String description) {
+        List<AccessibilityWindowInfo> windows = instrumentation.getUiAutomation().getWindows();
+        for (AccessibilityWindowInfo window : windows) {
+            AccessibilityNodeInfo root = window.getRoot();
+            if (root != null && findByDescription(root, description) != null) return root;
+        }
+        return null;
+    }
+
     private static AccessibilityNodeInfo findByText(AccessibilityNodeInfo root, String text) {
         if (root == null) return null;
         CharSequence value = root.getText();
-        if (value != null && (text.contentEquals(value) || value.toString().trim().equals(text) || value.toString().contains(text))) return root;
+        if (value != null && text.contentEquals(value)) return root;
         for (int i = 0; i < root.getChildCount(); i++) {
             AccessibilityNodeInfo found = findByText(root.getChild(i), text);
             if (found != null) return found;
@@ -358,7 +388,7 @@ final class TaskEditorImeInstrumentation {
     private static View findTextView(View root, String text) {
         if (root instanceof TextView) {
             CharSequence value = ((TextView) root).getText();
-            if (value != null && (text.contentEquals(value) || value.toString().trim().equals(text) || value.toString().contains(text))) return root;
+            if (value != null && text.contentEquals(value)) return root;
         }
         if (root instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) root;
@@ -385,7 +415,9 @@ final class TaskEditorImeInstrumentation {
     }
 
     private static void require(boolean condition, String message, int[] assertions) {
-        if (!condition) throw new AssertionError(message);
+        if (!condition) {
+            throw new AssertionError(message);
+        }
         assertions[0]++;
     }
 }
