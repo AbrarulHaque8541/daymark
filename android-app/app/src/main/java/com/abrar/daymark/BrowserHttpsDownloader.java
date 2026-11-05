@@ -28,8 +28,6 @@ final class BrowserHttpsDownloader {
     private static final int CONNECT_TIMEOUT_MILLIS = 15_000;
     private static final int READ_TIMEOUT_MILLIS = 30_000;
     private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
-    private static final Set<String> SENSITIVE_HEADERS = new HashSet<>(Arrays.asList(
-            "authorization", "proxy-authorization", "cookie", "cookie2"));
     private static final Set<String> MANAGED_HEADERS = new HashSet<>(Arrays.asList(
             "connection", "content-length", "host", "keep-alive", "proxy-connection",
             "te", "trailer", "transfer-encoding", "upgrade"));
@@ -71,9 +69,9 @@ final class BrowserHttpsDownloader {
 
     /**
      * Streams an HTTPS response into a caller-owned staging destination. Every redirect
-     * target is revalidated before opening a connection. Credentials are preserved only
-     * while redirects remain on the same HTTPS origin and are permanently removed after
-     * the first origin change.
+     * target is revalidated before opening a connection. Caller-supplied headers remain
+     * on same-origin redirects only; the first cross-origin redirect permanently removes
+     * all of them, including custom credential headers.
      */
     long download(String sourceUrl, Map<String, String> requestHeaders,
                   OutputStream destination, OnlineGate onlineGate) throws DownloadException {
@@ -110,7 +108,7 @@ final class BrowserHttpsDownloader {
                                 "The HTTPS download redirect was missing or exceeded the five-hop limit.");
                     }
                     URL next = resolveRedirect(current, location);
-                    if (!sameOrigin(current, next)) stripSensitiveHeaders(headers);
+                    if (!sameOrigin(current, next)) stripAllCallerHeaders(headers);
                     redirects++;
                     connection.disconnect();
                     connection = null;
@@ -218,9 +216,8 @@ final class BrowserHttpsDownloader {
         return false;
     }
 
-    private static void stripSensitiveHeaders(Map<String, String> headers) {
-        headers.entrySet().removeIf(entry ->
-                SENSITIVE_HEADERS.contains(entry.getKey().toLowerCase(Locale.ROOT)));
+    private static void stripAllCallerHeaders(Map<String, String> headers) {
+        headers.clear();
     }
 
     private static boolean sameOrigin(URL first, URL second) {

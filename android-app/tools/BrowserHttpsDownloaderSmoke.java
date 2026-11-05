@@ -108,18 +108,33 @@ public final class BrowserHttpsDownloaderSmoke {
         new BrowserHttpsDownloader(factory).download("https://start.example.test/file",
                 Map.of("Cookie", "session=secret", "Authorization", "Bearer secret",
                         "Proxy-Authorization", "proxy-secret", "Cookie2", "legacy=secret",
-                        "User-Agent", "Daymark-Test/1"), new ByteArrayOutputStream(), () -> true);
+                        "X-Api-Key", "custom-secret", "X-Auth-Token", "token-secret",
+                        "User-Agent", "Daymark-Test/1"),
+                new ByteArrayOutputStream(), () -> true);
 
         check("session=secret".equals(first.header("cookie")), "credentials are available on the original origin");
+        check("Daymark-Test/1".equals(first.header("user-agent")),
+                "caller headers are available on the original origin");
+        check("custom-secret".equals(first.header("x-api-key")),
+                "custom credential header is available on the original origin");
+        check("token-secret".equals(first.header("x-auth-token")),
+                "custom auth-token header is available on the original origin");
         check(crossOrigin.header("cookie") == null && crossOrigin.header("authorization") == null
                         && crossOrigin.header("proxy-authorization") == null
                         && crossOrigin.header("cookie2") == null,
                 "all cookie and authorization headers are stripped on a cross-origin hop");
+        check(crossOrigin.header("x-api-key") == null,
+                "custom credential header is absent on the CDN hop");
+        check(crossOrigin.header("x-auth-token") == null,
+                "custom auth-token header is absent on the CDN hop");
         check(returned.header("cookie") == null && returned.header("authorization") == null,
                 "credentials remain stripped if a later redirect returns to the first origin");
-        check("Daymark-Test/1".equals(crossOrigin.header("user-agent"))
-                        && "Daymark-Test/1".equals(returned.header("user-agent")),
-                "non-credential request headers continue across origins");
+        check(returned.header("x-api-key") == null,
+                "custom credential header remains absent after returning to the original origin");
+        check(returned.header("x-auth-token") == null,
+                "custom auth-token header remains absent after returning to the original origin");
+        check(crossOrigin.header("user-agent") == null && returned.header("user-agent") == null,
+                "all caller headers remain stripped after crossing and returning to the original origin");
     }
 
     private static void rejectsUnsafeRedirectTargets() throws Exception {

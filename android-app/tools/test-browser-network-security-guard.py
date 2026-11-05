@@ -68,7 +68,11 @@ mutate_and_expect_failure(
     "connection.setInstanceFollowRedirects(false);",
     "connection.setInstanceFollowRedirects(true);", "automatic downloader redirects")
 mutate_and_expect_failure(
+    "app/src/main/java/com/abrar/daymark/BrowserHttpsDownloader.java",
+    "headers.clear();", 'headers.remove("Authorization");',
+    "preserving arbitrary caller headers after a cross-origin redirect")
+mutate_and_expect_failure(
     "app/src/main/java/com/abrar/daymark/DaymarkWebView.java",
     "handler.cancel();", "handler.proceed();", "accepting WebView TLS errors")
 
-print("PASS browser network/security guard mutations: manifest, redirect, TLS")
+print("PASS browser network/security guard mutations: manifest, redirect, caller headers, TLS")

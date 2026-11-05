@@ -39,8 +39,8 @@ client_path = java / "BrowserHttpsDownloader.java"
 client = client_path.read_text(encoding="utf-8")
 for marker in ("HttpsURLConnection", "MAX_REDIRECTS = 5",
                "connection.setInstanceFollowRedirects(false)", "validateHttpsUrl(",
-               "resolveRedirect(", "sameOrigin(", "stripSensitiveHeaders(",
-               '"authorization", "proxy-authorization", "cookie", "cookie2"',
+               "resolveRedirect(", "sameOrigin(", "stripAllCallerHeaders(headers)",
+               "headers.clear();",
                "requireOnline(onlineGate)", "connection.setUseCaches(false)"):
     assert marker in client, f"browser HTTPS downloader missing security contract: {marker}"
 for forbidden in ("setInstanceFollowRedirects(true)", "TrustManager", "HostnameVerifier",
@@ -83,7 +83,11 @@ for marker in ("final committed HTTP page is labelled Not encrypted",
     assert marker in policy_test, f"missing browser HTTP policy regression: {marker}"
 for marker in ("stripsCredentialsAfterCrossingOrigins", "rejectsUnsafeRedirectTargets",
                "capsRedirectsAtFiveHops", "honorsOnlineAndOfflineTransitions",
-               "same-origin redirect", "credentials remain stripped"):
+               "same-origin redirect", "credentials remain stripped", "X-Api-Key", "X-Auth-Token",
+               "custom credential header is absent on the CDN hop",
+               "custom credential header remains absent after returning to the original origin",
+               "custom auth-token header is absent on the CDN hop",
+               "custom auth-token header remains absent after returning to the original origin"):
     assert marker in download_test, f"missing downloader redirect/cookie/offline test: {marker}"
 
 issues_test = (root / "tools/GitHubPublicIssuesClientSmoke.java").read_text(encoding="utf-8")
