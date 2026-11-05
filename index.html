@@ -100,6 +100,7 @@
           </select>
           <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
         </form>
+        <p id="new-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
         <div class="date-chips" aria-label="Quick due dates">
           <button class="date-chip" id="chip-today" type="button">Today</button>
           <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
@@ -366,6 +367,7 @@
         <div><label class="field-label" for="edit-due-date">Due date <span>(optional)</span></label><input id="edit-due-date" name="dueDate" type="date"></div>
         <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
       </div>
+      <p id="edit-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
       <div class="dialog-fields">
         <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">At due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
         <div><label class="field-label" for="edit-priority">Priority</label><select id="edit-priority" name="priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
