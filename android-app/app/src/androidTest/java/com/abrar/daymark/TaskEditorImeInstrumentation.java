@@ -210,8 +210,8 @@ final class TaskEditorImeInstrumentation {
         root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
-        AccessibilityNodeInfo cancel = findByText(root, "Cancel");
-        AccessibilityNodeInfo add = findByText(root, "Add task");
+        AccessibilityNodeInfo cancel = findClickableByText(root, "Cancel");
+        AccessibilityNodeInfo add = findClickableByText(root, "Add task");
         require(cancel != null && cancel.isClickable(), "the Cancel dialog action is present and clickable", assertions);
         require(add != null && add.isClickable(), "the Add Task dialog action is present and clickable", assertions);
         if (imeBounds != null) {
@@ -247,7 +247,7 @@ final class TaskEditorImeInstrumentation {
     private static void tapDialogAction(Instrumentation instrumentation, String dialogTitle, String label,
                                         int[] assertions) throws Exception {
         AccessibilityNodeInfo root = awaitDialogRoot(instrumentation, dialogTitle);
-        AccessibilityNodeInfo button = findByText(root, label);
+        AccessibilityNodeInfo button = findClickableByText(root, label);
         require(button != null && button.isClickable(), label + " action is clickable before tapping", assertions);
         Rect bounds = new Rect();
         button.getBoundsInScreen(bounds);
@@ -300,13 +300,13 @@ final class TaskEditorImeInstrumentation {
         });
         require(actions[0] != null && opened[0], "the saved test task exposes its actions", assertions);
         AccessibilityNodeInfo actionRoot = awaitDialogRootContaining(instrumentation, title, "Delete task");
-        AccessibilityNodeInfo deleteItem = findByText(actionRoot, "Delete task");
+        AccessibilityNodeInfo deleteItem = findClickableByText(actionRoot, "Delete task");
         require(deleteItem != null && deleteItem.isClickable(), "the task action list offers Delete task", assertions);
         require(tapNode(instrumentation, deleteItem), "the test task Delete action accepts a touch or accessibility click", assertions);
 
         AccessibilityNodeInfo confirmation = awaitDialogRootContaining(
                 instrumentation, "Delete this task?", "Delete task");
-        AccessibilityNodeInfo confirmButton = findByText(confirmation, "Delete task");
+        AccessibilityNodeInfo confirmButton = findClickableByText(confirmation, "Delete task");
         require(confirmButton != null && confirmButton.isClickable(), "the delete confirmation is available", assertions);
         require(tapNode(instrumentation, confirmButton), "the delete confirmation accepts a touch or accessibility click", assertions);
         awaitDialogGone(instrumentation, "Delete this task?");
@@ -444,6 +444,12 @@ final class TaskEditorImeInstrumentation {
             if (found != null) return found;
         }
         return null;
+    }
+
+    private static AccessibilityNodeInfo findClickableByText(AccessibilityNodeInfo root, String text) {
+        AccessibilityNodeInfo node = findByText(root, text);
+        while (node != null && !node.isClickable()) node = node.getParent();
+        return node;
     }
 
     private static AccessibilityNodeInfo findByDescription(AccessibilityNodeInfo root, String description) {
