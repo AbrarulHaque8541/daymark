@@ -31,7 +31,6 @@ final class TaskEditorImeInstrumentation {
     private static final String TITLE_FIELD_DESCRIPTION = "Task name. You can edit this before saving.";
     /** API 29 emulators can take longer for storage readiness + dialog a11y tree. */
     private static final long WAIT_MS = 15000L;
-    private static final long OPEN_RETRY_MS = 400L;
 
     private TaskEditorImeInstrumentation() { }
 
@@ -153,23 +152,27 @@ final class TaskEditorImeInstrumentation {
         require(addTask[0] != null && enabled[0],
                 "the visible Add task button becomes enabled after storage loads", assertions);
 
-        // Retry click + dialog appearance: API 29 a11y tree and first paint can lag.
+        // Click only once: repeated clicks can stack dialogs while API 29 a11y is delayed.
+        boolean[] clicked = { false };
+        instrumentation.runOnMainSync(() -> {
+            View btn = addTask[0];
+            if (btn != null && btn.isShown() && btn.isEnabled()) {
+                clicked[0] = btn.performClick();
+            }
+        });
+        require(clicked[0], "the ready Add task button accepts one click", assertions);
+
+        // Wait for either accessibility signal; do not retry the click while the tree publishes.
         long openDeadline = SystemClock.uptimeMillis() + WAIT_MS;
         AccessibilityNodeInfo root = null;
         while (SystemClock.uptimeMillis() < openDeadline && root == null) {
-            instrumentation.runOnMainSync(() -> {
-                View btn = findTextView(activity.getWindow().getDecorView(), "Add task");
-                if (btn != null && btn.isShown() && btn.isEnabled()) {
-                    btn.performClick();
-                }
-            });
             instrumentation.waitForIdleSync();
-            SystemClock.sleep(OPEN_RETRY_MS);
             root = findDialogRoot(instrumentation, EDITOR_TITLE);
             if (root == null) {
                 // Secondary signal: title field content description may appear before title text.
                 root = findDialogRootByDescription(instrumentation, TITLE_FIELD_DESCRIPTION);
             }
+            if (root == null) SystemClock.sleep(50L);
         }
         require(root != null, "the Add task button opens the full editor dialog", assertions);
         // Ensure the canonical title is eventually visible for subsequent steps.
