@@ -624,3 +624,21 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .wiki-item:hover { border-color: rgba(42, 143, 122, .5); }
   .wiki-item-link { color: #7ee0cb; }
 }
+
+/* Currency glance: keep the converted value and its Copy button side by side. */
+.currency-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.currency-result-row .currency-now {
+  flex: 1;
+  min-width: 0;
+}
+.tool-button.currency-copy {
+  flex: none;
+  white-space: nowrap;
+}
+.tool-button.currency-copy[hidden] {
+  display: none;
+}
