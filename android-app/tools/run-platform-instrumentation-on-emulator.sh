@@ -6,11 +6,13 @@ set -eu
 # public annotations API without sign-in. Pure diagnostics: no check is weakened.
 report_failure() {
   body="$1"
-  phase_log=""
-  for pkg in com.abrar.daymark com.abrar.daymark.debug; do
-    phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
-    [ -n "$phase_log" ] && break
-  done
+  phase_log="${2:-}"
+  if [ -z "$phase_log" ]; then
+    for pkg in com.abrar.daymark com.abrar.daymark.debug; do
+      phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
+      [ -n "$phase_log" ] && break
+    done
+  fi
   {
     printf '%s\n' "$body" | grep -E 'INSTRUMENTATION_|AssertionError|Exception|Error|failed' | tail -n 6
     printf '%s\n' "$phase_log" | tail -n 10
@@ -31,20 +33,35 @@ if [ -z "$instrumentation" ]; then
 fi
 
 echo "Running Android instrumentation component: $instrumentation"
+instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
+phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 set +e
 if command -v timeout >/dev/null 2>&1; then
-  output="$(timeout --kill-after=15s 8m adb shell am instrument -w -r "$instrumentation" 2>&1)"
+  timeout --signal=TERM --kill-after=10s 300s adb shell am instrument -w -r "$instrumentation" >"$instrumentation_output" 2>&1
   instrument_status=$?
-  if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
-    output="${output}
-INSTRUMENTATION_ERROR: host instrumentation command exceeded its 8-minute timeout."
-  fi
 else
   echo "WARNING: timeout utility unavailable; running instrumentation without host-side timeout." >&2
-  output="$(adb shell am instrument -w -r "$instrumentation" 2>&1)"
+  adb shell am instrument -w -r "$instrumentation" >"$instrumentation_output" 2>&1
   instrument_status=$?
 fi
 set -e
+output="$(cat "$instrumentation_output")"
+if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
+  phase_log=""
+  for pkg in com.abrar.daymark com.abrar.daymark.debug; do
+    phase_log="$(adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null | tr -d '\r' || true)"
+    [ -n "$phase_log" ] && break
+  done
+  printf '%s\n' "$phase_log" >"$phase_log_path"
+  output="${output}
+INSTRUMENTATION_ERROR: host command exceeded its 300-second timeout (exit $instrument_status)."
+  printf '%s\n' "$output"
+  echo "::group::instrumentation-phases.log captured after instrumentation timed out at 300 seconds"
+  cat "$phase_log_path"
+  echo "::endgroup::"
+  report_failure "$output" "$phase_log"
+  exit 1
+fi
 printf '%s\n' "$output"
 if [ "$instrument_status" -ne 0 ] \
    || ! printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: result=passed' \
