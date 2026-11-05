@@ -1,0 +1,23 @@
+# Normalize line endings for the cross-platform contract tests.
+#
+# The platform-contract workflow runs `npm test` on both ubuntu-24.04 and
+# windows-2025. Without this file, a Windows checkout converts text files to
+# CRLF, so the two runners read different bytes for the same commit and any
+# newline-sensitive assertion becomes runner-dependent (the Shared contracts
+# windows-2025 job failed on 2026-11-05 while the identical ubuntu job passed).
+# Pinning text files to LF makes the fixtures byte-identical on every runner.
+# Added during the PR #571 Windows CI investigation.
+* text=auto eol=lf
+
+# Binaries are never normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.jar binary
+*.zip binary
+*.apk binary
+*.keystore binary
+*.jks binary
