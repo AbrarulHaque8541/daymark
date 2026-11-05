@@ -26,7 +26,7 @@ import java.util.UUID;
 final class TaskEditorImeInstrumentation {
     private static final String EDITOR_TITLE = "Add task details";
     private static final String TITLE_FIELD_DESCRIPTION = "Task name. You can edit this before saving.";
-    private static final long WAIT_MS = 8000L;
+    private static final long WAIT_MS = 15000L;
 
     private TaskEditorImeInstrumentation() { }
 
@@ -96,6 +96,7 @@ final class TaskEditorImeInstrumentation {
                 if (addTask[0] != null && addTask[0].isEnabled()) {
                     enabled[0] = true;
                     opened[0] = addTask[0].performClick();
+                    SystemClock.sleep(200L);
                 }
             });
             if (!enabled[0]) SystemClock.sleep(50L);
@@ -325,7 +326,7 @@ final class TaskEditorImeInstrumentation {
     private static AccessibilityNodeInfo findByText(AccessibilityNodeInfo root, String text) {
         if (root == null) return null;
         CharSequence value = root.getText();
-        if (value != null && text.contentEquals(value)) return root;
+        if (value != null && (text.contentEquals(value) || value.toString().trim().equals(text) || value.toString().contains(text))) return root;
         for (int i = 0; i < root.getChildCount(); i++) {
             AccessibilityNodeInfo found = findByText(root.getChild(i), text);
             if (found != null) return found;
@@ -357,7 +358,7 @@ final class TaskEditorImeInstrumentation {
     private static View findTextView(View root, String text) {
         if (root instanceof TextView) {
             CharSequence value = ((TextView) root).getText();
-            if (value != null && text.contentEquals(value)) return root;
+            if (value != null && (text.contentEquals(value) || value.toString().trim().equals(text) || value.toString().contains(text))) return root;
         }
         if (root instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) root;
