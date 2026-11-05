@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/focus-timer-emulator.yml"
       - "android-app/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
+      - "android-app/app/src/androidTest/java/com/abrar/daymark/TaskEditorImeInstrumentation.java"
       - "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java"
       - "android-app/app/src/main/java/com/abrar/daymark/UiMotionPolicy.java"
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusSessionRuntime.java"
@@ -14,6 +15,7 @@ on:
       - "android-app/app/build.gradle.kts"
       - "android-app/tools/check-v1-source.sh"
       - "android-app/tools/run-core-tests.sh"
+      - "android-app/tools/run-platform-instrumentation-on-emulator.sh"
   workflow_dispatch:
 
 permissions:
@@ -23,7 +25,7 @@ jobs:
   focus-runtime:
     name: Focus runtime API ${{ matrix.api-level }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
