@@ -54,7 +54,8 @@ function fakeEnv(options) {
     'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
-    'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
+    'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' }),
+    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy', hidden: true })
   };
   elements['currency-refresh'].type = 'submit';
   elements['currency-refresh'].form = elements['currency-form'];
@@ -268,6 +269,36 @@ test('swap button exchanges from/to and updates status without auto-refresh', ()
 });
 
 
+test('swap shows inverse of cached reverse pair without a network call', () => {
+  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR', stored: STORED });
+  ui.attachCurrencyUi(env);
+  // Initial render is the cached USD→INR
+  assert.ok(elements['currency-now'].textContent.includes('1 USD = 94.91 INR'));
+  const swap = elements['currency-swap'];
+  const click = { preventDefault() {}, defaultPrevented: false };
+  swap.listeners.find((l) => l.type === 'click').handler(click);
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  // Inverse of 94.91 ≈ 0.010536 — rendered offline, no fetch call.
+  assert.ok(elements['currency-now'].textContent.includes('INR'), 'should show inverted pair');
+  assert.ok(elements['currency-now'].textContent.includes('USD'));
+  assert.ok(elements['currency-status'].textContent.includes('Inverse of cached rate'));
+  assert.ok(elements['currency-status'].textContent.includes('official ECB rate'));
+});
+
+test('amount input live-updates the display from a matching cached rate', () => {
+  const { env, elements } = fakeEnv({ stored: STORED, amount: '1' });
+  ui.attachCurrencyUi(env);
+  assert.ok(elements['currency-now'].textContent.startsWith('1 USD = 94.91 INR'));
+  const inputListeners = elements['currency-amount'].listeners.filter((l) => l.type === 'input');
+  const live = inputListeners[inputListeners.length - 1];
+  assert.ok(live, 'amount field should listen for input');
+  elements['currency-amount'].value = '10';
+  live.handler();
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'), 'display should update from cache without refresh');
+  assert.ok(elements['currency-status'].textContent.startsWith('Cached'), 'status remains the cached note');
+});
+
 test('restores last amount and currency pair from localStorage prefs', () => {
   const prefs = JSON.stringify({ amount: '25', from: 'EUR', to: 'GBP' });
   const { env, elements, storageData } = fakeEnv({});
@@ -298,19 +329,17 @@ test('persists prefs on swap and on input change', () => {
   assert.equal(saved.to, 'USD');
 });
 
-test('swap shows inverse of cached reverse pair without a network call', () => {
-  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR', stored: STORED });
-  ui.attachCurrencyUi(env);
-  // Initial render is the cached USD→INR
-  assert.ok(elements['currency-now'].textContent.includes('1 USD = 94.91 INR'));
-  const swap = elements['currency-swap'];
-  const click = { preventDefault() {}, defaultPrevented: false };
-  swap.listeners.find((l) => l.type === 'click').handler(click);
-  assert.equal(elements['currency-from'].value, 'INR');
-  assert.equal(elements['currency-to'].value, 'USD');
-  // Inverse of 94.91 ≈ 0.010536
-  assert.ok(elements['currency-now'].textContent.includes('INR'), 'should show inverted pair');
-  assert.ok(elements['currency-now'].textContent.includes('USD'));
-  assert.ok(elements['currency-status'].textContent.includes('Inverse of cached rate'));
-  assert.ok(elements['currency-status'].textContent.includes('official ECB rate'));
+test('copy button copies the main conversion line and updates status', async () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  let copied = null;
+  env.clipboard = { writeText: async (text) => { copied = text; } };
+  const handle = ui.attachCurrencyUi(env);
+  const copy = elements['currency-copy'];
+  assert.ok(copy.listeners.some((l) => l.type === 'click'), 'copy button should listen for clicks');
+  assert.equal(copy.hidden, false, 'copy button should be visible when a result is shown');
+  const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+  await copy.listeners.find((l) => l.type === 'click').handler(click);
+  assert.equal(copied, '1 USD = 94.91 INR');
+  assert.ok(elements['currency-status'].textContent.includes('Copied'));
+  assert.equal(click.prevented, true);
 });

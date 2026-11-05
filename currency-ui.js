@@ -38,12 +38,22 @@
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
+    const copyEl = element('currency-copy');
 
     let busy = false;
     let cached = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+
+    function updateCopyVisibility() {
+      if (!copyEl) return;
+      const hasResult = nowEl && nowEl.textContent && nowEl.textContent.trim().length > 0;
+      if (typeof copyEl.hidden !== 'undefined') copyEl.hidden = !hasResult;
+      if (copyEl.classList && typeof copyEl.classList.toggle === 'function') {
+        copyEl.classList.toggle('is-hidden', !hasResult);
+      }
     }
 
     function setBusy(isBusy) {
@@ -88,6 +98,7 @@
       nowEl.textContent = `${amountText} ${cache.from} = ${convertedText} ${cache.to}`
         + ` · 1 ${cache.from} = ${rateText} ${cache.to}`
         + ` · ECB reference rates, as of ${cache.asOfDate}`;
+      updateCopyVisibility();
     }
 
     function readCache() {
@@ -188,8 +199,10 @@
         amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
       ) || 1 : 1);
       status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      updateCopyVisibility();
     } else {
       status('Pick two currencies and tap Refresh.');
+      updateCopyVisibility();
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -214,6 +227,23 @@
       }
     });
 
+    // Live update the display from cache when the amount changes and the pair matches.
+    // No network call; pure offline responsiveness for the common case.
+    if (amountEl && typeof amountEl.addEventListener === 'function') {
+      amountEl.addEventListener('input', () => {
+        if (busy || !cached || !currencyApi) return;
+        const { from, to } = readInputs();
+        if (from !== cached.from || to !== cached.to) return;
+        const amount = currencyApi.normalizeAmount(
+          amountEl.value && typeof amountEl.value === 'string' && amountEl.value.trim()
+            ? amountEl.value
+            : DEFAULT_AMOUNT
+        );
+        if (amount === null) return;
+        render(cached, amount);
+      });
+    }
+
     if (swapEl && typeof swapEl.addEventListener === 'function') {
       swapEl.addEventListener('click', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
@@ -230,7 +260,7 @@
             render(cached, amount);
             status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
           } else if (cached.from === toEl.value && cached.to === fromEl.value) {
-            // Offline inverse of the cached pair — useful glance without a network call.
+            // Offline inverse of the cached pair — a useful glance without a network call.
             const inverseRate = 1 / cached.rate;
             if (Number.isFinite(inverseRate) && inverseRate >= currencyApi.MIN_RATE && inverseRate <= currencyApi.MAX_RATE) {
               const inverseCache = {
@@ -245,10 +275,12 @@
               status('Inverse of cached rate · tap Refresh for the official ECB rate.');
             } else {
               if (nowEl) nowEl.textContent = '';
+              updateCopyVisibility();
               status('Currencies swapped. Tap Refresh for the new rate.');
             }
           } else {
             if (nowEl) nowEl.textContent = '';
+            updateCopyVisibility();
             status('Currencies swapped. Tap Refresh for the new rate.');
           }
         } else {
@@ -257,9 +289,46 @@
       });
     }
 
+    async function onCopy() {
+      if (!nowEl || !nowEl.textContent || !nowEl.textContent.trim()) return;
+      const text = nowEl.textContent.split(' · ')[0].trim(); // main conversion line
+      const clipboard = (win && win.navigator && win.navigator.clipboard) || (env.clipboard);
+      try {
+        if (clipboard && typeof clipboard.writeText === 'function') {
+          await clipboard.writeText(text);
+        } else {
+          // fallback for older environments / tests
+          if (typeof document !== 'undefined' && document.createElement) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+        }
+        const prev = statusEl ? statusEl.textContent : '';
+        status('Copied conversion to clipboard.');
+        setTimeout(() => { if (statusEl && statusEl.textContent === 'Copied conversion to clipboard.') status(prev); }, 1800);
+      } catch (err) {
+        status('Could not copy. Select the text manually.');
+      }
+    }
+
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        onCopy();
+      });
+    }
+
     return {
       onRefresh,
       readCache,
+      onCopy,
       detach() {
         // No document-level listener is registered; the button reference is
         // dropped when the returned handle goes out of scope.
