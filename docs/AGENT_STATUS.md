@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-05T09:53:05Z (repository and CI postmortem)](./CURRENT_STATUS_20261105T095305Z.md)
+
 - [Daymark whole-project engineering status — 2026-11-05T07:37:00Z (Cycle A)](./CURRENT_STATUS_20261105T073700Z.md)
 
 - [Daymark whole-project engineering status — 2026-11-05T04:50:00Z (Cycle B)](./CURRENT_STATUS_20261105T045000Z.md)
@@ -53,7 +55,7 @@
 
 ## Latest reviewed snapshot
 
-- [Daymark whole-project engineering status — 2026-11-05T04:50:00Z (Cycle B)](./CURRENT_STATUS_20261105T045000Z.md)
+- [Daymark engineering status — 2026-11-05T09:53:05Z (repository and CI postmortem)](./CURRENT_STATUS_20261105T095305Z.md)
 
 ## Before acting
 
