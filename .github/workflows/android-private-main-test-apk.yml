@@ -115,6 +115,7 @@ jobs:
       - name: Verify package, source version, and pinned production signer
         run: |
           set -euo pipefail
+          trap 'printf "::error::APK verification failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
           apk='app/build/outputs/apk/githubSideload/release/app-githubSideload-release.apk'
           test -s "$apk"
           apk_bytes="$(stat -c%s "$apk")"
@@ -140,7 +141,7 @@ jobs:
           [[ "$package_id" == 'com.abrar.daymark' ]]
           [[ -n "$expected_name" && "$expected_code" =~ ^[0-9]+$ ]]
           [[ "$version_name" == "$expected_name" && "$version_code" == "$expected_code" ]]
-          grep -q "^launchable-activity: name='com.abrar.daymark.MainActivity'" <<< "$badging"
+          grep -q "^launchable-activity: name='com.abrar.daymark.SplashActivity'" <<< "$badging"
           if grep -q '^application-debuggable' <<< "$badging"; then
             echo '::error::Debuggable APK rejected; a production-signed release variant is required.'
             exit 1
