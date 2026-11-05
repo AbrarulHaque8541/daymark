@@ -697,6 +697,7 @@
     $('#new-reminder').value = '';
     $('#new-repeat').disabled = true;
     $('#new-repeat').value = '';
+    syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
     state.filter = 'all';
     state.query = '';
     $('#task-search').value = '';
@@ -880,7 +881,7 @@
     const target = new Date();
     target.setDate(target.getDate() + offsetDays);
     $('#new-due-date').value = logic.localDateString(target);
-    syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'));
+    syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
   }
 
   function notifyWebhookTaskCompleted(task) {
@@ -1775,7 +1776,7 @@
     }
   }
 
-  function syncDueInputs(dateInput, timeInput, reminderSelect, repeatSelect) {
+  function syncDueInputs(dateInput, timeInput, reminderSelect, repeatSelect, reminderHint) {
     const hasDate = logic.isDateOnly(dateInput.value);
     timeInput.disabled = !hasDate;
     if (timeInput.disabled) timeInput.value = '';
@@ -1787,6 +1788,7 @@
       repeatSelect.disabled = !hasDate;
       if (repeatSelect.disabled) repeatSelect.value = '';
     }
+    if (reminderHint) reminderHint.hidden = !(hasDate && !logic.isTimeOnly(timeInput.value));
   }
 
 
@@ -1925,7 +1927,10 @@
       $('#add-error').hidden = true;
       $('#new-title').removeAttribute('aria-invalid');
     });
-    $('#new-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#new-due-time'), $('#new-reminder'), $('#new-repeat')));
+    $('#new-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint')));
+    const syncNewDueTime = (event) => syncDueInputs($('#new-due-date'), event.currentTarget, $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
+    $('#new-due-time').addEventListener('input', syncNewDueTime);
+    $('#new-due-time').addEventListener('change', syncNewDueTime);
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
       render();
@@ -1956,7 +1961,10 @@
       $('#edit-error').hidden = true;
       $('#edit-title').removeAttribute('aria-invalid');
     });
-    $('#edit-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#edit-due-time'), $('#edit-reminder'), $('#edit-repeat')));
+    $('#edit-due-date').addEventListener('input', (event) => syncDueInputs(event.currentTarget, $('#edit-due-time'), $('#edit-reminder'), $('#edit-repeat'), $('#edit-date-only-reminder-hint')));
+    const syncEditDueTime = (event) => syncDueInputs($('#edit-due-date'), event.currentTarget, $('#edit-reminder'), $('#edit-repeat'), $('#edit-date-only-reminder-hint'));
+    $('#edit-due-time').addEventListener('input', syncEditDueTime);
+    $('#edit-due-time').addEventListener('change', syncEditDueTime);
     $('#add-subtask').addEventListener('click', addSubtaskFromInput);
     $('#new-subtask').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {

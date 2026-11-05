@@ -54,6 +54,11 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
         removeAttribute: (name) => attributes.delete(name),
         querySelector: (childSelector) => element(`${selector} ${childSelector}`),
         focus() {},
+        reset() {
+          if (selector !== '#add-form') return;
+          ['#new-title', '#new-due-date', '#new-due-time', '#new-reminder', '#new-repeat']
+            .forEach((fieldSelector) => { element(fieldSelector).value = ''; });
+        },
         showModal() { this.open = true; },
         close() { this.open = false; }
       });
@@ -103,6 +108,8 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     }
   }
 
+  element('#new-date-only-reminder-hint').hidden = true;
+  element('#edit-date-only-reminder-hint').hidden = true;
   element('#storage-status').classList.add('is-checking');
 
   vm.runInNewContext(APP_SOURCE, {
@@ -416,12 +423,109 @@ test('simultaneous reminders are summarized in one toast instead of overwriting 
     reminderLeadMinutes: 0
   }));
   const { elements, storedValues } = bootApp({ savedValue: JSON.stringify(tasks) });
-
   const toast = elements.get('#toast').textContent;
   assert.match(toast, /First reminder/);
   assert.match(toast, /Second reminder/);
   const savedTasks = JSON.parse(storedValues.get(STORAGE_KEY));
   assert.equal(savedTasks.filter((task) => typeof task.reminderShownFire === 'string').length, 2);
+});
+
+function triggerFormInput(app, selector, value) {
+  const input = app.elements.get(selector);
+  input.value = value;
+  const handlers = app.listeners.get(`${selector}:input`) || [];
+  for (const handler of handlers) handler({ currentTarget: input });
+}
+
+function triggerFormSubmit(app, selector) {
+  const form = app.elements.get(selector);
+  const handlers = app.listeners.get(`${selector}:submit`) || [];
+  for (const handler of handlers) handler({ currentTarget: form, preventDefault() {} });
+}
+
+function triggerTaskEdit(app, taskId) {
+  const handlers = app.listeners.get('#task-list:click') || [];
+  const button = {
+    dataset: { action: 'edit' },
+    closest(selector) {
+      return selector === '[data-task-id]' ? { dataset: { taskId } } : null;
+    }
+  };
+  const target = {
+    closest(selector) {
+      return selector === 'button[data-action]' ? button : null;
+    }
+  };
+  for (const handler of handlers) handler({ target });
+}
+
+
+test('date-only reminder helper uses accessible live-status markup in both forms', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const id of ['new-date-only-reminder-hint', 'edit-date-only-reminder-hint']) {
+    const match = indexSource.match(new RegExp(`<p id="${id}"[^>]*>Date-only reminders use 9:00 AM local time\.</p>`));
+    assert.ok(match, `${id} should contain the date-only reminder disclosure`);
+    assert.match(match[0], /role="status"/);
+    assert.match(match[0], /aria-live="polite"/);
+    assert.match(match[0], /aria-atomic="true"/);
+    assert.match(match[0], /\shidden>/);
+  }
+});
+
+test('add form shows date-only reminder guidance only for a date with no time and saves null time with the selected lead', () => {
+  const app = bootApp({ savedValue: JSON.stringify([]) });
+  const hint = app.elements.get('#new-date-only-reminder-hint');
+  assert.equal(hint.hidden, true);
+
+  triggerFormInput(app, '#new-due-date', '2026-11-20');
+  assert.equal(hint.hidden, false, 'a selected date with a blank time shows the guidance');
+  triggerFormInput(app, '#new-due-time', '09:30');
+  assert.equal(hint.hidden, true, 'entering a time hides the guidance');
+  triggerFormInput(app, '#new-due-time', '');
+  assert.equal(hint.hidden, false, 'clearing the time shows the guidance again');
+  triggerFormInput(app, '#new-due-date', '');
+  assert.equal(hint.hidden, true, 'clearing the date hides the guidance');
+  assert.equal(app.elements.get('#new-due-time').value, '', 'clearing the date also clears the time input');
+
+  triggerFormInput(app, '#new-due-date', '2026-11-20');
+  app.elements.get('#new-title').value = 'Date-only reminder';
+  app.elements.get('#new-reminder').value = '60';
+  triggerFormSubmit(app, '#add-form');
+
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].dueDate, '2026-11-20');
+  assert.equal(saved[0].dueTime, null, 'the 9:00 AM disclosure must not be written as a due time');
+  assert.equal(saved[0].reminderLeadMinutes, 60, 'the selected reminder lead is preserved');
+  assert.equal(hint.hidden, true, 'the helper hides after the add form resets');
+});
+
+test('edit form shows date-only reminder guidance and saves a null time with its selected lead', () => {
+  const task = makeImportTask('date-only-edit', 'Edit reminder');
+  task.dueDate = '2026-11-21';
+  task.dueTime = '14:30';
+  task.reminderLeadMinutes = 30;
+  const app = bootApp({ savedValue: JSON.stringify([task]) });
+  const hint = app.elements.get('#edit-date-only-reminder-hint');
+
+  triggerTaskEdit(app, task.id);
+  assert.equal(hint.hidden, true, 'an existing timed task does not show the guidance');
+  triggerFormInput(app, '#edit-due-time', '');
+  assert.equal(hint.hidden, false, 'removing the due time shows the guidance');
+  triggerFormInput(app, '#edit-due-time', '11:15');
+  assert.equal(hint.hidden, true, 'entering a due time hides the guidance');
+  triggerFormInput(app, '#edit-due-date', '');
+  assert.equal(hint.hidden, true, 'removing the due date hides the guidance');
+  assert.equal(app.elements.get('#edit-due-time').value, '', 'removing the due date clears the time input');
+  triggerFormInput(app, '#edit-due-date', '2026-11-21');
+  assert.equal(hint.hidden, false);
+  app.elements.get('#edit-due-time').value = '';
+  app.elements.get('#edit-reminder').value = '60';
+  triggerFormSubmit(app, '#edit-form');
+
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved[0].dueTime, null, 'date-only edit keeps the saved time null');
+  assert.equal(saved[0].reminderLeadMinutes, 60, 'date-only edit preserves the selected reminder lead');
 });
 
 
