@@ -79,6 +79,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             // Exercise the real Android Keystore, AtomicFile and NotificationManager on API 29 and 36 emulators.
             runPhase("focus-timer-keystore-notification-lifecycle", this::focusTimerKeystoreAndNotificationLifecycle);
             runPhase("main-activity-tabs-transition", this::mainActivityTaskWebTransitionAndRapidToggle);
+            runPhase("task-editor-ime-actions-and-save-cancel", this::taskEditorImeActionsAndSaveCancel);
             result.putString("main_activity_tabs_transition", "passed");
             result.putInt("api_level", android.os.Build.VERSION.SDK_INT);
             marker("all phases passed; " + assertions + " assertions");
@@ -120,6 +121,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     @FunctionalInterface
     private interface PhaseAction {
         void run() throws Exception;
+    }
+
+    private void taskEditorImeActionsAndSaveCancel() throws Exception {
+        assertions += TaskEditorImeInstrumentation.run(this);
     }
 
     /** Exercises actual bottom-nav taps and observable workspace changes on the API 29/36 CI matrix. */

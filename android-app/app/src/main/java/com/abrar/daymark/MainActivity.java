@@ -7576,7 +7576,8 @@ public final class MainActivity extends Activity {
         });
         dialog.show();
         if (dialog.getWindow() != null) {
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         }
         titleInput.requestFocus();
     }
