@@ -2,6 +2,8 @@ package com.abrar.daymark;
 
 import android.app.Activity;
 import android.app.Instrumentation;
+import android.app.UiAutomation;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
@@ -42,6 +44,13 @@ final class TaskEditorImeInstrumentation {
         String savedTitle = token + " saved";
         boolean savedTaskMayExist = false;
         try {
+            UiAutomation automation = instrumentation.getUiAutomation();
+            AccessibilityServiceInfo serviceInfo = automation.getServiceInfo();
+            if (serviceInfo == null) throw new AssertionError("UiAutomation has no accessibility service info.");
+            // UiAutomation.getWindows() returns no interactive windows until this flag is enabled.
+            serviceInfo.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+            automation.setServiceInfo(serviceInfo);
+
             Intent launch = new Intent(instrumentation.getTargetContext(), MainActivity.class);
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             Activity started = instrumentation.startActivitySync(launch);
