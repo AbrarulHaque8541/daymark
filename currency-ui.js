@@ -35,6 +35,7 @@
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
     const swapEl = element('currency-swap');
+    const copyEl = element('currency-copy');
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
@@ -176,12 +177,15 @@
 
     restorePrefs();
     cached = readCache();
-    if (cached) {
-      render(cached, currencyApi ? currencyApi.normalizeAmount(
+    const { from: currentFrom, to: currentTo } = readInputs();
+    if (cached && cached.from === currentFrom && cached.to === currentTo) {
+      const amt = currencyApi ? currencyApi.normalizeAmount(
         amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
-      ) || 1 : 1);
+      ) || 1 : 1;
+      render(cached, amt);
       status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
     } else {
+      if (nowEl) nowEl.textContent = '';
       status('Pick two currencies and tap Refresh.');
     }
 
@@ -229,6 +233,46 @@
         } else {
           status('Currencies swapped. Tap Refresh for the rate.');
         }
+      });
+    }
+
+    function copyResult() {
+      if (!nowEl || !nowEl.textContent) {
+        status('Nothing to copy yet. Refresh first.');
+        return;
+      }
+      const textToCopy = nowEl.textContent.trim();
+      const amountMatch = textToCopy.match(/^([0-9.,]+)\s+[A-Z]{3}\s+=\s+([0-9.,]+)\s+[A-Z]{3}/);
+      const toCopy = amountMatch ? amountMatch[2] : textToCopy;
+      const nav = win && win.navigator ? win.navigator : null;
+
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        nav.clipboard.writeText(toCopy).then(() => {
+          status('Copied converted amount.');
+        }).catch(() => {
+          status('Could not copy. Select the text manually.');
+        });
+      } else if (doc && typeof doc.createElement === 'function') {
+        try {
+          const ta = doc.createElement('textarea');
+          ta.value = toCopy;
+          if (doc.body) doc.body.appendChild(ta);
+          if (typeof ta.select === 'function') ta.select();
+          if (doc.execCommand) doc.execCommand('copy');
+          if (ta.parentNode) ta.parentNode.removeChild(ta);
+          status('Copied converted amount.');
+        } catch (e) {
+          status('Could not copy. Select the text manually.');
+        }
+      } else {
+        status('Could not copy. Select the text manually.');
+      }
+    }
+
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        copyResult();
       });
     }
 

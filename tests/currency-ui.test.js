@@ -52,6 +52,7 @@ function fakeEnv(options) {
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
     'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
+    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy' }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
@@ -236,7 +237,7 @@ test('refresh failure with a mismatched cache reports the error plainly', async 
   const handle = ui.attachCurrencyUi(env);
   await handle.onRefresh();
   assert.equal(elements['currency-status'].textContent, 'Could not refresh: offline');
-  assert.equal(elements['currency-now'].textContent, '1 USD = 94.91 INR · 1 USD = 94.91 INR · ECB reference rates, as of 2026-11-02');
+  assert.equal(elements['currency-now'].textContent, '', 'mismatched cache must not be shown');
 });
 
 test('missing fetch support is reported instead of throwing', async () => {
@@ -296,4 +297,54 @@ test('persists prefs on swap and on input change', () => {
   saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
   assert.equal(saved.from, 'INR');
   assert.equal(saved.to, 'USD');
+});
+
+
+test('does not render mismatched cache after prefs restore', () => {
+  const prefs = JSON.stringify({ amount: '10', from: 'EUR', to: 'GBP' });
+  const cache = JSON.stringify({
+    version: 1,
+    from: 'USD',
+    to: 'INR',
+    rate: 94.91,
+    asOfDate: '2026-11-02',
+    fetchedAt: '2026-11-03T12:00:00.000Z'
+  });
+  const { env, elements, storageData } = fakeEnv({});
+  storageData[ui.PREFS_KEY] = prefs;
+  storageData[ui.STORAGE_KEY] = cache;
+  ui.attachCurrencyUi(env);
+  assert.equal(elements['currency-now'].textContent, '', 'should not show mismatched cache');
+  assert.ok(elements['currency-status'].textContent.includes('Pick two currencies'), 'status should prompt refresh');
+});
+
+test('copy button copies converted amount when result is present', async () => {
+  const { env, elements } = fakeEnv({ from: 'USD', to: 'INR', amount: '1' });
+  // pre-seed matching cache
+  const cache = JSON.stringify({
+    version: 1,
+    from: 'USD',
+    to: 'INR',
+    rate: 94.91,
+    asOfDate: '2026-11-02',
+    fetchedAt: '2026-11-03T12:00:00.000Z'
+  });
+  env.localStorage.setItem(ui.STORAGE_KEY, cache);
+  let copied = null;
+  env.window.navigator = {
+    clipboard: {
+      writeText(text) {
+        copied = text;
+        return Promise.resolve();
+      }
+    }
+  };
+  ui.attachCurrencyUi(env);
+  const copy = elements['currency-copy'];
+  assert.ok(copy.listeners.some((l) => l.type === 'click'));
+  const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+  copy.listeners.find((l) => l.type === 'click').handler(click);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(copied, '94.91', 'should copy the converted amount');
+  assert.ok(elements['currency-status'].textContent.includes('Copied'));
 });
