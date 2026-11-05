@@ -162,6 +162,25 @@
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
   }
 
+  function relativeDueDays(dueDate, today) {
+    if (!isDateOnly(dueDate) || !isDateOnly(today)) return null;
+    const [dy, dm, dd] = dueDate.split('-').map(Number);
+    const [ty, tm, td] = today.split('-').map(Number);
+    const due = Date.UTC(dy, dm - 1, dd);
+    const tod = Date.UTC(ty, tm - 1, td);
+    return Math.round((due - tod) / 86400000);
+  }
+
+  function relativeDueLabel(dueDate, today) {
+    const days = relativeDueDays(dueDate, today);
+    if (days === null) return null;
+    if (days < 0) return 'Overdue';
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    if (days > 1 && days <= 7) return `In ${days} days`;
+    return null;
+  }
+
   const api = {
     localDateString,
     isDateOnly,
@@ -175,6 +194,8 @@
     validateStoredTasks,
     getFilteredTasks,
     getSuggestions,
+    relativeDueDays,
+    relativeDueLabel,
     MAX_NOTES_CHARS,
     MAX_SUBTASKS,
     MAX_SUBTASK_TITLE,
