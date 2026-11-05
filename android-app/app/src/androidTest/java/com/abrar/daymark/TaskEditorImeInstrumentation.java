@@ -193,8 +193,9 @@ final class TaskEditorImeInstrumentation {
         AccessibilityNodeInfo root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
         AccessibilityNodeInfo titleField = findByDescription(root, TITLE_FIELD_DESCRIPTION);
         require(titleField != null, "the editor exposes its task title field", assertions);
-        require(titleField.performAction(AccessibilityNodeInfo.ACTION_FOCUS),
-                "the task title field accepts focus", assertions);
+        // MainActivity requests title focus when the dialog opens; ACTION_FOCUS may return false if already focused.
+        require(titleField.isFocused() || titleField.performAction(AccessibilityNodeInfo.ACTION_FOCUS),
+                "the task title field is focused or accepts focus", assertions);
         Rect imeBounds = findImeBounds(instrumentation);
         if (imeBounds == null) {
             // Some CI emulator images never surface a software IME window when a
