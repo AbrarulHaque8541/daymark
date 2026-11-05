@@ -8,13 +8,22 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Bundle;
+
+import java.util.Collections;
 
 /**
  * Publishes an explicitly started focus session as an ongoing notification.
  *
  * A running session has one live source of displayed time: Android's chronometer. No static
- * numeric text or progress snapshot is paired with that moving clock. A paused countdown may show
+ * numeric text is paired with that moving clock. A paused countdown may show
  * its frozen time and determinate progress together. Paused sessions expose Resume and Finish.
+ *
+ * <p>On Android 16 (API 36) countdown sessions also carry a {@link Notification.ProgressStyle}
+ * and a stable status-bar chip label, and request promotion into a Live Update island when the
+ * platform admits promoted ongoing notifications (owner request 2026-11-05: glanceable chip with
+ * expanded Pause/Resume/Finish controls). The bar position is set only at publish time — Daymark
+ * keeps its no-polling-loop doctrine, so the live chronometer remains the sole displayed clock.
  */
 final class TaskFocusTimerNotification {
     static final String CHANNEL_ID = "daymark_focus_sessions";
@@ -27,6 +36,12 @@ final class TaskFocusTimerNotification {
     private static final int REQUEST_PAUSE = 9412;
     private static final int REQUEST_RESUME = 9413;
     private static final int REQUEST_FINISH = 9414;
+    /**
+     * Equals {@code Notification.EXTRA_REQUEST_PROMOTED_ONGOING}, which was added in API 36.1.
+     * At compileSdk 36 the constant is unavailable, so this string key is the only framework
+     * path to request a promoted ongoing Live Update.
+     */
+    private static final String EXTRA_REQUEST_PROMOTED_ONGOING_KEY = "android.requestPromotedOngoing";
 
     private TaskFocusTimerNotification() { }
 
@@ -89,8 +104,29 @@ final class TaskFocusTimerNotification {
         if (state.shouldShowProgressBar()) {
             builder.setProgress(PROGRESS_MAX, state.progressPermille, false);
         }
+        if (state.countdown && Build.VERSION.SDK_INT >= 36) {
+            // Stable chip label: a snapshot of remaining time would go stale between lifecycle
+            // transitions, so the island shows a truthful constant and the chronometer stays live.
+            builder.setShortCriticalText(state.paused ? "Paused" : "Focus");
+            builder.setStyle(new Notification.ProgressStyle()
+                    .setProgress(Math.round(state.progressPermille / 10f))
+                    .setProgressSegments(Collections.singletonList(
+                            new Notification.ProgressStyle.Segment(100))));
+        }
 
-        manager.notify(notificationId, builder.build());
+        Notification built = builder.build();
+        // Promotion is requested only when the platform admits promoted ongoing notifications,
+        // and only after the built notification confirms the promotable characteristics.
+        if (state.countdown && Build.VERSION.SDK_INT >= 36
+                && manager.canPostPromotedNotifications()
+                && built.hasPromotableCharacteristics()) {
+            Bundle promotion = new Bundle();
+            promotion.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING_KEY, true);
+            builder.addExtras(promotion);
+            built = builder.build();
+        }
+
+        manager.notify(notificationId, built);
         return true;
     }
 
