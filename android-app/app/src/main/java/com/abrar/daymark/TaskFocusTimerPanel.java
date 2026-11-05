@@ -50,6 +50,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private enum DisplayUnit { AUTO, SECONDS, MINUTES, HOURS }
     private DisplayUnit displayUnit = DisplayUnit.AUTO;
     private final TextView[] displayUnitButtons = new TextView[4];
+    private static final String FOCUS_PREFS = "daymark_focus_prefs";
+    private static final String KEY_DISPLAY_UNIT = "display_unit";
 
     private final Listener listener;
     private final TaskFocusTimerSoundscape sounds = new TaskFocusTimerSoundscape();
@@ -91,6 +93,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         ACCENT = accent;
         ACCENT_SOFT = accentSoft;
         WARNING = warning;
+        loadDisplayUnitPreference();
         setOrientation(VERTICAL);
         setPadding(dp(18), dp(20), dp(18), dp(18));
         setBackground(round(BG, 30));
@@ -179,6 +182,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             choice.setBackground(round(selected ? ACCENT_SOFT : SURFACE, 14));
             choice.setSelected(selected);
             configureChoiceAccessibility(choice);
+            choice.setContentDescription(displayNames[i] + (selected ? " (selected)" : ""));
             displayUnitButtons[i] = choice;
             displayModes.addView(choice, new LayoutParams(0, dp(48), 1));
             choice.setOnClickListener(v -> chooseDisplayUnit(unit));
@@ -401,6 +405,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
     private void chooseDisplayUnit(DisplayUnit unit) {
         if (closed || actionPending || unit == null) return;
         displayUnit = unit;
+        saveDisplayUnitPreference(unit);
         sounds.onSelection();
         String[] names = {"Auto", "Seconds", "Minutes", "Hours"};
         DisplayUnit[] values = DisplayUnit.values();
@@ -409,9 +414,26 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             displayUnitButtons[i].setBackground(round(selected ? ACCENT_SOFT : SURFACE, 14));
             displayUnitButtons[i].setTextColor(selected ? TEXT : MUTED);
             displayUnitButtons[i].setSelected(selected);
-            displayUnitButtons[i].setContentDescription(names[i]);
+            displayUnitButtons[i].setContentDescription(names[i] + (selected ? " (selected)" : ""));
         }
         render(timer, timer == null ? 0 : android.os.SystemClock.elapsedRealtime());
+    }
+
+
+    private void loadDisplayUnitPreference() {
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences(FOCUS_PREFS, android.content.Context.MODE_PRIVATE);
+        String saved = prefs.getString(KEY_DISPLAY_UNIT, "AUTO");
+        try {
+            displayUnit = DisplayUnit.valueOf(saved);
+        } catch (IllegalArgumentException ignored) {
+            displayUnit = DisplayUnit.AUTO;
+        }
+    }
+
+    private void saveDisplayUnitPreference(DisplayUnit unit) {
+        if (unit == null) return;
+        getContext().getSharedPreferences(FOCUS_PREFS, android.content.Context.MODE_PRIVATE)
+                .edit().putString(KEY_DISPLAY_UNIT, unit.name()).apply();
     }
 
     private TextView modeButton(String text, boolean selected) {
