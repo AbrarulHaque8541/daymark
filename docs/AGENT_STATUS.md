@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-05T14:49:20Z (Focus display unit persistence)](./CURRENT_STATUS_20261105T144920Z.md)
+
 - [Daymark engineering status — 2026-11-05T10:36:07Z (paused Focus task identity)](./CURRENT_STATUS_20261105T103607Z.md)
 
 - [Daymark engineering status — 2026-11-05T09:53:05Z (repository and CI postmortem)](./CURRENT_STATUS_20261105T095305Z.md)
@@ -56,6 +58,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+
+- [Daymark engineering status — 2026-11-05T14:49:20Z (Focus display unit persistence)](./CURRENT_STATUS_20261105T144920Z.md)
 
 - [Daymark engineering status — 2026-11-05T10:36:07Z (paused Focus task identity)](./CURRENT_STATUS_20261105T103607Z.md)
 
