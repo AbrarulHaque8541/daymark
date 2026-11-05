@@ -21,6 +21,8 @@
   <script src="currency-ui.js" defer></script>
   <script src="wiki-logic.js" defer></script>
   <script src="wiki-ui.js" defer></script>
+  <script src="browser-address-logic.js" defer></script>
+  <script src="browser-address-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="storage-logic.js" defer></script>
@@ -302,6 +304,26 @@
           <div class="wiki-list" id="wiki-list" aria-live="polite"></div>
         </aside>
 
+        <aside class="briefing-card" id="browser-address-card" aria-labelledby="browser-address-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">BROWSER ADDRESS</span></div>
+          <h2 id="browser-address-heading">Address-bar preview</h2>
+          <p class="briefing-description">See how Daymark's browser reads what you type — http(s) URLs with an honest security label, Unicode domains, ports, IPv4/IPv6 literals, malformed input, search-provider switching and safe external handoff. Classified locally; nothing loads here.</p>
+          <form id="browser-address-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-address-input">Address or search text</label>
+            <input id="browser-address-input" name="address" type="text" maxlength="2048" placeholder="URL or search, e.g. example.com" autocomplete="off" aria-describedby="browser-address-status">
+            <label class="sr-only" for="browser-address-provider">Search provider</label>
+            <select id="browser-address-provider" class="sort-select" aria-label="Search provider">
+              <option value="duckduckgo" selected>DuckDuckGo</option>
+              <option value="wikipedia">Wikipedia</option>
+              <option value="google">Google</option>
+              <option value="bing">Bing</option>
+            </select>
+            <button class="button button-primary" id="browser-address-check" type="submit">Check</button>
+            <button class="button button-quiet" id="browser-address-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-address-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-address-result" aria-live="polite"></div>
+        </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
           <h2 id="webhook-heading">Task-completion webhook</h2>
