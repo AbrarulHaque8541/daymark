@@ -7572,6 +7572,7 @@ public final class MainActivity extends Activity {
         Window dialogWindow = dialog.getWindow();
         if (dialogWindow != null) {
             if (Build.VERSION.SDK_INT >= 30) {
+                // Keep this floating form inside its window insets so its action panel can resize above the IME.
                 Api30Window.setDecorFits(dialogWindow, true);
             }
             dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
@@ -9601,7 +9602,6 @@ public final class MainActivity extends Activity {
         }
     }
 }
-
 
 
 
