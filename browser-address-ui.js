@@ -78,33 +78,55 @@
       return '';
     }
 
+    function applyStatusClass(kind, security) {
+      if (!statusEl || !statusEl.classList) return;
+      statusEl.classList.remove('is-encrypted', 'is-not-encrypted', 'is-blocked', 'is-search', 'is-external');
+      if (kind === 'navigate') {
+        if (security === 'encrypted') statusEl.classList.add('is-encrypted');
+        else if (security === 'not-encrypted') statusEl.classList.add('is-not-encrypted');
+      } else if (kind === 'blocked') {
+        statusEl.classList.add('is-blocked');
+      } else if (kind === 'search') {
+        statusEl.classList.add('is-search');
+      } else if (kind === 'external') {
+        statusEl.classList.add('is-external');
+      }
+    }
+
     function classify() {
       if (!addressApi || typeof addressApi.parseAddressInput !== 'function') {
         status('Address preview is unavailable.');
+        applyStatusClass('');
         return;
       }
       const typed = inputEl && typeof inputEl.value === 'string' ? inputEl.value : '';
       if (!typed.trim()) {
         status('Nothing typed yet.');
+        applyStatusClass('');
         detail('Type a URL or search text to see how the browser will read it.');
         return;
       }
       const result = addressApi.parseAddressInput(typed, { provider: currentProvider() });
       if (result.kind === 'navigate') {
         status('Opens a page · ' + securityLabel(result.security));
+        applyStatusClass('navigate', result.security);
         const idn = result.idn ? ' (Unicode domain, punycode host ' + result.host + ')' : '';
         detail('Navigate to ' + result.url + idn);
       } else if (result.kind === 'search') {
         status('Runs a search with ' + result.providerName + '.');
+        applyStatusClass('search');
         detail('Search for "' + result.searchQuery + '" · ' + result.url);
       } else if (result.kind === 'external') {
         status('External handoff.');
+        applyStatusClass('external');
         detail(result.url + ' — Daymark passes this to another app only on your explicit action.');
       } else if (result.kind === 'blocked') {
         status('Blocked.');
+        applyStatusClass('blocked');
         detail(result.reason);
       } else {
         status('Nothing to preview.');
+        applyStatusClass('');
         detail('');
       }
     }
@@ -112,6 +134,7 @@
     function onClear() {
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       status('Cleared. Type a URL or search text.');
+      applyStatusClass('');
       detail('');
     }
 
