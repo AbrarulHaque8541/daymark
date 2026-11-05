@@ -97,6 +97,21 @@ required_integration = [
 for token in required_integration:
     assert token in activity, f"Focus Timer Activity integration missing: {token}"
 
+picker_start = activity.index("    private void showFocusTaskPicker()")
+picker_end = activity.index("    private void startFocusSession(", picker_start)
+picker = activity[picker_start:picker_end]
+picker_gate = picker[:picker.index("List<Task> eligible")]
+assert "if (focusSnapshot != null && focusSnapshot.isRunning())" in picker_gate, (
+    "task switching must be blocked while the Focus Timer is RUNNING"
+)
+assert "isPaused()" not in picker_gate and "!focusSnapshot.isFinished()" not in picker_gate, (
+    "PAUSED and FINISHED Focus Timer sessions must not block task switching"
+)
+assert "selectedFocusTaskId = chosen.id;" in picker, (
+    "the task picker must still apply the selected task"
+)
+print("PASS task-chip regression guard: PAUSED/FINISHED selectable; RUNNING blocked")
+
 assert "coordinator.startFromUserAction(" in runtime
 assert "store.save(timer, elapsed, wall, boot)" in runtime
 assert "TaskFocusTimerNotification.publish(" in runtime
