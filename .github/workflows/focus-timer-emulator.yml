@@ -15,6 +15,7 @@ on:
       - "android-app/app/build.gradle.kts"
       - "android-app/tools/check-v1-source.sh"
       - "android-app/tools/run-core-tests.sh"
+      - "android-app/tools/run-platform-instrumentation-on-emulator.sh"
   workflow_dispatch:
 
 permissions:
