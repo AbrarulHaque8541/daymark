@@ -2,13 +2,13 @@
 
 The native Android project remains separate from the parent web prototype. The current baseline is a single-user Java Activity using Android platform APIs. This is a description of the implementation at the time of writing, not a requirement to use Java forever or a restriction on other languages. Future components may use any suitable language/runtime when evidence shows a net improvement; follow the repository [technology-agnostic engineering policy](../docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md). The task store is app-private encrypted file storage with no remote task service or third-party runtime dependency. The optional GitHub sideload updater is flavor-gated and has a narrow network permission scope; it does not upload task data.
 
-## Attached brief: requirement disposition
+## Core V1 brief: requirement disposition
 
 **V1 implemented (source-level; device verification pending).** The current app provides one local task list with capture/edit/complete/delete, dates/priorities, search/filters, deterministic Demo suggestions, and encrypted app-private task storage using AES-GCM and Android Keystore. The shared manifest declares `INTERNET`; the Play flavor inherits it, and `githubSideload` additionally declares `ACCESS_NETWORK_STATE`. Storage is a versioned encrypted JSON file, not Room/SQLCipher; schedules, model profiles, an inference engine, imported models, and downloaded assets are not implemented.
 
 The native Android project remains separate from the parent web prototype. It is a single-user Java Activity using Android platform APIs only, including Android System WebView. The task store is app-private encrypted file storage; no third-party runtime dependency, model API, or task-sync service is added. The shared and Play merged manifests declare normal `INTERNET`; `githubSideload` additionally declares `ACCESS_NETWORK_STATE` for the gated updater. Task CRUD needs none.
 
-## Attached brief: requirement disposition
+## Browser and deferred-scope brief: requirement disposition
 
 **V1 implemented (source-level; device verification pending).** The current app provides one local task list with capture/edit/complete/delete, dates/priorities, search/filters, deterministic Demo suggestions, and encrypted app-private task storage using AES-GCM and Android Keystore. It also includes an HTTPS-only Android System WebView, fixed search-provider choices, and AI-site website shortcuts. Browser pages are not provider API integrations. Storage is a versioned encrypted JSON file, not Room/SQLCipher; schedules, model profiles, an inference engine, imported models, and downloaded assets are not implemented.
 

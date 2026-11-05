@@ -17,6 +17,10 @@ const plan = readRepoFile('PROJECT_PLAN.md')
   .split('\n## ')[0];
 const parity = readRepoFile('docs/PLATFORM_PARITY_CONTRACT.md');
 const adr = readRepoFile('docs/adr/0001-cross-platform-shell-and-browser-engine.md');
+const api36 = readRepoFile('API36_MIGRATION_READINESS.md');
+const signing = readRepoFile('RELEASE_SIGNING.md');
+const truthAudit = readRepoFile('DOCUMENTATION_TRUTH_AUDIT.md');
+const fullPlan = readRepoFile('PROJECT_PLAN.md');
 
 test('current browser documentation describes Online-by-default tap-to-connect behavior', () => {
   assert.match(rootReadme, /networking defaults to Online/);
@@ -37,4 +41,16 @@ test('current browser documentation keeps the HTTP cleartext mismatch explicit a
   assert.match(design, /HTTP WebView loading and a visible .*? label remain unresolved/);
   assert.match(plan, /treat HTTP runtime support as unverified/);
   assert.match(parity, /HTTP runtime support is not accepted until device tests pass/);
+});
+
+test('dated status snapshots are labeled historical and Android design scopes are distinct', () => {
+  assert.match(api36, /Historical snapshot \(checked 2026-10-26/);
+  assert.match(api36, /Source and release evidence at the 2026-10-26 snapshot/);
+  assert.match(api36, /Gates open at the 2026-10-26 snapshot/);
+  assert.match(signing, /Historical source and published-release snapshot \(checked 2026-10-26\)/);
+  assert.match(fullPlan, /Historical status snapshot \(verified 2026-10-26\)/);
+  assert.match(truthAudit, /Archived snapshot \(2026-10-09\)/);
+  assert.match(design, /^## Core V1 brief: requirement disposition$/m);
+  assert.match(design, /^## Browser and deferred-scope brief: requirement disposition$/m);
+  assert.doesNotMatch(design, /^## Attached brief: requirement disposition$/m);
 });
