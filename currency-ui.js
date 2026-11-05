@@ -33,6 +33,7 @@
     const toEl = element('currency-to');
     const buttonEl = element('currency-refresh');
     const swapEl = element('currency-swap');
+    const copyEl = element('currency-copy');
     const formEl = element('currency-form');
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
@@ -79,6 +80,11 @@
       nowEl.textContent = `${amountText} ${cache.from} = ${convertedText} ${cache.to}`
         + ` · 1 ${cache.from} = ${rateText} ${cache.to}`
         + ` · ECB reference rates, as of ${cache.asOfDate}`;
+      if (copyEl) {
+        copyEl.disabled = false;
+        copyEl.dataset.converted = String(converted);
+        copyEl.dataset.currency = cache.to;
+      }
     }
 
     function readCache() {
@@ -150,6 +156,7 @@
       status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
     } else {
       status('Pick two currencies and tap Refresh.');
+      if (copyEl) copyEl.disabled = true;
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -188,11 +195,42 @@
             status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
           } else {
             if (nowEl) nowEl.textContent = '';
+            if (copyEl) copyEl.disabled = true;
             status('Currencies swapped. Tap Refresh for the new rate.');
           }
         } else {
           status('Currencies swapped. Tap Refresh for the rate.');
         }
+      });
+    }
+
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', async (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        if (copyEl.disabled) return;
+        const converted = copyEl.dataset.converted;
+        const currency = copyEl.dataset.currency || '';
+        if (!converted) return;
+        const text = `${converted} ${currency}`.trim();
+        let copied = false;
+        try {
+          if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          } else if (document && document.execCommand) {
+            // Fallback for older environments
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            copied = document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+        } catch (e) { /* clipboard blocked */ }
+        status(copied ? `Copied ${text}` : 'Could not copy — select and copy the amount manually.');
       });
     }
 

@@ -52,6 +52,7 @@ function fakeEnv(options) {
     'currency-to': Object.assign(fakeElement('select'), { id: 'currency-to', value: opts.to || 'INR' }),
     'currency-refresh': Object.assign(fakeElement('button'), { id: 'currency-refresh' }),
     'currency-swap': Object.assign(fakeElement('button'), { id: 'currency-swap' }),
+    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy', disabled: true, dataset: {} }),
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' })
@@ -267,3 +268,42 @@ test('swap button exchanges from/to and updates status without auto-refresh', ()
   assert.equal(click.prevented, true);
 });
 
+
+test('copy button copies the converted amount when a rate is available', async () => {
+  const { env, elements } = fakeEnv({ stored: STORED });
+  let written = null;
+  env.window.navigator = {
+    clipboard: {
+      writeText(text) { written = text; return Promise.resolve(); }
+    }
+  };
+  // Make navigator available on the global used by the handler
+  const originalNavigator = globalThis.navigator;
+  globalThis.navigator = env.window.navigator;
+  try {
+    ui.attachCurrencyUi(env);
+    const copy = elements['currency-copy'];
+    assert.equal(copy.disabled, false, 'copy should be enabled when a cached rate is rendered');
+    const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+    const handler = copy.listeners.find((l) => l.type === 'click');
+    assert.ok(handler, 'copy button should listen for clicks');
+    await handler.handler(click);
+    assert.equal(written, '94.91 INR');
+    assert.ok(elements['currency-status'].textContent.includes('Copied'));
+    assert.equal(click.prevented, true);
+  } finally {
+    globalThis.navigator = originalNavigator;
+  }
+});
+
+test('copy button stays disabled and reports failure when no rate is available', async () => {
+  const { env, elements } = fakeEnv({});
+  ui.attachCurrencyUi(env);
+  const copy = elements['currency-copy'];
+  assert.equal(copy.disabled, true, 'copy should be disabled with no rate');
+  const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
+  const handler = copy.listeners.find((l) => l.type === 'click');
+  assert.ok(handler);
+  await handler.handler(click);
+  assert.ok(elements['currency-status'].textContent.includes('Could not copy') || elements['currency-status'].textContent.includes('Pick two'));
+});

@@ -515,6 +515,38 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .currency-swap:hover { transform: none; }
 }
 
+.currency-copy {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(210, 228, 222, .8);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .65);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.currency-copy:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(42, 143, 122, .4);
+  background: var(--accent-soft);
+  box-shadow: 0 4px 12px rgba(24, 40, 48, .06);
+}
+.currency-copy:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.currency-copy:focus-visible {
+  outline: 3px solid rgba(22, 112, 95, .55);
+  outline-offset: 2px;
+}
+.currency-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .currency-copy:hover { transform: none; }
+}
+
 .currency-now:empty {
   display: none;
 }
