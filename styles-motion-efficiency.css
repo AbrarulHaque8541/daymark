@@ -226,3 +226,19 @@
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
+
+/* Focus progress fill: accent-gradient glass for professional depth (reduced-motion safe). */
+.focus-progress-fill {
+  background: linear-gradient(90deg, #16705f 0%, #2a8f7a 100%);
+  transition: width .28s cubic-bezier(.2, .9, .3, 1.15);
+}
+@media (prefers-reduced-motion: reduce) {
+  .focus-progress-fill {
+    transition: none;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .focus-progress-fill {
+    background: linear-gradient(90deg, #1d7f6c 0%, #2a8f7a 100%);
+  }
+}
