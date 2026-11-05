@@ -40,13 +40,15 @@ function fakeEnv(options) {
     'weather-refresh': Object.assign(fakeElement('button'), { id: 'weather-refresh', type: 'button' }),
     'weather-form': Object.assign(fakeElement('form'), { id: 'weather-form' }),
     'weather-status': Object.assign(fakeElement('p'), { id: 'weather-status' }),
-    'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' })
+    'weather-now': Object.assign(fakeElement('div'), { id: 'weather-now' }),
+    'weather-clear': Object.assign(fakeElement('button'), { id: 'weather-clear' })
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); }
+    setItem(key, value) { storageData[key] = String(value); },
+    removeItem(key) { delete storageData[key]; }
   };
   const env = {
     document: {
@@ -226,4 +228,56 @@ test('typing a place persists it for the next visit', () => {
   inputListener.handler();
   const saved = JSON.parse(storageData[ui.PREFS_KEY]);
   assert.equal(saved.place, 'Berlin');
+});
+
+test('clear removes the cached forecast, saved place, and input', () => {
+  const stored = JSON.stringify({
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 10, feelsLikeC: 9, windKph: 5, humidityPercent: 70,
+      isDay: false, weatherCode: 0, label: 'Clear night'
+    },
+    fetchedAt: '2026-11-02T09:30:00.000Z'
+  });
+  const { env, elements, storageData } = fakeEnv({ stored });
+  storageData[ui.PREFS_KEY] = JSON.stringify({ place: 'Tokyo' });
+  elements['weather-place'].value = 'Tokyo';
+  const handle = ui.attachWeatherUi(env);
+  assert.equal(typeof handle.onClear, 'function');
+  handle.onClear();
+  assert.equal(elements['weather-now'].textContent, '');
+  assert.equal(elements['weather-place'].value, '');
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
+  assert.equal(elements['weather-status'].textContent, 'Weather cleared on this device. Type a place name and tap Refresh.');
+});
+
+test('clear is safe when nothing was cached', () => {
+  const { env, elements } = fakeEnv({});
+  const handle = ui.attachWeatherUi(env);
+  handle.onClear();
+  assert.equal(elements['weather-now'].textContent, '');
+  assert.equal(elements['weather-status'].textContent, 'Weather cleared on this device. Type a place name and tap Refresh.');
+});
+
+test('clicking the Clear button clears the card', () => {
+  const stored = JSON.stringify({
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 10, feelsLikeC: 9, windKph: 5, humidityPercent: 70,
+      isDay: false, weatherCode: 0, label: 'Clear night'
+    },
+    fetchedAt: '2026-11-02T09:30:00.000Z'
+  });
+  const { env, elements, storageData } = fakeEnv({ stored });
+  ui.attachWeatherUi(env);
+  const clearBtn = elements['weather-clear'];
+  const click = clearBtn.listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'clear click listener registered');
+  click.handler();
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(elements['weather-now'].textContent, '');
+  assert.equal(elements['weather-status'].textContent, 'Weather cleared on this device. Type a place name and tap Refresh.');
 });
