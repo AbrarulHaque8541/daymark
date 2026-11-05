@@ -7,6 +7,7 @@
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
   const FEED_KEY = 'daymark.feed.v1';
+  const FEED_PREFS_KEY = 'daymark.feed.prefs.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
@@ -1804,6 +1805,27 @@
     }
   }
 
+  function loadFeedPrefs() {
+    try {
+      const raw = localStorage.getItem(FEED_PREFS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.url === 'string' && parsed.url.trim()) return parsed.url.trim();
+    } catch (error) {
+      console.warn('Could not load the saved Daymark feed prefs:', error);
+    }
+    return null;
+  }
+
+  function persistFeedPrefs(url) {
+    if (!url || !String(url).trim()) return;
+    try {
+      localStorage.setItem(FEED_PREFS_KEY, JSON.stringify({ url: String(url).trim() }));
+    } catch (error) {
+      console.warn('Could not save the Daymark feed prefs:', error);
+    }
+  }
+
   function loadFeedCache() {
     if (!feed) return null;
     try {
@@ -1835,7 +1857,13 @@
     if (!status || !list) return;
     const input = $('#feed-url');
     const button = $('#feed-refresh');
-    if (input && state.feedCache && !input.value) input.value = state.feedCache.url;
+    if (input && !input.value) {
+      if (state.feedCache && state.feedCache.url) input.value = state.feedCache.url;
+      else {
+        const prefsUrl = loadFeedPrefs();
+        if (prefsUrl) input.value = prefsUrl;
+      }
+    }
     if (button) {
       button.disabled = state.feedLoading;
       button.textContent = state.feedLoading ? 'Loading…' : 'Refresh';
@@ -1875,6 +1903,7 @@
       if (typeof fetch !== 'function') throw new Error('fetch unavailable');
       const parsed = await feed.fetchFeed(target, fetch);
       state.feedCache = { version: 1, url: target, fetchedAt: new Date().toISOString(), feed: parsed };
+      persistFeedPrefs(target);
       const savedOffline = persistFeedCache();
       state.feedNotice = savedOffline
         ? `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}. Saved for offline reading.`
@@ -1905,6 +1934,7 @@
     state.feedNotice = '';
     try {
       localStorage.removeItem(FEED_KEY);
+      localStorage.removeItem(FEED_PREFS_KEY);
     } catch (error) {
       console.warn('Could not clear the Daymark feed cache:', error);
     }
@@ -1994,6 +2024,11 @@
       }
     });
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
+    const feedUrlInput = $('#feed-url');
+    if (feedUrlInput) feedUrlInput.addEventListener('input', (event) => {
+      const value = event.currentTarget && event.currentTarget.value;
+      if (value && value.trim()) persistFeedPrefs(value);
+    });
     const feedClear = $('#feed-clear');
     if (feedClear) feedClear.addEventListener('click', clearFeed);
     $('#focus-start').addEventListener('click', () => startFocus(null));
