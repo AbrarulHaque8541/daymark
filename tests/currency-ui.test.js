@@ -297,3 +297,16 @@ test('persists prefs on swap and on input change', () => {
   assert.equal(saved.from, 'INR');
   assert.equal(saved.to, 'USD');
 });
+
+test('amount input live-updates the display from a matching cached rate', () => {
+  const { env, elements } = fakeEnv({ stored: STORED, amount: '1' });
+  ui.attachCurrencyUi(env);
+  assert.ok(elements['currency-now'].textContent.startsWith('1 USD = 94.91 INR'));
+  const inputListeners = elements['currency-amount'].listeners.filter((l) => l.type === 'input');
+  const live = inputListeners[inputListeners.length - 1];
+  assert.ok(live, 'amount field should listen for input');
+  elements['currency-amount'].value = '10';
+  live.handler();
+  assert.ok(elements['currency-now'].textContent.startsWith('10 USD = 949.1 INR'), 'display should update from cache without refresh');
+  assert.ok(elements['currency-status'].textContent.startsWith('Cached'), 'status remains the cached note');
+});
