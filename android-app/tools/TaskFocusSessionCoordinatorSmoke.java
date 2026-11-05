@@ -18,6 +18,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
         processRestorePublishesOnlyAnExistingRunningSession();
         aMissingTaskClearsOnlyTheFocusRecord();
         expiredAndUnknownBootRestoresFailClosed();
+        failedNotificationPublicationCancelsPriorVisibleState();
+        repeatedExpiryDoesNotCompleteOrRestartAgain();
         persistenceFailureDoesNotPublishOrMutateTheCurrentSession();
         notificationDenialDoesNotLoseTheRunningSession();
         System.out.println("PASS task focus session coordinator smoke tests: " + assertions + " assertions");
@@ -56,8 +58,11 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 "Pause freezes the accumulated elapsed duration");
         check(fixture.store.saved.status == TaskFocusTimer.Status.PAUSED,
                 "the paused state is persisted");
-        check(fixture.events().equals(list("save", "cancel")),
-                "Pause persists before cancelling the ongoing notification");
+        check(paused.notificationPublished && fixture.notifications.active
+                        && fixture.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "Pause retains a Resume/Finish notification after persistence");
+        check(fixture.events().equals(list("save", "publish")),
+                "Pause persists before publishing the paused notification");
 
         fixture.clock.advance(60_000);
         fixture.notifications.events.clear();
@@ -113,9 +118,12 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check("task-b".equals(fixture.store.saved.taskId)
                         && fixture.store.saved.status == TaskFocusTimer.Status.PAUSED,
                 "the selected task ID and paused state are durably saved before returning");
-        check(fixture.events().equals(list("save", "cancel"))
-                        && !fixture.notifications.active,
-                "switch persists first, keeps notifications cancelled, and never resumes in the background");
+        check(fixture.events().equals(list("save", "publish"))
+                        && fixture.notifications.active
+                        && fixture.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "switch persists first and republishes the paused notification without resuming");
+        check("Task B".equals(fixture.notifications.lastTitle),
+                "paused task switch updates the title before publishing its notification");
 
         int savesBeforeRejectedResume = fixture.store.saveCount;
         int publicationsBeforeRejectedResume = fixture.notifications.publishCount;
@@ -132,8 +140,9 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check(restored != null && restored.isPaused() && restored.restored
                         && "task-b".equals(restored.timer.taskId()),
                 "the switched task identity survives process death and restores as paused");
-        check(!restored.notificationPublished && !afterProcessDeath.notifications.active,
-                "restoring a switched paused session still does not publish a notification");
+        check(restored.notificationPublished && afterProcessDeath.notifications.active
+                        && afterProcessDeath.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "restoring a switched paused session republishes Resume/Finish actions");
 
         afterProcessDeath.store.events.clear();
         afterProcessDeath.notifications.events.clear();
@@ -165,8 +174,9 @@ public final class TaskFocusSessionCoordinatorSmoke {
                         && "task-a".equals(fixture.store.saved.taskId),
                 "a failed rebind leaves both memory and persisted session linked to the original task");
         check(fixture.events().equals(java.util.Collections.singletonList("save"))
-                        && !fixture.notifications.active,
-                "a failed rebind performs no notification-side effect and does not resume the timer");
+                        && fixture.notifications.active
+                        && fixture.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "a failed rebind leaves the existing paused notification unchanged");
     }
 
     private static void anActiveSessionCannotBeReplaced() throws Exception {
@@ -212,8 +222,9 @@ public final class TaskFocusSessionCoordinatorSmoke {
         TaskFocusSessionCoordinator.Snapshot paused =
                 pausedAfterDeath.coordinator.restoreAfterProcessStart("task-restore", "Renamed task");
         check(paused != null && paused.isPaused(), "a persisted paused session restores as paused");
-        check(!paused.notificationPublished && !pausedAfterDeath.notifications.active,
-                "a paused session never republishes an ongoing notification");
+        check(paused.notificationPublished && pausedAfterDeath.notifications.active
+                        && pausedAfterDeath.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "a restored paused session republishes its Resume/Finish notification");
     }
 
     private static void aMissingTaskClearsOnlyTheFocusRecord() throws Exception {
@@ -257,8 +268,99 @@ public final class TaskFocusSessionCoordinatorSmoke {
         TaskFocusSessionCoordinator.Snapshot safe =
                 afterUnknownBoot.coordinator.restoreAfterProcessStart("task-unknown-boot", "Unknown boot");
         check(safe != null && safe.isPaused(), "unknown boot identity restores a running session as paused");
-        check(!safe.notificationPublished && !afterUnknownBoot.notifications.active,
-                "unknown boot identity does not promote an uncertain session");
+        check(safe.notificationPublished && afterUnknownBoot.notifications.active
+                        && afterUnknownBoot.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "unknown boot identity remains paused and offers explicit Resume/Finish actions");
+    }
+
+    private static void repeatedExpiryDoesNotCompleteOrRestartAgain() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.initializeWithoutSession();
+        fixture.coordinator.startFromUserAction(
+                "task-zero", "Zero boundary", TaskFocusTimer.Mode.COUNTDOWN, 1_000L);
+        fixture.clock.advance(1_000L);
+        int savesBeforeExpiry = fixture.store.saveCount;
+        int publishesBeforeExpiry = fixture.notifications.publishCount;
+        fixture.store.events.clear();
+        fixture.notifications.events.clear();
+
+        TaskFocusSessionCoordinator.Snapshot finished =
+                fixture.coordinator.refreshNotification("Zero boundary");
+        check(finished != null && finished.isFinished() && !finished.notificationPublished,
+                "first zero refresh durably finishes and clears the running notification");
+        check(fixture.store.saveCount == savesBeforeExpiry + 1,
+                "the zero boundary writes one finished snapshot");
+        check(fixture.events().equals(list("save", "cancel")),
+                "completion persists once before cancelling notification state");
+
+        int savesAfterFinish = fixture.store.saveCount;
+        int publicationsAfterFinish = fixture.notifications.publishCount;
+        fixture.clock.advance(1_000L);
+        fixture.store.events.clear();
+        fixture.notifications.events.clear();
+        TaskFocusSessionCoordinator.Snapshot repeated =
+                fixture.coordinator.refreshNotification("Zero boundary");
+        check(repeated != null && repeated.isFinished() && !repeated.notificationPublished,
+                "later zero refreshes leave the finished session terminal");
+        check(fixture.store.saveCount == savesAfterFinish
+                        && fixture.notifications.publishCount == publicationsAfterFinish
+                        && fixture.events().isEmpty(),
+                "repeated zero refresh neither rewrites completion nor republishes/restarts a timer");
+        check(!fixture.notifications.active,
+                "no notification remains active after repeated zero refreshes");
+    }
+
+    private static void failedNotificationPublicationCancelsPriorVisibleState() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.initializeWithoutSession();
+        fixture.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0L);
+        fixture.store.events.clear();
+        fixture.notifications.events.clear();
+        fixture.notifications.available = false;
+
+        TaskFocusSessionCoordinator.Snapshot paused = fixture.coordinator.pauseFromUserAction();
+        check(paused.isPaused() && !paused.notificationPublished && !fixture.notifications.active,
+                "failed paused publication cancels the previously visible running notification");
+        check(fixture.events().size() == 3 && "save".equals(fixture.events().get(0))
+                        && "publish".equals(fixture.events().get(1))
+                        && "cancel".equals(fixture.events().get(2)),
+                "pause persistence precedes attempted publication and stale-state cancellation");
+
+        fixture.notifications.available = true;
+        check(fixture.coordinator.refreshNotification("Task A").notificationPublished
+                        && fixture.notifications.active,
+                "a later refresh can publish the paused state again");
+        fixture.store.events.clear();
+        fixture.notifications.events.clear();
+        fixture.notifications.available = false;
+        TaskFocusSessionCoordinator.Snapshot switched =
+                fixture.coordinator.switchTaskWhilePausedFromUserAction("task-b", "Task B");
+        check(switched.isPaused() && !switched.notificationPublished
+                        && "task-b".equals(fixture.store.saved.taskId)
+                        && !fixture.notifications.active,
+                "failed task-switch publication cancels the old-title notification");
+        check("Task A".equals(fixture.notifications.lastTitle),
+                "the fake notification retained its old title until cancellation");
+        check(fixture.events().size() == 3 && "save".equals(fixture.events().get(0))
+                        && "publish".equals(fixture.events().get(1))
+                        && "cancel".equals(fixture.events().get(2)),
+                "task switch persists, attempts new-title publication, then cancels stale content");
+
+        fixture.notifications.available = true;
+        check(fixture.coordinator.refreshNotification("Task B").notificationPublished
+                        && "Task B".equals(fixture.notifications.lastTitle),
+                "refresh publishes the new paused-task title when access returns");
+        fixture.notifications.events.clear();
+        fixture.notifications.available = false;
+        TaskFocusSessionCoordinator.Snapshot refreshed =
+                fixture.coordinator.refreshNotification("Task B renamed");
+        check(!refreshed.notificationPublished && !fixture.notifications.active,
+                "failed title refresh also removes the stale visible notification");
+        check(fixture.notifications.events.size() == 2
+                        && "publish".equals(fixture.notifications.events.get(0))
+                        && "cancel".equals(fixture.notifications.events.get(1)),
+                "failed refresh attempts publication and then cancels without rewriting timer data");
     }
 
     private static void persistenceFailureDoesNotPublishOrMutateTheCurrentSession() throws Exception {
@@ -395,6 +497,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         boolean active;
         int publishCount;
         String lastTitle;
+        TaskFocusTimer.Status lastStatus;
 
         FakeNotifications(List<String> events) { this.events = events; }
 
@@ -402,9 +505,11 @@ public final class TaskFocusSessionCoordinatorSmoke {
         public boolean publish(TaskFocusTimer timer, String currentTaskTitle, long nowElapsed) {
             events.add("publish");
             publishCount++;
+            if (!available || timer == null || (!timer.isRunning() && !timer.isPaused())) return false;
             lastTitle = currentTaskTitle;
-            active = available && timer != null && timer.isRunning();
-            return active;
+            lastStatus = timer.status();
+            active = true;
+            return true;
         }
 
         @Override

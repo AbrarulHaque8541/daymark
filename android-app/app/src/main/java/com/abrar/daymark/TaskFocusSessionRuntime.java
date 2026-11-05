@@ -9,8 +9,8 @@ import java.util.List;
 /**
  * Android boundary for the UI-independent focus coordinator.
  *
- * The only path to publish an ongoing focus notification is through the coordinator, which
- * persists a session created by an explicit Start/Resume action before invoking the sink.
+ * The only path to publish a focus notification is through the coordinator, which persists
+ * explicit Start/Pause/Resume transitions before invoking the sink.
  * Focus state is stored independently from the encrypted task snapshot.
  */
 final class TaskFocusSessionRuntime {
