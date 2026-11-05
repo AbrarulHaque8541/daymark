@@ -8,7 +8,7 @@ wd = root / "app/src/main/java/com/abrar/daymark/BrowserLoadWatchdog.java"
 assert wd.exists(), f"BrowserLoadWatchdog.java not found at {wd}"
 src = wd.read_text(encoding="utf-8")
 
-assert "STAGE_HINT_MS = 5_000L" in src, "5s hint stage missing"
+assert "STAGE_HINT_MS = 2_000L" in src, "2s hint stage missing"
 assert "STAGE_RETRY_MS = 15_000L" in src, "15s retry stage missing"
 assert "STAGE_FAIL_MS = 25_000L" in src, "25s fail stage missing"
 assert "MAX_EVENTS = 50" in src, "bounded event buffer (max 50) missing"
