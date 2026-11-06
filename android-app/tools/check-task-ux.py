@@ -221,11 +221,15 @@ filter_body = region_in(TASK_LOGIC, "static List<Task> filter(List<Task> tasks, 
                         "static List<String> availableTags", "tag-aware task filter")
 check("TaskSearch.prepare(query)" in filter_body and "if (!search.matches(task)) continue;" in filter_body,
       "the existing list/filter flow must use local search")
-for marker in ("Locale.ROOT", "searchable.contains(literal)", "searchable.contains(term.text)",
+for marker in ("Locale.ROOT", "containsAny(searchableFields, literal)",
+               'String.join(" ", searchableFields).contains(literal)',
+               "containsAny(searchableFields, term.text)",
                "MAX_FUZZY_QUERY_CHARS = 160", "MAX_FUZZY_TERMS = 6",
                "MIN_FUZZY_TERM_CODE_POINTS = 4", "MAX_FUZZY_TERM_CODE_POINTS = 32",
                "withinOneEdit(", "Character.isLetterOrDigit("):
     check(marker in TASK_SEARCH, f"bounded local search contract missing: {marker}")
+check("String searchable = task.title.toLowerCase(Locale.ROOT)" not in TASK_SEARCH,
+      "task search must not rebuild the complete normalized text for every task")
 for forbidden in ("import android.", "openConnection(", "loadUrl(", "HttpURLConnection"):
     check(forbidden not in TASK_SEARCH, f"task search must not need Android or a network request: {forbidden}")
 for marker in ("preservesExistingSearch()", "matchesCommonTyposAndMultipleTerms()",
