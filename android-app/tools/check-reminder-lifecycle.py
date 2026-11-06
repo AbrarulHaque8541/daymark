@@ -9,6 +9,7 @@ instrumentation = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPla
 receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java").read_text(encoding="utf-8")
 scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
 policy = (root / "app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java").read_text(encoding="utf-8")
+task_logic = (root / "app/src/main/java/com/abrar/daymark/TaskLogic.java").read_text(encoding="utf-8")
 core_runner = (root / "tools/run-core-tests.sh").read_text(encoding="utf-8")
 
 # The custom Instrumentation must explicitly start its worker thread from onCreate.
@@ -37,26 +38,35 @@ assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity
 
 # Snooze is a durable override tied to one exact base occurrence, not a fire-time mismatch.
 assert 'static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";' in receiver
-assert "if (ACTION_SNOOZE.equals(action)) {" in receiver
-assert ".setAction(ACTION_SNOOZE)" in receiver
+assert "static int snoozeMinutesForAction(String action)" in receiver
+assert "if (snoozeMinutesForAction(action) > 0)" in receiver
+assert "ReminderSchedulePolicy.snoozeMinutesForAction(" in receiver
+assert "snoozeActionForMinutes(minutes)" in receiver
 assert 'static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";' in receiver
 assert "if (ACTION_DISMISS.equals(action))" in receiver
 assert 'new Notification.BigTextStyle()' in receiver
 assert "Notification.VISIBILITY_PRIVATE" in receiver
 assert "Notification.CATEGORY_REMINDER" in receiver
-assert '"Dismiss", dismiss' in receiver
+assert ".setDeleteIntent(dismiss)" in receiver
+assert '"Dismiss", dismiss' not in receiver, "the three notification buttons are reserved for snooze choices"
 assert "expectedId != notificationId" in receiver
 assert "private void dismissReminder(Context context, Intent intent)" in receiver
 assert "notificationManager.cancel(notificationId)" not in receiver.split("private void dismissReminder", 1)[1].split("private void snoozeReminder", 1)[0],     "dismiss must validate the task's canonical ID before clearing a notification"
-assert '"Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min"' in receiver
+assert '"Snooze " + minutes + " min"' in receiver
+assert "for (int minutes : ReminderSchedulePolicy.snoozePresetsMinutes())" in receiver
+assert "Swipe away to dismiss." in receiver
 assert "PendingIntent.FLAG_IMMUTABLE" in receiver
+assert "static final int[] REMINDER_LEADS = { 0, 30, 60, 1440 };" in task_logic
 assert "static final int SNOOZE_MINUTES = 10;" in scheduler
+assert "return snooze(context, notificationId, task, baseFireText, SNOOZE_MINUTES);" in scheduler
+assert "!ReminderSchedulePolicy.isSupportedSnoozeMinutes(snoozeMinutes)" in scheduler
+assert "ReminderSchedulePolicy.snoozeFire(Instant.now(), snoozeMinutes)" in scheduler
 assert "ReminderSchedulePolicy.encodeSnooze(baseFireText, snoozeFire)" in scheduler
 assert "preferences.edit().putString(key, record).commit()" in scheduler
 assert "ReminderSchedulePolicy.scheduledFire(" in scheduler
 assert "ReminderSchedulePolicy.acceptsFire(" in receiver
 assert "ReminderSchedulePolicy.isSnoozedFire(" in receiver
-assert "TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire)" in receiver
+assert "TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire, snoozeMinutes)" in receiver
 show_method = receiver.split("private void showReminder", 1)[1].split(
     "private Task findValidReminderTask", 1
 )[0]
@@ -68,8 +78,14 @@ snooze_method = receiver.split("private void snoozeReminder", 1)[1].split(
 )[0]
 assert "findValidReminderTask(context, taskId, baseFire)" in snooze_method
 assert "TaskReminderScheduler.getNotificationId(context, taskId)" in snooze_method
-assert "if (TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire))" in snooze_method
+assert "if (TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire, snoozeMinutes))" in snooze_method
+stale_snooze = snooze_method.split("if (currentTask == null || expectedId == null || expectedId != notificationId)", 1)[1].split("TaskReminderScheduler.snooze(context", 1)[0]
+assert "cancelNotification(" not in stale_snooze and "clearSnooze(" not in stale_snooze, \
+    "a stale snooze action must not affect the current notification or snooze state"
 assert "notificationManager.cancel(notificationId);" not in snooze_method,     "a visible notification must remain if its snooze alarm could not be persisted/armed"
+assert "cancelNotification(context, notificationId);\n        }" in snooze_method, \
+    "only a successfully persisted and armed snooze clears the current notification"
+assert "TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire, snoozeMinutes)" in snooze_method
 
 # One canonical request-code index owns both alarms and notification IDs; no mirrored index.
 assert 'private static final String CODE_PREFERENCES = "daymark.reminder.codes.v1";' in scheduler

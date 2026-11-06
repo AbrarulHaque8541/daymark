@@ -9,6 +9,47 @@ public final class ReminderSchedulePolicySmoke {
 
     public static void main(String[] args) {
         ZoneId zone = ZoneId.of("UTC");
+        check(java.util.Arrays.equals(TaskLogic.REMINDER_LEADS, new int[] {0, 30, 60, 1440})
+                        && !TaskLogic.isReminderLead(5)
+                        && !TaskLogic.isReminderLead(10),
+                "snooze presets do not expand the task's stored reminder-lead choices");
+        check(java.util.Arrays.equals(ReminderSchedulePolicy.snoozePresetsMinutes(),
+                        new int[] {5, 10, 30}),
+                "notification snooze choices are short, standard, and long presets");
+        check(ReminderSchedulePolicy.isSupportedSnoozeMinutes(5)
+                        && ReminderSchedulePolicy.isSupportedSnoozeMinutes(10)
+                        && ReminderSchedulePolicy.isSupportedSnoozeMinutes(30),
+                "all offered snooze durations are accepted");
+        check(!ReminderSchedulePolicy.isSupportedSnoozeMinutes(0)
+                        && !ReminderSchedulePolicy.isSupportedSnoozeMinutes(60),
+                "unoffered snooze durations are rejected");
+        String actionPrefix = "daymark.action.snooze_reminder";
+        Instant now = Instant.parse("2026-11-06T12:00:00Z");
+        for (int minutes : ReminderSchedulePolicy.snoozePresetsMinutes()) {
+            String action = ReminderSchedulePolicy.snoozeActionForMinutes(actionPrefix, minutes);
+            check((actionPrefix + "." + minutes).equals(action),
+                    "each notification snooze has a distinct action token");
+            check(ReminderSchedulePolicy.snoozeMinutesForAction(action, actionPrefix, 10) == minutes,
+                    "each notification action decodes to its displayed duration");
+            int decodedMinutes = ReminderSchedulePolicy.snoozeMinutesForAction(action, actionPrefix, 10);
+            check(ReminderSchedulePolicy.snoozeFire(now, decodedMinutes)
+                            .equals(now.plusSeconds(minutes * 60L)),
+                    "each notification action computes its exact temporary snooze offset");
+        }
+        check(ReminderSchedulePolicy.snoozeMinutesForAction(actionPrefix, actionPrefix, 10) == 10,
+                "legacy notification snooze action retains its ten-minute behavior");
+        check(ReminderSchedulePolicy.snoozeMinutesForAction(actionPrefix + ".60", actionPrefix, 10) == 0
+                        && ReminderSchedulePolicy.snoozeActionForMinutes(actionPrefix, 60) == null,
+                "unknown action durations fail closed");
+        check(ReminderSchedulePolicy.snoozeFire(now, 5).equals(now.plusSeconds(5 * 60L)),
+                "short snooze is scheduled for five minutes after selection");
+        check(ReminderSchedulePolicy.snoozeFire(now, 10).equals(now.plusSeconds(10 * 60L)),
+                "standard snooze is scheduled for ten minutes after selection");
+        check(ReminderSchedulePolicy.snoozeFire(now, 30).equals(now.plusSeconds(30 * 60L)),
+                "long snooze is scheduled for thirty minutes after selection");
+        check(ReminderSchedulePolicy.snoozeFire(now, 60) == null
+                        && ReminderSchedulePolicy.snoozeFire(null, 10) == null,
+                "invalid snooze requests fail closed");
         Task task = TaskLogic.create("Snooze test", "2099-12-01", "high",
                 null, null, 60, null);
         Instant base = ReminderSchedulePolicy.baseFire(task, zone);
@@ -39,6 +80,43 @@ public final class ReminderSchedulePolicySmoke {
                 "old snooze is invalidated by a due-date edit");
         check(ReminderSchedulePolicy.scheduledFire(changed, zone, record).equals(changedBase),
                 "stale snooze falls back to the newly computed reminder occurrence");
+
+        for (int minutes : ReminderSchedulePolicy.snoozePresetsMinutes()) {
+            String action = ReminderSchedulePolicy.snoozeActionForMinutes(actionPrefix, minutes);
+            int decodedMinutes = ReminderSchedulePolicy.snoozeMinutesForAction(action, actionPrefix, 10);
+            Instant actionFire = base.plusSeconds(decodedMinutes * 60L);
+            String actionRecord = ReminderSchedulePolicy.encodeSnooze(baseText, actionFire);
+            check(ReminderSchedulePolicy.acceptsFire(task, zone, actionFire.toString(), actionRecord),
+                    "each notification action schedules an accepted occurrence");
+            check(!ReminderSchedulePolicy.acceptsFire(changed, zone, actionFire.toString(), actionRecord),
+                    "each action's old occurrence is rejected after the due date changes");
+        }
+
+        Task changedDueTime = task.withFullDetails(task.title, task.notes, task.dueDate,
+                "12:30", task.priority, task.reminderLeadMinutes, task.repeatRule,
+                task.subtasks, task.tags, Instant.now().toString());
+        Instant changedTimeBase = ReminderSchedulePolicy.baseFire(changedDueTime, zone);
+        check(changedTimeBase != null && !changedTimeBase.equals(base),
+                "editing the due time changes the base reminder occurrence");
+        check(!ReminderSchedulePolicy.acceptsFire(changedDueTime, zone, snooze.toString(), record),
+                "due-time edits invalidate old snooze actions");
+
+        Task changedLead = task.withFullDetails(task.title, task.notes, task.dueDate,
+                task.dueTime, task.priority, 30, task.repeatRule, task.subtasks,
+                task.tags, Instant.now().toString());
+        Instant changedLeadBase = ReminderSchedulePolicy.baseFire(changedLead, zone);
+        check(changedLeadBase != null && !changedLeadBase.equals(base),
+                "editing the reminder lead changes the base occurrence");
+        check(!ReminderSchedulePolicy.acceptsFire(changedLead, zone, snooze.toString(), record),
+                "lead-time edits invalidate old snooze actions");
+
+        Task reminderOff = task.withFullDetails(task.title, task.notes, task.dueDate,
+                task.dueTime, task.priority, null, task.repeatRule, task.subtasks,
+                task.tags, Instant.now().toString());
+        check(ReminderSchedulePolicy.baseFire(reminderOff, zone) == null
+                        && !ReminderSchedulePolicy.acceptsFire(reminderOff, zone, snooze.toString(), record)
+                        && ReminderSchedulePolicy.scheduledFire(reminderOff, zone, record) == null,
+                "turning reminders off invalidates old snooze actions and alarms");
 
         Task completed = TaskLogic.toggleCompleted(task);
         check(!ReminderSchedulePolicy.acceptsFire(completed, zone, snooze.toString(), record),

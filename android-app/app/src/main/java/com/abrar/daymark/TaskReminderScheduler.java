@@ -67,7 +67,13 @@ final class TaskReminderScheduler {
      * PendingIntent. This makes it survive app opens/reboots and lets task edits invalidate it.
      */
     static boolean snooze(Context context, int notificationId, Task task, String baseFireText) {
-        if (context == null || task == null || notificationId <= 0) return false;
+        return snooze(context, notificationId, task, baseFireText, SNOOZE_MINUTES);
+    }
+
+    static boolean snooze(Context context, int notificationId, Task task, String baseFireText,
+            int snoozeMinutes) {
+        if (context == null || task == null || notificationId <= 0
+                || !ReminderSchedulePolicy.isSupportedSnoozeMinutes(snoozeMinutes)) return false;
         AlarmManager alarmManager =
                 (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) {
@@ -83,7 +89,8 @@ final class TaskReminderScheduler {
             return false;
         }
 
-        Instant snoozeFire = Instant.now().plusSeconds(SNOOZE_MINUTES * 60L);
+        Instant snoozeFire = ReminderSchedulePolicy.snoozeFire(Instant.now(), snoozeMinutes);
+        if (snoozeFire == null) return false;
         String record = ReminderSchedulePolicy.encodeSnooze(baseFireText, snoozeFire);
         if (record == null) return false;
         SharedPreferences preferences =

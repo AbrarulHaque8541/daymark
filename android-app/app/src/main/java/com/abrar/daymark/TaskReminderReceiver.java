@@ -27,10 +27,20 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";
     static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";
 
+    static String snoozeActionForMinutes(int minutes) {
+        return ReminderSchedulePolicy.snoozeActionForMinutes(ACTION_SNOOZE, minutes);
+    }
+
+    static int snoozeMinutesForAction(String action) {
+        // Keep notifications posted by older app versions working as the original 10-minute snooze.
+        return ReminderSchedulePolicy.snoozeMinutesForAction(
+                action, ACTION_SNOOZE, TaskReminderScheduler.SNOOZE_MINUTES);
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent == null || intent.getAction() == null ? "" : intent.getAction();
-        if (ACTION_SNOOZE.equals(action)) {
+        if (snoozeMinutesForAction(action) > 0) {
             snoozeReminder(context, intent);
             return;
         }
@@ -131,39 +141,38 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         PendingIntent open = PendingIntent.getActivity(context, notificationId,
                 new Intent(context, MainActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent snooze = PendingIntent.getBroadcast(context, notificationId,
-                new Intent(context, TaskReminderReceiver.class)
-                        .setAction(ACTION_SNOOZE)
-                        .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
-                        .putExtra(EXTRA_TASK_ID, task.id)
-                        .putExtra(EXTRA_FIRE_INSTANT, fireInstant),
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent dismiss = PendingIntent.getBroadcast(context, notificationId,
                 new Intent(context, TaskReminderReceiver.class)
                         .setAction(ACTION_DISMISS)
                         .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
                         .putExtra(EXTRA_TASK_ID, task.id),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle(task.title)
-                .setContentText("Reminder due · Tap to open Daymark")
+                .setContentText("Reminder due · Snooze 5, 10 or 30 min")
                 .setStyle(new Notification.BigTextStyle()
                         .bigText("It's time for this task. Open Daymark to review the details, "
-                                + "or snooze the reminder for " + TaskReminderScheduler.SNOOZE_MINUTES
-                                + " minutes."))
+                                + "or choose a 5, 10 or 30 minute snooze. Swipe away to dismiss."))
                 .setCategory(Notification.CATEGORY_REMINDER)
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
                 .setContentIntent(open)
-                .addAction(new Notification.Action.Builder(
-                        Icon.createWithResource(context, android.R.drawable.ic_lock_idle_alarm),
-                        "Snooze " + TaskReminderScheduler.SNOOZE_MINUTES + " min", snooze).build())
-                .addAction(new Notification.Action.Builder(
-                        Icon.createWithResource(context, android.R.drawable.ic_menu_close_clear_cancel),
-                        "Dismiss", dismiss).build())
+                .setDeleteIntent(dismiss)
                 .setAutoCancel(true)
-                .setOnlyAlertOnce(true)
-                .build();
+                .setOnlyAlertOnce(true);
+        for (int minutes : ReminderSchedulePolicy.snoozePresetsMinutes()) {
+            Intent snoozeIntent = new Intent(context, TaskReminderReceiver.class)
+                    .setAction(snoozeActionForMinutes(minutes))
+                    .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                    .putExtra(EXTRA_TASK_ID, task.id)
+                    .putExtra(EXTRA_FIRE_INSTANT, fireInstant);
+            PendingIntent snooze = PendingIntent.getBroadcast(context, notificationId, snoozeIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(new Notification.Action.Builder(
+                    Icon.createWithResource(context, android.R.drawable.ic_lock_idle_alarm),
+                    "Snooze " + minutes + " min", snooze).build());
+        }
+        Notification notification = builder.build();
         notification.extras.putString(EXTRA_TASK_ID, task.id);
         notification.extras.putString(EXTRA_FIRE_INSTANT, fireInstant);
         try {
@@ -194,7 +203,8 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         int notificationId = intent == null ? 0 : intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
         String taskId = intent == null ? null : intent.getStringExtra(EXTRA_TASK_ID);
         String baseFire = intent == null ? null : intent.getStringExtra(EXTRA_FIRE_INSTANT);
-        if (notificationId <= 0 || taskId == null || baseFire == null) {
+        int snoozeMinutes = snoozeMinutesForAction(intent == null ? null : intent.getAction());
+        if (notificationId <= 0 || taskId == null || baseFire == null || snoozeMinutes <= 0) {
             Log.w("DaymarkReminder", "A snooze action arrived without a task occurrence; nothing was scheduled.");
             return;
         }
@@ -204,13 +214,11 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         Task currentTask = findValidReminderTask(context, taskId, baseFire);
         Integer expectedId = TaskReminderScheduler.getNotificationId(context, taskId);
         if (currentTask == null || expectedId == null || expectedId != notificationId) {
-            cancelNotification(context, notificationId);
-            TaskReminderScheduler.clearSnooze(context, taskId);
             Log.i("DaymarkReminder", "Stale snooze action ignored for task " + taskId);
             return;
         }
 
-        if (TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire)) {
+        if (TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire, snoozeMinutes)) {
             cancelNotification(context, notificationId);
         }
     }
