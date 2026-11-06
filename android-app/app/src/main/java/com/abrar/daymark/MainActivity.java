@@ -49,6 +49,7 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -2305,6 +2306,41 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Shared tap behavior for the bottom engine chips and the home grid engine tiles, so the
+     * two surfaces can never drift apart. An empty query selects the engine and focuses the
+     * address bar; a typed query runs immediately with the chosen engine.
+     */
+    private void handleBrowserEngineShortcutTap(BrowserAddress.SearchEngine engine) {
+        if (!webMode) return;
+        String query = "";
+        if (browserAddressInput != null && browserAddressInput.getText() != null) {
+            String entered = browserAddressInput.getText().toString().trim();
+            if (!entered.isEmpty() && !BrowserAddress.isLikelyWebAddress(entered)) query = entered;
+        }
+        if (query.isEmpty()) {
+            query = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
+        }
+        selectSearchEngine(engine);
+        if (query.isEmpty()) {
+            if (browserAddressInput != null) {
+                browserAddressInput.requestFocus();
+                showToast("Enter a search first, then choose " + engine.label + ".");
+            }
+            return;
+        }
+        browserLastSearchQuery = query;
+        String address;
+        try {
+            address = BrowserAddress.requireAllowedWebUrl(engine.searchUrl(query));
+        } catch (IllegalArgumentException invalidQuery) {
+            showToast("This query could not be sent to " + engine.label + ".");
+            return;
+        }
+        if (browserAddressInput != null) browserAddressInput.setText(query);
+        navigateBrowserTo(address);
+    }
+
     private Button browserSearchShortcutButton(BrowserAddress.SearchEngine engine) {
         Button button = compactButton(engine.label, false);
         button.setMinHeight(dp(34));
@@ -2313,40 +2349,38 @@ public final class MainActivity extends Activity {
         button.setPadding(dp(9), 0, dp(9), 0);
         button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
         button.setContentDescription("Search the current query with " + engine.label);
-        button.setOnClickListener(view -> {
-            if (!webMode) return;
-            String query = "";
-            if (browserAddressInput != null && browserAddressInput.getText() != null) {
-                String entered = browserAddressInput.getText().toString().trim();
-                if (!entered.isEmpty() && !BrowserAddress.isLikelyWebAddress(entered)) query = entered;
-            }
-            if (query.isEmpty()) {
-                query = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
-            }
-            selectSearchEngine(engine);
-            if (query.isEmpty()) {
-                if (browserAddressInput != null) {
-                    browserAddressInput.requestFocus();
-                    showToast("Enter a search first, then choose " + engine.label + ".");
-                }
-                return;
-            }
-            browserLastSearchQuery = query;
-            String address;
-            try {
-                address = BrowserAddress.requireAllowedWebUrl(engine.searchUrl(query));
-            } catch (IllegalArgumentException invalidQuery) {
-                showToast("This query could not be sent to " + engine.label + ".");
-                return;
-            }
-            if (browserAddressInput != null) browserAddressInput.setText(query);
-            navigateBrowserTo(address);
-        });
+        button.setOnClickListener(view -> handleBrowserEngineShortcutTap(engine));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
         params.setMargins(0, 0, dp(5), 0);
         button.setLayoutParams(params);
         return button;
+    }
+
+    /**
+     * Shared tap behavior for the bottom AI site chips and the home grid site tiles. With a
+     * typed question it asks that site; with nothing typed it opens the site's HTTPS home.
+     */
+    private void handleBrowserSiteShortcutTap(AiSiteCatalog.Entry entry) {
+        if (!webMode) return;
+        String value = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
+        if (value.isEmpty() && browserAddressInput != null && browserAddressInput.getText() != null) {
+            String addressText = browserAddressInput.getText().toString().trim();
+            if (!BrowserAddress.isLikelyWebAddress(addressText)) value = addressText;
+        }
+        selectSearchEngine(entry.searchEngine);
+        String address = entry.httpsUrl;
+        if (!value.isEmpty() && !BrowserAddress.isLikelyWebAddress(value)) {
+            try {
+                address = BrowserAddress.requireAllowedWebUrl(entry.searchEngine.searchUrl(value));
+            } catch (IllegalArgumentException exception) {
+                if (browserAddressInput != null) browserAddressInput.setError(exception.getMessage());
+                showBrowserStatus("Nothing was opened. Check the question or provider address.");
+                return;
+            }
+        }
+        if (browserAddressInput != null) browserAddressInput.setError(null);
+        navigateBrowserTo(address);
     }
 
     private Button browserSiteButton(AiSiteCatalog.Entry entry) {
@@ -2357,27 +2391,7 @@ public final class MainActivity extends Activity {
         button.setPadding(dp(9), 0, dp(9), 0);
         button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
         button.setContentDescription("Ask " + entry.label + " with the current search, or open its website if no question is entered");
-        button.setOnClickListener(view -> {
-            if (!webMode) return;
-            String value = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
-            if (value.isEmpty() && browserAddressInput != null && browserAddressInput.getText() != null) {
-                String addressText = browserAddressInput.getText().toString().trim();
-                if (!BrowserAddress.isLikelyWebAddress(addressText)) value = addressText;
-            }
-            selectSearchEngine(entry.searchEngine);
-            String address = entry.httpsUrl;
-            if (!value.isEmpty() && !BrowserAddress.isLikelyWebAddress(value)) {
-                try {
-                    address = BrowserAddress.requireAllowedWebUrl(entry.searchEngine.searchUrl(value));
-                } catch (IllegalArgumentException exception) {
-                    if (browserAddressInput != null) browserAddressInput.setError(exception.getMessage());
-                    showBrowserStatus("Nothing was opened. Check the question or provider address.");
-                    return;
-                }
-            }
-            if (browserAddressInput != null) browserAddressInput.setError(null);
-            navigateBrowserTo(address);
-        });
+        button.setOnClickListener(view -> handleBrowserSiteShortcutTap(entry));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
         params.setMargins(0, 0, dp(5), 0);
@@ -2385,30 +2399,157 @@ public final class MainActivity extends Activity {
         return button;
     }
 
+    /**
+     * Scenic backdrop for the browser home: a quiet palette-aware vertical tint, like the
+     * gradient wash behind UC Browser's home grid. Only palette colors are used, so every
+     * theme and high-contrast mode keeps its contrast guarantees.
+     */
+    private GradientDrawable browserHomeScenicBackdrop() {
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] { palette.background, palette.accentSoft, palette.background });
+    }
+
+    private TextView browserHomeSectionLabel(String value) {
+        TextView label = text(value, 10, palette.muted, Typeface.BOLD);
+        label.setAllCaps(true);
+        label.setLetterSpacing(0.12f);
+        label.setGravity(Gravity.CENTER);
+        return label;
+    }
+
+    /**
+     * The UC-style search pill. One tap focuses the real address bar (not a fake input) and
+     * opens the keyboard, so the pill and the toolbar can never hold different text.
+     */
+    private LinearLayout browserHomeSearchPill() {
+        LinearLayout pill = new LinearLayout(this);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setMinimumHeight(dp(52));
+        pill.setPadding(dp(14), dp(10), dp(14), dp(10));
+        pill.setBackground(pressable(palette.surface, 26, palette.line, palette.text, palette.muted));
+        pill.setContentDescription("Search the web or ask an AI. Tap to type.");
+        TextView glyph = text("🔍", 15, palette.muted, Typeface.NORMAL);
+        pill.addView(glyph);
+        pill.addView(text(" Search the web or ask an AI", 15, palette.muted, Typeface.NORMAL));
+        pill.setOnClickListener(view -> {
+            haptic(view, HapticFeedbackConstants.CONFIRM);
+            if (browserAddressInput != null) {
+                browserAddressInput.requestFocus();
+                InputMethodManager inputManager =
+                        (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (inputManager != null) {
+                    inputManager.showSoftInput(browserAddressInput, InputMethodManager.SHOW_IMPLICIT);
+                }
+            }
+            showBrowserStatus("Type your search or address, then tap Go.");
+        });
+        return pill;
+    }
+
+    private LinearLayout.LayoutParams tileParams() {
+        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+    }
+
+    /**
+     * One UC-style home tile: monogram badge, two-line label, one shared tap. The tap is the
+     * exact handler the bottom chips use, so a tile and its chip always do the same thing.
+     */
+    private LinearLayout browserHomeTile(String glyph, String label, String description, Runnable tap) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER_HORIZONTAL);
+        tile.setPadding(dp(4), dp(8), dp(4), dp(8));
+        tile.setFocusable(true);
+        tile.setClickable(true);
+        tile.setContentDescription(description);
+        TextView monogram = text(glyph, 19, palette.accent, Typeface.BOLD);
+        monogram.setGravity(Gravity.CENTER);
+        monogram.setBackground(pressable(palette.suggestionSurface, 16, palette.line, palette.accent));
+        LinearLayout.LayoutParams monogramParams = new LinearLayout.LayoutParams(dp(52), dp(52));
+        tile.addView(monogram, monogramParams);
+        TextView caption = text(label, 11, palette.muted, Typeface.NORMAL);
+        caption.setMaxLines(2);
+        caption.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams captionParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        captionParams.topMargin = dp(6);
+        tile.addView(caption, captionParams);
+        tile.setOnClickListener(view -> {
+            haptic(view, HapticFeedbackConstants.CONFIRM);
+            tap.run();
+        });
+        return tile;
+    }
+
     private View buildBrowserHomeView() {
         LinearLayout home = new LinearLayout(this);
         home.setOrientation(LinearLayout.VERTICAL);
-        home.setGravity(Gravity.CENTER);
-        home.setPadding(dp(24), dp(20), dp(24), dp(20));
+        home.setGravity(Gravity.CENTER_HORIZONTAL);
+        home.setPadding(dp(20), dp(28), dp(20), dp(16));
+        home.setBackground(browserHomeScenicBackdrop());
 
-        TextView title = text("Daymark", 28, palette.text, Typeface.BOLD);
+        TextView title = text("Daymark", 30, palette.text, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         home.addView(title, bottomMargin(dp(4)));
 
-        TextView tagline = text("Your browser, your way", 14, palette.muted, Typeface.NORMAL);
+        TextView tagline = text("Your browser, your way", 13, palette.muted, Typeface.NORMAL);
         tagline.setGravity(Gravity.CENTER);
-        home.addView(tagline, bottomMargin(dp(22)));
+        home.addView(tagline, bottomMargin(dp(18)));
 
-        TextView hint = text("Search the web or ask an AI", 17, palette.text, Typeface.BOLD);
-        hint.setGravity(Gravity.CENTER);
-        home.addView(hint, bottomMargin(dp(7)));
+        home.addView(browserHomeSearchPill(), bottomMargin(dp(10)));
 
         TextView detail = text(
-                "Enter a question or HTTPS address above, then tap Go or a provider shortcut. Choose another provider with + Add when needed.",
-                13, palette.muted, Typeface.NORMAL);
+                "Enter a question or HTTPS address, then tap Go or a provider tile.",
+                12, palette.muted, Typeface.NORMAL);
         detail.setGravity(Gravity.CENTER);
-        detail.setLineSpacing(dp(3), 1f);
-        home.addView(detail, bottomMargin(dp(18)));
+        home.addView(detail, bottomMargin(dp(20)));
+
+        home.addView(browserHomeSectionLabel("QUICK ACCESS"), bottomMargin(dp(8)));
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        quickRow.addView(browserHomeTile("H", "Site history", "Open saved HTTPS site history",
+                this::showBrowserHistoryDialog), tileParams());
+        quickRow.addView(browserHomeTile("B", "Bookmarks", "Open saved bookmarks",
+                this::showBrowserBookmarksDialog), tileParams());
+        quickRow.addView(browserHomeTile("D", "Downloads", "Open the browser download list",
+                this::showBrowserDownloadsDialog), tileParams());
+        quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
+                this::showBrowserExtensionsManager), tileParams());
+        home.addView(quickRow, bottomMargin(dp(16)));
+
+        home.addView(browserHomeSectionLabel("SEARCH & AI"), bottomMargin(dp(8)));
+        List<LinearLayout> gridRows = new ArrayList<>();
+        LinearLayout row = null;
+        int column = 0;
+        for (BrowserAddress.SearchEngine engine : BrowserAddress.SearchEngine.values()) {
+            if (!isBottomShortcutProvider(engine)) continue;
+            if (column == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                gridRows.add(row);
+            }
+            String monogram = engine.label.substring(0, 1);
+            row.addView(browserHomeTile(monogram, engine.label,
+                    "Search the current query with " + engine.label,
+                    () -> handleBrowserEngineShortcutTap(engine)), tileParams());
+            column = (column + 1) % 4;
+        }
+        for (AiSiteCatalog.Entry entry : AiSiteCatalog.entries()) {
+            if (column == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                gridRows.add(row);
+            }
+            String monogram = entry.label.substring(0, 1);
+            row.addView(browserHomeTile(monogram, entry.label,
+                    "Ask " + entry.label + " with the current search",
+                    () -> handleBrowserSiteShortcutTap(entry)), tileParams());
+            column = (column + 1) % 4;
+        }
+        for (LinearLayout gridRow : gridRows) {
+            home.addView(gridRow, bottomMargin(dp(2)));
+        }
 
         TextView privacyHint = text("Online browsing is on by default. Privacy details are above.", 11,
                 palette.muted, Typeface.NORMAL);
@@ -2417,7 +2558,12 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         privacyParams.topMargin = dp(16);
         home.addView(privacyHint, privacyParams);
-        return home;
+
+        ScrollView homeScroll = new ScrollView(this);
+        homeScroll.setFillViewport(true);
+        homeScroll.addView(home, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return homeScroll;
     }
 
     private void navigateFromInput() {
