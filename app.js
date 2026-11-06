@@ -7,6 +7,7 @@
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
   const FEED_KEY = 'daymark.feed.v1';
+  const VIEW_PREFS_KEY = 'daymark.view.prefs.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
@@ -644,6 +645,7 @@
   function clearSearch() {
     state.query = '';
     $('#task-search').value = '';
+    persistViewPrefs();
     render();
     $('#task-search').focus();
   }
@@ -1914,14 +1916,49 @@
     renderFeed();
   }
 
+
+  function loadViewPrefs() {
+    try {
+      const raw = localStorage.getItem(VIEW_PREFS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const allowed = ['all', 'today', 'upcoming', 'overdue', 'completed'];
+      const filter = allowed.includes(parsed.filter) ? parsed.filter : 'all';
+      const query = typeof parsed.query === 'string' ? parsed.query.slice(0, 200) : '';
+      return { filter, query };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function persistViewPrefs() {
+    try {
+      localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify({
+        filter: state.filter,
+        query: state.query || ''
+      }));
+    } catch (error) {
+      console.warn('Could not persist view prefs:', error);
+    }
+  }
+
   function setUp() {
     state.tasks = loadTasks();
+    const viewPrefs = loadViewPrefs();
+    if (viewPrefs) {
+      state.filter = viewPrefs.filter;
+      state.query = viewPrefs.query;
+    }
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
     const savedPreset = loadFocusPreset();
     if (savedPreset) state.focusPreset = savedPreset;
     state.feedCache = loadFeedCache();
+    if (viewPrefs && viewPrefs.query) {
+      const searchInput = $('#task-search');
+      if (searchInput) searchInput.value = viewPrefs.query;
+    }
     render();
     $('#add-form').addEventListener('submit', addTask);
     $('#new-title').addEventListener('input', () => {
@@ -1934,6 +1971,7 @@
     $('#new-due-time').addEventListener('change', syncNewDueTime);
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
+      persistViewPrefs();
       render();
     });
     $('#clear-search').addEventListener('click', clearSearch);
@@ -1954,6 +1992,7 @@
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
+      persistViewPrefs();
       render();
     }));
     taskList.addEventListener('click', handleTaskAction);
