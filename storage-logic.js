@@ -25,8 +25,8 @@
     {
       id: 'focus',
       label: 'Focus timer',
-      description: 'The current Focus session and its completed-session history log.',
-      keys: ['daymark.focus.v1']
+      description: 'The current Focus session, completed-session history, and last duration preset.',
+      keys: ['daymark.focus.v1', 'daymark.focus.preset.v1']
     },
     {
       id: 'focus-backup',
@@ -43,20 +43,32 @@
     {
       id: 'weather',
       label: 'Weather cache',
-      description: 'The last weather result for the place you last checked.',
-      keys: ['daymark.weather.v1']
+      description: 'The last weather result and the place name you typed last.',
+      keys: ['daymark.weather.v1', 'daymark.weather.prefs.v1']
     },
     {
       id: 'holidays',
       label: 'Holiday cache',
-      description: 'The last public-holidays list for the country you last checked.',
-      keys: ['daymark.holidays.v1']
+      description: 'The last public-holidays list and the country you last selected.',
+      keys: ['daymark.holidays.v1', 'daymark.holidays.prefs.v1']
     },
     {
       id: 'currency',
       label: 'Currency cache',
-      description: 'The last exchange-rate pair you looked up.',
-      keys: ['daymark.currency.v1']
+      description: 'The last exchange-rate pair and the amount/currency prefs you typed.',
+      keys: ['daymark.currency.v1', 'daymark.currency.prefs.v1']
+    },
+    {
+      id: 'wiki',
+      label: 'Wikipedia search cache',
+      description: 'The last Wikipedia search results and the query you typed last.',
+      keys: ['daymark.wiki.v1', 'daymark.wiki.prefs.v1']
+    },
+    {
+      id: 'browser-address',
+      label: 'Browser address prefs',
+      description: 'The last search-provider choice on the address helper card.',
+      keys: ['daymark.browser-address.prefs.v1']
     },
     {
       id: 'webhook',
@@ -79,30 +91,37 @@
   }
 
   function categoryById(id) {
-    if (typeof id !== 'string') return null;
     return CATEGORIES.find((category) => category.id === id) || null;
   }
 
-  // Every daymark.* storage key must belong to exactly one category, so the card
-  // can honestly claim it covers everything the prototype stores.
   function isManagedKey(key) {
     return ALL_KEY_SET.has(key);
   }
 
   function planClear(categoryId) {
     const category = categoryById(categoryId);
-    if (!category) throw new Error('Unknown data category: ' + String(categoryId));
+    if (!category) throw new Error('Unknown data category.');
     return category.keys.slice();
   }
 
   function estimateBytes(value) {
-    if (typeof value !== 'string') return 0;
-    if (typeof root.TextEncoder === 'function') {
-      try {
-        return new root.TextEncoder().encode(value).length;
-      } catch (error) { /* fall back to the character count below */ }
+    if (typeof value !== 'string' || !value) return 0;
+    if (typeof TextEncoder === 'function') {
+      return new TextEncoder().encode(value).length;
     }
-    return value.length;
+    // Fallback: approximate without inventing precision when TextEncoder is absent.
+    let bytes = 0;
+    for (let i = 0; i < value.length; i += 1) {
+      const code = value.charCodeAt(i);
+      if (code <= 0x7f) bytes += 1;
+      else if (code <= 0x7ff) bytes += 2;
+      else if (code >= 0xd800 && code <= 0xdbff) {
+        // Surrogate pair — count once as 4 UTF-8 bytes and skip the low surrogate.
+        bytes += 4;
+        i += 1;
+      } else bytes += 3;
+    }
+    return bytes;
   }
 
   function requireUsableStorage(storage) {
