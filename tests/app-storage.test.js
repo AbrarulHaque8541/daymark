@@ -566,13 +566,21 @@ function makeDateOnlyReminderTask(id, dueDate, reminderLeadMinutes, reminderShow
 }
 
 test('date-only reminder persists with null dueTime and fires once at the disclosed 9 AM local time', () => withTimeZone('America/New_York', () => {
-  const task = makeDateOnlyReminderTask('date-only-persist-fire', '2026-11-20', 0);
   const first = bootApp({
-    savedValue: JSON.stringify([task]),
+    savedValue: JSON.stringify([]),
     dateNow: '2026-11-20T13:59:00.000Z'
   });
+  triggerFormInput(first, '#new-due-date', '2026-11-20');
+  first.elements.get('#new-title').value = 'Date-only add form reminder';
+  first.elements.get('#new-reminder').value = '0';
+  triggerFormSubmit(first, '#add-form');
+  const firstSavedTasks = JSON.parse(first.storedValues.get(STORAGE_KEY));
+  assert.equal(firstSavedTasks.length, 1, 'the Add form stores the new reminder');
+  assert.equal(firstSavedTasks[0].dueDate, '2026-11-20');
+  assert.equal(firstSavedTasks[0].dueTime, null, 'the Add form leaves the disclosed time out of storage');
+  assert.equal(firstSavedTasks[0].reminderLeadMinutes, 0, 'the selected lead is saved with the date-only task');
   assert.equal(first.intervalCallbacks[0].delay, 30000, 'the app continues checking reminders on its existing interval');
-  assert.equal(JSON.parse(first.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
+  assert.equal(firstSavedTasks[0].reminderShownFire, undefined,
     '08:59 local is before the date-only 09:00 fire time');
 
   const reloaded = bootApp({
@@ -589,7 +597,7 @@ test('date-only reminder persists with null dueTime and fires once at the disclo
   let savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.dueTime, null);
   assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', '09:00 EST is recorded as the actual local fire instant');
-  assert.match(reloaded.elements.get('#toast').textContent, /Reminder: “Reminder date-only-persist-fire” is due\./);
+  assert.match(reloaded.elements.get('#toast').textContent, /Reminder: “Date-only add form reminder” is due\./);
 
   reloaded.intervalCallbacks[0].callback();
   savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
