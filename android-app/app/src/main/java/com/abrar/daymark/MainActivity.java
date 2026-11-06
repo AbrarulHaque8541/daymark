@@ -277,6 +277,7 @@ public final class MainActivity extends Activity {
     private Button undoButton;
     private TextView dateHeading;
     private TextView openCount;
+    private TextView completedCount;
     private TextView dueTodayCount;
     private TextView taskCount;
     private TextView storageStatus;
@@ -1628,6 +1629,7 @@ public final class MainActivity extends Activity {
         LinearLayout stats = horizontalCard(palette.surface);
         addStat(stats, "Open tasks", openCount = text("0", 23, palette.accent, Typeface.BOLD));
         addStat(stats, "Due today", dueTodayCount = text("0", 23, palette.text, Typeface.BOLD));
+        addStat(stats, "Completed", completedCount = text("0", 23, palette.muted, Typeface.BOLD));
         content.addView(stats, bottomMargin(dp(14)));
     }
 
@@ -5523,14 +5525,20 @@ public final class MainActivity extends Activity {
                 .format(today).toUpperCase(Locale.getDefault()));
         int open = 0;
         int dueToday = 0;
+        int completed = 0;
         for (Task task : tasks) {
-            if (!task.completed) {
+            if (task.completed) {
+                completed++;
+            } else {
                 open++;
                 if (today.toString().equals(task.dueDate)) dueToday++;
             }
         }
         openCount.setText(storageLoading || storageLoadFailed ? "—" : String.valueOf(open));
         dueTodayCount.setText(storageLoading || storageLoadFailed ? "—" : String.valueOf(dueToday));
+        if (completedCount != null) {
+            completedCount.setText(storageLoading || storageLoadFailed ? "—" : String.valueOf(completed));
+        }
         addTaskButton.setEnabled(canEdit() && !webMode);
         addTaskButton.setAlpha(canEdit() ? 1f : 0.55f);
         if (addDetailsButton != null) addDetailsButton.setEnabled(canEdit() && !webMode);
