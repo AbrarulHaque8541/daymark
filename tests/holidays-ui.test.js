@@ -119,7 +119,7 @@ test('attach renders a cached holiday list with a cached note', () => {
   const handle = ui.attachHolidaysUi(env);
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 1, 'past holidays are not shown');
-  assert.equal(rows[0][0], '2026-12-25');
+  assert.equal(rows[0][0], '2026-12-25 · in 49 days');
   assert.equal(rows[0][1], 'Christmas Day');
   assert.equal(rows[0][2], 'Nationwide public holiday');
   assert.ok(elements['holiday-status'].textContent.startsWith('Cached · updated 2026-11-02 09:30 UTC'));
@@ -175,9 +175,9 @@ test('refresh fetches, renders, and persists the result and preference', async (
   assert.equal(fetchImpl.seen[0], 'https://date.nager.at/api/v3/PublicHolidays/2026/IN');
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 2);
-  assert.equal(rows[0][0], '2026-11-14');
+  assert.equal(rows[0][0], '2026-11-14 · in 8 days');
   assert.equal(rows[0][1], 'Diwali · दीवाली');
-  assert.equal(rows[1][0], '2026-12-25');
+  assert.equal(rows[1][0], '2026-12-25 · in 49 days');
   assert.equal(elements['holiday-status'].textContent, 'Updated · 2026-11-06 12:00 UTC');
   assert.equal(elements['holiday-refresh'].disabled, false);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
@@ -199,7 +199,7 @@ test('refresh failure keeps the cached list visible', async () => {
   assert.ok(elements['holiday-status'].textContent.includes('Could not refresh: offline — showing cached holidays.'));
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 1);
-  assert.equal(rows[0][0], '2026-12-25');
+  assert.equal(rows[0][0], '2026-12-25 · in 49 days');
   assert.equal(elements['holiday-refresh'].disabled, false);
 });
 
