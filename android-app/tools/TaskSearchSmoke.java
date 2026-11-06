@@ -42,6 +42,18 @@ public final class TaskSearchSmoke {
                 "existing literal phrases still work without case sensitivity");
         check(filter(tasks, "missing@example.org").isEmpty(),
                 "punctuation-bearing text is not broadened into unrelated terms");
+        Task supportedAcrossFields = task("joined-words", "Weekly", "planning", null, false);
+        check(ids(filter(Collections.singletonList(supportedAcrossFields), "weekly planning"))
+                        .equals(Collections.singletonList("joined-words")),
+                "supported multiword searches still match across searchable fields");
+        Task punctuationAcrossFields = task("joined-punctuation", "Plan @", "budget", null, false);
+        check(ids(filter(Collections.singletonList(punctuationAcrossFields), "plan @ budget"))
+                        .equals(Collections.singletonList("joined-punctuation")),
+                "unsupported-punctuation literal phrases still match across field boundaries");
+        Task numericAcrossFields = task("joined-numbers", "2026", "10", null, false);
+        check(ids(filter(Collections.singletonList(numericAcrossFields), "2026 10"))
+                        .equals(Collections.singletonList("joined-numbers")),
+                "numeric-only literal phrases still match across field boundaries");
     }
 
     private static void matchesCommonTyposAndMultipleTerms() {

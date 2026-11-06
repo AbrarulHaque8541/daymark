@@ -31,21 +31,21 @@ final class TaskSearch {
 
         boolean matches(Task task) {
             if (literal.isEmpty()) return true;
-            // Preserve the existing searchable fields, boundaries and case-insensitive substring
-            // behavior before trying the more permissive word-by-word fallback.
-            String searchable = task.title.toLowerCase(Locale.ROOT)
-                    + " " + task.notes.toLowerCase(Locale.ROOT)
-                    + " " + String.join(" ", task.tags)
-                    + " " + task.priority.toLowerCase(Locale.ROOT)
-                    + " " + (task.dueDate == null ? "no date" : task.dueDate);
-            if (searchable.contains(literal)) return true;
-            if (terms.isEmpty()) return false;
+            String[] searchableFields = searchableFields(task);
+            // Most queries can be checked field-by-field without copying all task text into one
+            // large temporary String. Keep a joined-text fallback only for literal phrases whose
+            // unsupported or numeric terms cannot use the word-by-word matcher below.
+            if (containsAny(searchableFields, literal)) return true;
+            if (terms.isEmpty()) {
+                return literal.indexOf(' ') >= 0
+                        && String.join(" ", searchableFields).contains(literal);
+            }
 
             boolean[] matched = new boolean[terms.size()];
             int remaining = 0;
             for (int index = 0; index < terms.size(); index++) {
                 Term term = terms.get(index);
-                if (searchable.contains(term.text)) {
+                if (containsAny(searchableFields, term.text)) {
                     matched[index] = true;
                 } else if (!term.fuzzyAllowed) {
                     // Short and numeric terms are exact-only, so they cannot create noisy matches.
@@ -56,31 +56,50 @@ final class TaskSearch {
             }
             if (remaining == 0) return true;
 
-            int start = -1;
-            int codePoints = 0;
-            for (int offset = 0; offset <= searchable.length();) {
-                int codePoint = offset < searchable.length() ? searchable.codePointAt(offset) : -1;
-                if (codePoint >= 0 && isWordCodePoint(codePoint)) {
-                    if (start < 0) start = offset;
-                    codePoints++;
-                } else if (start >= 0) {
-                    if (codePoints <= MAX_FUZZY_TERM_CODE_POINTS + 1) {
-                        for (int index = 0; index < terms.size(); index++) {
-                            if (!matched[index] && withinOneEdit(terms.get(index).codePoints,
-                                    searchable, start, offset, codePoints)) {
-                                matched[index] = true;
-                                if (--remaining == 0) return true;
+            for (String searchable : searchableFields) {
+                int start = -1;
+                int codePoints = 0;
+                for (int offset = 0; offset <= searchable.length();) {
+                    int codePoint = offset < searchable.length() ? searchable.codePointAt(offset) : -1;
+                    if (codePoint >= 0 && isWordCodePoint(codePoint)) {
+                        if (start < 0) start = offset;
+                        codePoints++;
+                    } else if (start >= 0) {
+                        if (codePoints <= MAX_FUZZY_TERM_CODE_POINTS + 1) {
+                            for (int index = 0; index < terms.size(); index++) {
+                                if (!matched[index] && withinOneEdit(terms.get(index).codePoints,
+                                        searchable, start, offset, codePoints)) {
+                                    matched[index] = true;
+                                    if (--remaining == 0) return true;
+                                }
                             }
                         }
+                        start = -1;
+                        codePoints = 0;
                     }
-                    start = -1;
-                    codePoints = 0;
+                    if (codePoint < 0) break;
+                    offset += Character.charCount(codePoint);
                 }
-                if (codePoint < 0) break;
-                offset += Character.charCount(codePoint);
             }
             return false;
         }
+    }
+
+    private static String[] searchableFields(Task task) {
+        return new String[] {
+                task.title.toLowerCase(Locale.ROOT),
+                task.notes.toLowerCase(Locale.ROOT),
+                String.join(" ", task.tags),
+                task.priority.toLowerCase(Locale.ROOT),
+                task.dueDate == null ? "no date" : task.dueDate
+        };
+    }
+
+    private static boolean containsAny(String[] fields, String query) {
+        for (String field : fields) {
+            if (field.contains(query)) return true;
+        }
+        return false;
     }
 
     private static final class Term {
