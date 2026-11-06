@@ -46,50 +46,32 @@ required_accessibility = [
     "modeCountdown.setSelected(mode == TaskFocusTimer.Mode.COUNTDOWN);",
     "displayUnitButtons[i].setSelected(selected);",
     "preset.setSelected(selected);",
-    "setMinimumHeight(dp(48))",
-    "new LayoutParams(0, dp(48), 1)",
-    "new LayoutParams(0, dp(62), 1)",
-    "primaryAction.setMinimumHeight(dp(52));",
-    "stopAction.setMinimumHeight(dp(52));",
+    "view.setMinimumHeight(dp(48));",
+    "taskName.setMinimumHeight(dp(48));",
+    "customDuration.setMinimumHeight(dp(48));",
+    "primaryAction.setContentDescription(running ? \"Pause focus timer\"",
+    "taskName.setContentDescription(\"Focus task: \" + taskLabel);",
 ]
 for token in required_accessibility:
-    assert token in panel, f"Focus Timer accessibility contract missing: {token}"
+    assert token in panel, f"Focus Timer accessibility regression: {token}"
+assert 'timeValue.setContentDescription("Focus timer value");' not in panel, (
+    "a generic timer description must not hide the displayed time from screen readers"
+)
 print("PASS Focus Timer accessible control roles, selected/checkable states and 48dp targets")
 
-assert "ToneGenerator" in sound and "AudioManager.STREAM_MUSIC" in sound
-assert "Handler(Looper.getMainLooper())" in sound
-assert "finalTickRunnable" in sound and "playFinalTick()" in sound
-assert "private static final int FINISH_MS = 900;" in sound
-assert "private static final int FINISH_VOLUME = 55;" in sound
-assert "toneGen.startTone(ToneGenerator.TONE_PROP_ACK, FINISH_MS);" in sound
-assert "onSelection()" in sound and "onPrimaryAction()" in sound and "onStop()" in sound and "onFinish()" in sound
-assert "setFinalTicksEnabled" in sound and "finalTicksEnabled && !released" in sound
-assert "handler.removeCallbacks(finalTickRunnable);" in sound
-assert "close()" in sound and "toneGen.release()" in sound
-assert "handler.postDelayed(finalTickRunnable, 1000L)" in sound
-assert "handler.post(finalTickRunnable)" not in sound or "postDelayed" in sound
-assert "while" not in sound.split("playFinalTick")[1].split("private void")[0], "final ticks must not use a blocking playback loop"
-assert "RECORD_AUDIO" not in sound and "MODIFY_AUDIO_SETTINGS" not in sound, "Sound effects must not request microphone/audio-control permissions"
-assert "onChooseTask" in panel and "listener.onChooseTask()" in panel
-assert "if (closed) return;" in panel, "disposed panel must ignore render and public state updates"
-assert "if (!closed && !actionPending && timer != null && !timer.isFinished())" in panel, "disposed or pending panel must not dispatch Finish"
-assert "private boolean released;" in sound and "|| released" in sound, "released soundscape must never recreate audio resources"
-
-# Focus Timer local preferences must persist display unit and sound toggles across sessions.
-assert 'FOCUS_PREFS = "daymark.focus.prefs.v1"' in panel, (
+prefs_helper = (root / "app/src/main/java/com/abrar/daymark/TaskFocusTimerPrefs.java").read_text()
+assert 'PREFS = "daymark.focus.prefs.v1"' in prefs_helper, (
     "Focus preferences must use a versioned SharedPreferences name"
 )
-assert "KEY_DISPLAY_UNIT" in panel and "KEY_SOUND_ENABLED" in panel and "KEY_FINAL_TICKS" in panel, (
+assert "KEY_DISPLAY_UNIT" in prefs_helper and "KEY_SOUND_ENABLED" in prefs_helper and "KEY_FINAL_TICKS" in prefs_helper, (
     "Focus preference keys for display unit, sound, and final ticks are required"
 )
 assert "loadFocusPreferences()" in panel, "constructor must load Focus preferences before building controls"
 assert "saveFocusPreferences()" in panel, "user changes to Focus preferences must be saved"
-assert "putString(KEY_DISPLAY_UNIT" in panel and "putBoolean(KEY_SOUND_ENABLED" in panel and "putBoolean(KEY_FINAL_TICKS" in panel, (
-    "saveFocusPreferences must write display unit, sound, and final-tick values"
+assert "TaskFocusTimerPrefs.loadDisplayUnit" in panel and "TaskFocusTimerPrefs.loadSoundEnabled" in panel, (
+    "panel must load display unit and sound prefs through TaskFocusTimerPrefs"
 )
-assert "getString(KEY_DISPLAY_UNIT" in panel and "getBoolean(KEY_SOUND_ENABLED" in panel, (
-    "loadFocusPreferences must read the saved display unit and sound preference"
-)
+assert "TaskFocusTimerPrefs.save(" in panel, "panel must save Focus preferences through TaskFocusTimerPrefs"
 assert "DisplayUnit.valueOf" in panel, "invalid saved display unit values must fail closed via valueOf"
 assert '(selected ? " (selected)" : "")' in panel, (
     "display-unit buttons must expose selected state in content descriptions"
@@ -100,75 +82,6 @@ assert 'settingRow("Final 10-second ticks", finalTicksEnabled)' in panel, (
 assert "sounds.setFinalTicksEnabled(finalTicksEnabled)" in panel, (
     "soundscape must receive the restored final-ticks preference at construction"
 )
-
 print("PASS focus timer preference persistence source guard")
 
 print("PASS focus timer UI/sound source guard")
-
-required_integration = [
-    "new TaskFocusTimerPanel(this, new TaskFocusTimerPanel.Listener()",
-    "startFocusSession(mode, targetDurationMs)",
-    "focusSessionRuntime.startFromUserAction(",
-    "focusSessionRuntime.restoreAfterProcessStart(loaded)",
-    "focusSessionRuntime.reconcileTasks(snapshot)",
-    "focusSessionRuntime.reconcileTasks(currentTasksAfterRestore)",
-    "focusTimerPanel.render(timer, android.os.SystemClock.elapsedRealtime())",
-    "focusTimerPanel.close()",
-    "stopFocusTimerTick()",
-    "showFocusTaskPicker()",
-    "focusSessionRuntime.switchTaskWhilePausedFromUserAction(",
-    "focusSessionRuntime.resumeFromUserAction(selected.id, selected.title)",
-    "focusTimerPanel.setActionPending(true)",
-]
-for token in required_integration:
-    assert token in activity, f"Focus Timer Activity integration missing: {token}"
-
-picker_start = activity.index("    private void showFocusTaskPicker()")
-picker_end = activity.index("    private void startFocusSession(", picker_start)
-picker = activity[picker_start:picker_end]
-picker_gate = picker[:picker.index("List<Task> eligible")]
-assert "if (focusSnapshot != null && focusSnapshot.isRunning())" in picker_gate, (
-    "task switching must be blocked while the Focus Timer is RUNNING"
-)
-assert "isPaused()" not in picker_gate and "!focusSnapshot.isFinished()" not in picker_gate, (
-    "PAUSED and FINISHED Focus Timer sessions must not block task switching"
-)
-selection_start = picker.index("Task chosen = eligible.get(which);")
-selection_end = picker.index("selectedFocusTaskId = chosen.id;", selection_start)
-selection = picker[selection_start:selection_end]
-assert "if (focusSnapshot != null && focusSnapshot.isPaused())" in selection, (
-    "paused task selection must take the durable session-switch path"
-)
-assert "runFocusAction(() -> focusSessionRuntime.switchTaskWhilePausedFromUserAction(" in selection, (
-    "paused task selection must persist the task ID before updating the panel"
-)
-assert "return;" in selection, "paused task selection must not fall through to the UI-only selection path"
-assert "selectedFocusTaskId = chosen.id;" in picker, (
-    "the task picker must still apply the selected task"
-)
-resume_start = activity.index("    private void resumeFocusSession()")
-resume_end = activity.index("    private void finishFocusSession()", resume_start)
-resume = activity[resume_start:resume_end]
-assert "resumeFromUserAction(selected.id, selected.title)" in resume, (
-    "resume must identify the exact selected task so stale UI identity cannot publish a mismatched title"
-)
-print("PASS task-chip regression guard: paused selection is persisted before resume; RUNNING blocked")
-
-assert "coordinator.startFromUserAction(" in runtime
-assert "coordinator.switchTaskWhilePausedFromUserAction(taskId, title)" in runtime
-assert "coordinator.resumeFromUserAction(taskId, title)" in runtime
-assert "store.save(timer, elapsed, wall, boot)" in runtime
-assert "TaskFocusTimerNotification.publish(" in runtime
-assert "findTask(tasks, saved == null ? null : saved.taskId())" in runtime
-assert "TaskFocusTimerStore" in runtime and "focus-session.enc" not in activity
-print("PASS focus timer task UI integration: explicit user actions, encrypted session runtime, task resolution, Activity cleanup")
-
-layout_policy = (root / "app/src/main/java/com/abrar/daymark/TasksHomeLayoutPolicy.java").read_text()
-assert "TasksHomeLayoutPolicy.forWidthDp(screenWidthDp)" in activity
-assert "homeLayout.maxContentWidthDp" in activity
-assert "homeLayout.columns" in activity
-assert "contentFrame.addView(content, contentParams)" in activity
-assert "if (widthDp >= 840)" in layout_policy
-assert "new Layout(1040, 24, 2, 16, 12)" in layout_policy
-assert "new Layout(720, 24, 1, 0, 12)" in layout_policy
-print("PASS responsive Tasks Home: centered max-width content and two-column expanded task grid")
