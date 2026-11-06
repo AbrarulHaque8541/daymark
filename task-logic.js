@@ -16,6 +16,8 @@
   const REMINDER_LEADS = [0, 30, 60, 1440];
   const MAX_TAGS = 5;
   const MAX_TAG_CHARS = 24;
+  const MIN_ESTIMATED_MINUTES = 1;
+  const MAX_ESTIMATED_MINUTES = 480;
 
   function isDateOnly(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -72,6 +74,12 @@
     return normalized;
   }
 
+  function isValidEstimatedMinutes(value) {
+    return value === undefined || value === null
+      || (typeof value === 'number' && Number.isInteger(value)
+          && value >= MIN_ESTIMATED_MINUTES && value <= MAX_ESTIMATED_MINUTES);
+  }
+
   function isValidTask(task) {
     return Boolean(task && typeof task === 'object'
       && typeof task.id === 'string' && task.id.length > 0
@@ -89,7 +97,8 @@
       && (task.reminderShownFire === undefined || task.reminderShownFire === null
         || (typeof task.reminderShownFire === 'string' && !Number.isNaN(Date.parse(task.reminderShownFire))))
       && (task.subtasks === undefined || isValidSubtasks(task.subtasks))
-      && (task.tags === undefined || task.tags === null || isValidTags(task.tags)));
+      && (task.tags === undefined || task.tags === null || isValidTags(task.tags))
+      && isValidEstimatedMinutes(task.estimatedMinutes));
   }
 
   function validateStoredTasks(value) {
@@ -141,10 +150,11 @@
   }
 
   function suggestionReason(task, today, formatDate) {
-    if (task.dueDate && task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)} · ${task.priority} priority`;
-    if (task.dueDate === today) return `Due today · ${task.priority} priority`;
-    if (task.dueDate) return `Due ${formatDate(task.dueDate)} · ${task.priority} priority`;
-    return `No due date · ${task.priority} priority`;
+    const estimate = (typeof task.estimatedMinutes === 'number') ? ` · ~${task.estimatedMinutes}m` : '';
+    if (task.dueDate && task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)} · ${task.priority} priority${estimate}`;
+    if (task.dueDate === today) return `Due today · ${task.priority} priority${estimate}`;
+    if (task.dueDate) return `Due ${formatDate(task.dueDate)} · ${task.priority} priority${estimate}`;
+    return `No due date · ${task.priority} priority${estimate}`;
   }
 
   function getSuggestions(tasks, today, formatDate) {
@@ -172,6 +182,7 @@
     normalizeTags,
     isTag,
     isValidTask,
+    isValidEstimatedMinutes,
     validateStoredTasks,
     getFilteredTasks,
     getSuggestions,
@@ -180,7 +191,9 @@
     MAX_SUBTASK_TITLE,
     REMINDER_LEADS,
     MAX_TAGS,
-    MAX_TAG_CHARS
+    MAX_TAG_CHARS,
+    MIN_ESTIMATED_MINUTES,
+    MAX_ESTIMATED_MINUTES
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkLogic = api;

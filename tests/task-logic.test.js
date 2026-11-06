@@ -191,3 +191,23 @@ test('shared task date contract matches the Java host implementation fixture', (
   }
   assert.equal(cases, 9, 'shared date contract must include all nine cases');
 });
+
+test('estimatedMinutes is optional and bounded when present', () => {
+  const base = task('est', 'Estimate me');
+  assert.equal(logic.isValidTask({ ...base, estimatedMinutes: 25 }), true);
+  assert.equal(logic.isValidTask({ ...base, estimatedMinutes: 1 }), true);
+  assert.equal(logic.isValidTask({ ...base, estimatedMinutes: 480 }), true);
+  assert.equal(logic.isValidTask({ ...base, estimatedMinutes: 0 }), false);
+  assert.equal(logic.isValidTask({ ...base, estimatedMinutes: 481 }), false);
+  assert.equal(logic.isValidTask({ ...base, estimatedMinutes: 1.5 }), false);
+  assert.equal(logic.isValidEstimatedMinutes(undefined), true);
+  assert.equal(logic.isValidEstimatedMinutes(null), true);
+  assert.equal(logic.isValidEstimatedMinutes(25), true);
+});
+
+test('suggestion reasons include estimatedMinutes when present', () => {
+  const withEstimate = { ...task('e', 'With estimate', { dueDate: TODAY }), estimatedMinutes: 15 };
+  const reason = logic.getSuggestions([withEstimate], TODAY, (d) => d)[0].reason;
+  assert.match(reason, /~15m/);
+  assert.match(reason, /Due today/);
+});
