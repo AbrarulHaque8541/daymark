@@ -5,6 +5,7 @@ final class TasksHomeLayoutPolicy {
     private TasksHomeLayoutPolicy() { }
 
     static Layout forWidthDp(int widthDp) {
+        if (widthDp >= 1200) return new Layout(1280, 32, 3, 20, 16);
         if (widthDp >= 840) return new Layout(1040, 24, 2, 16, 12);
         if (widthDp >= 600) return new Layout(720, 24, 1, 0, 12);
         return new Layout(0, 16, 1, 0, 10);
