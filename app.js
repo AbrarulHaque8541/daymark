@@ -422,6 +422,18 @@
       button.setAttribute('aria-pressed', String(active));
     });
 
+    // Searching re-renders the entire list; a polite live region would re-announce all
+    // of it on every keystroke, which makes search unusable with a screen reader.
+    // While a query is active the list itself goes quiet and the concise result count
+    // in the dedicated status element becomes the only search announcement.
+    taskList.setAttribute('aria-live', hasQuery ? 'off' : 'polite');
+    const searchResultStatus = $('#search-result-status');
+    if (searchResultStatus) {
+      searchResultStatus.textContent = hasQuery
+        ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
+        : '';
+    }
+
     taskList.innerHTML = filteredTasks.map((task) => taskMarkup(task, today)).join('');
     // The first render is the reliable completion signal for the initial skeleton.
     taskList.classList.add('is-ready');
