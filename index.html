@@ -17,6 +17,8 @@
   <script src="feed-logic.js" defer></script>
   <script src="weather-logic.js" defer></script>
   <script src="weather-ui.js" defer></script>
+  <script src="holidays-logic.js" defer></script>
+  <script src="holidays-ui.js" defer></script>
   <script src="currency-logic.js" defer></script>
   <script src="currency-ui.js" defer></script>
   <script src="wiki-logic.js" defer></script>
@@ -219,6 +221,36 @@
           <p class="weather-status" id="weather-status" role="status" aria-live="polite"></p>
           <div class="weather-now" id="weather-now" aria-live="polite"></div>
         </aside>
+        <aside class="briefing-card" id="holiday-card" aria-labelledby="holiday-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="holiday-heading">Public holidays ahead</h2>
+          <p class="briefing-description">Nager.Date open data — no account, no API key. Cached offline.</p>
+          <form id="holiday-form" class="feed-form" novalidate>
+            <label class="sr-only" for="holiday-country">Country for public holidays</label>
+            <select id="holiday-country" name="country" class="sort-select" aria-label="Country">
+              <option value="IN" selected>IN — India</option>
+              <option value="US">US — United States</option>
+              <option value="GB">GB — United Kingdom</option>
+              <option value="AU">AU — Australia</option>
+              <option value="CA">CA — Canada</option>
+              <option value="DE">DE — Germany</option>
+              <option value="FR">FR — France</option>
+              <option value="ES">ES — Spain</option>
+              <option value="IT">IT — Italy</option>
+              <option value="NL">NL — Netherlands</option>
+              <option value="JP">JP — Japan</option>
+              <option value="SG">SG — Singapore</option>
+              <option value="AE">AE — United Arab Emirates</option>
+              <option value="BR">BR — Brazil</option>
+              <option value="ZA">ZA — South Africa</option>
+              <option value="NZ">NZ — New Zealand</option>
+            </select>
+            <button class="button button-primary" id="holiday-refresh" type="submit">Refresh</button>
+            <button class="button button-quiet" id="holiday-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="holiday-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="holiday-list" aria-live="polite"></div>
+        </aside>
         <aside class="currency-card" id="currency-card" aria-labelledby="currency-heading">
           <div class="currency-topline"><span class="currency-dot" aria-hidden="true"></span></div>
           <h2 id="currency-heading">Quick currency check</h2>
@@ -397,5 +429,3 @@
   </div>
 </body>
 </html>
-
-

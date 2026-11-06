@@ -47,6 +47,12 @@
       keys: ['daymark.weather.v1']
     },
     {
+      id: 'holidays',
+      label: 'Holiday cache',
+      description: 'The last public-holidays list for the country you last checked.',
+      keys: ['daymark.holidays.v1']
+    },
+    {
       id: 'currency',
       label: 'Currency cache',
       description: 'The last exchange-rate pair you looked up.',
