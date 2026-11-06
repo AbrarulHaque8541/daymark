@@ -54,10 +54,22 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (listEl && listEl.classList && typeof listEl.classList.toggle === 'function') {
+        listEl.classList.toggle('is-loading', isBusy);
+      }
     }
 
     function todayIso() {
       return String(now()).slice(0, 10);
+    }
+
+    function daysUntil(dateStr) {
+      const today = new Date(todayIso() + 'T00:00:00Z');
+      const then = new Date(dateStr + 'T00:00:00Z');
+      const diff = Math.round((then.getTime() - today.getTime()) / 86400000);
+      if (diff <= 0) return 'today';
+      if (diff === 1) return 'tomorrow';
+      return 'in ' + diff + ' days';
     }
 
     function makeRow(rowClass) {
@@ -107,9 +119,10 @@
         appendText(row, 'feed-item-title', holiday.name
           + (holiday.localName && holiday.localName !== holiday.name ? ' · ' + holiday.localName : ''));
         const scope = holiday.global ? 'Nationwide public holiday' : 'Regional holiday';
+        const relative = daysUntil(holiday.date);
         appendText(row, 'feed-item-summary', holiday.localName && holiday.localName !== holiday.name
-          ? 'Locally: ' + holiday.localName + ' · ' + scope
-          : scope);
+          ? 'Locally: ' + holiday.localName + ' · ' + scope + ' · ' + relative
+          : scope + ' · ' + relative);
         listEl.appendChild(row);
       }
     }
@@ -148,6 +161,7 @@
         return;
       }
       setBusy(true);
+      status('Refreshing holidays…');
       try {
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;

@@ -120,7 +120,7 @@ test('attach renders a cached holiday list with a cached note', () => {
   assert.equal(rows.length, 1, 'past holidays are not shown');
   assert.equal(rows[0][0], '2026-12-25');
   assert.equal(rows[0][1], 'Christmas Day');
-  assert.equal(rows[0][2], 'Nationwide public holiday');
+  assert.equal(rows[0][2], 'Nationwide public holiday · in 49 days');
   assert.ok(elements['holiday-status'].textContent.startsWith('Cached · updated 2026-11-02 09:30 UTC'));
   assert.equal(elements['holiday-country'].value, 'IN');
   assert.equal(typeof handle.onRefresh, 'function');
@@ -134,7 +134,7 @@ test('a cached list shows local names and regional scope honestly', () => {
   ui.attachHolidaysUi(env);
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows[0][1], 'Diwali · दीवाली');
-  assert.equal(rows[0][2], 'Locally: दीवाली · Regional holiday');
+  assert.equal(rows[0][2], 'Locally: दीवाली · Regional holiday · in 8 days');
 });
 
 test('attach with no cache prompts the user to choose a country', () => {
@@ -176,7 +176,9 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(rows.length, 2);
   assert.equal(rows[0][0], '2026-11-14');
   assert.equal(rows[0][1], 'Diwali · दीवाली');
+  assert.equal(rows[0][2], 'Locally: दीवाली · Regional holiday · in 8 days');
   assert.equal(rows[1][0], '2026-12-25');
+  assert.equal(rows[1][2], 'Nationwide public holiday · in 49 days');
   assert.equal(elements['holiday-status'].textContent, 'Updated · 2026-11-06 12:00 UTC');
   assert.equal(elements['holiday-refresh'].disabled, false);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
@@ -197,6 +199,7 @@ test('refresh failure keeps the cached list visible', async () => {
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 1);
   assert.equal(rows[0][0], '2026-12-25');
+  assert.equal(rows[0][2], 'Nationwide public holiday · in 49 days');
   assert.equal(elements['holiday-refresh'].disabled, false);
 });
 
