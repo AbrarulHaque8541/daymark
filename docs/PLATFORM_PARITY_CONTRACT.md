@@ -25,7 +25,7 @@ Create a platform-neutral core for deterministic logic only:
 - Task/domain models, validation, ordering, filtering, and state transitions.
 - Stable serialization/schema contract and migration fixtures.
 - Browser address parsing and navigation/security decisions.
-- Explicit online-consent state machine and HTTPS-only policy decisions.
+- Explicit online-consent state machine and HTTP+HTTPS policy decisions.
 - Typed errors and recovery decisions.
 - Test fixtures that do not contain real personal task data.
 
@@ -48,7 +48,7 @@ Shared product semantics do not require identical pixels. The UI must provide eq
 
 The browser is a separately replaceable engine adapter behind a common policy boundary. Test policy independently of the engine, then test engine integration separately. The adapter contract covers:
 
-- Explicit HTTP and HTTPS navigation, a visible **Not encrypted** state for HTTP, and reviewed downgrade/redirect behavior. Android's current app-wide cleartext restriction and browser UI disagree with the source policy, so HTTP runtime support is not accepted until device tests pass.
+- Explicit HTTP and HTTPS navigation and a visible **Not encrypted** state for HTTP. The owner-approved 2026-11-06 policy enables cleartext and follows redirect downgrades like mainstream browsers; HTTP runtime support is not device-verified, so do not claim device-verified HTTP support until device tests pass.
 - Explicit online consent and offline behavior.
 - Redirects, external intents, `target=_blank`, popups, downloads, permission prompts, and error/retry.
 - Clear site data/history and lifecycle/recovery.
@@ -118,7 +118,7 @@ The intended resource saving is to write scenarios once, reuse fixtures and asse
 - Preserve the production signer pin, signing secrets, monotonic versioning, and release gates.
 - Keep task data local-first and encrypted at rest; migration/export must be explicit and tested.
 - No analytics/ad SDKs and no task-content upload to CI or cloud services.
-- Preserve HTTPS-only browsing, explicit online consent, and safe untrusted-page boundaries.
+- Preserve HTTP+HTTPS browsing with visible **Not encrypted** labelling, explicit online consent, and safe untrusted-page boundaries.
 - Do not close browser blank-viewport issue #221 until its required runtime/device evidence is recorded.
 - Do not merge a framework rewrite or browser-engine swap as part of the initial architecture documentation change.
 
