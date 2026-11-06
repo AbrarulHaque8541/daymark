@@ -95,7 +95,7 @@ assert permission_names(sideload_manifest) == {
     "android.permission.POST_PROMOTED_NOTIFICATIONS",
 }, "GitHub sideload may declare only network/connectivity plus optional Android 16 Live Update promotion"
 assert app.get("{http://schemas.android.com/apk/res/android}allowBackup") == "false", "backup must stay disabled"
-assert app.get("{http://schemas.android.com/apk/res/android}usesCleartextTraffic") == "false", "cleartext must stay disabled"
+assert app.get("{http://schemas.android.com/apk/res/android}usesCleartextTraffic") == "true", "cleartext must stay enabled for owner-approved HTTP browsing"
 assert not list(app.findall("service")), "V1 must not add services"
 receivers = app.findall("receiver")
 assert len(receivers) == 1, "only the task-reminder boot receiver is allowed"
@@ -272,8 +272,8 @@ assert "targetRef[0] != browserWebView" in activity, "inactive tabs must not ove
 assert "daymark-download://media?url=" in activity, "in-player download button must hand direct media to the native download pipeline"
 assert "window.location.href='daymark-download://media?url='" in activity, "overlay click must use a bounded custom-scheme handoff rather than a fake HTML download"
 assert "onMediaDownloadRequested(String url)" in webview and "request.hasGesture()" in webview, "media handoff must require a user gesture"
-assert "BrowserMediaPolicy.allowsHandoff" in webview and "BrowserAddress.isAllowedWebUrl(mediaUrl)" in media_policy, "media handoff must centralize HTTPS validation"
-for expected in ("offline mode must block media handoff", "media handoff must require a user gesture", "cleartext media must be rejected"):
+assert "BrowserMediaPolicy.allowsHandoff" in webview and "BrowserAddress.isAllowedWebUrl(mediaUrl)" in media_policy, "media handoff must centralize web-URL validation"
+for expected in ("offline mode must block media handoff", "media handoff must require a user gesture", "cleartext media must be allowed (owner-approved HTTP browsing)"):
     assert expected in media_smoke, f"missing executable media-policy regression: {expected}"
 assert "BrowserTabPolicy.MAX_TABS = 6" in tab_policy or "MAX_TABS = 6" in tab_policy, "browser tabs must have a memory-conscious limit"
 for expected in ("tab count must be bounded", "closing the last tab should leave no selection", "selection must remain within the remaining tab list"):
@@ -311,7 +311,7 @@ privacy_disclosure = re.search(r'String disclosureText\s*=\s*"(.*?)";', activity
 assert privacy_disclosure, "browser home must retain an explicit privacy disclosure"
 disclosure_text = privacy_disclosure.group(1)
 for expected in (
-    "Site history keeps only validated HTTPS origins",
+    "Site history keeps only validated HTTP/HTTPS origins",
     "Paths, queries, fragments, URL credentials, and page titles are not saved",
     "Selecting a saved site opens its origin, not its last route",
 ):
@@ -321,7 +321,7 @@ assert 'showInfo("Privacy & connection details", disclosureText)' in activity, "
 assert "sanitizeStoredBrowserHistory();" in activity and "BrowserHistory.sanitizeSerialized(existing)" in activity, "legacy history must be sanitized on launch"
 assert "BrowserHistory.sanitizeUrl(url)" in activity and "BrowserHistory.add(current, safeHistoryUrl)" in activity, "each history write must pass through the sanitizer"
 history_dialog = re.search(r"private void showBrowserHistoryDialog\(\)\s*\{(.*?)\n    \}", activity, re.S)
-assert history_dialog and 'setTitle("Site history (HTTPS origins only)")' in history_dialog.group(1)
+assert history_dialog and 'setTitle("Site history (HTTP/HTTPS origins only)")' in history_dialog.group(1)
 assert history_dialog and "String url = history.get(matchedIndices.get(position));" in history_dialog.group(1) and "navigateBrowserTo(url)" in history_dialog.group(1), "reopening a saved site must navigate to its origin"
 for expected in ("source.getRawAuthority()", "authority.lastIndexOf('@')",
                  "hostAndPort.lastIndexOf(':')", "IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES)",
@@ -381,7 +381,7 @@ assert load_address and "browserWebView.loadUrl(address)" in load_address.group(
 for expected in (
     "settings.setBlockNetworkLoads(true)",
     "settings.setSafeBrowsingEnabled(safeBrowsingEnabled)",
-    "WebSettings.MIXED_CONTENT_NEVER_ALLOW",
+    "WebSettings.MIXED_CONTENT_ALWAYS_ALLOW",
     "settings.setAllowFileAccess(false)",
     "settings.setAllowContentAccess(false)",
     "settings.setAllowFileAccessFromFileURLs(false)",
@@ -400,8 +400,6 @@ for expected in (
     "listener.onDownloadRequested(url, userAgent, contentDisposition, mimeType, contentLength)",
     "BrowserAddress.isAllowedWebUrl(url)",
     "request.isForMainFrame()",
-    "request.isRedirect()",
-    "onHttpNavigationBlocked(url, true)",  # HTTPS→HTTP redirect downgrade still blocked
 ):
     assert expected in webview, f"missing WebView security boundary: {expected}"
 for forbidden in ("addJavascriptInterface(", "shouldInterceptRequest(", "loadUrl(request.getUrl",
@@ -450,12 +448,12 @@ for expected in ("WebStorage.getInstance().deleteAllData()", "removeAllCookies("
     assert expected in clear.group(1), f"clear action must include {expected}"
 assert "BrowserHistory.clear()" in clear.group(1), "clear action must erase local history"
 assert 'compactButton("Site history", false)' in activity and "Clear site history & data" in activity
-assert "Site history stores only validated HTTPS origins" in activity and "no paths, queries, fragments, URL credentials, or page titles" in activity
+assert "Site history stores only validated HTTP/HTTPS origins" in activity and "no paths, queries, fragments, URL credentials, or page titles" in activity
 assert "for all websites used in Daymark (not just the current site)" in activity, "clear scope must disclose all-site WebView storage/cookie deletion"
 assert "saved Android Autofill or password-manager data is not cleared" in activity, "clear disclosure must not overstate WebView form-data clearing"
 assert "showBrowserStatus(\"Clearing Daymark site history and local site data...\")" in clear.group(1), "clear action must show a clearing status before asynchronous cookie removal"
 assert "Daymark site history, WebView cache, Web SQL/HTML5 Storage, and cookies were cleared." in clear.group(1), "completion status must follow asynchronous cookie removal"
-assert "HTTP redirect/downgrade was blocked" in activity and "No insecure page was opened" in activity
+assert "Daymark opens web (HTTP and HTTPS) pages" in activity and "this HTTP page has no transport security" in activity, "HTTP pages must load and be labelled Not encrypted"
 
 text_size_calls = re.findall(r"\.setTextSize\(([^)]*)\)", activity)
 assert text_size_calls, "expected scalable text controls"
@@ -593,7 +591,7 @@ print("PASS lifecycle policy: task/storage/attachment/browser callbacks are supp
 print("PASS portable backup policy: bounded AES-GCM format, SAF create-only export, snapshot-last restore journal")
 print("PASS task/browser separation: web input does not create tasks or receive task-draft prefill")
 print("PASS browser policy: fresh installs Online like mainstream browsers; a saved Offline choice still fails closed behind the explicit Enable Online disclosure; HTTP/HTTPS navigation still requires a separate Go/site tap")
-print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, downgrade guard, no JS bridge/interceptor; HTTP runtime and visible label NOT TESTED")
+print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, cleartext HTTP loading with no downgrade guard, no JS bridge/interceptor; HTTP runtime and visible label NOT TESTED")
 print("PASS browser settings: Safe Browsing defaults on, confirmed opt-out persists, and current/future WebViews track the preference")
 print("PASS WebView source security: Safe Browsing, mixed-content/file-access restrictions, SSL cancel, site permission denial, pop-up/download handling")
 print("PASS local browser data: capped origin-only site history, legacy-origin migration, reopen/dedup, secret redaction, and explicit history/cookie/cache/WebStorage clear")

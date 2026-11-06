@@ -1,6 +1,6 @@
 package com.abrar.daymark;
 
-/** Validation for user-initiated media downloads discovered inside WebView pages. */
+/** Validation for user-initiated media downloads discovered inside WebView pages. HTTP media is allowed on the owner-approved HTTP+HTTPS browsing policy. */
 final class BrowserMediaPolicy {
     private BrowserMediaPolicy() { }
 
@@ -10,7 +10,7 @@ final class BrowserMediaPolicy {
                 && userGesture
                 && "daymark-download".equalsIgnoreCase(scheme)
                 && "media".equalsIgnoreCase(host)
-                && BrowserHttpPolicy.isHttps(mediaUrl)
+                && BrowserHttpPolicy.isAllowedWebScheme(mediaUrl)
                 && BrowserAddress.isAllowedWebUrl(mediaUrl);
     }
 }

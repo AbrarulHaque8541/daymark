@@ -1798,7 +1798,7 @@ public final class MainActivity extends Activity {
         webGoButton.setOnClickListener(view -> navigateFromInput());
         providerRow.addView(webGoButton, new LinearLayout.LayoutParams(dp(76), dp(48)));
         webActions.addView(providerRow);
-        TextView requestNote = text("Browsing starts ready for explicit searches and sites; no page opens until you tap Go or a provider shortcut. Requests send the query or URL and normal connection data (such as IP address and browser identification) to the chosen destination, which may log it; pages may contact third parties. Android System WebView Safe Browsing is a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash checks, depending on WebView/device settings. Daymark sends no task text or app telemetry; WebView diagnostic metrics are opted out. HTTP is blocked.",
+        TextView requestNote = text("Browsing starts ready for explicit searches and sites; no page opens until you tap Go or a provider shortcut. Requests send the query or URL and normal connection data (such as IP address and browser identification) to the chosen destination, which may log it; pages may contact third parties. Android System WebView Safe Browsing is a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash checks, depending on WebView/device settings. Daymark sends no task text or app telemetry; WebView diagnostic metrics are opted out. HTTP pages are allowed and labelled \"Not encrypted\"; HTTPS pages are encrypted.",
                 11, palette.muted, Typeface.NORMAL);
         webActions.addView(requestNote, topMargin(dp(3)));
         card.addView(webActions);
@@ -1851,7 +1851,7 @@ public final class MainActivity extends Activity {
         browserAddressInput = new EditText(this);
         browserAddressInput.setSingleLine(true);
         browserAddressInput.setTextSize(14 * textScale);
-        browserAddressInput.setHint("Search or enter HTTPS address");
+        browserAddressInput.setHint("Search or enter a web address");
         browserAddressInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         browserAddressInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_VARIATION_URI);
@@ -1943,8 +1943,8 @@ public final class MainActivity extends Activity {
     private void showBrowserSiteInfo() {
         if (isFinishing() || isDestroyed()) return;
         String origin = BrowserAddress.isAllowedWebUrl(lastBrowserAddress)
-                ? BrowserLogPolicy.redactedOrigin(lastBrowserAddress) : "No HTTPS page is open.";
-        String details = origin + "\n\nDaymark allows HTTPS pages only. Certificate errors are "
+                ? BrowserLogPolicy.redactedOrigin(lastBrowserAddress) : "No web page is open.";
+        String details = origin + "\n\nDaymark opens HTTP and HTTPS pages. Certificate errors are "
                 + "cancelled and never bypassed. HTTPS protects the connection in transit but does "
                 + "not guarantee that a website itself is trustworthy or safe.";
         new AlertDialog.Builder(this)
@@ -2024,7 +2024,7 @@ public final class MainActivity extends Activity {
         browserHomeButton.setContentDescription("Open a new browser tab");
         browserHomeButton.setOnClickListener(view -> requestNewBrowserTab());
         browserHistoryButton = compactButton("Site history", false);
-        browserHistoryButton.setContentDescription("View local site history, which lists HTTPS origins only, or clear site history and site data");
+        browserHistoryButton.setContentDescription("View local site history, which lists validated web origins only, or clear site history and site data");
         browserHistoryButton.setOnClickListener(view -> showBrowserHistoryDialog());
         browserHistoryButton.setVisibility(View.GONE);
         browserSettingsButton = compactButton("Privacy", false);
@@ -2061,13 +2061,13 @@ public final class MainActivity extends Activity {
         toolbarScroll.addView(toolbar);
 
         String disclosureText =
-                "Browsing is ready for explicit user-initiated navigation; no page opens until you tap Go or a site. Queries/URLs and connection data go to the chosen destination, which may log them; pages may contact third parties. Android System WebView Safe Browsing is separate and platform-managed; it may contact Google/Play Services for version/device-dependent threat-list updates or URL-hash checks. The Safe Browsing provider itself is not selectable in Daymark. HTTPS only; HTTP is blocked. Site history keeps only validated HTTPS origins (scheme, host, and non-default port). Paths, queries, fragments, URL credentials, and page titles are not saved; older entries are reduced to origins when Daymark opens. Selecting a saved site opens its origin, not its last route. Site history is local but not encrypted; use Site history to clear it and Daymark's cookies/cache/storage.";
+                "Browsing is ready for explicit user-initiated navigation; no page opens until you tap Go or a site. Queries/URLs and connection data go to the chosen destination, which may log them; pages may contact third parties. Android System WebView Safe Browsing is separate and platform-managed; it may contact Google/Play Services for version/device-dependent threat-list updates or URL-hash checks. The Safe Browsing provider itself is not selectable in Daymark. HTTP and HTTPS pages both open; HTTP pages are labelled \"Not encrypted\". Site history keeps only validated HTTP/HTTPS origins (scheme, host, and non-default port). Paths, queries, fragments, URL credentials, and page titles are not saved; older entries are reduced to origins when Daymark opens. Selecting a saved site opens its origin, not its last route. Site history is local but not encrypted; use Site history to clear it and Daymark's cookies/cache/storage.";
         browserPrivacyButton = text("ⓘ", 18, palette.muted, Typeface.NORMAL);
         browserPrivacyButton.setGravity(Gravity.CENTER);
         browserPrivacyButton.setPadding(dp(4), 0, dp(4), 0);
         browserPrivacyButton.setBackground(shape(palette.surface, 18, palette.line));
         browserPrivacyButton.setContentDescription("Open privacy and connection details");
-        browserPrivacyButton.setContentDescription("Browser privacy: browsing is ready for explicit user-initiated navigation; each search or site still requires a separate tap. The selected destination receives your query or URL and normal connection data such as your IP address and browser identification, and may log it; pages may contact and be logged by third-party endpoints. Daymark's browser network policy controls Daymark page and resource loads only and does not control Android System WebView Safe Browsing, a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash-based checks. The Safe Browsing provider itself is not selectable in Daymark. Browser Settings can disable the protection feature only after a warning. WebView M126 and later may send a partial URL hash through a proxy for real-time checks; earlier versions use a local partial-hash database and may query a server on prefix match. This does not mean every full URL is sent; the method depends on WebView version and device settings. Daymark sends no task text, adds no app analytics, and opts out of WebView diagnostic metrics. HTTPS only; HTTP is blocked.");
+        browserPrivacyButton.setContentDescription("Browser privacy: browsing is ready for explicit user-initiated navigation; each search or site still requires a separate tap. The selected destination receives your query or URL and normal connection data such as your IP address and browser identification, and may log it; pages may contact and be logged by third-party endpoints. Daymark's browser network policy controls Daymark page and resource loads only and does not control Android System WebView Safe Browsing, a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash-based checks. The Safe Browsing provider itself is not selectable in Daymark. Browser Settings can disable the protection feature only after a warning. WebView M126 and later may send a partial URL hash through a proxy for real-time checks; earlier versions use a local partial-hash database and may query a server on prefix match. This does not mean every full URL is sent; the method depends on WebView version and device settings. Daymark sends no task text, adds no app analytics, and opts out of WebView diagnostic metrics. HTTP and HTTPS pages both open; HTTP pages are labelled \"Not encrypted\".");
         browserPrivacyButton.setOnClickListener(view -> showInfo("Privacy & connection details", disclosureText));
         browserPrivacyDisclosure = disclosureText;
         LinearLayout privacyRow = new LinearLayout(this);
@@ -2103,7 +2103,7 @@ public final class MainActivity extends Activity {
         });
         panel.addView(browserStatus, bottomMargin(dp(2)));
         browserRetryButton = compactButton("Retry", true);
-        browserRetryButton.setContentDescription("Retry loading the current HTTPS page");
+        browserRetryButton.setContentDescription("Retry loading the current page");
         browserRetryButton.setVisibility(View.GONE);
         browserRetryButton.setOnClickListener(view -> {
             if (!webMode || !browserLoadFailed || !BrowserAddress.isAllowedWebUrl(lastBrowserAddress)) return;
@@ -2510,7 +2510,7 @@ public final class MainActivity extends Activity {
         home.addView(browserHomeSearchPill(), bottomMargin(dp(10)));
 
         TextView detail = text(
-                "Enter a question or HTTPS address, then tap Go or a provider tile.",
+                "Enter a question or web address, then tap Go or a provider tile.",
                 12, palette.muted, Typeface.NORMAL);
         detail.setGravity(Gravity.CENTER);
         home.addView(detail, bottomMargin(dp(20)));
@@ -2518,7 +2518,7 @@ public final class MainActivity extends Activity {
         home.addView(browserHomeSectionLabel("QUICK ACCESS"), bottomMargin(dp(8)));
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
-        quickRow.addView(browserHomeTile("H", "Site history", "Open saved HTTPS site history",
+        quickRow.addView(browserHomeTile("H", "Site history", "Open saved site history",
                 this::showBrowserHistoryDialog), tileParams());
         quickRow.addView(browserHomeTile("B", "Bookmarks", "Open saved bookmarks",
                 this::showBrowserBookmarksDialog), tileParams());
@@ -2747,7 +2747,7 @@ public final class MainActivity extends Activity {
                     browserPageLoading = false;
                     browserLoadFailed = true;
                     showBrowserRetryNotice("load-timeout", "Page load timed out",
-                            "The page did not finish loading. You can retry the current HTTPS address.");
+                            "The page did not finish loading. You can retry the current address.");
                     showBrowserStatus("Load Timeout: Check WebView version or Retry");
                 }
                 @Override public void onLoadStarted(String stageAddress) { }
@@ -2878,7 +2878,10 @@ public final class MainActivity extends Activity {
                 Log.i(BROWSER_LOG_TAG, "page finished: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page finished", url, null);
                 if (browserAddressInput != null) browserAddressInput.setText(url);
-                showBrowserStatus("Page loaded. Website content may contact its own or third-party endpoints.");
+                boolean pageNotEncrypted = BrowserHttpPolicy.isHttp(url);
+                showBrowserStatus("Page loaded. " + (pageNotEncrypted
+                        ? "Not encrypted: this HTTP page has no transport security. " : "")
+                        + "Website content may contact its own or third-party endpoints.");
                 injectVideoDownloadOverlay(browserWebView);
                 syncBrowserButtons();
             }
@@ -2888,11 +2891,11 @@ public final class MainActivity extends Activity {
                 browserPageLoading = false;
                 cancelBrowserLoadWatchdog();
                 showBrowserNotice(nextBrowserNoticeId("navigation-blocked"),
-                        "Navigation blocked", "Daymark only opens HTTPS pages. This link was not opened.",
+                        "Navigation blocked", "Daymark opens web (HTTP and HTTPS) pages. This link was not opened.",
                         BrowserAddressNotice.Severity.WARNING, true, java.util.Collections.emptyList());
-                showBrowserStatus("A non-HTTPS page link was blocked. Use HTTPS; a per-site HTTP exception requires a separate explicit request.");
-                browserDiagnostics.record(System.currentTimeMillis(), "navigation blocked (non-HTTPS)", url, null);
-                showToast("Only HTTPS pages open here. HTTP is blocked; site exceptions need a separate request.");
+                showBrowserStatus("A non-web link was blocked. Daymark opens HTTP and HTTPS pages only.");
+                browserDiagnostics.record(System.currentTimeMillis(), "navigation blocked (non-web)", url, null);
+                showToast("Only web (HTTP and HTTPS) pages open here.");
             }
 
             @Override public void onOfflineNavigationBlocked() {
@@ -2905,24 +2908,6 @@ public final class MainActivity extends Activity {
                     showBrowserNotice(nextBrowserNoticeId("offline-blocked"), "Offline mode",
                             "This navigation was blocked because remote browsing is currently disabled.",
                             BrowserAddressNotice.Severity.WARNING, true, java.util.Collections.emptyList());
-                });
-            }
-
-            @Override public void onHttpNavigationBlocked(String url, boolean redirect) {
-                if (targetRef[0] == browserWebView) {
-                    browserPageLoading = false;
-                    cancelBrowserLoadWatchdog();
-                }
-                String message = redirect
-                        ? "An HTTP redirect/downgrade was blocked. No insecure page was opened."
-                        : "An HTTP page navigation was blocked. No insecure page was opened.";
-                postActivityCallback(() -> {
-                    showBrowserNotice(nextBrowserNoticeId("http-blocked"), "Insecure navigation blocked",
-                            message + " Daymark does not open HTTP pages.",
-                            BrowserAddressNotice.Severity.WARNING, true, java.util.Collections.emptyList());
-                    showBrowserStatus(message + " Only HTTPS is supported. A per-site exception requires a separate explicit request.");
-                    browserDiagnostics.record(System.currentTimeMillis(), "navigation blocked (HTTP)", url, message);
-                    showToast("Insecure HTTP navigation blocked. Use HTTPS instead.");
                 });
             }
 
@@ -2941,7 +2926,7 @@ public final class MainActivity extends Activity {
                             BrowserAddressNotice.Severity.CRITICAL, false, java.util.Collections.emptyList());
                 } else {
                     showBrowserRetryNotice("load-error", "Page failed to load",
-                            "The page could not be loaded. You can retry the current HTTPS address.");
+                            "The page could not be loaded. You can retry the current address.");
                 }
                 Log.e(BROWSER_LOG_TAG, "load failed: code=" + errorCode
                         + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl));
@@ -3251,9 +3236,9 @@ public final class MainActivity extends Activity {
             browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY,
                     BrowserHistory.add(browserPreferences.getString(BROWSER_BOOKMARKS_KEY, ""),
                             browserWebView.getUrl())).apply();
-            showToast("Page bookmarked (saved as its HTTPS origin).");
+            showToast("Page bookmarked (saved as its origin).");
         } catch (IllegalArgumentException invalidPage) {
-            showToast("Only valid HTTPS pages can be bookmarked.");
+            showToast("Only valid web pages can be bookmarked.");
         }
     }
 
@@ -3262,7 +3247,7 @@ public final class MainActivity extends Activity {
         String[] entries = bookmarks.isEmpty() ? new String[] { "No bookmarks yet" }
                 : bookmarks.toArray(new String[0]);
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Bookmarks (HTTPS origins only)")
+                .setTitle("Bookmarks (HTTP/HTTPS origins only)")
                 .setItems(entries, (whichDialog, selected) -> {
                     if (selected < 0 || selected >= bookmarks.size()) return;
                     navigateBrowserTo(bookmarks.get(selected));
@@ -3275,7 +3260,7 @@ public final class MainActivity extends Activity {
                     dialog.dismiss();
                     new AlertDialog.Builder(this)
                             .setTitle("Clear all bookmarks?")
-                            .setMessage("Bookmarks store local HTTPS origins only. Clearing removes every bookmark; site history and site data are untouched.")
+                            .setMessage("Bookmarks store local HTTP/HTTPS origins only. Clearing removes every bookmark; site history and site data are untouched.")
                             .setNegativeButton("Cancel", null)
                             .setPositiveButton("Clear bookmarks", (confirm, selected) -> {
                                 browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY,
@@ -3893,7 +3878,7 @@ public final class MainActivity extends Activity {
         DaymarkWebView target = browserWebView;
         String url = target == null ? null : target.getUrl();
         if (target == null || !BrowserAddress.isAllowedWebUrl(url)) {
-            showToast("Open an HTTPS page before viewing site information.");
+            showToast("Open a web page before viewing site information.");
             return;
         }
 
@@ -3901,9 +3886,9 @@ public final class MainActivity extends Activity {
         String host = uri.getHost();
         StringBuilder details = new StringBuilder();
         details.append("Address: ").append(url)
-                .append("\n\nConnection: HTTPS")
+                .append("\n\nConnection: ").append(BrowserHttpPolicy.isHttp(url) ? "HTTP (not encrypted)" : "HTTPS")
                 .append("\nHost: ").append(host == null ? "Unavailable" : host)
-                .append("\n\nDaymark blocks HTTP navigation/downgrades and does not bypass SSL certificate errors.")
+                .append("\n\nDaymark does not bypass SSL certificate errors.")
                 .append("\n\nHTTPS does not guarantee that page content is safe. This summary is not a phishing, reputation, or third-party request audit.");
 
         android.net.http.SslCertificate certificate = target.getCertificate();
@@ -4117,12 +4102,12 @@ public final class MainActivity extends Activity {
         }
         if (status == DownloadManager.STATUS_FAILED) {
             if (!BrowserAddress.isAllowedWebUrl(url)) {
-                showToast("Retry is unavailable because the saved URL is not a valid HTTPS address.");
+                showToast("Retry is unavailable because the saved URL is not a valid web address.");
                 return;
             }
             new AlertDialog.Builder(this)
                     .setTitle("Retry download?")
-                    .setMessage("Daymark will make a new request to this HTTPS URL. The site may require a valid current session.")
+                    .setMessage("Daymark will make a new request to this URL. The site may require a valid current session.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Retry", (dialog, which) -> queueBrowserDownload(url, android.webkit.WebSettings.getDefaultUserAgent(this), null, mimeType))
                     .show();
@@ -4181,7 +4166,7 @@ public final class MainActivity extends Activity {
 
     private void queueBrowserDownload(String url, String userAgent, String contentDisposition, String mimeType) {
         if (!BrowserAddress.isAllowedWebUrl(url)) {
-            showToast("Download blocked: HTTPS is required.");
+            showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
             return;
         }
         DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
@@ -4351,7 +4336,7 @@ public final class MainActivity extends Activity {
                 .setItems(labels, (dialog, which) -> {
                     String url = urls[which];
                     if (!BrowserAddress.isAllowedWebUrl(url)) {
-                        showToast("Download blocked: HTTPS is required.");
+                        showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
                         return;
                     }
                     showBrowserStatus("Download started for the selected media file. Check Downloads for progress.");
@@ -4990,7 +4975,7 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         container.addView(historyList);
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Site history (HTTPS origins only)")
+                .setTitle("Site history (HTTP/HTTPS origins only)")
                 .setView(container)
                 .setNeutralButton("Clear site history & data", null)
                 .setPositiveButton("Close", null)
@@ -5028,7 +5013,7 @@ public final class MainActivity extends Activity {
                     dialog.dismiss();
                     new AlertDialog.Builder(this)
                             .setTitle("Clear site history and data?")
-                            .setMessage("Site history stores only validated HTTPS origins: no paths, queries, fragments, URL credentials, or page titles. Older entries are reduced to origins on launch. Selecting a saved site opens that origin, not the last route. Clearing removes Daymark's site history, every open WebView's back/forward list, resource cache, and SSL exception preferences, plus cookies and Web SQL/HTML5 Web Storage for all websites used in Daymark (not just the current site). This action also closes all open Daymark browser tabs and returns to browser home. It may sign you out of any site opened in Daymark. It only dismisses an open WebView form-autocomplete popup; saved Android Autofill or password-manager data is not cleared. Cookie removal finishes asynchronously. This does not clear other apps' browser data or erase requests/data retained by websites or search providers.")
+                            .setMessage("Site history stores only validated HTTP/HTTPS origins: no paths, queries, fragments, URL credentials, or page titles. Older entries are reduced to origins on launch. Selecting a saved site opens that origin, not the last route. Clearing removes Daymark's site history, every open WebView's back/forward list, resource cache, and SSL exception preferences, plus cookies and Web SQL/HTML5 Web Storage for all websites used in Daymark (not just the current site). This action also closes all open Daymark browser tabs and returns to browser home. It may sign you out of any site opened in Daymark. It only dismisses an open WebView form-autocomplete popup; saved Android Autofill or password-manager data is not cleared. Cookie removal finishes asynchronously. This does not clear other apps' browser data or erase requests/data retained by websites or search providers.")
                             .setNegativeButton("Cancel", null)
                             .setPositiveButton("Clear site data", (confirm, selected) -> clearBrowserData())
                             .show();
@@ -5762,7 +5747,7 @@ public final class MainActivity extends Activity {
         pathButton.setVisibility(webMode ? View.GONE : View.VISIBLE);
         quickCaptureInput.setHint(webMode ? "Search or enter HTTPS address" : "Task title or quick note");
         quickCaptureInput.setContentDescription(webMode
-                ? "Search the web or enter an HTTPS web address. Browsing is ready; requests are sent only after you tap Go or a provider/site shortcut."
+                ? "Search the web or enter a web address. Browsing is ready; requests are sent only after you tap Go or a provider/site shortcut."
                 : "What do you want to get done? Type a task");
         quickCaptureInput.setImeOptions(webMode ? EditorInfo.IME_ACTION_SEARCH : EditorInfo.IME_ACTION_DONE);
         // Bottom navigation is the sole Tasks/Web workspace switcher.
@@ -5904,7 +5889,7 @@ public final class MainActivity extends Activity {
 
     private void showBrowserSettingsDialog() {
         TextView explanation = text(
-                "Safe Browsing helps protect against known harmful pages. Its platform-managed provider is not selectable in Daymark and may contact Google/Play Services for version/device-dependent threat-list updates or URL-hash checks. The image option blocks network image resources; it does not block all ads or tracking. Page/resource requests remain governed by Daymark's HTTPS-only browser policy.",
+                "Safe Browsing helps protect against known harmful pages. Its platform-managed provider is not selectable in Daymark and may contact Google/Play Services for version/device-dependent threat-list updates or URL-hash checks. The image option blocks network image resources; it does not block all ads or tracking. Page/resource requests remain governed by Daymark's browser policy; HTTP and HTTPS pages both open and HTTP pages are labelled \"Not encrypted\".",
                 14, palette.text, Typeface.NORMAL);
         explanation.setLineSpacing(dp(3), 1f);
         explanation.setPadding(dp(16), dp(8), dp(16), dp(8));
@@ -5942,10 +5927,10 @@ public final class MainActivity extends Activity {
                 searchEngine.label + " · used for address-bar searches",
                 () -> showSearchProviderPicker());
         addSettingsRow(content, "Site history",
-                "Saved HTTPS origins · reopen, or clear history and site data",
+                "Saved web origins · reopen, or clear history and site data",
                 () -> showBrowserHistoryDialog());
         addSettingsRow(content, "Bookmarks",
-                "Saved HTTPS origins · reopen or clear bookmarks",
+                "Saved web origins · reopen or clear bookmarks",
                 () -> showBrowserBookmarksDialog());
         addSettingsRow(content, "Extensions",
                 "Manage page scripts and matching sites",
@@ -5968,7 +5953,7 @@ public final class MainActivity extends Activity {
                     settingsDialog.dismiss();
                     new AlertDialog.Builder(this)
                             .setTitle("Clear site data?")
-                            .setMessage("This clears Daymark's HTTPS site history, WebView cache, cookies, storage, form data, and current page history. This action also closes all open Daymark browser tabs and returns to browser home. It can sign you out of websites opened in Daymark. Android Autofill and password-manager data are not changed.")
+                            .setMessage("This clears Daymark's site history, WebView cache, cookies, storage, form data, and current page history. This action also closes all open Daymark browser tabs and returns to browser home. It can sign you out of websites opened in Daymark. Android Autofill and password-manager data are not changed.")
                             .setNegativeButton("Cancel", null)
                             .setPositiveButton("Clear", (d, w) -> clearBrowserData())
                             .show();

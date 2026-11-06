@@ -17,7 +17,6 @@ required = (
     "showBrowserRetryNotice",
     '"retry".equals(actionId)',
     "onNavigationBlocked(String url)",
-    "onHttpNavigationBlocked(String url, boolean redirect)",
     "onOfflineNavigationBlocked()",
     "onLoadError(int errorCode, String description, String failingUrl)",
     "BrowserAddressNotice.Severity.CRITICAL",
@@ -27,7 +26,7 @@ required = (
 for token in required:
     assert token in main, f"address notice integration missing: {token}"
 
-assert "Daymark only opens HTTPS pages" in main
+assert "Daymark opens web (HTTP and HTTPS) pages" in main
 assert "Certificate errors are " in main and "cancelled and never bypassed." in main
 assert "handler.cancel();" in webview and "handler.proceed();" not in webview
 assert "void dispose()" in view and "disposed = true;" in view

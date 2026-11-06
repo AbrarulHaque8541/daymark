@@ -28,7 +28,6 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         void onPageFinished(String url);
         void onNavigationBlocked(String url);
         void onOfflineNavigationBlocked();
-        void onHttpNavigationBlocked(String url, boolean redirect);
         void onLoadError(int errorCode, String description, String failingUrl);
         void onDownloadRequested(String url, String userAgent, String contentDisposition, String mimeType, long contentLength);
         void onMediaDownloadRequested(String url);
@@ -229,7 +228,9 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setLoadsImagesAutomatically(true);
         settings.setSafeBrowsingEnabled(safeBrowsingEnabled);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        // Owner decision 2026-11-06: allow mixed content so legacy pages render fully on the
+        // permissive HTTP+HTTPS policy; Safe Browsing stays on and TLS errors are still cancelled.
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -296,16 +297,9 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 // In-WebView navigations bypass MainActivity's unblock boundary; re-assert it
                 // here so a tab left blocked by enforceOffline() cannot silently drop loads.
                 syncNetworkBlockWithPolicy(view);
-                // HTTP and HTTPS are both allowed in the browser (BrowserHttpPolicy.ALLOW_HTTP).
-                // HTTP pages show "Not encrypted" in the UI. Updater stays HTTPS-only (separate path).
-                // HTTPS→HTTP redirect downgrades are still blocked below for safety.
-                if (request.isForMainFrame() && request.isRedirect()
-                        && "http".equalsIgnoreCase(request.getUrl().getScheme())
-                        && view.getUrl() != null
-                        && "https".equalsIgnoreCase(android.net.Uri.parse(view.getUrl()).getScheme())) {
-                    listener.onHttpNavigationBlocked(url, true);
-                    return true;
-                }
+                // HTTP and HTTPS both load in the browser (BrowserHttpPolicy.ALLOW_HTTP; owner
+                // decision 2026-11-06). Redirect downgrades follow like mainstream browsers; the
+                // host status line labels HTTP pages "Not encrypted". Updater stays HTTPS-only.
                 if (BrowserAddress.isAllowedWebUrl(url)) return false;
                 listener.onNavigationBlocked(url);
                 return true;
