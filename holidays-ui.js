@@ -6,13 +6,15 @@
  * successful result stays cached on this device, so the card keeps working
  * offline with a "cached" note. Nothing ever refreshes on its own — no polling,
  * no timers, no battery drain. The last-checked country is remembered inside the
- * cache itself (localStorage only). Mirrors the weather-ui.js module style:
- * attachHolidaysUi(env) is fully injectable for unit tests.
+ * cache itself (localStorage only). Also remembers the last selected country
+ * preference across sessions (even after clear) so the select restores. Mirrors
+ * the weather-ui.js module style: attachHolidaysUi(env) is fully injectable for unit tests.
  */
 ((root) => {
   'use strict';
 
   const STORAGE_KEY = 'daymark.holidays.v1';
+  const PREFS_KEY = 'daymark.holidays.prefs.v1';
   const DEFAULT_COUNTRY = 'IN';
   const UPCOMING_LIMIT = 8;
 
@@ -131,6 +133,22 @@
       storage.setItem(STORAGE_KEY, JSON.stringify(cache));
     }
 
+    function readPrefs() {
+      if (!storage || typeof storage.getItem !== 'function') return null;
+      const raw = storage.getItem(PREFS_KEY);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.countryCode === 'string' && parsed.countryCode.trim()) return parsed;
+      } catch (error) { /* ignore corrupt prefs */ }
+      return null;
+    }
+
+    function persistPrefs(countryCode) {
+      if (!storage || typeof storage.setItem !== 'function' || !countryCode || !countryCode.trim()) return;
+      storage.setItem(PREFS_KEY, JSON.stringify({ countryCode: countryCode.trim() }));
+    }
+
     async function onRefresh() {
       if (busy) return;
       if (!holidaysApi || typeof holidaysApi.fetchHolidays !== 'function') {
@@ -152,6 +170,7 @@
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;
         persistCache(cached);
+        persistPrefs(code);
         render(cached);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
       } catch (error) {
@@ -168,9 +187,10 @@
     }
 
     function onClear() {
-      // Explicit, scoped removal: only this card's cached holiday list.
+      // Explicit, scoped removal: only this card's cached holiday list and country preference.
       if (storage && typeof storage.removeItem === 'function') {
         storage.removeItem(STORAGE_KEY);
+        storage.removeItem(PREFS_KEY);
       }
       cached = null;
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = DEFAULT_COUNTRY;
@@ -179,10 +199,16 @@
     }
 
     cached = readCache();
+    const prefs = readPrefs();
+    if (prefs && countryEl && typeof countryEl.value === 'string') {
+      countryEl.value = prefs.countryCode;
+    }
     if (cached) {
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = cached.countryCode;
       render(cached);
       status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+    } else if (prefs) {
+      status('Last country restored. Tap Refresh for upcoming holidays.');
     } else {
       status('Choose a country and tap Refresh.');
     }
@@ -197,7 +223,14 @@
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
 
-    // Clear removes this card's cached holiday list on demand.
+    // Persist country preference on change so it restores even without a cache.
+    if (countryEl && typeof countryEl.addEventListener === 'function') {
+      countryEl.addEventListener('change', () => {
+        if (typeof countryEl.value === 'string') persistPrefs(countryEl.value);
+      });
+    }
+
+    // Clear removes this card's cached holiday list and preference on demand.
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
@@ -214,7 +247,7 @@
     };
   }
 
-  const api = { attachHolidaysUi, STORAGE_KEY, DEFAULT_COUNTRY, UPCOMING_LIMIT };
+  const api = { attachHolidaysUi, STORAGE_KEY, PREFS_KEY, DEFAULT_COUNTRY, UPCOMING_LIMIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkHolidaysUi = api;
 
