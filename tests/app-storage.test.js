@@ -27,6 +27,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     static now() { return clock.value; }
   } : Date;
   let fileReadCount = 0;
+  let toastWriteCount = 0;
   const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
   if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
 
@@ -36,7 +37,11 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
       const classes = new Set();
       classSets.set(selector, classes);
       elements.set(selector, {
-        textContent: '',
+        get textContent() { return this._textContent ?? ''; },
+        set textContent(value) {
+          this._textContent = value;
+          if (selector === '#toast') toastWriteCount += 1;
+        },
         value: '',
         hidden: false,
         innerHTML: '',
@@ -145,6 +150,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     listeners,
     confirmMessages,
     intervalCallbacks,
+    get toastWriteCount() { return toastWriteCount; },
     setNow(value) {
       if (!clock) throw new Error('This app instance does not have a controlled clock.');
       clock.value = new Date(value).getTime();
@@ -599,9 +605,12 @@ test('date-only reminder persists with null dueTime and fires once at the disclo
   assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', '09:00 EST is recorded as the actual local fire instant');
   assert.match(reloaded.elements.get('#toast').textContent, /Reminder: “Date-only add form reminder” is due\./);
 
+  const toastWritesAfterFirstFire = reloaded.toastWriteCount;
+  assert.equal(toastWritesAfterFirstFire, 1, 'the reminder emits one visible toast when it first fires');
   reloaded.intervalCallbacks[0].callback();
   savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', 'the same fire instant is not shown twice');
+  assert.equal(reloaded.toastWriteCount, toastWritesAfterFirstFire, 'the repeated interval check does not write/show another toast');
 }));
 
 test('editing a date-only reminder reschedules it without changing null-time or lead semantics', () => withTimeZone('America/New_York', () => {
