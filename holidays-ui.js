@@ -70,6 +70,16 @@
       return Math.round((target - today) / 86400000);
     }
 
+    function nextHolidaySummary(cache) {
+      if (!cache || !Array.isArray(cache.holidays)) return '';
+      const upcoming = cache.holidays.filter((h) => h && typeof h.date === 'string' && h.date >= todayIso());
+      if (!upcoming.length) return '';
+      const next = upcoming[0];
+      const days = daysUntil(next.date);
+      const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : days > 1 ? `in ${days} days` : '';
+      return when ? `Next: ${next.name} ${when}` : `Next: ${next.name}`;
+    }
+
     function makeRow(rowClass) {
       if (!doc || typeof doc.createElement !== 'function') return null;
       const row = doc.createElement('div');
@@ -159,6 +169,11 @@
       storage.setItem(PREFS_KEY, JSON.stringify({ countryCode: countryCode.trim() }));
     }
 
+    function updateStatusWithNext(baseMessage, cache) {
+      const next = nextHolidaySummary(cache);
+      status(next ? baseMessage + ' · ' + next : baseMessage);
+    }
+
     async function onRefresh() {
       if (busy) return;
       if (!holidaysApi || typeof holidaysApi.fetchHolidays !== 'function') {
@@ -183,12 +198,12 @@
         persistCache(cached);
         persistPrefs(code);
         render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        updateStatusWithNext(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`, cached);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
           render(cached);
-          status(`Could not refresh: ${message} — showing cached holidays.`);
+          updateStatusWithNext(`Could not refresh: ${message} — showing cached holidays.`, cached);
         } else {
           status(`Could not refresh: ${message}`);
         }
@@ -217,7 +232,7 @@
     if (cached) {
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = cached.countryCode;
       render(cached);
-      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      updateStatusWithNext(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`, cached);
     } else if (prefs) {
       status('Last country restored. Tap Refresh for upcoming holidays.');
     } else {
