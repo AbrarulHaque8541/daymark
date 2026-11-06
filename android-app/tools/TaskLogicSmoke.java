@@ -35,6 +35,7 @@ public final class TaskLogicSmoke {
         filtersAndSearchCompose();
         suggestionsUseOnlyTransparentLocalRules();
         repeatRulesValidateAndAdvance();
+        longGapCatchUpWorks();
         System.out.println("PASS Android core logic smoke tests: " + assertions + " assertions");
     }
 
@@ -659,3 +660,29 @@ public final class TaskLogicSmoke {
         check(cases == 12, "shared recurrence contract fixture contains all twelve cases");
     }
 }
+
+    private static void longGapCatchUpWorks() {
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        Instant now = Instant.parse("2026-11-06T06:00:00Z");
+        // Year 0001 daily task catches up to current
+        Task ancient = TaskLogic.create("Ancient daily", "0001-01-01", "low", "", null, null,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Task advanced = TaskLogic.advanceRepeat(ancient, zone, now);
+        check(advanced != null && advanced.dueDate != null && advanced.dueDate.compareTo("2026-11-06") >= 0,
+                "year-0001 daily catches up past the fixed loop limit");
+        // 20+ year daily
+        Task longDaily = TaskLogic.create("Long daily", "2000-01-01", "medium", "", "09:00", 0,
+                Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Task longAdv = TaskLogic.advanceRepeat(longDaily, zone, now);
+        check(longAdv.dueDate != null && longAdv.dueDate.startsWith("2026"),
+                "20+ year daily advances to current year");
+        // Feb 29 yearly through short years
+        Task leap = new Task("leap", "Leap", "2024-02-29", "medium", false,
+                "2024-02-29T00:00:00Z", "2024-02-29T00:00:00Z",
+                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                TaskLogic.REPEAT_YEARLY, Integer.valueOf(29), Collections.<Subtask>emptyList());
+        Task leapNext = TaskLogic.advanceRepeat(leap, zone, Instant.parse("2025-03-01T00:00:00Z"));
+        check("2025-02-28".equals(leapNext.dueDate), "Feb 29 yearly clamps to Feb 28 in non-leap");
+        Task leapAfter = TaskLogic.advanceRepeat(leapNext, zone, Instant.parse("2028-03-01T00:00:00Z"));
+        check("2028-02-29".equals(leapAfter.dueDate), "Feb 29 yearly restores on next leap year");
+    }
