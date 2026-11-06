@@ -110,7 +110,7 @@ function rowTexts(listEl) {
   return listEl.children.map((row) => row.children.map((child) => child.textContent));
 }
 
-test('attach renders a cached holiday list with a cached note', () => {
+test('attach renders a cached holiday list with a cached note and next-up countdown', () => {
   const stored = JSON.stringify(makeCache([
     { date: '2026-10-02', name: 'Gandhi Jayanti', localName: 'Gandhi Jayanti', global: true },
     { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
@@ -123,6 +123,7 @@ test('attach renders a cached holiday list with a cached note', () => {
   assert.equal(rows[0][1], 'Christmas Day');
   assert.equal(rows[0][2], 'Nationwide public holiday');
   assert.ok(elements['holiday-status'].textContent.startsWith('Cached · updated 2026-11-02 09:30 UTC'));
+  assert.ok(elements['holiday-status'].textContent.includes('Next: Christmas Day in 49 days'));
   assert.equal(elements['holiday-country'].value, 'IN');
   assert.equal(typeof handle.onRefresh, 'function');
 });
@@ -136,6 +137,7 @@ test('a cached list shows local names and regional scope honestly', () => {
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows[0][1], 'Diwali · दीवाली');
   assert.equal(rows[0][2], 'Locally: दीवाली · Regional holiday');
+  assert.ok(elements['holiday-status'].textContent.includes('Next: Diwali in 8 days'));
 });
 
 test('attach with no cache prompts the user to choose a country', () => {
@@ -162,9 +164,10 @@ test('a cache whose year has no holidays left says so instead of showing nothing
   assert.equal(rows.length, 1);
   assert.equal(rows[0][0], 'No more public holidays in 2026 for this country.');
   assert.equal(rows[0][1], 'Tap Refresh next year, or choose another country.');
+  assert.ok(!elements['holiday-status'].textContent.includes('Next:'));
 });
 
-test('refresh fetches, renders, and persists the result and preference', async () => {
+test('refresh fetches, renders, and persists the result and preference with next-up', async () => {
   const fetchImpl = okFetch([
     { prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }
   ]);
@@ -178,7 +181,8 @@ test('refresh fetches, renders, and persists the result and preference', async (
   assert.equal(rows[0][0], '2026-11-14');
   assert.equal(rows[0][1], 'Diwali · दीवाली');
   assert.equal(rows[1][0], '2026-12-25');
-  assert.equal(elements['holiday-status'].textContent, 'Updated · 2026-11-06 12:00 UTC');
+  assert.ok(elements['holiday-status'].textContent.includes('Updated · 2026-11-06 12:00 UTC'));
+  assert.ok(elements['holiday-status'].textContent.includes('Next: Diwali in 8 days'));
   assert.equal(elements['holiday-refresh'].disabled, false);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
   assert.ok(holidaysApi.validateHolidayCache(saved));
@@ -188,7 +192,7 @@ test('refresh fetches, renders, and persists the result and preference', async (
   assert.equal(prefs.countryCode, 'IN');
 });
 
-test('refresh failure keeps the cached list visible', async () => {
+test('refresh failure keeps the cached list visible and next-up note', async () => {
   const stored = JSON.stringify(makeCache([
     { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
   ]));
@@ -197,6 +201,7 @@ test('refresh failure keeps the cached list visible', async () => {
   const handle = ui.attachHolidaysUi(env);
   await handle.onRefresh();
   assert.ok(elements['holiday-status'].textContent.includes('Could not refresh: offline — showing cached holidays.'));
+  assert.ok(elements['holiday-status'].textContent.includes('Next: Christmas Day in 49 days'));
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 1);
   assert.equal(rows[0][0], '2026-12-25');
@@ -305,8 +310,9 @@ test('cache country overrides preference on load', () => {
   const prefs = JSON.stringify({ countryCode: 'DE' });
   const { env, elements } = fakeEnv({ stored, prefs });
   ui.attachHolidaysUi(env);
-  assert.equal(elements['holiday-country'].value, 'IN'); // from cache
+  assert.equal(elements['holiday-country'].value, 'IN');
   assert.ok(elements['holiday-status'].textContent.startsWith('Cached ·'));
+  assert.ok(elements['holiday-status'].textContent.includes('Next: Christmas Day in 49 days'));
 });
 
 test('the module exposes its API and stays inert under Node', () => {

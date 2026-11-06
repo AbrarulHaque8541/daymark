@@ -9,6 +9,9 @@
  * cache itself (localStorage only). Also remembers the last selected country
  * preference across sessions (even after clear) so the select restores. Mirrors
  * the weather-ui.js module style: attachHolidaysUi(env) is fully injectable for unit tests.
+ *
+ * Cycle B addition: when an upcoming holiday exists, the status includes a short
+ * "Next: NAME in N days" countdown for better glanceability.
  */
 ((root) => {
   'use strict';
@@ -43,8 +46,29 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function daysUntil(dateIso) {
+      if (!dateIso || typeof dateIso !== 'string') return null;
+      const today = String(now()).slice(0, 10);
+      const target = new Date(dateIso + 'T00:00:00Z');
+      const base = new Date(today + 'T00:00:00Z');
+      const diffMs = target.getTime() - base.getTime();
+      return Math.max(0, Math.round(diffMs / 86400000));
+    }
+
+    function nextUpNote(cache) {
+      if (!cache || !Array.isArray(cache.holidays)) return '';
+      const today = String(now()).slice(0, 10);
+      const next = cache.holidays.find((h) => h && typeof h.date === 'string' && h.date >= today);
+      if (!next) return '';
+      const days = daysUntil(next.date);
+      if (days === null) return '';
+      const name = next.name || next.localName || 'Holiday';
+      if (days === 0) return `Next: ${name} today`;
+      if (days === 1) return `Next: ${name} tomorrow`;
+      return `Next: ${name} in ${days} days`;
+    }
+
     function setBusy(isBusy) {
-      // a11y: announce busy state without flooding live regions
       busy = isBusy;
       if (buttonEl) {
         buttonEl.disabled = isBusy;
@@ -172,12 +196,14 @@
         persistCache(cached);
         persistPrefs(code);
         render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        const nextNote = nextUpNote(cached);
+        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC${nextNote ? ' · ' + nextNote : ''}`);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
           render(cached);
-          status(`Could not refresh: ${message} — showing cached holidays.`);
+          const nextNote = nextUpNote(cached);
+          status(`Could not refresh: ${message} — showing cached holidays.${nextNote ? ' ' + nextNote : ''}`);
         } else {
           status(`Could not refresh: ${message}`);
         }
@@ -187,7 +213,6 @@
     }
 
     function onClear() {
-      // Explicit, scoped removal: only this card's cached holiday list and country preference.
       if (storage && typeof storage.removeItem === 'function') {
         storage.removeItem(STORAGE_KEY);
         storage.removeItem(PREFS_KEY);
@@ -206,7 +231,8 @@
     if (cached) {
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = cached.countryCode;
       render(cached);
-      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      const nextNote = nextUpNote(cached);
+      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC${nextNote ? ' · ' + nextNote : ''}`);
     } else if (prefs) {
       status('Last country restored. Tap Refresh for upcoming holidays.');
     } else {
@@ -223,14 +249,12 @@
       buttonEl.addEventListener('click', () => { onRefresh(); });
     }
 
-    // Persist country preference on change so it restores even without a cache.
     if (countryEl && typeof countryEl.addEventListener === 'function') {
       countryEl.addEventListener('change', () => {
         if (typeof countryEl.value === 'string') persistPrefs(countryEl.value);
       });
     }
 
-    // Clear removes this card's cached holiday list and preference on demand.
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
@@ -240,8 +264,6 @@
       onClear,
       readCache,
       detach() {
-        // No document-level listener is registered; the button reference is
-        // dropped when the returned handle goes out of scope.
         setBusy(false);
       }
     };
