@@ -23,4 +23,13 @@ assert "switch browsing Offline again from **Browser actions**" in providers
 assert "remains offline until the user enables Online" not in providers, "stale offline-mode guidance"
 assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress))" in activity
 assert "BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY" in activity
+# UC-style browser home (owner request 2026-11-05): the home grid reuses the shared catalog and
+# the same tap handlers as the bottom provider chips, so tiles and chips cannot drift apart.
+assert "browserHomeSearchPill()" in activity and "browserHomeTile(" in activity, \
+    "browser home must expose the UC-style search pill and quick-access tiles"
+assert "browserHomeScenicBackdrop()" in activity, "browser home needs its palette-aware scenic backdrop"
+assert "handleBrowserEngineShortcutTap(engine)" in activity and "handleBrowserSiteShortcutTap(entry)" in activity, \
+    "home tiles and bottom chips must share one tap implementation per provider kind"
+assert "browserAddressInput.requestFocus();" in activity and "InputMethodManager" in activity, \
+    "the home search pill must focus the real address bar and open the keyboard"
 print("PASS browser catalog and provider guide: catalog wiring, Online default, explicit user-action navigation gate, and quiet first-page status agree")
