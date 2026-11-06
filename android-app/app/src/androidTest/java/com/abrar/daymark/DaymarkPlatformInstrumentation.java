@@ -78,6 +78,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             runPhase("reminder-notification-lifecycle", this::reminderNotificationLifecycleUsesCurrentTaskState);
             // Exercise the real Android Keystore, AtomicFile and NotificationManager on API 29 and 36 emulators.
             runPhase("focus-timer-keystore-notification-lifecycle", this::focusTimerKeystoreAndNotificationLifecycle);
+            runPhase("focus-timer-mode-selector-gestures", this::focusTimerModeSelectorTapsAndSwipes);
             runPhase("main-activity-tabs-transition", this::mainActivityTaskWebTransitionAndRapidToggle);
             runPhase("task-editor-ime-actions-and-save-cancel", this::taskEditorImeActionsAndSaveCancel);
             result.putString("main_activity_tabs_transition", "passed");
@@ -217,6 +218,76 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         }
     }
 
+    /** Exercises only the mode controls; this phase never presses Start or opens the task picker. */
+    private void focusTimerModeSelectorTapsAndSwipes() throws Exception {
+        Activity activity = null;
+        try {
+            android.content.Intent launch = new android.content.Intent(getTargetContext(), MainActivity.class);
+            launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity = startActivitySync(launch);
+            check(activity instanceof MainActivity, "mode gesture test launches the real MainActivity");
+            Activity mainActivity = activity;
+            android.view.View[] controls = new android.view.View[4];
+            long deadline = android.os.SystemClock.uptimeMillis() + 10000L;
+            while (android.os.SystemClock.uptimeMillis() < deadline) {
+                runOnMainSync(() -> {
+                    android.view.View root = mainActivity.getWindow().getDecorView();
+                    controls[0] = findViewByText(root, "Stopwatch");
+                    controls[1] = findViewByText(root, "Countdown");
+                    controls[2] = findViewByContentDescription(root, "Start focus timer");
+                    controls[3] = findViewByText(root, "READY WHEN YOU ARE");
+                });
+                if (controls[0] != null && controls[1] != null
+                        && controls[2] != null && controls[3] != null) break;
+                android.os.SystemClock.sleep(50L);
+            }
+            check(controls[0] != null && controls[1] != null
+                            && controls[2] != null && controls[3] != null,
+                    "real Focus Timer panel exposes mode controls and the idle Start/ready state");
+            android.view.View stopwatch = controls[0];
+            android.view.View countdown = controls[1];
+            android.view.View modeRow = (android.view.View) stopwatch.getParent();
+            check(countdown.getParent() == modeRow,
+                    "Stopwatch and Countdown are sibling buttons in the real mode selector");
+            scrollViewIntoFocus(modeRow);
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "fresh Focus Timer panel starts in Stopwatch mode");
+
+            dispatchTap(countdown);
+            checkFocusModeState(mainActivity, stopwatch, countdown, true,
+                    "a real tap selects Countdown");
+            dispatchTap(stopwatch);
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "a real tap selects Stopwatch");
+
+            dispatchSwipe(modeRow, true);
+            checkFocusModeState(mainActivity, stopwatch, countdown, true,
+                    "a leftward horizontal swipe selects Countdown");
+            dispatchSwipe(modeRow, false);
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "a rightward horizontal swipe selects Stopwatch");
+            dispatchVerticalSwipe(countdown);
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "a vertical drag inside Countdown cancels the child click");
+            dispatchTap(countdown);
+            checkFocusModeState(mainActivity, stopwatch, countdown, true,
+                    "a tap still works after a rejected vertical drag");
+            dispatchVerticalSwipe(stopwatch);
+            checkFocusModeState(mainActivity, stopwatch, countdown, true,
+                    "a vertical drag inside Stopwatch cancels the child click");
+            dispatchTap(stopwatch);
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "a vertical drag does not disable subsequent taps");
+        } finally {
+            if (activity != null && !activity.isFinishing()) {
+                Activity closingActivity = activity;
+                runOnMainSync(closingActivity::finish);
+                waitForIdleSync();
+            }
+        }
+    }
+
     private android.view.View findViewByContentDescription(android.view.View root, String expected) {
         CharSequence description = root.getContentDescription();
         if (description != null && expected.contentEquals(description)) return root;
@@ -243,6 +314,104 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         }
         return null;
+    }
+
+    private void scrollViewIntoFocus(android.view.View view) throws Exception {
+        int[] size = new int[2];
+        long deadline = android.os.SystemClock.uptimeMillis() + 2000L;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            runOnMainSync(() -> {
+                size[0] = view.getWidth();
+                size[1] = view.getHeight();
+            });
+            if (size[0] > 0 && size[1] > 0) break;
+            android.os.SystemClock.sleep(50L);
+        }
+        check(size[0] > 0 && size[1] > 0, "real mode selector has completed layout before touch injection");
+        runOnMainSync(() -> view.requestRectangleOnScreen(
+                new android.graphics.Rect(0, 0, size[0], size[1]), true));
+        waitForIdleSync();
+        deadline = android.os.SystemClock.uptimeMillis() + 2000L;
+        android.graphics.Rect bounds;
+        do {
+            bounds = visibleBounds(view);
+            if (bounds.width() >= size[0] && bounds.height() >= size[1]) break;
+            android.os.SystemClock.sleep(50L);
+        } while (android.os.SystemClock.uptimeMillis() < deadline);
+        check(bounds.width() >= size[0] && bounds.height() >= size[1],
+                "real mode selector is fully visible for injected pointer gestures");
+    }
+
+    private android.graphics.Rect visibleBounds(android.view.View view) throws Exception {
+        android.graphics.Rect[] bounds = {new android.graphics.Rect()};
+        runOnMainSync(() -> view.getGlobalVisibleRect(bounds[0]));
+        return bounds[0];
+    }
+
+    private void checkFocusModeState(Activity activity, android.view.View stopwatch,
+            android.view.View countdown, boolean countdownExpected, String message) throws Exception {
+        boolean[] selected = new boolean[2];
+        boolean[] idleState = new boolean[1];
+        runOnMainSync(() -> {
+            selected[0] = stopwatch.isSelected();
+            selected[1] = countdown.isSelected();
+            android.view.View root = activity.getWindow().getDecorView();
+            android.view.View start = findViewByContentDescription(root, "Start focus timer");
+            String expectedStatus = countdownExpected ? "TARGET DURATION" : "READY WHEN YOU ARE";
+            android.view.View status = findViewByText(root, expectedStatus);
+            idleState[0] = start != null && status != null;
+        });
+        check(selected[0] == !countdownExpected && selected[1] == countdownExpected,
+                message + ": exactly the expected mode is selected");
+        check(idleState[0], message + ": Start remains available and the timer stays idle");
+    }
+
+    private void dispatchTap(android.view.View view) throws Exception {
+        android.graphics.Rect bounds = visibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0, "tap target has visible screen bounds");
+        float x = bounds.centerX();
+        float y = bounds.centerY();
+        long downTime = android.os.SystemClock.uptimeMillis();
+        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, x, y);
+        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime, downTime + 60L, x, y);
+        waitForIdleSync();
+    }
+
+    private void dispatchSwipe(android.view.View view, boolean left) throws Exception {
+        android.graphics.Rect bounds = visibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0, "swipe target has visible screen bounds");
+        float startX = left ? bounds.left + bounds.width() * 0.82f : bounds.left + bounds.width() * 0.18f;
+        float endX = left ? bounds.left + bounds.width() * 0.18f : bounds.left + bounds.width() * 0.82f;
+        injectDrag(startX, bounds.centerY(), endX, bounds.centerY());
+    }
+
+    private void dispatchVerticalSwipe(android.view.View view) throws Exception {
+        android.graphics.Rect bounds = visibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0, "vertical-gesture target has visible screen bounds");
+        float distance = Math.min(bounds.height() * 0.70f, 48f);
+        injectDrag(bounds.centerX(), bounds.centerY() - distance / 2f,
+                bounds.centerX(), bounds.centerY() + distance / 2f);
+    }
+
+    private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
+        long downTime = android.os.SystemClock.uptimeMillis();
+        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, startX, startY);
+        injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime, downTime + 50L,
+                (startX + endX) / 2f, (startY + endY) / 2f);
+        injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime, downTime + 100L, endX, endY);
+        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime, downTime + 150L, endX, endY);
+        waitForIdleSync();
+    }
+
+    private void injectPointerEvent(int action, long downTime, long eventTime, float x, float y)
+            throws Exception {
+        android.view.MotionEvent event = android.view.MotionEvent.obtain(
+                downTime, eventTime, action, x, y, 0);
+        try {
+            sendPointerSync(event);
+        } finally {
+            event.recycle();
+        }
     }
 
     private void clickWorkspaceTab(android.view.View tab, String transition) throws Exception {
