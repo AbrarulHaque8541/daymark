@@ -13,9 +13,22 @@ public final class UiMotionPolicySmoke {
         check(UiMotionPolicy.SHEET_PRESENT_MS == 260L, "sheet presentation duration is pinned");
         check(UiMotionPolicy.CHROME_HIDE_MS == 160L, "chrome hide duration is pinned");
         check(UiMotionPolicy.CHROME_SHOW_MS == 180L, "chrome show duration is pinned");
+        check(UiMotionPolicy.CHROME_SCROLL_THRESHOLD_DP == 3, "task chrome scroll threshold is pinned");
+        check(UiMotionPolicy.CHROME_AUTO_RESTORE_MS == 700L, "task chrome idle restore delay is pinned");
         check(UiMotionPolicy.EXPAND_DEBOUNCE_MS == 120L, "expand debounce duration is pinned");
         check(UiMotionPolicy.tabSlideFraction() > 0f && UiMotionPolicy.tabSlideFraction() < 1f,
                 "tab slide fraction remains subtle and bounded");
+
+        check(UiMotionPolicy.chromeActionForScrollDelta(4, 3) == UiMotionPolicy.ChromeScrollAction.HIDE,
+                "downward scroll beyond the threshold hides task chrome");
+        check(UiMotionPolicy.chromeActionForScrollDelta(-4, 3) == UiMotionPolicy.ChromeScrollAction.SHOW,
+                "upward scroll beyond the threshold reveals task chrome");
+        check(UiMotionPolicy.chromeActionForScrollDelta(3, 3) == UiMotionPolicy.ChromeScrollAction.NONE,
+                "positive movement at the threshold does not flicker chrome");
+        check(UiMotionPolicy.chromeActionForScrollDelta(-3, 3) == UiMotionPolicy.ChromeScrollAction.NONE,
+                "negative movement at the threshold does not flicker chrome");
+        check(UiMotionPolicy.chromeActionForScrollDelta(0, 3) == UiMotionPolicy.ChromeScrollAction.NONE,
+                "no movement leaves task chrome unchanged");
 
         check(UiMotionPolicy.shouldAcceptCollapse(0L, 0L),
                 "unknown expand start accepts collapse without blocking");

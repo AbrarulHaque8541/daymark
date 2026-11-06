@@ -10,4 +10,5 @@ javac --release 17 -encoding UTF-8 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/UiMotionPolicy.java" \
   "$ROOT/tools/UiMotionPolicySmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UiMotionPolicySmoke
+python3 "$ROOT/tools/check-ui-motion-wiring.py"
 python3 "$ROOT/tools/check-ui-motion-policy-integration.py" "$REPO_ROOT"

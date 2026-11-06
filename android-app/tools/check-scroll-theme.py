@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the scroll-responsive theme and natural Tasks-home scrolling."""
+"""Guard the scroll-responsive theme and stable Tasks-home chrome behavior."""
 from pathlib import Path
 import sys
 
@@ -13,7 +13,10 @@ assert "ScrollThemeColor.gradientColors(" in activity, "task content must use th
 assert "palette.background, palette.accentSoft, palette.surfaceAlt, highContrast" in activity, "gradient must honor active palette and high-contrast mode"
 assert "content.addView(sharedComposer, bottomMargin(dp(8)));" in activity, "the composer must scroll as part of Tasks content"
 assert "root.addView(sharedComposer" not in activity, "the composer must not remain pinned above the task ScrollView"
-assert "scrollView.setOnScrollChangeListener" not in activity and "setTaskChromeHidden" not in activity, "task scrolling must not trigger composer hide/show flicker"
+assert "taskScrollView.setOnScrollChangeListener" in activity, "task ScrollView must observe scroll direction"
+assert "chromeActionForScrollDelta" in activity and "CHROME_SCROLL_THRESHOLD_DP" in activity, "task chrome must ignore tiny scroll noise"
+assert "CHROME_AUTO_RESTORE_MS" in activity, "task chrome must restore after the requested idle delay"
+assert "taskScrollView.getScrollY() < sharedComposer.getBottom()" in activity and "sharedComposer.setVisibility(View.INVISIBLE)" in activity, "composer must become invisible only after it naturally scrolls out of view"
 assert "ScrollThemeColor.java" in core and "ScrollThemeColorSmoke.java" in core, "core test script must compile helper and smoke test"
 assert "com.abrar.daymark.ScrollThemeColorSmoke" in core, "core test script must execute the smoke test"
 assert "check-scroll-theme.py" in source_guard, "canonical source checks must run the scroll theme guard"
