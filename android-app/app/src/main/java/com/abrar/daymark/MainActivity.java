@@ -231,7 +231,6 @@ public final class MainActivity extends Activity {
     private UpdaterCore.Release pendingVerifiedRelease;
     private PendingSaveTransaction pendingSaveTransaction;
     private boolean webMode;
-    private final BrowserDownloadEnqueueGate browserDownloadEnqueueGate = new BrowserDownloadEnqueueGate();
     private final BrowserDownloadTracker browserDownloadTracker = new BrowserDownloadTracker();
     private BrowserNetworkPolicy browserNetworkPolicy = new BrowserNetworkPolicy();
     private BrowserSettingsPolicy browserSettingsPolicy = new BrowserSettingsPolicy();
@@ -4031,7 +4030,7 @@ public final class MainActivity extends Activity {
             case DownloadManager.STATUS_SUCCESSFUL:
                 return "Completed — tap to open";
             case DownloadManager.STATUS_FAILED:
-                return "Failed — " + browserDownloadReason(false, reason) + " (tap to retry)";
+                return "Failed — " + browserDownloadReason(false, reason) + " (retry unavailable)";
             default:
                 return "Status unavailable";
         }
@@ -4087,16 +4086,9 @@ public final class MainActivity extends Activity {
             return;
         }
         if (status == DownloadManager.STATUS_FAILED) {
-            if (!BrowserAddress.isAllowedWebUrl(url)) {
-                showToast("Retry is unavailable because the saved URL is not a valid web address.");
-                return;
-            }
-            new AlertDialog.Builder(this)
-                    .setTitle("Retry download?")
-                    .setMessage("Daymark will make a new request to this URL. The site may require a valid current session.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Retry", (dialog, which) -> queueBrowserDownload(url, android.webkit.WebSettings.getDefaultUserAgent(this), null, mimeType))
-                    .show();
+            BrowserDownloadFailClosedPolicy.Decision decision =
+                    BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads());
+            showToast(decision.userMessage);
             return;
         }
         if (status == DownloadManager.STATUS_PENDING
@@ -4288,7 +4280,6 @@ public final class MainActivity extends Activity {
                         showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
                         return;
                     }
-                    showBrowserStatus("Download started for the selected media file. Check Downloads for progress.");
                     queueBrowserDownload(url, null, null, null);
                 })
                 .setNegativeButton("Close", null)
@@ -9755,5 +9746,3 @@ public final class MainActivity extends Activity {
         }
     }
 }
-
-
