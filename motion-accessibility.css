@@ -6,4 +6,10 @@
     scroll-behavior: auto !important;
     transition: none !important;
   }
+
+  /* Keep a clear, non-animated focus ring for keyboard users when motion is reduced. */
+  :focus-visible {
+    outline: 2px solid #16705f !important;
+    outline-offset: 2px !important;
+  }
 }
