@@ -60,6 +60,14 @@
       return String(now()).slice(0, 10);
     }
 
+    function daysUntil(dateIso) {
+      if (!dateIso || dateIso.length < 10) return null;
+      const today = new Date(todayIso() + 'T00:00:00Z');
+      const target = new Date(dateIso.slice(0, 10) + 'T00:00:00Z');
+      const diffMs = target.getTime() - today.getTime();
+      return Math.round(diffMs / 86400000);
+    }
+
     function makeRow(rowClass) {
       if (!doc || typeof doc.createElement !== 'function') return null;
       const row = doc.createElement('div');
@@ -98,8 +106,9 @@
           appendText(row, 'feed-item-summary', 'Tap Refresh next year, or choose another country.');
           listEl.appendChild(row);
         }
-        return;
+        return null;
       }
+      let nextDays = null;
       for (const holiday of upcoming) {
         const row = makeRow('feed-item');
         if (!row) break;
@@ -111,7 +120,11 @@
           ? 'Locally: ' + holiday.localName + ' · ' + scope
           : scope);
         listEl.appendChild(row);
+        if (nextDays === null) {
+          nextDays = daysUntil(holiday.date);
+        }
       }
+      return nextDays;
     }
 
     function readCache() {
@@ -129,6 +142,14 @@
     function persistCache(cache) {
       if (!storage || typeof storage.setItem !== 'function') return;
       storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    }
+
+    function statusWithCountdown(base, nextDays) {
+      if (typeof nextDays === 'number' && nextDays >= 0) {
+        const label = nextDays === 0 ? 'today' : nextDays === 1 ? 'tomorrow' : nextDays + ' days';
+        return base + ' · next in ' + label;
+      }
+      return base;
     }
 
     async function onRefresh() {
@@ -152,13 +173,13 @@
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;
         persistCache(cached);
-        render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        const nextDays = render(cached);
+        status(statusWithCountdown(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`, nextDays));
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
-          render(cached);
-          status(`Could not refresh: ${message} — showing cached holidays.`);
+          const nextDays = render(cached);
+          status(statusWithCountdown(`Could not refresh: ${message} — showing cached holidays.`, nextDays));
         } else {
           status(`Could not refresh: ${message}`);
         }
@@ -181,8 +202,8 @@
     cached = readCache();
     if (cached) {
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = cached.countryCode;
-      render(cached);
-      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      const nextDays = render(cached);
+      status(statusWithCountdown(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`, nextDays));
     } else {
       status('Choose a country and tap Refresh.');
     }
