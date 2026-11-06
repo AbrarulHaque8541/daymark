@@ -350,6 +350,8 @@ public final class MainActivity extends Activity {
     private TextView browserStatus;
     private Button browserRetryButton;
     private Runnable browserStatusHideRunnable;
+    private View browserLoadProgressBar;
+    private Runnable browserLoadProgressRunnable;
     private View browserProviderRow;
     private TextView browserPrivacyButton;
     private String browserPrivacyDisclosure;
@@ -2124,6 +2126,14 @@ public final class MainActivity extends Activity {
         browserHomeView = buildBrowserHomeView();
         browserViewport.addView(browserHomeView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Live load feedback: a thin accent strip pinned to the viewport top. Before this, a
+        // page load showed one status line and then silence until the watchdog hint, which
+        // read as a frozen browser on slow networks. The strip mirrors WebView.getProgress().
+        browserLoadProgressBar = new View(this);
+        browserLoadProgressBar.setBackgroundColor(palette.accent);
+        browserLoadProgressBar.setVisibility(View.GONE);
+        browserViewport.addView(browserLoadProgressBar, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(3), Gravity.TOP));
         panel.addView(browserViewport, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         panel.addView(browserToolbarScroll, bottomMargin(dp(2)));
@@ -2758,6 +2768,45 @@ public final class MainActivity extends Activity {
         if (stagedLoadWatchdog != null) stagedLoadWatchdog.cancel();
     }
 
+    /**
+     * Live feedback while a page loads. The WebView owns its progress internally, so this polls
+     * {@link WebView#getProgress()} on the main handler and mirrors it in the thin accent strip
+     * at the top of the browser viewport. The poll stops itself as soon as the load finishes,
+     * fails, is blocked, or the WebView goes away, so it can never outlive the page load.
+     */
+    private void startBrowserLoadProgress() {
+        if (browserLoadProgressBar == null) return;
+        stopBrowserLoadProgress();
+        browserLoadProgressBar.setScaleX(0.05f);
+        browserLoadProgressBar.setPivotX(0f);
+        browserLoadProgressBar.bringToFront();
+        browserLoadProgressBar.setVisibility(View.VISIBLE);
+        browserLoadProgressRunnable = new Runnable() {
+            @Override public void run() {
+                if (browserWebView == null || browserLoadProgressBar == null || !browserPageLoading) {
+                    stopBrowserLoadProgress();
+                    return;
+                }
+                int progress = browserWebView.getProgress();
+                if (progress >= 100) {
+                    stopBrowserLoadProgress();
+                    return;
+                }
+                browserLoadProgressBar.setScaleX(Math.max(0.05f, progress / 100f));
+                mainHandler.postDelayed(this, 200L);
+            }
+        };
+        mainHandler.postDelayed(browserLoadProgressRunnable, 150L);
+    }
+
+    private void stopBrowserLoadProgress() {
+        if (browserLoadProgressRunnable != null) {
+            mainHandler.removeCallbacks(browserLoadProgressRunnable);
+            browserLoadProgressRunnable = null;
+        }
+        if (browserLoadProgressBar != null) browserLoadProgressBar.setVisibility(View.GONE);
+    }
+
     private void setBrowserChromeHidden(boolean hidden) {
         if (hidden && (!webMode || fullScreenWebDialog != null && fullScreenWebDialog.isShowing())) return;
         if (browserChromeHidden == hidden) return;
@@ -2800,6 +2849,7 @@ public final class MainActivity extends Activity {
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page started", url, null);
                 showBrowserStatus("Loading page. Embedded resources may also make network requests.");
+                startBrowserLoadProgress();
                 // Keep the watchdog active after navigation begins: a page can start successfully
                 // but never finish, leaving the viewport blank with no further WebView callback.
                 scheduleBrowserLoadWatchdog(url);
@@ -2824,6 +2874,7 @@ public final class MainActivity extends Activity {
                 if (stagedLoadWatchdog != null) stagedLoadWatchdog.onPageFinished(url);
                 browserPageLoading = false;
                 browserLoadFailed = false;
+                stopBrowserLoadProgress();
                 Log.i(BROWSER_LOG_TAG, "page finished: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page finished", url, null);
                 if (browserAddressInput != null) browserAddressInput.setText(url);
@@ -2881,6 +2932,7 @@ public final class MainActivity extends Activity {
                 if (stagedLoadWatchdog != null) stagedLoadWatchdog.onReceivedError(failingUrl, errorCode, description);
                 browserPageLoading = false;
                 browserLoadFailed = true;
+                stopBrowserLoadProgress();
                 if (errorCode == -1) {
                     showBrowserNotice(nextBrowserNoticeId("certificate-error"),
                             "Certificate validation failed",
