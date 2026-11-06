@@ -57,7 +57,8 @@
 .focus-card,
 .weather-card,
 .currency-card,
-.briefing-card {
+.briefing-card,
+.empty-state {
   position: relative;
 }
 .button-primary::after,
@@ -66,7 +67,8 @@
 .focus-card::after,
 .weather-card::after,
 .currency-card::after,
-.briefing-card::after {
+.briefing-card::after,
+.empty-state::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -82,7 +84,8 @@
 .focus-card:hover::after,
 .weather-card:hover::after,
 .currency-card:hover::after,
-.briefing-card:hover::after {
+.briefing-card:hover::after,
+.empty-state:hover::after {
   opacity: 1;
 }
 
@@ -222,7 +225,18 @@
 .focus-card:focus-within,
 .weather-card:focus-within,
 .currency-card:focus-within,
-.briefing-card:focus-within {
+.briefing-card:focus-within,
+.empty-state:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+}
+
+/* Empty-state professional glass depth and calm hover. */
+.empty-state {
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.empty-state:hover {
+  border-color: rgba(22, 112, 95, .35);
+  background: rgba(255, 255, 255, .62);
+  box-shadow: 0 8px 24px rgba(24, 40, 48, .06);
 }
