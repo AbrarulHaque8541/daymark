@@ -17,7 +17,7 @@ assert '"Site info"' in menu and "showBrowserSiteInfoDialog()" in menu, \
 assert "case 10:" in menu and "setBrowserOnlineEnabled(false)" in menu, \
     "adding Site info must preserve the Turn off online browsing action"
 assert "BrowserAddress.isAllowedWebUrl(url)" in site, \
-    "site information must only be shown for a validated HTTPS URL"
+    "site information must only be shown for a validated web URL"
 assert "target.getCertificate()" in site, \
     "show certificate metadata only when Android WebView provides it"
 assert "getIssuedTo()" in site and "getIssuedBy()" in site, \
@@ -28,9 +28,9 @@ assert "HTTPS does not guarantee that page content is safe" in site, \
     "the panel must not imply that HTTPS means the page is trustworthy"
 assert "not a phishing, reputation, or third-party request audit" in site, \
     "the panel must not imply a complete security assessment"
-assert "Open an HTTPS page before viewing site information." in site, \
+assert "Open a web page before viewing site information." in site, \
     "no-page state must give the user a useful explanation"
-print("PASS browser Site info: HTTPS-only scope, available certificate metadata, and honest safety limitations")
+print("PASS browser Site info: HTTP/HTTPS web scope, available certificate metadata, and honest safety limitations")
 
 # Work by: ChatGPT
 # Model: GPT-6

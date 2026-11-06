@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Static guards for the current HTTPS-only app clients and cleartext manifest setting.
+"""Static guards for the HTTPS-only app clients and the owner-approved cleartext browser setting.
 
-These source assertions do not prove Android WebView HTTP behavior. WebView honors the current
-manifest's cleartext restriction for this target SDK; see docs/BROWSER_HTTP_POLICY_AUDIT.md.
+These source assertions do not prove Android WebView HTTP behavior. The main manifest now enables
+cleartext for the owner-approved HTTP browser (2026-11-06); the app-owned clients below stay
+HTTPS-only in code. HTTP WebView runtime and the "Not encrypted" label are NOT TESTED here; see
+docs/BROWSER_HTTP_POLICY_AUDIT.md.
 """
 import pathlib
 import re
@@ -52,14 +54,14 @@ for marker in ('"https".equalsIgnoreCase(uri.getScheme())', "url = validateEndpo
                "HttpsURLConnection", "connection.setInstanceFollowRedirects(false);"):
     assert marker in webhook, f"Webhook HTTPS boundary missing: {marker}"
 
-# Preserve the existing app-wide platform defense. It also affects WebView; do not assert
-# that HTTP browsing works until a reviewed policy change and runtime tests establish it.
+# Owner decision 2026-11-06: the browser loads HTTP and HTTPS pages, so the main manifest
+# enables cleartext. The app-owned updater/webhook/issues clients above stay HTTPS-only in code.
 manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
 application = manifest.find("application")
 assert application is not None
 android = "{http://schemas.android.com/apk/res/android}"
-assert application.get(android + "usesCleartextTraffic") == "false", \
-    "Main manifest must keep usesCleartextTraffic=false pending security review"
+assert application.get(android + "usesCleartextTraffic") == "true", \
+    "Main manifest enables cleartext for the owner-approved HTTP browser; updater clients stay HTTPS-only in code"
 
 http_policy = (base / "BrowserHttpPolicy.java").read_text(encoding="utf-8")
 assert "ALLOW_HTTP = true" in http_policy, "Browser address policy should accept HTTP"
