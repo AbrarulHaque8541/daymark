@@ -10,8 +10,10 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
@@ -121,8 +123,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         taskLp.topMargin = dp(16);
         addView(taskName, taskLp);
 
-        LinearLayout modes = new LinearLayout(context);
-        modes.setOrientation(HORIZONTAL);
+        ModeSelector modes = new ModeSelector(context);
         modes.setPadding(dp(4), dp(4), dp(4), dp(4));
         modes.setBackground(round(SURFACE, 22));
         modeStopwatch = modeButton("Stopwatch", true);
@@ -396,6 +397,85 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         modeStopwatch.setTextColor(mode == TaskFocusTimer.Mode.STOPWATCH ? TEXT : MUTED);
         modeCountdown.setTextColor(mode == TaskFocusTimer.Mode.COUNTDOWN ? TEXT : MUTED);
         render(null, 0);
+    }
+
+    /** Intercepts only intentional horizontal drags; child button taps remain untouched. */
+    private final class ModeSelector extends LinearLayout {
+        private final float gestureThresholdPx;
+        private float downX;
+        private float downY;
+        private boolean horizontalGesture;
+        private boolean verticalGesture;
+
+        ModeSelector(Context context) {
+            super(context);
+            setOrientation(HORIZONTAL);
+            gestureThresholdPx = ViewConfiguration.get(context).getScaledTouchSlop();
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getX();
+                    downY = event.getY();
+                    horizontalGesture = false;
+                    verticalGesture = false;
+                    return false;
+                case MotionEvent.ACTION_MOVE:
+                    if (closed || actionPending || timer != null && !timer.isFinished()) return false;
+                    if (verticalGesture) return true;
+                    TaskFocusTimerModeGesturePolicy.Result result =
+                            TaskFocusTimerModeGesturePolicy.classify(
+                                    event.getX() - downX, event.getY() - downY, gestureThresholdPx);
+                    if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL) {
+                        verticalGesture = true;
+                        return true;
+                    }
+                    if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH
+                            || result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
+                        horizontalGesture = true;
+                        requestDisallowInterceptTouchEvent(true);
+                        return true;
+                    }
+                    return false;
+                case MotionEvent.ACTION_UP:
+                    if (horizontalGesture || verticalGesture) return true;
+                    resetGesture();
+                    return false;
+                case MotionEvent.ACTION_CANCEL:
+                    resetGesture();
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (!horizontalGesture && !verticalGesture) return super.onTouchEvent(event);
+            if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                if (horizontalGesture) {
+                    TaskFocusTimerModeGesturePolicy.Result result =
+                            TaskFocusTimerModeGesturePolicy.classify(
+                                    event.getX() - downX, event.getY() - downY, gestureThresholdPx);
+                    if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH) {
+                        chooseMode(TaskFocusTimer.Mode.STOPWATCH);
+                    } else if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
+                        chooseMode(TaskFocusTimer.Mode.COUNTDOWN);
+                    }
+                }
+                resetGesture();
+                return true;
+            }
+            if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) resetGesture();
+            return true;
+        }
+
+        private void resetGesture() {
+            horizontalGesture = false;
+            verticalGesture = false;
+        }
     }
 
     private void chooseDisplayUnit(DisplayUnit unit) {
