@@ -19,10 +19,15 @@ public final class TasksHomeLayoutPolicySmoke {
         check(expanded.columns == 2 && expanded.columnGapDp == 16,
                 "expanded layouts use a two-column task grid");
 
-        TasksHomeLayoutPolicy.Layout wide = TasksHomeLayoutPolicy.forWidthDp(1200);
+        TasksHomeLayoutPolicy.Layout wide = TasksHomeLayoutPolicy.forWidthDp(1199);
         check(wide.columns == 2 && wide.maxContentWidthDp == 1040,
                 "wide tablets retain the same centered content cap");
-        System.out.println("PASS responsive Tasks Home layout policy: 8 assertions");
+
+        TasksHomeLayoutPolicy.Layout ultra = TasksHomeLayoutPolicy.forWidthDp(1200);
+        check(ultra.maxContentWidthDp == 1280, "ultra-wide layouts cap content at 1280dp");
+        check(ultra.columns == 3 && ultra.columnGapDp == 20 && ultra.horizontalPaddingDp == 32,
+                "ultra-wide layouts use a three-column grid with wider gutters");
+        System.out.println("PASS responsive Tasks Home layout policy: 10 assertions");
     }
 
     private static void check(boolean condition, String message) {
