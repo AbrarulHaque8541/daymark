@@ -3989,7 +3989,7 @@ public final class MainActivity extends Activity {
         if (ids.isEmpty()) {
             new AlertDialog.Builder(this)
                     .setTitle("Downloads")
-                    .setMessage("No Daymark browser downloads are available yet. Downloads started from a page will appear here when the system download provider exposes them.")
+                    .setMessage("No Daymark browser downloads are available. New browser downloads are temporarily blocked until Daymark can validate every redirect safely. Browsing remains available.")
                     .setPositiveButton("Close", null)
                     .setNeutralButton("Refresh", (dialog, which) -> showBrowserDownloadsDialog())
                     .show();
@@ -4155,46 +4155,9 @@ public final class MainActivity extends Activity {
             showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
             return;
         }
-        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        if (manager == null) {
-            showToast("Downloads are unavailable on this device.");
-            return;
-        }
-        if (!browserDownloadEnqueueGate.tryAcquire(url, android.os.SystemClock.elapsedRealtime())) {
-            showToast("This download was just started. Wait a moment before retrying.");
-            return;
-        }
-        try {
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            String filename = BrowserDownloadFilenamePolicy.sanitize(
-                    URLUtil.guessFileName(url, contentDisposition, mimeType));
-            request.setTitle(filename);
-            request.setDescription("Daymark browser download");
-            if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
-            String effectiveUserAgent = userAgent;
-            if ((effectiveUserAgent == null || effectiveUserAgent.isEmpty()) && browserWebView != null) {
-                effectiveUserAgent = browserWebView.getSettings().getUserAgentString();
-            }
-            if (effectiveUserAgent != null && !effectiveUserAgent.isEmpty()) {
-                request.addRequestHeader("User-Agent", effectiveUserAgent);
-            }
-            String cookies = CookieManager.getInstance().getCookie(url);
-            if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            if (Build.VERSION.SDK_INT >= 29) {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
-            } else {
-                request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, filename);
-            }
-            long downloadId = manager.enqueue(request);
-            if (downloadId > 0L) browserDownloadTracker.start(downloadId, url, filename);
-            showToast(Build.VERSION.SDK_INT >= 29
-                    ? "Download started. Check Downloads for progress."
-                    : "Download started. Check Daymark's app Downloads folder.");
-        } catch (Exception exception) {
-            browserDownloadEnqueueGate.release(url);
-            showToast("Download could not be started.");
-        }
+        BrowserDownloadFailClosedPolicy.Decision decision =
+                BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads());
+        showToast(decision.userMessage);
     }
 
     // UC-style media grabber: a one-shot read-only DOM probe (no JS bridge, no

@@ -23,6 +23,7 @@ python3 ./tools/check-browser-catalog.py "$ROOT"
 python3 ./tools/check-browser-load-watchdog.py "$ROOT"
 sh ./tools/run-load-watchdog-tests.sh
 sh ./tools/run-browser-download-tracker-tests.sh
+sh ./tools/run-browser-download-fail-closed-tests.sh
 python3 ./tools/check-browser-session-lifecycle.py "$ROOT"
 python3 ./tools/check-browser-error-diagnostics.py "$ROOT"
 python3 ./tools/check-cold-start-recovery.py "$ROOT"

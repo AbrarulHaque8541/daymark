@@ -81,16 +81,13 @@ for marker, explanation in (
 provider_error_catch = active_check.index("catch (RuntimeException providerUnavailable)")
 assert "return false;" in active_check[provider_error_catch:provider_error_catch + 120], \
     "provider/query errors must fail closed without removing a file"
-normalized_activity = "".join(activity.split())
-assert (
-    "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))"
-    in normalized_activity
-), "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
 assert "openDownloadsFolder()" not in activity, "Downloads must not be a generic document picker"
 assert "ACTION_OPEN_DOCUMENT" not in method, "the downloads list must not be implemented as a generic file picker"
-assert "No Daymark browser downloads are available yet." in method, "empty state must be explicit"
+assert "No Daymark browser downloads are available." in method, "empty state must be explicit"
 assert "No compatible app could open this file." in method, "viewer handoff failure must be disclosed"
-print("PASS browser downloads source checks: status/progress, confirmed web retry, safe file handoff, refresh and empty/error states")
+assert "New browser downloads are temporarily blocked" in method, \
+    "empty state must explain that new downloads are deliberately fail-closed"
+print("PASS browser downloads history checks: status/progress, confirmed retry, safe existing-file handoff, refresh and empty/error states")
 
 # Work by: ChatGPT
 # Model: GPT-6
