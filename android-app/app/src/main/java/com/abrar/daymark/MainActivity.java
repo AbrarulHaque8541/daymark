@@ -2462,28 +2462,28 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * One UC-style home tile: monogram badge, two-line label, one shared tap. The tap is the
+     * One compact UC-style home tile: monogram badge, single-line label, one shared tap. The tap is the
      * exact handler the bottom chips use, so a tile and its chip always do the same thing.
      */
     private LinearLayout browserHomeTile(String glyph, String label, String description, Runnable tap) {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
-        tile.setPadding(dp(4), dp(8), dp(4), dp(8));
+        tile.setPadding(dp(2), dp(5), dp(2), dp(5));
         tile.setFocusable(true);
         tile.setClickable(true);
         tile.setContentDescription(description);
-        TextView monogram = text(glyph, 19, palette.accent, Typeface.BOLD);
+        TextView monogram = text(glyph, 16, palette.accent, Typeface.BOLD);
         monogram.setGravity(Gravity.CENTER);
         monogram.setBackground(pressable(palette.suggestionSurface, 16, palette.line, palette.accent));
-        LinearLayout.LayoutParams monogramParams = new LinearLayout.LayoutParams(dp(52), dp(52));
+        LinearLayout.LayoutParams monogramParams = new LinearLayout.LayoutParams(dp(40), dp(40));
         tile.addView(monogram, monogramParams);
-        TextView caption = text(label, 11, palette.muted, Typeface.NORMAL);
-        caption.setMaxLines(2);
+        TextView caption = text(label, 10, palette.muted, Typeface.NORMAL);
+        caption.setMaxLines(1);
         caption.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams captionParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        captionParams.topMargin = dp(6);
+        captionParams.topMargin = dp(4);
         tile.addView(caption, captionParams);
         tile.setOnClickListener(view -> {
             haptic(view, HapticFeedbackConstants.CONFIRM);
@@ -2496,26 +2496,12 @@ public final class MainActivity extends Activity {
         LinearLayout home = new LinearLayout(this);
         home.setOrientation(LinearLayout.VERTICAL);
         home.setGravity(Gravity.CENTER_HORIZONTAL);
-        home.setPadding(dp(20), dp(28), dp(20), dp(16));
+        home.setPadding(dp(14), dp(14), dp(14), dp(12));
         home.setBackground(browserHomeScenicBackdrop());
-
-        TextView title = text("Daymark", 30, palette.text, Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        home.addView(title, bottomMargin(dp(4)));
-
-        TextView tagline = text("Your browser, your way", 13, palette.muted, Typeface.NORMAL);
-        tagline.setGravity(Gravity.CENTER);
-        home.addView(tagline, bottomMargin(dp(18)));
 
         home.addView(browserHomeSearchPill(), bottomMargin(dp(10)));
 
-        TextView detail = text(
-                "Enter a question or web address, then tap Go or a provider tile.",
-                12, palette.muted, Typeface.NORMAL);
-        detail.setGravity(Gravity.CENTER);
-        home.addView(detail, bottomMargin(dp(20)));
-
-        home.addView(browserHomeSectionLabel("QUICK ACCESS"), bottomMargin(dp(8)));
+        home.addView(browserHomeSectionLabel("QUICK ACCESS"), bottomMargin(dp(6)));
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
         quickRow.addView(browserHomeTile("H", "Site history", "Open saved site history",
@@ -2526,9 +2512,9 @@ public final class MainActivity extends Activity {
                 this::showBrowserDownloadsDialog), tileParams());
         quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
                 this::showBrowserExtensionsManager), tileParams());
-        home.addView(quickRow, bottomMargin(dp(16)));
+        home.addView(quickRow, bottomMargin(dp(12)));
 
-        home.addView(browserHomeSectionLabel("SEARCH & AI"), bottomMargin(dp(8)));
+        home.addView(browserHomeSectionLabel("SEARCH"), bottomMargin(dp(6)));
         List<LinearLayout> gridRows = new ArrayList<>();
         LinearLayout row = null;
         int column = 0;
@@ -2545,11 +2531,19 @@ public final class MainActivity extends Activity {
                     () -> handleBrowserEngineShortcutTap(engine)), tileParams());
             column = (column + 1) % 4;
         }
+        for (LinearLayout gridRow : gridRows) {
+            home.addView(gridRow, bottomMargin(dp(2)));
+        }
+
+        home.addView(browserHomeSectionLabel("AI"), bottomMargin(dp(6)));
+        List<LinearLayout> aiRows = new ArrayList<>();
+        row = null;
+        column = 0;
         for (AiSiteCatalog.Entry entry : AiSiteCatalog.entries()) {
             if (column == 0) {
                 row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
-                gridRows.add(row);
+                aiRows.add(row);
             }
             String monogram = entry.label.substring(0, 1);
             row.addView(browserHomeTile(monogram, entry.label,
@@ -2557,17 +2551,9 @@ public final class MainActivity extends Activity {
                     () -> handleBrowserSiteShortcutTap(entry)), tileParams());
             column = (column + 1) % 4;
         }
-        for (LinearLayout gridRow : gridRows) {
-            home.addView(gridRow, bottomMargin(dp(2)));
+        for (LinearLayout aiRow : aiRows) {
+            home.addView(aiRow, bottomMargin(dp(2)));
         }
-
-        TextView privacyHint = text("Online browsing is on by default. Privacy details are above.", 11,
-                palette.muted, Typeface.NORMAL);
-        privacyHint.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        privacyParams.topMargin = dp(16);
-        home.addView(privacyHint, privacyParams);
 
         ScrollView homeScroll = new ScrollView(this);
         homeScroll.setFillViewport(true);
