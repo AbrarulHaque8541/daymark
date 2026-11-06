@@ -85,6 +85,21 @@
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
     }
 
+    function prefillTaskFromHoliday(holiday) {
+      const titleEl = element('new-title');
+      const dueEl = element('new-due-date');
+      if (titleEl && typeof titleEl.value === 'string') {
+        titleEl.value = (holiday.name || 'Holiday') + ' (public holiday)';
+      }
+      if (dueEl && typeof dueEl.value === 'string') {
+        dueEl.value = holiday.date || '';
+      }
+      if (titleEl && typeof titleEl.focus === 'function') {
+        titleEl.focus();
+      }
+      status('Holiday copied to the task form. Review and add when ready.');
+    }
+
     function render(cache) {
       if (!listEl || !cache) return;
       clearList();
@@ -110,6 +125,18 @@
         appendText(row, 'feed-item-summary', holiday.localName && holiday.localName !== holiday.name
           ? 'Locally: ' + holiday.localName + ' · ' + scope
           : scope);
+
+        // Small related improvement: one-tap prefill of the task composer.
+        const addBtn = doc && typeof doc.createElement === 'function' ? doc.createElement('button') : null;
+        if (addBtn) {
+          addBtn.type = 'button';
+          addBtn.className = 'tool-button holiday-add-task';
+          addBtn.textContent = 'Add as task';
+          addBtn.setAttribute('aria-label', 'Add ' + (holiday.name || 'holiday') + ' on ' + holiday.date + ' as a task');
+          addBtn.addEventListener('click', () => prefillTaskFromHoliday(holiday));
+          row.appendChild(addBtn);
+        }
+
         listEl.appendChild(row);
       }
     }
