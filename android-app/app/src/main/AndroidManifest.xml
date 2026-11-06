@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Owner decision 2026-11-06: the embedded browser loads HTTP and HTTPS pages; HTTP pages
+         are labelled "Not encrypted" in the UI. App-owned network clients (updater, webhook,
+         public issues) remain HTTPS-only in code. -->
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -13,7 +16,7 @@
         android:roundIcon="@drawable/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="true">
         <meta-data
             android:name="android.webkit.WebView.MetricsOptOut"
             android:value="true" />
