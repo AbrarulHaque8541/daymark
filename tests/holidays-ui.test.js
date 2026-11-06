@@ -122,6 +122,7 @@ test('attach renders a cached holiday list with a cached note', () => {
   assert.equal(rows[0][1], 'Christmas Day');
   assert.equal(rows[0][2], 'Nationwide public holiday');
   assert.ok(elements['holiday-status'].textContent.startsWith('Cached · updated 2026-11-02 09:30 UTC'));
+  assert.ok(elements['holiday-status'].textContent.includes('next in 49 days'));
   assert.equal(elements['holiday-country'].value, 'IN');
   assert.equal(typeof handle.onRefresh, 'function');
 });
@@ -135,6 +136,7 @@ test('a cached list shows local names and regional scope honestly', () => {
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows[0][1], 'Diwali · दीवाली');
   assert.equal(rows[0][2], 'Locally: दीवाली · Regional holiday');
+  assert.ok(elements['holiday-status'].textContent.includes('next in 8 days'));
 });
 
 test('attach with no cache prompts the user to choose a country', () => {
@@ -161,6 +163,8 @@ test('a cache whose year has no holidays left says so instead of showing nothing
   assert.equal(rows.length, 1);
   assert.equal(rows[0][0], 'No more public holidays in 2026 for this country.');
   assert.equal(rows[0][1], 'Tap Refresh next year, or choose another country.');
+  assert.equal(elements['holiday-status'].textContent.startsWith('Cached · updated 2026-11-02 09:30 UTC'));
+  assert.ok(!elements['holiday-status'].textContent.includes('next in'));
 });
 
 test('refresh fetches, renders, and persists the result', async () => {
@@ -177,7 +181,7 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(rows[0][0], '2026-11-14');
   assert.equal(rows[0][1], 'Diwali · दीवाली');
   assert.equal(rows[1][0], '2026-12-25');
-  assert.equal(elements['holiday-status'].textContent, 'Updated · 2026-11-06 12:00 UTC');
+  assert.equal(elements['holiday-status'].textContent, 'Updated · 2026-11-06 12:00 UTC · next in 8 days');
   assert.equal(elements['holiday-refresh'].disabled, false);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
   assert.ok(holidaysApi.validateHolidayCache(saved));
@@ -194,6 +198,7 @@ test('refresh failure keeps the cached list visible', async () => {
   const handle = ui.attachHolidaysUi(env);
   await handle.onRefresh();
   assert.ok(elements['holiday-status'].textContent.includes('Could not refresh: offline — showing cached holidays.'));
+  assert.ok(elements['holiday-status'].textContent.includes('next in 49 days'));
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 1);
   assert.equal(rows[0][0], '2026-12-25');
