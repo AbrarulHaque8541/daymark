@@ -69,6 +69,7 @@ function fakeEnv(options) {
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
+  if (opts.prefs !== undefined) storageData[ui.PREFS_KEY] = opts.prefs;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); },
@@ -163,7 +164,7 @@ test('a cache whose year has no holidays left says so instead of showing nothing
   assert.equal(rows[0][1], 'Tap Refresh next year, or choose another country.');
 });
 
-test('refresh fetches, renders, and persists the result', async () => {
+test('refresh fetches, renders, and persists the result and preference', async () => {
   const fetchImpl = okFetch([
     { prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }
   ]);
@@ -183,6 +184,8 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.ok(holidaysApi.validateHolidayCache(saved));
   assert.equal(saved.countryCode, 'IN');
   assert.equal(saved.holidays.length, 2);
+  const prefs = JSON.parse(storageData[ui.PREFS_KEY]);
+  assert.equal(prefs.countryCode, 'IN');
 });
 
 test('refresh failure keeps the cached list visible', async () => {
@@ -231,11 +234,12 @@ test('holiday form submission prevents navigation and refreshes', async () => {
   assert.equal(elements['holiday-list'].children.length, 2);
 });
 
-test('clear removes the cached list and resets the country choice', () => {
+test('clear removes the cached list, preference, and resets the country choice', () => {
   const stored = JSON.stringify(makeCache([
     { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
   ]));
-  const { env, elements, storageData } = fakeEnv({ stored });
+  const prefs = JSON.stringify({ countryCode: 'DE' });
+  const { env, elements, storageData } = fakeEnv({ stored, prefs });
   elements['holiday-country'].value = 'DE';
   const handle = ui.attachHolidaysUi(env);
   assert.equal(typeof handle.onClear, 'function');
@@ -243,6 +247,7 @@ test('clear removes the cached list and resets the country choice', () => {
   assert.equal(elements['holiday-list'].children.length, 0);
   assert.equal(elements['holiday-country'].value, 'IN');
   assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
   assert.equal(elements['holiday-status'].textContent,
     'Holidays cleared on this device. Choose a country and tap Refresh.');
 });
@@ -272,8 +277,41 @@ test('clicking the Clear button clears the card', () => {
     'Holidays cleared on this device. Choose a country and tap Refresh.');
 });
 
+test('restores last country preference when no cache is present', () => {
+  const prefs = JSON.stringify({ countryCode: 'US' });
+  const { env, elements } = fakeEnv({ prefs });
+  ui.attachHolidaysUi(env);
+  assert.equal(elements['holiday-country'].value, 'US');
+  assert.equal(elements['holiday-status'].textContent, 'Last country restored. Tap Refresh for upcoming holidays.');
+  assert.equal(elements['holiday-list'].children.length, 0);
+});
+
+test('country change persists the preference immediately', () => {
+  const { env, elements, storageData } = fakeEnv({});
+  ui.attachHolidaysUi(env);
+  const countryEl = elements['holiday-country'];
+  countryEl.value = 'GB';
+  const change = countryEl.listeners.find((l) => l.type === 'change');
+  assert.ok(change, 'change listener registered');
+  change.handler();
+  const prefs = JSON.parse(storageData[ui.PREFS_KEY]);
+  assert.equal(prefs.countryCode, 'GB');
+});
+
+test('cache country overrides preference on load', () => {
+  const stored = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  const prefs = JSON.stringify({ countryCode: 'DE' });
+  const { env, elements } = fakeEnv({ stored, prefs });
+  ui.attachHolidaysUi(env);
+  assert.equal(elements['holiday-country'].value, 'IN'); // from cache
+  assert.ok(elements['holiday-status'].textContent.startsWith('Cached ·'));
+});
+
 test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachHolidaysUi, 'function');
   assert.equal(ui.STORAGE_KEY, 'daymark.holidays.v1');
+  assert.equal(ui.PREFS_KEY, 'daymark.holidays.prefs.v1');
   assert.equal(typeof globalThis.DaymarkHolidaysUi, 'object');
 });
