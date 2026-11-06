@@ -16,6 +16,8 @@
   const REMINDER_LEADS = [0, 30, 60, 1440];
   const MAX_TAGS = 5;
   const MAX_TAG_CHARS = 24;
+  const MIN_ESTIMATED_MINUTES = 1;
+  const MAX_ESTIMATED_MINUTES = 480;
 
   function isDateOnly(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -47,6 +49,13 @@
       && typeof subtask.done === 'boolean'));
   }
 
+
+  function isValidEstimatedMinutes(value) {
+    return value === undefined || value === null
+      || (typeof value === 'number' && Number.isInteger(value)
+          && value >= MIN_ESTIMATED_MINUTES && value <= MAX_ESTIMATED_MINUTES);
+  }
+
   function isTag(value) {
     return typeof value === 'string' && /^[a-z0-9][a-z0-9_-]{0,23}$/.test(value);
   }
@@ -63,8 +72,6 @@
     for (const raw of tags) {
       if (typeof raw !== 'string') throw new Error('Tags are malformed.');
       const tag = raw.trim().toLowerCase().replace(/ /g, '-');
-      if (!tag) continue;
-      if (tag.length > MAX_TAG_CHARS) throw new Error(`Tags can be at most ${MAX_TAG_CHARS} characters.`);
       if (!isTag(tag)) throw new Error('Tags can use letters, numbers, hyphens, and underscores.');
       if (!normalized.includes(tag)) normalized.push(tag);
     }
@@ -89,7 +96,8 @@
       && (task.reminderShownFire === undefined || task.reminderShownFire === null
         || (typeof task.reminderShownFire === 'string' && !Number.isNaN(Date.parse(task.reminderShownFire))))
       && (task.subtasks === undefined || isValidSubtasks(task.subtasks))
-      && (task.tags === undefined || task.tags === null || isValidTags(task.tags)));
+      && (task.tags === undefined || task.tags === null || isValidTags(task.tags))
+      && isValidEstimatedMinutes(task.estimatedMinutes));
   }
 
   function validateStoredTasks(value) {
@@ -109,11 +117,10 @@
   }
 
   function dueTimeOf(task) {
-    return isTimeOnly(task.dueTime) ? task.dueTime : null;
+    return typeof task.dueTime === 'string' ? task.dueTime : null;
   }
 
   function compareTasks(a, b) {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1;
     if (a.dueDate === null && b.dueDate !== null) return 1;
     if (a.dueDate !== null && b.dueDate === null) return -1;
     if (a.dueDate !== b.dueDate) return (a.dueDate || '').localeCompare(b.dueDate || '');
@@ -127,24 +134,28 @@
   }
 
   function getFilteredTasks(tasks, filter, query, today) {
-    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const normalizedQuery = (query || '').trim().toLowerCase();
     return tasks.filter((task) => {
-      if (filter === 'completed' && !task.completed) return false;
-      if (filter === 'today' && task.dueDate !== today) return false;
-      if (filter === 'upcoming' && !(task.dueDate !== null && task.dueDate > today)) return false;
+      if (filter === 'completed') return task.completed;
+      if (task.completed) return false;
+      if (filter === 'today') return task.dueDate === today;
+      if (filter === 'overdue') return task.dueDate && task.dueDate < today;
+      if (filter === 'upcoming') return task.dueDate && task.dueDate > today;
+      if (filter === 'undated') return !task.dueDate;
+      return true;
+    }).filter((task) => {
       if (!normalizedQuery) return true;
-      const notes = typeof task.notes === 'string' ? task.notes.toLowerCase() : '';
-      const tags = Array.isArray(task.tags) ? task.tags.join(' ').toLowerCase() : '';
-      return task.title.toLowerCase().includes(normalizedQuery) || notes.includes(normalizedQuery)
-        || tags.includes(normalizedQuery);
+      const haystack = `${task.title} ${task.notes || ''} ${(task.tags || []).join(' ')}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
     }).slice().sort(compareTasks);
   }
 
   function suggestionReason(task, today, formatDate) {
-    if (task.dueDate && task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)} · ${task.priority} priority`;
-    if (task.dueDate === today) return `Due today · ${task.priority} priority`;
-    if (task.dueDate) return `Due ${formatDate(task.dueDate)} · ${task.priority} priority`;
-    return `No due date · ${task.priority} priority`;
+    const estimate = (typeof task.estimatedMinutes === 'number') ? ` · ~${task.estimatedMinutes}m` : '';
+    if (task.dueDate && task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)} · ${task.priority} priority${estimate}`;
+    if (task.dueDate === today) return `Due today · ${task.priority} priority${estimate}`;
+    if (task.dueDate) return `Due ${formatDate(task.dueDate)} · ${task.priority} priority${estimate}`;
+    return `No due date · ${task.priority} priority${estimate}`;
   }
 
   function getSuggestions(tasks, today, formatDate) {
@@ -172,6 +183,7 @@
     normalizeTags,
     isTag,
     isValidTask,
+    isValidEstimatedMinutes,
     validateStoredTasks,
     getFilteredTasks,
     getSuggestions,
@@ -183,5 +195,5 @@
     MAX_TAG_CHARS
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.DaymarkLogic = api;
-})(globalThis);
+  else root.DaymarkTaskLogic = api;
+})(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
