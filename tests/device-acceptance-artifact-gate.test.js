@@ -36,11 +36,17 @@ const actualCondition = buildJob
 const expectedCondition =
   "${{ github.event_name == 'workflow_dispatch' && " +
   `github.actor == '${owner}' && ` +
+  `github.triggering_actor == '${owner}' && ` +
   "inputs.request_test_apk == true }}";
 
-function shouldRunArtifactJob(eventName, actor, requestTestApk) {
+function shouldRunArtifactJob(eventName, actor, triggeringActor, requestTestApk) {
   // Mirror the workflow expression exactly; this function never dispatches CI.
-  return eventName === "workflow_dispatch" && actor === owner && requestTestApk === true;
+  return (
+    eventName === "workflow_dispatch" &&
+    actor === owner &&
+    triggeringActor === owner &&
+    requestTestApk === true
+  );
 }
 
 test("device-acceptance APK artifact job is statically gated before build and upload", () => {
@@ -51,7 +57,8 @@ test("device-acceptance APK artifact job is statically gated before build and up
   assert.match(dispatchBlock, /^        default: false\s*$/m);
   assert.equal(actualCondition, expectedCondition);
   assert.match(buildJob, /Pull requests \(including forks\) always skip it\./);
-  assert.match(buildJob, /Manual dispatch is owner-only and requires the explicit, default-false input\./);
+  assert.match(buildJob, /Manual dispatch\/reruns require the owner as both original and triggering actor\./);
+  assert.match(buildJob, /The request_test_apk input is explicit and defaults to false\./);
   assert.match(buildJob, /name: Build sideload debug APK and compile instrumentation sources/);
   assert.match(buildJob, /name: Upload non-production APK and exact build metadata/);
   assert.equal((workflow.match(/uses: actions\/upload-artifact@v4/g) || []).length, 1);
@@ -59,24 +66,41 @@ test("device-acceptance APK artifact job is statically gated before build and up
 
 test("all pull-request events skip the artifact job, including fork PRs", () => {
   const pullRequestCases = [
-    ["same-repository PR with owner actor and true input", owner, true],
-    ["fork PR with a fork actor and true input", "fork-contributor", true],
-    ["fork PR with another actor and no input", "outside-collaborator", undefined],
+    ["same-repository PR with owner actors and true input", owner, owner, true],
+    ["fork PR with a fork actor and true input", "fork-contributor", "fork-contributor", true],
+    ["fork PR with another actor and no input", "outside-collaborator", "outside-collaborator", undefined],
   ];
-  for (const [label, actor, input] of pullRequestCases) {
-    assert.equal(shouldRunArtifactJob("pull_request", actor, input), false, label);
+  for (const [label, actor, triggeringActor, input] of pullRequestCases) {
+    assert.equal(shouldRunArtifactJob("pull_request", actor, triggeringActor, input), false, label);
   }
 });
 
-test("manual dispatch requires the owner actor and explicit true opt-in", () => {
+test("manual dispatch requires both owner actors and explicit true opt-in", () => {
   const dispatchCases = [
-    ["owner omitted/default-false input", owner, undefined, false],
-    ["owner explicit false input", owner, false, false],
-    ["other actor explicit true input", "fork-contributor", true, false],
-    ["owner explicit true input", owner, true, true],
+    ["owner omitted/default-false input", owner, owner, undefined, false],
+    ["owner explicit false input", owner, owner, false, false],
+    ["other actor explicit true input", "fork-contributor", "fork-contributor", true, false],
+    ["owner explicit true input", owner, owner, true, true],
   ];
-  for (const [label, actor, input, expected] of dispatchCases) {
-    assert.equal(shouldRunArtifactJob("workflow_dispatch", actor, input), expected, label);
+  for (const [label, actor, triggeringActor, input, expected] of dispatchCases) {
+    assert.equal(shouldRunArtifactJob("workflow_dispatch", actor, triggeringActor, input), expected, label);
   }
-  assert.equal(shouldRunArtifactJob("push", owner, true), false, "non-dispatch event must not run the artifact job");
+  assert.equal(
+    shouldRunArtifactJob("push", owner, owner, true),
+    false,
+    "non-dispatch event must not run the artifact job",
+  );
+});
+
+test("non-owner rerun of an owner-created opt-in run is denied", () => {
+  assert.equal(
+    shouldRunArtifactJob("workflow_dispatch", owner, "trusted-collaborator", true),
+    false,
+    "github.actor remains the owner, so rerun must be rejected by triggering_actor",
+  );
+  assert.equal(
+    shouldRunArtifactJob("workflow_dispatch", owner, owner, true),
+    true,
+    "owner rerun remains allowed with the explicit opt-in",
+  );
 });
