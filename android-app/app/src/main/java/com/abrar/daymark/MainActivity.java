@@ -2306,6 +2306,22 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private Button browserSearchShortcutButton(BrowserAddress.SearchEngine engine) {
+        Button button = compactButton(engine.label, false);
+        button.setMinHeight(dp(34));
+        button.setMinimumHeight(dp(34));
+        button.setTextSize(11 * textScale);
+        button.setPadding(dp(9), 0, dp(9), 0);
+        button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
+        button.setContentDescription("Search the current query with " + engine.label);
+        button.setOnClickListener(view -> handleBrowserEngineShortcutTap(engine));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+        params.setMargins(0, 0, dp(5), 0);
+        button.setLayoutParams(params);
+        return button;
+    }
+
     /**
      * Shared tap behavior for the bottom engine chips and the home grid engine tiles, so the
      * two surfaces can never drift apart. An empty query selects the engine and focuses the
@@ -2339,22 +2355,6 @@ public final class MainActivity extends Activity {
         }
         if (browserAddressInput != null) browserAddressInput.setText(query);
         navigateBrowserTo(address);
-    }
-
-    private Button browserSearchShortcutButton(BrowserAddress.SearchEngine engine) {
-        Button button = compactButton(engine.label, false);
-        button.setMinHeight(dp(34));
-        button.setMinimumHeight(dp(34));
-        button.setTextSize(11 * textScale);
-        button.setPadding(dp(9), 0, dp(9), 0);
-        button.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
-        button.setContentDescription("Search the current query with " + engine.label);
-        button.setOnClickListener(view -> handleBrowserEngineShortcutTap(engine));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
-        params.setMargins(0, 0, dp(5), 0);
-        button.setLayoutParams(params);
-        return button;
     }
 
     /**
