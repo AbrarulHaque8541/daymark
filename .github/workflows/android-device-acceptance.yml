@@ -2,6 +2,12 @@ name: Android device acceptance artifact (non-publishing)
 
 on:
   workflow_dispatch:
+    inputs:
+      request_test_apk:
+        description: "Owner-authorized request to build and upload a non-production test APK."
+        type: boolean
+        required: true
+        default: false
   pull_request:
     branches: ["main"]
     paths:
@@ -17,10 +23,16 @@ permissions:
 concurrency:
   group: android-device-acceptance-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   build:
     name: Build current-source debug APK for manual device QA
+    # This job builds and uploads an APK. Pull requests (including forks) always skip it.
+    # Manual dispatch is owner-only and requires the explicit, default-false input.
+    # Keep API 29/36 instrumentation and other non-artifact checks in their own workflows.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' &&
+          github.actor == 'AbrarulHaque8541' &&
+          inputs.request_test_apk == true }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
