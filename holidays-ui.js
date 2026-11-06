@@ -60,6 +60,18 @@
       return String(now()).slice(0, 10);
     }
 
+    function daysUntil(dateIso) {
+      if (!dateIso || dateIso.length < 10) return null;
+      const today = new Date(todayIso() + 'T00:00:00Z');
+      const target = new Date(dateIso + 'T00:00:00Z');
+      if (isNaN(today.getTime()) || isNaN(target.getTime())) return null;
+      const diff = Math.round((target - today) / 86400000);
+      if (diff === 0) return 'today';
+      if (diff === 1) return 'tomorrow';
+      if (diff > 1) return 'in ' + diff + ' days';
+      return null;
+    }
+
     function makeRow(rowClass) {
       if (!doc || typeof doc.createElement !== 'function') return null;
       const row = doc.createElement('div');
@@ -104,6 +116,10 @@
         const row = makeRow('feed-item');
         if (!row) break;
         appendText(row, 'feed-item-date', holiday.date);
+        const relative = daysUntil(holiday.date);
+        if (relative) {
+          appendText(row, 'feed-item-days', relative);
+        }
         appendText(row, 'feed-item-title', holiday.name
           + (holiday.localName && holiday.localName !== holiday.name ? ' · ' + holiday.localName : ''));
         const scope = holiday.global ? 'Nationwide public holiday' : 'Regional holiday';

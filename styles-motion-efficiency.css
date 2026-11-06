@@ -142,6 +142,7 @@
   50% { border-color: rgba(22, 112, 95, .45); }
 }
 
+
 /* Glance card refresh + data-controls busy indicator (accent #16705f spinner, reduced-motion safe).
    Primary buttons use white spinner; quiet/secondary/tool-button keep accent. Label stays visible with padding. */
 .button.is-busy,
@@ -225,4 +226,18 @@
 .briefing-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+}
+
+/* Relative days-until badge for public holidays (accent #16705f glass). */
+.feed-item-days {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  vertical-align: middle;
 }
