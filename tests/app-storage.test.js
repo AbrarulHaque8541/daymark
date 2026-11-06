@@ -12,12 +12,22 @@ const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
   const confirmMessages = [];
+  const intervalCallbacks = [];
+  const clock = dateNow === null ? null : { value: new Date(dateNow).getTime() };
+  const AppDate = clock ? class extends Date {
+    constructor(...args) {
+      if (args.length === 0) super(clock.value);
+      else super(...args);
+    }
+    static now() { return clock.value; }
+  } : Date;
   let fileReadCount = 0;
+  let toastWriteCount = 0;
   const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
   if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
 
@@ -27,7 +37,11 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
       const classes = new Set();
       classSets.set(selector, classes);
       elements.set(selector, {
-        textContent: '',
+        get textContent() { return this._textContent ?? ''; },
+        set textContent(value) {
+          this._textContent = value;
+          if (selector === '#toast') toastWriteCount += 1;
+        },
         value: '',
         hidden: false,
         innerHTML: '',
@@ -113,7 +127,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   element('#storage-status').classList.add('is-checking');
 
   vm.runInNewContext(APP_SOURCE, {
-    Date,
+    Date: AppDate,
     Intl,
     Math,
     console: { warn() {} },
@@ -123,7 +137,10 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     FileReader: TestFileReader,
     clearTimeout() {},
     setTimeout: () => 1,
-    setInterval: () => 1
+    setInterval: (callback, delay) => {
+      intervalCallbacks.push({ callback, delay });
+      return intervalCallbacks.length;
+    }
   }, { filename: 'app.js' });
 
   return {
@@ -132,6 +149,12 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     classSets,
     listeners,
     confirmMessages,
+    intervalCallbacks,
+    get toastWriteCount() { return toastWriteCount; },
+    setNow(value) {
+      if (!clock) throw new Error('This app instance does not have a controlled clock.');
+      clock.value = new Date(value).getTime();
+    },
     get fileReadCount() { return fileReadCount; }
   };
 }
@@ -527,6 +550,119 @@ test('edit form shows date-only reminder guidance and saves a null time with its
   assert.equal(saved[0].dueTime, null, 'date-only edit keeps the saved time null');
   assert.equal(saved[0].reminderLeadMinutes, 60, 'date-only edit preserves the selected reminder lead');
 });
+
+function withTimeZone(timeZone, run) {
+  const originalTimeZone = process.env.TZ;
+  process.env.TZ = timeZone;
+  try {
+    return run();
+  } finally {
+    if (originalTimeZone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTimeZone;
+  }
+}
+
+function makeDateOnlyReminderTask(id, dueDate, reminderLeadMinutes, reminderShownFire) {
+  const task = makeImportTask(id, `Reminder ${id}`);
+  task.dueDate = dueDate;
+  task.dueTime = null;
+  task.reminderLeadMinutes = reminderLeadMinutes;
+  if (reminderShownFire) task.reminderShownFire = reminderShownFire;
+  return task;
+}
+
+test('date-only reminder persists with null dueTime and fires once at the disclosed 9 AM local time', () => withTimeZone('America/New_York', () => {
+  const first = bootApp({
+    savedValue: JSON.stringify([]),
+    dateNow: '2026-11-20T13:59:00.000Z'
+  });
+  triggerFormInput(first, '#new-due-date', '2026-11-20');
+  first.elements.get('#new-title').value = 'Date-only add form reminder';
+  first.elements.get('#new-reminder').value = '0';
+  triggerFormSubmit(first, '#add-form');
+  const firstSavedTasks = JSON.parse(first.storedValues.get(STORAGE_KEY));
+  assert.equal(firstSavedTasks.length, 1, 'the Add form stores the new reminder');
+  assert.equal(firstSavedTasks[0].dueDate, '2026-11-20');
+  assert.equal(firstSavedTasks[0].dueTime, null, 'the Add form leaves the disclosed time out of storage');
+  assert.equal(firstSavedTasks[0].reminderLeadMinutes, 0, 'the selected lead is saved with the date-only task');
+  assert.equal(first.intervalCallbacks[0].delay, 30000, 'the app continues checking reminders on its existing interval');
+  assert.equal(firstSavedTasks[0].reminderShownFire, undefined,
+    '08:59 local is before the date-only 09:00 fire time');
+
+  const reloaded = bootApp({
+    savedValue: first.storedValues.get(STORAGE_KEY),
+    dateNow: '2026-11-20T13:59:00.000Z'
+  });
+  const reloadedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(reloadedTask.dueDate, '2026-11-20');
+  assert.equal(reloadedTask.dueTime, null, 'the disclosed time is not persisted as a due time');
+  assert.equal(reloadedTask.reminderLeadMinutes, 0, 'the selected lead survives reload');
+
+  reloaded.setNow('2026-11-20T14:00:00.000Z');
+  reloaded.intervalCallbacks[0].callback();
+  let savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(savedTask.dueTime, null);
+  assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', '09:00 EST is recorded as the actual local fire instant');
+  assert.match(reloaded.elements.get('#toast').textContent, /Reminder: “Date-only add form reminder” is due\./);
+
+  const toastWritesAfterFirstFire = reloaded.toastWriteCount;
+  assert.equal(toastWritesAfterFirstFire, 1, 'the reminder emits one visible toast when it first fires');
+  reloaded.intervalCallbacks[0].callback();
+  savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', 'the same fire instant is not shown twice');
+  assert.equal(reloaded.toastWriteCount, toastWritesAfterFirstFire, 'the repeated interval check does not write/show another toast');
+}));
+
+test('editing a date-only reminder reschedules it without changing null-time or lead semantics', () => withTimeZone('America/New_York', () => {
+  const task = makeDateOnlyReminderTask('date-only-reschedule', '2026-11-20', 0, '2026-11-20T14:00:00.000Z');
+  const app = bootApp({
+    savedValue: JSON.stringify([task]),
+    dateNow: '2026-11-20T14:05:00.000Z'
+  });
+  triggerTaskEdit(app, task.id);
+  triggerFormInput(app, '#edit-due-date', '2026-11-21');
+  triggerFormSubmit(app, '#edit-form');
+
+  let savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(savedTask.dueDate, '2026-11-21');
+  assert.equal(savedTask.dueTime, null, 'rescheduling does not materialize the helper time');
+  assert.equal(savedTask.reminderLeadMinutes, 0);
+  assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', 'the previous fire marker remains attached to its old instant');
+
+  app.setNow('2026-11-21T14:00:00.000Z');
+  app.intervalCallbacks[0].callback();
+  savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(savedTask.reminderShownFire, '2026-11-21T14:00:00.000Z', 'the rescheduled local 09:00 fire is delivered and persisted');
+  assert.match(app.elements.get('#toast').textContent, /Reminder: “Reminder date-only-reschedule” is due\./);
+}));
+
+test('date-only reminders recalculate their 9 AM instant after a timezone change', () => withTimeZone('America/Los_Angeles', () => {
+  const task = makeDateOnlyReminderTask('date-only-timezone', '2026-11-06', 0);
+  const app = bootApp({ savedValue: JSON.stringify([task]), dateNow: '2026-11-06T14:00:00.000Z' });
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
+    'the same instant is 06:00 in Los Angeles, before the disclosed local time');
+  process.env.TZ = 'America/New_York';
+  app.intervalCallbacks[0].callback();
+  const savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(savedTask.dueTime, null);
+  assert.equal(savedTask.reminderShownFire, '2026-11-06T14:00:00.000Z',
+    'the same instant is 09:00 in New York and becomes due without changing stored fields');
+}));
+
+test('date-only 9 AM scheduling stays local across the spring DST transition', () => withTimeZone('America/New_York', () => {
+  const task = makeDateOnlyReminderTask('date-only-dst', '2026-03-08', 1440);
+  const app = bootApp({ savedValue: JSON.stringify([task]), dateNow: '2026-03-07T13:59:00.000Z' });
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
+    '08:59 EST on the preceding local day is before the one-day reminder');
+
+  app.setNow('2026-03-07T14:00:00.000Z');
+  app.intervalCallbacks[0].callback();
+  const savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
+  assert.equal(savedTask.reminderShownFire, '2026-03-07T14:00:00.000Z', 'the 24-hour lead fires at 09:00 EST on the preceding date');
+  assert.equal(savedTask.dueTime, null);
+  assert.equal(Date.parse('2026-03-08T13:00:00.000Z') - Date.parse(savedTask.reminderShownFire), 23 * 60 * 60 * 1000,
+    '09:00 local on the due date is only 23 elapsed hours later across the spring-forward transition');
+}));
 
 
 test('initial loading indicators clear only when the real app render and storage check finish', () => {
