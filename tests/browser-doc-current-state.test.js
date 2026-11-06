@@ -34,13 +34,13 @@ test('current browser documentation describes Online-by-default tap-to-connect b
     /(?:browser networking starts Offline|fresh install is Offline|offline-by-default plus explicit consent|HTTPS-only navigation and that HTTP links)/i);
 });
 
-test('current browser documentation keeps the HTTP cleartext mismatch explicit and unverified', () => {
-  assert.match(rootReadme, /app-wide cleartext setting remains disabled/);
-  assert.match(androidReadme, /usesCleartextTraffic="false"/);
-  assert.match(acceptance, /usesCleartextTraffic=false/);
-  assert.match(design, /HTTP WebView loading and a visible .*? label remain unresolved/);
-  assert.match(plan, /treat HTTP runtime support as unverified/);
-  assert.match(parity, /HTTP runtime support is not accepted until device tests pass/);
+test('current browser documentation describes the owner-approved HTTP browsing policy as not device-verified', () => {
+  assert.match(rootReadme, /owner-approved 2026-11-06 policy enables cleartext/);
+  assert.match(androidReadme, /usesCleartextTraffic="true"/);
+  assert.match(acceptance, /manifest enables cleartext/);
+  assert.match(design, /enables app-wide cleartext, so HTTP WebView loading and redirect downgrades follow mainstream-browser behavior/);
+  assert.match(plan, /not yet device-verified under issue #348/);
+  assert.match(parity, /do not claim device-verified HTTP support until device tests pass/);
 });
 
 test('dated status snapshots are labeled historical and Android design scopes are distinct', () => {
