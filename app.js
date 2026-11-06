@@ -352,6 +352,9 @@
     const reminderChip = hasReminder
       ? `<span class="task-chip reminder-chip" title="${task.reminderLeadMinutes === 0 ? 'Reminder at due time' : `Reminder ${task.reminderLeadMinutes === 1440 ? '1 day' : task.reminderLeadMinutes === 60 ? '1 hour' : '30 min'} before`}">${icon('bell')}</span>`
       : '';
+    const todayButton = !task.completed && !task.dueDate
+      ? `<button class="icon-button today-button" type="button" data-action="due-today" aria-label="Set ${escapeHTML(task.title)} due today" title="Set due today">${icon('calendar')}</button>`
+      : '';
     return `<article class="task-row${task.completed ? ' is-complete' : ''}" data-task-id="${escapeHTML(task.id)}">
       <button class="complete-button" type="button" data-action="toggle" aria-label="${completionLabel}" aria-pressed="${task.completed}">${icon('check')}</button>
       <div class="task-main">
@@ -359,6 +362,7 @@
         <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}">${task.priority.toUpperCase()}</span>${tags}${repeatChip}${reminderChip}${notesChip}${subtaskChip}</div>
       </div>
       <div class="task-actions">
+        ${todayButton}
         <button class="icon-button focus-button" type="button" data-action="focus" aria-label="Start focus timer for ${escapeHTML(task.title)}" title="Start a focus timer for this task">${icon('timer')}</button>
         <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}">${icon('edit')}</button>
         <button class="icon-button duplicate-button" type="button" data-action="duplicate" aria-label="Duplicate ${escapeHTML(task.title)}" title="Duplicate as a new task">${icon('copy')}</button>
@@ -932,6 +936,13 @@
       const saved = persistTasks();
       render();
       showSaveResult(saved, 'Task duplicated as a new open task.');
+    } else if (button.dataset.action === 'due-today') {
+      const today = logic.localDateString();
+      task.dueDate = today;
+      task.updatedAt = new Date().toISOString();
+      const saved = persistTasks();
+      render();
+      showSaveResult(saved, 'Due date set to today.');
     } else if (button.dataset.action === 'focus') {
       startFocus(task.id);
       const card = $('#focus-card');

@@ -287,7 +287,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .stat-cell.is-warning .stat-cell-number { color: var(--orange); }
 .stat-cell.is-danger .stat-cell-number { color: var(--red); }
 .sort-select { height: 36px; padding: 0 28px 0 10px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 10px; background: rgba(255, 255, 255, .75); color: #5f6c76; font-size: 11px; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23565f68' stroke-width='1.2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
-.icon-button.duplicate-button:hover { color: var(--accent); background: var(--accent-soft); }
+.icon-button.today-button:hover { color: var(--accent); background: var(--accent-soft); }
+.icon-button:active { transform: scale(0.96); }
 .repeat-chip { color: var(--accent); }
 @media (prefers-color-scheme: dark) {
   .date-chip { border-color: #2c3640; background: rgba(26, 33, 40, .6); color: #9aa6af; }
