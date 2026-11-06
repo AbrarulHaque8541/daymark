@@ -32,6 +32,12 @@ public final class UiMotionPolicy {
     /** Duration of soft chrome restore on upward scroll or top reach. */
     public static final long CHROME_SHOW_MS = 180L;
 
+    /** Minimum task-list scroll delta, in dp, before changing task chrome visibility. */
+    public static final int CHROME_SCROLL_THRESHOLD_DP = 3;
+
+    /** Idle delay before task chrome is restored after scrolling stops. */
+    public static final long CHROME_AUTO_RESTORE_MS = 700L;
+
     /** Minimum time a newly expanded panel stays open before a rapid re-collapse is allowed. */
     public static final long EXPAND_DEBOUNCE_MS = 120L;
 
@@ -43,6 +49,16 @@ public final class UiMotionPolicy {
         if (expandStartedAtMs <= 0L) return true;
         if (nowMs < expandStartedAtMs) return false;
         return nowMs - expandStartedAtMs >= EXPAND_DEBOUNCE_MS;
+    }
+
+    public enum ChromeScrollAction { NONE, HIDE, SHOW }
+
+    /** Classify a vertical scroll delta using a pixel threshold derived from dp. */
+    public static ChromeScrollAction chromeActionForScrollDelta(int deltaPx, int thresholdPx) {
+        int threshold = Math.max(0, thresholdPx);
+        if (deltaPx > threshold) return ChromeScrollAction.HIDE;
+        if (deltaPx < -threshold) return ChromeScrollAction.SHOW;
+        return ChromeScrollAction.NONE;
     }
 
     /**

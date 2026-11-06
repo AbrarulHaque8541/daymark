@@ -309,6 +309,8 @@ public final class MainActivity extends Activity {
     private HorizontalScrollView browserToolbarScroll;
     private Runnable browserChromeRestoreRunnable;
     private boolean browserChromeHidden;
+    private Runnable taskChromeRestoreRunnable;
+    private boolean taskChromeHidden;
     private DaymarkWebView browserWebView;
     private final List<DaymarkWebView> browserTabs = new ArrayList<>();
     private final Map<DaymarkWebView, String> browserTabQueries = new HashMap<>();
@@ -1046,6 +1048,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (browserChromeRestoreRunnable != null) mainHandler.removeCallbacks(browserChromeRestoreRunnable);
+        if (taskChromeRestoreRunnable != null) mainHandler.removeCallbacks(taskChromeRestoreRunnable);
         unregisterDaymarkBackCallback();
         activityCallbackGate.close();
         if (undoDismissal != null) mainHandler.removeCallbacks(undoDismissal);
@@ -1409,6 +1412,19 @@ public final class MainActivity extends Activity {
         scrollView.setFillViewport(false);
         scrollView.setClipToPadding(false);
         taskScrollView = scrollView;
+        taskScrollView.setOnScrollChangeListener((View view, int x, int y, int oldX, int oldY) -> {
+            if (webMode) return;
+            UiMotionPolicy.ChromeScrollAction action = UiMotionPolicy.chromeActionForScrollDelta(
+                    y - oldY, dp(UiMotionPolicy.CHROME_SCROLL_THRESHOLD_DP));
+            if (action == UiMotionPolicy.ChromeScrollAction.HIDE) {
+                setTaskChromeHidden(true);
+            } else if (action == UiMotionPolicy.ChromeScrollAction.SHOW) {
+                setTaskChromeHidden(false);
+            } else if (taskChromeHidden) {
+                hideTaskComposerWhenOffscreen();
+            }
+            scheduleTaskChromeRestore();
+        });
         LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         taskScreen = scrollView;
@@ -2819,6 +2835,63 @@ public final class MainActivity extends Activity {
         if (browserChromeRestoreRunnable != null) mainHandler.removeCallbacks(browserChromeRestoreRunnable);
         browserChromeRestoreRunnable = () -> setBrowserChromeHidden(false);
         mainHandler.postDelayed(browserChromeRestoreRunnable, 700L);
+    }
+
+    private void setTaskChromeHidden(boolean hidden) {
+        if (appTopBar == null || sharedComposer == null || (hidden && webMode)) return;
+        boolean changed = taskChromeHidden != hidden;
+        taskChromeHidden = hidden;
+        if (changed) {
+            float hiddenOffset = -Math.max(appTopBar.getHeight(), dp(48));
+            if (hidden) {
+                WorkspaceMotion.hideChrome(appTopBar, hiddenOffset, MOTION_EXIT, () -> {
+                    if (taskChromeHidden && !webMode) appTopBar.setVisibility(View.GONE);
+                });
+            } else {
+                WorkspaceMotion.showChrome(appTopBar, hiddenOffset, MOTION_ENTER);
+            }
+        }
+        if (hidden) hideTaskComposerWhenOffscreen();
+        else showTaskComposer();
+    }
+
+    private void hideTaskComposerWhenOffscreen() {
+        if (taskScrollView == null || sharedComposer == null
+                || taskScrollView.getScrollY() < sharedComposer.getBottom()
+                || sharedComposer.getVisibility() != View.VISIBLE) return;
+        sharedComposer.animate().cancel();
+        sharedComposer.setTranslationY(0f);
+        sharedComposer.setAlpha(1f);
+        sharedComposer.setVisibility(View.INVISIBLE);
+    }
+
+    private void showTaskComposer() {
+        if (sharedComposer.getVisibility() == View.VISIBLE) return;
+        float hiddenOffset = -Math.max(sharedComposer.getHeight(), dp(48));
+        WorkspaceMotion.showChrome(sharedComposer, hiddenOffset, MOTION_ENTER);
+    }
+
+    private void scheduleTaskChromeRestore() {
+        if (taskChromeRestoreRunnable != null) mainHandler.removeCallbacks(taskChromeRestoreRunnable);
+        taskChromeRestoreRunnable = () -> {
+            taskChromeRestoreRunnable = null;
+            setTaskChromeHidden(false);
+        };
+        mainHandler.postDelayed(taskChromeRestoreRunnable, UiMotionPolicy.CHROME_AUTO_RESTORE_MS);
+    }
+
+    private void resetTaskChromeForModeSwitch() {
+        if (taskChromeRestoreRunnable != null) {
+            mainHandler.removeCallbacks(taskChromeRestoreRunnable);
+            taskChromeRestoreRunnable = null;
+        }
+        taskChromeHidden = false;
+        for (View view : new View[]{appTopBar, sharedComposer}) {
+            if (view == null) continue;
+            view.animate().cancel();
+            view.setTranslationY(0f);
+            view.setAlpha(1f);
+        }
     }
 
     private boolean ensureBrowserWebView() {
@@ -5719,6 +5792,7 @@ public final class MainActivity extends Activity {
     private void syncModeUi() {
         if (taskScreen == null || browserScreen == null || quickCaptureInput == null) return;
         syncBottomNavSelection();
+        if (webMode) resetTaskChromeForModeSwitch();
         if (webMode && browserChromeHidden) setBrowserChromeHidden(false);
         // Web mode is a dedicated browser workspace. Hide the task composer/dashboard
         // instead of stacking Task + Web controls and wasting the viewport.
@@ -9792,5 +9866,3 @@ public final class MainActivity extends Activity {
         }
     }
 }
-
-

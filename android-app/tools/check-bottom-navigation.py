@@ -33,10 +33,17 @@ check('Button moreButton = plainButton("More")' not in ACTIVITY, "Duplicate top-
 check("content.addView(sharedComposer, bottomMargin(dp(8)));" in ACTIVITY,
       "shared composer must be part of scrollable Tasks content")
 check("root.addView(sharedComposer" not in ACTIVITY, "shared composer must not be pinned as a root sibling")
-check("scrollView.setOnScrollChangeListener" not in ACTIVITY,
-      "Tasks scrolling must not hide or restore the composer on direction changes")
-check("setTaskChromeHidden" not in ACTIVITY and "taskChromeHidden" not in ACTIVITY,
-      "obsolete task chrome hide/show behavior must be removed")
+check("taskScrollView.setOnScrollChangeListener" in ACTIVITY,
+      "task ScrollView must observe scroll direction for contextual chrome")
+check("chromeActionForScrollDelta" in ACTIVITY and "CHROME_SCROLL_THRESHOLD_DP" in ACTIVITY,
+      "task chrome must respond only to meaningful vertical movement")
+check("setTaskChromeHidden" in ACTIVITY and "taskChromeHidden" in ACTIVITY,
+      "task top-bar/composer chrome must hide and reveal with scroll direction")
+check("CHROME_AUTO_RESTORE_MS" in ACTIVITY,
+      "task chrome must restore after the requested idle delay")
+check("taskScrollView.getScrollY() < sharedComposer.getBottom()" in ACTIVITY
+      and "sharedComposer.setVisibility(View.INVISIBLE)" in ACTIVITY,
+      "composer must scroll naturally and only become invisible after leaving the viewport")
 composer = ACTIVITY.split("private View buildSharedComposer() {", 1)[1].split(
     "private View buildBrowserAddressBar() {", 1)[0]
 check(composer.count('compactButton("Add task", false)') == 1,
