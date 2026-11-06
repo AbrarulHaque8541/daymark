@@ -591,7 +591,7 @@ print("PASS lifecycle policy: task/storage/attachment/browser callbacks are supp
 print("PASS portable backup policy: bounded AES-GCM format, SAF create-only export, snapshot-last restore journal")
 print("PASS task/browser separation: web input does not create tasks or receive task-draft prefill")
 print("PASS browser policy: fresh installs Online like mainstream browsers; a saved Offline choice still fails closed behind the explicit Enable Online disclosure; HTTP/HTTPS navigation still requires a separate Go/site tap")
-print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, cleartext HTTP loading with no downgrade guard, no JS bridge/interceptor; HTTP runtime NOT TESTED")
+print("PASS browser source checks: encoded search, HTTP/HTTPS address policy, cleartext HTTP loading with no downgrade guard, no JS bridge/interceptor; HTTP runtime and visible label NOT TESTED")
 print("PASS browser settings: Safe Browsing defaults on, confirmed opt-out persists, and current/future WebViews track the preference")
 print("PASS WebView source security: Safe Browsing, mixed-content/file-access restrictions, SSL cancel, site permission denial, pop-up/download handling")
 print("PASS local browser data: capped origin-only site history, legacy-origin migration, reopen/dedup, secret redaction, and explicit history/cookie/cache/WebStorage clear")
