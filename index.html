@@ -182,6 +182,9 @@
             <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
             <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
           </div>
+          <label class="field-label" for="focus-custom-minutes">Custom length <span>(optional, 1–120 min)</span></label>
+          <input id="focus-custom-minutes" type="number" min="1" max="120" step="1" inputmode="numeric" placeholder="e.g. 50" aria-label="Custom focus length in minutes" aria-describedby="focus-custom-hint">
+          <p id="focus-custom-hint" class="field-hint">Leave empty to use the selected preset. Custom length is used only for the next session.</p>
           <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
           <select id="focus-task"><option value="">No task</option></select>
           <div class="focus-actions">

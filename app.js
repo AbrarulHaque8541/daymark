@@ -1540,6 +1540,8 @@
       button.classList.toggle('is-active', active);
       button.disabled = Boolean(session);
     });
+    const customEl = $('#focus-custom-minutes');
+    if (customEl) customEl.disabled = Boolean(session);
     if (!session) {
       const minutes = focus.presetMinutes(state.focusPreset) || focus.PRESET_MINUTES.focus;
       timeEl.textContent = focus.formatClock(minutes * 60 * 1000);
@@ -1638,7 +1640,14 @@
       return;
     }
     const kind = focus.isKind(state.focusPreset) ? state.focusPreset : 'focus';
-    const minutes = focus.presetMinutes(kind);
+    let minutes = focus.presetMinutes(kind);
+    const customEl = $('#focus-custom-minutes');
+    if (customEl && typeof customEl.value === 'string' && customEl.value.trim()) {
+      const parsed = Number(customEl.value);
+      if (Number.isInteger(parsed) && focus.isValidDurationMinutes(kind, parsed)) {
+        minutes = parsed;
+      }
+    }
     const linkedTaskId = taskId || state.focusTaskId || null;
     state.focusSession = focus.createSession({ taskId: linkedTaskId, kind, durationMinutes: minutes }, Date.now());
     state.focusTaskId = linkedTaskId || '';

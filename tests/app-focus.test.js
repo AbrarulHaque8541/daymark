@@ -342,3 +342,27 @@ test('choosing a focus preset persists it for the next visit', () => {
   });
   assert.equal(reloaded.elements.get('#focus-time').textContent, '05:00');
 });
+
+test('a custom focus length overrides the selected preset for the next session', () => {
+  const { elements } = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] })
+  });
+  const custom = elements.get('#focus-custom-minutes');
+  custom.value = '50';
+  elements.get('#focus-start').dispatch('click');
+  // After start the clock shows the custom duration.
+  assert.equal(elements.get('#focus-time').textContent, '50:00');
+  assert.equal(elements.get('#focus-state-label').textContent, 'Focusing');
+  // Custom input is disabled while a session is active.
+  assert.equal(custom.disabled, true);
+});
+
+test('an invalid custom focus length falls back to the preset', () => {
+  const { elements } = bootApp({
+    savedFocus: JSON.stringify({ session: null, log: [] })
+  });
+  const custom = elements.get('#focus-custom-minutes');
+  custom.value = '999';
+  elements.get('#focus-start').dispatch('click');
+  assert.equal(elements.get('#focus-time').textContent, '25:00');
+});
