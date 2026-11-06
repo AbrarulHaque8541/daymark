@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -17,9 +19,11 @@ import android.view.InputEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
@@ -28,9 +32,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** End-to-end IME visibility and save/cancel checks for the real task editor. */
 final class TaskEditorImeInstrumentation {
@@ -39,8 +46,56 @@ final class TaskEditorImeInstrumentation {
     private static final String TITLE_FIELD_DESCRIPTION = "Task name. You can edit this before saving.";
     /** API 29 emulators can take longer for storage readiness + dialog a11y tree. */
     private static final long WAIT_MS = 15000L;
+    private static final long TRACE_SAMPLE_INTERVAL_MS = 2500L;
+    private static final long TRACE_MAIN_THREAD_TIMEOUT_MS = 100L;
+    private static final int TRACE_MAX_ENTRIES = 20;
+    private static final int TRACE_MAX_ENTRY_CHARS = 850;
+    private static final int TRACE_MAX_WINDOWS = 8;
 
     private TaskEditorImeInstrumentation() { }
+
+    private static final class UiTrace {
+        private final Instrumentation instrumentation;
+        private final MainActivity activity;
+        private final List<String> entries = new ArrayList<>();
+
+        UiTrace(Instrumentation instrumentation, MainActivity activity) {
+            this.instrumentation = instrumentation;
+            this.activity = activity;
+        }
+
+        void reset() {
+            entries.clear();
+        }
+
+        void record(String label) {
+            append(label + "{" + describeActivityWindowState(activity, TRACE_MAIN_THREAD_TIMEOUT_MS)
+                    + "; windows=" + describeWindowInventory(instrumentation) + "}");
+        }
+
+        void recordPoll(String label, long elapsedMs, String windows) {
+            append(label + "+" + elapsedMs + "ms{"
+                    + describeActivityWindowState(activity, TRACE_MAIN_THREAD_TIMEOUT_MS)
+                    + "; windows=" + windows + "}");
+        }
+
+        String summary() {
+            StringBuilder summary = new StringBuilder();
+            for (String entry : entries) {
+                if (summary.length() > 0) summary.append(" | ");
+                summary.append(entry);
+            }
+            return summary.length() == 0 ? "none" : summary.toString();
+        }
+
+        private void append(String entry) {
+            if (entry.length() > TRACE_MAX_ENTRY_CHARS) {
+                entry = entry.substring(0, TRACE_MAX_ENTRY_CHARS - 3) + "...";
+            }
+            if (entries.size() >= TRACE_MAX_ENTRIES) entries.remove(0);
+            entries.add(entry);
+        }
+    }
 
     static int run(Instrumentation instrumentation) throws Exception {
         int[] assertions = { 0 };
@@ -63,14 +118,15 @@ final class TaskEditorImeInstrumentation {
             Activity started = instrumentation.startActivitySync(launch);
             require(started instanceof MainActivity, "instrumentation launches the real MainActivity", assertions);
             activity = (MainActivity) started;
+            UiTrace trace = new UiTrace(instrumentation, activity);
             instrumentation.waitForIdleSync();
             ensureTasksMode(instrumentation, activity, assertions);
             awaitStorageReady(instrumentation, activity, assertions);
             byte[] storageBeforeCancel = encryptedTaskStorageSnapshot(activity);
 
-            openEditor(instrumentation, activity, assertions);
-            exerciseImeActions(instrumentation, cancelledTitle, assertions);
-            tapDialogAction(instrumentation, EDITOR_TITLE, "android:id/button2", "Cancel", assertions);
+            openEditor(instrumentation, activity, assertions, trace);
+            exerciseImeActions(instrumentation, activity, cancelledTitle, assertions, trace);
+            tapDialogAction(instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", assertions, trace);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
             awaitImeHidden(instrumentation);
             require(Arrays.equals(storageBeforeCancel, encryptedTaskStorageSnapshot(activity)),
@@ -78,10 +134,10 @@ final class TaskEditorImeInstrumentation {
             require(!taskTitleVisible(instrumentation, activity, cancelledTitle),
                     "Cancel closes the editor without creating the typed task", assertions);
 
-            openEditor(instrumentation, activity, assertions);
-            exerciseImeActions(instrumentation, savedTitle, assertions);
+            openEditor(instrumentation, activity, assertions, trace);
+            exerciseImeActions(instrumentation, activity, savedTitle, assertions, trace);
             savedTaskMayExist = true;
-            tapDialogAction(instrumentation, EDITOR_TITLE, "android:id/button1", "Add task", assertions);
+            tapDialogAction(instrumentation, activity, EDITOR_TITLE, "android:id/button1", "Add task", assertions, trace);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
             awaitImeHidden(instrumentation);
             require(awaitTaskTitleVisible(instrumentation, activity, savedTitle),
@@ -155,8 +211,9 @@ final class TaskEditorImeInstrumentation {
         }
     }
 
-    private static void openEditor(Instrumentation instrumentation, MainActivity activity, int[] assertions)
-            throws Exception {
+    private static void openEditor(Instrumentation instrumentation, MainActivity activity, int[] assertions,
+                                   UiTrace trace) throws Exception {
+        trace.reset();
         ensureTasksMode(instrumentation, activity, assertions);
         awaitStorageReady(instrumentation, activity, assertions);
         View[] addTask = { null };
@@ -174,6 +231,7 @@ final class TaskEditorImeInstrumentation {
         }
         require(addTask[0] != null && enabled[0],
                 "the visible Add task button becomes enabled after storage loads", assertions);
+        trace.record("open.beforeAddTaskClick");
 
         // Click only once: repeated clicks can stack dialogs while API 29 a11y is delayed.
         boolean[] clicked = { false };
@@ -184,6 +242,7 @@ final class TaskEditorImeInstrumentation {
             }
         });
         require(clicked[0], "the ready Add task button accepts one click", assertions);
+        trace.record("open.addTaskClickReturned");
 
         // Wait for either accessibility signal; do not retry the click while the tree publishes.
         long openDeadline = SystemClock.uptimeMillis() + WAIT_MS;
@@ -198,19 +257,29 @@ final class TaskEditorImeInstrumentation {
             if (root == null) SystemClock.sleep(50L);
         }
         require(root != null, "the Add task button opens the full editor dialog", assertions);
+        trace.record("open.dialogRootPublished");
         // Ensure the canonical title is eventually visible for subsequent steps.
         awaitDialogRoot(instrumentation, EDITOR_TITLE);
+        trace.record("open.canonicalDialogRootReady");
     }
 
-    private static void exerciseImeActions(Instrumentation instrumentation, String title, int[] assertions)
+    private static void exerciseImeActions(Instrumentation instrumentation, MainActivity activity,
+                                           String title, int[] assertions, UiTrace trace)
             throws Exception {
         AccessibilityNodeInfo root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
+        trace.record("exercise.dialogRootReady");
         AccessibilityNodeInfo titleField = findByDescription(root, TITLE_FIELD_DESCRIPTION);
         require(titleField != null, "the editor exposes its task title field", assertions);
         // MainActivity requests title focus when the dialog opens; ACTION_FOCUS may return false if already focused.
-        require(titleField.isFocused() || titleField.performAction(AccessibilityNodeInfo.ACTION_FOCUS),
+        trace.record("exercise.beforeTitleFocus");
+        boolean titleFocused = titleField.isFocused()
+                || titleField.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+        require(titleFocused,
                 "the task title field is focused or accepts focus", assertions);
+        trace.record("exercise.afterTitleFocus");
         Rect imeBounds = findImeBounds(instrumentation);
+        trace.record("exercise.afterImeProbe.bounds="
+                + (imeBounds == null ? "none" : imeBounds.toShortString()));
         if (imeBounds == null) {
             // Some CI emulator images never surface a software IME window when a
             // field takes focus, so resize behavior cannot be exercised there.
@@ -222,12 +291,17 @@ final class TaskEditorImeInstrumentation {
         }
 
         root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
+        trace.record("exercise.dialogRootAfterImeReady");
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
+        trace.record("exercise.beforeCancelButtonWait");
         AccessibilityNodeInfo cancel = awaitDialogButton(
-                instrumentation, EDITOR_TITLE, "android:id/button2", "Cancel");
+                instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", trace);
+        trace.record("exercise.cancelButtonReady");
+        trace.record("exercise.beforeAddButtonWait");
         AccessibilityNodeInfo add = awaitDialogButton(
-                instrumentation, EDITOR_TITLE, "android:id/button1", "Add task");
+                instrumentation, activity, EDITOR_TITLE, "android:id/button1", "Add task", trace);
+        trace.record("exercise.addButtonReady");
         require(hasVisibleTouchBounds(cancel), "the Cancel dialog action has a visible touch target", assertions);
         require(hasVisibleTouchBounds(add), "the Add Task dialog action has a visible touch target", assertions);
         if (imeBounds != null) {
@@ -238,58 +312,223 @@ final class TaskEditorImeInstrumentation {
         titleField = findByDescription(root, TITLE_FIELD_DESCRIPTION);
         Bundle text = new Bundle();
         text.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, title);
+        trace.record("exercise.beforeSetText");
         require(titleField != null && titleField.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, text),
                 "the focused title field accepts test text", assertions);
         instrumentation.waitForIdleSync();
+        trace.record("exercise.afterSetTextAndIdle");
     }
 
-    private static AccessibilityNodeInfo awaitDialogButton(Instrumentation instrumentation, String dialogTitle,
-                                                            String viewId, String label) throws Exception {
-        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+    private static AccessibilityNodeInfo awaitDialogButton(Instrumentation instrumentation, MainActivity activity,
+                                                            String dialogTitle, String viewId, String label,
+                                                            UiTrace trace)
+            throws Exception {
+        long startedAt = SystemClock.uptimeMillis();
+        long deadline = startedAt + WAIT_MS;
+        long nextTraceAt = startedAt;
         while (SystemClock.uptimeMillis() < deadline) {
-            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+            long now = SystemClock.uptimeMillis();
+            boolean captureTrace = trace != null && now >= nextTraceAt;
+            StringBuilder windowSnapshot = captureTrace ? new StringBuilder() : null;
+            List<AccessibilityWindowInfo> windows = instrumentation.getUiAutomation().getWindows();
+            int sampledWindows = Math.min(windows.size(), TRACE_MAX_WINDOWS);
+            for (int index = 0; index < windows.size(); index++) {
+                AccessibilityWindowInfo window = windows.get(index);
                 AccessibilityNodeInfo root = window.getRoot();
-                if (root == null || findByText(root, dialogTitle) == null) continue;
-                AccessibilityNodeInfo button = findByViewId(root, viewId);
-                if (button == null) button = findButtonByText(root, label);
-                if (button != null && findByText(button, label) != null && hasVisibleTouchBounds(button)) {
+                boolean dialogPresent = root != null && findByText(root, dialogTitle) != null;
+                AccessibilityNodeInfo button = null;
+                boolean labelPresent = false;
+                boolean visibleTarget = false;
+                if (dialogPresent) {
+                    button = findByViewId(root, viewId);
+                    if (button == null) button = findButtonByText(root, label);
+                    labelPresent = button != null && findByText(button, label) != null;
+                    visibleTarget = labelPresent && hasVisibleTouchBounds(button);
+                }
+                if (captureTrace && index < sampledWindows) {
+                    appendObservedWindow(windowSnapshot, window, index, dialogPresent,
+                            button != null, labelPresent, visibleTarget);
+                }
+                if (visibleTarget) {
+                    if (trace != null) trace.record("buttonReady." + label);
                     return button;
                 }
             }
+            if (captureTrace) {
+                if (windows.size() > sampledWindows) {
+                    windowSnapshot.append("|+").append(windows.size() - sampledWindows).append(" more windows");
+                }
+                String observed = windowSnapshot.length() == 0 ? "none" : windowSnapshot.toString();
+                trace.recordPoll(label + ".wait", now - startedAt, observed);
+                nextTraceAt = now + TRACE_SAMPLE_INTERVAL_MS;
+            }
             SystemClock.sleep(50L);
         }
-        throw new AssertionError("Timed out waiting for visible " + label + " button " + viewId
-                + "; accessibility nodes: " + describeDialogButtonNodes(instrumentation, dialogTitle, viewId, label));
+        throw new AssertionError("timeout " + label + "; "
+                + describeDialogButtonTimeoutState(instrumentation, activity, dialogTitle, viewId, label,
+                        SystemClock.uptimeMillis() - startedAt, trace));
     }
 
-    private static String describeDialogButtonNodes(Instrumentation instrumentation, String dialogTitle,
-                                                     String viewId, String label) {
+    private static String describeDialogButtonTimeoutState(Instrumentation instrumentation, MainActivity activity,
+                                                             String dialogTitle, String viewId, String label,
+                                                             long elapsedMs, UiTrace trace) {
         StringBuilder summary = new StringBuilder();
-        for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
-            AccessibilityNodeInfo root = window.getRoot();
-            if (root == null) continue;
-            AccessibilityNodeInfo titleNode = findByText(root, dialogTitle);
-            AccessibilityNodeInfo labelNode = findByText(root, label);
-            AccessibilityNodeInfo idNode = findByViewId(root, viewId);
-            AccessibilityNodeInfo buttonNode = findButtonByText(root, label);
-            if (titleNode == null && labelNode == null && idNode == null && buttonNode == null) continue;
-            if (summary.length() > 0) summary.append("; ");
-            summary.append("windowType=").append(window.getType())
-                    .append(" title=").append(describeNode(titleNode))
-                    .append(" label=").append(describeNode(labelNode))
-                    .append(" id=").append(describeNode(idNode))
-                    .append(" button=").append(describeNode(buttonNode));
+        summary.append(describeActivityWindowState(activity));
+        summary.append("; ").append(describeImeWindows(instrumentation));
+        summary.append("; elapsedMs=").append(elapsedMs)
+                .append("; target={title=").append(dialogTitle).append(",viewId=").append(viewId)
+                .append(",label=").append(label).append("}; stepTrace=")
+                .append(trace == null ? "none" : trace.summary()).append("; accessibilityWindows=");
+        try {
+            List<AccessibilityWindowInfo> windows = instrumentation.getUiAutomation().getWindows();
+            if (windows.isEmpty()) return summary.append("none").toString();
+            int[] remainingNodes = { 120 };
+            int shownWindows = Math.min(windows.size(), 12);
+            for (int i = 0; i < shownWindows; i++) {
+                AccessibilityWindowInfo window = windows.get(i);
+                if (i > 0) summary.append(" | ");
+                Rect bounds = new Rect();
+                window.getBoundsInScreen(bounds);
+                summary.append("W{type=").append(window.getType())
+                        .append(",title=").append(shortDiagnosticValue(window.getTitle()))
+                        .append(",layer=").append(window.getLayer())
+                        .append(",active=").append(window.isActive())
+                        .append(",focused=").append(window.isFocused())
+                        .append(",bounds=").append(bounds.toShortString());
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null) {
+                    summary.append(",root=none}");
+                } else {
+                    summary.append(",tree=");
+                    appendAccessibilityTree(root, summary, 0, remainingNodes);
+                    summary.append('}');
+                }
+                if (remainingNodes[0] <= 0) {
+                    summary.append(" | nodeLimitReached");
+                    break;
+                }
+            }
+            if (windows.size() > shownWindows) summary.append(" | windowLimitReached=").append(windows.size());
+        } catch (Throwable failure) {
+            summary.append("unavailable=").append(failure.getClass().getSimpleName());
         }
-        return summary.length() == 0 ? "no matching nodes in interactive windows" : summary.toString();
+        return summary.toString();
     }
 
-    private static String describeNode(AccessibilityNodeInfo node) {
-        if (node == null) return "none";
-        Rect bounds = new Rect();
-        node.getBoundsInScreen(bounds);
-        return "class=" + node.getClassName() + ",text=" + node.getText()
-                + ",viewId=" + node.getViewIdResourceName() + ",visible=" + node.isVisibleToUser()
-                + ",clickable=" + node.isClickable() + ",bounds=" + bounds.toShortString();
+    private static String describeActivityWindowState(MainActivity activity) {
+        return describeActivityWindowState(activity, 750L);
+    }
+
+    private static String describeActivityWindowState(MainActivity activity, long timeoutMs) {
+        if (activity == null) return "activity=none";
+        String[] snapshot = { "activityState=unavailable" };
+        CountDownLatch captured = new CountDownLatch(1);
+        boolean posted = new Handler(Looper.getMainLooper()).post(() -> {
+            try {
+                Window window = activity.getWindow();
+                View focusedView = activity.getCurrentFocus();
+                InputMethodManager inputMethod = (InputMethodManager) activity
+                        .getSystemService(Context.INPUT_METHOD_SERVICE);
+                snapshot[0] = "act=" + activity.getClass().getSimpleName()
+                        + "[fin=" + (activity.isFinishing() ? 1 : 0)
+                        + ",dst=" + (activity.isDestroyed() ? 1 : 0)
+                        + ",cfg=" + (activity.isChangingConfigurations() ? 1 : 0)
+                        + ",wf=" + (activity.hasWindowFocus() ? 1 : 0) + "]"
+                        + ",focus=" + describeFocusedView(focusedView)
+                        + ",soft=0x" + (window == null ? "none"
+                                : Integer.toHexString(window.getAttributes().softInputMode))
+                        + ",input=" + (inputMethod != null && inputMethod.isAcceptingText() ? 1 : 0);
+            } catch (Throwable failure) {
+                snapshot[0] = "activityStateError=" + failure.getClass().getSimpleName();
+            } finally {
+                captured.countDown();
+            }
+        });
+        if (!posted) return "activityState=mainLooperUnavailable";
+        try {
+            if (!captured.await(timeoutMs, TimeUnit.MILLISECONDS)) return "activityState=mainLooperSnapshotTimedOut";
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return "activityStateSnapshotInterrupted";
+        }
+        return snapshot[0];
+    }
+
+    private static String describeFocusedView(View view) {
+        if (view == null) return "none";
+        return view.getClass().getSimpleName() + "[f=" + (view.isFocused() ? 1 : 0) + "]";
+    }
+
+    private static String describeImeWindows(Instrumentation instrumentation) {
+        StringBuilder summary = new StringBuilder();
+        try {
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                if (window.getType() != AccessibilityWindowInfo.TYPE_INPUT_METHOD) continue;
+                Rect bounds = new Rect();
+                window.getBoundsInScreen(bounds);
+                if (summary.length() > 0) summary.append('|');
+                summary.append("ime{v=").append(bounds.isEmpty() ? 0 : 1)
+                        .append(",a=").append(window.isActive() ? 1 : 0)
+                        .append(",f=").append(window.isFocused() ? 1 : 0)
+                        .append(",b=").append(bounds.toShortString()).append('}');
+            }
+        } catch (Throwable failure) {
+            return "error=" + failure.getClass().getSimpleName();
+        }
+        return summary.length() == 0 ? "none" : summary.toString();
+    }
+
+    private static String describeWindowInventory(Instrumentation instrumentation) {
+        StringBuilder summary = new StringBuilder();
+        try {
+            List<AccessibilityWindowInfo> windows = instrumentation.getUiAutomation().getWindows();
+            if (windows.isEmpty()) return "none";
+            int shownWindows = Math.min(windows.size(), TRACE_MAX_WINDOWS);
+            for (int i = 0; i < shownWindows; i++) {
+                if (i > 0) summary.append('|');
+                appendWindowMetadata(summary, windows.get(i), i);
+                summary.append('}');
+            }
+            if (windows.size() > shownWindows) {
+                summary.append("|+").append(windows.size() - shownWindows).append(" more windows");
+            }
+        } catch (Throwable failure) {
+            return "unavailable=" + failure.getClass().getSimpleName();
+        }
+        return summary.toString();
+    }
+
+    private static void appendObservedWindow(StringBuilder summary, AccessibilityWindowInfo window, int index,
+                                             boolean dialogPresent, boolean buttonPresent,
+                                             boolean labelPresent, boolean visibleTarget) {
+        if (summary.length() > 0) summary.append('|');
+        appendWindowMetadata(summary, window, index);
+        summary.append(",dialog=").append(dialogPresent ? 1 : 0)
+                .append(",button=").append(buttonPresent ? 1 : 0)
+                .append(",label=").append(labelPresent ? 1 : 0)
+                .append(",touch=").append(visibleTarget ? 1 : 0).append('}');
+    }
+
+    private static void appendWindowMetadata(StringBuilder summary, AccessibilityWindowInfo window, int index) {
+        summary.append('w').append(index).append("{t=");
+        try {
+            summary.append(window.getType())
+                    .append(",title=").append(shortDiagnosticValue(window.getTitle()))
+                    .append(",layer=").append(window.getLayer())
+                    .append(",active=").append(window.isActive() ? 1 : 0)
+                    .append(",focused=").append(window.isFocused() ? 1 : 0);
+            Rect bounds = new Rect();
+            window.getBoundsInScreen(bounds);
+            summary.append(",bounds=").append(bounds.toShortString());
+        } catch (Throwable failure) {
+            summary.append("metadataError=").append(failure.getClass().getSimpleName());
+        }
+    }
+
+    private static String shortDiagnosticValue(CharSequence value) {
+        if (value == null) return "none";
+        String text = value.toString().replace('\n', ' ').replace('\r', ' ').replace(';', ',');
+        return text.length() <= 72 ? text : text.substring(0, 69) + "...";
     }
 
     private static void checkVisibleAboveIme(Instrumentation instrumentation, AccessibilityNodeInfo button,
@@ -309,15 +548,23 @@ final class TaskEditorImeInstrumentation {
         require(!Rect.intersects(bounds, imeBounds), label + " is not covered by the IME", assertions);
     }
 
-    private static void tapDialogAction(Instrumentation instrumentation, String dialogTitle, String viewId,
-                                        String label, int[] assertions) throws Exception {
-        AccessibilityNodeInfo button = awaitDialogButton(instrumentation, dialogTitle, viewId, label);
+    private static void tapDialogAction(Instrumentation instrumentation, MainActivity activity,
+                                        String dialogTitle, String viewId, String label, int[] assertions,
+                                        UiTrace trace)
+            throws Exception {
+        trace.record("tap.beforeButtonWait." + label);
+        AccessibilityNodeInfo button = awaitDialogButton(
+                instrumentation, activity, dialogTitle, viewId, label, trace);
+        trace.record("tap.buttonReady." + label);
         require(hasVisibleTouchBounds(button), label + " button has visible touch bounds before tapping", assertions);
         Rect bounds = new Rect();
         button.getBoundsInScreen(bounds);
+        trace.record("tap.beforeInject." + label);
         boolean tapped = injectTap(instrumentation, bounds);
         require(tapped, label + " button accepts exactly one real touch at its visible bounds", assertions);
+        trace.record("tap.afterInject." + label);
         instrumentation.waitForIdleSync();
+        trace.record("tap.afterIdle." + label);
     }
 
     private static boolean injectTap(Instrumentation instrumentation, Rect bounds) {
@@ -580,6 +827,38 @@ final class TaskEditorImeInstrumentation {
             if (found != null) return found;
         }
         return null;
+    }
+
+    private static void appendAccessibilityTree(AccessibilityNodeInfo node, StringBuilder summary,
+                                                int depth, int[] remainingNodes) {
+        if (node == null || remainingNodes[0] <= 0) return;
+        remainingNodes[0]--;
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        summary.append("N{").append(shortDiagnosticValue(node.getClassName()))
+                .append(",id=").append(shortDiagnosticValue(node.getViewIdResourceName()))
+                .append(",text=").append(shortDiagnosticValue(node.getText()))
+                .append(",desc=").append(shortDiagnosticValue(node.getContentDescription()))
+                .append(",visible=").append(node.isVisibleToUser())
+                .append(",focused=").append(node.isFocused())
+                .append(",a11yFocused=").append(node.isAccessibilityFocused())
+                .append(",focusable=").append(node.isFocusable())
+                .append(",clickable=").append(node.isClickable())
+                .append(",scrollable=").append(node.isScrollable())
+                .append(",bounds=").append(bounds.toShortString());
+        if (depth >= 16 && node.getChildCount() > 0) {
+            summary.append(",depthLimit");
+        } else {
+            for (int i = 0; i < node.getChildCount(); i++) {
+                if (remainingNodes[0] <= 0) {
+                    summary.append(",childrenTruncated");
+                    break;
+                }
+                summary.append(" child=");
+                appendAccessibilityTree(node.getChild(i), summary, depth + 1, remainingNodes);
+            }
+        }
+        summary.append('}');
     }
 
     private static AccessibilityNodeInfo findButtonByText(AccessibilityNodeInfo root, String text) {
