@@ -1,0 +1,32 @@
+/* Comprehensive reduced-motion support for professional glass UI
+   Accent #16705f. Disables non-essential animations and transitions
+   for users who prefer reduced motion. Physical device: NOT TESTED. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .status-dot,
+  .empty-illustration,
+  .sparkle,
+  .stat-number.is-bumped,
+  .task-row,
+  .focus-dot {
+    animation: none !important;
+  }
+
+  .brand-mark,
+  .button,
+  .task-row,
+  .icon-button,
+  .tag-pill,
+  .suggestion-item {
+    transition: none !important;
+  }
+}
