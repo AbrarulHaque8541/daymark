@@ -1,14 +1,15 @@
 # Daymark — Task reminders (v1.0.6 feature work)
 
-Current `main` source behavior after the v1.0.6 OS-reminders work, including the honest limits. This later source work is not part of the published v1.0.5 artifact; device notification behavior remains unverified.
+Current Daymark source behavior after the v1.0.6 OS-reminders work, including the honest limits. This later source work is not part of the published v1.0.5 artifact; device notification behavior remains unverified.
 
 ## What reminders do
 
 - Reminders fire **at due time**, or **30 minutes / 1 hour / 1 day before** the due moment (a due date is required; due time optional).
 - At the reminder moment Daymark posts a **best-effort Android notification** (title, due label, tap opens the app) and also shows the **in-app reminder dialog** the next time you open the app.
+- The notification offers **Snooze 5 min / 10 min / 30 min** buttons. These are temporary offsets for the current occurrence, not task reminder-lead settings (which remain at due time, 30 min, 1 hour, or 1 day early); each choice arms a real replacement alarm without changing the task. Edits to the due date/time or lead—or turning reminders off—invalidate the old snooze. Swiping the notification away dismisses only that notification and does not complete the task.
 - A reminder is shown **once per fire moment** (stored as `reminderShownFire`).
 - **Repeat rules**: a task can repeat **Daily / Weekly / Monthly / Weekdays (Mon–Fri) / Yearly**. On app open a repeating task without a reminder rolls forward to its next occurrence; when a repeating task's reminder is shown, the task advances to the next occurrence instead of being marked done. Repeat requires a due date; clearing the due date clears the repeat. Weekday repeats skip weekends; monthly and yearly repeats preserve the original day-of-month anchor across short months/years (Feb 29 clamps in short years and returns in leap years).
-- **Notification sound**: chosen from the system ringtone picker (notification type). Default is the system notification sound. Changing it recreates the reminder channel so the new sound applies.
+- **Notification sound**: chosen from the system ringtone picker (notification type). Default is the system notification sound. Changing it recreates the reminder channel so the new sound applies. On Android 8.0+ (API 26+), users control the channel’s sound/importance in system settings; Android 13+ also requires notification permission. Daymark cannot raise system volume, switch to media/alarm volume, override Do Not Disturb/silent mode, or bypass a user-muted notification channel; Android and the user’s device settings control those ([Android channel documentation](https://developer.android.com/develop/ui/compose/notifications/channels)).
 
 ## How it is scheduled
 
