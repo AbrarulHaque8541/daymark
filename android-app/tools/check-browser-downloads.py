@@ -23,9 +23,7 @@ for marker, explanation in (
     ("manager.getUriForDownloadedFile(id)", "completed files must use the provider content URI"),
     ("Intent.FLAG_GRANT_READ_URI_PERMISSION", "file handoff must grant read-only access"),
     ("Intent.ACTION_VIEW", "completed files should open only after a user tap"),
-    ("BrowserAddress.isAllowedWebUrl(url)", "retry must validate the web URL before making a new request"),
-    ('setPositiveButton("Retry"', "retry must require explicit user confirmation"),
-    ("android.webkit.WebSettings.getDefaultUserAgent(this)", "retry must not inherit an unrelated tab's user agent"),
+    ("BrowserDownloadFailClosedPolicy.evaluate", "failed downloads must use the fail-closed policy instead of a new request"),
     ('setNeutralButton("Refresh"', "the list must offer refresh"),
 ):
     assert marker in method, explanation
@@ -81,18 +79,9 @@ for marker, explanation in (
 provider_error_catch = active_check.index("catch (RuntimeException providerUnavailable)")
 assert "return false;" in active_check[provider_error_catch:provider_error_catch + 120], \
     "provider/query errors must fail closed without removing a file"
-normalized_activity = "".join(activity.split())
-assert (
-    "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))"
-    in normalized_activity
-), "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
+assert "BrowserDownloadFailClosedPolicy.evaluate" in activity, "new browser downloads must be fail-closed"
 assert "openDownloadsFolder()" not in activity, "Downloads must not be a generic document picker"
 assert "ACTION_OPEN_DOCUMENT" not in method, "the downloads list must not be implemented as a generic file picker"
-assert "No Daymark browser downloads are available yet." in method, "empty state must be explicit"
+assert "New browser downloads are temporarily blocked" in method, "empty state must disclose the temporary block"
 assert "No compatible app could open this file." in method, "viewer handoff failure must be disclosed"
-print("PASS browser downloads source checks: status/progress, confirmed web retry, safe file handoff, refresh and empty/error states")
-
-# Work by: ChatGPT
-# Model: GPT-6
-# Tooling: GitHub MCP tools
-# Timestamp (UTC): 2026-11-01T07:28:39Z
+print("PASS browser downloads source checks: status/progress, fail-closed new downloads, safe file handoff, refresh and empty/error states")
