@@ -187,6 +187,17 @@
     if (copyEl && typeof copyEl.addEventListener === 'function') {
       copyEl.addEventListener('click', () => { onCopy(); });
     }
+    // Escape clears the planned journey when focus is inside the download card form.
+    if (formEl && typeof formEl.addEventListener === 'function') {
+      formEl.addEventListener('keydown', (event) => {
+        if (!event) return;
+        const key = event.key || event.keyCode;
+        if (key === 'Escape' || key === 'Esc' || key === 27) {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          onClear();
+        }
+      });
+    }
 
     // Restore the last valid journey the user planned, so the card remembers across reloads.
     const remembered = loadLastScenario();
@@ -199,7 +210,7 @@
     if (restored && statusEl) {
       const current = statusEl.textContent || '';
       if (current && !current.startsWith('Restored')) {
-        statusEl.textContent = 'Restored previous journey · ' + current;
+        statusEl.textContent = 'Restored previous journey \u00b7 ' + current;
       }
     }
 
