@@ -30,17 +30,32 @@
       return 'import-' + String(Date.parse(now())) + '-' + String(idCounter);
     };
 
-    function status(message) {
+    function status(message, isError) {
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('import-status') : null;
       if (!el && typeof doc.createElement === 'function') {
         el = doc.createElement('span');
         el.id = 'import-status';
-        el.className = 'sr-only';
-        if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
-        const parent = doc.body || doc.documentElement;
+        el.className = 'import-status';
+        if (typeof el.setAttribute === 'function') {
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+          el.setAttribute('aria-atomic', 'true');
+        }
+        const fileInput = typeof doc.getElementById === 'function' ? doc.getElementById('import-file') : null;
+        const parent = (fileInput && fileInput.parentNode) || doc.body || doc.documentElement;
         if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
       }
-      if (el) el.textContent = message;
+      if (el) {
+        el.textContent = message;
+        if (typeof el.classList === 'object' && el.classList) {
+          if (isError) el.classList.add('is-error');
+          else el.classList.remove('is-error');
+        } else if (isError) {
+          el.className = 'import-status is-error';
+        } else {
+          el.className = 'import-status';
+        }
+      }
       return el;
     }
 
@@ -127,9 +142,9 @@
         if (merge.duplicates > 0) parts.push(plural(merge.duplicates, 'duplicate') + ' skipped.');
         if (merge.invalid > 0) parts.push(plural(merge.invalid, 'invalid task') + ' skipped.');
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
-        status(parts.join(' '));
+        status(parts.join(' '), false);
       } catch (error) {
-        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.');
+        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.', true);
       }
     }
 
