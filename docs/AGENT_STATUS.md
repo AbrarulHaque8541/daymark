@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-08T02:08:00Z (Cycle B: download status motion + a11y)](./CURRENT_STATUS_20261108T020800Z.md)
+
 - [Daymark engineering status — 2026-11-08T01:30:00Z (Cycle A: complete download status polish)](./CURRENT_STATUS_20261108T013000Z.md)
 
 - [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
@@ -66,6 +68,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [Daymark engineering status — 2026-11-08T02:08:00Z (Cycle B: download status motion + a11y)](./CURRENT_STATUS_20261108T020800Z.md)
 - [Daymark engineering status — 2026-11-08T01:30:00Z (Cycle A: complete download status polish)](./CURRENT_STATUS_20261108T013000Z.md)
 
 
