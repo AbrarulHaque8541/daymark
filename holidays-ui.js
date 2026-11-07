@@ -110,6 +110,16 @@
         }
         return;
       }
+      // Next-up summary for faster glanceability (first upcoming holiday).
+      const next = upcoming[0];
+      const nextDays = daysUntil(next.date);
+      const nextWhen = nextDays === 0 ? 'today' : nextDays === 1 ? 'tomorrow' : nextDays > 1 ? `in ${nextDays} days` : '';
+      const summaryRow = makeRow('feed-item');
+      if (summaryRow) {
+        appendText(summaryRow, 'feed-item-title', 'Next up: ' + next.name + (nextWhen ? ' · ' + nextWhen : ''));
+        appendText(summaryRow, 'feed-item-summary', 'Soonest public holiday for this country.');
+        listEl.appendChild(summaryRow);
+      }
       for (const holiday of upcoming) {
         const row = makeRow('feed-item');
         if (!row) break;
