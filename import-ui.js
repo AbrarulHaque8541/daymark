@@ -9,6 +9,9 @@
  * skipped, and every skip is reported honestly in a status line. After a
  * successful save a synthesized storage event asks app.js to reload tasks so
  * imported rows appear immediately. Fully offline: no network, no timers.
+ *
+ * Cycle B polish: visible #import-status (aria-live), busy/press state on
+ * #import-tasks while reading/parsing, glass-friendly status chip.
  */
 ((root) => {
   'use strict';
@@ -30,17 +33,69 @@
       return 'import-' + String(Date.parse(now())) + '-' + String(idCounter);
     };
 
-    function status(message) {
+    function importButton() {
+      return typeof doc.getElementById === 'function' ? doc.getElementById('import-tasks') : null;
+    }
+
+    function setBusy(isBusy) {
+      const btn = importButton();
+      if (!btn) return;
+      if (typeof btn.classList === 'object' && btn.classList) {
+        if (isBusy) {
+          if (typeof btn.classList.add === 'function') btn.classList.add('is-busy');
+        } else if (typeof btn.classList.remove === 'function') {
+          btn.classList.remove('is-busy');
+        }
+      } else if (typeof btn.className === 'string') {
+        if (isBusy && btn.className.indexOf('is-busy') === -1) {
+          btn.className = (btn.className + ' is-busy').trim();
+        } else if (!isBusy) {
+          btn.className = btn.className.replace(/\bis-busy\b/g, '').replace(/\s+/g, ' ').trim();
+        }
+      }
+      if (typeof btn.setAttribute === 'function') {
+        btn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        if (isBusy) btn.setAttribute('disabled', 'disabled');
+        else if (typeof btn.removeAttribute === 'function') btn.removeAttribute('disabled');
+      }
+      if ('disabled' in btn) btn.disabled = !!isBusy;
+    }
+
+    function status(message, kind) {
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('import-status') : null;
       if (!el && typeof doc.createElement === 'function') {
-        el = doc.createElement('span');
+        el = doc.createElement('p');
         el.id = 'import-status';
-        el.className = 'sr-only';
-        if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
-        const parent = doc.body || doc.documentElement;
-        if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
+        el.className = 'import-status';
+        if (typeof el.setAttribute === 'function') {
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+        }
+        const tools = typeof doc.getElementById === 'function' ? doc.getElementById('task-tools') : null;
+        const parent = (tools && tools.parentNode) || doc.body || doc.documentElement;
+        if (parent && typeof parent.appendChild === 'function') {
+          if (tools && typeof tools.insertAdjacentElement === 'function') {
+            tools.insertAdjacentElement('afterend', el);
+          } else if (tools && tools.parentNode && typeof tools.parentNode.insertBefore === 'function') {
+            tools.parentNode.insertBefore(el, tools.nextSibling);
+          } else {
+            parent.appendChild(el);
+          }
+        }
       }
-      if (el) el.textContent = message;
+      if (el) {
+        el.textContent = message || '';
+        if (typeof el.setAttribute === 'function') {
+          if (kind) el.setAttribute('data-kind', kind);
+          else if (typeof el.removeAttribute === 'function') el.removeAttribute('data-kind');
+        }
+        if (typeof el.hidden !== 'undefined') el.hidden = !message;
+        if (typeof el.classList === 'object' && el.classList && typeof el.classList.toggle === 'function') {
+          el.classList.toggle('is-empty', !message);
+          el.classList.toggle('is-error', kind === 'error');
+          el.classList.toggle('is-success', kind === 'success');
+        }
+      }
       return el;
     }
 
@@ -63,17 +118,12 @@
       });
     }
 
-    // Same-tab refresh hint: the real storage event only fires in other
-    // tabs, so a synthesized event lets app.js reload tasks from storage.
-    // Best effort only; the saved data itself is durable either way.
     function notifySaved() {
       try {
         if (win && typeof win.StorageEvent === 'function' && typeof win.dispatchEvent === 'function') {
           win.dispatchEvent(new win.StorageEvent('storage', { key: STORAGE_KEY }));
         }
-      } catch (error) {
-        // Refresh signaling is optional; ignore dispatch failures.
-      }
+      } catch (error) {}
     }
 
     function plural(count, singular) {
@@ -85,16 +135,13 @@
       if (!target || target.id !== 'import-file') return;
       const file = target.files && target.files[0];
       const format = importApi && file ? importApi.formatFromFileName(file.name) : null;
-      if (!file || format === null) return; // JSON backups stay with app.js
+      if (!file || format === null) return;
       if (typeof event.preventDefault === 'function') event.preventDefault();
       if (typeof event.stopPropagation === 'function') event.stopPropagation();
-      try {
-        target.value = '';
-      } catch (error) {
-        // Some engines disallow resetting a file input; the guarded
-        // change listener still prevents a double import of the same file.
-      }
+      try { target.value = ''; } catch (error) {}
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
+      setBusy(true);
+      status('Importing from ' + fileLabel + '...', 'busy');
       try {
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
@@ -127,9 +174,11 @@
         if (merge.duplicates > 0) parts.push(plural(merge.duplicates, 'duplicate') + ' skipped.');
         if (merge.invalid > 0) parts.push(plural(merge.invalid, 'invalid task') + ' skipped.');
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
-        status(parts.join(' '));
+        status(parts.join(' '), merge.added.length > 0 ? 'success' : 'idle');
       } catch (error) {
-        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.');
+        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.', 'error');
+      } finally {
+        setBusy(false);
       }
     }
 
