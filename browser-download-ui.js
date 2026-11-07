@@ -30,6 +30,7 @@
     const resultEl = element('browser-download-result');
     const formEl = element('browser-download-form');
     const clearEl = element('browser-download-clear');
+    const planBtn = element('browser-download-check');
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -61,9 +62,18 @@
       }
     }
 
+    function setBusy(on) {
+      if (planBtn && planBtn.classList) {
+        if (on) planBtn.classList.add('is-busy');
+        else planBtn.classList.remove('is-busy');
+      }
+    }
+
     function plan() {
+      setBusy(true);
       if (!downloadApi || typeof downloadApi.planScenario !== 'function') {
         status('Download planning is unavailable.');
+        setBusy(false);
         return;
       }
       const scenario = scenarioEl && typeof scenarioEl.value === 'string' ? scenarioEl.value : '';
@@ -76,6 +86,14 @@
           + (result.retryable ? ' \u00b7 safe to retry' : ' \u00b7 do not just retry'));
       }
       renderPlan(result);
+      // Brief busy feedback for press consistency (sync engine; reduced-motion safe).
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setBusy(false));
+        });
+      } else {
+        setBusy(false);
+      }
     }
 
     function onClear() {
