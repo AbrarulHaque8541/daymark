@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
+
 - [Daymark engineering status — 2026-11-07T04:15:08Z (open-format task import)](./CURRENT_STATUS_20261107T041500Z.md)
 
 - [Daymark engineering status — 2026-11-06T050500Z (public-holidays card)](./CURRENT_STATUS_20261106T050500Z.md)
@@ -63,7 +65,7 @@
 
 ## Latest reviewed snapshot
 
-- [Daymark engineering status — 2026-11-07T04:15:08Z (open-format task import)](./CURRENT_STATUS_20261107T041500Z.md)
+- [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
 
 ## Before acting
 

@@ -27,6 +27,8 @@
   <script src="browser-address-ui.js" defer></script>
   <script src="browser-error-logic.js" defer></script>
   <script src="browser-error-ui.js" defer></script>
+  <script src="browser-download-logic.js" defer></script>
+  <script src="browser-download-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="storage-logic.js" defer></script>
@@ -383,6 +385,27 @@
           </form>
           <p class="feed-status" id="browser-error-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="browser-error-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-download-heading">Downloads, planned safely</h2>
+          <p class="briefing-description">Redirect chains, filenames and file types are checked locally. Nothing downloads here.</p>
+          <form id="browser-download-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-download-scenario">Download journey to plan</label>
+            <select id="browser-download-scenario" class="sort-select" aria-label="Download journey to plan">
+              <option value="same-origin-redirects" selected>Redirects, same site</option>
+              <option value="cross-origin-redirect">Redirects to another site</option>
+              <option value="server-filename">Server-chosen filename</option>
+              <option value="unknown-mime">Unknown file type</option>
+              <option value="expired-link">Expired link</option>
+              <option value="installable-app">Installable app file</option>
+              <option value="spoofed-filename">Suspicious filename</option>
+            </select>
+            <button class="button button-primary" id="browser-download-check" type="submit">Plan</button>
+            <button class="button button-quiet" id="browser-download-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-download-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-download-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
