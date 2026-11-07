@@ -32,8 +32,26 @@
     const clearEl = element('browser-download-clear');
     const planBtn = element('browser-download-check');
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, options) {
+      if (!statusEl) return;
+      while (statusEl.firstChild) statusEl.removeChild(statusEl.firstChild);
+      if (!message) return;
+      const text = doc.createElement('span');
+      text.textContent = message;
+      statusEl.appendChild(text);
+      // Optional dismiss button for non-empty status (a11y + UX polish).
+      if (options && options.dismissible !== false) {
+        const dismiss = doc.createElement('button');
+        dismiss.type = 'button';
+        dismiss.className = 'status-dismiss';
+        dismiss.setAttribute('aria-label', 'Dismiss status');
+        dismiss.textContent = '×';
+        dismiss.addEventListener('click', () => {
+          status('');
+          setStatusTone(false);
+        });
+        statusEl.appendChild(dismiss);
+      }
     }
 
     function setStatusTone(hasNotices) {
@@ -87,11 +105,11 @@
       // The engine fails closed for any value the prototype does not know.
       const result = downloadApi.planScenario(scenario);
       if (!result.ok) {
-        status('Not checkable \u00b7 nothing is planned.');
+        status('Not checkable · nothing is planned.');
         setStatusTone(false);
       } else {
         status('Planned · ' + result.filename + (Array.isArray(result.notices) && result.notices.length ? ' · ' + result.notices.length + ' notice' + (result.notices.length === 1 ? '' : 's') : '')
-          + (result.retryable ? ' \u00b7 safe to retry' : ' \u00b7 do not just retry'));
+          + (result.retryable ? ' · safe to retry' : ' · do not just retry'));
         setStatusTone(Array.isArray(result.notices) && result.notices.length > 0);
       }
       renderPlan(result);
@@ -109,7 +127,7 @@
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
-      status('Cleared. Pick a download journey to see its safety plan.');
+      status('Cleared. Pick a download journey to see its safety plan.', { dismissible: false });
       setStatusTone(false);
     }
 
