@@ -30,17 +30,38 @@
       return 'import-' + String(Date.parse(now())) + '-' + String(idCounter);
     };
 
-    function status(message) {
+    function ensureStatus() {
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('import-status') : null;
       if (!el && typeof doc.createElement === 'function') {
-        el = doc.createElement('span');
+        el = doc.createElement('p');
         el.id = 'import-status';
-        el.className = 'sr-only';
-        if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
-        const parent = doc.body || doc.documentElement;
-        if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
+        el.className = 'import-status';
+        if (typeof el.setAttribute === 'function') {
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+        }
+        const anchor = typeof doc.getElementById === 'function' ? doc.getElementById('import-file') : null;
+        const parent = anchor && anchor.parentNode ? anchor.parentNode : (doc.body || doc.documentElement);
+        if (parent && typeof parent.insertBefore === 'function' && anchor) {
+          parent.insertBefore(el, anchor.nextSibling);
+        } else if (parent && typeof parent.appendChild === 'function') {
+          parent.appendChild(el);
+        }
       }
-      if (el) el.textContent = message;
+      return el;
+    }
+
+    function status(message, options) {
+      const el = ensureStatus();
+      if (!el) return null;
+      el.textContent = message || '';
+      const isLoading = options && options.loading;
+      if (typeof el.classList === 'object' && el.classList) {
+        if (isLoading) el.classList.add('is-loading');
+        else el.classList.remove('is-loading');
+      } else {
+        el.className = 'import-status' + (isLoading ? ' is-loading' : '');
+      }
       return el;
     }
 
@@ -95,6 +116,7 @@
         // change listener still prevents a double import of the same file.
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
+      status('Reading and importing ' + fileLabel + '…', { loading: true });
       try {
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
