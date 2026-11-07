@@ -96,10 +96,13 @@ test('markdown export output round-trips through fromMarkdown', () => {
 });
 
 test('fromCsv skips malformed rows and fills lenient defaults', () => {
+  const rows = [
+    ['', '', '', '', '', 'false', '', '', '', '[]', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'],
+    ['k1', 'Foreign row', 'not-a-date', '25:99', 'urgent', '1', 'sometimes', 'bad-tag! GoodTag', 'x', '[]', '', '']
+  ];
   const csv = importer.CSV_HEADER + '\r\n'
-    + ',No title at all,,,,false,,,,[],2026-01-01T00:00:00.000Z,2026-01-01T00:00:00.000Z\r\n'
-    + 'short,row\r\n'
-    + 'k1,Foreign row,not-a-date,25:99,urgent,1,sometimes,badtag GoodTag,x,,,,\r\n';
+    + rows.map((row) => row.join(',')).join('\r\n') + '\r\n'
+    + 'short,row\r\n';
   const result = importer.fromCsv(csv, freshCtx());
   assert.equal(result.skippedRows, 2, 'blank title and wrong width rows are skipped');
   assert.equal(result.tasks.length, 1);

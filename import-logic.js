@@ -103,7 +103,7 @@
       if (ch === '\n') { pushRow(); i += 1; continue; }
       field += ch; i += 1;
     }
-    if (inQuotes) throw new Error('CSV input ends inside a quoted field.');
+    if (inQuotes) throw new Error('CSV input ends with an unterminated quoted field.');
     pushRow();
     return rows;
   }

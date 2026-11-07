@@ -188,9 +188,10 @@ test('FileReader fallback reads files without file.text()', async () => {
     files: [{ name: 'reader.csv', size: csv.length }]
   });
   env.window.FileReader = class {
-    constructor() { this.onload = null; this.onerror = null; }
+    constructor() { this.onload = null; this.onerror = null; this.result = ''; }
     readAsText(file) {
-      this.onload({ target: { result: csv } });
+      this.result = csv;
+      this.onload({ target: this });
     }
   };
   const handle = ui.attachImportUi(env);
