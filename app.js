@@ -298,12 +298,22 @@
     return timeText ? ` · ${timeText}` : '';
   }
 
+  function daysUntil(dateIso, today) {
+    if (!dateIso || !today) return null;
+    const todayDate = new Date(today + 'T00:00:00Z');
+    const target = new Date(dateIso.slice(0, 10) + 'T00:00:00Z');
+    if (Number.isNaN(todayDate.getTime()) || Number.isNaN(target.getTime())) return null;
+    return Math.round((target - todayDate) / 86400000);
+  }
+
   function getDueText(task, today) {
     const suffix = dueSuffix(task);
     if (!task.dueDate) return 'No due date';
     if (task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)}${suffix}`;
     if (task.dueDate === today) return `Due today${suffix}`;
-    return `Due ${formatDate(task.dueDate)}${suffix}`;
+    const days = daysUntil(task.dueDate, today);
+    const relative = days === 1 ? 'tomorrow' : days > 1 ? `in ${days} days` : '';
+    return relative ? `Due ${relative} · ${formatDate(task.dueDate)}${suffix}` : `Due ${formatDate(task.dueDate)}${suffix}`;
   }
 
   function getDueClass(task, today) {
