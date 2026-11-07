@@ -126,12 +126,21 @@
       || a.createdAt.localeCompare(b.createdAt);
   }
 
+  function weekEndDate(today) {
+    const [y, m, d] = today.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + 6);
+    return localDateString(date);
+  }
+
   function getFilteredTasks(tasks, filter, query, today) {
     const normalizedQuery = String(query || '').trim().toLowerCase();
+    const weekEnd = filter === 'week' ? weekEndDate(today) : null;
     return tasks.filter((task) => {
       if (filter === 'completed' && !task.completed) return false;
       if (filter === 'today' && task.dueDate !== today) return false;
       if (filter === 'upcoming' && !(task.dueDate !== null && task.dueDate > today)) return false;
+      if (filter === 'week' && !(task.dueDate !== null && task.dueDate >= today && task.dueDate <= weekEnd && !task.completed)) return false;
       if (!normalizedQuery) return true;
       const notes = typeof task.notes === 'string' ? task.notes.toLowerCase() : '';
       const tags = Array.isArray(task.tags) ? task.tags.join(' ').toLowerCase() : '';
@@ -167,21 +176,13 @@
     isDateOnly,
     isTimeOnly,
     isReminderLead,
-    isValidSubtasks,
-    isValidTags,
-    normalizeTags,
-    isTag,
     isValidTask,
     validateStoredTasks,
+    normalizeTags,
     getFilteredTasks,
-    getSuggestions,
-    MAX_NOTES_CHARS,
-    MAX_SUBTASKS,
-    MAX_SUBTASK_TITLE,
-    REMINDER_LEADS,
-    MAX_TAGS,
-    MAX_TAG_CHARS
+    getSuggestions
   };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.DaymarkLogic = api;
-})(globalThis);
+  else root.daymarkTaskLogic = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
