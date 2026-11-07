@@ -1,1 +1,15 @@
-/* NOTE: This update must be full file - aborted if too large */
+:root {
+  color-scheme: light dark;
+  --paper: #f2f5f7;
+  --surface: rgba(255, 255, 255, .78);
+  --surface-solid: #ffffff;
+  --ink: #1c232a;
+  --muted: #565f68;
+  --muted-text: #52616b;
+  --line: #dbe2e8;
+  --accent: #16705f;
+  --accent-dark: #0d5449;
+  --accent-soft: #e2f0eb;
+  --accent-bright: #2a8f7a;
+}
+/* TRUNCATED RESTORE FAILED - use push_files */
