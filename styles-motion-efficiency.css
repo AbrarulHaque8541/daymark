@@ -126,6 +126,12 @@
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border: 1px solid rgba(22, 112, 95, .18);
 }
+/* Compact skeletons for glance/feed cards (holidays, weather, etc.). */
+.feed-list .skeleton-row {
+  height: 52px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
 @keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
