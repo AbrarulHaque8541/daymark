@@ -21,7 +21,11 @@ function makeElement(tagName) {
       return child;
     },
     addEventListener(type, handler) { (el.listeners[type] = el.listeners[type] || []).push(handler); },
-    preventDefault() { el.prevented = true; }
+    preventDefault() { el.prevented = true; },
+    attrs: Object.create(null),
+    setAttribute(name, value) { el.attrs[name] = String(value); },
+    removeAttribute(name) { delete el.attrs[name]; },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; }
   };
   Object.defineProperty(el, 'firstChild', {
     get() { return el.children.length ? el.children[0] : null; }
@@ -40,7 +44,7 @@ function makeDoc(ids) {
 }
 
 const ALL_IDS = ['browser-download-scenario', 'browser-download-status', 'browser-download-result',
-  'browser-download-form', 'browser-download-clear', 'browser-download-copy'];
+  'browser-download-form', 'browser-download-clear', 'browser-download-copy', 'browser-download-check'];
 
 test('attachBrowserDownloadUi requires a document', () => {
   assert.throws(() => ui.attachBrowserDownloadUi(null), /requires a document/);
@@ -134,15 +138,27 @@ test('copy button collects the plan and reports success when clipboard is availa
   const click = copy.listeners.click;
   assert.ok(click && click.length === 1, 'a click listener must be wired on copy');
   let written = null;
-  const originalNav = global.navigator;
-  global.navigator = { clipboard: { writeText: async (t) => { written = t; return true; } } };
+  const mockClip = { writeText: async (t) => { written = t; return true; } };
+  const hadClipboard = Object.prototype.hasOwnProperty.call(globalThis.navigator || {}, 'clipboard');
+  const originalClipboard = globalThis.navigator && globalThis.navigator.clipboard;
   try {
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      configurable: true,
+      get() { return mockClip; }
+    });
     click[0]();
     await new Promise(r => setTimeout(r, 0));
     assert.ok(written && written.includes('report.pdf'));
     assert.match(doc.elements['browser-download-status'].textContent, /Copied plan/);
   } finally {
-    global.navigator = originalNav;
+    if (hadClipboard) {
+      Object.defineProperty(globalThis.navigator, 'clipboard', {
+        configurable: true,
+        get() { return originalClipboard; }
+      });
+    } else {
+      try { delete globalThis.navigator.clipboard; } catch (_) { /* ignore */ }
+    }
   }
 });
 
@@ -229,4 +245,27 @@ test('clear button also forgets the remembered journey in localStorage', () => {
   assert.equal(scenario.value, '');
   assert.match(doc.elements['browser-download-status'].textContent, /Cleared\./);
   assert.equal(doc.elements['browser-download-result'].children.length, 0);
+});
+
+test('Escape clears the planned download journey when focus is in the form', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-download-scenario'].value = 'same-origin-redirects';
+  const store = {
+    data: Object.create(null),
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this.data, k) ? this.data[k] : null; },
+    setItem(k, v) { this.data[k] = String(v); },
+    removeItem(k) { delete this.data[k]; }
+  };
+  ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine, localStorage: store });
+  assert.match(doc.elements['browser-download-status'].textContent, /Planned/);
+  assert.ok(doc.elements['browser-download-result'].children.length > 0);
+  const form = doc.elements['browser-download-form'];
+  const keyHandlers = form.listeners.keydown;
+  assert.ok(keyHandlers && keyHandlers.length >= 1, 'form must listen for keydown');
+  const ev = { key: 'Escape', preventDefault() { ev.prevented = true; } };
+  keyHandlers[keyHandlers.length - 1](ev);
+  assert.equal(ev.prevented, true);
+  assert.match(doc.elements['browser-download-status'].textContent, /Cleared/);
+  assert.equal(doc.elements['browser-download-result'].children.length, 0);
+  assert.equal(store.data['daymark.browser-download.last-scenario'], undefined);
 });
