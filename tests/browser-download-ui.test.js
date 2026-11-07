@@ -165,7 +165,7 @@ test('missing elements never throw; the card simply does less', () => {
   handle.detach();
 });
 
-test('remembers the last planned journey across attach calls via localStorage', () => {
+test('remembers the last planned journey across attach calls via localStorage and indicates restoration', () => {
   const doc = makeDoc(ALL_IDS);
   const scenario = doc.elements['browser-download-scenario'];
   scenario.value = 'expired-link';
@@ -178,6 +178,7 @@ test('remembers the last planned journey across attach calls via localStorage', 
   doc2.elements['browser-download-scenario'].value = 'same-origin-redirects';
   ui.attachBrowserDownloadUi({ document: doc2, downloadApi: engine, localStorage: store });
   assert.equal(doc2.elements['browser-download-scenario'].value, 'expired-link');
+  assert.match(doc2.elements['browser-download-status'].textContent, /Restored \u00b7 /);
   assert.match(doc2.elements['browser-download-status'].textContent, /do not just retry/);
 });
 

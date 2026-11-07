@@ -185,11 +185,16 @@
     }
 
     // Restore the last valid journey the user planned, so the card remembers across reloads.
+    let restored = false;
     const remembered = loadLastScenario();
     if (remembered && scenarioEl && scenarioEl.value !== remembered) {
       scenarioEl.value = remembered;
+      restored = true;
     }
     plan();
+    if (restored && statusEl && statusEl.textContent) {
+      statusEl.textContent = 'Restored \u00b7 ' + statusEl.textContent;
+    }
 
     return {
       plan,
