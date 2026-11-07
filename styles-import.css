@@ -1,0 +1,21 @@
+/* Visible import status feedback — glass design, accent #16705f */
+.import-status {
+  display: block;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(226, 240, 235, .75);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(22, 112, 95, .25);
+  color: var(--accent-dark);
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.import-status.is-error {
+  background: var(--red-soft);
+  border-color: rgba(163, 40, 31, .25);
+  color: var(--red);
+}
