@@ -825,3 +825,18 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     color: #b8e0d4;
   }
 }
+
+/* Orange-soft glass when the download plan has safety notices — immediate visual attention. */
+#browser-download-status.has-notices {
+  background: var(--orange-soft);
+  border-color: rgba(148, 88, 30, .28);
+  color: var(--orange);
+  box-shadow: 0 4px 12px rgba(148, 88, 30, .08);
+}
+@media (prefers-color-scheme: dark) {
+  #browser-download-status.has-notices {
+    background: rgba(58, 40, 22, .72);
+    border-color: rgba(200, 140, 60, .4);
+    color: #e8c49a;
+  }
+}

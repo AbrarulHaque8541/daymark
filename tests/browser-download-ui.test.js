@@ -9,6 +9,7 @@ function makeElement(tagName) {
   const el = {
     tagName,
     className: '',
+    classList: { add(cls) { el.className = (el.className + " " + cls).trim(); }, remove(cls) { el.className = el.className.replace(new RegExp("\\b" + cls + "\\b", "g"), "").replace(/\s+/g, " ").trim(); } },
     textContent: '',
     value: '',
     children: [],
@@ -54,6 +55,7 @@ test('the card plans the selected journey at boot', () => {
   const result = doc.elements['browser-download-result'];
   assert.match(status, /Planned \u00b7 report\.pdf/);
   assert.match(status, /safe to retry/);
+  assert.doesNotMatch(doc.elements['browser-download-status'].className, /has-notices/);
   // One head item plus one detail line per planned line.
   assert.equal(result.children[0].className, 'feed-item');
   assert.equal(result.children[0].children[0].className, 'feed-item-title');
@@ -100,6 +102,8 @@ test('a suspicious filename discloses the sanitization honestly', () => {
   const result = doc.elements['browser-download-result'];
   assert.equal(result.children[0].children[0].textContent, 'evilexe.exe');
   assert.match(result.children[0].children[1].textContent, /unsafe characters; they were removed/);
+  assert.match(doc.elements['browser-download-status'].className, /has-notices/);
+  assert.match(doc.elements['browser-download-status'].textContent, /2 notices/);
 });
 
 test('form submit re-plans and the clear button empties the card', () => {

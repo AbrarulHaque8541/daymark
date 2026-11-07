@@ -90,7 +90,7 @@
         status('Not checkable \u00b7 nothing is planned.');
         setStatusTone(false);
       } else {
-        status('Planned \u00b7 ' + result.filename
+        status('Planned · ' + result.filename + (Array.isArray(result.notices) && result.notices.length ? ' · ' + result.notices.length + ' notice' + (result.notices.length === 1 ? '' : 's') : '')
           + (result.retryable ? ' \u00b7 safe to retry' : ' \u00b7 do not just retry'));
         setStatusTone(Array.isArray(result.notices) && result.notices.length > 0);
       }
