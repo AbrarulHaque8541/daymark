@@ -331,6 +331,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .feed-status { min-height: 16px; margin: 9px 0 4px; color: var(--muted-text); font-size: 10px; }
 .feed-list { display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
 .feed-item { padding: 9px 10px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.feed-item.is-next { border-color: #16705f; box-shadow: 0 0 0 1px rgba(22, 112, 95, .25), 0 4px 12px rgba(22, 112, 95, .08); }
 .feed-item:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
 .feed-item-link, .feed-item-title { display: block; color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }
 .feed-item-link:hover { color: var(--accent); text-decoration: underline; }
@@ -344,6 +345,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .feed-form input::placeholder { color: var(--muted-text); }
   .feed-status { color: var(--muted-text); }
   .feed-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
+  .feed-item.is-next { border-color: #16705f; box-shadow: 0 0 0 1px rgba(22, 112, 95, .4), 0 4px 12px rgba(0, 0, 0, .2); }
   .feed-item:hover { border-color: rgba(42, 143, 122, .5); }
   .feed-item-link, .feed-item-title { color: #e8eef2; }
   .feed-item-date { color: var(--muted-text); }

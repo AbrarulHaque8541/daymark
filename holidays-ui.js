@@ -100,6 +100,7 @@
       clearList();
       const upcoming = (Array.isArray(cache.holidays) ? cache.holidays : [])
         .filter((holiday) => holiday && typeof holiday.date === 'string' && holiday.date >= todayIso())
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
         .slice(0, UPCOMING_LIMIT);
       if (!upcoming.length) {
         const row = makeRow('feed-item');
@@ -110,8 +111,9 @@
         }
         return;
       }
-      for (const holiday of upcoming) {
-        const row = makeRow('feed-item');
+      for (let i = 0; i < upcoming.length; i++) {
+        const holiday = upcoming[i];
+        const row = makeRow('feed-item' + (i === 0 ? ' is-next' : ''));
         if (!row) break;
         const days = daysUntil(holiday.date);
         const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : days > 1 ? `in ${days} days` : '';

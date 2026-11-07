@@ -178,6 +178,9 @@ test('refresh fetches, renders, and persists the result and preference', async (
   assert.equal(rows[0][0], '2026-11-14 · in 8 days');
   assert.equal(rows[0][1], 'Diwali · दीवाली');
   assert.equal(rows[1][0], '2026-12-25 · in 49 days');
+  // First (next) holiday is highlighted
+  const firstRow = elements['holiday-list'].children[0];
+  assert.ok(firstRow.class && firstRow.class.includes('is-next'), 'next holiday should have is-next class');
   assert.equal(elements['holiday-status'].textContent, 'Updated · 2026-11-06 12:00 UTC');
   assert.equal(elements['holiday-refresh'].disabled, false);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
