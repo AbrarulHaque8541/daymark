@@ -1,16 +1,9 @@
 /*
- * Daymark browser download safety card UI wiring for the web prototype.
+ * Daymark offline browser download safety UI for the web prototype.
  *
- * A small offline-first card next to the error taxonomy: the user picks a
- * download journey (redirects within one site, redirects to another site,
- * a server-chosen filename, an unknown file type, an expired link, an
- * installable app file, a suspicious filename) and this card shows,
- * locally, how Daymark will treat that download: the planned filename and
- * where it came from, the file type verdict, the redirect verdict, honest
- * retry advice, and the duplicate-tap rule. Nothing is fetched or
- * downloaded here; the planning engine is DaymarkBrowserDownload
- * (browser-download-logic.js). Mirrors the browser-error-ui.js module
- * style: attachBrowserDownloadUi(env) is fully injectable for unit tests.
+ * Renders the "Downloads, planned safely" card. Fully injectable; no network;
+ * no storage except the optional last-scenario key. Honest degradation when
+ * the planning engine is missing.
  */
 ((root) => {
   'use strict';
@@ -18,8 +11,8 @@
   function attachBrowserDownloadUi(env) {
     if (!env || !env.document) throw new Error('attachBrowserDownloadUi requires a document.');
     const doc = env.document;
-    // An env may explicitly pass downloadApi: null to model a page where
-    // the engine failed to load; only fall back to the global when absent.
+    // Distinguish an explicit downloadApi: null (engine failed to load) from a
+    // missing property so tests can model the unavailable case.
     const downloadApi = Object.prototype.hasOwnProperty.call(env, 'downloadApi')
       ? env.downloadApi
       : (root.DaymarkBrowserDownload || null);
@@ -113,14 +106,23 @@
       // The engine fails closed for any value the prototype does not know.
       const result = downloadApi.planScenario(scenario);
       if (!result.ok) {
-        status('Not checkable \u00b7 nothing is planned.');
+        status('Not checkable · nothing is planned.');
         setStatusTone(false);
       } else {
-        status('Planned \u00b7 ' + result.filename + (Array.isArray(result.notices) && result.notices.length ? ' \u00b7 ' + result.notices.length + ' notice' + (result.notices.length === 1 ? '' : 's') : '')
-          + (result.retryable ? ' \u00b7 safe to retry' : ' \u00b7 do not just retry'));
+        status('Planned · ' + result.filename + (Array.isArray(result.notices) && result.notices.length ? ' · ' + result.notices.length + ' notice' + (result.notices.length === 1 ? '' : 's') : '')
+          + (result.retryable ? ' · safe to retry' : ' · do not just retry'));
         setStatusTone(Array.isArray(result.notices) && result.notices.length > 0);
       }
       renderPlan(result);
+      // Move focus to the status so assistive tech reliably announces the plan summary.
+      if (statusEl && typeof statusEl.focus === 'function') {
+        try {
+          if (typeof statusEl.setAttribute === 'function' && statusEl.getAttribute('tabindex') == null) {
+            statusEl.setAttribute('tabindex', '-1');
+          }
+          statusEl.focus({ preventScroll: true });
+        } catch (_) { /* ignore focus failures */ }
+      }
       // Brief busy feedback for press consistency (sync engine; reduced-motion safe).
       if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(() => {
