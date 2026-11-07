@@ -43,6 +43,22 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function showSkeleton() {
+      if (!listEl || cached) return; // keep existing list visible when refreshing with cache
+      clearList();
+      for (let i = 0; i < 3; i++) {
+        const sk = makeRow('skeleton-row');
+        if (sk) listEl.appendChild(sk);
+      }
+      if (listEl.setAttribute) listEl.setAttribute('aria-busy', 'true');
+    }
+
+    function hideSkeleton() {
+      if (!listEl) return;
+      // clearList is called by render or error path; just clear aria
+      if (listEl.removeAttribute) listEl.removeAttribute('aria-busy');
+    }
+
     function setBusy(isBusy) {
       // a11y: announce busy state without flooding live regions
       busy = isBusy;
@@ -56,6 +72,8 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (isBusy) showSkeleton();
+      else hideSkeleton();
     }
 
     function todayIso() {
@@ -190,6 +208,7 @@
           render(cached);
           status(`Could not refresh: ${message} — showing cached holidays.`);
         } else {
+          clearList();
           status(`Could not refresh: ${message}`);
         }
       } finally {
