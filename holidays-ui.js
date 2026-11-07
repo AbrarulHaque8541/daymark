@@ -73,7 +73,10 @@
     function makeRow(rowClass) {
       if (!doc || typeof doc.createElement !== 'function') return null;
       const row = doc.createElement('div');
-      if (row && typeof row.setAttribute === 'function') row.setAttribute('class', rowClass);
+      if (row && typeof row.setAttribute === 'function') {
+        row.setAttribute('class', rowClass);
+        row.setAttribute('role', 'listitem');
+      }
       return row;
     }
 
@@ -97,6 +100,10 @@
 
     function render(cache) {
       if (!listEl || !cache) return;
+      if (typeof listEl.setAttribute === "function") {
+        listEl.setAttribute("role", "list");
+        listEl.setAttribute("aria-label", "Upcoming public holidays");
+      }
       clearList();
       const upcoming = (Array.isArray(cache.holidays) ? cache.holidays : [])
         .filter((holiday) => holiday && typeof holiday.date === 'string' && holiday.date >= todayIso())

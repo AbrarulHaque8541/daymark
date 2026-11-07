@@ -119,6 +119,8 @@ test('attach renders a cached holiday list with a cached note', () => {
   const handle = ui.attachHolidaysUi(env);
   const rows = rowTexts(elements['holiday-list']);
   assert.equal(rows.length, 1, 'past holidays are not shown');
+  assert.equal(elements['holiday-list'].role, 'list', 'list has accessible role');
+  assert.equal(elements['holiday-list'].children[0].role, 'listitem', 'rows have listitem role');
   assert.equal(rows[0][0], '2026-12-25 · in 49 days');
   assert.equal(rows[0][1], 'Christmas Day');
   assert.equal(rows[0][2], 'Nationwide public holiday');
