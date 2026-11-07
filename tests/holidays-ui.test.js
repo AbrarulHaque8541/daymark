@@ -315,3 +315,24 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.PREFS_KEY, 'daymark.holidays.prefs.v1');
   assert.equal(typeof globalThis.DaymarkHolidaysUi, 'object');
 });
+
+test('refresh with no cache shows then clears skeleton rows', async () => {
+  let resolveFetch;
+  const pending = new Promise((resolve) => { resolveFetch = resolve; });
+  const fetchImpl = (url) => pending.then(() => ({
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(FETCH_BODY)
+  }));
+  const { env, elements } = fakeEnv({ country: 'IN', fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  const refreshPromise = handle.onRefresh();
+  // Skeleton should be present while the request is in flight
+  assert.equal(elements['holiday-list'].children.length, 3, 'skeleton rows while busy');
+  assert.equal(elements['holiday-list'].children[0].class || elements['holiday-list'].children[0].getAttribute?.('class'), 'skeleton-row');
+  assert.equal(elements['holiday-status'].textContent, 'Refreshing…');
+  resolveFetch();
+  await refreshPromise;
+  assert.equal(elements['holiday-list'].children.length, 2, 'real rows after success');
+  assert.equal(elements['holiday-refresh'].disabled, false);
+});
