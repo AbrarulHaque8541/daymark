@@ -14,6 +14,9 @@ function makeElement(tagName) {
     value: '',
     children: [],
     listeners: {},
+    attrs: {},
+    setAttribute(name, value) { el.attrs[name] = String(value); },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; },
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) {
       const index = el.children.indexOf(child);
@@ -57,8 +60,11 @@ test('the card plans the selected journey at boot', () => {
   assert.match(status, /safe to retry/);
   assert.doesNotMatch(doc.elements['browser-download-status'].className, /has-notices/);
   assert.equal(result.children[0].className, 'feed-item');
-  assert.equal(result.children[0].children[0].className, 'feed-item-title');
-  assert.equal(result.children[0].children[0].textContent, 'report.pdf');
+  const titleRow = result.children[0].children[0];
+  assert.equal(titleRow.className, 'plan-title-row');
+  assert.equal(titleRow.children[0].className, 'feed-item-title');
+  assert.equal(titleRow.children[0].textContent, 'report.pdf');
+  assert.equal(titleRow.children.length, 1, 'same-origin plan has no notices badge');
   assert.equal(result.children[0].children[1].className, 'feed-item-summary');
   const expected = engine.planScenario('same-origin-redirects');
   assert.equal(result.children.length, 1 + expected.lines.length);
@@ -81,7 +87,7 @@ test('changing the journey re-plans, and non-retryable downloads say so', () => 
   assert.match(status, /do not just retry/);
   assert.doesNotMatch(status, /safe to retry/);
   const result = doc.elements['browser-download-result'];
-  assert.equal(result.children[0].children[0].textContent, 'old.pdf');
+  assert.equal(result.children[0].children[0].children[0].textContent, 'old.pdf');
 });
 
 test('an unknown journey value fails closed to not-checkable', () => {
@@ -90,7 +96,7 @@ test('an unknown journey value fails closed to not-checkable', () => {
   ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine });
   assert.match(doc.elements['browser-download-status'].textContent, /Not checkable/);
   const result = doc.elements['browser-download-result'];
-  assert.equal(result.children[0].children[0].textContent, 'Not checkable');
+  assert.equal(result.children[0].children[0].children[0].textContent, 'Not checkable');
   assert.equal(result.children.length, 1);
   assert.match(result.children[0].children[1].textContent, /not known/);
 });
@@ -100,7 +106,7 @@ test('a suspicious filename discloses the sanitization honestly', () => {
   doc.elements['browser-download-scenario'].value = 'spoofed-filename';
   ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine });
   const result = doc.elements['browser-download-result'];
-  assert.equal(result.children[0].children[0].textContent, 'evilexe.exe');
+  assert.equal(result.children[0].children[0].children[0].textContent, 'evilexe.exe');
   assert.match(result.children[0].children[1].textContent, /unsafe characters; they were removed/);
   assert.match(doc.elements['browser-download-status'].className, /has-notices/);
   assert.match(doc.elements['browser-download-status'].textContent, /2 notices/);
@@ -208,4 +214,20 @@ test('clear button also forgets the remembered journey in localStorage', () => {
   assert.equal(scenario.value, '');
   assert.match(doc.elements['browser-download-status'].textContent, /Cleared\./);
   assert.equal(doc.elements['browser-download-result'].children.length, 0);
+});
+
+test('plans with notices show a numeric badge on the title row', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-download-scenario'].value = 'cross-origin-redirect';
+  ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine });
+  const result = doc.elements['browser-download-result'];
+  const titleRow = result.children[0].children[0];
+  assert.equal(titleRow.className, 'plan-title-row');
+  assert.equal(titleRow.children.length, 2);
+  const badge = titleRow.children[1];
+  assert.equal(badge.className, 'plan-notices-badge');
+  assert.match(badge.textContent, /^[1-9]/);
+  assert.match(badge.getAttribute('aria-label'), /safety notice/);
+  assert.match(doc.elements['browser-download-status'].textContent, /notice/);
+  assert.match(doc.elements['browser-download-status'].className, /has-notices/);
 });

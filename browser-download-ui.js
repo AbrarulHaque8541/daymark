@@ -79,13 +79,24 @@
       while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       const head = doc.createElement('div');
       head.className = 'feed-item';
+      const titleRow = doc.createElement('div');
+      titleRow.className = 'plan-title-row';
       const title = doc.createElement('span');
       title.className = 'feed-item-title';
       title.textContent = plan.ok && plan.filename ? plan.filename : 'Not checkable';
+      titleRow.appendChild(title);
+      const noticeCount = Array.isArray(plan.notices) ? plan.notices.length : 0;
+      if (noticeCount > 0) {
+        const badge = doc.createElement('span');
+        badge.className = 'plan-notices-badge';
+        badge.setAttribute('aria-label', noticeCount + ' safety notice' + (noticeCount === 1 ? '' : 's'));
+        badge.textContent = String(noticeCount);
+        titleRow.appendChild(badge);
+      }
       const summary = doc.createElement('p');
       summary.className = 'feed-item-summary';
       summary.textContent = plan.summary;
-      head.appendChild(title);
+      head.appendChild(titleRow);
       head.appendChild(summary);
       resultEl.appendChild(head);
       for (let i = 0; i < plan.lines.length; i += 1) {

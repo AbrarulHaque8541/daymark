@@ -772,6 +772,28 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .button:active { transform: none; }
 }
 
+/* Download plan notices badge — accent glass chip, reduced-motion safe. */
+.plan-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plan-notices-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: rgba(22, 112, 95, 0.14);
+  color: #16705f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(22, 112, 95, 0.28);
+  backdrop-filter: blur(4px);
+}
+@media (prefers-color-scheme: dark) {
+  .plan-notices-badge { background: rgba(22, 112, 95, 0.28); color: #7de0cb; border-color: rgba(125, 224, 203, 0.35); }
+}
+
 /* Visible import result status — glass accent feedback after CSV/Markdown import. */
 .import-status {
   flex-basis: 100%;
