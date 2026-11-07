@@ -190,3 +190,22 @@ test('ignores an unknown stored scenario and never throws when storage is unavai
   // Unknown value is ignored; the engine fails closed for the (default empty/unknown) selection.
   assert.match(doc.elements['browser-download-status'].textContent, /Not checkable|Planned|unavailable/);
 });
+
+test('clear button also forgets the remembered journey in localStorage', () => {
+  const doc = makeDoc(ALL_IDS);
+  const scenario = doc.elements['browser-download-scenario'];
+  scenario.value = 'installable-app';
+  const store = {
+    data: {},
+    getItem(k) { return this.data[k] || null; },
+    setItem(k, v) { this.data[k] = String(v); },
+    removeItem(k) { delete this.data[k]; }
+  };
+  const handle = ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine, localStorage: store });
+  assert.equal(store.data['daymark.browser-download.last-scenario'], 'installable-app');
+  handle.onClear();
+  assert.equal(store.data['daymark.browser-download.last-scenario'], undefined);
+  assert.equal(scenario.value, '');
+  assert.match(doc.elements['browser-download-status'].textContent, /Cleared\./);
+  assert.equal(doc.elements['browser-download-result'].children.length, 0);
+});

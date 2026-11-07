@@ -62,6 +62,11 @@
       try { storage.setItem(LAST_SCENARIO_KEY, id); } catch (_) { /* ignore quota / private mode */ }
     }
 
+    function clearLastScenario() {
+      if (!storage || typeof storage.removeItem !== 'function') return;
+      try { storage.removeItem(LAST_SCENARIO_KEY); } catch (_) { /* ignore */ }
+    }
+
     function makeItem(className, text) {
       const item = doc.createElement('div');
       item.className = className;
@@ -130,6 +135,8 @@
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
+      clearLastScenario();
+      if (scenarioEl) scenarioEl.value = '';
       status('Cleared. Pick a download journey to see its safety plan.');
       setStatusTone(false);
     }

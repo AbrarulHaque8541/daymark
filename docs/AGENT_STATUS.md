@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-08T03:15:00Z (Cycle B: clear also forgets download journey)](./CURRENT_STATUS_20261108T031500Z.md)
+
 - [Daymark engineering status — 2026-11-08T03:05:00Z (Cycle A: persist last download journey)](./CURRENT_STATUS_20261108T030500Z.md)
 
 - [Daymark engineering status — 2026-11-08T02:05:00Z (Cycle A: copy-plan for download safety card)](./CURRENT_STATUS_20261108T020500Z.md)
