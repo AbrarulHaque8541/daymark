@@ -1,4 +1,4 @@
-successfully downloaded text file (SHA: ec0e4454ce368f48d8625d9bdcd73a20731a0f4c)<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -34,6 +34,8 @@ successfully downloaded text file (SHA: ec0e4454ce368f48d8625d9bdcd73a20731a0f4c
   <script src="motion-policy.js" defer></script>
   <script src="app.js" defer></script>
   <script src="export-ui.js" defer></script>
+  <script src="import-logic.js" defer></script>
+  <script src="import-ui.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -148,7 +150,7 @@ successfully downloaded text file (SHA: ec0e4454ce368f48d8625d9bdcd73a20731a0f4c
             </select>
             <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
             <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
-            <input id="import-file" type="file" accept="application/json,.json" hidden>
+            <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown" hidden>
           </div>
           <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
             <div class="task-list-skeleton" aria-hidden="true">
