@@ -8,7 +8,7 @@
  * tasks are merged into daymark.tasks.v1: existing ids win, invalid rows are
  * skipped, and every skip is reported honestly in a status line. After a
  * successful save a synthesized storage event asks app.js to reload tasks so
- * imported rows appear immediately. Fully offline: no network, no timers.
+ * imported rows appear immediately. Fully offline: no network. Success status auto-clears after 8s; failures stay until dismissed.
  */
 ((root) => {
   'use strict';
@@ -30,17 +30,52 @@
       return 'import-' + String(Date.parse(now())) + '-' + String(idCounter);
     };
 
+    let dismissTimer = null;
+    function clearDismissTimer() {
+      if (dismissTimer && typeof win.clearTimeout === 'function') {
+        try { win.clearTimeout(dismissTimer); } catch (e) {}
+      }
+      dismissTimer = null;
+    }
     function status(message) {
+      clearDismissTimer();
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('import-status') : null;
       if (!el && typeof doc.createElement === 'function') {
         el = doc.createElement('span');
         el.id = 'import-status';
-        el.className = 'sr-only';
+        el.className = 'import-status';
         if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
         const parent = doc.body || doc.documentElement;
         if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
       }
-      if (el) el.textContent = message;
+      if (!el) return el;
+      // Clear previous content and any dismiss control
+      while (el.firstChild) el.removeChild(el.firstChild);
+      if (!message) {
+        el.textContent = '';
+        return el;
+      }
+      const text = doc.createElement('span');
+      text.className = 'import-status-text';
+      text.textContent = message;
+      el.appendChild(text);
+      // Dismiss control for explicit clear
+      const btn = doc.createElement('button');
+      btn.type = 'button';
+      btn.className = 'import-status-dismiss';
+      btn.setAttribute('aria-label', 'Dismiss import status');
+      btn.textContent = '×';
+      btn.addEventListener('click', () => {
+        clearDismissTimer();
+        status('');
+      });
+      el.appendChild(btn);
+      // Auto-clear success messages after 8s (failures stay until dismissed)
+      if (message.indexOf('Import failed') === -1 && typeof win.setTimeout === 'function') {
+        dismissTimer = win.setTimeout(() => {
+          if (el.textContent && el.textContent.indexOf(message) !== -1) status('');
+        }, 8000);
+      }
       return el;
     }
 

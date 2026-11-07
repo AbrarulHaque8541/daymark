@@ -14,15 +14,29 @@ const sampleTasks = [
 ];
 
 function fakeElement(tag) {
-  return {
+  const el = {
     tagName: tag,
     id: '',
     className: '',
     value: '',
-    textContent: '',
     attributes: {},
-    setAttribute(name, value) { this.attributes[name] = value; }
+    children: [],
+    listeners: [],
+    setAttribute(name, value) { this.attributes[name] = value; },
+    appendChild(child) { this.children.push(child); return child; },
+    removeChild(child) {
+      const i = this.children.indexOf(child);
+      if (i !== -1) this.children.splice(i, 1);
+      return child;
+    },
+    addEventListener(type, fn) { this.listeners.push({ type, fn }); }
   };
+  Object.defineProperty(el, 'firstChild', { get() { return this.children[0] || null; } });
+  Object.defineProperty(el, 'textContent', {
+    get() { return this.children.map(c => c.textContent || '').join('') || this._text || ''; },
+    set(v) { this._text = String(v); this.children = []; }
+  });
+  return el;
 }
 
 function fakeEnv(options) {
@@ -35,7 +49,7 @@ function fakeEnv(options) {
   const doc = {
     readyState: 'complete',
     body: { appendChild(el) { created.push(el); return el; } },
-    getElementById(id) { return elements[id] || null; },
+    getElementById(id) { return elements[id] || created.find(el => el.id === id) || null; },
     createElement(tag) {
       const el = fakeElement(tag);
       created.push(el);
@@ -206,4 +220,46 @@ test('auto-boot stays inert under Node (no window) and the module exposes its AP
   assert.equal(ui.STORAGE_KEY, 'daymark.tasks.v1');
   assert.equal(ui.MAX_IMPORT_FILE_BYTES, 8 * 1024 * 1024);
   assert.equal(typeof globalThis.DaymarkImportUi, 'object');
+});
+
+
+test('import status can be dismissed immediately', async () => {
+  const csv = exporter.toCsv([
+    { id: 'new-dismiss', title: 'Dismissable', dueDate: null, priority: 'medium', completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const { env, elements, created } = fakeEnv({
+    stored: JSON.stringify(sampleTasks),
+    files: [{ name: 'd.csv', size: csv.length, text: async () => csv }]
+  });
+  const handle = ui.attachImportUi(env);
+  await handle.onChange(changeEvent(elements['import-file']));
+  const status = created.find((el) => el.id === 'import-status');
+  assert.ok(status);
+  assert.match(status.textContent, /Imported 1 task/);
+  const dismiss = status.children.find((c) => c.className === 'import-status-dismiss');
+  assert.ok(dismiss, 'dismiss control present');
+  const click = dismiss.listeners.find((l) => l.type === 'click');
+  assert.ok(click);
+  click.fn();
+  assert.equal(status.textContent, '', 'dismiss clears the status');
+});
+
+test('success import status schedules auto-clear', async () => {
+  const csv = exporter.toCsv([
+    { id: 'new-auto', title: 'Auto clear', dueDate: null, priority: 'medium', completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const { env, elements, created } = fakeEnv({
+    stored: JSON.stringify(sampleTasks),
+    files: [{ name: 'a.csv', size: csv.length, text: async () => csv }]
+  });
+  let timerFn = null;
+  env.window.setTimeout = (fn, ms) => { timerFn = fn; assert.equal(ms, 8000); return 99; };
+  env.window.clearTimeout = () => { timerFn = null; };
+  const handle = ui.attachImportUi(env);
+  await handle.onChange(changeEvent(elements['import-file']));
+  const status = created.find((el) => el.id === 'import-status');
+  assert.match(status.textContent, /Imported 1 task/);
+  assert.ok(timerFn, 'timer scheduled');
+  timerFn();
+  assert.equal(status.textContent, '', 'auto-clear empties status');
 });

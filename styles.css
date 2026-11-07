@@ -787,9 +787,43 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   line-height: 1.45;
   box-shadow: 0 4px 12px rgba(22, 112, 95, .06);
   transition: opacity .18s ease, transform .18s ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 .import-status:empty {
   display: none;
+}
+.import-status-text {
+  flex: 1;
+}
+.import-status-dismiss {
+  flex: none;
+  margin: -2px -4px 0 0;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  opacity: .65;
+  transition: opacity .12s ease, background .12s ease;
+}
+.import-status-dismiss:hover,
+.import-status-dismiss:focus-visible {
+  opacity: 1;
+  background: rgba(22, 112, 95, .12);
+  outline: none;
+}
+.import-status-dismiss:active {
+  transform: scale(.92);
+}
+@media (prefers-reduced-motion: reduce) {
+  .import-status,
+  .import-status-dismiss { transition: none; }
+  .import-status-dismiss:active { transform: none; }
 }
 @media (prefers-color-scheme: dark) {
   .import-status {
