@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-07T05:05:00Z (browser download fail-closed)](./CURRENT_STATUS_20261107T050500Z.md)
+
 - [Daymark engineering status — 2026-11-07T04:15:08Z (open-format task import)](./CURRENT_STATUS_20261107T041500Z.md)
 
 - [Daymark engineering status — 2026-11-06T050500Z (public-holidays card)](./CURRENT_STATUS_20261106T050500Z.md)
@@ -62,6 +64,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+
+- [Daymark engineering status — 2026-11-07T05:05:00Z (browser download fail-closed)](./CURRENT_STATUS_20261107T050500Z.md)
 
 - [Daymark engineering status — 2026-11-07T04:15:08Z (open-format task import)](./CURRENT_STATUS_20261107T041500Z.md)
 

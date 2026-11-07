@@ -30,7 +30,7 @@ assert "for (BrowserDownloadListPolicy.Item item : selection.items)" in method, 
     "the UI must render the selected newest-first bounded window"
 assert "Downloads (showing 100 most recent items)" in method, \
     "truncated history must disclose that the most recent items are shown"
-assert "No Daymark browser downloads are available yet." in method, \
+assert "No Daymark browser downloads are available." in method, \
     "the list must explain the empty state"
 assert 'setNeutralButton("Refresh"' in method, \
     "the list must expose a refresh action"
@@ -39,9 +39,28 @@ assert "DownloadManager.ACTION_VIEW_DOWNLOADS" not in method, \
 assert "private final BrowserDownloadTracker browserDownloadTracker" in activity, \
     "the bounded in-memory tracker must be owned by the Activity"
 queue = activity.split("private void queueBrowserDownload(", 1)[1].split("private void exitBrowserFullscreen", 1)[0]
-assert "long downloadId = manager.enqueue(request);" in queue and \
-    "browserDownloadTracker.start(downloadId, url, filename)" in queue, \
-    "only successfully enqueued Daymark browser downloads should enter the tracker"
+assert "BrowserAddress.isAllowedWebUrl(url)" in queue, \
+    "the blocked download callback must still reject non-web schemes"
+assert "BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads())" in queue, \
+    "the callback must respect Online/Offline state and the temporary fail-closed policy"
+assert "showToast(decision.userMessage)" in queue, \
+    "the blocked download action must explain its current limitation"
+for forbidden in ("new DownloadManager.Request(", "manager.enqueue(", "CookieManager.getInstance().getCookie(",
+                  'addRequestHeader("Cookie"'):
+    assert forbidden not in queue, f"legacy download callback must not use {forbidden}"
+assert "new DownloadManager.Request(" not in activity and "manager.enqueue(request)" not in activity, \
+    "the browser must not enqueue requests through Android DownloadManager"
+assert '"Cookie"' not in queue, "the blocked callback must not attach the page Cookie header"
+for source_path in (root / "app/src/main/java").rglob("*.java"):
+    production_source = source_path.read_text(encoding="utf-8")
+    for forbidden in ("DownloadManager.Request(", ".enqueue(", 'addRequestHeader("Cookie"',
+                      'setRequestProperty("Cookie"'):
+        assert forbidden not in production_source, \
+            f"production source {source_path.relative_to(root)} must not contain download/cookie sink {forbidden}"
+assert "Download started for the selected media file" not in activity, \
+    "media selection must not claim a download started after the callback is blocked"
+assert "(tap to retry)" not in activity and 'setTitle("Retry download?")' not in activity, \
+    "failed download history must not promise a retry while downloads are disabled"
 assert "BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id)" in method, \
     "the Downloads list should update only entries already owned by Daymark browser enqueue"
 for expected in ("browserDownloadTracker.onQueued(id)", "browserDownloadTracker.onProgress(id, downloaded, total)", \
@@ -53,7 +72,7 @@ handler = activity.split("private void handleBrowserDownloadSelection(", 1)[1].s
 )[0]
 assert "browserDownloadTracker.onCancel(id)" in handler, \
     "confirmed DownloadManager removal must be reflected in the tracker"
-print("PASS browser Downloads destination: in-app DownloadManager list, explicit empty state and refresh")
+print("PASS browser Downloads destination: history list plus fail-closed callback, no app enqueue/Cookie sink, and truthful retry/media copy")
 
 # Work by: ChatGPT (OpenAI)
 # Model: GPT-6
