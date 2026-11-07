@@ -36,6 +36,12 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function setStatusTone(hasNotices) {
+      if (!statusEl || !statusEl.classList) return;
+      if (hasNotices) statusEl.classList.add('has-notices');
+      else statusEl.classList.remove('has-notices');
+    }
+
     function makeItem(className, text) {
       const item = doc.createElement('div');
       item.className = className;
@@ -73,6 +79,7 @@
       setBusy(true);
       if (!downloadApi || typeof downloadApi.planScenario !== 'function') {
         status('Download planning is unavailable.');
+        setStatusTone(false);
         setBusy(false);
         return;
       }
@@ -81,9 +88,11 @@
       const result = downloadApi.planScenario(scenario);
       if (!result.ok) {
         status('Not checkable \u00b7 nothing is planned.');
+        setStatusTone(false);
       } else {
         status('Planned \u00b7 ' + result.filename
           + (result.retryable ? ' \u00b7 safe to retry' : ' \u00b7 do not just retry'));
+        setStatusTone(Array.isArray(result.notices) && result.notices.length > 0);
       }
       renderPlan(result);
       // Brief busy feedback for press consistency (sync engine; reduced-motion safe).
@@ -101,6 +110,7 @@
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
       status('Cleared. Pick a download journey to see its safety plan.');
+      setStatusTone(false);
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
