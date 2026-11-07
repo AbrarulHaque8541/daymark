@@ -1,1 +1,76 @@
-PLACEHOLDER
+#!/usr/bin/env python3
+"""Source regression checks for the in-app browser Downloads destination (issues #211/#213)."""
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+menu = activity.split("private void showBrowserOverflowMenu", 1)[1].split(
+    "private void importExtensionFromUri", 1
+)[0]
+method = activity.split("private void showBrowserDownloadsDialog()", 1)[1].split(
+    "private String browserDownloadStatusLabel", 1
+)[0]
+
+assert 'showBrowserDownloadsDialog();' in menu, \
+    "the browser Downloads menu must open the in-app status list"
+assert "private void openDownloadsFolder()" not in activity, \
+    "the obsolete generic/system downloads destination must not shadow the in-app list"
+assert "manager.query(new DownloadManager.Query())" in method, \
+    "the in-app list must query Android DownloadManager"
+assert "BrowserDownloadListPolicy.Collector(BrowserDownloadListPolicy.MAX_VISIBLE)" in method, \
+    "the in-app list must retain only a bounded newest-download window"
+assert "DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP" in method, \
+    "the list must use provider modification timestamps when available"
+assert "collector.add(id, title, url, mime, status, reason," in method, \
+    "provider rows must flow through the allocation-conscious streaming selector"
+assert "BrowserDownloadListPolicy.Selection selection = collector.finish();" in method, \
+    "the provider scan must finish through the bounded collector"
+assert "for (BrowserDownloadListPolicy.Item item : selection.items)" in method, \
+    "the UI must render the selected newest-first bounded window"
+assert "Downloads (showing 100 most recent items)" in method, \
+    "truncated history must disclose that the most recent items are shown"
+assert "No Daymark browser downloads are available." in method, \
+    "the list must explain the empty state"
+assert 'setNeutralButton("Refresh"' in method, \
+    "the list must expose a refresh action"
+assert "DownloadManager.ACTION_VIEW_DOWNLOADS" not in method, \
+    "the status list must not silently hand off to another screen"
+assert "private final BrowserDownloadTracker browserDownloadTracker" in activity, \
+    "the bounded in-memory tracker must be owned by the Activity"
+assert "BrowserDownloadEnqueueGate browserDownloadEnqueueGate" not in activity, \
+    "the removed legacy enqueue path must not retain an unused Activity gate"
+queue = activity.split("private void queueBrowserDownload(", 1)[1].split("private void exitBrowserFullscreen", 1)[0]
+assert "BrowserAddress.isAllowedWebUrl(url)" in queue, \
+    "the blocked download callback must still reject non-web schemes"
+assert "BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads())" in queue, \
+    "the callback must respect Online/Offline state and the temporary fail-closed policy"
+assert "showToast(decision.userMessage)" in queue, \
+    "the blocked download action must explain its current limitation"
+for forbidden in ("new DownloadManager.Request(", "manager.enqueue(", "CookieManager.getInstance().getCookie(",
+                  'addRequestHeader("Cookie"'):
+    assert forbidden not in queue, f"legacy download callback must not use {forbidden}"
+assert "new DownloadManager.Request(" not in activity and "manager.enqueue(request)" not in activity, \
+    "the browser must not enqueue requests through Android DownloadManager"
+assert '"Cookie"' not in queue, "the blocked callback must not attach the page Cookie header"
+assert "Download started for the selected media file" not in activity, \
+    "media selection must not claim a download started after the callback is blocked"
+assert "(tap to retry)" not in activity and 'setTitle("Retry download?")' not in activity, \
+    "failed download history must not promise a retry while downloads are disabled"
+assert "BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id)" in method, \
+    "the Downloads list should update only entries already owned by Daymark browser enqueue"
+for expected in ("browserDownloadTracker.onQueued(id)", "browserDownloadTracker.onProgress(id, downloaded, total)", \
+                 "browserDownloadTracker.onPaused(id)", "browserDownloadTracker.onComplete(id)", \
+                 "browserDownloadTracker.onFailure(id, Integer.toString(reason))"):
+    assert expected in method, f"provider status must update the bounded tracker: {expected}"
+handler = activity.split("private void handleBrowserDownloadSelection(", 1)[1].split( \
+    "private boolean isBrowserDownloadActive", 1
+)[0]
+assert "browserDownloadTracker.onCancel(id)" in handler, \
+    "confirmed DownloadManager removal must be reflected in the tracker"
+print("PASS browser Downloads destination: history list plus fail-closed callback, no app enqueue/Cookie sink, and truthful retry/media copy")
+
+# Work by: ChatGPT (OpenAI)
+# Model: GPT-6
+# Tooling: GitHub MCP repository contents and Actions logs
+# Timestamp (UTC): 2026-11-01T15:32:00Z
