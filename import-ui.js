@@ -30,17 +30,21 @@
       return 'import-' + String(Date.parse(now())) + '-' + String(idCounter);
     };
 
-    function status(message) {
+    function status(message, kind) {
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('import-status') : null;
       if (!el && typeof doc.createElement === 'function') {
         el = doc.createElement('span');
         el.id = 'import-status';
-        el.className = 'sr-only';
+        el.className = 'import-status-banner';
         if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
-        const parent = doc.body || doc.documentElement;
+        const tools = typeof doc.querySelector === 'function' ? doc.querySelector('.task-tools') : null;
+        const parent = tools || doc.body || doc.documentElement;
         if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
       }
-      if (el) el.textContent = message;
+      if (el) {
+        el.textContent = message;
+        el.className = 'import-status-banner' + (kind ? ' is-' + kind : '');
+      }
       return el;
     }
 
@@ -95,6 +99,7 @@
         // change listener still prevents a double import of the same file.
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
+      status('Importing…', 'loading');
       try {
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
@@ -129,7 +134,7 @@
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
         status(parts.join(' '));
       } catch (error) {
-        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.');
+        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.', 'error');
       }
     }
 
