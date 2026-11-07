@@ -9,6 +9,7 @@ function makeElement(tagName) {
   const el = {
     tagName,
     className: '',
+    setAttribute(name, value) { el[name] = value; },
     classList: { add(cls) { el.className = (el.className + " " + cls).trim(); }, remove(cls) { el.className = el.className.replace(new RegExp("\\b" + cls + "\\b", "g"), "").replace(/\s+/g, " ").trim(); } },
     textContent: '',
     value: '',

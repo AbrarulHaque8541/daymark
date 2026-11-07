@@ -69,6 +69,7 @@
     }
 
     function setBusy(on) {
+      if (statusEl) statusEl.setAttribute("aria-busy", on ? "true" : "false");
       if (planBtn && planBtn.classList) {
         if (on) planBtn.classList.add('is-busy');
         else planBtn.classList.remove('is-busy');
