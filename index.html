@@ -9,6 +9,7 @@
   <title>Daymark — personal tasks</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2316705f'/%3E%3Crect x='5' y='9' width='3' height='10' rx='1' fill='%23f7f8f5'/%3E%3Crect x='10.5' y='5' width='3' height='14' rx='1' fill='%23f7f8f5'/%3E%3Crect x='16' y='11' width='3' height='8' rx='1' fill='%23f7f8f5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-import.css">
   <link rel="stylesheet" href="styles-motion-efficiency.css">
   <link rel="stylesheet" href="motion-accessibility.css">
   <script src="task-logic.js" defer></script>
@@ -257,202 +258,55 @@
         </aside>
         <aside class="currency-card" id="currency-card" aria-labelledby="currency-heading">
           <div class="currency-topline"><span class="currency-dot" aria-hidden="true"></span></div>
-          <h2 id="currency-heading">Quick currency check</h2>
-          <p class="currency-description">Frankfurter (ECB rates) — no account, no API key. Cached offline.</p>
+          <h2 id="currency-heading">Currency rates</h2>
+          <p class="currency-description">Frankfurter open data — no account, no API key. Cached offline.</p>
           <form id="currency-form" class="feed-form" novalidate>
-            <label class="sr-only" for="currency-amount">Amount</label>
-            <input id="currency-amount" name="amount" type="text" inputmode="decimal" maxlength="12" placeholder="Amount, e.g. 10" autocomplete="off" aria-describedby="currency-status">
-            <label class="sr-only" for="currency-from">From currency</label>
-            <select id="currency-from" name="from" aria-label="From currency">
-            <option value="USD" selected>USD — US Dollar</option>
-            <option value="EUR">EUR — Euro</option>
-            <option value="GBP">GBP — British Pound</option>
-            <option value="INR">INR — Indian Rupee</option>
-            <option value="JPY">JPY — Japanese Yen</option>
-            <option value="AUD">AUD — Australian Dollar</option>
-            <option value="CAD">CAD — Canadian Dollar</option>
-            <option value="CHF">CHF — Swiss Franc</option>
-            <option value="CNY">CNY — Chinese Yuan</option>
-            <option value="SGD">SGD — Singapore Dollar</option>
-            <option value="HKD">HKD — Hong Kong Dollar</option>
-            <option value="NZD">NZD — New Zealand Dollar</option>
-            <option value="SEK">SEK — Swedish Krona</option>
-            <option value="NOK">NOK — Norwegian Krone</option>
-            <option value="DKK">DKK — Danish Krone</option>
-            <option value="PLN">PLN — Polish Zloty</option>
-            <option value="CZK">CZK — Czech Koruna</option>
-            <option value="HUF">HUF — Hungarian Forint</option>
-            <option value="ILS">ILS — Israeli Shekel</option>
-            <option value="MXN">MXN — Mexican Peso</option>
-            <option value="BRL">BRL — Brazilian Real</option>
-            <option value="ZAR">ZAR — South African Rand</option>
-            <option value="KRW">KRW — South Korean Won</option>
-            <option value="THB">THB — Thai Baht</option>
+            <label class="sr-only" for="currency-base">Base currency</label>
+            <select id="currency-base" name="base" class="sort-select" aria-label="Base currency">
+              <option value="USD" selected>USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="INR">INR</option>
+              <option value="JPY">JPY</option>
+              <option value="CAD">CAD</option>
+              <option value="AUD">AUD</option>
+              <option value="CHF">CHF</option>
+              <option value="CNY">CNY</option>
+              <option value="SGD">SGD</option>
             </select>
-            <button class="tool-button currency-swap" id="currency-swap" type="button" aria-label="Swap currencies" title="Swap from and to">⇄</button>
-            <label class="sr-only" for="currency-to">To currency</label>
-            <select id="currency-to" name="to" aria-label="To currency">
-            <option value="USD">USD — US Dollar</option>
-            <option value="EUR">EUR — Euro</option>
-            <option value="GBP">GBP — British Pound</option>
-            <option value="INR" selected>INR — Indian Rupee</option>
-            <option value="JPY">JPY — Japanese Yen</option>
-            <option value="AUD">AUD — Australian Dollar</option>
-            <option value="CAD">CAD — Canadian Dollar</option>
-            <option value="CHF">CHF — Swiss Franc</option>
-            <option value="CNY">CNY — Chinese Yuan</option>
-            <option value="SGD">SGD — Singapore Dollar</option>
-            <option value="HKD">HKD — Hong Kong Dollar</option>
-            <option value="NZD">NZD — New Zealand Dollar</option>
-            <option value="SEK">SEK — Swedish Krona</option>
-            <option value="NOK">NOK — Norwegian Krone</option>
-            <option value="DKK">DKK — Danish Krone</option>
-            <option value="PLN">PLN — Polish Zloty</option>
-            <option value="CZK">CZK — Czech Koruna</option>
-            <option value="HUF">HUF — Hungarian Forint</option>
-            <option value="ILS">ILS — Israeli Shekel</option>
-            <option value="MXN">MXN — Mexican Peso</option>
-            <option value="BRL">BRL — Brazilian Real</option>
-            <option value="ZAR">ZAR — South African Rand</option>
-            <option value="KRW">KRW — South Korean Won</option>
-            <option value="THB">THB — Thai Baht</option>
-            </select>
-            <button class="button button-primary currency-refresh" id="currency-refresh" type="submit">Refresh</button>
+            <button class="button button-primary" id="currency-refresh" type="submit">Refresh</button>
+            <button class="button button-quiet" id="currency-clear" type="button">Clear</button>
           </form>
-          <p class="currency-status" id="currency-status" role="status" aria-live="polite"></p>
-          <div class="currency-result-row">
-            <div class="currency-now" id="currency-now" aria-live="polite"></div>
-            <button class="tool-button currency-copy" id="currency-copy" type="button" aria-label="Copy conversion result" title="Copy the conversion" hidden>Copy</button>
-          </div>
+          <p class="feed-status" id="currency-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="currency-list" aria-live="polite"></div>
         </aside>
-
         <aside class="wiki-card" id="wiki-card" aria-labelledby="wiki-heading">
           <div class="wiki-topline"><span class="wiki-dot" aria-hidden="true"></span></div>
-          <h2 id="wiki-heading">Look it up on Wikipedia</h2>
-          <p class="wiki-description">Only your query leaves this device. Cached offline.</p>
+          <h2 id="wiki-heading">Wikipedia summary</h2>
+          <p class="wiki-description">Wikimedia open data — no account, no API key. Cached offline.</p>
           <form id="wiki-form" class="feed-form" novalidate>
-            <label class="sr-only" for="wiki-query">Search topic</label>
-            <input id="wiki-query" name="query" type="text" maxlength="120" placeholder="Topic, e.g. Kanyakumari" autocomplete="off">
-            <button class="button button-primary wiki-search" id="wiki-search" type="button">Search</button>
-            <button class="button button-quiet wiki-clear" id="wiki-clear" type="button">Clear</button>
+            <label class="sr-only" for="wiki-query">Search Wikipedia</label>
+            <input id="wiki-query" name="query" type="text" maxlength="120" placeholder="Search topic" autocomplete="off">
+            <button class="button button-primary" id="wiki-search" type="submit">Search</button>
+            <button class="button button-quiet" id="wiki-clear" type="button">Clear</button>
           </form>
-          <p class="wiki-status" id="wiki-status" role="status" aria-live="polite"></p>
-          <div class="wiki-list" id="wiki-list" aria-live="polite"></div>
+          <p class="feed-status" id="wiki-status" role="status" aria-live="polite"></p>
+          <div class="wiki-result" id="wiki-result" aria-live="polite"></div>
         </aside>
-
-        <aside class="briefing-card" id="browser-address-card" aria-labelledby="browser-address-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="browser-address-heading">Address-bar preview</h2>
-          <p class="briefing-description">Classified locally; nothing loads here.</p>
-          <form id="browser-address-form" class="feed-form" novalidate>
-            <label class="sr-only" for="browser-address-input">Address or search text</label>
-            <input id="browser-address-input" name="address" type="text" maxlength="2048" placeholder="URL or search, e.g. example.com" autocomplete="off" aria-describedby="browser-address-status">
-            <label class="sr-only" for="browser-address-provider">Search provider</label>
-            <select id="browser-address-provider" class="sort-select" aria-label="Search provider">
-              <option value="duckduckgo" selected>DuckDuckGo</option>
-              <option value="wikipedia">Wikipedia</option>
-              <option value="google">Google</option>
-              <option value="bing">Bing</option>
-            </select>
-            <button class="button button-primary" id="browser-address-check" type="submit">Check</button>
-            <button class="button button-quiet" id="browser-address-clear" type="button">Clear</button>
+        <aside class="browser-card" id="browser-card" aria-labelledby="browser-heading">
+          <div class="browser-topline"><span class="browser-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-heading">In-app browser</h2>
+          <p class="browser-description">System WebView. HTTP labeled Not encrypted. Online by default.</p>
+          <form id="browser-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-url">Address or search</label>
+            <input id="browser-url" name="url" type="text" maxlength="2048" placeholder="https:// or search" autocomplete="off">
+            <button class="button button-primary" id="browser-go" type="submit">Go</button>
           </form>
-          <p class="feed-status" id="browser-address-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="browser-address-result" aria-live="polite"></div>
+          <p class="browser-status" id="browser-status" role="status" aria-live="polite"></p>
+          <div class="browser-frame" id="browser-frame"></div>
         </aside>
-        <aside class="briefing-card" id="browser-error-card" aria-labelledby="browser-error-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="browser-error-heading">When a page fails, plain words</h2>
-          <p class="briefing-description">Every failure gets a calm explanation and a next step. No codes, no secrets shown.</p>
-          <form id="browser-error-form" class="feed-form" novalidate>
-            <label class="sr-only" for="browser-error-scenario">Failure to explain</label>
-            <select id="browser-error-scenario" class="sort-select" aria-label="Failure to explain">
-              <option value="offline" selected>Offline</option>
-              <option value="dns-not-found">Site not found (DNS)</option>
-              <option value="timeout">Page timed out</option>
-              <option value="tls">Connection not trusted (TLS)</option>
-              <option value="http-client-error">Page not available (4xx)</option>
-              <option value="http-server-error">Site problem (5xx)</option>
-              <option value="blocked-navigation">Link blocked</option>
-              <option value="download-failure">Download failed</option>
-              <option value="unknown">Unknown failure</option>
-            </select>
-            <button class="button button-primary" id="browser-error-check" type="submit">Explain</button>
-            <button class="button button-quiet" id="browser-error-clear" type="button">Clear</button>
-          </form>
-          <p class="feed-status" id="browser-error-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="browser-error-result" aria-live="polite"></div>
-        </aside>
-        <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="webhook-heading">Task-completion webhook</h2>
-          <p class="briefing-description">HTTPS-only, opt-in. Failed sends queue and retry.</p>
-          <form id="webhook-form" class="feed-form" novalidate>
-            <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
-            <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
-            <button class="button button-primary webhook-save" id="webhook-save" type="submit">Save</button>
-          </form>
-          <div class="focus-actions">
-            <button class="button button-quiet" id="webhook-test" type="button">Send test</button>
-            <button class="button button-quiet" id="webhook-flush" type="button" disabled>Retry queued</button>
-          </div>
-          <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
-        </aside>
-        <aside class="briefing-card" id="data-card" aria-labelledby="data-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="data-heading">Your data, explained</h2>
-          <p class="briefing-description">Everything stays in this browser; each Clear asks first.</p>
-          <div class="focus-actions" role="group" aria-label="Data controls actions">
-            <button class="button button-quiet" id="data-refresh" type="button">Refresh sizes</button>
-            <button class="button button-quiet" id="data-clear-all" type="button">Clear all local data</button>
-          </div>
-          <p class="feed-status" id="data-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="data-list" aria-label="Stored data categories"></div>
-        </aside>
-        </div>
       </div>
-      <footer class="page-footer"><span>DAYMARK <span aria-hidden="true">·</span> PERSONAL TASKS</span></footer>
     </main>
-</div>
-
-  <dialog id="edit-dialog" class="edit-dialog" aria-labelledby="edit-heading">
-    <form id="edit-form" method="dialog" novalidate>
-      <div class="dialog-header"><div><p class="eyebrow">UPDATE YOUR LIST</p><h2 id="edit-heading">Edit task</h2></div><button class="icon-button close-dialog" type="button" aria-label="Close edit dialog">×</button></div>
-      <input type="hidden" name="id" id="edit-id">
-      <label class="field-label" for="edit-title">Task title</label>
-      <input id="edit-title" name="title" type="text" maxlength="160" aria-describedby="edit-error" required>
-      <div class="dialog-fields">
-        <div><label class="field-label" for="edit-due-date">Due date <span>(optional)</span></label><input id="edit-due-date" name="dueDate" type="date"></div>
-        <div><label class="field-label" for="edit-due-time">Due time <span>(optional)</span></label><input id="edit-due-time" name="dueTime" type="time" disabled></div>
-      </div>
-      <p id="edit-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
-      <div class="dialog-fields">
-        <div><label class="field-label" for="edit-reminder">Reminder <span>(optional)</span></label><select id="edit-reminder" name="reminder" disabled><option value="">No reminder</option><option value="0">At due time</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
-        <div><label class="field-label" for="edit-priority">Priority</label><select id="edit-priority" name="priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-      </div>
-      <div class="dialog-fields">
-        <div><label class="field-label" for="edit-tags">Tags <span>(up to 5, comma separated)</span></label><input id="edit-tags" name="tags" type="text" maxlength="160" placeholder="work, errands" autocomplete="off"></div>
-        <div><label class="field-label" for="edit-repeat">Repeat <span>(optional)</span></label><select id="edit-repeat" name="repeat" disabled><option value="">No repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="weekdays">Weekdays</option><option value="yearly">Yearly</option></select></div>
-      </div>
-      <p class="reminder-note-standalone">Reminders show on this page while it is open. Completing a repeating task automatically schedules its next occurrence.</p>
-      <label class="field-label" for="edit-notes">Notes <span>(optional)</span></label>
-      <textarea id="edit-notes" name="notes" rows="3" maxlength="4000" placeholder="Add details, links, or context…"></textarea>
-      <div class="subtask-editor">
-        <label class="field-label" for="new-subtask">Steps <span id="subtask-count-label">(optional, up to 20)</span></label>
-        <div class="subtask-list" id="subtask-list"></div>
-        <div class="subtask-add-row">
-          <label class="sr-only" for="new-subtask">Add a step</label>
-          <input id="new-subtask" type="text" maxlength="120" placeholder="Add a step…" autocomplete="off">
-          <button class="button button-quiet subtask-add-button" id="add-subtask" type="button">Add step</button>
-        </div>
-      </div>
-      <p class="form-error" id="edit-error" role="alert" hidden>Please enter a task title.</p>
-      <div class="dialog-actions"><button class="button button-quiet cancel-edit" type="button">Cancel</button><button class="button button-primary" type="submit">Save changes</button></div>
-    </form>
-  </dialog>
-  <div class="toast-stack" id="toast-stack">
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <button class="toast-action" id="toast-action" type="button" hidden>Undo</button>
   </div>
 </body>
 </html>
