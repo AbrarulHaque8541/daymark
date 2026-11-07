@@ -35,9 +35,15 @@
       if (!el && typeof doc.createElement === 'function') {
         el = doc.createElement('span');
         el.id = 'import-status';
-        el.className = 'sr-only';
-        if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
-        const parent = doc.body || doc.documentElement;
+        el.className = 'import-status';
+        if (typeof el.setAttribute === 'function') {
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+          el.setAttribute('aria-atomic', 'true');
+        }
+        // Prefer placing the status next to the import controls in the task tools bar.
+        const tools = typeof doc.querySelector === 'function' ? doc.querySelector('.task-tools') : null;
+        const parent = tools || doc.body || doc.documentElement;
         if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
       }
       if (el) el.textContent = message;
@@ -95,6 +101,7 @@
         // change listener still prevents a double import of the same file.
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
+      status('Importing…');
       try {
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');

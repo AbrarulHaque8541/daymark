@@ -771,3 +771,31 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .button.is-busy::after { animation: none; border-right-color: currentColor; }
   .button:active { transform: none; }
 }
+
+/* Cycle B: visible import status feedback (accent #16705f, glass, reduced-motion safe). */
+.import-status {
+  flex: 1 1 100%;
+  display: block;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(226, 240, 235, .65);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(22, 112, 95, .25);
+  color: var(--accent-dark);
+  font-size: 12px;
+  line-height: 1.45;
+  min-height: 1.45em;
+}
+.import-status:empty { display: none; }
+@media (prefers-color-scheme: dark) {
+  .import-status {
+    background: rgba(26, 58, 50, .55);
+    border-color: rgba(42, 143, 122, .4);
+    color: #8fd4c0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .import-status { transition: none; }
+}
