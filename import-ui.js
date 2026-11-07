@@ -30,17 +30,24 @@
       return 'import-' + String(Date.parse(now())) + '-' + String(idCounter);
     };
 
-    function status(message) {
+    function status(message, kind) {
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('import-status') : null;
       if (!el && typeof doc.createElement === 'function') {
         el = doc.createElement('span');
         el.id = 'import-status';
-        el.className = 'sr-only';
-        if (typeof el.setAttribute === 'function') el.setAttribute('role', 'status');
+        el.className = 'import-status';
+        if (typeof el.setAttribute === 'function') {
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+          el.setAttribute('aria-atomic', 'true');
+        }
         const parent = doc.body || doc.documentElement;
         if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
       }
-      if (el) el.textContent = message;
+      if (el) {
+        el.textContent = message;
+        el.className = 'import-status' + (kind ? ' is-' + kind : '');
+      }
       return el;
     }
 
@@ -95,6 +102,7 @@
         // change listener still prevents a double import of the same file.
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
+      status('Reading ' + fileLabel + '\u2026', 'loading');
       try {
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
@@ -127,9 +135,9 @@
         if (merge.duplicates > 0) parts.push(plural(merge.duplicates, 'duplicate') + ' skipped.');
         if (merge.invalid > 0) parts.push(plural(merge.invalid, 'invalid task') + ' skipped.');
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
-        status(parts.join(' '));
+        status(parts.join(' '), 'success');
       } catch (error) {
-        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.');
+        status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.', 'error');
       }
     }
 
