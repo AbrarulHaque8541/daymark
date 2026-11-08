@@ -56,6 +56,7 @@ function fakeEnv(options) {
     'zones-add': Object.assign(fakeElement('button'), { id: 'zones-add', type: 'submit' }),
     'zones-refresh': Object.assign(fakeElement('button'), { id: 'zones-refresh', type: 'button' }),
     'zones-clear': Object.assign(fakeElement('button'), { id: 'zones-clear', type: 'button' }),
+    'zones-copy': Object.assign(fakeElement('button'), { id: 'zones-copy', type: 'button' }),
     'zones-form': Object.assign(fakeElement('form'), { id: 'zones-form' }),
     'zones-status': Object.assign(fakeElement('p'), { id: 'zones-status' }),
     'zones-list': Object.assign(fakeElement('div'), { id: 'zones-list' })
@@ -249,3 +250,31 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.DEFAULT_ZONE, 'Asia/Kolkata');
   assert.equal(typeof globalThis.DaymarkZonesUi, 'object');
 });
+
+test('copy window writes the planned overlap to the clipboard when available', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const writes = [];
+  const { env, elements } = fakeEnv({ stored });
+  env.navigator = {
+    clipboard: {
+      writeText(text) {
+        writes.push(text);
+        return Promise.resolve();
+      }
+    }
+  };
+  const handle = ui.attachZonesUi(env);
+  await handle.onCopy();
+  assert.equal(writes.length, 1);
+  assert.ok(writes[0].includes('Best shared window:'));
+  assert.ok(writes[0].includes('awake'));
+  assert.ok(elements['zones-status'].textContent.includes('Copied'));
+});
+
+test('copy window fails closed when clipboard is missing', async () => {
+  const { env, elements } = fakeEnv({});
+  const handle = ui.attachZonesUi(env);
+  await handle.onCopy();
+  assert.equal(elements['zones-status'].textContent, 'Clipboard is unavailable in this browser.');
+});
+

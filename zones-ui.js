@@ -29,6 +29,8 @@
     const addEl = element('zones-add');
     const refreshEl = element('zones-refresh');
     const clearEl = element('zones-clear');
+    const copyEl = element('zones-copy');
+    const navigator = env.navigator || (win && win.navigator) || null;
     const formEl = element('zones-form');
     const statusEl = element('zones-status');
     const listEl = element('zones-list');
@@ -211,6 +213,45 @@
       status('Updated · ' + stamp());
     }
 
+
+    function onCopy() {
+      if (!zonesApi) {
+        status('World clock is unavailable.');
+        return;
+      }
+      const when = new Date(now());
+      let text = '';
+      try {
+        const overlap = zonesApi.bestOverlap(zones, when);
+        if (!overlap || overlap.start === null) {
+          status('No shared window to copy yet. Add zones first.');
+          return;
+        }
+        const baseLabel = zonesApi.zoneLabel(zones[0]) || zones[0];
+        const startClock = zonesApi.formatZoneTime(zones[0], new Date(overlap.start));
+        const endClock = zonesApi.formatZoneTime(zones[0], new Date(overlap.end));
+        const who = overlap.allAwake
+          ? 'All ' + zoneCount(overlap.totalZones) + ' awake'
+          : zoneCount(overlap.awakeCount) + ' of ' + zoneCount(overlap.totalZones) + ' awake';
+        text = 'Best shared window: ' + who + ' · ' + startClock.time + '–' + endClock.time + ' in ' + baseLabel + '\nWaking hours 08:00–22:00 local. Computed offline on this device.';
+      } catch (error) {
+        status('Could not plan a window to copy.');
+        return;
+      }
+      if (!navigator || typeof navigator.clipboard !== 'object' || typeof navigator.clipboard.writeText !== 'function') {
+        status('Clipboard is unavailable in this browser.');
+        return;
+      }
+      if (copyEl) copyEl.setAttribute('aria-busy', 'true');
+      Promise.resolve(navigator.clipboard.writeText(text)).then(() => {
+        status('Copied shared window.');
+      }).catch(() => {
+        status('Could not copy the window.');
+      }).finally(() => {
+        if (copyEl) copyEl.removeAttribute('aria-busy');
+      });
+    }
+
     function onClear() {
       if (storage && typeof storage.removeItem === 'function') storage.removeItem(STORAGE_KEY);
       zones = [zonesApi ? zonesApi.DEFAULT_ZONE : DEFAULT_ZONE];
@@ -252,12 +293,16 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
 
     return {
       onAdd,
       onRemove,
       onRefresh,
       onClear,
+      onCopy,
       readCache,
       detach() {
         // No document-level listener is registered; the button references are
