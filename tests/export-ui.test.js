@@ -217,6 +217,6 @@ test('blocked storage getter leaves open-format export attached but fails closed
 
 test('export auto-boot does not eagerly evaluate window.localStorage', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'export-ui.js'), 'utf8');
-  assert.doesNotMatch(source, /localStorage:\\s*window\\.localStorage/,
+  assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
     'boot must pass window and let attachExportUi guard the storage getter');
 });
