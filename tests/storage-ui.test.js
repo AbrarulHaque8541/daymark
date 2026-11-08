@@ -48,8 +48,12 @@ function fakeEnv(options) {
     'data-clear-all': Object.assign(fakeElement('button'), { id: 'data-clear-all' })
   };
   const storageData = Object.assign({}, opts.data || {});
+  const readFailures = new Set(opts.readFailures || []);
   const storage = {
-    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    getItem(key) {
+      if (readFailures.has(key)) throw new Error('Read access failure');
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
@@ -181,6 +185,28 @@ test('a failed removal during clear-all is reported honestly', () => {
   const handle = ui.attachStorageUi(env);
   env.localStorage.removeItem = () => { throw new Error('blocked'); };
   handle.onClearAll();
+  assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
+});
+
+test('unreadable data is shown as unknown and a clear retry fails safely', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' },
+    readFailures: ['daymark.tasks.v1']
+  });
+  const handle = ui.attachStorageUi(env);
+  const taskRow = elements['data-list'].children.find((row) =>
+    row.children.some((child) => child.textContent.startsWith('Tasks —')));
+  const taskTitle = taskRow.children.find((child) => child.tagName === 'span');
+  const taskButton = taskRow.children.find((child) => child.tagName === 'button');
+
+  assert.match(taskTitle.textContent, /status unknown/);
+  assert.equal(taskButton.disabled, false, 'an unreadable category allows an explicit retry');
+  assert.equal(elements['data-clear-all'].disabled, false, 'unknown data is not treated as an empty store');
+  assert.match(elements['data-status'].textContent, /categories could not be checked/);
+  assert.doesNotMatch(elements['data-status'].textContent, /No local data is stored yet/);
+
+  handle.onClearCategory('tasks');
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'failed reads must not delete the stored value');
   assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
 });
 
