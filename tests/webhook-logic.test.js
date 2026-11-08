@@ -170,7 +170,7 @@ test('the final failed attempt drops the event instead of looping forever', asyn
   const result = await webhook.flushQueue([event], 'https://hooks.example.com/x', failingFetch);
   assert.equal(result.queue.length, 0);
   assert.equal(result.droppedCount, 1);
-  assert.match(result.failure, /offline/);
+  assert.match(result.failure, /network error/);
 });
 
 test('deliver rejects non-2xx responses with an honest no-retry message', async () => {
