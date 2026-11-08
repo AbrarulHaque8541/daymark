@@ -210,6 +210,21 @@ test('unreadable data is shown as unknown and a clear retry fails safely', () =>
   assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
 });
 
+test('all unreadable categories never produce an empty-store claim', () => {
+  const allKeys = storageApi.CATEGORIES.flatMap((category) => category.keys);
+  const data = Object.fromEntries(allKeys.map((key) => [key, 'still stored']));
+  const { env, elements, storageData } = fakeEnv({ data, readFailures: allKeys });
+  ui.attachStorageUi(env);
+
+  assert.match(elements['data-status'].textContent, /No readable local data was found/);
+  assert.match(elements['data-status'].textContent, /categories could not be checked/);
+  assert.doesNotMatch(elements['data-status'].textContent, /No local data is stored yet/);
+  assert.equal(elements['data-clear-all'].disabled, false,
+    'the user can explicitly retry after an incomplete scan');
+  assert.ok(Object.values(storageData).every((value) => value === 'still stored'),
+    'rendering an incomplete scan must not mutate data');
+});
+
 test('unavailable storage keeps the card honest and never clears anything', () => {
   const { env, elements } = fakeEnv({});
   env.localStorage = null;
