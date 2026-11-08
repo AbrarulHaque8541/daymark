@@ -89,3 +89,15 @@ Work by: ChatGPT
 Model: GPT-6  
 Tooling: GitHub connector (live repository/source/PR/Actions reads and GitHub branch/file writes); Code Mode V8 source syntax and focused behavior smoke  
 Timestamp (UTC): 2026-11-08T14:58:00Z
+
+
+## First exact-head CI failure and correction — 2026-11-08T15:05:00Z
+
+The first PR head `018e5280a62cec55b9bc48a4722523ae0a084fd8` triggered Android CI, Ubuntu/Windows contracts, and the device-test APK workflow. All three reached the canonical Node suite and exposed one expected-output mismatch in the pre-existing test `a corrupt cache is ignored instead of crashing`: the implementation now correctly appends an explicit “saved holiday cache is unreadable and was preserved” notice, while the old test still asserted the previous bare prompt. The logs show 495/496 tests passing; the sole failure was that stale exact-string assertion, not a runtime exception.
+
+Corrected the regression test to assert both the original prompt and the new preservation warning. Test-fix commit: `a9bf01e18f27c10fbab45c94c9b063a53850cc03`. The branch's latest head will include this correction and this status update; fresh exact-head Actions are required before any merge decision. No test was removed or weakened.
+
+Work by: ChatGPT  
+Model: GPT-6  
+Tooling: GitHub connector (Actions job logs and branch file update)  
+Timestamp (UTC): 2026-11-08T15:05:00Z
