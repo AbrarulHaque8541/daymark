@@ -16,12 +16,18 @@ test('phone receives only explicitly declared full-surface capabilities', () => 
   ]));
 });
 
-test('displayless ring and button companion cannot expose rich editing or browser', () => {
+test('displayless ring and button companion cannot expose task capture, rich editing or browser', () => {
   const p = profile('ring', 'none', ['button'],
     ['task-capture', 'task-edit', 'task-review', 'focus-timer', 'reminder-actions', 'browser']);
   assert.deepEqual(new Set(p.actions), new Set([
-    'capture-task', 'start-focus', 'pause-focus', 'finish-focus', 'acknowledge-reminder', 'snooze-reminder'
+    'start-focus', 'pause-focus', 'finish-focus', 'acknowledge-reminder', 'snooze-reminder'
   ]));
+  assert.ok(!p.actions.includes('capture-task'), 'a button alone cannot provide a task title');
+});
+
+test('voice-only displayless companion can capture a task without exposing rich editing', () => {
+  const p = profile('displayless', 'none', ['voice'], ['task-capture', 'voice-capture', 'task-edit']);
+  assert.deepEqual(new Set(p.actions), new Set(['capture-task', 'voice-capture']));
 });
 
 test('watch glance surface permits review and short actions but not full editing', () => {
