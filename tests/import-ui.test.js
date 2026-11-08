@@ -181,6 +181,22 @@ test('oversize and unreadable files fail closed without touching storage', async
   assert.match(broken.created.find((el) => el.id === 'import-status').textContent, /Import failed: CSV header does not match/);
 });
 
+test('empty task storage is corruption and cannot be replaced by an import', async () => {
+  const csv = exporter.toCsv([
+    { id: 'new-1', title: 'Must not replace unknown data', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const { env, elements, created, storageData, dispatched } = fakeEnv({
+    stored: '',
+    files: [csvFile(csv)]
+  });
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  assert.equal(storageData[ui.STORAGE_KEY], '', 'empty corrupt task data is preserved');
+  assert.equal(dispatched.length, 0, 'failed import does not signal a successful task-store update');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /Import failed: .*Nothing was changed\./);
+});
+
 test('FileReader fallback reads files without file.text()', async () => {
   const csv = exporter.toCsv([
     { id: 'fr-1', title: 'Reader path', dueDate: null, priority: 'medium', completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }

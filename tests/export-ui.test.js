@@ -163,6 +163,19 @@ test('missing storage exports an empty but valid document', () => {
   assert.ok(payload.includes('END:VCALENDAR'));
 });
 
+test('empty or non-array task storage is not exported as an empty backup', () => {
+  for (const stored of ['', 'null', '{"tasks":[]}']) {
+    const { env, elements, created, storageData } = fakeEnv({ format: 'markdown', stored });
+    const handle = ui.attachExportUi(env);
+    handle.onClick(clickEvent(elements['export-tasks']));
+    assert.equal(created.filter((el) => el.tagName === 'a').length, 0,
+      'unknown top-level task state must never produce an empty-looking export');
+    assert.equal(storageData[ui.STORAGE_KEY], stored, 'the original task value remains untouched');
+    const status = created.find((el) => el.id === 'export-status');
+    assert.match(status.textContent, /Export failed:/);
+  }
+});
+
 test('malformed stored tasks are reported and skipped, valid ones still export', () => {
   const broken = sampleTasks.concat([{ id: 't1', title: 'duplicate id' }, { nope: true }]);
   const { env, elements, created } = fakeEnv({ format: 'markdown', stored: JSON.stringify(broken) });

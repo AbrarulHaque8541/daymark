@@ -119,7 +119,7 @@
         }
         const raw = storage.getItem(STORAGE_KEY);
         let stored = [];
-        if (raw) {
+        if (raw !== null) {
           stored = JSON.parse(raw);
           if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
         }

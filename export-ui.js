@@ -82,7 +82,10 @@
           throw new Error('browser storage is unavailable; no data was exported');
         }
         const raw = storage.getItem(STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
+        const parsed = raw === null ? [] : JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          throw new Error('saved tasks are unreadable; no data was exported');
+        }
         const validated = logic.validateStoredTasks(parsed);
         const generatedAt = now();
         const output = exportApi.render(format, validated.tasks, { generatedAt });
