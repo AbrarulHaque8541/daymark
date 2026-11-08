@@ -123,12 +123,15 @@
     const categories = CATEGORIES.map((category) => {
       let bytes = 0;
       let present = false;
+      const unreadableKeys = [];
       for (const key of category.keys) {
         let raw = null;
         try {
           raw = storage.getItem(key);
         } catch (error) {
-          raw = null;
+          // A failed read is unknown, not evidence that the key is absent.
+          unreadableKeys.push(key);
+          continue;
         }
         if (raw !== null && raw !== undefined) {
           present = true;
@@ -141,13 +144,22 @@
         description: category.description,
         keys: category.keys.slice(),
         bytes,
-        present
+        present,
+        unreadableKeys,
+        complete: unreadableKeys.length === 0
       };
     });
     const presentCount = categories.filter((category) => category.present).length;
+    const unreadableCategories = categories.filter((category) => category.unreadableKeys.length > 0);
+    const unreadableKeys = unreadableCategories.reduce(
+      (all, category) => all.concat(category.unreadableKeys), []
+    );
     return {
       categories,
       presentCount,
+      unreadableCount: unreadableCategories.length,
+      unreadableKeys,
+      complete: unreadableCategories.length === 0,
       totalBytes: categories.reduce((sum, category) => sum + category.bytes, 0)
     };
   }
