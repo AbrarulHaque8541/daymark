@@ -19,11 +19,13 @@ function isAllowedRequest(details, allowedAppFiles, appUiEntry) {
   const mainFrame = isMainFrame(details);
   switch (url.protocol) {
     case 'https:':
-    case 'wss:':
       return true;
+    case 'wss:':
+      return details.resourceType === 'webSocket';
     case 'http:':
-    case 'ws:':
       return isAllowedInsecure(url.hostname);
+    case 'ws:':
+      return details.resourceType === 'webSocket' && isAllowedInsecure(url.hostname);
     case 'file:':
       if (!allowedAppFiles || typeof allowedAppFiles.has !== 'function'
         || !allowedAppFiles.has(url.href)) return false;

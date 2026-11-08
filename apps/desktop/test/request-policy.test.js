@@ -18,6 +18,7 @@ function request(url, resourceType = 'mainFrame') {
 test('HTTPS pages and secure WebSockets remain available', () => {
   assert.equal(isAllowedRequest(request('https://example.com/')), true);
   assert.equal(isAllowedRequest(request('wss://example.com/socket', 'webSocket')), true);
+  assert.equal(isAllowedRequest(request('wss://example.com/socket')), false);
 });
 
 test('remote HTTP and WebSockets are blocked while localhost remains available', () => {
@@ -27,6 +28,7 @@ test('remote HTTP and WebSockets are blocked while localhost remains available',
   assert.equal(isAllowedRequest(request('http://localhost:3000/')), true);
   assert.equal(isAllowedRequest(request('http://127.0.0.1:8080/app.js', 'script')), true);
   assert.equal(isAllowedRequest(request('ws://[::1]:9222/socket', 'webSocket')), true);
+  assert.equal(isAllowedRequest(request('ws://localhost:3000/socket')), false);
   assert.equal(isAllowedRequest(request('http://192.168.1.20/')), false);
 });
 
