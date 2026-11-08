@@ -14,6 +14,7 @@ public final class DeviceCapabilityPolicySmoke {
     public static void main(String[] args) throws Exception {
         phoneGetsOnlyDeclaredFeatures();
         displaylessCompanionStaysTiny();
+        voiceOnlyCompanionCanCaptureTask();
         watchIsGlanceableNotAFullEditor();
         carPolicyIsRestrictive();
         einkAndDesktopFollowDeclaredCapabilities();
@@ -51,10 +52,33 @@ public final class DeviceCapabilityPolicySmoke {
         check(actions.contains(DeviceCapabilityPolicy.Action.START_FOCUS), "button companion can start focus");
         check(actions.contains(DeviceCapabilityPolicy.Action.PAUSE_FOCUS), "button companion can pause focus");
         check(actions.contains(DeviceCapabilityPolicy.Action.ACKNOWLEDGE_REMINDER), "button companion can acknowledge");
-        check(actions.contains(DeviceCapabilityPolicy.Action.CAPTURE_TASK), "explicit button capture may be supported");
+        check(!actions.contains(DeviceCapabilityPolicy.Action.CAPTURE_TASK),
+                "button-only companion cannot capture a task without a title-entry path");
         check(!actions.contains(DeviceCapabilityPolicy.Action.EDIT_TASK), "no-display companion cannot edit");
         check(!actions.contains(DeviceCapabilityPolicy.Action.REVIEW_TASKS), "no-display companion cannot review lists");
         check(!actions.contains(DeviceCapabilityPolicy.Action.OPEN_BROWSER), "no-display companion cannot browse");
+    }
+
+    private static void voiceOnlyCompanionCanCaptureTask() {
+        DeviceCapabilityPolicy voice = profile(DeviceCapabilityPolicy.Surface.DISPLAYLESS,
+                DeviceCapabilityPolicy.Display.NONE,
+                EnumSet.of(DeviceCapabilityPolicy.Input.VOICE),
+                EnumSet.of(DeviceCapabilityPolicy.Feature.TASK_CAPTURE,
+                        DeviceCapabilityPolicy.Feature.VOICE_CAPTURE,
+                        DeviceCapabilityPolicy.Feature.TASK_EDIT));
+        Set<DeviceCapabilityPolicy.Action> actions = voice.availableActions();
+        check(actions.contains(DeviceCapabilityPolicy.Action.CAPTURE_TASK),
+                "voice input can provide the task title on a display-less companion");
+        check(actions.contains(DeviceCapabilityPolicy.Action.VOICE_CAPTURE),
+                "voice capture remains explicitly feature-gated");
+        check(!actions.contains(DeviceCapabilityPolicy.Action.EDIT_TASK),
+                "voice capture does not imply rich task editing");
+        DeviceCapabilityPolicy noVoiceFeature = profile(DeviceCapabilityPolicy.Surface.DISPLAYLESS,
+                DeviceCapabilityPolicy.Display.NONE,
+                EnumSet.of(DeviceCapabilityPolicy.Input.VOICE),
+                EnumSet.of(DeviceCapabilityPolicy.Feature.TASK_CAPTURE));
+        check(!noVoiceFeature.availableActions().contains(DeviceCapabilityPolicy.Action.CAPTURE_TASK),
+                "voice hardware alone does not imply Daymark voice-capture support");
     }
 
     private static void watchIsGlanceableNotAFullEditor() {
