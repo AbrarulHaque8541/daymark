@@ -103,4 +103,55 @@ set -e
   exit 1
 }
 
-echo "PASS run-gradle-with-retry: transient 504 retry, non-network failure no-retry, bounded exhaustion, and bounded backoff configuration"
+# Use the action-provisioned Gradle 8.13 instead of downloading through the wrapper.
+make_case "cached-gradle" "permanent-failure"
+cached_dir="$TEMP_ROOT/cached-gradle"
+mkdir -p "$cached_dir/bin"
+cat > "$cached_dir/bin/gradle" <<'CACHED_GRADLE'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$#" -eq 1 && "$1" == "--version" ]]; then
+  echo "Gradle 8.13"
+  exit 0
+fi
+count="$(cat "$GRADLE_COUNT_FILE" 2>/dev/null || printf '0')"
+count=$((count + 1))
+printf '%s' "$count" > "$GRADLE_COUNT_FILE"
+echo "BUILD SUCCESSFUL"
+CACHED_GRADLE
+chmod +x "$cached_dir/bin/gradle"
+COUNT_FILE="$cached_dir/wrapper.count" GRADLE_COUNT_FILE="$cached_dir/gradle.count" \
+  FAKE_MODE=permanent-failure DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
+  PATH="$cached_dir/bin:$PATH" bash "$cached_dir/android-app/tools/run-gradle-with-retry.sh" \
+  --no-daemon assembleDebug > "$cached_dir/output.log" 2>&1
+[[ "$(cat "$cached_dir/gradle.count")" == "1" && ! -f "$cached_dir/wrapper.count" ]] || {
+  cat "$cached_dir/output.log" >&2
+  echo "Provisioned Gradle 8.13 should be used without invoking the wrapper" >&2
+  exit 1
+}
+grep -q "Using cached Gradle 8.13" "$cached_dir/output.log"
+
+# An unexpected system Gradle version must fall back to the pinned wrapper.
+make_case "wrong-gradle-version" "retry-once"
+wrong_dir="$TEMP_ROOT/wrong-gradle-version"
+mkdir -p "$wrong_dir/bin"
+cat > "$wrong_dir/bin/gradle" <<'WRONG_GRADLE'
+#!/usr/bin/env bash
+if [[ "$#" -eq 1 && "$1" == "--version" ]]; then
+  echo "Gradle 8.12"
+  exit 0
+fi
+exit 9
+WRONG_GRADLE
+chmod +x "$wrong_dir/bin/gradle"
+COUNT_FILE="$wrong_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
+  PATH="$wrong_dir/bin:$PATH" bash "$wrong_dir/android-app/tools/run-gradle-with-retry.sh" \
+  --no-daemon assembleDebug > "$wrong_dir/output.log" 2>&1
+[[ "$(cat "$wrong_dir/count")" == "2" ]] || {
+  cat "$wrong_dir/output.log" >&2
+  echo "Unexpected Gradle versions must fall back to the wrapper retry path" >&2
+  exit 1
+}
+grep -q "falling back to the checked wrapper" "$wrong_dir/output.log"
+
+echo "PASS run-gradle-with-retry: cached Gradle selection, version fallback, transient 504 retry, no retry on build failure, bounded exhaustion, and bounded backoff"
