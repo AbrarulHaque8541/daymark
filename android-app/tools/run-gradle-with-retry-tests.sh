@@ -10,7 +10,8 @@ make_case() {
   local name="$1"
   local mode="$2"
   local dir="$TEMP_ROOT/$name"
-  mkdir -p "$dir/android-app/tools"
+  mkdir -p "$dir/android-app/tools" "$dir/android-app/gradle/wrapper"
+  : > "$dir/android-app/gradle/wrapper/gradle-wrapper.properties"
   cp "$SOURCE_SCRIPT" "$dir/android-app/tools/run-gradle-with-retry.sh"
   cat > "$dir/android-app/gradlew" <<'FAKE_GRADLE'
 #!/usr/bin/env bash
