@@ -417,7 +417,7 @@
             // Loop to re-read, so events appended during the request are included.
           }
 
-          if (deliveredCount || droppedCount) {
+          if ((deliveredCount || droppedCount) && !queueWriteFailed && !lastFailure) {
             const parts = [];
             if (deliveredCount) parts.push('Delivered ' + deliveredCount + ' event(s).');
             if (droppedCount) parts.push(droppedCount + ' event(s) were dropped after too many attempts.');
