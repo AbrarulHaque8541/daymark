@@ -6,7 +6,7 @@
 - Verified main SHA: `01daaa3b3cef768a273085cd32f096145519bb47` (commit `feat(zones): complete Save as text wiring in zones-ui.js and tests`).
 - Open PRs: #599 and #600. No PR was merged in this run.
 - Current Gradle identity: namespace/applicationId `com.abrar.daymark`; versionName `1.6`, versionCode `13`. Latest published release is `v1.5`; `v1.4` is a draft. No release/tag/version/signing changes were made.
-- Identity-policy conflict: the current run-level owner guard says the ID must remain `com.cue.daymark`, while live `AGENTS.md` and `android-app/app/build.gradle.kts` say `com.abrar.daymark`. No identity change was made. Treat this as unresolved; do not silently migrate either way.
+- Identity-policy conflict: the current run-level owner guard names a historical package identifier that differs from live `AGENTS.md` and `android-app/app/build.gradle.kts`, which currently declare `com.abrar.daymark`. No identity change was made. Treat this as unresolved; do not silently migrate either way.
 
 ## Engineering delivered
 
