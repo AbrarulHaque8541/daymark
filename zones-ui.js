@@ -63,7 +63,9 @@
     }
 
     function tagFor(className) {
-      return className === 'feed-item-summary' ? 'p' : 'span';
+      if (className === 'feed-item-title') return 'h3';
+      if (className === 'feed-item-summary') return 'p';
+      return 'span';
     }
 
     function clearList() {
@@ -73,19 +75,19 @@
 
     function persist() {
       if (!storage || typeof storage.setItem !== 'function') return;
-      const cache = { version: 1, zones, updatedAt: updatedAt || now() };
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, zones, updatedAt }));
     }
 
     function readCache() {
       if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
       try {
+        const raw = storage.getItem(STORAGE_KEY);
+        if (!raw) return null;
         const parsed = JSON.parse(raw);
-        if (zonesApi && typeof zonesApi.validateZonesCache === 'function'
-          && zonesApi.validateZonesCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
+        if (zonesApi && typeof zonesApi.validateZonesCache === 'function' && zonesApi.validateZonesCache(parsed)) {
+          return parsed;
+        }
+      } catch (error) { /* corrupt cache fails closed */ }
       return null;
     }
 
@@ -140,8 +142,9 @@
             const who = overlap.allAwake
               ? 'All ' + zoneCount(overlap.totalZones) + ' awake'
               : zoneCount(overlap.awakeCount) + ' of ' + zoneCount(overlap.totalZones) + ' awake';
+            const until = zonesApi.relativeUntilLabel ? zonesApi.relativeUntilLabel(overlap.start, when) : '';
             appendText(overlapRow, 'feed-item-title',
-              who + ' · ' + startClock.time + '–' + endClock.time + ' in ' + baseLabel);
+              who + ' · ' + startClock.time + '–' + endClock.time + ' in ' + baseLabel + (until ? ' · ' + until : ''));
             appendText(overlapRow, 'feed-item-summary',
               'Waking hours are 08:00–22:00 local in every zone. Computed offline from this device.');
             planned = true;
@@ -234,8 +237,10 @@
           const who = overlap.allAwake
             ? 'All ' + zoneCount(overlap.totalZones) + ' awake'
             : zoneCount(overlap.awakeCount) + ' of ' + zoneCount(overlap.totalZones) + ' awake';
+          const until = zonesApi.relativeUntilLabel ? zonesApi.relativeUntilLabel(overlap.start, when) : '';
           lines.push('');
-          lines.push('Best shared window: ' + who + ' · ' + startClock.time + '–' + endClock.time + ' in ' + baseLabel);
+          lines.push('Best shared window: ' + who + ' · ' + startClock.time + '–' + endClock.time + ' in ' + baseLabel + (until ? ' · ' + until : ''));
+          if (until) lines.push('Starts: ' + until + '.');
           lines.push('Waking hours 08:00–22:00 local. Computed offline.');
         } else {
           lines.push('');
@@ -301,7 +306,15 @@
       updatedAt = now();
       persist();
       render();
-      status('Updated · ' + stamp());
+      let untilMsg = "";
+      try {
+        const overlap = zonesApi.bestOverlap(zones, new Date(now()));
+        if (overlap && overlap.start !== null && zonesApi.relativeUntilLabel) {
+          const until = zonesApi.relativeUntilLabel(overlap.start, new Date(now()));
+          if (until) untilMsg = " · overlap " + until;
+        }
+      } catch (e) { /* ignore */ }
+      status('Updated · ' + stamp() + untilMsg);
     }
 
     function onClear() {
@@ -321,36 +334,38 @@
       if (cache) {
         zones = cache.zones.slice();
         updatedAt = cache.updatedAt;
-        render();
-        status('Cached · updated ' + stamp());
+        status('Restored ' + zoneCount(zones.length) + ' · ' + stamp());
       } else {
-        zones = [zonesApi.DEFAULT_ZONE];
-        render();
-        status('Pick time zones to compare. Everything is computed offline.');
+        zones = [DEFAULT_ZONE];
+        updatedAt = now();
+        persist();
+        status('Started with ' + (zonesApi.zoneLabel(DEFAULT_ZONE) || DEFAULT_ZONE) + '.');
       }
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
-        return onAdd();
+        onAdd();
       });
     }
     if (addEl && typeof addEl.addEventListener === 'function') {
-      addEl.addEventListener('click', () => { onAdd(); });
+      addEl.addEventListener('click', onAdd);
     }
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
-      refreshEl.addEventListener('click', () => { onRefresh(); });
+      refreshEl.addEventListener('click', onRefresh);
     }
     if (clearEl && typeof clearEl.addEventListener === 'function') {
-      clearEl.addEventListener('click', () => { onClear(); });
+      clearEl.addEventListener('click', onClear);
     }
     if (copyEl && typeof copyEl.addEventListener === 'function') {
-      copyEl.addEventListener('click', () => { onCopy(); });
+      copyEl.addEventListener('click', onCopy);
     }
     if (shareEl && typeof shareEl.addEventListener === 'function') {
-      shareEl.addEventListener('click', () => { onShare(); });
+      shareEl.addEventListener('click', onShare);
     }
+
+    render();
 
     return {
       onAdd,
@@ -359,22 +374,11 @@
       onClear,
       onCopy,
       onShare,
-      readCache,
-      detach() {
-        // No document-level listener is registered; the button references are
-        // dropped when the returned handle goes out of scope.
-        status('');
-      }
+      STORAGE_KEY
     };
   }
 
   const api = { attachZonesUi, STORAGE_KEY, DEFAULT_ZONE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkZonesUi = api;
-
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachZonesUi({ document, window, localStorage: window.localStorage });
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
-  }
-})(typeof globalThis !== 'undefined' ? globalThis : this);
+})(globalThis);
