@@ -59,7 +59,7 @@ jobs:
 
       - name: Build and verify debug variants
         run: >-
-          ./gradlew --no-daemon
+          bash tools/run-gradle-with-retry.sh --no-daemon
           assembleGithubSideloadDebug
           assemblePlayDebug
           lintGithubSideloadDebug
