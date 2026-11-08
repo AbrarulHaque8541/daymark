@@ -32,6 +32,8 @@
   <script src="browser-error-ui.js" defer></script>
   <script src="browser-download-logic.js" defer></script>
   <script src="browser-download-ui.js" defer></script>
+  <script src="browser-proxy-logic.js" defer></script>
+  <script src="browser-proxy-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="storage-logic.js" defer></script>
@@ -387,6 +389,20 @@
           </form>
           <p class="feed-status" id="browser-download-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="browser-download-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-proxy-card" aria-labelledby="browser-proxy-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-proxy-heading">Proxy, planned honestly</h2>
+          <p class="briefing-description">Check a proxy address offline. No network, nothing is routed.</p>
+          <form id="browser-proxy-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-proxy-address">Proxy address</label>
+            <input id="browser-proxy-address" name="address" type="text" maxlength="512" placeholder="proxy.example.org:8080" autocomplete="off">
+            <button class="button button-primary" id="browser-proxy-plan" type="submit">Plan</button>
+            <button class="button button-quiet" id="browser-proxy-clear" type="button">Clear</button>
+            <button class="button button-quiet" id="browser-proxy-copy" type="button" aria-label="Copy the proxy plan to the clipboard">Copy plan</button>
+          </form>
+          <p class="feed-status" id="browser-proxy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="browser-proxy-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
