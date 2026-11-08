@@ -59,6 +59,12 @@
       keys: ['daymark.currency.v1']
     },
     {
+      id: 'zones',
+      label: 'World clock zones',
+      description: 'The time zones you saved on the world-clock card.',
+      keys: ['daymark.zones.v1']
+    },
+    {
       id: 'webhook',
       label: 'Webhook settings',
       description: 'The https:// endpoint you saved for task-completion events.',
