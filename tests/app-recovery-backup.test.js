@@ -490,3 +490,49 @@ test('Briefing confirms when its cache was persisted for offline reading', async
     /Saved for offline reading/,
     'the status only promises offline availability after persistence succeeds');
 });
+
+
+test('empty backup bytes and empty recovery bundles remain opaque recovery data', () => {
+  const healthyPrimary = JSON.stringify([validTask('healthy-1', 'Healthy primary task')]);
+  const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
+  const priorBackups = [
+    ['empty string backup', ''],
+    ['empty recovery bundle', emptyBundle]
+  ];
+
+  for (const [label, priorBackup] of priorBackups) {
+    const storedValues = new Map([
+      [STORAGE_KEY, healthyPrimary],
+      [BACKUP_KEY, priorBackup]
+    ]);
+    const app = bootApp(storedValues);
+
+    assert.equal(storedValues.get(BACKUP_KEY), priorBackup,
+      label + ' must not be deleted merely because it contains no parseable task payload');
+    assert.match(app.elements.get('#storage-status span').textContent,
+      /recovery backup retained for manual review/,
+      label + ' must be disclosed as retained recovery data');
+  }
+});
+
+test('empty prior recovery sources survive when a new partial task payload is backed up', () => {
+  const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
+  const priorBackups = ['', emptyBundle];
+  const current = JSON.stringify([
+    validTask('current-valid', 'Current valid task'),
+    validTask('current-invalid', 'x'.repeat(170))
+  ]);
+
+  for (const priorBackup of priorBackups) {
+    const storedValues = new Map([
+      [STORAGE_KEY, current],
+      [BACKUP_KEY, priorBackup]
+    ]);
+    bootApp(storedValues);
+
+    const merged = JSON.parse(storedValues.get(BACKUP_KEY));
+    assert.equal(merged.format, 'daymark-recovery-bundle-v1');
+    assert.deepEqual(merged.payloads, [priorBackup, current],
+      'the new recovery bundle must retain the exact prior empty/unknown source bytes');
+  }
+});
