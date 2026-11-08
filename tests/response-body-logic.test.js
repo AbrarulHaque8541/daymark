@@ -104,15 +104,55 @@ test('oversized Content-Length is rejected before opening a reader', async () =>
   assert.equal(state.textCalled, undefined);
 });
 
-test('text-only compatibility responses are checked by UTF-8 byte size', async () => {
-  const text = await responseBody.readBoundedText({
-    text: async () => '{"ok":true}'
-  }, { maxBytes: 32, maxChars: 32 });
-  assert.deepEqual(JSON.parse(text), { ok: true });
+test('shared reader fails closed when a bounded stream is unavailable without calling text()', async () => {
+  const controller = new AbortController();
+  let textCalls = 0;
+  let bodyCancelled = false;
+  const response = {
+    body: {
+      cancel() {
+        bodyCancelled = true;
+        return Promise.resolve();
+      }
+    },
+    text() {
+      textCalls += 1;
+      return Promise.resolve('{"unbounded":true}');
+    }
+  };
+
   await assert.rejects(
-    responseBody.readBoundedText({ text: async () => 'é' }, { maxBytes: 1, maxChars: 10 }),
-    /too large/
+    responseBody.readBoundedText(response, {
+      controller,
+      streamRequiredMessage: 'bounded stream required'
+    }),
+    /bounded stream required/
   );
+  assert.equal(textCalls, 0, 'the unbounded text API must never be invoked');
+  assert.equal(bodyCancelled, true, 'the unread body is cancelled');
+  assert.equal(controller.signal.aborted, true, 'the request is aborted on fail-closed rejection');
+});
+
+test('shared reader fails closed when TextDecoder is unavailable', async () => {
+  const originalDecoder = globalThis.TextDecoder;
+  const controller = new AbortController();
+  const { response, state } = makeStreamResponse([new Uint8Array([0x7B, 0x7D])]);
+  try {
+    globalThis.TextDecoder = undefined;
+    await assert.rejects(
+      responseBody.readBoundedText(response, {
+        controller,
+        streamRequiredMessage: 'bounded stream required'
+      }),
+      /bounded stream required/
+    );
+  } finally {
+    globalThis.TextDecoder = originalDecoder;
+  }
+  assert.equal(state.opened, false, 'the reader is not acquired without a fatal decoder');
+  assert.equal(state.cancelled, true, 'the unlocked stream is cancelled');
+  assert.equal(state.textCalled, undefined, 'there is no text fallback');
+  assert.equal(controller.signal.aborted, true);
 });
 
 test('all JSON API modules cancel oversized streamed responses', async () => {
@@ -149,6 +189,41 @@ test('all JSON API modules cancel oversized streamed responses', async () => {
       name
     );
     assert.equal(cancelled, true, name + ' must cancel its oversized stream');
+  }
+});
+
+test('all JSON API clients fail closed when a bounded response stream is unavailable', async () => {
+  const clients = [
+    ['weather', weather],
+    ['currency', currency],
+    ['holidays', holidays],
+    ['Wikipedia', wiki]
+  ];
+  for (const [name, api] of clients) {
+    let textCalled = false;
+    let cancelled = false;
+    const response = {
+      ok: true,
+      status: 200,
+      headers: { get() { return null; } },
+      body: {
+        cancel() {
+          cancelled = true;
+          return Promise.resolve();
+        }
+      },
+      text() {
+        textCalled = true;
+        return Promise.resolve('{}');
+      }
+    };
+    await assert.rejects(
+      api.fetchJson('https://example.test/api', () => Promise.resolve(response), 1000),
+      /required size limit/,
+      name
+    );
+    assert.equal(textCalled, false, name + ' must not allocate an unbounded response string');
+    assert.equal(cancelled, true, name + ' must cancel the unread response body');
   }
 });
 
