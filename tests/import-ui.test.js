@@ -281,3 +281,38 @@ test('import auto-boot does not eagerly evaluate window.localStorage', () => {
   assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
     'boot must pass window and let attachImportUi guard the storage getter');
 });
+
+test('import aborts if another tab changes task storage while the selected file is read', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const changedByOtherTab = JSON.stringify(sampleTasks.concat([{
+    id: 'other-tab-1', title: 'Saved in another tab', dueDate: null, priority: 'medium',
+    completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: []
+  }]));
+  const csv = exporter.toCsv([
+    { id: 'import-after-read', title: 'Imported task', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let fileRead = false;
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
+    stored: original,
+    files: [{
+      name: 'tasks.csv',
+      size: csv.length,
+      text: async () => {
+        fileRead = true;
+        storageData[ui.STORAGE_KEY] = changedByOtherTab;
+        return csv;
+      }
+    }]
+  });
+
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+
+  assert.equal(fileRead, true, 'the selected file was read before the conflict was detected');
+  assert.equal(storageData[ui.STORAGE_KEY], changedByOtherTab,
+    'the newer value written by another tab is preserved byte-for-byte');
+  assert.equal(writes.length, 0, 'the stale import merge is not written');
+  assert.equal(dispatched.length, 0, 'a failed import does not announce a successful save');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /saved tasks changed while import was being prepared/);
+});

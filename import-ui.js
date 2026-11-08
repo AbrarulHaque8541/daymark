@@ -5,10 +5,11 @@
  * built-in app.js handler untouched; a selected .csv or .md file is
  * intercepted first (capture-phase change listener on the document fires
  * before app.js's at-target listener) and parsed by import-logic.js. Parsed
- * tasks are merged into daymark.tasks.v1: existing ids win, invalid rows are
- * skipped, and every skip is reported honestly in a status line. After a
- * successful save a synthesized storage event asks app.js to reload tasks so
- * imported rows appear immediately. Fully offline: no network, no timers.
+ * tasks are merged into daymark.tasks.v1: existing ids win and invalid import
+ * rows are reported. If the existing store is corrupt or changes while the
+ * file is being read, the import aborts rather than overwriting unknown/newer
+ * task data. After a successful save a synthesized storage event asks app.js
+ * to reload tasks so imported rows appear immediately. Fully offline.
  */
 ((root) => {
   'use strict';
@@ -137,8 +138,16 @@
           : importApi.fromMarkdown(text, { now: now(), makeId });
         const merge = importApi.mergeTasks(validated.tasks, parsed.tasks, logic);
         if (merge.added.length > 0) {
-          if (!storage || typeof storage.setItem !== 'function') {
+          if (!storage || typeof storage.getItem !== 'function'
+            || typeof storage.setItem !== 'function') {
             throw new Error('browser storage is unavailable; nothing was changed');
+          }
+          // File reading/parsing is asynchronous. Another tab may save tasks
+          // during that gap, so compare the raw value immediately before this
+          // synchronous write instead of replacing a newer task store.
+          const currentRaw = storage.getItem(STORAGE_KEY);
+          if (currentRaw !== raw) {
+            throw new Error('saved tasks changed while import was being prepared; nothing was changed');
           }
           storage.setItem(STORAGE_KEY, JSON.stringify(merge.merged));
           notifySaved();
