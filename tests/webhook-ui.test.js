@@ -347,3 +347,23 @@ test('failed persistence after delivery keeps an empty queue retryable until it 
     'Retry persists the empty queue without sending the already-delivered event again');
   assert.equal(elements['webhook-flush'].disabled, true);
 });
+
+
+test('empty persisted config and queue strings are corrupt rather than absent', () => {
+  const { env, storageData } = fakeEnv({});
+  storageData[webhookApi.CONFIG_KEY] = '';
+  storageData[webhookApi.QUEUE_KEY] = '';
+  const backing = env.localStorage;
+  env.localStorage = {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
+    setItem: backing.setItem.bind(backing),
+    removeItem: backing.removeItem.bind(backing)
+  };
+  const handle = ui.attachWebhookUi(env);
+  assert.match(env.document.getElementById('webhook-status').textContent, /storage could not be read/);
+  assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
+  assert.equal(storageData[webhookApi.CONFIG_KEY], '');
+  assert.equal(storageData[webhookApi.QUEUE_KEY], '');
+});
