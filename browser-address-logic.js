@@ -132,6 +132,16 @@
     return true;
   }
 
+  // WHATWG URL treats hosts whose final label is an IPv4 number as IPv4
+  // candidates, including shortened, integer, octal, and hexadecimal forms.
+  // Reject these unless the entire host was already accepted as canonical
+  // four-octet decimal IPv4 above; otherwise Chromium may navigate elsewhere.
+  function endsInWhatwgIpv4Number(label) {
+    return /^[0-9]+$/.test(label)
+      || /^0[xX][0-9a-fA-F]*$/.test(label)
+      || (label.length > 1 && label[0] === '0' && /^[0-7]+$/.test(label.slice(1)));
+  }
+
   function isValidIpv6Literal(text) {
     const body = String(text);
     if (!/^[0-9a-fA-F:.]+$/.test(body)) return false;
@@ -198,7 +208,7 @@
     // literal; "999.1.1.1" and "1.2.3" are not navigation hosts.
     const labels = host.split('.');
     if (labels.length > MAX_HOST_LABELS) return null;
-    if (/^\d+$/.test(labels[labels.length - 1])) return null;
+    if (endsInWhatwgIpv4Number(labels[labels.length - 1])) return null;
     let idn = false;
     const encodedLabels = [];
     for (const label of labels) {

@@ -97,6 +97,32 @@ test('bare IP literals and localhost resolve to HTTPS without losing explicit sc
   assert.equal(address.parseAddressInput('http://192.168.1.1/admin').url, 'http://192.168.1.1/admin');
 });
 
+test('rejects WHATWG legacy IPv4 aliases before Chromium can normalize them', () => {
+  const aliases = [
+    '127.1',
+    '2130706433',
+    '0177.0.0.1',
+    '0x7f.0.0.1',
+    '127.0.0x1',
+    '0x7f.0.0x1',
+    '1.2.3.0x4',
+    'foo.0x1',
+    'foo.08',
+    '0x'
+  ];
+
+  for (const host of aliases) {
+    assert.equal(address.parseAddressInput(host).kind, 'search', 'bare ' + host);
+    for (const scheme of ['http', 'https']) {
+      const input = scheme + '://' + host + '/';
+      assert.equal(address.parseAddressInput(input).kind, 'search', input);
+    }
+  }
+
+  assert.equal(address.parseAddressInput('192.0.2.1').url, 'https://192.0.2.1');
+  assert.equal(address.parseAddressInput('https://192.0.2.1/').kind, 'navigate');
+});
+
 test('bracketed IPv6 literals validate with and without ports, including IPv4 tails', () => {
   assert.equal(address.parseAddressInput('[::1]/').url, 'https://[::1]/');
   assert.equal(address.parseAddressInput('https://[2001:db8::1]:8443/x').port, 8443);

@@ -129,10 +129,10 @@ final class BrowserAddress {
             }
             String hostForIpValidation = host.endsWith(".")
                     ? host.substring(0, host.length() - 1) : host;
-            if (BARE_IPV4_HOST.matcher(hostForIpValidation).matches()
-                    && !isCanonicalIpv4Literal(hostForIpValidation)) {
+            if (!isCanonicalIpv4Literal(hostForIpValidation)
+                    && endsInWhatwgIpv4Number(hostForIpValidation)) {
                 throw new IllegalArgumentException(
-                        "IPv4 octets must not contain leading zeros or exceed 255.");
+                        "IP hosts must use canonical four-octet decimal IPv4 notation.");
             }
             if (host.startsWith("[") && !hasCanonicalIpv4Tail(host)) {
                 throw new IllegalArgumentException(
@@ -233,6 +233,21 @@ final class BrowserAddress {
             if (Integer.parseInt(octet) > 255) return false;
         }
         return true;
+    }
+
+    /**
+     * Mirrors WHATWG's ends-in-a-number check so Chromium cannot reinterpret a
+     * non-canonical DNS-looking host as a shortened, octal, hexadecimal, or
+     * integer IPv4 address after this validator has accepted it.
+     */
+    private static boolean endsInWhatwgIpv4Number(String host) {
+        if (host == null || host.isEmpty()) return false;
+        String[] labels = host.split("\\.", -1);
+        String last = labels[labels.length - 1];
+        return last.matches("[0-9]+")
+                || last.matches("(?i)0x[0-9a-f]*")
+                || (last.length() > 1 && last.charAt(0) == '0'
+                && last.substring(1).matches("[0-7]+"));
     }
 
     private static boolean hasCanonicalIpv4Tail(String bracketedHost) {
