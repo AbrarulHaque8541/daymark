@@ -4,6 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const webhookApi = require('../webhook-logic.js');
 const ui = require('../webhook-ui.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const TASK = {
   id: 'task-1',
@@ -178,14 +180,19 @@ test('a saved config from a previous visit is restored on attach', () => {
   assert.ok(elements['webhook-status'].textContent.includes('Webhook ready'));
 });
 
-test('corrupt stored config and queue data are ignored instead of crashing', () => {
-  const { env, elements } = fakeEnv({});
-  env.localStorage.setItem(webhookApi.CONFIG_KEY, '{not json');
-  env.localStorage.setItem(webhookApi.QUEUE_KEY, '{"nope":1}');
+test('corrupt stored config and queue are preserved and block delivery instead of becoming empty state', () => {
+  const { env, elements, storageData } = fakeEnv({});
+  const badConfig = '{not json';
+  const badQueue = '{"nope":1}';
+  env.localStorage.setItem(webhookApi.CONFIG_KEY, badConfig);
+  env.localStorage.setItem(webhookApi.QUEUE_KEY, badQueue);
   const handle = ui.attachWebhookUi(env);
   assert.equal(handle.readConfig(), null);
   assert.equal(handle.readQueue().length, 0);
-  assert.equal(elements['webhook-status'].textContent, 'Add an https:// webhook URL to enable automation.');
+  assert.match(elements['webhook-status'].textContent, /storage could not be read/);
+  assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
+  assert.equal(storageData[webhookApi.CONFIG_KEY], badConfig);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], badQueue);
 });
 
 test('the form and buttons are wired on attach', () => {
@@ -195,4 +202,94 @@ test('the form and buttons are wired on attach', () => {
   assert.ok(elements['webhook-test'].listeners.some((entry) => entry.type === 'click'));
   assert.ok(elements['webhook-flush'].listeners.some((entry) => entry.type === 'click'));
   handle.detach();
+});
+
+
+test('a throwing localStorage getter does not abort the webhook card or send task data', async () => {
+  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  delete env.localStorage;
+  let fetchCalls = 0;
+  env.fetch = async () => { fetchCalls += 1; return { ok: true, status: 200 }; };
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage access blocked'); }
+  });
+  const handle = ui.attachWebhookUi(env);
+  assert.match(elements['webhook-status'].textContent, /storage could not be read/);
+  assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
+  await settle();
+  assert.equal(fetchCalls, 0, 'no task event is sent when saved settings/queue cannot be read');
+  assert.equal(storageData[webhookApi.CONFIG_KEY], undefined);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
+});
+
+test('a queue read failure preserves the unknown queue and pauses task delivery', async () => {
+  const { env, elements } = fakeEnv({});
+  const config = { version: 1, url: 'https://hooks.example.com/x' };
+  let writes = 0;
+  let fetchCalls = 0;
+  env.localStorage = {
+    getItem(key) {
+      if (key === webhookApi.CONFIG_KEY) return JSON.stringify(config);
+      throw new Error('queue read blocked');
+    },
+    setItem() { writes += 1; },
+    removeItem() { writes += 1; }
+  };
+  env.fetch = async () => { fetchCalls += 1; return { ok: true, status: 200 }; };
+  const handle = ui.attachWebhookUi(env);
+  assert.equal(handle.readConfig().url, config.url);
+  assert.match(elements['webhook-status'].textContent, /queued webhook events could not be read/);
+  assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
+  await handle.flush();
+  assert.equal(writes, 0, 'unknown queue state is never overwritten');
+  assert.equal(fetchCalls, 0, 'unknown queued events are never flushed');
+});
+
+test('a queue write failure keeps the event in this tab and retries persistence before delivery', async () => {
+  const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  const backing = env.localStorage;
+  let failQueueWrite = true;
+  let fetchCalls = 0;
+  env.fetch = async () => { fetchCalls += 1; return { ok: true, status: 200 }; };
+  env.localStorage = {
+    getItem: backing.getItem.bind(backing),
+    setItem(key, value) {
+      if (key === webhookApi.QUEUE_KEY && failQueueWrite) throw new Error('quota exceeded');
+      backing.setItem(key, value);
+    },
+    removeItem: backing.removeItem.bind(backing)
+  };
+  const handle = ui.attachWebhookUi(env);
+  const queued = handle.notifyTaskCompleted(TASK);
+  assert.deepEqual(queued, { queued: true, reason: 'memory-only' });
+  assert.equal(handle.readQueue().length, 1);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
+  assert.equal(fetchCalls, 0, 'the event is not sent before its queue is durable');
+  failQueueWrite = false;
+  await handle.flush();
+  assert.equal(fetchCalls, 1);
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
+
+test('failed webhook clear does not claim that the saved configuration was removed', () => {
+  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  const backing = env.localStorage;
+  env.localStorage = {
+    getItem: backing.getItem.bind(backing),
+    setItem: backing.setItem.bind(backing),
+    removeItem() { throw new Error('storage is read-only'); }
+  };
+  const handle = ui.attachWebhookUi(env);
+  elements['webhook-url'].value = '';
+  const result = handle.onSave({ preventDefault() {} });
+  assert.deepEqual(result, { saved: false, cleared: false });
+  assert.ok(storageData[webhookApi.CONFIG_KEY], 'the saved configuration remains');
+  assert.match(elements['webhook-status'].textContent, /Webhook could not be cleared; saved settings were not changed/);
+});
+
+test('webhook boot does not eagerly evaluate window.localStorage', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'webhook-ui.js'), 'utf8');
+  assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
+    'boot must pass window and let attachWebhookUi guard the storage getter');
 });
