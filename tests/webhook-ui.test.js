@@ -69,14 +69,15 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.deepEqual(ui.notifyTaskCompleted(TASK), { queued: false, reason: 'not-attached' });
 });
 
-test('attach without a saved webhook prompts the user and ignores completions', () => {
+test('attach without a saved webhook prompts for a session-only endpoint and ignores completions', () => {
   const { env, elements } = fakeEnv({});
   const handle = ui.attachWebhookUi(env);
-  assert.equal(elements['webhook-status'].textContent, 'Add an https:// webhook URL to enable automation.');
+  assert.match(elements['webhook-status'].textContent, /Add an https:\/\/ webhook URL/);
+  assert.match(elements['webhook-status'].textContent, /kept only in this tab|stays in this tab/);
+  assert.match(elements['webhook-status'].textContent, /re-entered after reload/);
   assert.equal(handle.notifyTaskCompleted(TASK).queued, false);
   assert.equal(elements['webhook-flush'].disabled, true, 'retry is disabled with an empty queue');
 });
-
 test('saving an invalid or insecure URL is rejected without persistence', () => {
   const { env, elements, storageData } = fakeEnv({ url: 'http://insecure.example.com/hook', fetch: async () => ({ ok: true, status: 200 }) });
   const handle = ui.attachWebhookUi(env);
@@ -86,25 +87,27 @@ test('saving an invalid or insecure URL is rejected without persistence', () => 
   assert.equal(storageData[webhookApi.CONFIG_KEY], undefined);
 });
 
-test('saving a valid URL persists the config', () => {
-  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+test('saving a valid URL keeps the endpoint in tab memory only', () => {
+  const secret = 'https://hooks.example.com/x?token=tab-only-secret';
+  const { env, elements, storageData } = fakeEnv({ url: secret });
   const handle = ui.attachWebhookUi(env);
   const saved = handle.onSave({ preventDefault() {} });
-  assert.equal(saved.saved, true);
-  assert.deepEqual(JSON.parse(storageData[webhookApi.CONFIG_KEY]), { version: 1, url: 'https://hooks.example.com/x' });
-  assert.ok(elements['webhook-status'].textContent.includes('Webhook saved'));
+  assert.deepEqual(saved, { saved: true, cleared: false, sessionOnly: true });
+  assert.deepEqual(handle.readConfig(), { version: 1, url: secret });
+  assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'the endpoint is never persisted');
+  assert.ok(elements['webhook-status'].textContent.includes('tab only'));
+  assert.equal(elements['webhook-status'].textContent.includes(secret), false, 'status never echoes the endpoint');
 });
-
-test('clearing the URL removes the saved webhook', () => {
-  const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+test('clearing the URL disables only the in-memory endpoint and preserves the queue', () => {
+  const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x?token=memory-only' });
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
   env.document.getElementById('webhook-url').value = '';
   const cleared = handle.onSave({ preventDefault() {} });
-  assert.equal(cleared.cleared, true);
+  assert.deepEqual(cleared, { saved: false, cleared: true, sessionOnly: true });
+  assert.equal(handle.readConfig(), null);
   assert.equal(storageData[webhookApi.CONFIG_KEY], undefined);
 });
-
 test('a completed task with a failing endpoint queues the event on this device', async () => {
   const failing = async () => { throw new Error('offline'); };
   const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x', fetch: failing });
@@ -208,30 +211,56 @@ test('the retry button flushes a queued event when the endpoint recovers', async
   assert.equal(handle.readQueue().length, 0, 'a recovered endpoint drains the queue on the explicit retry');
 });
 
-test('a saved config from a previous visit is restored on attach', () => {
-  const { env, elements } = fakeEnv({});
-  env.localStorage.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/saved' }));
+test('a legacy endpoint is removed without being read and queued events wait for re-entry', async () => {
+  const legacyUrl = 'https://hooks.example.com/saved?token=legacy-secret';
+  const newUrl = 'https://hooks.example.com/new?token=current-secret';
+  const event = webhookApi.makeQueueEvent(webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'), '2026-11-04T12:00:00.000Z');
+  const seen = [];
+  const { env, elements, storageData } = fakeEnv({
+    fetch: async (url, init) => { seen.push({ url, init }); return { ok: true, status: 200 }; }
+  });
+  storageData[webhookApi.CONFIG_KEY] = JSON.stringify({ version: 1, url: legacyUrl });
+  storageData[webhookApi.QUEUE_KEY] = JSON.stringify([event]);
+  const backing = env.localStorage;
+  const reads = [];
+  env.localStorage = {
+    getItem(key) { reads.push(key); return backing.getItem(key); },
+    setItem: backing.setItem.bind(backing),
+    removeItem: backing.removeItem.bind(backing)
+  };
   const handle = ui.attachWebhookUi(env);
-  assert.equal(handle.readConfig().url, 'https://hooks.example.com/saved');
-  assert.equal(elements['webhook-url'].value, 'https://hooks.example.com/saved');
-  assert.ok(elements['webhook-status'].textContent.includes('Webhook ready'));
+  assert.equal(handle.readConfig(), null, 'a previous endpoint is never restored');
+  assert.equal(elements['webhook-url'].value, '', 'the user must re-enter the endpoint');
+  assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'the legacy secret is removed');
+  assert.equal(reads.includes(webhookApi.CONFIG_KEY), false, 'the legacy endpoint is never read');
+  assert.deepEqual(handle.readQueue(), [event], 'queued events survive the endpoint migration');
+  assert.equal(seen.length, 0, 'queued events are not sent while the endpoint is unknown');
+  assert.equal(elements['webhook-status'].textContent.includes(legacyUrl), false);
+  elements['webhook-url'].value = newUrl;
+  const saved = handle.onSave({ preventDefault() {} });
+  assert.equal(saved.sessionOnly, true);
+  await settle();
+  assert.equal(seen.length, 1, 're-entering an endpoint resumes the preserved queue');
+  assert.equal(seen[0].url, newUrl);
+  assert.deepEqual(handle.readQueue(), []);
+  assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'the new endpoint is not persisted either');
+  assert.equal(elements['webhook-status'].textContent.includes(newUrl), false);
 });
-
-test('corrupt stored config and queue are preserved and block delivery instead of becoming empty state', () => {
+test('corrupt queue data is preserved while any legacy endpoint is removed and delivery stays paused', () => {
+  const legacyUrl = 'https://hooks.example.com/legacy?token=secret';
   const { env, elements, storageData } = fakeEnv({});
-  const badConfig = '{not json';
   const badQueue = '{"nope":1}';
-  env.localStorage.setItem(webhookApi.CONFIG_KEY, badConfig);
-  env.localStorage.setItem(webhookApi.QUEUE_KEY, badQueue);
+  storageData[webhookApi.CONFIG_KEY] = JSON.stringify({ version: 1, url: legacyUrl });
+  storageData[webhookApi.QUEUE_KEY] = badQueue;
   const handle = ui.attachWebhookUi(env);
   assert.equal(handle.readConfig(), null);
   assert.equal(handle.readQueue().length, 0);
   assert.match(elements['webhook-status'].textContent, /storage could not be read/);
   assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
-  assert.equal(storageData[webhookApi.CONFIG_KEY], badConfig);
-  assert.equal(storageData[webhookApi.QUEUE_KEY], badQueue);
+  assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'legacy endpoint is cleared without reading it');
+  assert.equal(storageData[webhookApi.QUEUE_KEY], badQueue, 'unreadable queue data is preserved');
+  assert.equal(elements['webhook-status'].textContent.includes(legacyUrl), false);
 });
-
 test('the form and buttons are wired on attach', () => {
   const { env, elements } = fakeEnv({});
   const handle = ui.attachWebhookUi(env);
@@ -310,23 +339,28 @@ test('a queue write failure keeps the event in this tab and retries persistence 
   assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
 });
 
-test('failed webhook clear does not claim that the saved configuration was removed', () => {
-  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+test('failed legacy endpoint cleanup blocks webhook use without exposing either endpoint', () => {
+  const legacyUrl = 'https://hooks.example.com/old?token=old-secret';
+  const newUrl = 'https://hooks.example.com/new?token=new-secret';
+  const { env, elements, storageData } = fakeEnv({});
   const backing = env.localStorage;
-  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
+  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: legacyUrl }));
   env.localStorage = {
     getItem: backing.getItem.bind(backing),
-    setItem: backing.setItem.bind(backing),
+    setItem() { throw new Error('storage is read-only'); },
     removeItem() { throw new Error('storage is read-only'); }
   };
   const handle = ui.attachWebhookUi(env);
-  elements['webhook-url'].value = '';
-  const result = handle.onSave({ preventDefault() {} });
-  assert.deepEqual(result, { saved: false, cleared: false });
-  assert.ok(storageData[webhookApi.CONFIG_KEY], 'the saved configuration remains');
-  assert.match(elements['webhook-status'].textContent, /Webhook could not be cleared; saved settings were not changed/);
+  elements['webhook-url'].value = newUrl;
+  const saved = handle.onSave({ preventDefault() {} });
+  assert.deepEqual(saved, { saved: false, cleared: false, reason: 'storage-unavailable' });
+  assert.equal(handle.readConfig(), null, 'no new endpoint is activated while the old secret cannot be cleared');
+  assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
+  assert.ok(storageData[webhookApi.CONFIG_KEY].includes(legacyUrl), 'the failed cleanup is explicit in the fixture');
+  assert.equal(elements['webhook-status'].textContent.includes(legacyUrl), false);
+  assert.equal(elements['webhook-status'].textContent.includes(newUrl), false);
+  assert.match(elements['webhook-status'].textContent, /clear this site/);
 });
-
 test('webhook boot does not eagerly evaluate window.localStorage', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'webhook-ui.js'), 'utf8');
   assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
@@ -334,23 +368,29 @@ test('webhook boot does not eagerly evaluate window.localStorage', () => {
 });
 
 
-test('a storage adapter without removeItem clears config with an explicit null marker', () => {
-  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+test('a storage adapter without removeItem overwrites the legacy endpoint with a null marker', () => {
+  const legacyUrl = 'https://hooks.example.com/legacy?token=secret';
+  const newUrl = 'https://hooks.example.com/current?token=memory';
+  const { env, elements, storageData } = fakeEnv({});
   const backing = env.localStorage;
-  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
+  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: legacyUrl }));
   env.localStorage = {
     getItem: backing.getItem.bind(backing),
     setItem: backing.setItem.bind(backing)
   };
   const handle = ui.attachWebhookUi(env);
-  elements['webhook-url'].value = '';
-  assert.deepEqual(handle.onSave({ preventDefault() {} }), { saved: false, cleared: true });
   assert.equal(storageData[webhookApi.CONFIG_KEY], 'null');
-  const restored = ui.attachWebhookUi(env);
+  assert.equal(handle.readConfig(), null);
+  elements['webhook-url'].value = newUrl;
+  assert.deepEqual(handle.onSave({ preventDefault() {} }), { saved: true, cleared: false, sessionOnly: true });
+  assert.equal(storageData[webhookApi.CONFIG_KEY], 'null', 'the new endpoint never replaces the legacy null marker');
+  const second = fakeEnv({});
+  second.env.localStorage = env.localStorage;
+  const restored = ui.attachWebhookUi(second.env);
   assert.equal(restored.readConfig(), null);
-  assert.doesNotMatch(elements['webhook-status'].textContent, /storage could not be read/);
+  assert.equal(second.elements['webhook-url'].value, '');
+  assert.match(second.elements['webhook-status'].textContent, /re-entered after reload/);
 });
-
 test('failed persistence after delivery keeps an empty queue retryable until it is durable', async () => {
   const { env, elements, storageData } = fakeEnv({
     url: 'https://hooks.example.com/x',
@@ -388,21 +428,33 @@ test('failed persistence after delivery keeps an empty queue retryable until it 
 });
 
 
-test('empty persisted config and queue strings are corrupt rather than absent', () => {
+test('an empty legacy config is cleared but an empty queue remains corrupt rather than absent', () => {
   const { env, storageData } = fakeEnv({});
   storageData[webhookApi.CONFIG_KEY] = '';
   storageData[webhookApi.QUEUE_KEY] = '';
-  const backing = env.localStorage;
-  env.localStorage = {
-    getItem(key) {
-      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
-    },
-    setItem: backing.setItem.bind(backing),
-    removeItem: backing.removeItem.bind(backing)
-  };
   const handle = ui.attachWebhookUi(env);
   assert.match(env.document.getElementById('webhook-status').textContent, /storage could not be read/);
   assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
-  assert.equal(storageData[webhookApi.CONFIG_KEY], '');
-  assert.equal(storageData[webhookApi.QUEUE_KEY], '');
+  assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'legacy config is removed without parsing it');
+  assert.equal(storageData[webhookApi.QUEUE_KEY], '', 'the corrupt queue is preserved');
+});
+
+test('status never echoes a webhook endpoint from a network error', async () => {
+  const secret = 'https://hooks.example.com/private/path?token=do-not-show';
+  const { env, elements } = fakeEnv({url:secret,fetch:async()=>{throw new Error('Network error for '+secret);}});
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({preventDefault(){}});
+  await handle.onTest();
+  assert.match(elements['webhook-status'].textContent,/Test event failed/);
+  assert.equal(elements['webhook-status'].textContent.includes(secret),false);
+});
+
+test('index markup exposes task-completion webhook controls and session-only disclosure', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const id of ['webhook-url','webhook-form','webhook-save','webhook-test','webhook-flush','webhook-status']) {
+    assert.ok(html.includes('id="'+id+'"'),id+' must be present for webhook-ui.js');
+  }
+  assert.match(html,/kept only in this tab/);
+  assert.match(html,/re-enter after reload/);
+  assert.doesNotMatch(html,/Local webhook preview/);
 });

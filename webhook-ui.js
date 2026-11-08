@@ -44,14 +44,23 @@
     let config = null;
     let queue = [];
     let busy = false;
-    let configReadFailed = storageAccessFailed;
     let queueReadFailed = storageAccessFailed;
-    let configWriteFailed = false;
+    let legacyConfigCleanupFailed = false;
     let queueWriteFailed = false;
     let flushRequested = false;
 
     function status(message) {
-      if (statusEl) statusEl.textContent = message;
+      let safeMessage = String(message === null || message === undefined ? '' : message);
+      const endpoints = [
+        config && config.url,
+        urlEl && typeof urlEl.value === 'string' ? urlEl.value.trim() : ''
+      ];
+      endpoints.forEach((endpoint) => {
+        if (typeof endpoint === 'string' && endpoint) {
+          safeMessage = safeMessage.split(endpoint).join('[hidden]');
+        }
+      });
+      if (statusEl) statusEl.textContent = safeMessage;
     }
 
     function isOnline() {
@@ -63,7 +72,7 @@
       [saveEl, testEl, flushEl].forEach((button) => {
         if (!button) return;
         button.disabled = isBusy || (button === flushEl
-          && ((queue.length === 0 && !queueWriteFailed) || storageAccessFailed || queueReadFailed));
+          && ((queue.length === 0 && !queueWriteFailed) || storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed));
         if (button.classList && typeof button.classList.toggle === 'function') {
           button.classList.toggle('is-busy', isBusy);
         }
@@ -74,45 +83,29 @@
       });
     }
 
-    function readConfig() {
-      if (storageAccessFailed || !storage || !webhookApi) return { ok: false, value: null };
+    // Older versions persisted the complete endpoint URL, including provider
+    // tokens commonly carried in its path or query. Never read or restore that
+    // value. Remove the legacy key without inspecting it; if removal is not
+    // available, overwrite it with an explicit null marker.
+    function clearLegacyConfig() {
+      if (storageAccessFailed || !storage || !webhookApi) return false;
       try {
-        if (typeof storage.getItem !== 'function') return { ok: false, value: null };
-        const raw = storage.getItem(webhookApi.CONFIG_KEY);
-        if (raw === null) return { ok: true, value: null };
-        const parsed = JSON.parse(raw);
-        if (parsed === null) return { ok: true, value: null };
-        return webhookApi.validateWebhookConfig(parsed)
-          ? { ok: true, value: parsed }
-          : { ok: false, value: null };
-      } catch (error) {
-        return { ok: false, value: null };
-      }
-    }
-
-    function persistConfig(nextConfig, allowUnreadableReplacement) {
-      if (storageAccessFailed || !storage || !webhookApi
-        || (configReadFailed && !allowUnreadableReplacement)) {
-        configWriteFailed = true;
-        return false;
-      }
-      try {
-        if (nextConfig) {
-          if (typeof storage.setItem !== 'function') throw new Error('storage write unavailable');
-          storage.setItem(webhookApi.CONFIG_KEY, JSON.stringify(nextConfig));
-        } else if (typeof storage.removeItem === 'function') {
+        if (typeof storage.removeItem === 'function') {
           storage.removeItem(webhookApi.CONFIG_KEY);
-        } else if (typeof storage.setItem === 'function') {
-          storage.setItem(webhookApi.CONFIG_KEY, JSON.stringify(null));
-        } else {
-          throw new Error('storage removal unavailable');
+          return true;
         }
-        configWriteFailed = false;
-        return true;
       } catch (error) {
-        configWriteFailed = true;
-        return false;
+        // Try the non-secret null marker below.
       }
+      try {
+        if (typeof storage.setItem === 'function') {
+          storage.setItem(webhookApi.CONFIG_KEY, JSON.stringify(null));
+          return true;
+        }
+      } catch (error) {
+        // The legacy value cannot be safely removed in this browser.
+      }
+      return false;
     }
 
     function readQueue() {
@@ -148,9 +141,10 @@
 
     function storageWarning() {
       const problems = [];
-      if (configReadFailed) problems.push('saved webhook settings could not be read');
+      if (legacyConfigCleanupFailed) {
+        problems.push('a legacy saved endpoint could not be removed; clear this site\'s browser data before enabling webhooks');
+      }
       if (queueReadFailed) problems.push('queued webhook events could not be read');
-      if (configWriteFailed) problems.push('webhook settings could not be saved');
       if (queueWriteFailed) problems.push('queued webhook events could not be saved');
       return problems.length
         ? ' Storage warning: ' + problems.join('; ') + '. No unreadable stored values were overwritten.'
@@ -163,7 +157,7 @@
 
     function renderQueue() {
       if (flushEl) flushEl.disabled = busy || (queue.length === 0 && !queueWriteFailed)
-        || storageAccessFailed || queueReadFailed;
+        || storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed;
     }
 
     function finishBusyOperation() {
@@ -177,8 +171,8 @@
 
     async function attemptFlush() {
       if (busy) return;
-      if (storageAccessFailed || configReadFailed || queueReadFailed) {
-        status('Webhook delivery is paused because saved settings or queued events could not be read.' + storageWarning());
+      if (storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed) {
+        status('Webhook delivery is paused because browser storage could not be read or safely prepared.' + storageWarning());
         renderQueue();
         return;
       }
@@ -235,7 +229,7 @@
         if (!persisted) parts.push('Queue state could not be saved; delivered events may be retried after reload.');
         status((parts.join(' ') || 'No queued webhook events.') + (queue.length ? ' ' + queueNote() : '') + storageWarning());
       } catch (error) {
-        status('Could not deliver: ' + (error && error.message ? error.message : 'unknown error'));
+        status('Could not deliver webhook events. Check the endpoint and retry.');
       } finally {
         finishBusyOperation();
       }
@@ -245,45 +239,39 @@
       if (event && typeof event.preventDefault === 'function') event.preventDefault();
       const raw = urlEl && typeof urlEl.value === 'string' ? urlEl.value.trim() : '';
       if (!raw) {
-        if (configReadFailed || storageAccessFailed) {
-          status('Saved webhook settings could not be read; nothing was cleared.' + storageWarning());
-          return { saved: false, cleared: false };
-        }
         if (config) {
-          if (!persistConfig(null, false)) {
-            status('Webhook could not be cleared; saved settings were not changed.' + storageWarning());
-            return { saved: false, cleared: false };
-          }
           config = null;
-          status('Webhook cleared. Completed tasks stay on this device.' + storageWarning());
-          return { saved: false, cleared: true };
+          status('Webhook disabled for this tab. Queued events remain on this device.' + storageWarning());
+          return { saved: false, cleared: true, sessionOnly: true };
         }
-        status('Add an https:// webhook URL to enable automation.' + storageWarning());
+        status('Add an https:// webhook URL to enable automation. The endpoint stays in this tab only and must be re-entered after reload.'
+          + (queue.length ? ' ' + queueNote() : '') + storageWarning());
         return { saved: false, cleared: false };
       }
       if (!webhookApi || !webhookApi.isValidWebhookUrl(raw)) {
         status('Enter a valid https:// webhook URL. Plain http is not allowed.');
         return { saved: false, cleared: false };
       }
-      if (storageAccessFailed || !storage) {
-        status('Browser storage is unavailable; the webhook was not saved.' + storageWarning());
-        return { saved: false, cleared: false };
+      if (legacyConfigCleanupFailed) legacyConfigCleanupFailed = !clearLegacyConfig();
+      if (legacyConfigCleanupFailed) {
+        status('A legacy saved webhook endpoint could not be cleared. Clear this site\'s browser data before enabling webhook delivery.'
+          + storageWarning());
+        return { saved: false, cleared: false, reason: 'storage-unavailable' };
       }
-      const nextConfig = { version: 1, url: raw };
-      const saved = persistConfig(nextConfig, true);
-      if (!saved) {
-        status('Webhook could not be saved; existing settings were not changed.' + storageWarning());
-        return { saved: false, cleared: false };
-      }
-      configReadFailed = false;
-      config = nextConfig;
-      status('Webhook saved. Completed tasks will be announced to your endpoint.' + storageWarning());
+      // The endpoint intentionally exists only in this page's memory. The
+      // durable queue contains event payloads, never the destination URL.
+      config = { version: 1, url: raw };
+      status('Webhook enabled for this tab only. Re-enter the endpoint after reload.' + storageWarning());
       void attemptFlush();
-      return { saved: true, cleared: false };
+      return { saved: true, cleared: false, sessionOnly: true };
     }
 
     async function onTest() {
       if (busy) return;
+      if (legacyConfigCleanupFailed) {
+        status('Webhook testing is paused because a legacy saved endpoint could not be cleared. Clear this site\'s browser data first.' + storageWarning());
+        return;
+      }
       const raw = urlEl && typeof urlEl.value === 'string' && urlEl.value.trim()
         ? urlEl.value.trim()
         : (config ? config.url : '');
@@ -306,7 +294,7 @@
         await webhookApi.deliverWebhook(raw, payload, fetchImpl);
         status('Test event delivered. Your endpoint is reachable.' + (queue.length ? ' ' + queueNote() : ''));
       } catch (error) {
-        status('Test event failed: ' + (error && error.message ? error.message : 'unknown error'));
+        status('Test event failed. Check the endpoint and retry.');
       } finally {
         finishBusyOperation();
       }
@@ -314,8 +302,8 @@
 
     function notifyTaskCompleted(task) {
       if (!webhookApi) return { queued: false, reason: 'unavailable' };
-      if (storageAccessFailed || configReadFailed || queueReadFailed) {
-        status('Task completion was not queued or sent because saved webhook settings or queued events could not be read.' + storageWarning());
+      if (storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed) {
+        status('Task completion was not queued or sent because browser storage could not be safely accessed.' + storageWarning());
         return { queued: false, reason: 'storage-unavailable' };
       }
       if (!config) return { queued: false, reason: 'disabled' };
@@ -350,13 +338,13 @@
       return { queued: true, reason: 'queued' };
     }
 
-    const configState = readConfig();
-    config = configState.value;
-    configReadFailed = !configState.ok;
+    // Remove any endpoint saved by an older version, but never read or restore
+    // it. The queue remains independent and can be delivered after re-entry.
+    legacyConfigCleanupFailed = !clearLegacyConfig();
     const queueState = readQueue();
     queue = queueState.value;
     queueReadFailed = !queueState.ok;
-    if (config && urlEl && typeof urlEl.value === 'string' && !urlEl.value) urlEl.value = config.url;
+
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', onSave);
     }
@@ -369,11 +357,11 @@
     if (win && typeof win.addEventListener === 'function') {
       win.addEventListener('online', () => { void attemptFlush(); });
     }
-    status(configReadFailed || queueReadFailed || storageAccessFailed
-      ? 'Webhook storage could not be read; existing settings and queued events were left untouched. Automatic delivery is paused.' + storageWarning()
-      : config
-        ? ('Webhook ready. Completed tasks will be announced to your endpoint.' + (queue.length ? ' ' + queueNote() : ''))
-        : 'Add an https:// webhook URL to enable automation.' + storageWarning());
+    status(storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed
+      ? 'Webhook storage could not be read or safely prepared; queued events were left untouched. Automatic delivery is paused.' + storageWarning()
+      : 'Add an https:// webhook URL to enable automation. The endpoint is kept only in this tab and must be re-entered after reload.'
+        + (queue.length ? ' ' + queueNote() : '') + storageWarning());
+
     renderQueue();
 
     const handle = {

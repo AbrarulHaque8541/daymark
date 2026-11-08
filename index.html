@@ -404,21 +404,19 @@
           <div class="feed-list" id="browser-proxy-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="webhook-heading">Local webhook preview</h2>
-          <p class="briefing-description">Build a sample payload offline. Nothing is sent.</p>
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span><span class="demo-label">AUTOMATION</span></div>
+          <h2 id="webhook-heading">Task-completion webhook</h2>
+          <p class="briefing-description">Send a minimal JSON event to an HTTPS webhook you choose when a task is completed. The endpoint is kept only in this tab and must be re-entered after reload; queued events stay on this device until you reconnect it. No polling, no timers, no maintainer backend.</p>
           <form id="webhook-form" class="feed-form" novalidate>
-            <label class="sr-only" for="webhook-event">Event</label>
-            <select id="webhook-event" name="event" class="sort-select" aria-label="Event">
-              <option value="task.created" selected>task.created</option>
-              <option value="task.completed">task.completed</option>
-              <option value="focus.session.ended">focus.session.ended</option>
-            </select>
-            <button class="button button-primary" id="webhook-preview" type="submit">Preview</button>
-            <button class="button button-quiet" id="webhook-clear" type="button">Clear</button>
+            <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
+            <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
+            <button class="button button-primary webhook-save" id="webhook-save" type="submit">Use for this tab</button>
           </form>
-          <p class="feed-status" id="webhook-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="webhook-list" aria-live="polite"></div>
+          <div class="focus-actions">
+            <button class="button button-quiet" id="webhook-test" type="button">Send test</button>
+            <button class="button button-quiet" id="webhook-flush" type="button" disabled>Retry queued</button>
+          </div>
+          <p class="feed-status" id="webhook-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
         <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
