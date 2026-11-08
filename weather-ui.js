@@ -19,7 +19,8 @@
     if (!env || !env.document) throw new Error('attachWeatherUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storageRequested = Object.prototype.hasOwnProperty.call(env, 'localStorage') || !!win;
+    const storageRequested = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+      || !!env.window || typeof window !== 'undefined';
     let storage = null;
     let storageAccessFailed = false;
     let storageReadFailed = false;
