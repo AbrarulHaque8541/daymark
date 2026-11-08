@@ -480,3 +480,41 @@ test('country preference write failure is reported without throwing from the cha
   assert.match(elements['holiday-status'].textContent, /Country preference was not saved/);
   assert.match(elements['holiday-status'].textContent, /changes could not be saved/);
 });
+
+
+test('a blocked storage getter still allows a successful refresh to render', async () => {
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ country: 'IN', fetch: fetchImpl });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage getter blocked'); }
+  });
+  const handle = ui.attachHolidaysUi(env);
+  assert.match(elements['holiday-status'].textContent, /browser storage is unavailable/);
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2, 'fresh network results remain usable');
+  assert.match(elements['holiday-status'].textContent, /^Updated ·/);
+  assert.match(elements['holiday-status'].textContent, /browser storage is unavailable/);
+});
+
+test('a failed storage read does not block fresh results or overwrite an unreadable cache', async () => {
+  const original = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  let writes = 0;
+  const storage = {
+    getItem() { throw new Error('storage read blocked'); },
+    setItem() { writes += 1; },
+    removeItem() {}
+  };
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ storage, fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  assert.match(elements['holiday-status'].textContent, /saved holiday data could not be read/);
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2, 'fresh network results remain visible');
+  assert.equal(writes, 0, 'unreadable records are never replaced');
+  assert.match(elements['holiday-status'].textContent, /saved holiday data could not be read/);
+  assert.equal(handle.readCache(), null);
+});
