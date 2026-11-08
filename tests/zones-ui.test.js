@@ -56,6 +56,7 @@ function fakeEnv(options) {
     'zones-add': Object.assign(fakeElement('button'), { id: 'zones-add', type: 'submit' }),
     'zones-refresh': Object.assign(fakeElement('button'), { id: 'zones-refresh', type: 'button' }),
     'zones-clear': Object.assign(fakeElement('button'), { id: 'zones-clear', type: 'button' }),
+    'zones-copy': Object.assign(fakeElement('button'), { id: 'zones-copy', type: 'button' }),
     'zones-form': Object.assign(fakeElement('form'), { id: 'zones-form' }),
     'zones-status': Object.assign(fakeElement('p'), { id: 'zones-status' }),
     'zones-list': Object.assign(fakeElement('div'), { id: 'zones-list' })
@@ -248,4 +249,33 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.STORAGE_KEY, 'daymark.zones.v1');
   assert.equal(ui.DEFAULT_ZONE, 'Asia/Kolkata');
   assert.equal(typeof globalThis.DaymarkZonesUi, 'object');
+});
+
+test('copy overlap writes a multi-line summary to an injected clipboard and reports status', async () => {
+  let written = null;
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    clipboard: {
+      writeText(text) {
+        written = text;
+        return Promise.resolve();
+      }
+    }
+  };
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-copy'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the copy button has a click listener');
+  await click.handler();
+  assert.ok(written && written.includes('Daymark world clock'), 'clipboard received the summary');
+  assert.ok(written.includes('India · Kolkata'), 'summary includes the zone');
+  assert.ok(written.includes('Best shared window'), 'summary includes the overlap');
+  assert.equal(elements['zones-status'].textContent, 'Copied world clock and overlap to clipboard.');
+  assert.equal(elements['zones-copy'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
+});
+
+test('copy reports nothing when the zones module is missing', async () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  handle.onCopy();
+  assert.equal(elements['zones-status'].textContent, 'Nothing to copy yet.');
 });

@@ -29,6 +29,7 @@
     const addEl = element('zones-add');
     const refreshEl = element('zones-refresh');
     const clearEl = element('zones-clear');
+    const copyEl = element('zones-copy');
     const formEl = element('zones-form');
     const statusEl = element('zones-status');
     const listEl = element('zones-list');
@@ -200,6 +201,74 @@
       status('Removed ' + (zonesApi.zoneLabel(zoneId) || zoneId) + ' · ' + stamp());
     }
 
+    function setAriaBusy(btn, busy) {
+      if (!btn) return;
+      if (busy) {
+        btn.setAttribute('aria-busy', 'true');
+        if (btn.classList && typeof btn.classList.add === 'function') btn.classList.add('is-busy');
+      } else {
+        btn.removeAttribute('aria-busy');
+        if (btn.classList && typeof btn.classList.remove === 'function') btn.classList.remove('is-busy');
+      }
+    }
+
+    function buildCopyText() {
+      if (!zonesApi || !zones.length) return '';
+      const when = new Date(now());
+      const lines = ['Daymark world clock · ' + stamp()];
+      for (const zoneId of zones) {
+        try {
+          const clock = zonesApi.formatZoneTime(zoneId, when);
+          if (!clock) continue;
+          const label = zonesApi.zoneLabel(zoneId) || zoneId;
+          lines.push(label + ': ' + clock.time + ' (' + clock.offsetLabel + ')');
+        } catch (error) { /* skip unreadable zone */ }
+      }
+      try {
+        const overlap = zonesApi.bestOverlap(zones, when);
+        if (overlap && overlap.start !== null) {
+          const baseLabel = zonesApi.zoneLabel(zones[0]) || zones[0];
+          const startClock = zonesApi.formatZoneTime(zones[0], new Date(overlap.start));
+          const endClock = zonesApi.formatZoneTime(zones[0], new Date(overlap.end));
+          const who = overlap.allAwake
+            ? 'All ' + zoneCount(overlap.totalZones) + ' awake'
+            : zoneCount(overlap.awakeCount) + ' of ' + zoneCount(overlap.totalZones) + ' awake';
+          lines.push('');
+          lines.push('Best shared window: ' + who + ' · ' + startClock.time + '–' + endClock.time + ' in ' + baseLabel);
+          lines.push('Waking hours 08:00–22:00 local. Computed offline.');
+        } else {
+          lines.push('');
+          lines.push('No shared waking window found in the next 24 hours.');
+        }
+      } catch (error) {
+        lines.push('');
+        lines.push('Overlap could not be computed.');
+      }
+      return lines.join('\n');
+    }
+
+    function onCopy() {
+      const text = buildCopyText();
+      if (!text) {
+        status('Nothing to copy yet.');
+        return;
+      }
+      const nav = env.navigator || (win && win.navigator) || null;
+      setAriaBusy(copyEl, true);
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        nav.clipboard.writeText(text).then(() => {
+          status('Copied world clock and overlap to clipboard.');
+          setAriaBusy(copyEl, false);
+        }).catch(() => {
+          status('Could not copy the summary.');
+          setAriaBusy(copyEl, false);
+        });
+      } else {
+        status('Clipboard is unavailable.');
+        setAriaBusy(copyEl, false);
+      }
+    }
+
     function onRefresh() {
       if (!zonesApi) {
         status('World clock is unavailable.');
@@ -252,12 +321,16 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
 
     return {
       onAdd,
       onRemove,
       onRefresh,
       onClear,
+      onCopy,
       readCache,
       detach() {
         // No document-level listener is registered; the button references are
