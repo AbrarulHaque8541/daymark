@@ -220,11 +220,11 @@
 
     const body = response && response.body;
     if (!body || typeof body.getReader !== 'function' || typeof root.TextDecoder !== 'function') {
-      // Compatibility fallback for older/test Response implementations. Prefer
-      // streaming whenever the browser exposes a readable response body.
-      const xml = await response.text();
-      if (xml.length > MAX_XML_CHARS) throw new Error('The feed response was too large to parse safely.');
-      return xml;
+      if (controller) controller.abort();
+      // A post-read text() length check cannot bound peak allocation. RSS/Atom
+      // network responses must be streamed so the byte cap is enforced before
+      // the complete document is materialized.
+      throw new Error('A streaming response reader is required to enforce the feed size limit safely.');
     }
 
     const reader = body.getReader();
@@ -289,7 +289,16 @@
         cache: 'no-store',
         redirect: 'follow'
       });
-      if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
+      if (!response || !response.ok) {
+        const body = response && response.body;
+        if (body && typeof body.cancel === 'function') {
+          try {
+            const cancellation = body.cancel();
+            if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+          } catch (error) { /* releasing an unread error body is best-effort */ }
+        }
+        throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
+      }
       const xml = await readResponseText(
         response,
         controller,
