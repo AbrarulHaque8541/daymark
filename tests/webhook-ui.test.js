@@ -315,7 +315,10 @@ test('a storage adapter without removeItem clears config with an explicit null m
 });
 
 test('failed persistence after delivery keeps an empty queue retryable until it is durable', async () => {
-  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  const { env, elements, storageData } = fakeEnv({
+    url: 'https://hooks.example.com/x',
+    fetch: async () => ({ ok: true, status: 200 })
+  });
   const backing = env.localStorage;
   backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
   let failEmptyQueueOnce = true;
