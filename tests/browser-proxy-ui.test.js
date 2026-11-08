@@ -252,3 +252,56 @@ test('plan button reports aria-busy only while planning', () => {
   ui.attachBrowserProxyUi({ document: doc, proxyApi: engine });
   assert.equal(planBtn.getAttribute('aria-busy'), null);
 });
+
+test('clear writes an empty tombstone when removeItem throws', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-proxy-address'].value = 'proxy.example.org:8080';
+  const store = {
+    data: {},
+    getItem(k) { return this.data[k] || null; },
+    setItem(k, v) { this.data[k] = String(v); },
+    removeItem() { throw new Error('remove blocked'); }
+  };
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], 'proxy.example.org:8080');
+  doc.elements['browser-proxy-clear'].listeners.click[0]();
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], '', 'the old address is replaced by a durable empty marker');
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Cleared\./);
+});
+
+test('clear reports failure when removal and the empty tombstone both fail', () => {
+  const doc = makeDoc(ALL_IDS);
+  const remembered = 'proxy.example.org:8080';
+  const store = {
+    data: { 'daymark.browser-proxy.last-profile': remembered },
+    getItem(k) { return this.data[k] || null; },
+    setItem() { throw new Error('write blocked'); },
+    removeItem() { throw new Error('remove blocked'); }
+  };
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
+  doc.elements['browser-proxy-clear'].listeners.click[0]();
+  assert.equal(doc.elements['browser-proxy-address'].value, '');
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], remembered, 'failed storage operations do not pretend the key was removed');
+  assert.doesNotMatch(doc.elements['browser-proxy-status'].textContent, /Cleared\./);
+  assert.match(doc.elements['browser-proxy-status'].textContent, /could not be removed/);
+  assert.match(doc.elements['browser-proxy-status'].textContent, /clear this site/);
+});
+
+test('legacy credentials remain explicitly warned about when both safe cleanup paths fail', () => {
+  const doc = makeDoc(ALL_IDS);
+  const legacy = 'http://alice:secret@proxy.example.org:3128';
+  const store = {
+    data: { 'daymark.browser-proxy.last-profile': legacy },
+    getItem(k) { return this.data[k] || null; },
+    setItem() { throw new Error('write blocked'); },
+    removeItem() { throw new Error('remove blocked'); }
+  };
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
+  assert.equal(doc.elements['browser-proxy-address'].value, 'http://proxy.example.org:3128');
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], legacy, 'the test proves cleanup really failed');
+  const status = doc.elements['browser-proxy-status'].textContent;
+  assert.match(status, /could not be removed/);
+  assert.match(status, /clear this site's browser data/);
+  assert.equal(status.includes('alice'), false);
+  assert.equal(status.includes('secret'), false);
+});

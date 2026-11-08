@@ -177,3 +177,19 @@ test('non-string and oversize inputs fail closed without throwing', () => {
   assert.equal(engine.parseProxyAddress('proxy.example.org:8080'.padEnd(600, 'a')), null);
   assert.equal(engine.planProfile(undefined).ok, false);
 });
+
+test('IPv4-mapped IPv6 loopback addresses produce a caution', () => {
+  for (const input of [
+    '[::ffff:127.0.0.1]:8080',
+    '[::ffff:7f00:1]:8080',
+    '[0:0:0:0:0:ffff:7f00:1]:8080',
+    '[::ffff:7fff:ffff]:8080'
+  ]) {
+    const plan = engine.planProfile(input);
+    assert.equal(plan.ok, true, input);
+    assert.ok(plan.notices.some((notice) => /loopback/.test(notice)), input);
+  }
+  const publicMapped = engine.planProfile('[::ffff:c000:201]:8080');
+  assert.equal(publicMapped.ok, true);
+  assert.equal(publicMapped.notices.some((notice) => /loopback/.test(notice)), false);
+});

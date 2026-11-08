@@ -34,6 +34,8 @@
       : (root.DaymarkBrowserProxy || null);
     const storage = resolveStorage(env);
     const nav = env.navigator || (typeof navigator !== 'undefined' ? navigator : null);
+    let storageCleanupFailed = false;
+    let profileRememberFailed = false;
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const inputEl = element('browser-proxy-address');
@@ -73,8 +75,25 @@
     }
 
     function forgetProfile() {
-      if (!storage || typeof storage.removeItem !== 'function') return;
-      try { storage.removeItem(LAST_PROFILE_KEY); } catch (e) { /* fail closed */ }
+      if (!storage) return false;
+      try {
+        if (typeof storage.removeItem === 'function') {
+          storage.removeItem(LAST_PROFILE_KEY);
+          return true;
+        }
+      } catch (e) {
+        // Try a non-secret tombstone so a quota/adapter failure cannot leave
+        // the old remembered address while the UI claims it was cleared.
+      }
+      try {
+        if (typeof storage.setItem === 'function') {
+          storage.setItem(LAST_PROFILE_KEY, '');
+          return true;
+        }
+      } catch (e) {
+        // No safe removal or tombstone path is available.
+      }
+      return false;
     }
 
     function sanitizedAddress(parsed, original) {
@@ -96,7 +115,15 @@
             // Older builds may have persisted userinfo. Replace it with the
             // credential-free authority; if that fails, try to remove the
             // unsafe legacy value instead of keeping it by design.
-            if (safeAddress !== remembered && !rememberProfile(safeAddress)) forgetProfile();
+            if (safeAddress !== remembered && !rememberProfile(safeAddress)) {
+              if (forgetProfile()) {
+                profileRememberFailed = true;
+                storageCleanupFailed = false;
+              } else {
+                storageCleanupFailed = true;
+                profileRememberFailed = false;
+              }
+            }
             return true;
           }
         }
@@ -168,16 +195,38 @@
           ? proxyApi.parseProxyAddress(text) : null;
         const result = proxyApi.planProfile(text);
         renderPlan(result);
-        status(buildStatus(result, restored));
+        const warning = storageCleanupFailed
+          ? " · The remembered proxy value could not be removed. Clear this site's browser data to remove it."
+          : profileRememberFailed
+            ? ' · This address is only in the current card and could not be remembered.'
+            : '';
+        status(buildStatus(result, restored) + warning);
         setHasNotices(!!(result && result.notices && result.notices.length > 0));
         if (result && result.ok && parsed) {
           const safeAddress = sanitizedAddress(parsed, text);
           if (inputEl) inputEl.value = safeAddress;
-          if (!rememberProfile(safeAddress)) forgetProfile();
+          if (!rememberProfile(safeAddress)) {
+            if (forgetProfile()) {
+              profileRememberFailed = true;
+              storageCleanupFailed = false;
+            } else {
+              storageCleanupFailed = true;
+              profileRememberFailed = false;
+            }
+          } else {
+            storageCleanupFailed = false;
+            profileRememberFailed = false;
+          }
         } else if (result && result.ok) {
           // Never persist an address if it cannot be independently parsed
           // into a credential-free representation.
-          forgetProfile();
+          if (forgetProfile()) {
+            storageCleanupFailed = false;
+            profileRememberFailed = false;
+          } else {
+            storageCleanupFailed = true;
+            profileRememberFailed = false;
+          }
         }
       } finally {
         setAriaBusy(false);
@@ -189,8 +238,12 @@
       }
       if (inputEl) inputEl.value = '';
       setHasNotices(false);
-      forgetProfile();
-      status('Cleared. Enter a proxy address to plan it honestly.');
+      const removed = forgetProfile();
+      storageCleanupFailed = !removed;
+      profileRememberFailed = false;
+      status(removed
+        ? 'Cleared. Enter a proxy address to plan it honestly.'
+        : "The card was cleared, but the remembered address could not be removed. Clear this site's browser data to remove it.");
     }
 
     function collectPlanText() {
