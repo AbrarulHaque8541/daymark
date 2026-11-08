@@ -458,3 +458,21 @@ test('index markup exposes task-completion webhook controls and session-only dis
   assert.match(html,/re-enter after reload/);
   assert.doesNotMatch(html,/Local webhook preview/);
 });
+
+test('queued delivery errors never echo the endpoint into status text', async () => {
+  const secret = 'https://hooks.example.com/private/path?token=do-not-show';
+  const event = webhookApi.makeQueueEvent(
+    webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
+    '2026-11-04T12:00:00.000Z'
+  );
+  const { env, elements, storageData } = fakeEnv({
+    url: secret,
+    fetch: async () => { throw new Error('Network error for ' + secret); }
+  });
+  storageData[webhookApi.QUEUE_KEY] = JSON.stringify([event]);
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  await settle();
+  assert.match(elements['webhook-status'].textContent, /Could not deliver webhook events/);
+  assert.equal(elements['webhook-status'].textContent.includes(secret), false);
+});

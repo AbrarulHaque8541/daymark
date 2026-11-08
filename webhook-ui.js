@@ -225,7 +225,7 @@
         const parts = [];
         if (result.deliveredCount > 0) parts.push('Delivered ' + result.deliveredCount + ' event(s).');
         if (result.droppedCount > 0) parts.push(result.droppedCount + ' event(s) were dropped after too many attempts.');
-        if (result.failure) parts.push('Could not deliver: ' + result.failure);
+        if (result.failure) parts.push('Could not deliver webhook events. Check the endpoint and retry.');
         if (!persisted) parts.push('Queue state could not be saved; delivered events may be retried after reload.');
         status((parts.join(' ') || 'No queued webhook events.') + (queue.length ? ' ' + queueNote() : '') + storageWarning());
       } catch (error) {
