@@ -20,7 +20,15 @@
     if (!env || !env.document) throw new Error('attachImportUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
@@ -99,6 +107,9 @@
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
         }
+        if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+          throw new Error('browser storage is unavailable; nothing was changed');
+        }
         const text = await readText(file);
         const parsed = format === 'csv'
           ? importApi.fromCsv(text, { now: now(), makeId })
@@ -106,7 +117,7 @@
         if (!logic || typeof logic.validateStoredTasks !== 'function') {
           throw new Error('task logic is unavailable');
         }
-        const raw = storage && typeof storage.getItem === 'function' ? storage.getItem(STORAGE_KEY) : null;
+        const raw = storage.getItem(STORAGE_KEY);
         let stored = [];
         if (raw) {
           stored = JSON.parse(raw);
@@ -149,7 +160,7 @@
   root.DaymarkImportUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachImportUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachImportUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
