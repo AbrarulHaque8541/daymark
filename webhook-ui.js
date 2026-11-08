@@ -233,17 +233,6 @@
         renderQueue();
         return;
       }
-      if (!fetchImpl) {
-        status('Webhook delivery is unavailable: fetch is missing in this browser. ' + queueNote() + storageWarning());
-        renderQueue();
-        return;
-      }
-      if (!isOnline()) {
-        status('Offline - ' + queueNote() + ' They send on the next connection or Retry.' + storageWarning());
-        renderQueue();
-        return;
-      }
-
       setBusy(true);
       try {
         const locked = await withQueueLock(async () => {
@@ -323,6 +312,12 @@
             }
             renderQueue();
             return { reason: 'empty' };
+          }
+
+          if (!fetchImpl) {
+            status('Webhook delivery is unavailable: fetch is missing in this browser. ' + queueNote() + storageWarning());
+            renderQueue();
+            return { reason: 'fetch-unavailable' };
           }
 
           // Verify that the current snapshot is still writable before sending.
