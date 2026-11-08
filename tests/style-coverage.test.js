@@ -51,8 +51,8 @@ test('currency form keeps From, swap and To on one row', () => {
 test('edit dialog is named by its visible heading', () => {
   const dialog = markup.match(/<dialog\b[^>]*id="edit-dialog"[^>]*>/);
   assert.ok(dialog, 'edit task dialog is present');
-  assert.match(dialog[0], /aria-labelledby="edit-heading",/
-    'edit form must reference its accessible heading');
+  assert.match(dialog[0], /aria-labelledby="edit-heading"/,
+    'edit dialog must reference its accessible heading');
   assert.match(markup, /<h2\b[^>]*id="edit-heading"[^>]*>\s*Edit task/,
     'the referenced heading must exist and name the dialog');
 });
