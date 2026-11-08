@@ -396,7 +396,7 @@
       // durable queue contains event payloads, never the destination URL.
       config = { version: 1, url: raw };
       status('Webhook enabled for this tab only. Re-enter the endpoint after reload.' + storageWarning());
-      void attemptFlush();
+      if (queue.length || memoryOnlyEvents.length || queueWriteFailed) void attemptFlush();
       return { saved: true, cleared: false, sessionOnly: true };
     }
 
