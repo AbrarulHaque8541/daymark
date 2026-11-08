@@ -131,21 +131,16 @@ test('form submit re-plans and the clear button empties the card', () => {
 test('copy button collects the plan and reports success when clipboard is available', async () => {
   const doc = makeDoc(ALL_IDS);
   doc.elements['browser-download-scenario'].value = 'same-origin-redirects';
-  const handle = ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine });
+  let written = null;
+  const fakeNavigator = { clipboard: { writeText: async (t) => { written = t; return true; } } };
+  const handle = ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine, navigator: fakeNavigator });
   const copy = doc.elements['browser-download-copy'];
   const click = copy.listeners.click;
   assert.ok(click && click.length === 1, 'a click listener must be wired on copy');
-  let written = null;
-  const originalNav = global.navigator;
-  global.navigator = { clipboard: { writeText: async (t) => { written = t; return true; } } };
-  try {
-    click[0]();
-    await new Promise(r => setTimeout(r, 0));
-    assert.ok(written && written.includes('report.pdf'));
-    assert.match(doc.elements['browser-download-status'].textContent, /Copied plan/);
-  } finally {
-    global.navigator = originalNav;
-  }
+  click[0]();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(written && written.includes('report.pdf'));
+  assert.match(doc.elements['browser-download-status'].textContent, /Copied plan/);
 });
 
 test('a missing engine degrades honestly instead of guessing', () => {

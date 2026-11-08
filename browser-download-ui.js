@@ -179,7 +179,6 @@
         status('Nothing to copy yet.');
         return;
       }
-      const nav = (typeof navigator !== 'undefined' ? navigator : null) || (env.window && env.window.navigator);
       if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
         nav.clipboard.writeText(text).then(() => {
           status('Copied plan to clipboard.');
