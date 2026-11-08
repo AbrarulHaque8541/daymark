@@ -30,6 +30,7 @@ public final class TaskLogicSmoke {
         storedTaskSnapshotsMatchWriterRules();
         snapshotSchemaRejectsCoercibleWrongTypes();
         notesDueTimeAndReminderValidate();
+        reminderLeadsAreElapsedInstantsAcrossDst();
         subtasksValidateAndToggle();
         attachmentMetadataAndQuotasAreStrict();
         filtersAndSearchCompose();
@@ -387,6 +388,40 @@ public final class TaskLogicSmoke {
         check(TaskLogic.suggestions(new ArrayList<>(), TODAY).isEmpty(), "empty list has no suggestions");
     }
 
+
+    private static void reminderLeadsAreElapsedInstantsAcrossDst() {
+        ZoneId eastern = ZoneId.of("America/New_York");
+
+        Task springAfterGap = TaskLogic.create("Spring after gap", "2026-03-08", "medium", "",
+                "03:30", 60, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Instant springDue = Instant.parse("2026-03-08T07:30:00Z");
+        Instant springTrigger = Instant.parse("2026-03-08T06:30:00Z");
+        check(springDue.equals(TaskLogic.dueMomentInstant(springAfterGap, eastern)),
+                "spring-forward 03:30 due time resolves after the DST gap");
+        check(springTrigger.equals(TaskLogic.reminderFireInstant(springAfterGap, eastern)),
+                "spring-forward lead is 60 elapsed minutes before the resolved due instant");
+        check(TaskLogic.advanceRepeat(springAfterGap, eastern,
+                        Instant.parse("2026-03-08T06:29:59Z")) == springAfterGap,
+                "spring-forward recurrence remains pending one second before its elapsed-time trigger");
+        check("2026-03-09".equals(TaskLogic.advanceRepeat(springAfterGap, eastern,
+                        springTrigger).dueDate),
+                "spring-forward recurrence advances exactly at its elapsed-time trigger");
+
+        Task fallAfterOverlap = TaskLogic.create("Fall after overlap", "2026-11-01", "medium", "",
+                "02:30", 60, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Instant fallDue = Instant.parse("2026-11-01T07:30:00Z");
+        Instant fallTrigger = Instant.parse("2026-11-01T06:30:00Z");
+        check(fallDue.equals(TaskLogic.dueMomentInstant(fallAfterOverlap, eastern)),
+                "fall-back 02:30 due time resolves after the repeated 01:00 hour");
+        check(fallTrigger.equals(TaskLogic.reminderFireInstant(fallAfterOverlap, eastern)),
+                "fall-back lead is 60 elapsed minutes before the resolved due instant");
+        check(TaskLogic.advanceRepeat(fallAfterOverlap, eastern,
+                        Instant.parse("2026-11-01T06:29:59Z")) == fallAfterOverlap,
+                "fall-back recurrence remains pending one second before its elapsed-time trigger");
+        check("2026-11-02".equals(TaskLogic.advanceRepeat(fallAfterOverlap, eastern,
+                        fallTrigger).dueDate),
+                "fall-back recurrence advances exactly at its elapsed-time trigger");
+    }
 
     private static void repeatRulesValidateAndAdvance() {
         Task repeating = TaskLogic.create("Water the plants", "2026-10-05", "medium", "",
