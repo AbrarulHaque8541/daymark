@@ -69,7 +69,7 @@ function isAllowedRequest(details, allowedAppFiles, appUiEntry) {
 }
 
 function isTrackerRequest(details) {
-  if (!details || details.resourceType === 'mainFrame') return false;
+  if (!details || isMainFrame(details)) return false;
   return isTrackerUrl(details.url);
 }
 
