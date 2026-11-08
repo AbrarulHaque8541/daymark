@@ -5,11 +5,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const feedLogic = require('../feed-logic.js');
+const focus = require('../focus-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FEED_KEY = 'daymark.feed.v1';
+const FOCUS_KEY = 'daymark.focus.v1';
+const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
 const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
 
 function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set()) {
@@ -106,6 +109,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   const window = {
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
+    DaymarkFocus: focus,
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
@@ -401,6 +405,77 @@ test('recovery export uses encoded data URL when Blob URL APIs are unavailable',
     'fallback URI must preserve the exact Unicode and punctuation payload');
   assert.equal(app.getPendingTimeouts().some((timer) => timer.delay === 1000), false,
     'data URLs do not need object-URL revocation');
+});
+
+test('unreadable task primary remains read-only after a user attempts to add a task', () => {
+  const backup = JSON.stringify([validTask('recovered-task', 'Recovered task')]);
+  const storedValues = new Map([[BACKUP_KEY, backup]]);
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  app.elements.get('#new-title').value = 'Session-only task';
+  app.elements.get('#add-form').dispatch('submit');
+
+  assert.equal(storedValues.has(STORAGE_KEY), false,
+    'a later setItem must not replace a primary key whose read failed');
+  assert.equal(storedValues.get(BACKUP_KEY), backup,
+    'the readable recovery backup remains byte-for-byte unchanged');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save tasks safely: primary task data is unreadable/);
+});
+
+test('unreadable Focus primary remains read-only after a user starts a session', () => {
+  const backup = JSON.stringify({ session: null, log: [] });
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, backup]]);
+  const failReads = new Set([FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus data unreadable; recovery backup available/);
+  app.elements.get('#focus-start').dispatch('click');
+
+  assert.equal(storedValues.has(FOCUS_KEY), false,
+    'starting a timer must not overwrite an unreadable Focus primary');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), backup,
+    'the readable Focus backup remains byte-for-byte unchanged');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save Focus data safely: primary Focus data is unreadable/);
+});
+
+test('unreadable task and Focus primaries with unreadable backups remain unchanged after attempted writes', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY, BACKUP_KEY, FOCUS_KEY, FOCUS_BACKUP_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  app.elements.get('#new-title').value = 'Must not overwrite task primary';
+  app.elements.get('#add-form').dispatch('submit');
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+  assert.equal(storedValues.has(BACKUP_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save tasks safely: primary task data is unreadable/);
+
+  app.elements.get('#focus-start').dispatch('click');
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save Focus data safely: primary Focus data is unreadable/);
+});
+
+test('unreadable task and Focus primaries with no backups do not create replacement primaries', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY, FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus data unreadable; no recovery backup found/);
+  app.elements.get('#new-title').value = 'Session-only task';
+  app.elements.get('#add-form').dispatch('submit');
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+  assert.equal(storedValues.has(BACKUP_KEY), false);
+
+  app.elements.get('#focus-start').dispatch('click');
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
 });
 
 test('app.js parses before browser runtime boot', () => {
