@@ -421,6 +421,30 @@ public final class TaskLogicSmoke {
         check("2026-11-02".equals(TaskLogic.advanceRepeat(fallAfterOverlap, eastern,
                         fallTrigger).dueDate),
                 "fall-back recurrence advances exactly at its elapsed-time trigger");
+
+        Task springDayLead = TaskLogic.create("Spring DST day lead", "2026-03-08", "medium", "",
+                "03:30", 1440, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Instant springDayLeadTrigger = Instant.parse("2026-03-07T07:30:00Z");
+        check(springDayLeadTrigger.equals(TaskLogic.reminderFireInstant(springDayLead, eastern)),
+                "spring-forward 24-hour lead is elapsed from the resolved due instant across the date boundary");
+        check(TaskLogic.advanceRepeat(springDayLead, eastern,
+                        springDayLeadTrigger.minusSeconds(1)) == springDayLead,
+                "spring-forward 24-hour repeat remains pending one second before its previous-day trigger");
+        check("2026-03-09".equals(TaskLogic.advanceRepeat(springDayLead, eastern,
+                        springDayLeadTrigger).dueDate),
+                "spring-forward 24-hour repeat advances exactly once at its previous-day trigger");
+
+        Task fallDayLead = TaskLogic.create("Fall DST day lead", "2026-11-01", "medium", "",
+                "02:30", 1440, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Instant fallDayLeadTrigger = Instant.parse("2026-10-31T07:30:00Z");
+        check(fallDayLeadTrigger.equals(TaskLogic.reminderFireInstant(fallDayLead, eastern)),
+                "fall-back 24-hour lead is elapsed from the resolved due instant across the date boundary");
+        check(TaskLogic.advanceRepeat(fallDayLead, eastern,
+                        fallDayLeadTrigger.minusSeconds(1)) == fallDayLead,
+                "fall-back 24-hour repeat remains pending one second before its previous-day trigger");
+        check("2026-11-02".equals(TaskLogic.advanceRepeat(fallDayLead, eastern,
+                        fallDayLeadTrigger).dueDate),
+                "fall-back 24-hour repeat advances exactly once at its previous-day trigger");
     }
 
     private static void repeatRulesValidateAndAdvance() {
