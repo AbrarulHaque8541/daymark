@@ -97,49 +97,35 @@
   }
 
   function recoveryBackupPayloads(raw) {
-    if (typeof raw !== 'string' || !raw) return [];
+    if (typeof raw !== 'string' || raw.length === 0) return [];
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return isPartialRecoveryPayload(raw) ? [raw] : [];
+        // Even a fully valid array can be a unique older recovery copy.
+        return [raw];
       }
       if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
           && Array.isArray(parsed.payloads)) {
-        return parsed.payloads.filter((payload) => typeof payload === 'string');
+        // If a bundle contains unknown payload types, retain the exact outer
+        // bytes rather than silently filtering any part of the bundle.
+        return parsed.payloads.every((payload) => typeof payload === 'string')
+          ? parsed.payloads : [raw];
       }
     } catch (error) {
-      // An opaque/malformed backup may itself be the only surviving copy of
-      // older data. Preserve its exact bytes when a new damaged payload arrives.
+      // An opaque/malformed backup may be the only surviving copy of older data.
     }
     return [raw];
-  }
-
-  function isHealthyTaskPayload(raw) {
-    if (typeof raw !== 'string' || !raw) return false;
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount === 0;
-    } catch (error) {
-      return false;
-    }
   }
 
   function backUpRawPayload(raw) {
     try {
       const existing = localStorage.getItem(BACKUP_KEY);
       const existingPayloads = recoveryBackupPayloads(existing);
-      const existingParsed = (() => {
-        try { return JSON.parse(existing); } catch (error) { return null; }
-      })();
-      const existingIsBundle = Boolean(existingParsed
-        && existingParsed.format === 'daymark-recovery-bundle-v1'
-        && Array.isArray(existingParsed.payloads));
       const preserveExisting = existingPayloads.length > 0
-        && (existingIsBundle || !isHealthyTaskPayload(existing));
+        && !recoveryBackupIsRedundant(existing, raw);
       if (preserveExisting) {
-        // A recovery bundle, partial payload, or opaque prior backup may hold
-        // unique user data. Merge it with the newly rejected original rather
-        // than replacing it. Healthy task-array backups remain stale.
+        // Preserve every distinct prior backup before adding the newly rejected
+        // primary payload. A valid array is not automatically stale.
         const payloads = Array.from(new Set([...existingPayloads, raw]));
         localStorage.setItem(BACKUP_KEY, JSON.stringify({
           format: 'daymark-recovery-bundle-v1',

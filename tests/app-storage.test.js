@@ -431,6 +431,17 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
+test('backing up a corrupt primary preserves a different valid existing backup', () => {
+  const existingBackup = JSON.stringify([makeImportTask('backup-only-task', 'Older backup task')]);
+  const corruptPrimary = '{not valid JSON';
+  const app = bootApp({ savedValue: corruptPrimary, savedBackupValue: existingBackup });
+
+  const bundle = JSON.parse(app.storedValues.get(BACKUP_KEY));
+  assert.equal(bundle.format, 'daymark-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, [existingBackup, corruptPrimary],
+    'a new corrupt primary must not overwrite a distinct valid recovery copy');
+});
+
 test('different healthy task-array backups are preserved across later task saves', () => {
   const primaryTask = makeImportTask('primary-task', 'Primary task');
   const backupTask = makeImportTask('backup-only-task', 'Backup-only task');
