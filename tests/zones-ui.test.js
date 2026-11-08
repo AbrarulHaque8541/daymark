@@ -89,49 +89,95 @@ function rowTexts(listEl) {
 
 // Original tests preserved; new save tests appended below.
 
-test('save overlap creates a local text file via Blob and reports status', async () => {
-  let created = null;
+test('save overlap downloads the offline summary, cleans up, and clears busy state', async () => {
+  let savedBlob = null;
   let clicked = false;
+  let revoked = null;
+  let revokeDelay = null;
+  let link = null;
   const { env, elements } = fakeEnv({});
-  global.URL = {
+  class FakeBlob {
+    constructor(parts, options) {
+      this.parts = parts;
+      this.type = options && options.type;
+    }
+  }
+  env.Blob = FakeBlob;
+  env.URL = {
     createObjectURL(blob) {
-      created = blob;
+      savedBlob = blob;
       return 'blob:fake';
     },
-    revokeObjectURL() {}
+    revokeObjectURL(url) { revoked = url; }
+  };
+  env.setTimeout = (callback, delay) => {
+    revokeDelay = delay;
+    callback();
+    return 1;
+  };
+  const createElement = env.document.createElement;
+  env.document.createElement = (tag) => {
+    const element = createElement(tag);
+    if (tag === 'a') {
+      link = element;
+      element.click = () => { clicked = true; };
+    }
+    return element;
   };
   const handle = ui.attachZonesUi(env);
-  const click = elements['zones-save'].listeners.find((l) => l.type === 'click');
-  assert.ok(click, 'the save button has a click listener');
-  const origCreate = env.document.createElement;
-  env.document.createElement = (tag) => {
-    const el = origCreate(tag);
-    if (tag === 'a') {
-      el.click = () => { clicked = true; };
-    }
-    return el;
-  };
+  const click = elements['zones-save'].listeners.find((listener) => listener.type === 'click');
+  assert.ok(click, 'the Save as text button has a click listener');
   await click.handler();
-  assert.ok(created instanceof Blob, 'a Blob was created');
-  assert.equal(created.type, 'text/plain');
-  assert.equal(clicked, true, 'the temporary link was clicked');
-  assert.equal(elements['zones-status'].textContent, 'Saved world clock and overlap as daymark-world-clock.txt.');
+  assert.ok(savedBlob, 'a Blob was created');
+  assert.equal(savedBlob.type, 'text/plain;charset=utf-8');
+  assert.ok(savedBlob.parts[0].includes('Daymark world clock'));
+  assert.ok(savedBlob.parts[0].includes('India · Kolkata'));
+  assert.ok(savedBlob.parts[0].includes('Best shared window'));
+  assert.ok(link, 'a temporary anchor was created');
+  assert.equal(link.href, 'blob:fake');
+  assert.equal(link.download, 'daymark-world-clock.txt');
+  assert.equal(clicked, true, 'the temporary link was activated');
+  assert.equal(revoked, 'blob:fake', 'the temporary object URL was revoked');
+  assert.equal(revokeDelay, 1000, 'the URL remains available briefly for the browser download handoff');
+  assert.equal(elements['zones-status'].textContent,
+    'Saved world clock and overlap as daymark-world-clock.txt.');
   assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
 });
 
 test('save reports nothing when the zones module is missing', async () => {
   const { env, elements } = fakeEnv({ zonesApi: null });
   const handle = ui.attachZonesUi(env);
-  handle.onSave();
+  await handle.onSave();
   assert.equal(elements['zones-status'].textContent, 'Nothing to save yet.');
 });
 
-test('save reports unavailable when URL.createObjectURL is missing', async () => {
+test('save fails closed when Blob, object-URL, or document-body download support is unavailable', async () => {
   const { env, elements } = fakeEnv({});
-  delete global.URL;
+  env.Blob = null;
+  env.URL = null;
   const handle = ui.attachZonesUi(env);
-  const click = elements['zones-save'].listeners.find((l) => l.type === 'click');
-  assert.ok(click);
-  await click.handler();
+  await handle.onSave();
   assert.equal(elements['zones-status'].textContent, 'Saving is not available in this environment.');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
 });
+
+test('save reports a download failure and revokes the object URL', async () => {
+  let revoked = null;
+  const { env, elements } = fakeEnv({});
+  class FakeBlob {
+    constructor(parts, options) { this.parts = parts; this.type = options && options.type; }
+  }
+  env.Blob = FakeBlob;
+  env.URL = {
+    createObjectURL() { return 'blob:failed'; },
+    revokeObjectURL(url) { revoked = url; }
+  };
+  env.setTimeout = (callback) => { callback(); };
+  env.document.createElement = () => { throw new Error('blocked'); };
+  const handle = ui.attachZonesUi(env);
+  await handle.onSave();
+  assert.equal(elements['zones-status'].textContent, 'Could not save the summary as a text file.');
+  assert.equal(revoked, 'blob:failed');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
+});
+
