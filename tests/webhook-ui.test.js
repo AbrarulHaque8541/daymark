@@ -249,6 +249,7 @@ test('a queue read failure preserves the unknown queue and pauses task delivery'
 test('a queue write failure keeps the event in this tab and retries persistence before delivery', async () => {
   const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
   const backing = env.localStorage;
+  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
   let failQueueWrite = true;
   let fetchCalls = 0;
   env.fetch = async () => { fetchCalls += 1; return { ok: true, status: 200 }; };
@@ -275,6 +276,7 @@ test('a queue write failure keeps the event in this tab and retries persistence 
 test('failed webhook clear does not claim that the saved configuration was removed', () => {
   const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
   const backing = env.localStorage;
+  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
   env.localStorage = {
     getItem: backing.getItem.bind(backing),
     setItem: backing.setItem.bind(backing),
