@@ -88,4 +88,19 @@ set -e
   exit 1
 }
 
-echo "PASS run-gradle-with-retry: transient 504 retry, non-network failure no-retry, and bounded exhaustion"
+# Retry backoff configuration itself must remain bounded.
+make_case "invalid-delay" "retry-once"
+invalid_dir="$TEMP_ROOT/invalid-delay"
+set +e
+COUNT_FILE="$invalid_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=31 \
+  bash "$invalid_dir/android-app/tools/run-gradle-with-retry.sh" --no-daemon assembleDebug \
+  > "$invalid_dir/output.log" 2>&1
+invalid_status=$?
+set -e
+[[ "$invalid_status" -eq 2 && ! -f "$invalid_dir/count" ]] || {
+  cat "$invalid_dir/output.log" >&2
+  echo "Retry backoff configuration above 30 seconds must be rejected before invoking Gradle" >&2
+  exit 1
+}
+
+echo "PASS run-gradle-with-retry: transient 504 retry, non-network failure no-retry, bounded exhaustion, and bounded backoff configuration"
