@@ -110,10 +110,6 @@
         if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
           throw new Error('browser storage is unavailable; nothing was changed');
         }
-        const text = await readText(file);
-        const parsed = format === 'csv'
-          ? importApi.fromCsv(text, { now: now(), makeId })
-          : importApi.fromMarkdown(text, { now: now(), makeId });
         if (!logic || typeof logic.validateStoredTasks !== 'function') {
           throw new Error('task logic is unavailable');
         }
@@ -124,6 +120,21 @@
           if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
         }
         const validated = logic.validateStoredTasks(stored);
+        if (!validated || !Array.isArray(validated.tasks)
+          || !Number.isSafeInteger(validated.rejectedCount) || validated.rejectedCount < 0) {
+          throw new Error('saved tasks could not be validated; nothing was changed');
+        }
+        if (validated.rejectedCount > 0) {
+          throw new Error('existing saved tasks contain ' + validated.rejectedCount
+            + ' invalid or duplicate record(s); import was not applied');
+        }
+        // Do not read/parse the selected file until the existing store is known
+        // to be complete. Otherwise a merge can silently sanitize pre-existing
+        // malformed/duplicate records as a side effect of importing another file.
+        const text = await readText(file);
+        const parsed = format === 'csv'
+          ? importApi.fromCsv(text, { now: now(), makeId })
+          : importApi.fromMarkdown(text, { now: now(), makeId });
         const merge = importApi.mergeTasks(validated.tasks, parsed.tasks, logic);
         if (merge.added.length > 0) {
           if (!storage || typeof storage.setItem !== 'function') {

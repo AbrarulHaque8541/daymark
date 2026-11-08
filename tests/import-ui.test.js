@@ -50,10 +50,11 @@ function fakeEnv(options) {
     }
   };
   const storageData = {};
+  const writes = [];
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); },
+    setItem(key, value) { writes.push({ key, value: String(value) }); storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
   const dispatched = [];
@@ -77,6 +78,7 @@ function fakeEnv(options) {
     created,
     listeners,
     storageData,
+    writes,
     dispatched
   };
 }
@@ -186,15 +188,42 @@ test('empty task storage is corruption and cannot be replaced by an import', asy
     { id: 'new-1', title: 'Must not replace unknown data', dueDate: null, priority: 'medium',
       completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
   ], { generatedAt: NOW });
-  const { env, elements, created, storageData, dispatched } = fakeEnv({
+  let fileRead = false;
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
     stored: '',
-    files: [csvFile(csv)]
+    files: [{ name: 'tasks.csv', size: csv.length, text: async () => { fileRead = true; return csv; } }]
   });
   await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
   assert.equal(storageData[ui.STORAGE_KEY], '', 'empty corrupt task data is preserved');
+  assert.equal(fileRead, false, 'the selected file is not read when the existing store is corrupt');
+  assert.equal(writes.length, 0, 'failed import does not write the task store');
   assert.equal(dispatched.length, 0, 'failed import does not signal a successful task-store update');
   assert.match(created.find((el) => el.id === 'import-status').textContent,
     /Import failed: .*Nothing was changed\./);
+});
+
+test('mixed valid and malformed existing tasks block import without sanitizing the raw store', async () => {
+  const malformed = { ...sampleTasks[0], id: 'broken', title: '' };
+  const duplicate = { ...sampleTasks[0], title: 'Duplicate existing id' };
+  const raw = JSON.stringify([sampleTasks[0], malformed, duplicate]);
+  const csv = exporter.toCsv([
+    { id: 'new-2', title: 'New imported task', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let fileRead = false;
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
+    stored: raw,
+    files: [{ name: 'tasks.csv', size: csv.length, text: async () => { fileRead = true; return csv; } }]
+  });
+
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+
+  assert.equal(storageData[ui.STORAGE_KEY], raw, 'the original mixed-valid/invalid JSON is preserved byte-for-byte');
+  assert.equal(fileRead, false, 'the selected file is not read after existing-record validation fails');
+  assert.equal(writes.length, 0, 'no replacement task-store write occurs');
+  assert.equal(dispatched.length, 0, 'no successful storage event is dispatched');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /invalid or duplicate record/);
 });
 
 test('FileReader fallback reads files without file.text()', async () => {
