@@ -5,6 +5,13 @@ import sys
 
 root = Path(sys.argv[1])
 activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+source_root = root / "app/src/main/java"
+production_sources = list(source_root.rglob("*.java")) + list(source_root.rglob("*.kt"))
+assert production_sources, "the production Android source tree must be present"
+for source_path in production_sources:
+    source_text = source_path.read_text(encoding="utf-8")
+    assert "DownloadManager.Request(" not in source_text, \
+        f"new Android DownloadManager requests are forbidden until redirect-safe transport exists: {source_path}"
 menu = activity.split("private void showBrowserOverflowMenu", 1)[1].split(
     "private void importExtensionFromUri", 1
 )[0]
@@ -74,4 +81,4 @@ print("PASS browser Downloads destination: in-app DownloadManager list, explicit
 # Work by: ChatGPT (OpenAI)
 # Model: GPT-6
 # Tooling: GitHub MCP repository contents and Actions logs
-# Timestamp (UTC): 2026-11-01T15:32:00Z
+# Timestamp (UTC): 2026-11-08T11:27:20Z

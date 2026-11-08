@@ -108,7 +108,7 @@ assert "New browser downloads are temporarily blocked" in method, "empty state m
 assert "No compatible app could open this file." in method, "viewer handoff failure must be disclosed"
 print("PASS browser downloads source checks: bounded history, safe completed-file handoff/cancel, fail-closed new requests, refresh and truthful empty/error states")
 
-# Work by: ChatGPT
+# Work by: ChatGPT (OpenAI)
 # Model: GPT-6
-# Tooling: GitHub MCP tools
-# Timestamp (UTC): 2026-11-01T07:28:39Z
+# Tooling: GitHub connector, GitHub Actions, AOSP source inspection
+# Timestamp (UTC): 2026-11-08T11:27:20Z
