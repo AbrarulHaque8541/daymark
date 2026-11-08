@@ -216,13 +216,13 @@ final class TaskLogic {
         return dateOnlyOrNull(nextMonth.withDayOfMonth(Math.min(repeatDayOfMonth, nextMonth.lengthOfMonth())));
     }
 
-        /** Returns null when a computed occurrence is outside the supported four-digit date-only format. */
+    /** Returns null when a computed occurrence is outside the supported four-digit date-only format. */
     private static String dateOnlyOrNull(LocalDate date) {
         String value = date.toString();
         return isDateOnly(value) ? value : null;
     }
 
-static boolean isValidTaskList(List<Task> tasks) {
+    static boolean isValidTaskList(List<Task> tasks) {
         if (tasks == null) return false;
         Set<String> ids = new HashSet<>();
         for (Task task : tasks) {
