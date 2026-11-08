@@ -79,6 +79,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .add-button span { margin-right: 3px; font-size: 16px; vertical-align: -1px; }
 .button-quiet { color: #4c5a64; background: rgba(255, 255, 255, .6); border-color: rgba(219, 226, 232, .9); }
 .button-quiet:hover { background: rgba(236, 242, 245, .9); transform: translateY(-1px); }
+.button-quiet:active { transform: scale(0.97); background: rgba(22, 112, 95, 0.12); color: var(--accent-dark); }
 .form-error { margin: 9px 0 0; color: var(--red); font-size: 12px; }
 .date-only-reminder-hint { margin: 8px 0 0; color: var(--muted-text); font-size: 11px; line-height: 1.5; }
 .date-only-reminder-hint[hidden] { display: none; }
@@ -224,6 +225,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .button-primary { box-shadow: 0 6px 16px rgba(0, 0, 0, .4); }
   .button-quiet { color: #9aa6af; background: rgba(26, 33, 40, .6); border-color: #2c3640; }
   .button-quiet:hover { background: rgba(44, 54, 64, .9); }
+  .button-quiet:active { transform: scale(0.97); background: rgba(22, 112, 95, 0.25); color: var(--accent); }
   .clear-completed:hover { border-color: #2c3640; background: rgba(26, 33, 40, .8); }
   .filters { border-bottom-color: #232d35; }
   .filter-button span { background: #232d35; color: #9aa6af; }
