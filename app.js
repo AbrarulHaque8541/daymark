@@ -1966,7 +1966,11 @@
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
+      taskList.classList.add('is-filtering');
       render();
+      requestAnimationFrame(() => {
+        taskList.classList.remove('is-filtering');
+      });
     }));
     taskList.addEventListener('click', handleTaskAction);
     $('#edit-form').addEventListener('submit', saveEdit);
