@@ -195,12 +195,6 @@
           ? proxyApi.parseProxyAddress(text) : null;
         const result = proxyApi.planProfile(text);
         renderPlan(result);
-        const warning = storageCleanupFailed
-          ? " · The remembered proxy value could not be removed. Clear this site's browser data to remove it."
-          : profileRememberFailed
-            ? ' · This address is only in the current card and could not be remembered.'
-            : '';
-        status(buildStatus(result, restored) + warning);
         setHasNotices(!!(result && result.notices && result.notices.length > 0));
         if (result && result.ok && parsed) {
           const safeAddress = sanitizedAddress(parsed, text);
@@ -228,6 +222,14 @@
             profileRememberFailed = false;
           }
         }
+        // Report the outcome after persistence/cleanup attempts so the first
+        // plan action cannot hide a failed remember or cleanup operation.
+        const warning = storageCleanupFailed
+          ? " · The remembered proxy value could not be removed. Clear this site's browser data to remove it."
+          : profileRememberFailed
+            ? ' · This address is only in the current card and could not be remembered.'
+            : '';
+        status(buildStatus(result, restored) + warning);
       } finally {
         setAriaBusy(false);
       }

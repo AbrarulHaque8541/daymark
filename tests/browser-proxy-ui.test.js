@@ -305,3 +305,26 @@ test('legacy credentials remain explicitly warned about when both safe cleanup p
   assert.equal(status.includes('alice'), false);
   assert.equal(status.includes('secret'), false);
 });
+
+test('first plan reports when a failed remember falls back to a successful tombstone', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-proxy-address'].value = 'proxy.example.org:8080';
+  let writes = 0;
+  const store = {
+    data: {},
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this.data, k) ? this.data[k] : null; },
+    setItem(k, v) {
+      writes += 1;
+      if (writes === 1) throw new Error('quota exceeded');
+      this.data[k] = String(v);
+    },
+    removeItem() { throw new Error('remove blocked'); }
+  };
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
+  assert.equal(writes, 2, 'the first remember fails and the empty tombstone succeeds');
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], '');
+  assert.match(doc.elements['browser-proxy-status'].textContent,
+    /only in the current card and could not be remembered/);
+  assert.doesNotMatch(doc.elements['browser-proxy-status'].textContent,
+    /remembered proxy value could not be removed/);
+});
