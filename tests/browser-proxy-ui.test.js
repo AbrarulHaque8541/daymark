@@ -301,7 +301,7 @@ test('legacy credentials remain explicitly warned about when both safe cleanup p
   assert.equal(store.data['daymark.browser-proxy.last-profile'], legacy, 'the test proves cleanup really failed');
   const status = doc.elements['browser-proxy-status'].textContent;
   assert.match(status, /could not be removed/);
-  assert.match(status, /clear this site's browser data/);
+  assert.match(status, /Clear this site's browser data/);
   assert.equal(status.includes('alice'), false);
   assert.equal(status.includes('secret'), false);
 });
