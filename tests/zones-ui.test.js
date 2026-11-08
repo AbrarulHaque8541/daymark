@@ -135,14 +135,34 @@ test('attach restores a saved zone list with a cached note', () => {
   assert.ok(elements['zones-status'].textContent.startsWith('Cached · updated 2026-11-08 08:30 UTC'));
 });
 
-test('a corrupt cache is ignored instead of crashing', () => {
-  const { env, elements } = fakeEnv({ stored: '{not json' });
-  ui.attachZonesUi(env);
-  const rows = rowTexts(elements['zones-list']);
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0][1], 'India · Kolkata — 17:30');
-  assert.equal(elements['zones-status'].textContent,
-    'Pick time zones to compare. Everything is computed offline.');
+test('empty, malformed, and non-cache zone values are preserved instead of treated as absent', async () => {
+  for (const stored of ['', '{not json', 'null', '{"zones":[]}']) {
+    const { env, elements, storageData, storageCalls } = fakeEnv({
+      stored,
+      pick: 'Europe/London'
+    });
+    const handle = ui.attachZonesUi(env);
+    const rows = rowTexts(elements['zones-list']);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0][1], 'India · Kolkata — 17:30');
+    assert.match(elements['zones-status'].textContent, /invalid and were left untouched/i);
+    await handle.onAdd();
+    assert.equal(storageCalls.writes, 0, 'unknown saved data blocks an add write');
+    assert.equal(storageData[ui.STORAGE_KEY], stored, 'the original corrupt value remains untouched');
+    assert.equal(rowTexts(elements['zones-list']).length, 2, 'the visible list remains unchanged');
+    await handle.onRefresh();
+    assert.equal(storageCalls.writes, 0, 'refresh cannot overwrite an unreadable cache');
+    assert.equal(storageData[ui.STORAGE_KEY], stored);
+  }
+});
+
+test('an explicit Clear action can remove a corrupt zone cache', async () => {
+  const { env, elements, storageData } = fakeEnv({ stored: '' });
+  const handle = ui.attachZonesUi(env);
+  await handle.onClear();
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(rowTexts(elements['zones-list'])[0][1], 'India · Kolkata — 17:30');
+  assert.equal(elements['zones-status'].textContent, 'World clock cleared on this device.');
 });
 
 test('a throwing localStorage getter does not crash and keeps writes fail-closed', async () => {

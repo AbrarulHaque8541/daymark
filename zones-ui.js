@@ -31,6 +31,7 @@
       storageAccessFailed = true;
     }
     let storageReadFailed = false;
+    let storageCorrupt = false;
     const zonesApi = env.zonesApi !== undefined ? env.zonesApi : (root.DaymarkZones || null);
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
 
@@ -83,7 +84,7 @@
     }
 
     function persist(nextZones, nextUpdatedAt) {
-      if (storageAccessFailed || storageReadFailed || !storage
+      if (storageAccessFailed || storageReadFailed || storageCorrupt || !storage
         || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') return false;
       const cache = {
         version: 1,
@@ -109,12 +110,17 @@
         storageReadFailed = true;
         return null;
       }
-      if (!raw) return null;
+      if (raw === null) return null;
+      if (typeof raw !== 'string' || raw.length === 0) {
+        storageCorrupt = true;
+        return null;
+      }
       try {
         const parsed = JSON.parse(raw);
         if (zonesApi && typeof zonesApi.validateZonesCache === 'function'
           && zonesApi.validateZonesCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
+      } catch (error) { /* preserve corrupt saved data; do not treat it as an empty cache */ }
+      storageCorrupt = true;
       return null;
     }
 
@@ -123,6 +129,7 @@
         return 'Browser storage is unavailable.';
       }
       if (storageReadFailed) return 'Saved time zones could not be read.';
+      if (storageCorrupt) return 'Saved time zones are invalid and were left untouched.';
       return 'Browser storage could not be updated.';
     }
 
@@ -453,7 +460,7 @@
         if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
           status(storageProblem()
             + ' Showing the default zone for this session; changes cannot be saved.');
-        } else if (storageReadFailed) {
+        } else if (storageReadFailed || storageCorrupt) {
           status(storageProblem()
             + ' Showing the default zone for this session; stored data was not changed.');
         } else {
