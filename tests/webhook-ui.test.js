@@ -261,6 +261,7 @@ test('two tabs cannot deliver the same stored event concurrently', async () => {
   const secondHandle = ui.attachWebhookUi(second.env);
   firstHandle.onSave({ preventDefault() {} });
   secondHandle.onSave({ preventDefault() {} });
+  await settle();
   first.env.navigator.onLine = true;
   second.env.navigator.onLine = true;
 
@@ -622,6 +623,7 @@ test('status never echoes a webhook endpoint from a network error', async () => 
   const { env, elements } = fakeEnv({url:secret,fetch:async()=>{throw new Error('Network error for '+secret);}});
   const handle = ui.attachWebhookUi(env);
   handle.onSave({preventDefault(){}});
+  await settle();
   await handle.onTest();
   assert.match(elements['webhook-status'].textContent,/Test event failed/);
   assert.equal(elements['webhook-status'].textContent.includes(secret),false);
