@@ -10,6 +10,11 @@
   const MAX_XML_BYTES = MAX_XML_CHARS * 4;
   // Public RSS/Atom documents should be shallow; bound recursion before hostile XML exhausts the JS stack.
   const MAX_XML_DEPTH = 64;
+  // A shallow, element-dense document can amplify a small response into a
+  // large object graph. Bound nodes and attributes independently of byte/depth.
+  const MAX_XML_NODES = 5000;
+  const MAX_XML_ATTRIBUTES = 10000;
+  const MAX_XML_ATTRIBUTES_PER_ELEMENT = 32;
 
   function decodeEntities(text) {
     return String(text).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
@@ -40,6 +45,8 @@
     let i = 0;
     const len = xml.length;
     const fail = (message) => { throw new Error(`Malformed XML: ${message}`); };
+    let nodesCreated = 0;
+    let attributesCreated = 0;
 
     function skipMisc() {
       for (;;) {
@@ -77,12 +84,15 @@
     function parseElement(depth) {
       const level = Number.isInteger(depth) ? depth : 1;
       if (level > MAX_XML_DEPTH) fail('XML nesting limit exceeded');
+      nodesCreated += 1;
+      if (nodesCreated > MAX_XML_NODES) fail('XML node limit exceeded');
       i += 1; // consume '<'
       const nameMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/.exec(xml.slice(i));
       if (!nameMatch) fail('expected an element name');
       const name = nameMatch[0];
       i += name.length;
-      const attributes = {};
+      const attributes = Object.create(null);
+      let elementAttributeCount = 0;
       for (;;) {
         while (i < len && /\s/.test(xml[i])) i += 1;
         if (xml.startsWith('/>', i)) {
@@ -95,6 +105,12 @@
         }
         const attrMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/.exec(xml.slice(i));
         if (!attrMatch) fail('expected an attribute name');
+        if (elementAttributeCount >= MAX_XML_ATTRIBUTES_PER_ELEMENT
+          || attributesCreated >= MAX_XML_ATTRIBUTES) {
+          fail('XML attribute limit exceeded');
+        }
+        elementAttributeCount += 1;
+        attributesCreated += 1;
         const attrName = attrMatch[0];
         i += attrName.length;
         while (i < len && /\s/.test(xml[i])) i += 1;
@@ -426,7 +442,10 @@
     MAX_SUMMARY_CHARS,
     MAX_XML_CHARS,
     MAX_XML_BYTES,
-    MAX_XML_DEPTH
+    MAX_XML_DEPTH,
+    MAX_XML_NODES,
+    MAX_XML_ATTRIBUTES,
+    MAX_XML_ATTRIBUTES_PER_ELEMENT
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkFeed = api;

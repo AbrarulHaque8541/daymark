@@ -139,6 +139,30 @@ test('XML parser rejects excessive nesting before JavaScript stack exhaustion', 
   assert.throws(() => feed.parseFeed(xml), /XML nesting limit exceeded/);
 });
 
+
+test('XML parser rejects shallow documents that exceed the total node budget', () => {
+  const manyNodes = '<x/>'.repeat(feed.MAX_XML_NODES + 1);
+  const xml = '<rss><channel><title>Bounded</title><item><title>Dense</title>' +
+    manyNodes + '</item></channel></rss>';
+  assert.throws(() => feed.parseFeed(xml), /XML node limit exceeded/);
+});
+
+test('XML parser rejects per-element and aggregate attribute exhaustion', () => {
+  const tooManyOnOneElement = Array.from(
+    { length: feed.MAX_XML_ATTRIBUTES_PER_ELEMENT + 1 },
+    (_, index) => `a${index}="v"`
+  ).join(' ');
+  assert.throws(
+    () => feed.parseFeed(`<rss ${tooManyOnOneElement}><channel><item><title>x</title></item></channel></rss>`),
+    /XML attribute limit exceeded/
+  );
+
+  const manyAttributes = '<x a="1" b="2" c="3"/>'.repeat(Math.ceil(feed.MAX_XML_ATTRIBUTES / 3));
+  const xml = '<rss><channel><title>Bounded</title><item><title>Dense</title>' +
+    manyAttributes + '</item></channel></rss>';
+  assert.throws(() => feed.parseFeed(xml), /XML attribute limit exceeded/);
+});
+
 test('feed URLs must be plain http(s) URLs without credentials', () => {
   assert.equal(feed.isValidFeedUrl('https://example.com/feed.xml'), true);
   assert.equal(feed.isValidFeedUrl('http://news.example.org/rss'), true);
