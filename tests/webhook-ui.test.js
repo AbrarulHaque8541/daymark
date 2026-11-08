@@ -629,6 +629,12 @@ test('status never echoes a webhook endpoint from a network error', async () => 
   assert.equal(elements['webhook-status'].textContent.includes(secret),false);
 });
 
+test('the app task-completion hook handles asynchronous queue failures', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  assert.match(app, /const result = webhookUi\.notifyTaskCompleted\(task\);/);
+  assert.match(app, /result\.catch\(\(error\) =>/);
+});
+
 test('index markup exposes task-completion webhook controls and session-only disclosure', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   for (const id of ['webhook-url','webhook-form','webhook-save','webhook-test','webhook-flush','webhook-status']) {
