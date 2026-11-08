@@ -30,8 +30,10 @@ assert "for (BrowserDownloadListPolicy.Item item : selection.items)" in method, 
     "the UI must render the selected newest-first bounded window"
 assert "Downloads (showing 100 most recent items)" in method, \
     "truncated history must disclose that the most recent items are shown"
-assert "No Daymark browser downloads are available yet." in method, \
+assert "No Daymark browser downloads are available." in method, \
     "the list must explain the empty state"
+assert "New browser downloads are temporarily blocked" in method, \
+    "the empty state must disclose the fail-closed redirect-safety policy"
 assert 'setNeutralButton("Refresh"' in method, \
     "the list must expose a refresh action"
 assert "DownloadManager.ACTION_VIEW_DOWNLOADS" not in method, \
@@ -39,16 +41,23 @@ assert "DownloadManager.ACTION_VIEW_DOWNLOADS" not in method, \
 assert "private final BrowserDownloadTracker browserDownloadTracker" in activity, \
     "the bounded in-memory tracker must be owned by the Activity"
 queue = activity.split("private void queueBrowserDownload(", 1)[1].split("private void exitBrowserFullscreen", 1)[0]
-assert "long downloadId = manager.enqueue(request);" in queue and \
-    "browserDownloadTracker.start(downloadId, url, filename)" in queue, \
-    "only successfully enqueued Daymark browser downloads should enter the tracker"
-assert "BrowserDownloadRequestHeaders.forDownload(effectiveUserAgent)" in queue, \
-    "download request headers must use the explicit non-sensitive allowlist"
-assert "CookieManager.getInstance().getCookie(url)" not in queue and \
-    'addRequestHeader("Cookie"' not in queue, \
-    "WebView session cookies must never be forwarded to redirect-following DownloadManager requests"
-assert "site sign-in cookies are not shared for redirect safety" in queue, \
-    "the system download notification must disclose the cookie boundary"
+assert "BrowserAddress.isAllowedWebUrl(url)" in queue, \
+    "the callback must still reject non-web schemes"
+assert "BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads())" in queue, \
+    "the callback must respect Online/Offline state and fail closed"
+assert "showToast(decision.userMessage)" in queue, \
+    "the blocked download action must explain the current limitation"
+for forbidden in ("new DownloadManager.Request(", "manager.enqueue(", "CookieManager.getInstance().getCookie(url)", \
+                  'addRequestHeader("Cookie"'):
+    assert forbidden not in queue, f"new browser downloads must not use {forbidden}"
+assert "new DownloadManager.Request(" not in activity and "manager.enqueue(request)" not in activity, \
+    "MainActivity must not persist new browser download URLs/headers through DownloadManager"
+assert "BrowserDownloadEnqueueGate browserDownloadEnqueueGate" not in activity, \
+    "the removed legacy enqueue gate must not remain in Activity"
+assert "Download started for the selected media file" not in activity, \
+    "media selection must not claim a download started after the callback is blocked"
+assert "(tap to retry)" not in activity and 'setTitle("Retry download?")' not in activity, \
+    "failed history must not promise retry while downloads are disabled"
 assert "BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id)" in method, \
     "the Downloads list should update only entries already owned by Daymark browser enqueue"
 for expected in ("browserDownloadTracker.onQueued(id)", "browserDownloadTracker.onProgress(id, downloaded, total)", \
