@@ -146,6 +146,7 @@
         maxChars: MAX_JSON_CHARS,
         tooLargeMessage: 'The rates response was too large to parse safely.',
         malformedMessage: 'The rates response was malformed.',
+        streamRequiredMessage: 'This browser cannot read rates responses with the required size limit.'
         timeoutMessage: 'Currency request timed out.',
         controller,
         isTimedOut: () => timedOut,
