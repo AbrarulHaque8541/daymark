@@ -21,6 +21,8 @@
   <script src="holidays-ui.js" defer></script>
   <script src="currency-logic.js" defer></script>
   <script src="currency-ui.js" defer></script>
+  <script src="zones-logic.js" defer></script>
+  <script src="zones-ui.js" defer></script>
   <script src="wiki-logic.js" defer></script>
   <script src="wiki-ui.js" defer></script>
   <script src="browser-address-logic.js" defer></script>
@@ -285,6 +287,38 @@
           </form>
           <p class="feed-status" id="currency-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="currency-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="zones-card" aria-labelledby="zones-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="zones-heading">World clock &amp; meeting overlap</h2>
+          <p class="briefing-description">Compare saved time zones offline and find a waking-hours window that works for everyone. No network, no account.</p>
+          <form id="zones-form" class="feed-form" novalidate>
+            <label class="sr-only" for="zones-pick">Time zone to add</label>
+            <select id="zones-pick" name="zone" class="sort-select" aria-label="Time zone to add">
+              <option value="Asia/Kolkata" selected>India · Kolkata</option>
+              <option value="Asia/Dubai">UAE · Dubai</option>
+              <option value="Asia/Singapore">Singapore</option>
+              <option value="Asia/Tokyo">Japan · Tokyo</option>
+              <option value="Asia/Shanghai">China · Shanghai</option>
+              <option value="Australia/Sydney">Australia · Sydney</option>
+              <option value="Pacific/Auckland">New Zealand · Auckland</option>
+              <option value="Europe/London">UK · London</option>
+              <option value="Europe/Berlin">Germany · Berlin</option>
+              <option value="Europe/Paris">France · Paris</option>
+              <option value="Europe/Moscow">Russia · Moscow</option>
+              <option value="America/New_York">US East · New York</option>
+              <option value="America/Chicago">US Central · Chicago</option>
+              <option value="America/Los_Angeles">US West · Los Angeles</option>
+              <option value="America/Sao_Paulo">Brazil · São Paulo</option>
+              <option value="Africa/Nairobi">Kenya · Nairobi</option>
+              <option value="Africa/Lagos">Nigeria · Lagos</option>
+            </select>
+            <button class="button button-primary" id="zones-add" type="submit">Add</button>
+            <button class="button button-quiet" id="zones-refresh" type="button">Refresh</button>
+            <button class="button button-quiet" id="zones-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="zones-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="zones-list" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="wiki-card" aria-labelledby="wiki-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
