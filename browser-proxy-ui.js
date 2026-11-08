@@ -12,6 +12,7 @@
   'use strict';
 
   const LAST_PROFILE_KEY = 'daymark.browser-proxy.last-profile';
+  const SAVE_FILENAME = 'daymark-proxy-plan.txt';
 
   function attachBrowserProxyUi(env) {
     if (!env || !env.document) throw new Error('attachBrowserProxyUi requires a document.');
@@ -29,6 +30,7 @@
     const formEl = element('browser-proxy-form');
     const clearEl = element('browser-proxy-clear');
     const copyEl = element('browser-proxy-copy');
+    const saveEl = element('browser-proxy-save');
     const planBtn = element('browser-proxy-plan');
 
     function status(message) {
@@ -183,6 +185,69 @@
       }
     }
 
+    function onSave() {
+      const text = collectPlanText() || (statusEl && statusEl.textContent) || '';
+      if (!text || text.includes('Enter a proxy address') || text.includes('Cleared.')) {
+        status('Nothing to save yet.');
+        return;
+      }
+      const BlobCtor = env.Blob !== undefined ? env.Blob : ((typeof window !== 'undefined' && window.Blob) || root.Blob);
+      const urlApi = env.URL !== undefined ? env.URL : ((typeof window !== 'undefined' && window.URL) || root.URL);
+      if (typeof BlobCtor !== 'function' || !urlApi
+        || typeof urlApi.createObjectURL !== 'function'
+        || typeof urlApi.revokeObjectURL !== 'function'
+        || !doc.body
+        || typeof doc.body.appendChild !== 'function'
+        || typeof doc.body.removeChild !== 'function'
+        || typeof doc.createElement !== 'function') {
+        status('Saving is not available in this environment.');
+        return;
+      }
+      if (saveEl && typeof saveEl.setAttribute === 'function') {
+        saveEl.setAttribute('aria-busy', 'true');
+      }
+      let objectUrl = null;
+      let link = null;
+      let appended = false;
+      try {
+        const blob = new BlobCtor([text], { type: 'text/plain;charset=utf-8' });
+        objectUrl = urlApi.createObjectURL(blob);
+        link = doc.createElement('a');
+        if (!link || typeof link.click !== 'function') {
+          throw new Error('Download link is unavailable.');
+        }
+        link.href = objectUrl;
+        link.download = SAVE_FILENAME;
+        if (typeof link.setAttribute === 'function') {
+          link.setAttribute('href', objectUrl);
+          link.setAttribute('download', SAVE_FILENAME);
+        }
+        doc.body.appendChild(link);
+        appended = true;
+        link.click();
+        status('Saved proxy plan as ' + SAVE_FILENAME + '.');
+      } catch (error) {
+        status('Could not save the plan as a text file.');
+      } finally {
+        if (appended && link) {
+          try { doc.body.removeChild(link); } catch (e) { /* best-effort */ }
+        }
+        if (objectUrl) {
+          const revoke = () => {
+            try { urlApi.revokeObjectURL(objectUrl); } catch (e) { /* best-effort */ }
+          };
+          if (typeof setTimeout === 'function') {
+            try { setTimeout(revoke, 1000); } catch (e) { revoke(); }
+          } else {
+            revoke();
+          }
+        }
+        if (saveEl && typeof saveEl.removeAttribute === 'function') {
+          saveEl.removeAttribute('aria-busy');
+        }
+      }
+    }
+
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
@@ -194,6 +259,9 @@
     }
     if (copyEl && typeof copyEl.addEventListener === 'function') {
       copyEl.addEventListener('click', () => { onCopy(); });
+    }
+    if (saveEl && typeof saveEl.addEventListener === 'function') {
+      saveEl.addEventListener('click', () => { onSave(); });
     }
 
     const wasRestored = restoreProfile();
@@ -207,6 +275,7 @@
       plan,
       onClear,
       onCopy,
+      onSave,
       detach() {
         status('');
       }
