@@ -81,6 +81,12 @@ public final class NoteFormatSmoke {
         check("https://[::1]/dev".equals(
                 NoteFormat.spans("https://[::1]/dev").get(0).target),
                 "valid HTTPS IPv6 links use the browser address validator");
+        check("https://[::1]".equals(
+                NoteFormat.spans("https://[::1]").get(0).target),
+                "the IPv6 authority's closing bracket is not trimmed as punctuation");
+        check("https://[::1]".equals(
+                NoteFormat.spans("https://[::1].").get(0).target),
+                "sentence punctuation after an IPv6 authority is trimmed safely");
         check("http://localhost:8080/path".equals(
                 NoteFormat.spans("http://localhost:8080/path").get(0).target),
                 "localhost links with ports are supported");

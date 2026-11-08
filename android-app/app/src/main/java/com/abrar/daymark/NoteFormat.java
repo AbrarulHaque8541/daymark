@@ -110,9 +110,27 @@ final class NoteFormat {
             end++;
         }
         if (end - start > MAX_LINK_CHARS) return start;
-        while (end > start && isTrailingPunctuation(text.charAt(end - 1))) end--;
+        while (end > start && isTrailingPunctuation(text.charAt(end - 1))) {
+            if (text.charAt(end - 1) == ']' && closesIpv6Authority(text, start, end)) break;
+            end--;
+        }
         return end > start + schemeLength
                 && BrowserAddress.isAllowedWebUrl(text.substring(start, end)) ? end : start;
+    }
+
+    /** Keeps the closing bracket when it is part of a bracketed IPv6 authority. */
+    private static boolean closesIpv6Authority(String text, int start, int end) {
+        int authorityStart = start + schemeLengthAt(text, start);
+        int authorityEnd = end;
+        for (int index = authorityStart; index < authorityEnd; index++) {
+            char c = text.charAt(index);
+            if (c == '/' || c == '?' || c == '#') {
+                authorityEnd = index;
+                break;
+            }
+        }
+        return authorityEnd == end && authorityEnd > authorityStart
+                && text.charAt(authorityStart) == '[' && text.charAt(authorityEnd - 1) == ']';
     }
 
     private static boolean isTrailingPunctuation(char c) {
