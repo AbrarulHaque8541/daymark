@@ -47,3 +47,12 @@ test('currency form keeps From, swap and To on one row', () => {
   assert.ok(css.includes('.currency-card .feed-form > .currency-swap { justify-self: center; }'),
     'swap must be centered between the two selects');
 });
+
+test('edit dialog is named by its visible heading', () => {
+  const form = markup.match(/<form\\b[^>]*id="edit-form"[^>]*>/);
+  assert.ok(form, 'edit task form is present');
+  assert.match(form[0], /aria-labelledby="edit-heading"/,
+    'edit form must reference its accessible heading');
+  assert.match(markup, /<h2\\b[^>]*id="edit-heading"[^>]*>\\s*Edit task/,
+    'the referenced heading must exist and name the dialog');
+});

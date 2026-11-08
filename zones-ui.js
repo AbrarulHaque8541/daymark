@@ -300,29 +300,58 @@
         status('Nothing to save yet.');
         return;
       }
+      const BlobCtor = env.Blob !== undefined ? env.Blob : ((win && win.Blob) || root.Blob);
+      const urlApi = env.URL !== undefined ? env.URL : ((win && win.URL) || root.URL);
+      if (typeof BlobCtor !== 'function' || !urlApi
+        || typeof urlApi.createObjectURL !== 'function'
+        || typeof urlApi.revokeObjectURL !== 'function'
+        || !doc.body
+        || typeof doc.body.appendChild !== 'function'
+        || typeof doc.body.removeChild !== 'function'
+        || typeof doc.createElement !== 'function') {
+        status('Saving is not available in this environment.');
+        return;
+      }
       setAriaBusy(saveEl, true);
+      let objectUrl = null;
+      let link = null;
+      let appended = false;
       try {
-        const blob = new Blob([text], { type: 'text/plain' });
-        const urlApi = (typeof URL !== 'undefined' ? URL : null);
-        if (!urlApi || typeof urlApi.createObjectURL !== 'function') {
-          status('Saving is not available in this environment.');
-          setAriaBusy(saveEl, false);
-          return;
+        const blob = new BlobCtor([text], { type: 'text/plain;charset=utf-8' });
+        objectUrl = urlApi.createObjectURL(blob);
+        link = doc.createElement('a');
+        if (!link || typeof link.click !== 'function') {
+          throw new Error('Download link is unavailable.');
         }
-        const url = urlApi.createObjectURL(blob);
-        const a = doc.createElement('a');
-        a.href = url;
-        a.download = SAVE_FILENAME;
-        if (doc.body && typeof doc.body.appendChild === 'function') {
-          doc.body.appendChild(a);
-          if (typeof a.click === 'function') a.click();
-          doc.body.removeChild(a);
+        link.href = objectUrl;
+        link.download = SAVE_FILENAME;
+        if (typeof link.setAttribute === 'function') {
+          link.setAttribute('href', objectUrl);
+          link.setAttribute('download', SAVE_FILENAME);
         }
-        if (typeof urlApi.revokeObjectURL === 'function') urlApi.revokeObjectURL(url);
+        doc.body.appendChild(link);
+        appended = true;
+        link.click();
         status('Saved world clock and overlap as ' + SAVE_FILENAME + '.');
-      } catch (e) {
-        status('Could not save the summary.');
+      } catch (error) {
+        status('Could not save the summary as a text file.');
       } finally {
+        if (appended && link) {
+          try { doc.body.removeChild(link); } catch (error) { /* best-effort DOM cleanup */ }
+        }
+        if (objectUrl) {
+          const revoke = () => {
+            try { urlApi.revokeObjectURL(objectUrl); } catch (error) { /* best-effort URL cleanup */ }
+          };
+          const schedule = typeof env.setTimeout === 'function'
+            ? env.setTimeout
+            : ((win && typeof win.setTimeout === 'function') ? win.setTimeout.bind(win) : root.setTimeout);
+          if (typeof schedule === 'function') {
+            try { schedule(revoke, 1000); } catch (error) { revoke(); }
+          } else {
+            revoke();
+          }
+        }
         setAriaBusy(saveEl, false);
       }
     }
