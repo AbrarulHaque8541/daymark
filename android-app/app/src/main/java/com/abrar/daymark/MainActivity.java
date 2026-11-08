@@ -7843,6 +7843,14 @@ public final class MainActivity extends Activity {
                     | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         }
         dialog.show();
+        // AlertDialog may apply its floating-window attributes during show(). Reapply the
+        // resize policy after the window is attached so the action buttons remain reachable
+        // above the IME on current Android releases (including target-SDK 36).
+        Window shownDialogWindow = dialog.getWindow();
+        if (shownDialogWindow != null) {
+            shownDialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
         titleInput.requestFocus();
     }
 
