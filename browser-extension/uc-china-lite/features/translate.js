@@ -35,7 +35,8 @@ function onEnable() {
     btn.style.top = Math.max(4, rect.top - 32) + "px";
     btn.style.display = "block";
   });
-  btn.onclick = async () => {
+  btn.onclick = async (event) => {
+    if (!event || event.isTrusted !== true) return;
     const text = selectedText();
     if (!text || text.length > 500) return;
     let lang = "hi";
