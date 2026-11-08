@@ -144,7 +144,7 @@
         maxChars: MAX_JSON_CHARS,
         tooLargeMessage: 'The holidays response was too large to parse safely.',
         malformedMessage: 'The holidays response was malformed.',
-        streamRequiredMessage: 'This browser cannot read holiday responses with the required size limit.'
+        streamRequiredMessage: 'This browser cannot read holiday responses with the required size limit.',
         timeoutMessage: 'Holidays request timed out.',
         controller,
         isTimedOut: () => timedOut,
