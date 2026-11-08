@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../export-ui.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
 function fakeElement(tag) {
   return {
@@ -190,4 +192,31 @@ test('auto-boot stays inert under Node (no window) and the module exposes its AP
   assert.equal(typeof ui.attachExportUi, 'function');
   assert.equal(ui.STORAGE_KEY, 'daymark.tasks.v1');
   assert.equal(typeof globalThis.DaymarkExportUi, 'object');
+});
+
+
+test('blocked storage getter leaves open-format export attached but fails closed without an empty backup', () => {
+  const { env, elements, created } = fakeEnv({ format: 'markdown', stored: JSON.stringify(sampleTasks) });
+  delete env.localStorage;
+  let reads = 0;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() {
+      reads += 1;
+      throw new Error('storage access blocked');
+    }
+  });
+  const handle = ui.attachExportUi(env);
+  assert.equal(reads, 1, 'storage acquisition is attempted once and caught');
+  handle.onClick(clickEvent(elements['export-tasks']));
+  assert.equal(created.filter((el) => el.tagName === 'a').length, 0,
+    'an unreadable task store must never produce an empty-looking export');
+  const status = created.find((el) => el.id === 'export-status');
+  assert.match(status.textContent, /Export failed: browser storage is unavailable; no data was exported/);
+});
+
+test('export auto-boot does not eagerly evaluate window.localStorage', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'export-ui.js'), 'utf8');
+  assert.doesNotMatch(source, /localStorage:\\s*window\\.localStorage/,
+    'boot must pass window and let attachExportUi guard the storage getter');
 });
