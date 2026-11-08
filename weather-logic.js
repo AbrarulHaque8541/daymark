@@ -10,7 +10,9 @@
   const MAX_PLACE_CHARS = 80;
   const MAX_COUNTRY_CHARS = 80;
   const MAX_LABEL_CHARS = 40;
-  const MAX_JSON_CHARS = 256 * 1024;
+  // Legacy public name retained for callers; the cap is enforced on UTF-8 response bytes.
+  const MAX_JSON_BYTES = 256 * 1024;
+  const MAX_JSON_CHARS = MAX_JSON_BYTES;
   const MAX_LATITUDE_ABS = 90;
   const MAX_LONGITUDE_ABS = 180;
   const MIN_TEMPERATURE_C = -90;
@@ -180,6 +182,82 @@
       && typeof value.fetchedAt === 'string' && !Number.isNaN(Date.parse(value.fetchedAt)));
   }
 
+  async function readBoundedResponseText(response) {
+    // Reject a declared oversized body before reading it. Content-Length may
+    // describe compressed bytes, so the streaming byte counter remains the
+    // authoritative bound on the decoded response body.
+    let declaredLength = null;
+    try {
+      const headers = response && response.headers;
+      if (headers && typeof headers.get === 'function') {
+        const header = headers.get('content-length');
+        const value = header === null || header === undefined ? '' : String(header).trim();
+        if (value.length > 0 && Array.from(value).every((character) => character >= '0' && character <= '9')) {
+          const parsed = Number(value);
+          if (Number.isSafeInteger(parsed)) declaredLength = parsed;
+        }
+      }
+    } catch (error) {
+      // A non-readable optional header does not prevent bounded stream reading.
+    }
+    if (declaredLength !== null && declaredLength > MAX_JSON_BYTES) {
+      throw new Error('The weather response was too large to parse safely.');
+    }
+
+    const body = response && response.body;
+    const Decoder = typeof root.TextDecoder === 'function' ? root.TextDecoder : null;
+    if (body && typeof body.getReader === 'function' && Decoder) {
+      const reader = body.getReader();
+      const decoder = new Decoder('utf-8');
+      let bytesRead = 0;
+      let text = '';
+      try {
+        while (true) {
+          const part = await reader.read();
+          if (!part || typeof part !== 'object') {
+            throw new Error('The weather response stream was malformed.');
+          }
+          if (part.done) break;
+          const chunk = part.value;
+          if (!chunk || !Number.isFinite(chunk.byteLength)) {
+            throw new Error('The weather response stream was malformed.');
+          }
+          bytesRead += chunk.byteLength;
+          if (bytesRead > MAX_JSON_BYTES) {
+            try {
+              const cancellation = reader.cancel();
+              if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+            } catch (error) {
+              // The request is already rejected; cancellation is best-effort.
+            }
+            throw new Error('The weather response was too large to parse safely.');
+          }
+          text += decoder.decode(chunk, { stream: true });
+        }
+        text += decoder.decode();
+        return text;
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch (error) {
+          // Some lightweight stream implementations do not expose a releasable lock.
+        }
+      }
+    }
+
+    if (!response || typeof response.text !== 'function') {
+      throw new Error('The weather response body is unavailable.');
+    }
+    const text = await response.text();
+    if (typeof text !== 'string') throw new Error('The weather response was malformed.');
+    const Encoder = typeof root.TextEncoder === 'function' ? root.TextEncoder : null;
+    const byteLength = Encoder ? new Encoder().encode(text).byteLength : text.length;
+    if (byteLength > MAX_JSON_BYTES) {
+      throw new Error('The weather response was too large to parse safely.');
+    }
+    return text;
+  }
+
   async function fetchJson(url, fetchImpl, timeoutMs) {
     if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
     const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
@@ -200,8 +278,7 @@
         redirect: 'follow'
       });
       if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
-      const text = await response.text();
-      if (text.length > MAX_JSON_CHARS) throw new Error('The weather response was too large to parse safely.');
+      const text = await readBoundedResponseText(response);
       if (timedOut) throw new Error('Weather request timed out.');
       try {
         return JSON.parse(text);
@@ -249,6 +326,7 @@
     MAX_COUNTRY_CHARS,
     MAX_LABEL_CHARS,
     MAX_JSON_CHARS,
+    MAX_JSON_BYTES,
     DEFAULT_TIMEOUT_MS,
     GEOCODING_ENDPOINT,
     FORECAST_ENDPOINT
