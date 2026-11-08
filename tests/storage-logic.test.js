@@ -30,6 +30,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.holidays.v1',
     'daymark.currency.v1',
     'daymark.zones.v1',
+    'daymark.countdowns.v1',
     'daymark.webhook.v1',
     'daymark.webhook.queue.v1'
   ];
