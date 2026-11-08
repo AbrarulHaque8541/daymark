@@ -62,7 +62,7 @@ PR #627 [RSS/Atom parser](https://github.com/AbrarulHaque8541/daymark/pull/627) 
 - Exact-head Android CI [42499551905](https://github.com/AbrarulHaque8541/daymark/actions/runs/42499551905): **IN PROGRESS** at last poll.
 - Cross-platform contracts [42499551886](https://github.com/AbrarulHaque8541/daymark/actions/runs/42499551886): **PENDING**.
 - Device-test APK [42499551948](https://github.com/AbrarulHaque8541/daymark/actions/runs/42499551948): **IN PROGRESS**.
-- Prior run 42499381066/42499381086? **FAIL** due UI test mocks still returning text-only responses and the TextDecoder-unavailable fake stream lacking a body-level cancel method. All four UI fixture helpers now use `tests/helpers/stream-response.js`; `makeStreamResponse` now supports body cancellation. Those fixes are on current head and need fresh exact-head validation.
+- Prior cross-platform run 42499381066 (Ubuntu job 128788583697; Windows job 128788583889) **FAIL** due UI test mocks still returning text-only responses and the TextDecoder-unavailable fake stream lacking a body-level cancel method. All four UI fixture helpers now use `tests/helpers/stream-response.js`; `makeStreamResponse` now supports body cancellation. Those fixes are on current head and need fresh exact-head validation.
 - Independent security review still required; do not merge before green exact-head CI and review.
 
 ## Other integration findings
