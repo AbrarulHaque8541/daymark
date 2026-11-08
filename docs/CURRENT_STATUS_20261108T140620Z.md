@@ -51,3 +51,31 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6
 Tooling: GitHub connector (live repository/source/PR/Actions APIs, branch and commit writes); V8 runtime (source compilation and focused streaming behavior harness)
 Timestamp (UTC): 2026-11-08T14:06:20.122Z
+
+
+## Verification refresh — 2026-11-08T14:08:28Z
+
+### PR #622 exact-head CI
+- Head: `faa0d4f8f51b0741b0f6f1810b2b939a802f0a55`; base/main remains `f9e505604718beae5ef14e274fc96879e34fdfdb` (compare: 3 ahead, 0 behind).
+- Cross-platform contracts [run #42488148176](https://github.com/AbrarulHaque8541/daymark/actions/runs/42488148176): **PASS** — Ubuntu 24.04 and Windows 2025.
+- Android CI [run #42488148163](https://github.com/AbrarulHaque8541/daymark/actions/runs/42488148163): **IN PROGRESS** at last poll.
+- Device-test APK [run #42488148159](https://github.com/AbrarulHaque8541/daymark/actions/runs/42488148159): **IN PROGRESS** at last poll.
+- PR #622: OPEN, mergeable, not merged. Exact-head required checks are incomplete.
+
+### PR #621 exact-head CI refresh
+- Head: `143cd41cb11c9d0fb02f414da8acebe5e636f146`.
+- Android CI [run #42487534991](https://github.com/AbrarulHaque8541/daymark/actions/runs/42487534991): **PASS**.
+- Cross-platform contracts [run #42487534980](https://github.com/AbrarulHaque8541/daymark/actions/runs/42487534980): **PASS** — Ubuntu and Windows.
+- Device-test APK [run #42487534965](https://github.com/AbrarulHaque8541/daymark/actions/runs/42487534965): **PASS**; production publication job **SKIPPED**.
+- Independent review remains outstanding; PR #621 remains OPEN.
+
+### API 36 lifecycle evidence
+- PR #616 head `db0a31b0087691b5363a6f7dcec24abb0a94f54a`, run [#42481951459](https://github.com/AbrarulHaque8541/daymark/actions/runs/42481951459): API 29 **PASS**, API 36 **FAIL at repeat 4/10**.
+- Exact failure: task-editor Cancel target is clickable but not visible after IME appears; IME top y=1048, Cancel bounds y=1662–1804, `visible=0`.
+- Evidence-backed owner handoff posted on PR #610; linked coordination comments posted on PR #616 and issue #613. The shared `MainActivity.java` edit remains with PR #610 owner; no overlapping edit was made.
+- Issue #613 remains OPEN. No retry or assertion weakening was used.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector (live Actions job/log inspection, PR/issue coordination, repository handoff update)
+Timestamp (UTC): 2026-11-08T14:08:28Z
