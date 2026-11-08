@@ -57,6 +57,7 @@ function fakeEnv(options) {
     'zones-refresh': Object.assign(fakeElement('button'), { id: 'zones-refresh', type: 'button' }),
     'zones-clear': Object.assign(fakeElement('button'), { id: 'zones-clear', type: 'button' }),
     'zones-copy': Object.assign(fakeElement('button'), { id: 'zones-copy', type: 'button' }),
+    'zones-share': Object.assign(fakeElement('button'), { id: 'zones-share', type: 'button' }),
     'zones-form': Object.assign(fakeElement('form'), { id: 'zones-form' }),
     'zones-status': Object.assign(fakeElement('p'), { id: 'zones-status' }),
     'zones-list': Object.assign(fakeElement('div'), { id: 'zones-list' })
@@ -278,4 +279,40 @@ test('copy reports nothing when the zones module is missing', async () => {
   const handle = ui.attachZonesUi(env);
   handle.onCopy();
   assert.equal(elements['zones-status'].textContent, 'Nothing to copy yet.');
+});
+
+test('share overlap calls navigator.share with the summary and reports status', async () => {
+  let shared = null;
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    share(data) {
+      shared = data;
+      return Promise.resolve();
+    }
+  };
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-share'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the share button has a click listener');
+  await click.handler();
+  assert.ok(shared && shared.text && shared.text.includes('Daymark world clock'), 'share received the summary');
+  assert.equal(shared.title, 'Daymark world clock and overlap');
+  assert.equal(elements['zones-status'].textContent, 'Shared world clock and overlap.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
+});
+
+test('share reports unavailable when navigator.share is missing', async () => {
+  const { env, elements } = fakeEnv({});
+  env.navigator = {};
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-share'].listeners.find((l) => l.type === 'click');
+  assert.ok(click);
+  await click.handler();
+  assert.equal(elements['zones-status'].textContent, 'Sharing is not available in this environment.');
+});
+
+test('share reports nothing when the zones module is missing', async () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  handle.onShare();
+  assert.equal(elements['zones-status'].textContent, 'Nothing to share yet.');
 });

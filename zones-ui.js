@@ -30,6 +30,7 @@
     const refreshEl = element('zones-refresh');
     const clearEl = element('zones-clear');
     const copyEl = element('zones-copy');
+    const shareEl = element('zones-share');
     const formEl = element('zones-form');
     const statusEl = element('zones-status');
     const listEl = element('zones-list');
@@ -269,6 +270,29 @@
       }
     }
 
+
+    function onShare() {
+      const text = buildCopyText();
+      if (!text) {
+        status('Nothing to share yet.');
+        return;
+      }
+      const nav = env.navigator || (win && win.navigator) || null;
+      setAriaBusy(shareEl, true);
+      if (nav && typeof nav.share === 'function') {
+        nav.share({ title: 'Daymark world clock and overlap', text }).then(() => {
+          status('Shared world clock and overlap.');
+          setAriaBusy(shareEl, false);
+        }).catch(() => {
+          status('Could not share the summary.');
+          setAriaBusy(shareEl, false);
+        });
+        return;
+      }
+      status('Sharing is not available in this environment.');
+      setAriaBusy(shareEl, false);
+    }
+
     function onRefresh() {
       if (!zonesApi) {
         status('World clock is unavailable.');
@@ -324,6 +348,9 @@
     if (copyEl && typeof copyEl.addEventListener === 'function') {
       copyEl.addEventListener('click', () => { onCopy(); });
     }
+    if (shareEl && typeof shareEl.addEventListener === 'function') {
+      shareEl.addEventListener('click', () => { onShare(); });
+    }
 
     return {
       onAdd,
@@ -331,6 +358,7 @@
       onRefresh,
       onClear,
       onCopy,
+      onShare,
       readCache,
       detach() {
         // No document-level listener is registered; the button references are
