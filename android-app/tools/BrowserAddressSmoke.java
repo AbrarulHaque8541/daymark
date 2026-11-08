@@ -98,6 +98,11 @@ public final class BrowserAddressSmoke {
                 .equals("https://[::1]/dev") : "bare IPv6 loopback must resolve to HTTPS";
         assert BrowserAddress.resolveInput("[2001:db8::1]:8443/path", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://[2001:db8::1]:8443/path") : "bare IPv6 with port must be accepted";
+        assert BrowserAddress.resolveInput("[1:2:3:4:5:6:192.0.2.1]", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://[1:2:3:4:5:6:192.0.2.1]")
+                : "bare IPv6 with an uncompressed IPv4 tail must be accepted";
+        assert !BrowserAddress.isLikelyWebAddress("[1:2:3:4:5:192.0.2.1]")
+                : "an IPv4 tail must still account for two IPv6 groups";
         assert BrowserAddress.resolveInput("localhost:3000/api", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://localhost:3000/api") : "localhost with port must resolve to HTTPS";
         assert BrowserAddress.isLikelyWebAddress("[::1]");
