@@ -58,6 +58,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 @keyframes stat-bump { 50% { transform: scale(1.22); } }
 .stat-label { color: var(--muted-text); font-size: 11px; }
 .card { background: var(--surface); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border: 1px solid rgba(219, 226, 232, .75); border-radius: 20px; box-shadow: var(--shadow); }
+.card:active { transform: scale(.998); }
 .composer { padding: 20px 22px 18px; }
 .composer-intro { display: flex; align-items: center; gap: 11px; margin-bottom: 17px; }
 .plus-mark { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 22px; line-height: 1; font-weight: 400; }
@@ -110,6 +111,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .task-list { display: grid; gap: 8px; }
 .task-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 11px; align-items: center; min-height: 76px; border: 1px solid rgba(219, 226, 232, .75); border-radius: 16px; background: var(--surface); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); padding: 12px 13px; box-shadow: 0 4px 16px rgba(24, 40, 48, .04); animation: rise-in .22s ease both; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
 .task-row:hover { transform: translateY(-1px); border-color: rgba(22, 112, 95, .3); box-shadow: 0 10px 26px rgba(24, 40, 48, .08); }
+.task-row:active { transform: translateY(0) scale(.995); }
 @keyframes rise-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .complete-button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 1.5px solid #c3ced6; border-radius: 50%; color: white; background: white; transition: all .15s ease; }
 .complete-button:hover { border-color: var(--accent); background: #eef6f2; transform: scale(1.08); }
@@ -150,6 +152,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .empty-check { position: absolute; right: 7px; bottom: 5px; display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; color: white; background: var(--accent); font-size: 11px; }
 .empty-state h3 { margin: 0 0 5px; font-size: 13px; }.empty-state p { max-width: 225px; margin: 0; color: var(--muted-text); font-size: 10px; line-height: 1.6; }
 .suggestion-card { position: relative; overflow: hidden; border: 1px solid rgba(219, 232, 228, .8); border-radius: 20px; background: rgba(226, 240, 235, .55); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); padding: 19px 18px 15px; }
+.card:active { transform: scale(.998); }
 .suggestion-card::before { position: absolute; top: -75px; right: -55px; width: 160px; height: 160px; border-radius: 50%; background: rgba(200, 226, 216, .7); content: ''; }
 .suggestion-card > * { position: relative; }
 .suggestion-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 13px; }
@@ -191,6 +194,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .add-button { grid-column: 1 / -1; justify-self: stretch; }
   .content-grid { grid-template-columns: 1fr; margin-top: 32px; }
   .suggestion-card { order: 2; }
+.card:active { transform: scale(.998); }
   .suggestion-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .suggestion-empty { grid-column: 1 / -1; }
 }
@@ -230,6 +234,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .filter-button.is-active span { background: var(--accent-soft); color: var(--accent); }
   .task-row { border-color: #2c3640; background: var(--surface); box-shadow: 0 4px 16px rgba(0, 0, 0, .2); }
   .task-row:hover { border-color: rgba(42, 143, 122, .4); box-shadow: 0 10px 26px rgba(0, 0, 0, .3); }
+.task-row:active { transform: translateY(0) scale(.995); }
   .complete-button { border-color: #3a4650; background: #1a2128; }
   .complete-button:hover { border-color: var(--accent); background: #1a3a32; }
   .task-title { color: #e8eef2; }
@@ -250,6 +255,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .empty-sun { border-color: #2c3640; background: #1a3a32; }
   .empty-line { background: #2c3640; }
   .suggestion-card { border-color: #2c3640; background: rgba(26, 58, 50, .4); }
+.card:active { transform: scale(.998); }
   .suggestion-card::before { background: rgba(26, 58, 50, .5); }
   .suggestion-card h2 { color: #e8eef2; }
   .suggestion-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
@@ -299,6 +305,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 /* Focus timer card */
 .focus-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); }
+.card:active { transform: scale(.998); }
 .focus-card[hidden] { display: none; }
 .focus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .focus-header h3 { margin: 0; font-size: 14px; }
@@ -310,6 +317,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .focus-task-select { width: 100%; height: 36px; margin-bottom: 10px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 10px; background: rgba(255, 255, 255, .75); padding: 0 10px; font-size: 12px; }
 @media (prefers-color-scheme: dark) {
   .focus-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
+.card:active { transform: scale(.998); }
   .focus-preset { color: #9aa6af; }
   .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .focus-task-select { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }
@@ -317,6 +325,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 /* Briefing (RSS/Atom feed) card */
 .briefing-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.card:active { transform: scale(.998); }
 .briefing-card[hidden] { display: none; }
 .briefing-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
 .briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
@@ -339,6 +348,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .feed-empty { border: 1px dashed #b9d2ca; border-radius: 12px; background: rgba(255, 255, 255, .5); color: var(--muted-text); font-size: 11px; text-align: center; padding: 14px; }
 @media (prefers-color-scheme: dark) {
   .briefing-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
+.card:active { transform: scale(.998); }
   .briefing-description { color: var(--muted-text); }
   .feed-form input { border-color: #2c3640; background: rgba(26, 33, 40, .85); color: #e8eef2; }
   .feed-form input::placeholder { color: var(--muted-text); }
@@ -358,6 +368,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .focus-progress-fill { transition: none; }
 }
 .focus-card { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.card:active { transform: scale(.998); }
 .focus-card:hover { border-color: rgba(22, 112, 95, .35); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px rgba(22, 112, 95, .08); }
 .focus-card.is-running {
   border-color: rgba(22, 112, 95, .45);
@@ -377,11 +388,13 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 @media (prefers-color-scheme: dark) {
   .focus-card { border-color: rgba(22, 112, 95, .28); background: rgba(26, 58, 50, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.card:active { transform: scale(.998); }
   .focus-progress { background: rgba(22, 112, 95, .18); border-color: rgba(22, 112, 95, .22); }
 }
 
 /* Weather glance card (Open-Meteo, keyless) */
 .weather-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.card:active { transform: scale(.998); }
 .weather-card[hidden] { display: none; }
 .weather-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
 .weather-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
@@ -394,6 +407,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .weather-now:empty { display: none; }
 @media (prefers-color-scheme: dark) {
   .weather-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
+.card:active { transform: scale(.998); }
   .weather-description { color: var(--muted-text); }
   .weather-status { color: var(--muted-text); }
   .weather-now { border-color: #2c3640; background: rgba(26, 33, 40, .65); color: #e8eef2; }
@@ -413,6 +427,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 /* ---------- Currency glance card ---------- */
 .currency-card {
+.card:active { transform: scale(.998); }
   position: relative;
   margin-top: 18px;
   border: 1px solid rgba(22, 112, 95, 0.18);
@@ -531,6 +546,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 
 @media (prefers-color-scheme: dark) {
   .currency-card {
+.card:active { transform: scale(.998); }
     border-color: rgba(125, 224, 203, 0.14);
     background: linear-gradient(160deg, rgba(24, 31, 37, 0.92), rgba(14, 18, 22, 0.85));
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
@@ -573,6 +589,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .currency-card,
 .briefing-card,
 .focus-card {
+.card:active { transform: scale(.998); }
   position: relative;
   overflow: hidden;
 }
@@ -608,6 +625,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 /* Wikipedia knowledge glance card (2026-11-05). Glass surface, accent
    #16705f, tactile hover, dark-mode parity, reduced-motion safe. */
 .wiki-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); position: relative; overflow: hidden; }
+.card:active { transform: scale(.998); }
 .wiki-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
 .wiki-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
 .wiki-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
@@ -639,6 +657,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 @media (prefers-color-scheme: dark) {
   .wiki-card { border-color: rgba(125, 224, 203, 0.14); background: linear-gradient(160deg, rgba(24, 31, 37, 0.92), rgba(14, 18, 22, 0.85)); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); }
+.card:active { transform: scale(.998); }
   .wiki-dot { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.28); }
   .wiki-card .feed-form input { border-color: rgba(125, 224, 203, 0.16); background: rgba(14, 18, 22, 0.7); }
   .wiki-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
