@@ -5805,7 +5805,7 @@ public final class MainActivity extends Activity {
         taskActions.setVisibility(webMode ? View.GONE : View.VISIBLE);
         webActions.setVisibility(View.GONE);
         pathButton.setVisibility(webMode ? View.GONE : View.VISIBLE);
-        quickCaptureInput.setHint(webMode ? "Search or enter HTTPS address" : "Task title or quick note");
+        quickCaptureInput.setHint(webMode ? "Search or enter web address" : "Task title or quick note");
         quickCaptureInput.setContentDescription(webMode
                 ? "Search the web or enter a web address. Browsing is ready; requests are sent only after you tap Go or a provider/site shortcut."
                 : "What do you want to get done? Type a task");
@@ -5876,7 +5876,7 @@ public final class MainActivity extends Activity {
     private void confirmBrowserOnlineAccess(Runnable afterEnable) {
         new AlertDialog.Builder(this)
                 .setTitle("Enable online browsing?")
-                .setMessage("Online browsing sends a search query or requested URL, plus normal connection data such as your IP address and browser identification, to the selected provider/site; those services may log requests. Pages may contact their own or third-party endpoints, which may also be logged. Daymark's browser network policy controls page/resource loads only and does not control Android System WebView Safe Browsing, a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash-based checks; its provider is not selectable in Daymark, though its protection setting is available in Browser Settings. WebView M126+ may send a partial URL hash through a proxy for real-time checks; earlier versions use a local partial-hash database and may query a server on prefix match. This is not a claim that every full URL is sent; the method depends on WebView version and device settings. Daymark sends no task text and adds no app analytics; WebView diagnostic metrics are opted out. HTTP remains blocked. Enabling Online alone makes no page request; each search or site still requires a tap. This choice is saved on this device. Turning Online off stops and closes the active page.")
+                .setMessage("Online browsing sends a search query or requested URL, plus normal connection data such as your IP address and browser identification, to the selected provider/site; those services may log requests. Pages may contact their own or third-party endpoints, which may also be logged. Daymark's browser network policy controls page/resource loads only and does not control Android System WebView Safe Browsing, a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash-based checks; its provider is not selectable in Daymark, though its protection setting is available in Browser Settings. WebView M126+ may send a partial URL hash through a proxy for real-time checks; earlier versions use a local partial-hash database and may query a server on prefix match. This is not a claim that every full URL is sent; the method depends on WebView version and device settings. Daymark sends no task text and adds no app analytics; WebView diagnostic metrics are opted out. HTTP pages are allowed and labelled \"Not encrypted\"; HTTPS pages are encrypted. Enabling Online alone makes no page request; each search or site still requires a tap. This choice is saved on this device. Turning Online off stops and closes the active page.")
                 .setNegativeButton("Stay offline", (dialog, which) -> showBrowserOfflineStatus())
                 .setPositiveButton("Enable Online", (dialog, which) -> {
                     setBrowserOnlineEnabled(true);
@@ -6903,7 +6903,7 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Applies {@link NoteFormat} to a note: inline code in the monospace family, HTTPS links
+     * Applies {@link NoteFormat} to a note: inline code in the monospace family, HTTP/HTTPS links
      * underlined in the accent color and tappable. The note text itself is never interpreted as
      * HTML or Markdown, so a stored note cannot inject markup into the dialog.
      */
@@ -6933,10 +6933,10 @@ public final class MainActivity extends Activity {
         return styled;
     }
 
-    /** Opens a note's link in the in-app browser, which enforces the same HTTPS-only policy. */
+    /** Opens a validated HTTP/HTTPS note link in the in-app browser. */
     private void openNoteLink(String url) {
         if (url == null || !BrowserAddress.isAllowedWebUrl(url)) {
-            showToast("Only HTTPS links can be opened from a note.");
+            showToast("Only HTTP and HTTPS links can be opened from a note.");
             return;
         }
         setWebMode(true);
