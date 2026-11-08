@@ -316,6 +316,133 @@ test("translation requests are bounded, HTTPS-only, and encode user text", async
 });
 
 
+function makeExtensionFeatureEnvironment() {
+  const elements = new Map();
+  const listeners = new Map();
+  const calls = { messages: 0, storageReads: 0, opens: 0, alerts: 0 };
+
+  function createElement(tagName) {
+    return {
+      tagName: String(tagName).toUpperCase(),
+      id: "",
+      title: "",
+      textContent: "",
+      style: {},
+      attributes: {},
+      children: [],
+      onclick: null,
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      appendChild(child) {
+        this.children.push(child);
+        if (child.id) elements.set(child.id, child);
+        return child;
+      },
+      remove() {
+        if (this.id) elements.delete(this.id);
+        for (const child of this.children) if (child.id) elements.delete(child.id);
+      },
+    };
+  }
+
+  const documentElement = createElement("html");
+  const document = {
+    documentElement,
+    getElementById(id) { return elements.get(id) || null; },
+    createElement,
+    addEventListener(name, callback) {
+      const callbacks = listeners.get(name) || [];
+      callbacks.push(callback);
+      listeners.set(name, callbacks);
+    },
+  };
+  const window = {
+    getSelection() {
+      return {
+        toString() { return "private selected page text"; },
+        rangeCount: 1,
+        getRangeAt() {
+          return { getBoundingClientRect() { return { left: 10, top: 20, right: 120, width: 110, height: 16 }; } };
+        },
+      };
+    },
+    open() { calls.opens += 1; },
+  };
+  const chrome = {
+    runtime: {
+      async sendMessage() {
+        calls.messages += 1;
+        return { text: "safe response" };
+      },
+    },
+    storage: {
+      sync: {
+        async get() {
+          calls.storageReads += 1;
+          return { settings: { language: "hi" } };
+        },
+      },
+    },
+  };
+  const alert = () => { calls.alerts += 1; };
+  return { document, window, chrome, alert, elements, calls };
+}
+
+function loadExtensionFeature(file, environment) {
+  const source = fs.readFileSync(path.join(root, file), "utf8")
+    .replace(/^export\\s+\\{[^}]+\\};\\s*$/m, "")
+    .replace(/^export default \\{[^\\n]*\\};\\s*$/m, "");
+  const factory = new Function("document", "window", "chrome", "alert",
+    source + "\\nreturn { onEnable, onDisable };");
+  return factory(environment.document, environment.window, environment.chrome, environment.alert);
+}
+
+test("AI launcher and action buttons reject synthetic clicks before sending selected text", async () => {
+  const environment = makeExtensionFeatureEnvironment();
+  const feature = loadExtensionFeature("browser-extension/uc-china-lite/features/aibutton.js", environment);
+  feature.onEnable();
+
+  const launcher = environment.elements.get("uccl-ai-btn");
+  assert.ok(launcher);
+  await launcher.onclick({ isTrusted: false });
+  assert.equal(environment.elements.has("uccl-ai-panel"), false);
+  assert.equal(environment.calls.messages, 0);
+  assert.equal(environment.calls.opens, 0);
+
+  await launcher.onclick({ isTrusted: true });
+  const panel = environment.elements.get("uccl-ai-panel");
+  assert.ok(panel, "a trusted user click opens the AI panel");
+  const row = panel.children.find((child) => child.children.length === 3);
+  assert.ok(row, "the panel exposes the three AI actions");
+  await row.children[0].onclick({ isTrusted: false });
+  assert.equal(environment.calls.messages, 0,
+    "a synthetic click on Explain cannot send the selected text");
+  assert.equal(environment.calls.opens, 0);
+
+  await row.children[0].onclick({ isTrusted: true });
+  assert.equal(environment.calls.messages, 1,
+    "a trusted user click still sends the selected text through the configured AI flow");
+});
+
+test("Quick Translate rejects synthetic clicks before storage, network, alert, or external navigation", async () => {
+  const environment = makeExtensionFeatureEnvironment();
+  const feature = loadExtensionFeature("browser-extension/uc-china-lite/features/translate.js", environment);
+  feature.onEnable();
+
+  const button = environment.elements.get("uccl-translate-btn");
+  assert.ok(button);
+  await button.onclick({ isTrusted: false });
+  assert.equal(environment.calls.storageReads, 0);
+  assert.equal(environment.calls.messages, 0);
+  assert.equal(environment.calls.alerts, 0);
+  assert.equal(environment.calls.opens, 0);
+
+  await button.onclick({ isTrusted: true });
+  assert.equal(environment.calls.storageReads, 1);
+  assert.equal(environment.calls.messages, 1);
+  assert.equal(environment.calls.alerts, 1);
+  assert.equal(environment.calls.opens, 0);
+});
+
 test("optional API host permissions are HTTPS-only while page features retain HTTP support", () => {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(root, "browser-extension/uc-china-lite/manifest.json"),
