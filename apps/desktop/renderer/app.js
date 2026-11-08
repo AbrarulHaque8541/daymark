@@ -18,7 +18,8 @@ function toast(msg) {
 }
 
 function isLocal(hostname) {
-  return ['localhost', '127.0.0.1', '::1'].includes(String(hostname || '').toLowerCase());
+  const normalized = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  return ['localhost', '127.0.0.1', '::1'].includes(normalized);
 }
 
 // Same policy as lib/rules.js (renderer has no node access).

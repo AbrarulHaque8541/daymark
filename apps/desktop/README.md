@@ -1,39 +1,45 @@
 # Daymark Browser (desktop)
 
-Daymark ka cross-platform mini browser — ek hi codebase jo **Windows, Linux aur macOS** pe
-Chromium engine ke saath identical chalta hai.
+Daymark ka desktop browser abhi **experimental prototype** hai. Electron Chromium embed karta hai, lekin Windows, Linux aur macOS ke OS integration, packaging aur rendering behavior ko identical ya production-supported assume nahi karna chahiye.
 
-## Kaise chalayein (kisi bhi machine pe)
+## Kaise chalayein
 
 ```bash
 git clone https://github.com/AbrarulHaque8541/daymark.git
 cd daymark/apps/desktop
 npm install
-npm start      # browser khul jayega
-npm test      # unit tests (Windows/Linux/macOS sab pe hote hain)
+npm start
+npm test
 ```
 
-Koi bhi agent ya insaan — chahe uske paas Windows ho ya Linux — repo clone karke seedha
-test/chaal sakta hai. CI bhi teeno OS pe ye test automatic chalata hai
-(`desktop-browser-ci` workflow).
+Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS par unit tests chalata hai. Yeh GUI launch, installer packaging, screenshot capture ya real-device compatibility prove nahi karta.
 
-## Features (v0.1)
+## Features (prototype)
 
 - Tabs (Ctrl+T naya, Ctrl+W band, click se switch)
-- Address bar with auto https:// upgrade (Ctrl+L)
-- **HTTPS-only policy**: plain `http://` requests cancel — sirf localhost exception
-- Tracker/ad domain blocking (starter list, expandable)
-- Privacy headers: `DNT: 1`, `Sec-GPC: 1`
+- Address bar with auto HTTPS upgrade (Ctrl+L)
+- HTTPS-only navigation; HTTP/WS exception sirf localhost ke liye
+- Secure WebSockets (WSS) aur starter tracker-domain blocking
+- Privacy headers: DNT: 1, Sec-GPC: 1
 - Find in page (Ctrl+F)
-- Downloads OS ke Downloads folder mein
-- `target=_blank` / `window.open` naye tab mein khulta hai
+- Downloads currently OS Downloads folder mein auto-save hote hain; per-download consent/redirect audit abhi production-grade nahi
+- target=_blank / window.open allowed web URLs ko new tab mein route karta hai
+
+## Security boundary
+
+- Host renderer: sandbox, contextIsolation aur webSecurity enabled; nodeIntegration disabled.
+- Guest webviews: preload aur custom session/partition overrides remove hote hain; Node integration, plugins aur nested webview disabled; sandbox/security preferences force hoti hain.
+- Initial URL, in-page navigation, redirects aur popup targets HTTPS/localhost policy se validate hote hain.
+- file: access exact packaged renderer files tak limited hai. data:/blob: sirf subresources ke liye, aur about:blank/about:srcdoc sirf child frames ke liye allowed hain. Top-level file:, data:, chrome:, devtools:, javascript: aur unknown schemes blocked hain.
+- HTTPS/WSS allowed; remote HTTP/WS blocked; localhost HTTP/WS development exception hai.
+- Tracker list starter list hai, comprehensive network-level ad/tracker blocker nahi.
+
+Android app ka browser policy alag hai: production Android WebView HTTP aur HTTPS dono support karta hai, aur plain HTTP ko “Not encrypted” label karta hai. Is desktop prototype ki HTTPS-only policy ko Android behavior ka replacement na samjhein.
 
 ## Design notes
 
-- URL policy pure logic mein hai (`lib/rules.js`) — koi Electron dependency nahi,
-  isliye tests har OS pe bina display ke chal jaate hain.
-- Renderer aur main process isolated hain (contextIsolation on, nodeIntegration off).
-- Engine scratch se nahi likha gaya — Brave/Edge bhi nahi likhte. Hum Chromium
-  (Electron) use karte hain taaki har desktop pe behaviour 100% same rahe.
+- Request and URL policy pure logic modules mein hain (lib/rules.js, lib/request-policy.js) aur Node tests se verify hote hain.
+- Electron/Chromium engine OS-provided browser engine nahi hai; Electron version ke saath Chromium update hota hai. Platform differences remain.
+- CI abhi unit/policy tests tak limited hai; GUI smoke, signed installers, physical desktop acceptance aur downloads consent workflow backlog mein hain.
 
-Roadmap aur platform matrix: `docs/DESKTOP_BROWSER_PLAN.md` dekhein.
+Roadmap aur platform matrix: docs/DESKTOP_BROWSER_PLAN.md.
