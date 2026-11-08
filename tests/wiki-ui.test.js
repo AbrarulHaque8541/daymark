@@ -80,12 +80,34 @@ function fakeEnv(options) {
   return { env, elements, storageData };
 }
 
+function streamResponse(body) {
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; }, cancel() { return reader.cancel(); } },
+    text() { throw new Error('bounded response reader must not call response.text()'); }
+  };
+}
+
 function okFetch(body) {
   const seen = [];
   const impl = (url, init) => {
     seen.push(url);
     assert.ok(!init || typeof init === 'object', 'fetch init must be an options object when provided');
-    return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
+    return Promise.resolve(streamResponse(body));
   };
   impl.seen = seen;
   return impl;
