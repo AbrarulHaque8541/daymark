@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-08T02:40:00Z (Cycle A: restore complete download UI + task editor)](./CURRENT_STATUS_20261108T024000Z.md)
+
 - [Daymark engineering status — 2026-11-08T06:35:00Z (Cycle A: download status aria-atomic)](./CURRENT_STATUS_20261108T063500Z.md)
 
 - [Daymark engineering status — 2026-11-08T05:08:00Z (Cycle B: restore announcement + aria-busy)](./CURRENT_STATUS_20261108T050800Z.md)
