@@ -8,6 +8,11 @@
  * event, or the next completed task. Nothing polls and nothing wakes the radio
  * on a timer: zero battery drain by design. Mirrors the weather/currency
  * module style: attachWebhookUi(env) is fully injectable for unit tests.
+ *
+ * Origin-wide Web Locks serialize queue mutations and hold one exclusive lock
+ * across delivery. If that coordinator is unavailable, task events are not
+ * queued or sent. Delivery remains at-least-once across crashes or ambiguous
+ * network outcomes; arbitrary webhook receivers do not promise exactly once.
  */
 ((root) => {
   'use strict';
