@@ -115,3 +115,15 @@ Work by: ChatGPT
 Model: GPT-6  
 Tooling: GitHub connector (live PR/source/issue/Actions logs and status snapshot update); Code Mode V8 behavior smoke  
 Timestamp (UTC): 2026-11-08T15:20:00Z
+
+
+## Additional Clear rollback regression — 2026-11-08T15:21:00Z
+
+Added a failure-injection case where the first key removal succeeds, the second removal fails, and restoring the first key also fails. The test asserts that the visible list remains available, the untouched original key is restored, the missing key is not falsely reported as restored, and status explicitly reports both the failed removal and partially changed storage. The existing successful-rollback test now also asserts that a removal failure is not mislabeled as a write failure.
+
+Test commit: `cbfb89c8db59fd3c2a44e918c41a094d4c786e04`. This is a meaningful test-only change; no test was removed or weakened. New exact-head Actions must validate the final docs-integrated branch head before merge.
+
+Work by: ChatGPT  
+Model: GPT-6  
+Tooling: GitHub connector (test update and source-level regression review)  
+Timestamp (UTC): 2026-11-08T15:21:00Z
