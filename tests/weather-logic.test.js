@@ -214,7 +214,7 @@ test('oversized responses are rejected by Content-Length before acquiring the st
   await assert.rejects(
     weather.fetchWeatherByPlace('kolkata', routeFetch([
       { prefix: weather.GEOCODING_ENDPOINT, body: () => response }
-    ]])),
+    ])),
     /too large/
   );
   assert.equal(readerOpened, false);
