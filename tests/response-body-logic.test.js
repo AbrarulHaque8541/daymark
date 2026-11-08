@@ -38,6 +38,9 @@ function makeStreamResponse(chunks, options) {
         state.opened = true;
         state.activeReader = reader;
         return reader;
+      },
+      cancel() {
+        return reader.cancel();
       }
     },
     text() {
