@@ -45,10 +45,11 @@ FAKE_GRADLE
   printf '%s' "$mode" > "$dir/mode"
 }
 
+# Hide the workflow action-installed Gradle unless a case explicitly supplies a fake version.
 # A transient Gradle distribution 504 is retried once and then succeeds.
 make_case "retry" "retry-once"
 retry_dir="$TEMP_ROOT/retry"
-COUNT_FILE="$retry_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
+COUNT_FILE="$retry_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 PATH="/usr/bin:/bin" \
   bash "$retry_dir/android-app/tools/run-gradle-with-retry.sh" --no-daemon assembleDebug \
   > "$retry_dir/output.log" 2>&1
 [[ "$(cat "$retry_dir/count")" == "2" ]] || {
@@ -62,7 +63,7 @@ grep -q "retrying attempt 2/3" "$retry_dir/output.log"
 make_case "build-failure" "permanent-failure"
 failure_dir="$TEMP_ROOT/build-failure"
 set +e
-COUNT_FILE="$failure_dir/count" FAKE_MODE=permanent-failure DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
+COUNT_FILE="$failure_dir/count" FAKE_MODE=permanent-failure DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 PATH="/usr/bin:/bin" \
   bash "$failure_dir/android-app/tools/run-gradle-with-retry.sh" --no-daemon assembleDebug \
   > "$failure_dir/output.log" 2>&1
 failure_status=$?
@@ -77,7 +78,7 @@ set -e
 make_case "exhausted" "always-504"
 exhausted_dir="$TEMP_ROOT/exhausted"
 set +e
-COUNT_FILE="$exhausted_dir/count" FAKE_MODE=always-504 DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
+COUNT_FILE="$exhausted_dir/count" FAKE_MODE=always-504 DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 PATH="/usr/bin:/bin" \
   bash "$exhausted_dir/android-app/tools/run-gradle-with-retry.sh" --no-daemon assembleDebug \
   > "$exhausted_dir/output.log" 2>&1
 exhausted_status=$?
@@ -92,7 +93,7 @@ set -e
 make_case "invalid-delay" "retry-once"
 invalid_dir="$TEMP_ROOT/invalid-delay"
 set +e
-COUNT_FILE="$invalid_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=31 \
+COUNT_FILE="$invalid_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=31 PATH="/usr/bin:/bin" \
   bash "$invalid_dir/android-app/tools/run-gradle-with-retry.sh" --no-daemon assembleDebug \
   > "$invalid_dir/output.log" 2>&1
 invalid_status=$?
@@ -122,7 +123,7 @@ CACHED_GRADLE
 chmod +x "$cached_dir/bin/gradle"
 COUNT_FILE="$cached_dir/wrapper.count" GRADLE_COUNT_FILE="$cached_dir/gradle.count" \
   FAKE_MODE=permanent-failure DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
-  PATH="$cached_dir/bin:$PATH" bash "$cached_dir/android-app/tools/run-gradle-with-retry.sh" \
+  PATH="$cached_dir/bin:/usr/bin:/bin" bash "$cached_dir/android-app/tools/run-gradle-with-retry.sh" \
   --no-daemon assembleDebug > "$cached_dir/output.log" 2>&1
 [[ "$(cat "$cached_dir/gradle.count")" == "1" && ! -f "$cached_dir/wrapper.count" ]] || {
   cat "$cached_dir/output.log" >&2
@@ -145,7 +146,7 @@ exit 9
 WRONG_GRADLE
 chmod +x "$wrong_dir/bin/gradle"
 COUNT_FILE="$wrong_dir/count" FAKE_MODE=retry-once DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS=0 \
-  PATH="$wrong_dir/bin:$PATH" bash "$wrong_dir/android-app/tools/run-gradle-with-retry.sh" \
+  PATH="$wrong_dir/bin:/usr/bin:/bin" bash "$wrong_dir/android-app/tools/run-gradle-with-retry.sh" \
   --no-daemon assembleDebug > "$wrong_dir/output.log" 2>&1
 [[ "$(cat "$wrong_dir/count")" == "2" ]] || {
   cat "$wrong_dir/output.log" >&2
