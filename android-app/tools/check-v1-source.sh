@@ -4,6 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
+sh ./tools/run-platform-instrumentation-repeat-tests.sh
 bash ./tools/run-gradle-with-retry-tests.sh
 python3 ./tools/check-ui-motion-wiring.py "$ROOT"
 sh ./tools/run-browser-address-notice-tests.sh
@@ -641,6 +642,7 @@ python3 "$ROOT/tools/check-source-check-summary.py"
 
 python3 "$ROOT/tools/check-focus-timer-notification.py" "$ROOT"
 python3 "$ROOT/tools/check-focus-timer-ui.py"
+python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT"
 python3 "$ROOT/tools/check-merged-manifests.py" "$ROOT"
 python3 "$ROOT/tools/check-ci-test-honesty.py" "$ROOT/.."
 sh "$ROOT/tools/run-browser-download-list-tests.sh"
