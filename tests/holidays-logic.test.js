@@ -175,7 +175,7 @@ test('oversized responses are rejected by Content-Length before acquiring the st
   await assertStrict.rejects(
     holidays.fetchHolidays('IN', routeFetch([
       { prefix: holidays.ENDPOINT, body: () => response }
-    ]]), { now: () => '2026-11-06T12:00:00.000Z' }),
+    ])),
     /too large/
   );
   assertStrict.equal(readerOpened, false);
