@@ -122,6 +122,7 @@
       const existing = localStorage.getItem(BACKUP_KEY);
       const existingPayloads = recoveryBackupPayloads(existing);
       const preserveExisting = existingPayloads.length > 0
+        && existing !== raw
         && !recoveryBackupIsRedundant(existing, raw);
       if (preserveExisting) {
         // Preserve every distinct prior backup before adding the newly rejected

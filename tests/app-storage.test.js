@@ -431,6 +431,14 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
+test('re-backing up identical opaque bytes does not duplicate the recovery payload', () => {
+  const opaque = '{legacy recovery bytes that are not parseable JSON';
+  const app = bootApp({ savedValue: opaque, savedBackupValue: opaque });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), opaque,
+    'the exact same opaque payload does not need a second nested copy');
+});
+
 test('backing up a corrupt primary preserves a different valid existing backup', () => {
   const existingBackup = JSON.stringify([makeImportTask('backup-only-task', 'Older backup task')]);
   const corruptPrimary = '{not valid JSON';
