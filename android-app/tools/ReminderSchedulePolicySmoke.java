@@ -62,6 +62,27 @@ public final class ReminderSchedulePolicySmoke {
                         ReminderSchedulePolicy.baseFire(fallDst, eastern)),
                 "reminder policy preserves a 60-minute elapsed lead after the fall-back overlap");
 
+        Task springThirty = TaskLogic.create("Spring DST 30-minute policy", "2026-03-08", "medium",
+                "", "03:30", 30, null);
+        Task springDay = TaskLogic.create("Spring DST 24-hour policy", "2026-03-08", "medium",
+                "", "03:30", 1440, null);
+        Task fallThirty = TaskLogic.create("Fall DST 30-minute policy", "2026-11-01", "medium",
+                "", "02:30", 30, null);
+        Task fallDay = TaskLogic.create("Fall DST 24-hour policy", "2026-11-01", "medium",
+                "", "02:30", 1440, null);
+        check(Instant.parse("2026-03-08T07:00:00Z").equals(
+                        ReminderSchedulePolicy.baseFire(springThirty, eastern)),
+                "reminder policy preserves a 30-minute elapsed lead across the spring-forward date boundary");
+        check(Instant.parse("2026-03-07T07:30:00Z").equals(
+                        ReminderSchedulePolicy.baseFire(springDay, eastern)),
+                "reminder policy preserves a 24-hour elapsed lead across the spring-forward date boundary");
+        check(Instant.parse("2026-11-01T07:00:00Z").equals(
+                        ReminderSchedulePolicy.baseFire(fallThirty, eastern)),
+                "reminder policy preserves a 30-minute elapsed lead across the fall-back date boundary");
+        check(Instant.parse("2026-10-31T07:30:00Z").equals(
+                        ReminderSchedulePolicy.baseFire(fallDay, eastern)),
+                "reminder policy preserves a 24-hour elapsed lead across the fall-back date boundary");
+
         Task task = TaskLogic.create("Snooze test", "2099-12-01", "high",
                 null, null, 60, null);
         Instant base = ReminderSchedulePolicy.baseFire(task, zone);
