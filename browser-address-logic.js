@@ -123,7 +123,9 @@
     const parts = String(text).split('.');
     if (parts.length !== 4) return false;
     for (const part of parts) {
-      if (!/^\d{1,3}$/.test(part)) return false;
+      // Reject legacy WHATWG IPv4 spellings such as 010.0.0.1 before WebView
+      // can reinterpret an octet as octal or collapse leading-zero components.
+      if (!/^(?:0|[1-9]\d{0,2})$/.test(part)) return false;
       const value = Number(part);
       if (value > 255) return false;
     }

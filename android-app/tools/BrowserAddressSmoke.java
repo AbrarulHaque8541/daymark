@@ -88,6 +88,20 @@ public final class BrowserAddressSmoke {
         assert BrowserAddress.resolveInput("192.168.1.1:8080", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://192.168.1.1:8080") : "bare IPv4 literal with port must be accepted";
         assert BrowserAddress.isLikelyWebAddress("192.168.1.1");
+        // WHATWG URL parsing treats leading-zero IPv4 octets as legacy octal/short forms.
+        // Reject them before a URL string can be handed to WebView.
+        for (String host : new String[]{"010.0.0.1", "001.002.003.004", "0.00.0.0"}) {
+            assert !BrowserAddress.isLikelyWebAddress(host) : host;
+            assert BrowserAddress.resolveInput(host, BrowserAddress.SearchEngine.DUCKDUCKGO)
+                    .equals("https://duckduckgo.com/?q=" + host) : host;
+            for (String scheme : new String[]{"http", "https"}) {
+                String url = scheme + "://" + host + "/";
+                assert !BrowserAddress.isAllowedWebUrl(url) : url;
+                rejects(url);
+            }
+        }
+        assert BrowserAddress.isAllowedWebUrl("http://0.0.0.0/");
+        assert BrowserAddress.isAllowedWebUrl("https://192.0.2.1/");
         assert !BrowserAddress.isLikelyWebAddress("999.1.1.1");
         assert !BrowserAddress.isLikelyWebAddress("1.2.3");
         assert BrowserAddress.resolveInput("http://192.168.1.1/admin", BrowserAddress.SearchEngine.DUCKDUCKGO)
@@ -107,6 +121,10 @@ public final class BrowserAddressSmoke {
                 : "an IPv4 tail before trailing compression is not a valid IPv6 literal";
         assert !BrowserAddress.isAllowedWebUrl("https://[192.0.2.1::]/")
                 : "the explicit URL parser must reject an IPv4 tail before trailing compression";
+        assert !BrowserAddress.isLikelyWebAddress("[::ffff:192.000.2.1]");
+        assert !BrowserAddress.isAllowedWebUrl("https://[::ffff:192.000.2.1]/");
+        rejects("https://[::ffff:192.000.2.1]/");
+        assert BrowserAddress.isAllowedWebUrl("https://[::ffff:192.0.2.1]/");
         assert BrowserAddress.resolveInput("localhost:3000/api", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://localhost:3000/api") : "localhost with port must resolve to HTTPS";
         assert BrowserAddress.isLikelyWebAddress("[::1]");

@@ -127,6 +127,17 @@ final class BrowserAddress {
             if (host == null || host.trim().isEmpty()) {
                 throw new IllegalArgumentException("Enter a valid web address with a host name.");
             }
+            String hostForIpValidation = host.endsWith(".")
+                    ? host.substring(0, host.length() - 1) : host;
+            if (BARE_IPV4_HOST.matcher(hostForIpValidation).matches()
+                    && !isCanonicalIpv4Literal(hostForIpValidation)) {
+                throw new IllegalArgumentException(
+                        "IPv4 octets must not contain leading zeros or exceed 255.");
+            }
+            if (host.startsWith("[") && !hasCanonicalIpv4Tail(host)) {
+                throw new IllegalArgumentException(
+                        "IPv4 tails in IPv6 addresses must use canonical octets.");
+            }
             if (hasExplicitEmptyPort(uri)) {
                 throw new IllegalArgumentException("Enter a valid port between 1 and 65535.");
             }
@@ -198,12 +209,7 @@ final class BrowserAddress {
         String host = colon < 0 ? authority : authority.substring(0, colon);
         if (!BARE_IPV4_HOST.matcher(host).matches()) return false;
         if (colon >= 0 && !isValidPortText(authority.substring(colon + 1))) return false;
-        String[] octets = host.split("\\.", -1);
-        for (String octet : octets) {
-            int value = Integer.parseInt(octet);
-            if (value > 255) return false;
-        }
-        return true;
+        return isCanonicalIpv4Literal(host);
     }
 
     private static boolean isBareIpv6Authority(String authority) {
@@ -211,11 +217,32 @@ final class BrowserAddress {
         try {
             URI uri = new URI("https://" + authority);
             int port = uri.getPort();
-            return uri.getHost() != null && uri.getHost().startsWith("[")
+            String host = uri.getHost();
+            return host != null && host.startsWith("[") && hasCanonicalIpv4Tail(host)
                     && !hasExplicitEmptyPort(uri) && port != 0 && port <= 65535;
         } catch (Exception invalid) {
             return false;
         }
+    }
+
+    private static boolean isCanonicalIpv4Literal(String host) {
+        if (host == null || !BARE_IPV4_HOST.matcher(host).matches()) return false;
+        String[] octets = host.split("\\.", -1);
+        for (String octet : octets) {
+            if (octet.length() > 1 && octet.charAt(0) == '0') return false;
+            if (Integer.parseInt(octet) > 255) return false;
+        }
+        return true;
+    }
+
+    private static boolean hasCanonicalIpv4Tail(String bracketedHost) {
+        if (bracketedHost == null || !bracketedHost.startsWith("[")
+                || !bracketedHost.endsWith("]")) return false;
+        String literal = bracketedHost.substring(1, bracketedHost.length() - 1);
+        int lastColon = literal.lastIndexOf(':');
+        if (lastColon < 0) return true;
+        String tail = literal.substring(lastColon + 1);
+        return !tail.contains(".") || isCanonicalIpv4Literal(tail);
     }
 
     private static boolean isBareLocalhostAuthority(String authority) {
