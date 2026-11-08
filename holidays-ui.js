@@ -22,7 +22,21 @@
     if (!env || !env.document) throw new Error('attachHolidaysUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    const storageRequested = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+      || !!env.window || typeof window !== 'undefined';
+    let storage = null;
+    let storageAccessFailed = false;
+    let storageReadFailed = false;
+    let storageWriteFailed = false;
+    let storageRemoveFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
+    if (storageRequested && !storage) storageAccessFailed = true;
     const holidaysApi = env.holidaysApi || root.DaymarkHolidays || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
@@ -38,6 +52,8 @@
 
     let busy = false;
     let cached = null;
+    let cacheRecord = { state: 'unread', raw: null, value: null };
+    let prefsRecord = { state: 'unread', raw: null, value: null };
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -126,37 +142,88 @@
       }
     }
 
-    function readCache() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+    function readRecord(key, validate) {
+      if (!storageRequested) return { state: 'absent', raw: null, value: null };
+      if (!storage || storageAccessFailed || typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        return { state: 'unavailable', raw: null, value: null };
+      }
+      let raw;
       try {
-        const parsed = JSON.parse(raw);
-        if (holidaysApi && typeof holidaysApi.validateHolidayCache === 'function'
-          && holidaysApi.validateHolidayCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
-      return null;
+        raw = storage.getItem(key);
+      } catch (error) {
+        storageReadFailed = true;
+        return { state: 'unreadable', raw: null, value: null };
+      }
+      if (raw === null) return { state: 'absent', raw: null, value: null };
+      if (typeof raw !== 'string' || raw.length === 0) {
+        return { state: 'corrupt', raw, value: null };
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (error) {
+        return { state: 'corrupt', raw, value: null };
+      }
+      let valid = false;
+      try { valid = validate(parsed) === true; } catch (error) { valid = false; }
+      return valid
+        ? { state: 'valid', raw, value: parsed }
+        : { state: 'corrupt', raw, value: null };
+    }
+
+    function storageNotice() {
+      if (!storageRequested) return '';
+      if (storageAccessFailed || storageReadFailed
+        || cacheRecord.state === 'unreadable' || cacheRecord.state === 'unavailable'
+        || prefsRecord.state === 'unreadable' || prefsRecord.state === 'unavailable') {
+        return ' · saved holiday data could not be read in this browser';
+      }
+      if (cacheRecord.state === 'corrupt' || prefsRecord.state === 'corrupt') {
+        return ' · invalid saved holiday data was left unchanged';
+      }
+      if (storageWriteFailed) return ' · saved holiday data could not be updated in this browser';
+      if (storageRemoveFailed) return ' · saved holiday data could not be removed';
+      return '';
+    }
+
+    function persistRecord(record, key, value) {
+      if (!storageRequested) return true;
+      if (!storage || storageAccessFailed || storageReadFailed
+        || record.state === 'corrupt' || record.state === 'unreadable'
+        || record.state === 'unavailable') return false;
+      if (typeof storage.setItem !== 'function') {
+        storageWriteFailed = true;
+        return false;
+      }
+      try {
+        const raw = JSON.stringify(value);
+        storage.setItem(key, raw);
+        record.state = 'valid';
+        record.raw = raw;
+        record.value = value;
+        return true;
+      } catch (error) {
+        storageWriteFailed = true;
+        return false;
+      }
+    }
+
+    function readCache() {
+      return cacheRecord.value;
     }
 
     function persistCache(cache) {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      return persistRecord(cacheRecord, STORAGE_KEY, cache);
     }
 
     function readPrefs() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(PREFS_KEY);
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.countryCode === 'string' && parsed.countryCode.trim()) return parsed;
-      } catch (error) { /* ignore corrupt prefs */ }
-      return null;
+      return prefsRecord.value;
     }
 
     function persistPrefs(countryCode) {
-      if (!storage || typeof storage.setItem !== 'function' || !countryCode || !countryCode.trim()) return;
-      storage.setItem(PREFS_KEY, JSON.stringify({ countryCode: countryCode.trim() }));
+      if (!countryCode || typeof countryCode !== 'string' || !countryCode.trim()) return true;
+      return persistRecord(prefsRecord, PREFS_KEY, { countryCode: countryCode.trim() });
     }
 
     async function onRefresh() {
@@ -180,17 +247,18 @@
       try {
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;
+        storageWriteFailed = false;
         persistCache(cached);
         persistPrefs(code);
         render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
           render(cached);
-          status(`Could not refresh: ${message} — showing cached holidays.`);
+          status(`Could not refresh: ${message} — showing cached holidays.` + storageNotice());
         } else {
-          status(`Could not refresh: ${message}`);
+          status(`Could not refresh: ${message}` + storageNotice());
         }
       } finally {
         setBusy(false);
@@ -198,17 +266,66 @@
     }
 
     function onClear() {
-      // Explicit, scoped removal: only this card's cached holiday list and country preference.
-      if (storage && typeof storage.removeItem === 'function') {
-        storage.removeItem(STORAGE_KEY);
-        storage.removeItem(PREFS_KEY);
+      // Explicit, scoped removal. Read both original values first so a partial
+      // two-key clear can be rolled back rather than silently losing one record.
+      if (storageRequested) {
+        if (!storage || storageAccessFailed || typeof storage.getItem !== 'function'
+          || typeof storage.removeItem !== 'function') {
+          storageRemoveFailed = true;
+          status('Could not clear saved holiday data in this browser; the current list was kept.' + storageNotice());
+          return false;
+        }
+        let previous;
+        try {
+          previous = {
+            cache: storage.getItem(STORAGE_KEY),
+            prefs: storage.getItem(PREFS_KEY)
+          };
+        } catch (error) {
+          storageReadFailed = true;
+          storageRemoveFailed = true;
+          status('Could not verify saved holiday data before clearing; nothing was removed.' + storageNotice());
+          return false;
+        }
+        try {
+          storage.removeItem(STORAGE_KEY);
+          storage.removeItem(PREFS_KEY);
+        } catch (error) {
+          storageRemoveFailed = true;
+          let restored = true;
+          for (const [key, value] of [[STORAGE_KEY, previous.cache], [PREFS_KEY, previous.prefs]]) {
+            try {
+              if (value === null) storage.removeItem(key);
+              else storage.setItem(key, value);
+            } catch (restoreError) {
+              restored = false;
+            }
+          }
+          status(restored
+            ? 'Could not clear saved holiday data; the current list was kept.'
+            : 'Could not fully restore saved holiday data after a failed clear; reload may show a partial result.');
+          return false;
+        }
       }
       cached = null;
+      cacheRecord = { state: 'absent', raw: null, value: null };
+      prefsRecord = { state: 'absent', raw: null, value: null };
+      storageReadFailed = false;
+      storageWriteFailed = false;
+      storageRemoveFailed = false;
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = DEFAULT_COUNTRY;
       clearList();
       status('Holidays cleared on this device. Choose a country and tap Refresh.');
+      return true;
     }
 
+    cacheRecord = readRecord(STORAGE_KEY, (value) => Boolean(
+      holidaysApi && typeof holidaysApi.validateHolidayCache === 'function'
+        && holidaysApi.validateHolidayCache(value)
+    ));
+    prefsRecord = readRecord(PREFS_KEY, (value) => Boolean(
+      value && typeof value.countryCode === 'string' && value.countryCode.trim()
+    ));
     cached = readCache();
     const prefs = readPrefs();
     if (prefs && countryEl && typeof countryEl.value === 'string') {
@@ -217,11 +334,11 @@
     if (cached) {
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = cached.countryCode;
       render(cached);
-      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+      status(`Cached · updated ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
     } else if (prefs) {
-      status('Last country restored. Tap Refresh for upcoming holidays.');
+      status('Last country restored. Tap Refresh for upcoming holidays.' + storageNotice());
     } else {
-      status('Choose a country and tap Refresh.');
+      status('Choose a country and tap Refresh.' + storageNotice());
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -237,7 +354,12 @@
     // Persist country preference on change so it restores even without a cache.
     if (countryEl && typeof countryEl.addEventListener === 'function') {
       countryEl.addEventListener('change', () => {
-        if (typeof countryEl.value === 'string') persistPrefs(countryEl.value);
+        if (typeof countryEl.value === 'string') {
+          storageWriteFailed = false;
+          if (!persistPrefs(countryEl.value)) {
+            status('Country choice changed for this session, but could not be saved.' + storageNotice());
+          }
+        }
       });
     }
 
@@ -263,7 +385,7 @@
   root.DaymarkHolidaysUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachHolidaysUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachHolidaysUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

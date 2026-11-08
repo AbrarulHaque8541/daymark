@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const holidaysApi = require('../holidays-logic.js');
 const ui = require('../holidays-ui.js');
 
@@ -71,9 +73,18 @@ function fakeEnv(options) {
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   if (opts.prefs !== undefined) storageData[ui.PREFS_KEY] = opts.prefs;
   const storage = {
-    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); },
-    removeItem(key) { delete storageData[key]; }
+    getItem(key) {
+      if (opts.throwGetItem) throw new Error('storage read blocked');
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
+    setItem(key, value) {
+      if (opts.throwSetItem) throw new Error('storage write blocked');
+      storageData[key] = String(value);
+    },
+    removeItem(key) {
+      if (opts.throwRemoveItem || opts.throwRemoveKey === key) throw new Error('storage remove blocked');
+      delete storageData[key];
+    }
   };
   const env = {
     document: {
@@ -90,6 +101,28 @@ function fakeEnv(options) {
   return { env, elements, storageData };
 }
 
+function streamResponse(body) {
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; } },
+    text() { return Promise.resolve(body); }
+  };
+}
+
 function okFetch(routes) {
   const seen = [];
   const impl = (url) => {
@@ -97,9 +130,7 @@ function okFetch(routes) {
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
-    if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
-    }
+    if (typeof body === 'string') return Promise.resolve(streamResponse(body));
     return Promise.resolve(body);
   };
   impl.seen = seen;
@@ -145,11 +176,12 @@ test('attach with no cache prompts the user to choose a country', () => {
   assert.equal(elements['holiday-status'].textContent, 'Choose a country and tap Refresh.');
 });
 
-test('a corrupt cache is ignored instead of crashing', () => {
-  const { env, elements } = fakeEnv({ stored: '{not json' });
+test('a corrupt cache is preserved and disclosed instead of treated as absent', () => {
+  const { env, elements, storageData } = fakeEnv({ stored: '{not json' });
   ui.attachHolidaysUi(env);
   assert.equal(elements['holiday-list'].children.length, 0);
-  assert.equal(elements['holiday-status'].textContent, 'Choose a country and tap Refresh.');
+  assert.match(elements['holiday-status'].textContent, /invalid saved holiday data was left unchanged/);
+  assert.equal(storageData[ui.STORAGE_KEY], '{not json');
 });
 
 test('a cache whose year has no holidays left says so instead of showing nothing', () => {
@@ -308,6 +340,102 @@ test('cache country overrides preference on load', () => {
   assert.equal(elements['holiday-country'].value, 'IN'); // from cache
   assert.ok(elements['holiday-status'].textContent.startsWith('Cached ·'));
 });
+
+
+test('blocked localStorage getter does not abort card boot or a successful refresh', async () => {
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ country: 'IN', fetch: fetchImpl });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage getter blocked'); }
+  });
+  const handle = ui.attachHolidaysUi(env);
+  assert.ok(elements['holiday-status'].textContent.includes('saved holiday data could not be read'));
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2, 'fresh results remain usable without storage');
+  assert.ok(elements['holiday-status'].textContent.startsWith('Updated ·'));
+  assert.ok(elements['holiday-status'].textContent.includes('saved holiday data could not be read'));
+  assert.equal(typeof handle.onClear, 'function');
+});
+
+
+test('refresh does not overwrite a corrupt saved cache', async () => {
+  const raw = '{not json';
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements, storageData } = fakeEnv({ stored: raw, fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2, 'fresh results remain visible');
+  assert.equal(storageData[ui.STORAGE_KEY], raw, 'unknown cache bytes remain untouched');
+  assert.ok(elements['holiday-status'].textContent.includes('invalid saved holiday data was left unchanged'));
+  assert.equal(typeof handle.readCache(), 'object');
+});
+
+test('storage read exceptions preserve the unknown cache and do not block fresh results', async () => {
+  const stored = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements, storageData } = fakeEnv({ stored, fetch: fetchImpl, throwGetItem: true });
+  const handle = ui.attachHolidaysUi(env);
+  assert.ok(elements['holiday-status'].textContent.includes('saved holiday data could not be read'));
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2);
+  assert.equal(storageData[ui.STORAGE_KEY], stored, 'an unreadable cache must never be overwritten');
+  assert.ok(elements['holiday-status'].textContent.includes('saved holiday data could not be read'));
+  assert.equal(handle.readCache(), null);
+});
+
+test('storage write failures do not discard a successful network result', async () => {
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ country: 'IN', fetch: fetchImpl, throwSetItem: true });
+  const handle = ui.attachHolidaysUi(env);
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2);
+  assert.ok(elements['holiday-status'].textContent.startsWith('Updated ·'));
+  assert.ok(elements['holiday-status'].textContent.includes('saved holiday data could not be updated'));
+  assert.equal(elements['holiday-refresh'].disabled, false);
+});
+
+test('failed two-key clear restores the first key and keeps the current list', () => {
+  const stored = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  const prefs = JSON.stringify({ countryCode: 'DE' });
+  const { env, elements, storageData } = fakeEnv({
+    stored,
+    prefs,
+    throwRemoveKey: ui.PREFS_KEY
+  });
+  elements['holiday-country'].value = 'DE';
+  const handle = ui.attachHolidaysUi(env);
+  const cleared = handle.onClear();
+  assert.equal(cleared, false);
+  assert.equal(storageData[ui.STORAGE_KEY], stored, 'cache is restored after the second removal fails');
+  assert.equal(storageData[ui.PREFS_KEY], prefs, 'preference remains unchanged');
+  assert.equal(elements['holiday-list'].children.length, 1);
+  assert.equal(elements['holiday-country'].value, 'DE');
+  assert.ok(elements['holiday-status'].textContent.includes('Could not clear saved holiday data'));
+});
+
+test('country preference write failure is reported without throwing from change', () => {
+  const { env, elements } = fakeEnv({ throwSetItem: true });
+  ui.attachHolidaysUi(env);
+  const countryEl = elements['holiday-country'];
+  countryEl.value = 'GB';
+  const change = countryEl.listeners.find((listener) => listener.type === 'change');
+  assert.ok(change);
+  assert.doesNotThrow(() => change.handler());
+  assert.ok(elements['holiday-status'].textContent.includes('could not be saved'));
+});
+
+test('holiday auto-boot defers localStorage access until guarded attachment', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'holidays-ui.js'), 'utf8');
+  assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
+    'boot must pass window and let attachHolidaysUi guard the storage getter');
+});
+
 
 test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachHolidaysUi, 'function');
