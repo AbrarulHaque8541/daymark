@@ -48,6 +48,8 @@ final class NoteFormat {
     }
 
     static final int MAX_LINK_CHARS = 2048;
+    private static final char BACKTICK = 0x60;
+    private static final char SINGLE_QUOTE = 0x27;
 
     private NoteFormat() { }
 
@@ -58,8 +60,8 @@ final class NoteFormat {
         int index = 0;
         while (index < length) {
             char current = text.charAt(index);
-            if (current == 96) {
-                int close = text.indexOf(96, index + 1);
+            if (current == BACKTICK) {
+                int close = text.indexOf(BACKTICK, index + 1);
                 int lineBreak = close == -1 ? -1 : text.indexOf('\n', index + 1);
                 boolean singleLine = close > index + 1 && (lineBreak == -1 || lineBreak > close);
                 if (singleLine) {
@@ -105,8 +107,8 @@ final class NoteFormat {
         int end = start + schemeLength;
         while (end < text.length()) {
             char c = text.charAt(end);
-            if (Character.isWhitespace(c) || c == '<' || c == '>' || c == '"' || c == 39
-                    || c == 96) break;
+            if (Character.isWhitespace(c) || c == '<' || c == '>' || c == '"' || c == SINGLE_QUOTE
+                    || c == BACKTICK) break;
             end++;
         }
         if (end - start > MAX_LINK_CHARS) return start;

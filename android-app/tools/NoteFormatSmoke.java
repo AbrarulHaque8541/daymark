@@ -97,7 +97,9 @@ public final class NoteFormatSmoke {
                 "HTTP links with embedded credentials are rejected");
         check(NoteFormat.spans("http://example.com:99999").isEmpty(),
                 "HTTP links with invalid ports are rejected");
-        check(NoteFormat.spans("xhttps://example.com").isEmpty(), "scheme must start a token");
+        check(NoteFormat.spans("xhttps://example.com").isEmpty(), "HTTPS scheme must start a token");
+        check(NoteFormat.spans("xhttp://example.com").isEmpty(), "HTTP scheme must start a token");
+        check(NoteFormat.spans("http:///path").isEmpty(), "HTTP URL without an authority is literal");
         check(NoteFormat.spans("https://").isEmpty(), "scheme without host is literal");
         check(NoteFormat.spans("https:///path").isEmpty(), "empty authority is literal");
         check(NoteFormat.spans("https://exa_mple.com").isEmpty(), "underscore host is literal");
