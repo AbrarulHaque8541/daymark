@@ -177,7 +177,7 @@ test('oversized responses are rejected by Content-Length before acquiring the st
   await assert.rejects(
     currency.fetchLatestRates('USD', 'INR', routeFetch([
       { prefix: currency.RATES_ENDPOINT, body: () => response }
-    ]]), 1000),
+    ])),
     /too large/
   );
   assert.equal(readerOpened, false);
