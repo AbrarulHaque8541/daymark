@@ -160,16 +160,30 @@ test('fetchLatestRates reports friendly errors', async () => {
   );
 });
 
-test('oversized responses are rejected before parsing', async () => {
-  const huge = 'x'.repeat(currency.MAX_JSON_CHARS + 1);
+test('oversized responses are rejected by Content-Length before acquiring the stream', async () => {
+  let readerOpened = false;
+  let bodyCancelled = false;
+  let textCalled = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get(name) { return name.toLowerCase() === 'content-length' ? String(currency.MAX_JSON_BYTES + 1) : null; } },
+    body: {
+      getReader() { readerOpened = true; throw new Error('oversized body must be rejected before reader acquisition'); },
+      cancel() { bodyCancelled = true; return Promise.resolve(); }
+    },
+    text() { textCalled = true; throw new Error('unbounded text fallback must not be called'); }
+  };
   await assert.rejects(
     currency.fetchLatestRates('USD', 'INR', routeFetch([
-      { prefix: currency.RATES_ENDPOINT, body: () => ({ ok: true, status: 200, text: () => Promise.resolve(huge) }) }
-    ])),
+      { prefix: currency.RATES_ENDPOINT, body: () => response }
+    ]]), 1000),
     /too large/
   );
+  assert.equal(readerOpened, false);
+  assert.equal(bodyCancelled, true);
+  assert.equal(textCalled, false);
 });
-
 test('a hanging request times out', async () => {
   const hanging = () => new Promise(() => {});
   await assert.rejects(
