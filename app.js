@@ -96,7 +96,7 @@
     }
   }
 
-  function isKnownRecoveryBundle(parsed) {
+  function isKnownRecoveryBundle(parsed, raw) {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
     const keys = Object.keys(parsed);
     return keys.length === 2
@@ -105,7 +105,11 @@
       && parsed.format === 'daymark-recovery-bundle-v1'
       && Array.isArray(parsed.payloads)
       && parsed.payloads.length > 0
-      && parsed.payloads.every((payload) => typeof payload === 'string');
+      && parsed.payloads.every((payload) => typeof payload === 'string')
+      // The current writer emits compact JSON. Requiring the same bytes also
+      // rejects duplicate-key/ambiguous JSON, whose overwritten values may
+      // contain recovery data that JSON.parse would otherwise discard.
+      && JSON.stringify(parsed) === raw;
   }
 
   function recoveryBackupPayloads(raw) {
@@ -116,7 +120,7 @@
         // Even a fully valid array can be a unique older recovery copy.
         return [raw];
       }
-      if (isKnownRecoveryBundle(parsed)) {
+      if (isKnownRecoveryBundle(parsed, raw)) {
         // Only the exact supported envelope is unpacked. Unknown top-level
         // fields make the original bytes opaque so future writers preserve them.
         return parsed.payloads;
@@ -180,7 +184,7 @@
       return raw === primaryRaw;
     }
 
-    if (isKnownRecoveryBundle(parsed)) {
+    if (isKnownRecoveryBundle(parsed, raw)) {
       // Only the exact supported envelope may be considered redundant.
       // Unknown top-level metadata is opaque user data and prevents cleanup.
       return parsed.payloads.every((payload) => payload === primaryRaw);

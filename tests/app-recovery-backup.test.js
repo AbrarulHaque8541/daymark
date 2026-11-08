@@ -289,6 +289,28 @@ test('unknown recovery-bundle fields survive when a new partial primary is backe
     'unknown metadata must survive byte-for-byte inside the retained envelope');
 });
 
+test('duplicate-key recovery bundles remain opaque instead of losing overwritten values', () => {
+  const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
+  const primaryValue = JSON.stringify(healthyPrimary);
+  const ambiguousBackups = [
+    '{"format":"legacy-recovery-v0","format":"daymark-recovery-bundle-v1","payloads":[' + primaryValue + ']}',
+    '{"format":"daymark-recovery-bundle-v1","payloads":["older-payload"],"payloads":[' + primaryValue + ']}'
+  ];
+
+  for (const ambiguousBackup of ambiguousBackups) {
+    const storedValues = new Map([
+      [STORAGE_KEY, healthyPrimary],
+      [BACKUP_KEY, ambiguousBackup]
+    ]);
+    const app = bootApp(storedValues);
+
+    assert.equal(storedValues.get(BACKUP_KEY), ambiguousBackup,
+      'duplicate keys make the parsed envelope ambiguous; original bytes must remain untouched');
+    assert.match(app.elements.get('#storage-status span').textContent,
+      /recovery backup retained for manual review/);
+  }
+});
+
 test('a malformed backup is retained for manual recovery when the primary task store is healthy', () => {
   const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
   const opaqueBackup = '{previously unreadable}';
