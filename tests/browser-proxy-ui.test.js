@@ -46,7 +46,7 @@ function makeDoc(ids) {
 }
 
 const ALL_IDS = ['browser-proxy-address', 'browser-proxy-status', 'browser-proxy-result',
-  'browser-proxy-form', 'browser-proxy-clear', 'browser-proxy-copy', 'browser-proxy-plan'];
+  'browser-proxy-form', 'browser-proxy-clear', 'browser-proxy-copy', 'browser-proxy-plan', 'browser-proxy-save'];
 
 test('attachBrowserProxyUi requires a document', () => {
   assert.throws(() => ui.attachBrowserProxyUi(null), /requires a document/);
@@ -191,4 +191,42 @@ test('plan button reports aria-busy only while planning', () => {
   const planBtn = doc.elements['browser-proxy-plan'];
   ui.attachBrowserProxyUi({ document: doc, proxyApi: engine });
   assert.equal(planBtn.getAttribute('aria-busy'), null);
+});
+
+test('save button downloads the plan as text when Blob and URL are available', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-proxy-address'].value = 'proxy.example.org:8080';
+  doc.body = { appendChild() {}, removeChild() {} };
+  let createdBlob = null;
+  let createdUrl = null;
+  const fakeBlob = function(parts, opts) { createdBlob = { parts, opts }; return { type: 'blob' }; };
+  const fakeURL = {
+    createObjectURL(blob) { createdUrl = 'blob:fake'; return createdUrl; },
+    revokeObjectURL(url) { /* ok */ }
+  };
+  const handle = ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, Blob: fakeBlob, URL: fakeURL });
+  const click = doc.elements['browser-proxy-save'].listeners.click;
+  assert.ok(click && click.length === 1, 'a click listener must be wired on save');
+  click[0]();
+  assert.ok(createdBlob);
+  assert.match(createdBlob.parts[0], /http:\/\/proxy\.example\.org:8080/);
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Saved proxy plan as daymark-proxy-plan\.txt/);
+  assert.equal(doc.elements['browser-proxy-save'].getAttribute('aria-busy'), null);
+});
+
+test('save button reports nothing to save when the card is empty', () => {
+  const doc = makeDoc(ALL_IDS);
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine });
+  const click = doc.elements['browser-proxy-save'].listeners.click;
+  click[0]();
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Nothing to save yet/);
+});
+
+test('save button fails closed when download APIs are missing', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-proxy-address'].value = 'proxy.example.org:8080';
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, Blob: undefined, URL: undefined });
+  const click = doc.elements['browser-proxy-save'].listeners.click;
+  click[0]();
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Saving is not available/);
 });
