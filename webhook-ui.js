@@ -51,6 +51,10 @@
     let flushRequested = false;
     let coordinationFailed = false;
     let memoryOnlyEvents = [];
+    // If a POST succeeded but the queue-removal write failed, remember those
+    // resolved IDs in this tab so Retry can persist their removal without
+    // sending them a second time during the same page lifetime.
+    let resolvedUnpersistedIds = new Set();
 
     function status(message) {
       let safeMessage = String(message === null || message === undefined ? '' : message);
@@ -283,7 +287,33 @@
           }
 
           if (!config) return { reason: 'disabled' };
+          if (resolvedUnpersistedIds.size) {
+            const reconciled = queue.filter((event) => !resolvedUnpersistedIds.has(event.id));
+            if (reconciled.length !== queue.length) {
+              if (!persistQueue(reconciled)) {
+                queue = reconciled;
+                queueWriteFailed = true;
+                status('Webhook queue state is still waiting to be saved. No already-delivered event was sent again.'
+                  + storageWarning());
+                renderQueue();
+                return { reason: 'storage-unavailable' };
+              }
+              queue = reconciled;
+              resolvedUnpersistedIds.clear();
+              queueWriteFailed = false;
+            } else {
+              resolvedUnpersistedIds.clear();
+            }
+          }
+
           if (!queue.length) {
+            if (queueWriteFailed) {
+              if (!persistQueue([])) {
+                status('Webhook queue state could not be saved yet. No event was sent again.' + storageWarning());
+                renderQueue();
+                return { reason: 'storage-unavailable' };
+              }
+            }
             queueWriteFailed = false;
             status('No queued webhook events.' + storageWarning());
             renderQueue();
@@ -308,9 +338,14 @@
           // same snapshot concurrently or overwrite it with stale state.
           const flushingQueue = queue.slice();
           const result = await webhookApi.flushQueue(flushingQueue, config.url, fetchImpl);
+          const remainingIds = new Set(result.queue.map((event) => event.id));
+          flushingQueue.forEach((event) => {
+            if (!remainingIds.has(event.id)) resolvedUnpersistedIds.add(event.id);
+          });
           const persisted = persistQueue(result.queue);
           queue = result.queue;
-          if (!persisted) queueWriteFailed = true;
+          if (persisted) resolvedUnpersistedIds.clear();
+          else queueWriteFailed = true;
 
           const parts = [];
           if (result.deliveredCount > 0) parts.push('Delivered ' + result.deliveredCount + ' event(s).');
