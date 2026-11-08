@@ -37,7 +37,7 @@
       showToast('Browser storage is unavailable. You can still use this page for now.');
       return [];
     }
-    if (!saved) {
+    if (saved === null) {
       setStorageStatus('Local storage ready');
       return [];
     }
