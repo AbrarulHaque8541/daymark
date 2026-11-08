@@ -240,6 +240,55 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'ordinary saves must not drop the rejected task source');
 });
 
+test('recovery bundles with unknown top-level fields remain opaque during healthy-primary cleanup', () => {
+  const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
+  const backupWithMetadata = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [healthyPrimary],
+    legacyMetadata: { source: 'older recovery writer', revision: 2 }
+  });
+  const storedValues = new Map([
+    [STORAGE_KEY, healthyPrimary],
+    [BACKUP_KEY, backupWithMetadata]
+  ]);
+  const app = bootApp(storedValues);
+
+  assert.equal(storedValues.get(BACKUP_KEY), backupWithMetadata,
+    'unknown top-level metadata makes the whole envelope opaque, even when payload bytes match');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+});
+
+test('unknown recovery-bundle fields survive when a new partial primary is backed up', () => {
+  const olderPayload = JSON.stringify([
+    validTask('older-valid', 'Older valid task'),
+    validTask('older-invalid', 'x'.repeat(170))
+  ]);
+  const backupWithMetadata = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [olderPayload],
+    legacyMetadata: { source: 'older recovery writer', revision: 2 }
+  });
+  const currentPrimary = JSON.stringify([
+    validTask('current-valid', 'Current valid task'),
+    validTask('current-invalid', 'y'.repeat(170))
+  ]);
+  const storedValues = new Map([
+    [STORAGE_KEY, currentPrimary],
+    [BACKUP_KEY, backupWithMetadata]
+  ]);
+
+  bootApp(storedValues);
+
+  const merged = JSON.parse(storedValues.get(BACKUP_KEY));
+  assert.equal(merged.format, 'daymark-recovery-bundle-v1');
+  assert.deepEqual(merged.payloads, [backupWithMetadata, currentPrimary],
+    'the exact prior envelope must be retained as an opaque payload');
+  assert.deepEqual(JSON.parse(merged.payloads[0]).legacyMetadata,
+    { source: 'older recovery writer', revision: 2 },
+    'unknown metadata must survive byte-for-byte inside the retained envelope');
+});
+
 test('a malformed backup is retained for manual recovery when the primary task store is healthy', () => {
   const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
   const opaqueBackup = '{previously unreadable}';

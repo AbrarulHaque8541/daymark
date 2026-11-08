@@ -96,6 +96,18 @@
     }
   }
 
+  function isKnownRecoveryBundle(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+    const keys = Object.keys(parsed);
+    return keys.length === 2
+      && Object.prototype.hasOwnProperty.call(parsed, 'format')
+      && Object.prototype.hasOwnProperty.call(parsed, 'payloads')
+      && parsed.format === 'daymark-recovery-bundle-v1'
+      && Array.isArray(parsed.payloads)
+      && parsed.payloads.length > 0
+      && parsed.payloads.every((payload) => typeof payload === 'string');
+  }
+
   function recoveryBackupPayloads(raw) {
     if (typeof raw !== 'string') return [];
     try {
@@ -104,12 +116,10 @@
         // Even a fully valid array can be a unique older recovery copy.
         return [raw];
       }
-      if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
-          && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
-        // If a bundle contains unknown payload types, retain the exact outer
-        // bytes rather than silently filtering any part of the bundle.
-        return parsed.payloads.every((payload) => typeof payload === 'string')
-          ? parsed.payloads : [raw];
+      if (isKnownRecoveryBundle(parsed)) {
+        // Only the exact supported envelope is unpacked. Unknown top-level
+        // fields make the original bytes opaque so future writers preserve them.
+        return parsed.payloads;
       }
     } catch (error) {
       // An opaque/malformed backup may be the only surviving copy of older data.
@@ -170,11 +180,10 @@
       return raw === primaryRaw;
     }
 
-    if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
-        && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
-      // Preserve every bundle containing unknown, malformed, or distinct data.
-      return parsed.payloads.every((payload) =>
-        typeof payload === 'string' && payload === primaryRaw);
+    if (isKnownRecoveryBundle(parsed)) {
+      // Only the exact supported envelope may be considered redundant.
+      // Unknown top-level metadata is opaque user data and prevents cleanup.
+      return parsed.payloads.every((payload) => payload === primaryRaw);
     }
 
     // Unknown JSON shapes may be older recovery formats. Keep them intact.
