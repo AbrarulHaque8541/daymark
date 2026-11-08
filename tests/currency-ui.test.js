@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const currencyApi = require('../currency-logic.js');
 const ui = require('../currency-ui.js');
+const { createStreamResponse } = require('./helpers/stream-response.js');
 
 const RATES_BODY = JSON.stringify({
   amount: 1.0,
@@ -89,7 +90,7 @@ function okFetch(routes) {
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
     if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
+      return Promise.resolve(createStreamResponse(body).response);
     }
     return Promise.resolve(body);
   };
