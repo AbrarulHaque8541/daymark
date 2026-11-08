@@ -65,6 +65,12 @@
       keys: ['daymark.zones.v1']
     },
     {
+      id: 'countdowns',
+      label: 'Countdown dates',
+      description: 'Named future dates you are tracking on the countdown card.',
+      keys: ['daymark.countdowns.v1']
+    },
+    {
       id: 'webhook',
       label: 'Webhook settings',
       description: 'The https:// endpoint you saved for task-completion events.',
