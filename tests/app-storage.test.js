@@ -509,6 +509,14 @@ test('recovery bundles with distinct valid task arrays are preserved', () => {
     'a bundle containing a different valid task array may contain unique user data');
 });
 
+test('a missing primary task key remains a normal empty state without a recovery backup', () => {
+  const app = bootApp({ savedValue: null });
+
+  assert.equal(app.elements.get('#storage-status span').textContent, 'Local storage ready');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'an absent key is not treated as corrupt data and does not create a backup');
+});
+
 test('an empty primary task payload is preserved before a later task save', () => {
   const app = bootApp({ savedValue: '' });
 
