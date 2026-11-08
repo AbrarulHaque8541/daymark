@@ -46,7 +46,11 @@ public final class WebClipSmoke {
         WebClip.Draft plain = WebClip.fromReader("Title", "Article", "http://example.com/path");
         check(plain.notes.startsWith("Source: http://example.com/path\n\n"),
                 "HTTP sources are preserved as plain text, not upgraded");
-        check(NoteFormat.spans(plain.notes).isEmpty(), "HTTP source is not offered as an HTTPS link");
+        check(NoteFormat.spans(plain.notes).stream().anyMatch(span -> span.kind == NoteFormat.Kind.LINK
+                        && "http://example.com/path".equals(span.target)),
+                "HTTP source remains an explicit task-note link without being upgraded");
+        check(!plain.notes.contains("https://example.com/path"),
+                "HTTP source scheme is never rewritten to HTTPS");
         check(plain.sourceTreatment == WebClip.SourceTreatment.UNCHANGED, "unmodified source is identified");
     }
 
