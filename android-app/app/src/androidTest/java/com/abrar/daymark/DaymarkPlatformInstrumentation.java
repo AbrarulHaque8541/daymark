@@ -459,9 +459,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         android.view.MotionEvent event = android.view.MotionEvent.obtain(
                 downTime, eventTime, action, x, y, 0);
         event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
-        event.setToolType(0, android.view.MotionEvent.TOOL_TYPE_FINGER);
         try {
-            sendPointerSync(event);
+            if (!getUiAutomation().injectInputEvent((android.view.InputEvent) event, true)) {
+                throw new AssertionError("touchscreen event injection was rejected: action=" + action);
+            }
         } finally {
             event.recycle();
         }

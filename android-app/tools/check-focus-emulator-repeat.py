@@ -27,7 +27,7 @@ assert "sh ./tools/run-platform-instrumentation-repeat-tests.sh" in canonical
 assert 'python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT"' in canonical
 assert "run_instrumentation_repeated" in test_runner
 assert "event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN)" in platform_test
-assert "event.setToolType(0, android.view.MotionEvent.TOOL_TYPE_FINGER)" in platform_test
+assert "getUiAutomation().injectInputEvent((android.view.InputEvent) event, true)" in platform_test
 assert "stableVisibleBounds" in platform_test
 assert "locationOnScreen=(" in platform_test
 print("PASS focus emulator repeat wiring: API 36 ten-run gate, bounded disposable reset, fail-fast test integration")
