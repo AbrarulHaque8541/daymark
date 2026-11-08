@@ -82,18 +82,33 @@ public final class BrowserAddressSmoke {
         assert BrowserAddress.resolveInput("example.com:8443", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://example.com:8443");
 
-        // IPv4 and IPv6 literals must navigate when an explicit scheme is given.
+        // IP literals and localhost work without a scheme just like ordinary bare domains.
+        assert BrowserAddress.resolveInput("192.168.1.1/admin", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://192.168.1.1/admin") : "bare IPv4 literal must resolve to HTTPS";
+        assert BrowserAddress.resolveInput("192.168.1.1:8080", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://192.168.1.1:8080") : "bare IPv4 literal with port must be accepted";
+        assert BrowserAddress.isLikelyWebAddress("192.168.1.1");
+        assert !BrowserAddress.isLikelyWebAddress("999.1.1.1");
+        assert !BrowserAddress.isLikelyWebAddress("1.2.3");
         assert BrowserAddress.resolveInput("http://192.168.1.1/admin", BrowserAddress.SearchEngine.DUCKDUCKGO)
-                .equals("http://192.168.1.1/admin") : "IPv4 literal with explicit scheme must be accepted";
+                .equals("http://192.168.1.1/admin") : "explicit HTTP IPv4 literal must be preserved";
         assert BrowserAddress.resolveInput("https://10.0.0.1:8443/", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://10.0.0.1:8443/") : "IPv4 with port must be accepted";
+        assert BrowserAddress.resolveInput("[::1]/dev", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://[::1]/dev") : "bare IPv6 loopback must resolve to HTTPS";
+        assert BrowserAddress.resolveInput("[2001:db8::1]:8443/path", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://[2001:db8::1]:8443/path") : "bare IPv6 with port must be accepted";
+        assert BrowserAddress.resolveInput("localhost:3000/api", BrowserAddress.SearchEngine.DUCKDUCKGO)
+                .equals("https://localhost:3000/api") : "localhost with port must resolve to HTTPS";
+        assert BrowserAddress.isLikelyWebAddress("[::1]");
+        assert BrowserAddress.isLikelyWebAddress("localhost:3000");
+        assert !BrowserAddress.isLikelyWebAddress("[::1]:99999");
         assert BrowserAddress.isAllowedWebUrl("http://[::1]:8080/dev") : "IPv6 literal must be accepted";
         assert BrowserAddress.resolveInput("http://[::1]:8080/dev", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("http://[::1]:8080/dev") : "IPv6 literal with port must round-trip";
         assert BrowserAddress.isAllowedWebUrl("https://[2001:db8::1]/path") : "IPv6 global unicast must be accepted";
         assert !BrowserAddress.isAllowedWebUrl("https://[::1]:0/") : "IPv6 with invalid port must be rejected";
         assert !BrowserAddress.isAllowedWebUrl("https://[::1]:99999/") : "IPv6 with out-of-range port must be rejected";
-        assert !BrowserAddress.isLikelyWebAddress("192.168.1.1") : "bare IPv4 is not a bare domain";
         assert BrowserAddress.isLikelyWebAddress("http://192.168.1.1") : "explicit scheme makes IPv4 a web address";
         // Internationalized (non-ASCII) hosts must navigate instead of being rejected or
         // mistaken for a search: the address bar shows the punycode form, which is the

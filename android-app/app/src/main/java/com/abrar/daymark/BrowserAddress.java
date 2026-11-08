@@ -13,6 +13,11 @@ final class BrowserAddress {
     private static final Pattern SCHEME = Pattern.compile("^[A-Za-z][A-Za-z0-9+.-]*:");
     private static final Pattern BARE_DOMAIN = Pattern.compile(
             "(?i)^(?:[A-Za-z0-9-]+\\.)+[A-Za-z]{2,}(?::[0-9]{1,5})?(?:[/\\?#].*)?$");
+    private static final Pattern BARE_IPV4_HOST = Pattern.compile("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$");
+    private static final Pattern BARE_IPV6_AUTHORITY =
+            Pattern.compile("^\\[[0-9A-Fa-f:.]+\\](?::[0-9]{1,5})?$");
+    private static final Pattern BARE_LOCALHOST_AUTHORITY =
+            Pattern.compile("(?i)^localhost(?::([0-9]{1,5}))?$");
 
     private BrowserAddress() { }
 
@@ -181,7 +186,49 @@ final class BrowserAddress {
             if (asciiHost == null) return false;
             hostPart = asciiHost + (colon < 0 ? "" : hostPart.substring(colon));
         }
-        return BARE_DOMAIN.matcher(hostPart).matches() && hostPart.toLowerCase(Locale.ROOT).contains(".");
+        return isBareIpv4Authority(hostPart)
+                || isBareIpv6Authority(hostPart)
+                || isBareLocalhostAuthority(hostPart)
+                || (BARE_DOMAIN.matcher(hostPart).matches()
+                && hostPart.toLowerCase(Locale.ROOT).contains("."));
+    }
+
+    private static boolean isBareIpv4Authority(String authority) {
+        int colon = authority.lastIndexOf(':');
+        String host = colon < 0 ? authority : authority.substring(0, colon);
+        if (!BARE_IPV4_HOST.matcher(host).matches()) return false;
+        if (colon >= 0 && !isValidPortText(authority.substring(colon + 1))) return false;
+        String[] octets = host.split("\\.", -1);
+        for (String octet : octets) {
+            int value = Integer.parseInt(octet);
+            if (value > 255) return false;
+        }
+        return true;
+    }
+
+    private static boolean isBareIpv6Authority(String authority) {
+        if (!BARE_IPV6_AUTHORITY.matcher(authority).matches()) return false;
+        try {
+            URI uri = new URI("https://" + authority);
+            int port = uri.getPort();
+            return uri.getHost() != null && uri.getHost().startsWith("[")
+                    && !hasExplicitEmptyPort(uri) && port != 0 && port <= 65535;
+        } catch (Exception invalid) {
+            return false;
+        }
+    }
+
+    private static boolean isBareLocalhostAuthority(String authority) {
+        java.util.regex.Matcher matcher = BARE_LOCALHOST_AUTHORITY.matcher(authority);
+        if (!matcher.matches()) return false;
+        String port = matcher.group(1);
+        return port == null || isValidPortText(port);
+    }
+
+    private static boolean isValidPortText(String text) {
+        if (text == null || !text.matches("[0-9]{1,5}")) return false;
+        int port = Integer.parseInt(text);
+        return port >= 1 && port <= 65535;
     }
 
     /** Reject an explicit trailing port separator; URI.getPort() reports -1 for it. */
