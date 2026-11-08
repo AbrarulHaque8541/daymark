@@ -48,6 +48,10 @@
   transform: translateY(0);
   box-shadow: 0 2px 10px rgba(24, 40, 48, .05);
 }
+.suggestion-item:active {
+  transform: translateY(0) scale(.995);
+  box-shadow: 0 2px 8px rgba(24, 40, 48, .04);
+}
 
 /* Subtle accent-tinted glass edge on primary surfaces for professional depth. */
 .button-primary,
@@ -194,6 +198,9 @@
     border-top-color: #16705f;
     border-color: #16705f;
   }
+  .suggestion-item:active {
+    transform: none;
+  }
 }
 
 /* Dark-mode glass skeleton matching empty-state professional depth (accent #16705f). */
@@ -222,7 +229,8 @@
 .focus-card:focus-within,
 .weather-card:focus-within,
 .currency-card:focus-within,
-.briefing-card:focus-within {
+.briefing-card:focus-within,
+.suggestion-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
