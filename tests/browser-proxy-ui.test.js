@@ -284,7 +284,7 @@ test('clear reports failure when removal and the empty tombstone both fail', () 
   assert.equal(store.data['daymark.browser-proxy.last-profile'], remembered, 'failed storage operations do not pretend the key was removed');
   assert.doesNotMatch(doc.elements['browser-proxy-status'].textContent, /Cleared\./);
   assert.match(doc.elements['browser-proxy-status'].textContent, /could not be removed/);
-  assert.match(doc.elements['browser-proxy-status'].textContent, /clear this site/);
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Clear this site/);
 });
 
 test('legacy credentials remain explicitly warned about when both safe cleanup paths fail', () => {
