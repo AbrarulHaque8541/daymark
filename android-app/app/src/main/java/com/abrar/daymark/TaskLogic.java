@@ -378,7 +378,8 @@ final class TaskLogic {
                 ? LocalTime.parse(task.dueTime, DateTimeFormatter.ISO_LOCAL_TIME)
                 : DEFAULT_REMINDER_TIME;
         LocalDateTime dueMoment = LocalDateTime.of(LocalDate.parse(task.dueDate), time);
-        return dueMoment.minusMinutes(task.reminderLeadMinutes).atZone(zone).toInstant();
+        return reminderTriggerInstant(LocalDate.parse(task.dueDate), time,
+                task.reminderLeadMinutes, zone);
     }
 
     /**
@@ -464,9 +465,20 @@ final class TaskLogic {
         return task.withRepeatAdvanced(next.toString(), now.toString());
     }
 
+    /**
+     * Resolves the due wall-clock time in its zone first, then subtracts elapsed lead minutes.
+     * Subtracting from LocalDateTime before zone resolution can shift or collapse the lead
+     * across daylight-saving gaps and overlaps.
+     */
+    private static Instant reminderTriggerInstant(LocalDate date, LocalTime dueTime,
+                                                  int leadMinutes, ZoneId zone) {
+        Instant dueMoment = LocalDateTime.of(date, dueTime).atZone(zone).toInstant();
+        return dueMoment.minusSeconds(leadMinutes * 60L);
+    }
+
     private static Instant repeatTriggerMoment(LocalDate date, LocalTime dueTime,
-                                             int leadMinutes, ZoneId zone) {
-        return LocalDateTime.of(date, dueTime).minusMinutes(leadMinutes).atZone(zone).toInstant();
+                                               int leadMinutes, ZoneId zone) {
+        return reminderTriggerInstant(date, dueTime, leadMinutes, zone);
     }
 
     private static boolean isWeekday(LocalDate date) {
