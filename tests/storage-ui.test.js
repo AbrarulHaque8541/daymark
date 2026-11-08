@@ -48,8 +48,12 @@ function fakeEnv(options) {
     'data-clear-all': Object.assign(fakeElement('button'), { id: 'data-clear-all' })
   };
   const storageData = Object.assign({}, opts.data || {});
+  const readFailures = new Set(opts.readFailures || []);
   const storage = {
-    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    getItem(key) {
+      if (readFailures.has(key)) throw new Error('Read access failure');
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
@@ -184,11 +188,72 @@ test('a failed removal during clear-all is reported honestly', () => {
   assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
 });
 
+test('unreadable data is shown as unknown and a clear retry fails safely', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' },
+    readFailures: ['daymark.tasks.v1']
+  });
+  const handle = ui.attachStorageUi(env);
+  const taskRow = elements['data-list'].children.find((row) =>
+    row.children.some((child) => child.textContent.startsWith('Tasks —')));
+  const taskTitle = taskRow.children.find((child) => child.tagName === 'span');
+  const taskButton = taskRow.children.find((child) => child.tagName === 'button');
+
+  assert.match(taskTitle.textContent, /status unknown/);
+  assert.equal(taskButton.disabled, false, 'an unreadable category allows an explicit retry');
+  assert.equal(elements['data-clear-all'].disabled, false, 'unknown data is not treated as an empty store');
+  assert.match(elements['data-status'].textContent, /categories could not be checked/);
+  assert.doesNotMatch(elements['data-status'].textContent, /No local data is stored yet/);
+
+  handle.onClearCategory('tasks');
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'failed reads must not delete the stored value');
+  assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
+});
+
+test('all unreadable categories never produce an empty-store claim', () => {
+  const allKeys = storageApi.CATEGORIES.flatMap((category) => category.keys);
+  const data = Object.fromEntries(allKeys.map((key) => [key, 'still stored']));
+  const { env, elements, storageData } = fakeEnv({ data, readFailures: allKeys });
+  ui.attachStorageUi(env);
+
+  assert.match(elements['data-status'].textContent, /No readable local data was found/);
+  assert.match(elements['data-status'].textContent, /categories could not be checked/);
+  assert.doesNotMatch(elements['data-status'].textContent, /No local data is stored yet/);
+  assert.equal(elements['data-clear-all'].disabled, false,
+    'the user can explicitly retry after an incomplete scan');
+  assert.ok(Object.values(storageData).every((value) => value === 'still stored'),
+    'rendering an incomplete scan must not mutate data');
+});
+
 test('unavailable storage keeps the card honest and never clears anything', () => {
   const { env, elements } = fakeEnv({});
   env.localStorage = null;
   ui.attachStorageUi(env);
   assert.match(elements['data-status'].textContent, /Could not read local data: Browser storage is unavailable/);
+});
+
+test('a throwing localStorage getter leaves every category unknown and fails closed', () => {
+  const { env, elements, storageData, confirmations } = fakeEnv({
+    data: { 'daymark.tasks.v1': 'keep this task data' }
+  });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage access denied'); }
+  });
+
+  const handle = ui.attachStorageUi(env);
+  assert.match(elements['data-status'].textContent,
+    /Browser storage could not be accessed\. Local data status is unknown/);
+  assert.equal(elements['data-clear-all'].disabled, true,
+    'clear-all is disabled when the storage object itself cannot be acquired');
+
+  handle.onClearAll();
+  handle.onClearCategory('tasks');
+  assert.equal(confirmations.length, 0, 'no destructive confirmation is offered without storage access');
+  assert.equal(storageData['daymark.tasks.v1'], 'keep this task data',
+    'a throwing storage getter must never cause data to be cleared');
+  assert.match(elements['data-status'].textContent, /Browser storage is unavailable/);
 });
 
 test('the refresh button rescans without confirmation and without changing data', () => {
