@@ -18,6 +18,15 @@ public final class BrowserDownloadRequestHeadersSmoke {
                 "a blank user agent adds no custom headers");
         check(BrowserDownloadRequestHeaders.forDownload("ok\r\nCookie: session=secret").isEmpty(),
                 "CR/LF header injection is rejected");
+        check("Mozilla".equals(BrowserDownloadRequestHeaders.forDownload("  Mozilla  ").get("User-Agent")),
+                "surrounding whitespace is trimmed");
+        check(BrowserDownloadRequestHeaders.forDownload("ok\\u0000bad").isEmpty(),
+                "NUL control characters are rejected");
+        check(BrowserDownloadRequestHeaders.forDownload("ok\\u007fbad").isEmpty(),
+                "DEL control characters are rejected");
+        check(BrowserDownloadRequestHeaders.forDownload("x".repeat(
+                BrowserDownloadRequestHeaders.MAX_USER_AGENT_CHARS)).size() == 1,
+                "the maximum allowed user-agent length is accepted");
         check(BrowserDownloadRequestHeaders.forDownload("x".repeat(
                 BrowserDownloadRequestHeaders.MAX_USER_AGENT_CHARS + 1)).isEmpty(),
                 "oversized user agents are rejected");

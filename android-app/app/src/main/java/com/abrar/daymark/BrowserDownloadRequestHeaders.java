@@ -17,11 +17,19 @@ final class BrowserDownloadRequestHeaders {
 
     private BrowserDownloadRequestHeaders() { }
 
+    private static boolean containsHeaderControl(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character < 0x20 || character == 0x7f) return true;
+        }
+        return false;
+    }
+
     static Map<String, String> forDownload(String userAgent) {
         if (userAgent == null) return Collections.emptyMap();
         String value = userAgent.trim();
         if (value.isEmpty() || value.length() > MAX_USER_AGENT_CHARS
-                || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
+                || containsHeaderControl(value)) {
             return Collections.emptyMap();
         }
         Map<String, String> headers = new LinkedHashMap<>();
