@@ -99,25 +99,8 @@ async function readResponseText(response, controller, setActiveReader, isTimedOu
   const body = response && response.body;
   const Decoder = globalThis.TextDecoder;
   if (!body || typeof body.getReader !== "function" || typeof Decoder !== "function") {
-    if (!response || typeof response.text !== "function") {
-      throw networkError("invalid-response", "The server returned no readable response body.");
-    }
-    const text = await response.text();
-    if (isTimedOut()) throw networkError("timeout", "The network request timed out.");
-    if (typeof text !== "string" || text.length > maxChars) {
-      abort(controller);
-      throw networkError("response-too-large", "The response exceeded the configured size limit.");
-    }
-    if (typeof globalThis.TextEncoder !== "function") {
-      abort(controller);
-      throw networkError("decoder-unavailable", "A safe response-size check is unavailable.");
-    }
-    const byteLength = new globalThis.TextEncoder().encode(text).byteLength;
-    if (byteLength > maxBytes) {
-      abort(controller);
-      throw networkError("response-too-large", "The response exceeded the configured size limit.");
-    }
-    return text;
+    abort(controller);
+    throw networkError("stream-unavailable", "A streaming response reader is required for safe API requests.");
   }
 
   let reader;

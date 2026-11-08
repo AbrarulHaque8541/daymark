@@ -86,8 +86,8 @@ test("language codes are bounded and fall back to Hindi when invalid", () => {
 test("bounded JSON reader streams UTF-8 chunks and applies safe request defaults", async () => {
   const bytes = new TextEncoder().encode(JSON.stringify({ text: "नमस्ते 🌏" }));
   const { response, state } = streamResponse([
-    bytes.slice(0, 12),
-    bytes.slice(12, 17),
+    bytes.slice(0, 10),
+    bytes.slice(10, 17),
     bytes.slice(17),
   ]);
   let seenInit;
@@ -156,16 +156,23 @@ test("malformed UTF-8 and malformed JSON are rejected rather than silently repla
   );
 });
 
-test("text-only compatibility responses are still checked against byte and character caps", async () => {
-  const response = { ok: true, status: 200, headers: { get: () => null }, text: async () => "x".repeat(11) };
+test("responses without a streaming body fail closed without materializing text", async () => {
+  let textRead = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: null,
+    async text() { textRead = true; return "{}"; },
+  };
   await assert.rejects(
     fetchBoundedJson("https://api.example.com/result", {}, {
       fetchImpl: async () => response,
-      maxBytes: 10,
       timeoutMs: 1000,
     }),
-    (error) => error.code === "response-too-large"
+    (error) => error.code === "stream-unavailable"
   );
+  assert.equal(textRead, false);
 });
 
 test("timeouts abort the request and cancel an active stream reader", async () => {
@@ -280,6 +287,7 @@ test("extension entry points use the bounded background transport and avoid sile
   assert.match(translate, /type:\s*"translateRequest"/);
   assert.doesNotMatch(translate, /fetch\s*\(/);
   assert.doesNotMatch(translate, /response\.json\s*\(/);
+  assert.match(aiButton, /MAX_SELECTED_TEXT_CHARS = 11800/);
   assert.match(aiButton, /code === "no-api-key"/);
   assert.match(aiButton, /Your selection was not sent to a search provider/);
   assert.match(options, /validateAiEndpointConfig/);

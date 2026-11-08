@@ -5,6 +5,7 @@
 
 const BTN_ID = "uccl-ai-btn";
 const PANEL_ID = "uccl-ai-panel";
+const MAX_SELECTED_TEXT_CHARS = 11800;
 
 function selectedText() {
   const sel = window.getSelection && window.getSelection();
@@ -61,6 +62,10 @@ function buildPanel(text) {
 
 async function runAction(action, text) {
   const out = document.getElementById(PANEL_ID + "-out");
+  if (text.length > MAX_SELECTED_TEXT_CHARS) {
+    if (out) out.textContent = "Select a shorter passage (maximum 11,800 characters).";
+    return;
+  }
   if (out) out.textContent = "…";
   const prompt = action === "Explain"
     ? "Explain this clearly:\n\n" + text

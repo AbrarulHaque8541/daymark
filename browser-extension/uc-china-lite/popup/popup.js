@@ -51,6 +51,8 @@ for (const id of ORDER) {
       if (!granted) {
         toggle.checked = false;
         settings.features[id] = false;
+        await chrome.storage.sync.set({ settings });
+        await chrome.runtime.sendMessage({ type: "setFeature", id, enabled: false });
         return;
       }
     }
