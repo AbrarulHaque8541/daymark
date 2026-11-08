@@ -123,11 +123,23 @@
     const parts = String(text).split('.');
     if (parts.length !== 4) return false;
     for (const part of parts) {
-      if (!/^\d{1,3}$/.test(part)) return false;
+      // Reject legacy WHATWG IPv4 spellings such as 010.0.0.1 before WebView
+      // can reinterpret an octet as octal or collapse leading-zero components.
+      if (!/^(?:0|[1-9]\d{0,2})$/.test(part)) return false;
       const value = Number(part);
       if (value > 255) return false;
     }
     return true;
+  }
+
+  // WHATWG URL treats hosts whose final label is an IPv4 number as IPv4
+  // candidates, including shortened, integer, octal, and hexadecimal forms.
+  // Reject these unless the entire host was already accepted as canonical
+  // four-octet decimal IPv4 above; otherwise Chromium may navigate elsewhere.
+  function endsInWhatwgIpv4Number(label) {
+    return /^[0-9]+$/.test(label)
+      || /^0[xX][0-9a-fA-F]*$/.test(label)
+      || (label.length > 1 && label[0] === '0' && /^[0-7]+$/.test(label.slice(1)));
   }
 
   function isValidIpv6Literal(text) {
@@ -147,16 +159,25 @@
     const groups = (head === '' ? [] : head.split(':'))
       .concat(tail === null || tail === '' ? [] : tail.split(':'));
     if (groups.length > 8) return false;
+    let addressUnits = 0;
     for (let i = 0; i < groups.length; i += 1) {
       const group = groups[i];
-      if (i === groups.length - 1 && group.includes('.') && groups.indexOf(group) === i) {
-        if (!isValidIpv4(group)) return false;
+      if (group.includes('.')) {
+        // An IPv4 tail occupies two 16-bit IPv6 groups and must be last.
+        // With "::", it must be in the post-compression tail: groups omitted
+        // by "::" are to the right, so an IPv4 group before "::" is not last.
+        const followsCompression = doubleColons.length === 0 || (tail !== null && tail !== '');
+        if (i !== groups.length - 1 || !followsCompression || !isValidIpv4(group)) return false;
+        addressUnits += 2;
         continue;
       }
       if (!/^[0-9a-fA-F]{1,4}$/.test(group)) return false;
+      addressUnits += 1;
     }
-    if (doubleColons.length === 0 && groups.length !== 8) return false;
-    if (doubleColons.length === 1 && groups.length >= 8 && body !== '::') return false;
+    // Without "::" exactly eight 16-bit units are required. With "::",
+    // at least one unit must be compressed (except the all-zero "::" form).
+    if (doubleColons.length === 0 && addressUnits !== 8) return false;
+    if (doubleColons.length === 1 && addressUnits >= 8 && body !== '::') return false;
     return true;
   }
 
@@ -187,7 +208,7 @@
     // literal; "999.1.1.1" and "1.2.3" are not navigation hosts.
     const labels = host.split('.');
     if (labels.length > MAX_HOST_LABELS) return null;
-    if (/^\d+$/.test(labels[labels.length - 1])) return null;
+    if (endsInWhatwgIpv4Number(labels[labels.length - 1])) return null;
     let idn = false;
     const encodedLabels = [];
     for (const label of labels) {
