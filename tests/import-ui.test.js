@@ -233,6 +233,6 @@ test('blocked storage getter keeps the import handler attached and changes no ta
 
 test('import auto-boot does not eagerly evaluate window.localStorage', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'import-ui.js'), 'utf8');
-  assert.doesNotMatch(source, /localStorage:\\s*window\\.localStorage/,
+  assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
     'boot must pass window and let attachImportUi guard the storage getter');
 });
