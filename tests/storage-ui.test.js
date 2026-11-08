@@ -232,6 +232,30 @@ test('unavailable storage keeps the card honest and never clears anything', () =
   assert.match(elements['data-status'].textContent, /Could not read local data: Browser storage is unavailable/);
 });
 
+test('a throwing localStorage getter leaves every category unknown and fails closed', () => {
+  const { env, elements, storageData, confirmations } = fakeEnv({
+    data: { 'daymark.tasks.v1': 'keep this task data' }
+  });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage access denied'); }
+  });
+
+  const handle = ui.attachStorageUi(env);
+  assert.match(elements['data-status'].textContent,
+    /Browser storage could not be accessed\. Local data status is unknown/);
+  assert.equal(elements['data-clear-all'].disabled, true,
+    'clear-all is disabled when the storage object itself cannot be acquired');
+
+  handle.onClearAll();
+  handle.onClearCategory('tasks');
+  assert.equal(confirmations.length, 0, 'no destructive confirmation is offered without storage access');
+  assert.equal(storageData['daymark.tasks.v1'], 'keep this task data',
+    'a throwing storage getter must never cause data to be cleared');
+  assert.match(elements['data-status'].textContent, /Browser storage is unavailable/);
+});
+
 test('the refresh button rescans without confirmation and without changing data', () => {
   const { env, elements, storageData, confirmations } = fakeEnv({ data: { 'daymark.feed.v1': '{}' } });
   ui.attachStorageUi(env);

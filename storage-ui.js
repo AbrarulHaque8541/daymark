@@ -15,7 +15,15 @@
     if (!env || !env.document) throw new Error('attachStorageUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = env.localStorage !== undefined
+        ? env.localStorage
+        : ((win && win.localStorage) || null);
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
@@ -31,7 +39,8 @@
     }
 
     function storageAvailable() {
-      if (!storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+      if (storageAccessFailed
+        || !storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
         return false;
       }
       try {
@@ -48,6 +57,12 @@
         return;
       }
       if (!listEl || typeof listEl.appendChild !== 'function') return;
+      if (storageAccessFailed) {
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        status('Browser storage could not be accessed. Local data status is unknown; nothing was changed.');
+        return;
+      }
       let scan = null;
       try {
         scan = storageApi.scanStorage(storage);
@@ -273,7 +288,7 @@
   root.DaymarkStorageUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachStorageUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachStorageUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
