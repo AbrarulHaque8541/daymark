@@ -315,3 +315,38 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.PREFS_KEY, 'daymark.holidays.prefs.v1');
   assert.equal(typeof globalThis.DaymarkHolidaysUi, 'object');
 });
+
+test('boot and attach succeed when localStorage getter throws', () => {
+  const throwingWindow = {
+    get localStorage() { throw new Error('storage blocked'); }
+  };
+  const { env, elements } = fakeEnv({});
+  env.window = throwingWindow;
+  delete env.localStorage;
+  assert.doesNotThrow(() => ui.attachHolidaysUi(env));
+  assert.equal(elements['holiday-status'].textContent, 'Choose a country and tap Refresh.');
+});
+
+test('successful refresh keeps result visible when storage write fails', () => {
+  const { env, elements } = fakeEnv({
+    fetch: okFetch([{ prefix: 'https://date.nager.at/api/v3/PublicHolidays/', body: FETCH_BODY }])
+  });
+  env.localStorage.setItem = () => { throw new Error('quota'); };
+  const handle = ui.attachHolidaysUi(env);
+  return handle.onRefresh().then(() => {
+    assert.ok(elements['holiday-status'].textContent.includes('Updated'));
+    assert.ok(elements['holiday-status'].textContent.includes('could not save'));
+    assert.ok(elements['holiday-list'].children.length > 0);
+  });
+});
+
+test('clear reports failure honestly when removeItem throws', () => {
+  const stored = JSON.stringify(makeCache([{ date: '2026-12-25', name: 'X', localName: 'X', global: true }]));
+  const { env, elements, storageData } = fakeEnv({ stored });
+  env.localStorage.removeItem = () => { throw new Error('blocked'); };
+  ui.attachHolidaysUi(env);
+  const clear = elements['holiday-clear'].listeners.find((l) => l.type === 'click');
+  clear.handler();
+  assert.ok(elements['holiday-status'].textContent.includes('Could not clear'));
+  assert.ok(storageData[ui.STORAGE_KEY]); // still present
+});

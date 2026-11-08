@@ -22,7 +22,15 @@
     if (!env || !env.document) throw new Error('attachHolidaysUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    function safeStorage() {
+      try {
+        return env.localStorage || (win && win.localStorage) || null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    const storage = safeStorage();
     const holidaysApi = env.holidaysApi || root.DaymarkHolidays || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
@@ -128,24 +136,41 @@
 
     function readCache() {
       if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
+      let raw;
+      try {
+        raw = storage.getItem(STORAGE_KEY);
+      } catch (error) {
+        return null; // unreadable treated as absent for display, but do not overwrite
+      }
       if (!raw) return null;
       try {
         const parsed = JSON.parse(raw);
         if (holidaysApi && typeof holidaysApi.validateHolidayCache === 'function'
           && holidaysApi.validateHolidayCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
+      } catch (error) { /* corrupt cache preserved, not treated as absent for overwrite */ }
       return null;
     }
 
     function persistCache(cache) {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      if (!storage || typeof storage.setItem !== 'function') return false;
+      try {
+        const current = storage.getItem(STORAGE_KEY);
+        // Only write if no concurrent change or absent
+        storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+        return true;
+      } catch (error) {
+        return false;
+      }
     }
 
     function readPrefs() {
       if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(PREFS_KEY);
+      let raw;
+      try {
+        raw = storage.getItem(PREFS_KEY);
+      } catch (error) {
+        return null;
+      }
       if (!raw) return null;
       try {
         const parsed = JSON.parse(raw);
@@ -155,8 +180,13 @@
     }
 
     function persistPrefs(countryCode) {
-      if (!storage || typeof storage.setItem !== 'function' || !countryCode || !countryCode.trim()) return;
-      storage.setItem(PREFS_KEY, JSON.stringify({ countryCode: countryCode.trim() }));
+      if (!storage || typeof storage.setItem !== 'function' || !countryCode || !countryCode.trim()) return false;
+      try {
+        storage.setItem(PREFS_KEY, JSON.stringify({ countryCode: countryCode.trim() }));
+        return true;
+      } catch (error) {
+        return false;
+      }
     }
 
     async function onRefresh() {
@@ -180,10 +210,12 @@
       try {
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;
-        persistCache(cached);
-        persistPrefs(code);
+        const cacheOk = persistCache(cached);
+        const prefsOk = persistPrefs(code);
         render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        let msg = `Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`;
+        if (!cacheOk || !prefsOk) msg += ' (could not save locally)';
+        status(msg);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
@@ -199,14 +231,26 @@
 
     function onClear() {
       // Explicit, scoped removal: only this card's cached holiday list and country preference.
+      let hadKeys = false;
+      let failed = false;
       if (storage && typeof storage.removeItem === 'function') {
-        storage.removeItem(STORAGE_KEY);
-        storage.removeItem(PREFS_KEY);
+        try {
+          if (storage.getItem(STORAGE_KEY) != null) {
+            hadKeys = true;
+            storage.removeItem(STORAGE_KEY);
+          }
+        } catch (error) { failed = true; }
+        try {
+          if (storage.getItem(PREFS_KEY) != null) {
+            hadKeys = true;
+            storage.removeItem(PREFS_KEY);
+          }
+        } catch (error) { failed = true; }
       }
       cached = null;
       if (countryEl && typeof countryEl.value === 'string') countryEl.value = DEFAULT_COUNTRY;
       clearList();
-      status('Holidays cleared on this device. Choose a country and tap Refresh.');
+      status(failed ? 'Could not clear saved holidays. They remain on this device.' : 'Holidays cleared on this device. Choose a country and tap Refresh.');
     }
 
     cached = readCache();
@@ -263,7 +307,7 @@
   root.DaymarkHolidaysUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachHolidaysUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachHolidaysUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
