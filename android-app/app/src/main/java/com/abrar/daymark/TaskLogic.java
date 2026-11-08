@@ -192,14 +192,14 @@ final class TaskLogic {
             throw new IllegalArgumentException("Choose a valid repeat rule.");
         }
         LocalDate date = LocalDate.parse(dueDate);
-        if (REPEAT_DAILY.equals(rule)) return date.plusDays(1).toString();
-        if (REPEAT_WEEKLY.equals(rule)) return date.plusWeeks(1).toString();
+        if (REPEAT_DAILY.equals(rule)) return dateOnlyOrNull(date.plusDays(1));
+        if (REPEAT_WEEKLY.equals(rule)) return dateOnlyOrNull(date.plusWeeks(1));
         if (REPEAT_WEEKDAYS.equals(rule)) {
             LocalDate next = date.plusDays(1);
             while (next.getDayOfWeek() == DayOfWeek.SATURDAY || next.getDayOfWeek() == DayOfWeek.SUNDAY) {
                 next = next.plusDays(1);
             }
-            return next.toString();
+            return dateOnlyOrNull(next);
         }
         if (REPEAT_YEARLY.equals(rule)) {
             int anchor = repeatDayOfMonth == null ? date.getDayOfMonth() : repeatDayOfMonth;
@@ -207,16 +207,22 @@ final class TaskLogic {
                 throw new IllegalArgumentException("Choose a valid yearly repeat date.");
             }
             LocalDate nextYear = date.plusYears(1);
-            return nextYear.withDayOfMonth(Math.min(anchor, nextYear.lengthOfMonth())).toString();
+            return dateOnlyOrNull(nextYear.withDayOfMonth(Math.min(anchor, nextYear.lengthOfMonth())));
         }
         if (!isValidRepeatDayOfMonth(repeatDayOfMonth)) {
             throw new IllegalArgumentException("Choose a valid monthly repeat date.");
         }
         LocalDate nextMonth = date.plusMonths(1);
-        return nextMonth.withDayOfMonth(Math.min(repeatDayOfMonth, nextMonth.lengthOfMonth())).toString();
+        return dateOnlyOrNull(nextMonth.withDayOfMonth(Math.min(repeatDayOfMonth, nextMonth.lengthOfMonth())));
     }
 
-    static boolean isValidTaskList(List<Task> tasks) {
+        /** Returns null when a computed occurrence is outside the supported four-digit date-only format. */
+    private static String dateOnlyOrNull(LocalDate date) {
+        String value = date.toString();
+        return isDateOnly(value) ? value : null;
+    }
+
+static boolean isValidTaskList(List<Task> tasks) {
         if (tasks == null) return false;
         Set<String> ids = new HashSet<>();
         for (Task task : tasks) {
