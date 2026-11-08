@@ -173,7 +173,11 @@ test('save reports a download failure and revokes the object URL', async () => {
     revokeObjectURL(url) { revoked = url; }
   };
   env.setTimeout = (callback) => { callback(); };
-  env.document.createElement = () => { throw new Error('blocked'); };
+  const createElement = env.document.createElement;
+  env.document.createElement = (tag) => {
+    if (tag === 'a') throw new Error('blocked');
+    return createElement(tag);
+  };
   const handle = ui.attachZonesUi(env);
   await handle.onSave();
   assert.equal(elements['zones-status'].textContent, 'Could not save the summary as a text file.');
@@ -181,3 +185,12 @@ test('save reports a download failure and revokes the object URL', async () => {
   assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
 });
 
+
+test('save fails closed when the document body cannot host a download link', async () => {
+  const { env, elements } = fakeEnv({});
+  env.document.body = null;
+  const handle = ui.attachZonesUi(env);
+  await handle.onSave();
+  assert.equal(elements['zones-status'].textContent, 'Saving is not available in this environment.');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
+});
