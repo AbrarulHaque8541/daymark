@@ -1,9 +1,9 @@
 # Daymark multi-device architecture and support matrix
 
 **Status:** Architecture proposal with one CI-tested Java 17 capability-policy slice; no non-Android Daymark app shell is shipped. This document is not a compatibility claim.
-**Baseline inspected:** `main` at `05de9c927843d32586c24a478653e9caab097c72`.
+**Baseline inspected:** `main` at `78524e9f12824f580aec29a8ed1dd123c78bf46f`.
 **Owner direction:** Make Daymark useful across device classes and operating systems, including constrained and display-less companions, while preserving the current Android product.
-**Last updated:** 2026-11-08T10:29:23.921Z
+**Last updated:** 2026-11-08T11:10:37Z
 
 ## 1. Product principle
 
@@ -231,3 +231,13 @@ Work by: ChatGPT
 Model: GPT-6
 Tooling: GitHub connector (live AGENTS/source/PR/Actions/Releases inspection; Git tree/commit/ref APIs)
 Timestamp (UTC): 2026-11-08T10:29:23.921Z
+
+
+## 14. Integration refresh after PR #608 and PR #606 — 2026-11-08T11:10:37Z
+
+- Current `main` SHA: `78524e9f12824f580aec29a8ed1dd123c78bf46f`.
+- PR #608 merged at `c702d73f7ef269cdb7f061256f3dbd27bacfece8`, aligning task-note HTTP/HTTPS link handling with the browser's explicit HTTP+HTTPS policy.
+- PR #606 merged at the current main SHA, preserving elapsed reminder lead time across spring-forward gaps and fall-back overlaps.
+- The Android CI and Ubuntu/Windows contract runs listed in section 13 were executed against `05de9c927843d32586c24a478653e9caab097c72`; they are historical and do **not** validate the current `78524e9f` tree. Fresh current-main CI evidence was not yet observed at this refresh.
+- Android remains the only shipped product target. Windows/Linux have only the shared Java 17 contract slice; no desktop app shell is shipped.
+- Physical Android/WebView and AlarmManager acceptance remain **NOT TESTED** under #160.

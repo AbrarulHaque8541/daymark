@@ -50,6 +50,18 @@ public final class ReminderSchedulePolicySmoke {
         check(ReminderSchedulePolicy.snoozeFire(now, 60) == null
                         && ReminderSchedulePolicy.snoozeFire(null, 10) == null,
                 "invalid snooze requests fail closed");
+        ZoneId eastern = ZoneId.of("America/New_York");
+        Task springDst = TaskLogic.create("Spring DST policy", "2026-03-08", "medium",
+                "", "03:30", 60, null);
+        Task fallDst = TaskLogic.create("Fall DST policy", "2026-11-01", "medium",
+                "", "02:30", 60, null);
+        check(Instant.parse("2026-03-08T06:30:00Z").equals(
+                        ReminderSchedulePolicy.baseFire(springDst, eastern)),
+                "reminder policy preserves a 60-minute elapsed lead after the spring-forward gap");
+        check(Instant.parse("2026-11-01T06:30:00Z").equals(
+                        ReminderSchedulePolicy.baseFire(fallDst, eastern)),
+                "reminder policy preserves a 60-minute elapsed lead after the fall-back overlap");
+
         Task task = TaskLogic.create("Snooze test", "2099-12-01", "high",
                 null, null, 60, null);
         Instant base = ReminderSchedulePolicy.baseFire(task, zone);
