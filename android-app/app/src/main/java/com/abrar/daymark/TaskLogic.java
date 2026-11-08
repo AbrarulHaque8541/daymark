@@ -377,7 +377,6 @@ final class TaskLogic {
         LocalTime time = TaskDuePresets.isTimeOnly(task.dueTime)
                 ? LocalTime.parse(task.dueTime, DateTimeFormatter.ISO_LOCAL_TIME)
                 : DEFAULT_REMINDER_TIME;
-        LocalDateTime dueMoment = LocalDateTime.of(LocalDate.parse(task.dueDate), time);
         return reminderTriggerInstant(LocalDate.parse(task.dueDate), time,
                 task.reminderLeadMinutes, zone);
     }
