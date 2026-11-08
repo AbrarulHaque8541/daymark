@@ -22,7 +22,9 @@ public final class TaskFocusTimerModeGesturePolicySmoke {
         check(classify(18f, 40f, 12f) == TaskFocusTimerModeGesturePolicy.Result.VERTICAL,
                 "vertical-dominant diagonal movement is rejected");
         check(classify(-40f, 18f, 12f) == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN,
-                "horizontal-dominant diagonal movement selects by horizontal direction");
+                "horizontal-dominant diagonal movement selects by leftward direction");
+        check(classify(40f, 18f, 12f) == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH,
+                "horizontal-dominant diagonal movement selects by rightward direction");
         check(classify(8f, 3f, 12f) == TaskFocusTimerModeGesturePolicy.Result.NONE,
                 "horizontal movement below threshold remains a tap-sized gesture");
         check(classify(Float.NaN, 40f, 12f) == TaskFocusTimerModeGesturePolicy.Result.NONE,

@@ -417,6 +417,8 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         public boolean onInterceptTouchEvent(MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    // Clear any ancestor scroll-interception request left by a prior gesture.
+                    requestDisallowInterceptTouchEvent(false);
                     downX = event.getX();
                     downY = event.getY();
                     horizontalGesture = false;
@@ -475,6 +477,15 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         private void resetGesture() {
             horizontalGesture = false;
             verticalGesture = false;
+            // A horizontal gesture temporarily disallows the parent ScrollView from intercepting.
+            // Release that request on every terminal path so later vertical drags can scroll normally.
+            requestDisallowInterceptTouchEvent(false);
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            resetGesture();
+            super.onDetachedFromWindow();
         }
     }
 
