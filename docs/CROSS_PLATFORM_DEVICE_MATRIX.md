@@ -1,9 +1,9 @@
 # Daymark multi-device architecture and support matrix
 
-**Status:** Architecture proposal / implementation not yet complete. This document is not a compatibility claim.
-**Baseline inspected:** `main` at `67d08db5b13fc4da73c2c0dfbe59a1c574dd69c2`.
+**Status:** Architecture proposal with one CI-tested Java 17 capability-policy slice; no non-Android Daymark app shell is shipped. This document is not a compatibility claim.
+**Baseline inspected:** `main` at `05de9c927843d32586c24a478653e9caab097c72`.
 **Owner direction:** Make Daymark useful across device classes and operating systems, including constrained and display-less companions, while preserving the current Android product.
-**Last updated:** 2026-10-30T19:18:00Z
+**Last updated:** 2026-11-08T10:29:23.921Z
 
 ## 1. Product principle
 
@@ -187,3 +187,47 @@ For desk work, meetings, walking, jogging, reading, exercise and sport, use opti
 8. **Migration decision:** only move production components after behavioral parity, performance, security, rollback and data compatibility are demonstrated.
 
 Every stage must state exact commit, OS/toolchain, tests, artifacts, benchmark methodology and untested hardware. Android's existing package ID, signer, data, features and release line remain protected throughout.
+
+
+## 13. Live verification refresh — 2026-11-08T10:29:23.921Z
+
+This section supersedes only the dated source/CI facts above; the platform status labels remain conservative and are not upgraded by a green shared-core workflow.
+
+### Current Android product baseline
+
+- Exact `main` SHA: `05de9c927843d32586c24a478653e9caab097c72`.
+- Android module: native Java application with Android System WebView; `minSdk = 26`, `targetSdk = 36`.
+- Source build identity/version: namespace and application ID `com.abrar.daymark`; `versionName = 1.6`, `versionCode = 13`. No identity, signer, version, manifest, or release changes were made in this refresh.
+- Browser policy: Android System WebView accepts explicit HTTP and HTTPS; plain HTTP is visibly labelled **Not encrypted**. Bare domains resolve to HTTPS. Online is the default; a deliberately saved Offline choice remains fail-closed and returning Online uses the explicit disclosure. The updater and other app-owned network clients remain HTTPS-only.
+- Task/attachment data and portable backup remain local and encrypted in the current Android source. No desktop storage adapter or cross-device sync implementation is present.
+
+### Exact current-main CI evidence
+
+- [Android CI — run 42469883833](https://github.com/AbrarulHaque8541/daymark/actions/runs/42469883833), exact `main` SHA `05de9c927843d32586c24a478653e9caab097c72`: **PASS**.
+- [Cross-platform contract tests — run 42469883856](https://github.com/AbrarulHaque8541/daymark/actions/runs/42469883856), exact `main` SHA `05de9c927843d32586c24a478653e9caab097c72`: **PASS**. The shared Java 17 capability-policy/contract slice ran on Ubuntu 24.04 and Windows 2025.
+- This proves the stated CI suites on those runners only. It does not build a Windows/Linux Daymark desktop app, prove platform storage/security adapters, or establish device compatibility.
+- Android physical-device acceptance remains **NOT TESTED**; issue [#160](https://github.com/AbrarulHaque8541/daymark/issues/160) remains open. The required evidence is a named device/model, Android API/build, WebView provider/version, tested build SHA, APK SHA-256, and scenario-by-scenario results.
+
+### Current distribution boundary
+
+- Latest published release observed: [v1.5](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.5), published 2026-10-23.
+- [v1.4](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.4) remains a draft.
+- Source is at version 1.6 / versionCode 13, but no v1.6 release was observed. This matrix refresh does not authorize a tag, version bump, draft creation, or publication.
+
+### Platform status interpretation
+
+- **Android phone:** remains the only shipped product target (**SUPPORTED**); current-main Android CI is **CI-TESTED**. It is not **DEVICE-TESTED**.
+- **Windows and Linux:** the shared Java 17 contract slice is **CI-TESTED** on the named runners; the Daymark desktop applications remain **UNSUPPORTED** because no desktop shell, packaging, encrypted storage adapter, updater, or GUI acceptance suite is shipped.
+- **HarmonyOS/OpenHarmony, iOS, watchOS/Wear OS, car, ring, and other companion targets:** remain **EXPERIMENTAL** or **UNSUPPORTED** exactly as shown in the platform matrix; no new target build or physical-device evidence was produced in this refresh.
+
+### Next qualification gates
+
+1. Complete the physical Android/WebView matrix under #160 before making broader Android compatibility claims.
+2. Finish browser reliability work under #348, keeping HTTP/HTTPS transport policy tests separate from real WebView/device acceptance.
+3. For Windows/Linux, produce a minimal desktop POC with local encrypted persistence, packaging, keyboard/accessibility checks, screenshots/log artifacts, and the same synthetic shared-core fixtures before changing those rows from **UNSUPPORTED**.
+4. Treat HarmonyOS NEXT as a separate ArkTS/ArkUI target: require a real toolchain build and target-runtime/device evidence before any support claim.
+
+Work by: ChatGPT
+Model: GPT-6
+Tooling: GitHub connector (live AGENTS/source/PR/Actions/Releases inspection; Git tree/commit/ref APIs)
+Timestamp (UTC): 2026-11-08T10:29:23.921Z
