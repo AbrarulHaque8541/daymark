@@ -42,7 +42,7 @@ function makeDoc(ids) {
 }
 
 const ALL_IDS = ['browser-download-scenario', 'browser-download-status', 'browser-download-result',
-  'browser-download-form', 'browser-download-clear', 'browser-download-copy', 'browser-download-save'];
+  'browser-download-form', 'browser-download-clear', 'browser-download-copy', 'browser-download-save', 'browser-download-share'];
 
 test('attachBrowserDownloadUi requires a document', () => {
   assert.throws(() => ui.attachBrowserDownloadUi(null), /requires a document/);
@@ -252,4 +252,24 @@ test('clear button also forgets the remembered journey in localStorage', () => {
   assert.equal(scenario.value, '');
   assert.match(doc.elements['browser-download-status'].textContent, /Cleared\./);
   assert.equal(doc.elements['browser-download-result'].children.length, 0);
+});
+
+test('share button uses injected navigator.share when available and reports success', async () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-download-scenario'].value = 'same-origin-redirects';
+  let shared = null;
+  const fakeNav = {
+    share(data) {
+      shared = data;
+      return Promise.resolve();
+    }
+  };
+  const handle = ui.attachBrowserDownloadUi({ document: doc, downloadApi: engine, navigator: fakeNav });
+  assert.ok(doc.elements['browser-download-result'].children.length > 0);
+  const shareBtn = doc.elements['browser-download-share'];
+  assert.ok(shareBtn.listeners.click && shareBtn.listeners.click.length === 1, 'share listener wired');
+  await handle.onShare();
+  assert.equal(shared && shared.title, 'Daymark download safety plan');
+  assert.match(shared.text, /report\.pdf/);
+  assert.match(doc.elements['browser-download-status'].textContent, /Shared plan/);
 });

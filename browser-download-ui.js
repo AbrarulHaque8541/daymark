@@ -20,6 +20,7 @@
       ? env.downloadApi
       : (root.DaymarkBrowserDownload || null);
     const storage = env.localStorage || null;
+    const nav = env.navigator || (typeof navigator !== "undefined" ? navigator : null);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const scenarioEl = element('browser-download-scenario');
@@ -29,6 +30,7 @@
     const clearEl = element('browser-download-clear');
     const copyEl = element('browser-download-copy');
     const saveEl = element('browser-download-save');
+    const shareEl = element('browser-download-share');
     const planBtn = element('browser-download-check');
 
     function status(message) {
@@ -218,6 +220,23 @@
       }
     }
 
+    function onShare() {
+      const text = collectPlanText();
+      if (!text) {
+        status('Nothing to share yet.');
+        return;
+      }
+      if (nav && typeof nav.share === 'function') {
+        nav.share({ title: 'Daymark download safety plan', text }).then(() => {
+          status('Shared plan.');
+        }).catch(() => {
+          status('Could not share the plan.');
+        });
+        return;
+      }
+      status('Sharing is not available in this environment.');
+    }
+
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
@@ -236,6 +255,9 @@
     if (saveEl && typeof saveEl.addEventListener === 'function') {
       saveEl.addEventListener('click', () => { onSave(); });
     }
+    if (shareEl && typeof shareEl.addEventListener === 'function') {
+      shareEl.addEventListener('click', () => { onShare(); });
+    }
 
     const wasRestored = restoreScenario();
     plan({ restored: wasRestored });
@@ -245,6 +267,7 @@
       onClear,
       onCopy,
       onSave,
+      onShare,
       detach() {
         status('');
       }
