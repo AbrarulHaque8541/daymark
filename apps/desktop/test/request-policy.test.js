@@ -75,3 +75,18 @@ test('tracker requests are blocked only for subresources', () => {
   assert.equal(isTrackerRequest(request('https://ads.doubleclick.net/')), false);
   assert.equal(isTrackerRequest(request('https://example.com/')), false);
 });
+
+
+test('credential-bearing URLs fail closed for every network scheme', () => {
+  const cases = [
+    ['https://alice:secret@example.com/', 'mainFrame'],
+    ['wss://alice:secret@example.com/socket', 'webSocket'],
+    ['http://alice:secret@localhost:3000/', 'mainFrame'],
+    ['ws://alice:secret@localhost:3000/socket', 'webSocket'],
+  ];
+  for (const [url, resourceType] of cases) {
+    assert.equal(isAllowedRequest(request(url, resourceType)), false, url);
+  }
+  assert.equal(isAllowedRequest(request('https://example.com/')), true);
+  assert.equal(isAllowedRequest(request('wss://example.com/socket', 'webSocket')), true);
+});

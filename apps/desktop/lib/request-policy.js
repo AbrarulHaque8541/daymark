@@ -29,6 +29,10 @@ function isAllowedRequest(details, allowedAppFiles, appUiEntry) {
     return false;
   }
 
+  // URL userinfo can expose credentials through browser history, logs, or
+  // downstream request handling. It is outside Daymark's navigation policy.
+  if (url.username || url.password) return false;
+
   switch (url.protocol) {
     case 'https:':
       return true;
