@@ -13,6 +13,7 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 
 ## How it is scheduled
 
+- Reminder lead time is measured as **elapsed minutes before the zone-resolved due instant**, not by subtracting from the local wall clock. A nonexistent due time in a spring-forward gap is shifted forward by the zone rules; an ambiguous fall-back time uses Java's earlier-offset `atZone` resolution. The configured lead is then subtracted from that resolved instant, preserving the requested elapsed duration.
 - Alarms use `AlarmManager.setAndAllowWhileIdle` (RTC_WAKEUP) — **no foreground service, no polling**.
 - Alarms are (re)scheduled when the app opens, after every successful task save, and after device boot (a non-exported receiver listening only for `BOOT_COMPLETED` / `QUICKBOOT_POWERON`).
 - If a notification is missed (device off, Doze), the in-app dialog on the next app open still covers it.
