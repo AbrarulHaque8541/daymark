@@ -287,6 +287,7 @@
           }
 
           if (!config) return { reason: 'disabled' };
+          let queueStateRecovered = false;
           if (resolvedUnpersistedIds.size) {
             const reconciled = queue.filter((event) => !resolvedUnpersistedIds.has(event.id));
             if (reconciled.length !== queue.length) {
@@ -301,6 +302,7 @@
               queue = reconciled;
               resolvedUnpersistedIds.clear();
               queueWriteFailed = false;
+              queueStateRecovered = true;
             } else {
               resolvedUnpersistedIds.clear();
             }
@@ -313,9 +315,12 @@
                 renderQueue();
                 return { reason: 'storage-unavailable' };
               }
+              queueStateRecovered = true;
             }
             queueWriteFailed = false;
-            status('No queued webhook events.' + storageWarning());
+            if (queueStateRecovered) {
+              status('Webhook queue state is now saved. No events remain queued.' + storageWarning());
+            }
             renderQueue();
             return { reason: 'empty' };
           }
