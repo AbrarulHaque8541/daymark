@@ -346,6 +346,8 @@ test('failed persistence after delivery keeps an empty queue retryable until it 
   assert.equal(storageData[webhookApi.QUEUE_KEY], '[]',
     'Retry persists the empty queue without sending the already-delivered event again');
   assert.equal(elements['webhook-flush'].disabled, true);
+  assert.match(elements['webhook-status'].textContent, /Webhook queue state is now saved/);
+  assert.doesNotMatch(elements['webhook-status'].textContent, /may be retried after reload/);
 });
 
 
