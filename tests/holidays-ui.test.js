@@ -4,6 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const holidaysApi = require('../holidays-logic.js');
 const ui = require('../holidays-ui.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const FROZEN_NOW = '2026-11-06T12:00:00.000Z';
 
@@ -70,7 +72,7 @@ function fakeEnv(options) {
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   if (opts.prefs !== undefined) storageData[ui.PREFS_KEY] = opts.prefs;
-  const storage = {
+  const storage = opts.storage || {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
@@ -87,7 +89,7 @@ function fakeEnv(options) {
     fetch: opts.fetch,
     now: () => FROZEN_NOW
   };
-  return { env, elements, storageData };
+  return { env, elements, storageData, storage };
 }
 
 function okFetch(routes) {
@@ -314,4 +316,128 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.STORAGE_KEY, 'daymark.holidays.v1');
   assert.equal(ui.PREFS_KEY, 'daymark.holidays.prefs.v1');
   assert.equal(typeof globalThis.DaymarkHolidaysUi, 'object');
+});
+
+
+test('a blocked window.localStorage getter does not prevent the holidays card from attaching', () => {
+  const { env, elements } = fakeEnv({});
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage access blocked'); }
+  });
+  const handle = ui.attachHolidaysUi(env);
+  assert.equal(typeof handle.onRefresh, 'function');
+  assert.ok(elements['holiday-form'].listeners.some((listener) => listener.type === 'submit'));
+  assert.match(elements['holiday-status'].textContent, /browser storage is unavailable/);
+});
+
+test('a failed cache read is not treated as absent and Clear does not remove unknown data', () => {
+  let writes = 0;
+  let removes = 0;
+  const storage = {
+    getItem() { throw new Error('storage read blocked'); },
+    setItem() { writes += 1; },
+    removeItem() { removes += 1; }
+  };
+  const { env, elements } = fakeEnv({ storage });
+  const handle = ui.attachHolidaysUi(env);
+  assert.match(elements['holiday-status'].textContent, /saved holiday data could not be read/);
+  handle.onClear();
+  assert.equal(writes, 0);
+  assert.equal(removes, 0);
+  assert.match(elements['holiday-status'].textContent, /nothing was cleared/);
+});
+
+test('a successful refresh remains visible when cache and preference writes fail', async () => {
+  let writes = 0;
+  const storage = {
+    getItem() { return null; },
+    setItem() { writes += 1; throw new Error('quota exceeded'); },
+    removeItem() {}
+  };
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ storage, fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  await handle.onRefresh();
+  assert.equal(elements['holiday-list'].children.length, 2, 'fresh results render even when persistence fails');
+  assert.equal(writes, 2, 'cache and country preference writes are attempted independently');
+  assert.match(elements['holiday-status'].textContent, /^Updated ·/);
+  assert.match(elements['holiday-status'].textContent, /changes could not be saved/);
+  assert.doesNotMatch(elements['holiday-status'].textContent, /Could not refresh/);
+});
+
+test('a partial Clear failure restores saved cache and preference and keeps the visible list', () => {
+  const cacheRaw = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  const prefsRaw = JSON.stringify({ countryCode: 'DE' });
+  const data = { [ui.STORAGE_KEY]: cacheRaw, [ui.PREFS_KEY]: prefsRaw };
+  let removeCalls = 0;
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); },
+    removeItem(key) {
+      removeCalls += 1;
+      if (removeCalls === 2) throw new Error('storage blocked the second removal');
+      delete data[key];
+    }
+  };
+  const { env, elements } = fakeEnv({ storage });
+  const handle = ui.attachHolidaysUi(env);
+  assert.equal(elements['holiday-list'].children.length, 1);
+  handle.onClear();
+  assert.equal(data[ui.STORAGE_KEY], cacheRaw, 'the original cache is restored');
+  assert.equal(data[ui.PREFS_KEY], prefsRaw, 'the original preference is preserved');
+  assert.equal(elements['holiday-list'].children.length, 1, 'visible data remains after failed Clear');
+  assert.equal(elements['holiday-country'].value, 'IN', 'the selected country is not reset');
+  assert.match(elements['holiday-status'].textContent, /previous saved data was restored where possible/);
+  assert.doesNotMatch(elements['holiday-status'].textContent, /^Holidays cleared/);
+});
+
+test('refresh preserves corrupt cache bytes and reports that the new result is not cached', async () => {
+  const corrupt = '{not valid json';
+  const data = { [ui.STORAGE_KEY]: corrupt };
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); },
+    removeItem(key) { delete data[key]; }
+  };
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ storage, fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  await handle.onRefresh();
+  assert.equal(data[ui.STORAGE_KEY], corrupt, 'corrupt original bytes are never silently overwritten');
+  assert.equal(elements['holiday-list'].children.length, 2, 'fresh results remain available in memory');
+  assert.match(elements['holiday-status'].textContent, /Updated ·/);
+  assert.match(elements['holiday-status'].textContent, /saved holiday cache is unreadable and was preserved/);
+});
+
+test('a cache changed by another tab is not overwritten by a refresh', async () => {
+  const original = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  const external = JSON.stringify(makeCache([
+    { date: '2026-12-26', name: 'Boxing Day', localName: 'Boxing Day', global: true }
+  ]));
+  const data = { [ui.STORAGE_KEY]: original };
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); },
+    removeItem(key) { delete data[key]; }
+  };
+  const fetchImpl = okFetch([{ prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }]);
+  const { env, elements } = fakeEnv({ storage, fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  data[ui.STORAGE_KEY] = external;
+  await handle.onRefresh();
+  assert.equal(data[ui.STORAGE_KEY], external, 'the other tab\'s value wins');
+  assert.equal(elements['holiday-list'].children.length, 2, 'the freshly fetched result still renders');
+  assert.match(elements['holiday-status'].textContent, /saved data changed elsewhere and was preserved/);
+});
+
+test('auto-boot lets attachHolidaysUi guard the storage getter instead of reading it eagerly', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'holidays-ui.js'), 'utf8');
+  assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
+    'the DOMContentLoaded callback must not evaluate window.localStorage before guarded attachment');
 });
