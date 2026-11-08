@@ -84,7 +84,7 @@
 
     function persist(nextZones, nextUpdatedAt) {
       if (storageAccessFailed || storageReadFailed || !storage
-        || typeof storage.setItem !== 'function') return false;
+        || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') return false;
       const cache = {
         version: 1,
         zones: nextZones.slice(),
@@ -99,7 +99,9 @@
     }
 
     function readCache() {
-      if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') return null;
+      if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+        return null;
+      }
       let raw = null;
       try {
         raw = storage.getItem(STORAGE_KEY);
