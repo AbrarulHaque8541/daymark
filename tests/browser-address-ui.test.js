@@ -131,7 +131,7 @@ test('a corrupt provider preference is preserved and never overwritten by a late
   change.handler();
   assert.equal(storageData[ui.PREFS_KEY], raw, 'corrupt saved preference is not overwritten');
   assert.equal(handle.currentProvider(), 'google', 'the current page can still use an in-memory choice');
-  assert.match(elements['browser-address-result'].textContent, /www\\.google\\.com/);
+  assert.match(elements['browser-address-result'].textContent, /www\.google\.com/);
 });
 
 test('an empty provider preference is corruption, not an absent key', () => {
