@@ -110,8 +110,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .clear-search[hidden], .empty-clear-search[hidden], .tool-button[hidden] { display: none; }
 .task-list { display: grid; gap: 8px; }
 .task-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 11px; align-items: center; min-height: 76px; border: 1px solid rgba(219, 226, 232, .75); border-radius: 16px; background: var(--surface); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); padding: 12px 13px; box-shadow: 0 4px 16px rgba(24, 40, 48, .04); animation: rise-in .22s ease both; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
-.task-row:active { transform: translateY(0) scale(.995); }
 .task-row:hover { transform: translateY(-1px); border-color: rgba(22, 112, 95, .3); box-shadow: 0 10px 26px rgba(24, 40, 48, .08); }
+.task-row:active { transform: translateY(0) scale(.995); }
 @keyframes rise-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .complete-button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 1.5px solid #c3ced6; border-radius: 50%; color: white; background: white; transition: all .15s ease; }
 .complete-button:hover { border-color: var(--accent); background: #eef6f2; transform: scale(1.08); }

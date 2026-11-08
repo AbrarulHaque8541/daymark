@@ -16,6 +16,8 @@ test('press feedback CSS stays complete, deduplicated, and reduced-motion aware'
     'one task-row press rule plus one reduced-motion override');
   assert.match(css, /\.card:active\s*\{\s*transform:\s*scale\(\.998\);\s*\}/);
   assert.match(css, /\.task-row:active\s*\{\s*transform:\s*translateY\(0\) scale\(\.995\);\s*\}/);
+  assert.ok(css.indexOf('.task-row:hover {') < css.indexOf('.task-row:active {'),
+    'active feedback must follow hover in the cascade so the pressed row returns to neutral');
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.card:active,\s*\.task-row:active\s*\{\s*transform:\s*none;/);
   assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length,
     'stylesheet braces must remain balanced');
