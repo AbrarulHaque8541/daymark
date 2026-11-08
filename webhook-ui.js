@@ -181,6 +181,11 @@
           return;
         }
       }
+      if (queuePersisted && !queue.length) {
+        status('Webhook queue state is now saved. No events remain queued.' + storageWarning());
+        renderQueue();
+        return;
+      }
       if (!config || !webhookApi || !queue.length) {
         renderQueue();
         return;
