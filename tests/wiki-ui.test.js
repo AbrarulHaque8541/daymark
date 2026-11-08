@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const wikiApi = require('../wiki-logic.js');
 const ui = require('../wiki-ui.js');
+const { createStreamResponse } = require('./helpers/stream-response.js');
 
 const SEARCH_BODY = JSON.stringify({
   query: {
@@ -83,7 +84,7 @@ function okFetch(body) {
   const impl = (url, init) => {
     seen.push(url);
     assert.ok(!init || typeof init === 'object', 'fetch init must be an options object when provided');
-    return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
+    return Promise.resolve(createStreamResponse(body).response);
   };
   impl.seen = seen;
   return impl;
