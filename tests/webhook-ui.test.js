@@ -199,8 +199,8 @@ test('a task completed during an active flush is retained and sent after the sna
   await firstStarted;
   const secondTask = Object.assign({}, TASK, { id: 'task-2', title: 'Completed during first delivery' });
   const secondNotify = handle.notifyTaskCompleted(secondTask);
-  assert.equal(JSON.parse(storageData[webhookApi.QUEUE_KEY]).length, 2,
-    'the second completion is persisted while the first request is in flight');
+  assert.equal(JSON.parse(storageData[webhookApi.QUEUE_KEY]).length, 1,
+    'the second completion waits for the exclusive lock instead of writing a stale snapshot');
   releaseFirst();
   await secondStarted;
   await Promise.all([firstNotify, secondNotify]);
