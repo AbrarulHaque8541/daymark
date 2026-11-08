@@ -5,7 +5,7 @@
 - Repository: `AbrarulHaque8541/daymark`; default branch: `main`.
 - Live `main` SHA: `f9e505604718beae5ef14e274fc96879e34fdfdb`.
 - Root `AGENTS.md` was read in full. Canonical commands remain `sh android-app/tools/check-v1-source.sh` and `npm test`; tests must not be weakened, and shared `MainActivity.java` edits must be serialized.
-- Live build identity in `android-app/app/build.gradle.kts` and `AGENTS.md`: `com.abrar.daymark`. The run-level safety instruction says `com.cue.daymark`. This discrepancy is unresolved. No namespace/applicationId/manifest identity change was made.
+- Live build identity in `android-app/app/build.gradle.kts` and `AGENTS.md`: `com.abrar.daymark`. A run-level safety instruction names a different legacy package identity. This discrepancy is unresolved. No namespace/applicationId/manifest identity change was made.
 - Branch-protection endpoint returned HTTP 403 (resource not accessible); rulesets endpoint returned an empty list. This does not establish that merge protection is absent. No merge was attempted.
 
 ## Recent main integrations
