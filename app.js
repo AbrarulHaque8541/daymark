@@ -7,6 +7,9 @@
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
   const FEED_KEY = 'daymark.feed.v1';
+  const UI_PREFS_KEY = 'daymark.ui-prefs.v1';
+  const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed']);
+  const VALID_SORTS = new Set(['smart', 'title']);
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
@@ -1926,8 +1929,44 @@
     renderFeed();
   }
 
+
+  function loadUiPrefs() {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(UI_PREFS_KEY);
+    } catch (error) {
+      return null;
+    }
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const filter = typeof parsed.filter === 'string' && VALID_FILTERS.has(parsed.filter) ? parsed.filter : null;
+      const sort = typeof parsed.sort === 'string' && VALID_SORTS.has(parsed.sort) ? parsed.sort : null;
+      return { filter, sort };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function persistUiPrefs() {
+    try {
+      const prefs = {};
+      if (VALID_FILTERS.has(state.filter)) prefs.filter = state.filter;
+      if (VALID_SORTS.has(state.sort)) prefs.sort = state.sort;
+      localStorage.setItem(UI_PREFS_KEY, JSON.stringify(prefs));
+    } catch (error) {
+      console.warn('Could not save Daymark UI preferences:', error);
+    }
+  }
+
   function setUp() {
     state.tasks = loadTasks();
+    const prefs = loadUiPrefs();
+    if (prefs) {
+      if (prefs.filter) state.filter = prefs.filter;
+      if (prefs.sort) state.sort = prefs.sort;
+    }
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
@@ -1953,6 +1992,7 @@
     $('#chip-tomorrow').addEventListener('click', () => setQuickDueDate(1));
     $('#sort-toggle').addEventListener('click', () => {
       state.sort = state.sort === 'smart' ? 'title' : 'smart';
+      persistUiPrefs();
       render();
     });
     $('#empty-clear-search').addEventListener('click', clearSearch);
@@ -1966,6 +2006,7 @@
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
+      persistUiPrefs();
       render();
     }));
     taskList.addEventListener('click', handleTaskAction);
