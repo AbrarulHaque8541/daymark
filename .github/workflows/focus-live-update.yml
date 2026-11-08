@@ -46,7 +46,7 @@ jobs:
           python3 tools/check-merged-manifests.py "$PWD"
       - name: Compile both distribution variants and lint
         run: >-
-          ./gradlew --no-daemon
+          bash tools/run-gradle-with-retry.sh --no-daemon
           assembleGithubSideloadDebug
           assemblePlayDebug
           lintGithubSideloadDebug
