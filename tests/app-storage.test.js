@@ -509,6 +509,45 @@ test('recovery bundles with distinct valid task arrays are preserved', () => {
     'a bundle containing a different valid task array may contain unique user data');
 });
 
+test('an empty primary task payload is preserved before a later task save', () => {
+  const app = bootApp({ savedValue: '' });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'the original empty primary payload remains unchanged during recovery');
+  assert.equal(app.storedValues.get(BACKUP_KEY), '',
+    'the present empty-string payload is copied verbatim to the recovery backup');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Saved data could not be read/,
+    'an empty stored value is reported as unreadable rather than absent');
+
+  app.elements.get('#new-title').value = 'Safe task after recovery';
+  app.elements.get('#add-form').dispatch('submit');
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), '',
+    'a later save must retain the opaque empty recovery source');
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].title, 'Safe task after recovery');
+});
+
+test('an empty primary task payload is not overwritten when its recovery backup cannot be created', () => {
+  const app = bootApp({ savedValue: '', failBackup: true });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'the original empty primary payload remains byte-for-byte unchanged');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'failed backup creation must not claim that recovery data was saved');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup could not be created/);
+
+  app.elements.get('#new-title').value = 'Must not overwrite the only source';
+  app.elements.get('#add-form').dispatch('submit');
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'later task saves remain blocked while the only original payload cannot be backed up');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false);
+});
+
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
   const corruptData = '{not valid JSON';
   const { elements, storedValues } = bootApp({ savedValue: corruptData });
