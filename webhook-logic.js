@@ -134,15 +134,18 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
           body,
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
           redirect: 'error',
           cache: 'no-store',
           signal: controller ? controller.signal : undefined
         });
       } catch (error) {
         if (timedOut) throw new Error(TIMEOUT_MESSAGE);
-        throw new Error('Webhook delivery failed: '
-          + (error && error.message ? error.message : 'network error')
-          + '. No automatic retry was attempted.');
+        // Fetch implementations may include the full endpoint in their
+        // error text. Never surface arbitrary network errors: webhook URLs may
+        // contain bearer tokens in their path or query string.
+        throw new Error('Webhook delivery failed due to a network error. No automatic retry was attempted.');
       }
       if (!response || !response.ok) {
         throw new Error('Webhook endpoint returned HTTP '

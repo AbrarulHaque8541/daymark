@@ -160,3 +160,9 @@ test('the module exposes its constants and stays inert under Node', () => {
   assert.equal(storage.categoryById('weather').label, 'Weather cache');
   assert.equal(storage.categoryById('nope'), null);
 });
+
+test('webhook settings category explains that only legacy endpoints are stored there', () => {
+  const category = storage.categoryById('webhook');
+  assert.match(category.description,/legacy endpoint/i);
+  assert.match(category.description,/active tab only/i);
+});

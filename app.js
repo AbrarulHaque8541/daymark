@@ -901,7 +901,12 @@
     const webhookUi = window.DaymarkWebhookUi;
     if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
     try {
-      webhookUi.notifyTaskCompleted(task);
+      const result = webhookUi.notifyTaskCompleted(task);
+      if (result && typeof result.catch === 'function') {
+        result.catch((error) => {
+          console.warn('Could not queue the Daymark task-completed webhook:', error);
+        });
+      }
     } catch (error) {
       console.warn('Could not queue the Daymark task-completed webhook:', error);
     }

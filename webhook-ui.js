@@ -8,17 +8,32 @@
  * event, or the next completed task. Nothing polls and nothing wakes the radio
  * on a timer: zero battery drain by design. Mirrors the weather/currency
  * module style: attachWebhookUi(env) is fully injectable for unit tests.
+ *
+ * Origin-wide Web Locks serialize queue mutations and hold one exclusive lock
+ * across delivery. If that coordinator is unavailable, task events are not
+ * queued or sent. Delivery remains at-least-once across crashes or ambiguous
+ * network outcomes; arbitrary webhook receivers do not promise exactly once.
  */
 ((root) => {
   'use strict';
 
+  const QUEUE_LOCK_NAME = 'daymark.webhook.queue.v1';
+  const DELIVERY_LOCK_NAME = 'daymark.webhook.delivery.v1';
   let activeHandle = null;
 
   function attachWebhookUi(env) {
     if (!env || !env.document) throw new Error('attachWebhookUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const webhookApi = env.webhookApi || root.DaymarkWebhook || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
@@ -36,20 +51,87 @@
     let config = null;
     let queue = [];
     let busy = false;
+    let queueReadFailed = storageAccessFailed;
+    let legacyConfigCleanupFailed = false;
+    let queueWriteFailed = false;
+    let flushRequested = false;
+    let coordinationFailed = false;
+    let memoryOnlyEvents = [];
+    // If a POST succeeded but the queue-removal write failed, remember those
+    // resolved IDs in this tab so Retry can persist their removal without
+    // sending them a second time during the same page lifetime.
+    let resolvedUnpersistedIds = new Set();
 
     function status(message) {
-      if (statusEl) statusEl.textContent = message;
+      let safeMessage = String(message === null || message === undefined ? '' : message);
+      const endpoints = [
+        config && config.url,
+        urlEl && typeof urlEl.value === 'string' ? urlEl.value.trim() : ''
+      ];
+      endpoints.forEach((endpoint) => {
+        if (typeof endpoint === 'string' && endpoint) {
+          safeMessage = safeMessage.split(endpoint).join('[hidden]');
+        }
+      });
+      if (statusEl) statusEl.textContent = safeMessage;
     }
 
     function isOnline() {
       return !navigator || typeof navigator.onLine !== 'boolean' || navigator.onLine;
     }
 
+    function queueCoordinatorAvailable() {
+      try {
+        return !!(navigator && navigator.locks && typeof navigator.locks.request === 'function');
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function coordinationWarning() {
+      if (!queueCoordinatorAvailable()) {
+        return ' Cross-tab queue coordination is unavailable in this browser; webhook queueing and delivery are paused.';
+      }
+      return coordinationFailed
+        ? ' Cross-tab queue coordination failed; retry after the browser lock service is available.'
+        : '';
+    }
+
+    async function withNamedLock(lockName, operation) {
+      let locks = null;
+      try {
+        locks = navigator && navigator.locks;
+      } catch (error) {
+        locks = null;
+      }
+      if (!locks || typeof locks.request !== 'function') {
+        coordinationFailed = true;
+        return { ok: false, reason: 'unavailable' };
+      }
+      try {
+        const value = await locks.request(lockName, { mode: 'exclusive' }, operation);
+        coordinationFailed = false;
+        return { ok: true, value };
+      } catch (error) {
+        coordinationFailed = true;
+        return { ok: false, reason: 'failed' };
+      }
+    }
+
+    function withQueueLock(operation) {
+      return withNamedLock(QUEUE_LOCK_NAME, operation);
+    }
+
+    function withDeliveryLock(operation) {
+      return withNamedLock(DELIVERY_LOCK_NAME, operation);
+    }
+
     function setBusy(isBusy) {
       busy = isBusy;
       [saveEl, testEl, flushEl].forEach((button) => {
         if (!button) return;
-        button.disabled = isBusy || (button === flushEl && queue.length === 0);
+        button.disabled = isBusy || (button === flushEl
+          && ((queue.length === 0 && !queueWriteFailed) || storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed || !queueCoordinatorAvailable()));
         if (button.classList && typeof button.classList.toggle === 'function') {
           button.classList.toggle('is-busy', isBusy);
         }
@@ -60,50 +142,74 @@
       });
     }
 
-    function readConfig() {
-      if (!storage || typeof storage.getItem !== 'function' || !webhookApi) return null;
-      const raw = storage.getItem(webhookApi.CONFIG_KEY);
-      if (!raw) return null;
+    // Older versions persisted the complete endpoint URL, including provider
+    // tokens commonly carried in its path or query. Never read or restore that
+    // value. Remove the legacy key without inspecting it; if removal is not
+    // available, overwrite it with an explicit null marker.
+    function clearLegacyConfig() {
+      if (storageAccessFailed || !storage || !webhookApi) return false;
       try {
-        const parsed = JSON.parse(raw);
-        return webhookApi.validateWebhookConfig(parsed) ? parsed : null;
+        if (typeof storage.removeItem === 'function') {
+          storage.removeItem(webhookApi.CONFIG_KEY);
+          return true;
+        }
       } catch (error) {
-        return null;
+        // Try the non-secret null marker below.
       }
-    }
-
-    function persistConfig() {
-      if (!storage || typeof storage.setItem !== 'function' || !webhookApi) return false;
       try {
-        if (config) storage.setItem(webhookApi.CONFIG_KEY, JSON.stringify(config));
-        else if (typeof storage.removeItem === 'function') storage.removeItem(webhookApi.CONFIG_KEY);
-        else storage.setItem(webhookApi.CONFIG_KEY, JSON.stringify(null));
-        return true;
+        if (typeof storage.setItem === 'function') {
+          storage.setItem(webhookApi.CONFIG_KEY, JSON.stringify(null));
+          return true;
+        }
       } catch (error) {
-        return false;
+        // The legacy value cannot be safely removed in this browser.
       }
+      return false;
     }
 
     function readQueue() {
-      if (!storage || typeof storage.getItem !== 'function' || !webhookApi) return [];
-      const raw = storage.getItem(webhookApi.QUEUE_KEY);
-      if (!raw) return [];
+      if (storageAccessFailed || !storage || !webhookApi) return { ok: false, value: [] };
       try {
+        if (typeof storage.getItem !== 'function') return { ok: false, value: [] };
+        const raw = storage.getItem(webhookApi.QUEUE_KEY);
+        if (raw === null) return { ok: true, value: [] };
         const parsed = JSON.parse(raw);
-        return webhookApi.validateQueue(parsed) ? parsed : [];
+        return webhookApi.validateQueue(parsed)
+          ? { ok: true, value: parsed }
+          : { ok: false, value: [] };
       } catch (error) {
-        return [];
+        return { ok: false, value: [] };
       }
     }
 
-    function persistQueue() {
-      if (!storage || typeof storage.setItem !== 'function' || !webhookApi) return false;
-      try {
-        storage.setItem(webhookApi.QUEUE_KEY, JSON.stringify(queue));
-        return true;
-      } catch (error) {
+    function persistQueue(nextQueue) {
+      if (storageAccessFailed || !storage || !webhookApi || queueReadFailed) {
+        queueWriteFailed = true;
         return false;
       }
+      try {
+        if (typeof storage.setItem !== 'function') throw new Error('storage write unavailable');
+        storage.setItem(webhookApi.QUEUE_KEY, JSON.stringify(nextQueue));
+        queueWriteFailed = false;
+        return true;
+      } catch (error) {
+        queueWriteFailed = true;
+        return false;
+      }
+    }
+
+    function storageWarning() {
+      const problems = [];
+      if (legacyConfigCleanupFailed) {
+        problems.push('a legacy saved endpoint could not be removed; clear this site\'s browser data before enabling webhooks');
+      }
+      if (queueReadFailed) problems.push('queued webhook events could not be read');
+      if (queueWriteFailed) problems.push('queued webhook events could not be saved');
+      const coordination = coordinationWarning();
+      if (coordination) problems.push(coordination.trim());
+      return problems.length
+        ? ' Storage warning: ' + problems.join('; ') + '. No unreadable stored values were overwritten.'
+        : '';
     }
 
     function queueNote() {
@@ -111,38 +217,222 @@
     }
 
     function renderQueue() {
-      if (flushEl) flushEl.disabled = busy || queue.length === 0;
+      if (flushEl) flushEl.disabled = busy || (queue.length === 0 && !queueWriteFailed)
+        || storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed || !queueCoordinatorAvailable();
+    }
+
+    function finishBusyOperation() {
+      setBusy(false);
+      renderQueue();
+      if (flushRequested) {
+        flushRequested = false;
+        void attemptFlush();
+      }
     }
 
     async function attemptFlush() {
       if (busy) return;
-      if (!config || !webhookApi) return;
-      if (!queue.length) return;
-      if (!fetchImpl) {
-        status('Webhook delivery is unavailable: fetch is missing in this browser. ' + queueNote());
+      if (storageAccessFailed || legacyConfigCleanupFailed) {
+        status('Webhook delivery is paused because browser storage could not be safely prepared.' + storageWarning());
         renderQueue();
         return;
       }
-      if (!isOnline()) {
-        status('Offline - ' + queueNote() + ' They send on the next connection or Retry.');
+      if (!config || !webhookApi) {
         renderQueue();
         return;
       }
+      if (!queueCoordinatorAvailable()) {
+        coordinationFailed = true;
+        status('Webhook delivery is paused because this browser cannot safely coordinate the shared queue across tabs.' + storageWarning());
+        renderQueue();
+        return;
+      }
+
       setBusy(true);
       try {
-        const result = await webhookApi.flushQueue(queue, config.url, fetchImpl);
-        queue = result.queue;
-        persistQueue();
-        const parts = [];
-        if (result.deliveredCount > 0) parts.push('Delivered ' + result.deliveredCount + ' event(s).');
-        if (result.droppedCount > 0) parts.push(result.droppedCount + ' event(s) were dropped after too many attempts.');
-        if (result.failure) parts.push('Could not deliver: ' + result.failure);
-        status((parts.join(' ') || 'No queued webhook events.') + (queue.length ? ' ' + queueNote() : ''));
-      } catch (error) {
-        status('Could not deliver: ' + (error && error.message ? error.message : 'unknown error'));
+        const delivery = await withDeliveryLock(async () => {
+          let deliveredCount = 0;
+          let droppedCount = 0;
+          let lastFailure = null;
+
+          // The delivery lock prevents two tabs from sending the same queue
+          // entry. The separate, short-lived queue lock is released before
+          // network I/O so another tab can durably append a completion while
+          // this tab is waiting for the webhook endpoint.
+          while (true) {
+            const snapshot = await withQueueLock(() => {
+              coordinationFailed = false;
+              const state = readQueue();
+              if (!state.ok) {
+                queueReadFailed = true;
+                status('Webhook delivery is paused because the shared queue could not be read.' + storageWarning());
+                renderQueue();
+                return { ok: false };
+              }
+              queueReadFailed = false;
+              let latest = state.value.slice();
+              let changed = false;
+              const recoveringQueueState = queueWriteFailed;
+
+              if (memoryOnlyEvents.length) {
+                const seen = new Set(latest.map((event) => event.id));
+                memoryOnlyEvents.forEach((event) => {
+                  if (!seen.has(event.id)) {
+                    latest = webhookApi.enqueueEvent(latest, event);
+                    seen.add(event.id);
+                    changed = true;
+                  }
+                });
+              }
+
+              if (resolvedUnpersistedIds.size) {
+                const reconciled = latest.filter((event) => !resolvedUnpersistedIds.has(event.id));
+                if (reconciled.length !== latest.length) {
+                  latest = reconciled;
+                  changed = true;
+                }
+              }
+
+              if (changed || queueWriteFailed) {
+                if (!persistQueue(latest)) {
+                  queue = latest;
+                  queueWriteFailed = true;
+                  status('Webhook delivery is paused because the queued events could not be saved. '
+                    + queueNote() + storageWarning());
+                  renderQueue();
+                  return { ok: false };
+                }
+                memoryOnlyEvents = [];
+                resolvedUnpersistedIds.clear();
+                queueWriteFailed = false;
+              }
+
+              queue = latest;
+              return { ok: true, queue: latest.slice(), recovered: recoveringQueueState || changed };
+            });
+
+            if (!snapshot.ok) {
+              status('Webhook delivery is paused because the shared queue could not be safely updated. '
+                + storageWarning());
+              break;
+            }
+            if (!snapshot.value || !snapshot.value.ok) break;
+            queue = snapshot.value.queue;
+            if (snapshot.value.recovered && !queue.length) {
+              status('Webhook queue state is now saved. No events remain queued.' + storageWarning());
+            }
+
+            if (!queue.length) {
+              if (queueWriteFailed) {
+                const recovered = await withQueueLock(() => {
+                  const state = readQueue();
+                  if (!state.ok) {
+                    queueReadFailed = true;
+                    return false;
+                  }
+                  queueReadFailed = false;
+                  if (!persistQueue([])) return false;
+                  queue = [];
+                  queueWriteFailed = false;
+                  resolvedUnpersistedIds.clear();
+                  return true;
+                });
+                if (recovered.ok && recovered.value) {
+                  status('Webhook queue state is now saved. No events remain queued.' + storageWarning());
+                }
+              }
+              break;
+            }
+
+            if (!config) break;
+            if (!fetchImpl) {
+              status('Webhook delivery is unavailable: fetch is missing in this browser. '
+                + queueNote() + storageWarning());
+              break;
+            }
+            if (!isOnline()) {
+              status('Offline - ' + queueNote() + ' They send on the next connection or Retry.' + storageWarning());
+              break;
+            }
+
+            const event = queue[0];
+            const result = await webhookApi.flushQueue([event], config.url, fetchImpl);
+            deliveredCount += result.deliveredCount;
+            droppedCount += result.droppedCount;
+            if (result.failure) lastFailure = result.failure;
+
+            // Re-read under the queue lock after the network request. This
+            // removes/updates only the event just processed and preserves
+            // completions appended by any other tab during the POST.
+            const updated = await withQueueLock(() => {
+              coordinationFailed = false;
+              const state = readQueue();
+              if (!state.ok) {
+                queueReadFailed = true;
+                if (!result.failure) resolvedUnpersistedIds.add(event.id);
+                status('Webhook delivery finished but the shared queue could not be read for reconciliation. '
+                  + storageWarning());
+                return { ok: false };
+              }
+              queueReadFailed = false;
+              const latest = state.value.slice();
+              const index = latest.findIndex((item) => item.id === event.id);
+              if (index < 0) {
+                queue = latest;
+                return { ok: true, missing: true };
+              }
+
+              if (result.failure) {
+                if (result.queue.length) latest[index] = result.queue[0];
+              } else {
+                latest.splice(index, 1);
+              }
+
+              if (!persistQueue(latest)) {
+                queue = latest;
+                queueWriteFailed = true;
+                if (!result.failure) resolvedUnpersistedIds.add(event.id);
+                status('Webhook delivery finished but its queue update could not be saved. '
+                  + 'The event may be retried after reload.' + storageWarning());
+                renderQueue();
+                return { ok: false };
+              }
+              queue = latest;
+              queueWriteFailed = false;
+              return { ok: true };
+            });
+
+            if (!updated.ok) {
+              status('Webhook delivery is paused because its queue update could not be saved safely. '
+                + storageWarning());
+              break;
+            }
+            if (!updated.value || !updated.value.ok) break;
+            if (result.failure) {
+              status('Could not deliver webhook events. Check the endpoint and retry. '
+                + (queue.length ? queueNote() : '') + storageWarning());
+              break;
+            }
+            // A successful or max-attempt-dropped event is now durably removed.
+            // Loop to re-read, so events appended during the request are included.
+          }
+
+          if ((deliveredCount || droppedCount) && !queueWriteFailed && !lastFailure) {
+            const parts = [];
+            if (deliveredCount) parts.push('Delivered ' + deliveredCount + ' event(s).');
+            if (droppedCount) parts.push(droppedCount + ' event(s) were dropped after too many attempts.');
+            status(parts.join(' ') + (queue.length ? ' ' + queueNote() : '') + storageWarning());
+          }
+          return { deliveredCount, droppedCount, failure: lastFailure };
+        });
+
+        if (!delivery.ok) {
+          status('Webhook delivery is paused because this browser could not obtain the cross-tab delivery lock. '
+            + storageWarning());
+          renderQueue();
+        }
       } finally {
-        setBusy(false);
-        renderQueue();
+        finishBusyOperation();
       }
     }
 
@@ -152,28 +442,37 @@
       if (!raw) {
         if (config) {
           config = null;
-          persistConfig();
-          status('Webhook cleared. Completed tasks stay on this device.');
-          return { saved: false, cleared: true };
+          status('Webhook disabled for this tab. Queued events remain on this device.' + storageWarning());
+          return { saved: false, cleared: true, sessionOnly: true };
         }
-        status('Add an https:// webhook URL to enable automation.');
+        status('Add an https:// webhook URL to enable automation. The endpoint stays in this tab only and must be re-entered after reload.'
+          + (queue.length ? ' ' + queueNote() : '') + storageWarning());
         return { saved: false, cleared: false };
       }
       if (!webhookApi || !webhookApi.isValidWebhookUrl(raw)) {
         status('Enter a valid https:// webhook URL. Plain http is not allowed.');
         return { saved: false, cleared: false };
       }
+      if (legacyConfigCleanupFailed) legacyConfigCleanupFailed = !clearLegacyConfig();
+      if (legacyConfigCleanupFailed) {
+        status('A legacy saved webhook endpoint could not be cleared. Clear this site\'s browser data before enabling webhook delivery.'
+          + storageWarning());
+        return { saved: false, cleared: false, reason: 'storage-unavailable' };
+      }
+      // The endpoint intentionally exists only in this page's memory. The
+      // durable queue contains event payloads, never the destination URL.
       config = { version: 1, url: raw };
-      const saved = persistConfig();
-      status(saved
-        ? 'Webhook saved. Completed tasks will be announced to your endpoint.'
-        : 'Webhook set for this tab, but browser storage could not save it.');
-      void attemptFlush();
-      return { saved: true, cleared: false };
+      status('Webhook enabled for this tab only. Re-enter the endpoint after reload.' + storageWarning());
+      if (queue.length || memoryOnlyEvents.length || queueWriteFailed) void attemptFlush();
+      return { saved: true, cleared: false, sessionOnly: true };
     }
 
     async function onTest() {
       if (busy) return;
+      if (legacyConfigCleanupFailed) {
+        status('Webhook testing is paused because a legacy saved endpoint could not be cleared. Clear this site\'s browser data first.' + storageWarning());
+        return;
+      }
       const raw = urlEl && typeof urlEl.value === 'string' && urlEl.value.trim()
         ? urlEl.value.trim()
         : (config ? config.url : '');
@@ -196,41 +495,83 @@
         await webhookApi.deliverWebhook(raw, payload, fetchImpl);
         status('Test event delivered. Your endpoint is reachable.' + (queue.length ? ' ' + queueNote() : ''));
       } catch (error) {
-        status('Test event failed: ' + (error && error.message ? error.message : 'unknown error'));
+        status('Test event failed. Check the endpoint and retry.');
       } finally {
-        setBusy(false);
-        renderQueue();
+        finishBusyOperation();
       }
     }
 
     function notifyTaskCompleted(task) {
       if (!webhookApi) return { queued: false, reason: 'unavailable' };
+      if (storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed) {
+        status('Task completion was not queued or sent because browser storage could not be safely accessed.' + storageWarning());
+        return { queued: false, reason: 'storage-unavailable' };
+      }
       if (!config) return { queued: false, reason: 'disabled' };
+      if (!queueCoordinatorAvailable()) {
+        coordinationFailed = true;
+        status('Task completion was not queued because this browser cannot safely coordinate the shared webhook queue across tabs.' + storageWarning());
+        return { queued: false, reason: 'coordination-unavailable' };
+      }
+
       let event;
       try {
         const payload = webhookApi.buildTaskCompletedPayload(task, now());
         event = webhookApi.makeQueueEvent(payload, now());
       } catch (error) {
-        status('Could not prepare the webhook event: '
-          + (error && error.message ? error.message : 'unknown error'));
+        status('Could not prepare the webhook event.');
         return { queued: false, reason: 'invalid' };
       }
-      try {
-        queue = webhookApi.enqueueEvent(queue, event);
-      } catch (error) {
-        status('Could not queue the webhook event: '
-          + (error && error.message ? error.message : 'unknown error'));
-        return { queued: false, reason: 'invalid' };
-      }
-      persistQueue();
-      renderQueue();
-      void attemptFlush();
-      return { queued: true, reason: 'queued' };
+
+      return withQueueLock(() => {
+        coordinationFailed = false;
+        const state = readQueue();
+        if (!state.ok) {
+          queueReadFailed = true;
+          status('Task completion was not queued or sent because the shared queue could not be read.' + storageWarning());
+          renderQueue();
+          return { queued: false, reason: 'storage-unavailable' };
+        }
+        queueReadFailed = false;
+        const nextQueue = webhookApi.enqueueEvent(state.value, event);
+        if (!persistQueue(nextQueue)) {
+          queue = nextQueue;
+          if (!memoryOnlyEvents.some((pending) => pending.id === event.id)) {
+            memoryOnlyEvents = webhookApi.enqueueEvent(memoryOnlyEvents, event);
+          }
+          queueWriteFailed = true;
+          renderQueue();
+          status('Webhook event is held only in this tab; it was not sent because the queue could not be saved. '
+            + queueNote() + storageWarning());
+          return { queued: true, reason: 'memory-only' };
+        }
+        queue = nextQueue;
+        queueWriteFailed = false;
+        renderQueue();
+        return { queued: true, reason: 'queued' };
+      }).then(async (locked) => {
+        if (!locked.ok) {
+          status('Task completion was not queued or sent because this browser could not obtain the cross-tab queue lock. '
+            + storageWarning());
+          renderQueue();
+          return { queued: false, reason: 'coordination-unavailable' };
+        }
+        const result = locked.value;
+        if (result && result.queued && result.reason === 'queued') {
+          if (busy) flushRequested = true;
+          else await attemptFlush();
+        }
+        return result;
+      });
     }
 
-    config = readConfig();
-    queue = readQueue();
-    if (config && urlEl && typeof urlEl.value === 'string' && !urlEl.value) urlEl.value = config.url;
+    // Remove any endpoint saved by an older version, but never read or restore
+    // it. The queue remains independent and can be delivered after re-entry.
+    legacyConfigCleanupFailed = !clearLegacyConfig();
+    const queueState = readQueue();
+    queue = queueState.value;
+    queueReadFailed = !queueState.ok;
+
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', onSave);
     }
@@ -242,10 +583,27 @@
     }
     if (win && typeof win.addEventListener === 'function') {
       win.addEventListener('online', () => { void attemptFlush(); });
+      // Keep this tab's queue count fresh when another tab writes. This event
+      // is informational only; all read-modify-write and delivery operations
+      // still require the Web Locks exclusive lock above.
+      win.addEventListener('storage', (event) => {
+        if (!event || !webhookApi || event.key !== webhookApi.QUEUE_KEY) return;
+        const state = readQueue();
+        if (!state.ok) {
+          queueReadFailed = true;
+          status('The shared webhook queue could not be refreshed from browser storage.' + storageWarning());
+        } else {
+          queueReadFailed = false;
+          queue = state.value;
+        }
+        renderQueue();
+      });
     }
-    status(config
-      ? ('Webhook ready. Completed tasks will be announced to your endpoint.' + (queue.length ? ' ' + queueNote() : ''))
-      : 'Add an https:// webhook URL to enable automation.');
+    status(storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed
+      ? 'Webhook storage could not be read or safely prepared; queued events were left untouched. Automatic delivery is paused.' + storageWarning()
+      : 'Add an https:// webhook URL to enable automation. The endpoint is kept only in this tab and must be re-entered after reload.'
+        + (queue.length ? ' ' + queueNote() : '') + storageWarning());
+
     renderQueue();
 
     const handle = {
@@ -274,7 +632,7 @@
   root.DaymarkWebhookUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachWebhookUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachWebhookUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
