@@ -98,7 +98,23 @@ test('searchWikipedia returns a versioned cache payload', async () => {
   const fetchImpl = (url, init) => {
     seen.push(url);
     assert.ok(!init || typeof init === 'object');
-    return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(SAMPLE_BODY) });
+    const bytes = new TextEncoder().encode(SAMPLE_BODY);
+    let offset = 0;
+    const reader = {
+      async read() {
+        if (offset >= bytes.length) return { done: true, value: undefined };
+        const chunk = bytes.slice(offset, offset + 1024);
+        offset += chunk.length;
+        return { done: false, value: chunk };
+      },
+      cancel() { return Promise.resolve(); },
+      releaseLock() {}
+    };
+    return Promise.resolve({
+      ok: true, status: 200, headers: { get() { return null; } },
+      body: { getReader() { return reader; }, cancel() { return reader.cancel(); } },
+      text() { throw new Error('bounded response reader must not call response.text()'); }
+    });
   };
   const result = await wiki.searchWikipedia('  kanyakumari ', fetchImpl, {
     now: () => '2026-11-05T12:00:00.000Z'
