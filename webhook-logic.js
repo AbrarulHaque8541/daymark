@@ -134,6 +134,8 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
           body,
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
           redirect: 'error',
           cache: 'no-store',
           signal: controller ? controller.signal : undefined

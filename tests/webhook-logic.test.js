@@ -131,6 +131,8 @@ test('flush delivers queued events in order and empties the queue', async () => 
   assert.equal(seen[0].init.headers['Content-Type'], 'application/json');
   assert.equal(seen[0].init.headers['Cache-Control'], 'no-store');
   assert.equal(seen[0].init.redirect, 'error', 'webhook redirects must be refused');
+  assert.equal(seen[0].init.credentials, 'omit', 'webhook requests must never attach ambient browser credentials');
+  assert.equal(seen[0].init.referrerPolicy, 'no-referrer', 'webhook URLs and page context must not be exposed through the Referer header');
   const order = seen.map((entry) => JSON.parse(entry.init.body).task.title);
   assert.deepEqual(order, ['ordered-0', 'ordered-1', 'ordered-2']);
 });
