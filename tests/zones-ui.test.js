@@ -83,6 +83,7 @@ function fakeEnv(options) {
       delete storageData[key];
     }
   };
+  if (opts.omitGetItem) delete storage.getItem;
   const window = {};
   if (opts.storageGetterThrows) {
     Object.defineProperty(window, 'localStorage', {
@@ -159,6 +160,29 @@ test('a throwing localStorage getter does not crash and keeps writes fail-closed
   assert.equal(storageCalls.writes, 0);
   assert.equal(rowTexts(elements['zones-list']).length, 2);
   assert.match(elements['zones-status'].textContent, /saved list was not changed/i);
+});
+
+test('a storage adapter without getItem cannot overwrite unreadable saved zones', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements, storageData, storageCalls } = fakeEnv({
+    stored,
+    omitGetItem: true,
+    pick: 'Asia/Tokyo'
+  });
+  const handle = ui.attachZonesUi(env);
+  assert.match(elements['zones-status'].textContent, /Browser storage is unavailable/);
+  assert.equal(rowTexts(elements['zones-list']).length, 2);
+  await handle.onAdd();
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  assert.equal(rowTexts(elements['zones-list'])[0][1], 'India · Kolkata — 17:30');
+  await handle.onClear();
+  assert.equal(storageCalls.removes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  await handle.onRefresh();
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  assert.match(elements['zones-status'].textContent, /refresh time was not saved/i);
 });
 
 test('a failed saved-zone read never overwrites or clears unknown stored data', async () => {
