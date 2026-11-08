@@ -11,14 +11,15 @@ import java.util.List;
  * <ul>
  *   <li><b>Inline code</b> — text between single backticks on one line. The backticks are not
  *       displayed; the content is drawn in the monospace family.</li>
- *   <li><b>Bare HTTPS links</b> — {@code https://…} runs delimited by whitespace or the characters
- *       that end a sentence. They become tappable and open in the in-app browser.</li>
+ *   <li><b>HTTP/HTTPS links</b> — explicit {@code http://…} and {@code https://…} runs delimited
+ *       by whitespace or sentence-ending punctuation. Valid links become tappable and open in
+ *       the in-app browser.</li>
  * </ul>
  *
- * <p>{@code http://} is deliberately not linkified. The browser this app ships is HTTPS-only and
- * would refuse the navigation anyway; offering a link that cannot open would be a worse
- * experience than leaving it as plain text. HTML, Markdown emphasis and images are not parsed —
- * a note is untrusted user text, never rendered as markup.
+ * <p>Only explicit HTTP/HTTPS URLs are linkified. Every candidate is validated by
+ * {@link BrowserAddress#isAllowedWebUrl(String)}, so malformed hosts, embedded credentials,
+ * invalid ports and unsupported schemes stay as plain text. HTML, Markdown emphasis and images
+ * are not parsed — a note is untrusted user text, never rendered as markup.
  *
  * <p>Spans are returned sorted by start offset and never overlap: code is recognised first and
  * the scan resumes after it, so a URL inside backticks stays code. Unclosed backticks and
@@ -57,8 +58,8 @@ final class NoteFormat {
         int index = 0;
         while (index < length) {
             char current = text.charAt(index);
-            if (current == '`') {
-                int close = text.indexOf('`', index + 1);
+            if (current == 96) {
+                int close = text.indexOf(96, index + 1);
                 int lineBreak = close == -1 ? -1 : text.indexOf('\n', index + 1);
                 boolean singleLine = close > index + 1 && (lineBreak == -1 || lineBreak > close);
                 if (singleLine) {
@@ -71,7 +72,7 @@ final class NoteFormat {
             }
             if (isSchemeStart(text, index)) {
                 int end = linkEnd(text, index);
-                if (end > index + 8) {
+                if (end > index) {
                     spans.add(new Span(index, end, Kind.LINK, text.substring(index, end)));
                     index = end;
                     continue;
@@ -82,55 +83,40 @@ final class NoteFormat {
         return spans;
     }
 
-    /** True when an {@code https://} scheme starts at {@code index} as its own token. */
+    /** Length of an explicit HTTP or HTTPS scheme at {@code index}, or zero when absent. */
+    private static int schemeLengthAt(String text, int index) {
+        if (text.regionMatches(true, index, "https://", 0, 8)) return 8;
+        if (text.regionMatches(true, index, "http://", 0, 7)) return 7;
+        return 0;
+    }
+
+    /** True when an explicit HTTP/HTTPS scheme starts at {@code index} as its own token. */
     private static boolean isSchemeStart(String text, int index) {
-        if (!text.regionMatches(true, index, "https://", 0, 8)) return false;
+        if (schemeLengthAt(text, index) == 0) return false;
         if (index == 0) return true;
         char before = text.charAt(index - 1);
         return !Character.isLetterOrDigit(before) && before != '_';
     }
 
-    /** End offset of the link beginning at {@code start}, after trailing punctuation is trimmed. */
+    /** End offset of a valid link beginning at {@code start}, after trailing punctuation is trimmed. */
     private static int linkEnd(String text, int start) {
-        int end = start + 8;
+        int schemeLength = schemeLengthAt(text, start);
+        if (schemeLength == 0) return start;
+        int end = start + schemeLength;
         while (end < text.length()) {
             char c = text.charAt(end);
-            if (Character.isWhitespace(c) || c == '<' || c == '>' || c == '"' || c == '\''
-                    || c == '`') break;
+            if (Character.isWhitespace(c) || c == '<' || c == '>' || c == '"' || c == 39
+                    || c == 96) break;
             end++;
         }
         if (end - start > MAX_LINK_CHARS) return start;
         while (end > start && isTrailingPunctuation(text.charAt(end - 1))) end--;
-        if (!hasHost(text, start + 8, end)) return start;
-        return end;
+        return end > start + schemeLength
+                && BrowserAddress.isAllowedWebUrl(text.substring(start, end)) ? end : start;
     }
 
     private static boolean isTrailingPunctuation(char c) {
         return c == '.' || c == ',' || c == ';' || c == ':' || c == '!' || c == '?'
                 || c == ')' || c == ']' || c == '}' || c == '*';
-    }
-
-    /** A link needs a non-empty DNS-shaped authority before the path, query or fragment. */
-    private static boolean hasHost(String text, int from, int to) {
-        if (from >= to) return false;
-        int hostEnd = from;
-        boolean letterSeen = false;
-        while (hostEnd < to) {
-            char c = text.charAt(hostEnd);
-            if (c == '/' || c == '?' || c == '#') break;
-            if (!isHostChar(c)) return false;
-            if (Character.isLetter(c)) letterSeen = true;
-            hostEnd++;
-        }
-        if (hostEnd == from || !letterSeen) return false;
-        char first = text.charAt(from);
-        char last = text.charAt(hostEnd - 1);
-        return first != '.' && first != '-' && first != ':' && last != '.' && last != '-'
-                && last != ':';
-    }
-
-    private static boolean isHostChar(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                || c == '.' || c == '-' || c == ':';
     }
 }
