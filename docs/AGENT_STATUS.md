@@ -1,4 +1,4 @@
-- [Daymark engineering status — 2026-11-08T04:19:09Z (offline world clock & meeting-overlap card)](./CURRENT_STATUS_20261108T04:19:09Z.md)
+- [Daymark engineering status — 2026-11-08T04:19:09Z (offline world clock & meeting-overlap card)](./CURRENT_STATUS_20261108T041909Z.md)
 
 - [Daymark engineering status — 2026-11-08T09:30:00Z (Cycle A: Share plan on download safety card)](./CURRENT_STATUS_20261108T093000Z.md)
 
