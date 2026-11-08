@@ -337,7 +337,7 @@ function makeBootElement() {
     value: 'same-origin-redirects',
     classList: {
       add(name) { el.className = (el.className + ' ' + name).trim(); },
-      remove(name) { el.className = el.className.split(/\\s+/).filter((item) => item !== name).join(' '); }
+      remove(name) { el.className = el.className.split(' ').filter((item) => item && item !== name).join(' '); }
     },
     get firstChild() { return children[0] || null; },
     appendChild(child) { children.push(child); return child; },
