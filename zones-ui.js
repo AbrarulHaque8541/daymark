@@ -21,6 +21,7 @@
     const doc = env.document;
     const win = env.window || root;
     const storage = env.localStorage || (win && win.localStorage) || null;
+    const nav = env.navigator || (typeof navigator !== 'undefined' ? navigator : null);
     const zonesApi = env.zonesApi !== undefined ? env.zonesApi : (root.DaymarkZones || null);
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
 
@@ -28,6 +29,7 @@
     const pickEl = element('zones-pick');
     const addEl = element('zones-add');
     const refreshEl = element('zones-refresh');
+    const copyEl = element('zones-copy');
     const clearEl = element('zones-clear');
     const formEl = element('zones-form');
     const statusEl = element('zones-status');
@@ -220,6 +222,39 @@
       status('World clock cleared on this device.');
     }
 
+    function buildCopyText() {
+      if (!zonesApi || zones.length === 0) return '';
+      const when = new Date(now());
+      const lines = [];
+      for (const zoneId of zones) {
+        try {
+          const clock = zonesApi.formatZoneTime(zoneId, when);
+          if (!clock) continue;
+          const label = zonesApi.zoneLabel(zoneId) || zoneId;
+          lines.push(label + ' — ' + clock.time + ' (' + clock.offsetLabel + ')');
+        } catch (error) { /* skip unreadable zone */ }
+      }
+      if (lines.length === 0) return '';
+      return 'World clock (' + stamp() + ')\n' + lines.join('\n');
+    }
+
+    function onCopy() {
+      const text = buildCopyText();
+      if (!text) {
+        status('Nothing to copy yet. Add a time zone first.');
+        return;
+      }
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        nav.clipboard.writeText(text).then(() => {
+          status('Times copied.');
+        }).catch(() => {
+          status('Copy failed. Select the times manually.');
+        });
+      } else {
+        status('Clipboard unavailable on this device.');
+      }
+    }
+
     if (!zonesApi) {
       zones = [];
       status('World clock is unavailable.');
@@ -249,6 +284,9 @@
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
       refreshEl.addEventListener('click', () => { onRefresh(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
@@ -257,6 +295,7 @@
       onAdd,
       onRemove,
       onRefresh,
+      onCopy,
       onClear,
       readCache,
       detach() {

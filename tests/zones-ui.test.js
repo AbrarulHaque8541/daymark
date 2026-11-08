@@ -55,6 +55,7 @@ function fakeEnv(options) {
     'zones-pick': Object.assign(fakeElement('select'), { id: 'zones-pick', value: opts.pick || 'Asia/Kolkata' }),
     'zones-add': Object.assign(fakeElement('button'), { id: 'zones-add', type: 'submit' }),
     'zones-refresh': Object.assign(fakeElement('button'), { id: 'zones-refresh', type: 'button' }),
+    'zones-copy': Object.assign(fakeElement('button'), { id: 'zones-copy', type: 'button' }),
     'zones-clear': Object.assign(fakeElement('button'), { id: 'zones-clear', type: 'button' }),
     'zones-form': Object.assign(fakeElement('form'), { id: 'zones-form' }),
     'zones-status': Object.assign(fakeElement('p'), { id: 'zones-status' }),
@@ -248,4 +249,27 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(ui.STORAGE_KEY, 'daymark.zones.v1');
   assert.equal(ui.DEFAULT_ZONE, 'Asia/Kolkata');
   assert.equal(typeof globalThis.DaymarkZonesUi, 'object');
+});
+
+test('copy times builds a plain-text summary and uses the injected clipboard', async () => {
+  const copied = [];
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    clipboard: {
+      writeText(text) {
+        copied.push(text);
+        return Promise.resolve();
+      }
+    }
+  };
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-copy'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the copy button has a click listener');
+  click.handler();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(copied.length, 1);
+  assert.ok(copied[0].includes('India · Kolkata — 17:30'));
+  assert.ok(copied[0].includes('UTC+05:30'));
+  assert.equal(elements['zones-status'].textContent, 'Times copied.');
+  assert.equal(typeof handle.onCopy, 'function');
 });
