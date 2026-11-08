@@ -38,7 +38,15 @@
       return [];
     }
     if (saved === null) {
-      setStorageStatus('Local storage ready');
+      // A missing primary key does not prove that an older recovery backup is
+      // redundant. Keep it visible and exportable instead of presenting an
+      // empty-store state that hides recoverable user data.
+      if (hasRecoveryBackupNeedingPreservation(null)) {
+        setStorageStatus('No current task list; recovery backup retained for manual review', true);
+        offerRecoveryExport('No current task list is present; an older recovery backup is available for export.');
+      } else {
+        setStorageStatus('Local storage ready');
+      }
       return [];
     }
     try {

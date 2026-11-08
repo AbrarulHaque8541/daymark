@@ -517,6 +517,20 @@ test('a missing primary task key remains a normal empty state without a recovery
     'an absent key is not treated as corrupt data and does not create a backup');
 });
 
+test('a missing primary task key surfaces an existing recovery backup for manual review', () => {
+  const backup = JSON.stringify([makeImportTask('backup-only', 'Recoverable older task')]);
+  const app = bootApp({ savedValue: null, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), null,
+    'the missing primary is not silently recreated or overwritten');
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'the existing backup remains byte-for-byte intact');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+  assert.equal(app.toastWriteCount > 0, true,
+    'the user receives an export affordance for the recoverable backup');
+});
+
 test('an empty primary task payload is preserved before a later task save', () => {
   const app = bootApp({ savedValue: '' });
 
