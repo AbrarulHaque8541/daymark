@@ -261,12 +261,12 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a real tap selects Stopwatch");
 
-            dispatchSwipe(modeRow, true);
+            String leftSwipe = dispatchSwipe(modeRow, true);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
-                    "a leftward horizontal swipe selects Countdown");
-            dispatchSwipe(modeRow, false);
+                    "a leftward horizontal swipe selects Countdown (" + leftSwipe + ")");
+            String rightSwipe = dispatchSwipe(modeRow, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
-                    "a rightward horizontal swipe selects Stopwatch");
+                    "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
             dispatchVerticalSwipe(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag inside Countdown cancels the child click");
@@ -362,7 +362,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             idleState[0] = start != null && status != null;
         });
         check(selected[0] == !countdownExpected && selected[1] == countdownExpected,
-                message + ": exactly the expected mode is selected");
+                message + ": exactly the expected mode is selected (actual Stopwatch="
+                        + selected[0] + ", Countdown=" + selected[1] + ", idle=" + idleState[0] + ")");
         check(idleState[0], message + ": Start remains available and the timer stays idle");
     }
 
@@ -377,12 +378,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         waitForIdleSync();
     }
 
-    private void dispatchSwipe(android.view.View view, boolean left) throws Exception {
+    private String dispatchSwipe(android.view.View view, boolean left) throws Exception {
         android.graphics.Rect bounds = visibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0, "swipe target has visible screen bounds");
         float startX = left ? bounds.left + bounds.width() * 0.82f : bounds.left + bounds.width() * 0.18f;
         float endX = left ? bounds.left + bounds.width() * 0.18f : bounds.left + bounds.width() * 0.82f;
-        injectDrag(startX, bounds.centerY(), endX, bounds.centerY());
+        float y = bounds.centerY();
+        injectDrag(startX, y, endX, y);
+        return (left ? "leftward" : "rightward") + " swipe bounds=" + bounds.toShortString()
+                + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")";
     }
 
     private void dispatchVerticalSwipe(android.view.View view) throws Exception {
@@ -396,10 +400,16 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
         long downTime = android.os.SystemClock.uptimeMillis();
         injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, startX, startY);
-        injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime, downTime + 50L,
-                (startX + endX) / 2f, (startY + endY) / 2f);
-        injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime, downTime + 100L, endX, endY);
-        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime, downTime + 150L, endX, endY);
+        final int moveSteps = 5;
+        for (int step = 1; step <= moveSteps; step++) {
+            float progress = step / (float) moveSteps;
+            float x = startX + (endX - startX) * progress;
+            float y = startY + (endY - startY) * progress;
+            injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime,
+                    downTime + step * 50L, x, y);
+        }
+        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime,
+                downTime + (moveSteps + 1) * 50L, endX, endY);
         waitForIdleSync();
     }
 
