@@ -103,6 +103,10 @@ public final class BrowserAddressSmoke {
                 : "bare IPv6 with an uncompressed IPv4 tail must be accepted";
         assert !BrowserAddress.isLikelyWebAddress("[1:2:3:4:5:192.0.2.1]")
                 : "an IPv4 tail must still account for two IPv6 groups";
+        assert !BrowserAddress.isLikelyWebAddress("[192.0.2.1::]")
+                : "an IPv4 tail before trailing compression is not a valid IPv6 literal";
+        assert !BrowserAddress.isAllowedWebUrl("https://[192.0.2.1::]/")
+                : "the explicit URL parser must reject an IPv4 tail before trailing compression";
         assert BrowserAddress.resolveInput("localhost:3000/api", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("https://localhost:3000/api") : "localhost with port must resolve to HTTPS";
         assert BrowserAddress.isLikelyWebAddress("[::1]");

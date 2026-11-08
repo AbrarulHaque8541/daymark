@@ -88,6 +88,9 @@ test('bracketed IPv6 literals validate with and without ports, including IPv4 ta
   assert.equal(address.parseAddressInput('https://[1:2:3:4:5:6:192.0.2.1]/').kind, 'navigate');
   assert.equal(address.parseAddressInput('https://[1:2:3:4:5:192.0.2.1]/').kind, 'search');
   assert.equal(address.parseAddressInput('https://[::ffff:192.0.2.999]/').kind, 'search');
+  assert.equal(address.parseAddressInput('https://[192.0.2.1::]/').kind, 'search');
+  assert.equal(address.parseAddressInput('[192.0.2.1::]').kind, 'search');
+  assert.equal(address.parseAddressInput('https://[::192.0.2.1]/').kind, 'navigate');
 
   assert.equal(address.parseAddressInput('https://[1:2:xyz/').kind, 'search');
   assert.equal(address.parseAddressInput('https://[1:2:3:4:5:6:7:8:9]').kind, 'search');

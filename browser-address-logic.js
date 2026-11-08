@@ -152,7 +152,10 @@
       const group = groups[i];
       if (group.includes('.')) {
         // An IPv4 tail occupies two 16-bit IPv6 groups and must be last.
-        if (i !== groups.length - 1 || !isValidIpv4(group)) return false;
+        // With "::", it must be in the post-compression tail: groups omitted
+        // by "::" are to the right, so an IPv4 group before "::" is not last.
+        const followsCompression = doubleColons.length === 0 || (tail !== null && tail !== '');
+        if (i !== groups.length - 1 || !followsCompression || !isValidIpv4(group)) return false;
         addressUnits += 2;
         continue;
       }
