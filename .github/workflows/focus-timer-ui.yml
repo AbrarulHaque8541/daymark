@@ -18,8 +18,8 @@ jobs:
   focus-timer-ui:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -38,7 +38,7 @@ jobs:
         if: steps.setup-gradle.outcome != 'success'
         shell: bash
         run: echo "::warning::Gradle 8.13 cache provisioning did not complete; the checked wrapper retry helper will be used."
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.x"
       - name: Focus Timer UI and sound contract

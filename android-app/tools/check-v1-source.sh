@@ -110,6 +110,14 @@ for workflow_name in retry_workflows:
         f"{workflow_name} must pin Gradle 8.13 and protect fork cache writes"
     assert "cache-provider: basic" in workflow, \
         f"{workflow_name} must retain the open-source GitHub Actions cache provider"
+    if workflow_name == "android-device-acceptance.yml":
+        assert "actions/upload-artifact@v6" in workflow and "actions/upload-artifact@v4" not in workflow, \
+            "manual device QA artifact upload must use the Node 24 action"
+    if workflow_name == "focus-timer-ui.yml":
+        for action in ("actions/checkout@v5", "actions/setup-java@v5", "actions/setup-python@v6"):
+            assert f"uses: {action}" in workflow, f"Focus Timer UI must use Node 24 action {action}"
+        for action in ("actions/checkout@v4", "actions/setup-java@v4", "actions/setup-python@v5"):
+            assert f"uses: {action}" not in workflow, f"Focus Timer UI must not retain Node 20 action {action}"
     assert "cache: gradle" not in workflow, \
         f"{workflow_name} must not combine setup-java Gradle caching with setup-gradle caching"
     assert not re.search(r"(?m)^\s*\./gradlew\s", workflow), \
