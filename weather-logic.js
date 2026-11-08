@@ -220,6 +220,7 @@
         maxChars: MAX_JSON_CHARS,
         tooLargeMessage: 'The weather response was too large to parse safely.',
         malformedMessage: 'The weather response was malformed.',
+        streamRequiredMessage: 'This browser cannot read weather responses with the required size limit.'
         timeoutMessage: 'Weather request timed out.',
         controller,
         isTimedOut: () => timedOut,
