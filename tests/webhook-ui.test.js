@@ -299,6 +299,7 @@ test('a second tab completion waits for an in-flight delivery and is not lost', 
   const secondHandle = ui.attachWebhookUi(second.env);
   firstHandle.onSave({ preventDefault() {} });
   secondHandle.onSave({ preventDefault() {} });
+  await settle();
   first.env.navigator.onLine = true;
   second.env.navigator.onLine = true;
 
