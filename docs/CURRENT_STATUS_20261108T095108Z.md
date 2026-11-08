@@ -1,4 +1,4 @@
-# Daymark whole-project engineering snapshot — 2026-11-08T09:49:01Z
+# Daymark whole-project engineering snapshot — 2026-11-08T09:51:08Z
 
 This snapshot records live repository state and exact-head evidence for this engineering cycle. It distinguishes merged mainline work, open PR work, CI, emulator/device artifacts, and physical-device acceptance.
 
@@ -7,7 +7,7 @@ This snapshot records live repository state and exact-head evidence for this eng
 - Repository: `AbrarulHaque8541/daymark`; default branch: `main`.
 - Current main SHA: `3d121bf4fc14011ab1c8ae112ae72a31c9b7ab1b` (PR #599 merge commit; PR #600 is also merged in its history).
 - `AGENTS.md` blob SHA: `492ed21e2219a8d1b80c7d6e63575525c98a5a91`; rules require source-backed changes, meaningful tests, exact-head evidence, independent review for risky storage/security/release changes, and no false device/release claims.
-- Live Gradle identity: namespace/applicationId `com.abrar.daymark`; versionName `1.6`, versionCode `13`, minSdk `26`, targetSdk `36`. The automation guard says `com.cue.daymark`; this conflicts with live AGENTS.md and build source. No identity, signer, version, manifest, or data migration was changed. Preserve the live owner-approved identity until explicit migration authorization.
+- Live Gradle identity: namespace/applicationId `com.abrar.daymark`; versionName `1.6`, versionCode `13`, minSdk `26`, targetSdk `36`. A run-level identity instruction conflicts with the live owner-approved Gradle identity; no identity, signer, version, manifest, or data migration was changed. Preserve the live owner-approved identity until explicit migration authorization.
 - Latest published production release: `v1.5`, published 2026-10-23T09:42:55Z, one APK asset. No release/tag/publication action occurred in this cycle.
 - Branch protection endpoint returned HTTP 403 to this integration; rulesets query returned an empty list. Required protection/approval rules are therefore **NOT VERIFIED**. Do not merge based on assumptions.
 
@@ -43,10 +43,10 @@ This snapshot records live repository state and exact-head evidence for this eng
 
 ### PR #604 — storage health unreadable-key correctness
 
-- Tested code head: `02a35faa94d054d774e67a8141510ac2fadd6415`; PR base ref `main`.
+- Tested code head: `02a35faa94d054d774e67a8141510ac2fadd6415`; integrated/docs head before the current correction: `0c6eb830e66f8b7b438fdb9ead5646dac21184b8`.
 - Changes: `storage-logic.js` reports unreadable keys/scan completeness separately from absent data; `storage-ui.js` displays unknown/partial states and avoids false empty-store claims; explicit retry still fails closed when a read fails; logic/UI tests cover partial and total read failures and confirm values remain untouched.
-- Exact code-head checks **PASS**: cross-platform Ubuntu/Windows (`npm test` 488/488 each); Android CI (canonical source guard, Node 488/488, Android core smoke 205 assertions, Gradle builds successful); device-test APK/manifest workflow **PASS**, release-publish job **SKIPPED**.
-- This branch is now being refreshed with current main and a durable status snapshot; the new merge/status-only head must complete its own checks before it is considered green.
+- Exact code-head `02a35` checks **PASS**: cross-platform Ubuntu/Windows (`npm test` 488/488 each); Android CI (canonical source guard, Node 488/488, Android core smoke 205 assertions, Gradle builds successful); device-test APK/manifest workflow **PASS**, release-publish job **SKIPPED**.
+- Integrated/docs head `0c6eb`: cross-platform Ubuntu/Windows **PASS**, but Android source guard/device-test host checks **FAIL** because this snapshot contained a retired package token. No storage code/test failed. This corrected snapshot removes that token and restores the 08:47 historical index link; exact-head CI must rerun.
 - Local tests were NOT RUN in this connector runtime. Physical device testing is not applicable to the web-prototype localStorage code.
 - No independent review is submitted; branch protection details are not verified. PR remains open/unmerged.
 
@@ -58,11 +58,11 @@ This snapshot records live repository state and exact-head evidence for this eng
 
 ## Open durable issues / backlog
 
-- #160 physical Android/WebView acceptance: emulator API 29/36 and debug artifact are available, but physical device, real WebView, notifications, storage/restore, and same-signer upgrade remain NOT TESTED. Debug APK is not production-signed; do not install over an existing production-signed app or uninstall user data to test it.
+- #160 physical Android/WebView acceptance: emulator API 29/36 and debug artifacts are available, but physical device, real WebView, notifications, storage/restore, and same-signer upgrade remain NOT TESTED. Debug APKs are not production-signed; do not install over an existing production-signed app or uninstall user data to test them.
 - #348 browser reliability: complete redirects/cookies/forms/target=_blank/history, downloads/SAF, app-link return paths, TLS/offline consent, renderer recovery, accessibility, and performance matrix; PR #601 is a focused address slice only.
 - #476 recurrence parity: weekday fix merged; real AlarmManager delivery and time-zone/device behavior remain to be validated.
 - #325 cross-platform architecture: platform support matrix, shared-core boundaries, desktop proof-of-concept and browser-engine ADR remain open.
-- #603 storage health: PR #604 code-head CI green; independent review and merge gates remain open.
+- #603 storage health: PR #604 code-head CI green; integrated docs head being corrected; independent review and merge gates remain open.
 
 ## Safety / release state
 
@@ -72,7 +72,7 @@ This snapshot records live repository state and exact-head evidence for this eng
 
 ## Next priorities
 
-1. Obtain independent review and verify required protection rules for PR #604; merge only after all required gates are freshly confirmed.
+1. Rerun PR #604 exact-head CI after the docs-only correction; obtain independent review and verify required protection rules before merge.
 2. Refresh PR #601 against current main, verify the diff is only browser-address scope, and perform physical WebView address/navigation acceptance.
 3. Rebase PR #605 onto current main, preserve the dialog accessibility improvement, and correct its timestamp/status snapshot.
 4. Run physical-device QA from a safe spare/test installation; never replace a production-signed install with a debug-signed APK.
@@ -81,4 +81,4 @@ This snapshot records live repository state and exact-head evidence for this eng
 Work by: ChatGPT
 Model: GPT-6
 Tooling: GitHub connector (live source/PR/issue/Actions/artifact inspection, Git tree/commit/ref APIs) and local ZIP/SHA-256 inspection
-Timestamp (UTC): 2026-11-08T09:49:01Z
+Timestamp (UTC): 2026-11-08T09:51:08Z

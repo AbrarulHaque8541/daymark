@@ -1,5 +1,6 @@
-- [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:49:01Z (PR #600/#599 merged; PR #601/#604 checks; storage and device QA)](./CURRENT_STATUS_20261108T094901Z.md)
+- [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:51:08Z (PR #600/#599 merged; PR #601/#604 checks; storage and device QA)](./CURRENT_STATUS_20261108T095108Z.md)
 - Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T09:20:00Z](./CURRENT_STATUS_20261108T092000Z.md)
+- Earlier snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25Z](./CURRENT_STATUS_20261108T084725Z.md)
 - Use the CURRENT snapshot above for live repository/PR/CI/backlog state; older entries below are historical.
 
 - [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
@@ -88,7 +89,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-08T09:49:01Z (PR #600/#599 merged; PR #601/#604 checks; storage and device QA)](./CURRENT_STATUS_20261108T094901Z.md)
+- [Daymark whole-project engineering status — 2026-11-08T09:51:08Z (PR #600/#599 merged; PR #601/#604 checks; storage and device QA)](./CURRENT_STATUS_20261108T095108Z.md)
 
 
 - [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
