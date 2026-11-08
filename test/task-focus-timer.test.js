@@ -7,7 +7,7 @@ const { test } = require("node:test");
 
 test("Android task focus timer state engine", () => {
   const root = path.resolve(__dirname, "..");
-  const runner = path.join("android-app", "tools", "run-focus-timer-tests.sh");
+  const runner = "android-app/tools/run-focus-timer-tests.sh";
   const result = spawnSync(process.platform === "win32" ? "bash" : "sh", [runner], {
     cwd: root,
     encoding: "utf8",

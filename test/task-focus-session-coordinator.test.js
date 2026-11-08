@@ -7,7 +7,7 @@ const { test } = require("node:test");
 
 test("Android task focus session lifecycle coordinator", () => {
   const root = path.resolve(__dirname, "..");
-  const runner = path.join("android-app", "tools", "run-focus-session-coordinator-tests.sh");
+  const runner = "android-app/tools/run-focus-session-coordinator-tests.sh";
   const result = spawnSync(process.platform === "win32" ? "bash" : "sh", [runner], {
     cwd: root,
     encoding: "utf8",
