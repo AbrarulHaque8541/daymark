@@ -147,11 +147,12 @@ test('attach with no cache prompts the user to choose a country', () => {
   assert.equal(elements['holiday-status'].textContent, 'Choose a country and tap Refresh.');
 });
 
-test('a corrupt cache is ignored instead of crashing', () => {
+test('a corrupt cache is preserved and reported instead of crashing', () => {
   const { env, elements } = fakeEnv({ stored: '{not json' });
   ui.attachHolidaysUi(env);
   assert.equal(elements['holiday-list'].children.length, 0);
-  assert.equal(elements['holiday-status'].textContent, 'Choose a country and tap Refresh.');
+  assert.match(elements['holiday-status'].textContent, /^Choose a country and tap Refresh\./);
+  assert.match(elements['holiday-status'].textContent, /saved holiday cache is unreadable and was preserved/);
 });
 
 test('a cache whose year has no holidays left says so instead of showing nothing', () => {
