@@ -6,6 +6,8 @@ const importer = require('../import-logic.js');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const NOW = '2026-11-07T05:00:00.000Z';
 
@@ -206,4 +208,31 @@ test('auto-boot stays inert under Node (no window) and the module exposes its AP
   assert.equal(ui.STORAGE_KEY, 'daymark.tasks.v1');
   assert.equal(ui.MAX_IMPORT_FILE_BYTES, 8 * 1024 * 1024);
   assert.equal(typeof globalThis.DaymarkImportUi, 'object');
+});
+
+
+test('blocked storage getter keeps the import handler attached and changes no task data', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const { env, elements, created, storageData } = fakeEnv({
+    stored: original,
+    files: [{ name: 'tasks.csv', size: 10, text: async () => 'should not be read' }]
+  });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() {
+      throw new Error('storage access blocked');
+    }
+  });
+  const handle = ui.attachImportUi(env);
+  await handle.onChange(changeEvent(elements['import-file']));
+  assert.equal(storageData[ui.STORAGE_KEY], original, 'the existing task store is untouched');
+  const status = created.find((el) => el.id === 'import-status');
+  assert.match(status.textContent, /Import failed: browser storage is unavailable; nothing was changed/);
+});
+
+test('import auto-boot does not eagerly evaluate window.localStorage', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'import-ui.js'), 'utf8');
+  assert.doesNotMatch(source, /localStorage:\\s*window\\.localStorage/,
+    'boot must pass window and let attachImportUi guard the storage getter');
 });
