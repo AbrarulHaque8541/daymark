@@ -102,6 +102,14 @@ for workflow_name in retry_workflows:
     workflow = workflow_path.read_text(encoding="utf-8")
     assert "tools/run-gradle-with-retry.sh" in workflow, \
         f"{workflow_name} must use the bounded Gradle distribution retry wrapper"
+    assert "gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947" in workflow, \
+        f"{workflow_name} must provision/cache the pinned Gradle 8.13 distribution"
+    assert "gradle/actions/wrapper-validation@48b5f213c81028ace310571dc5ec0fbbca0b2947" in workflow, \
+        f"{workflow_name} must validate the Gradle Wrapper JAR"
+    assert "gradle-version: '8.13'" in workflow and "cache-read-only:" in workflow, \
+        f"{workflow_name} must pin Gradle 8.13 and protect fork cache writes"
+    assert "cache: gradle" not in workflow, \
+        f"{workflow_name} must not combine setup-java Gradle caching with setup-gradle caching"
     assert not re.search(r"(?m)^\s*\./gradlew\s", workflow), \
         f"{workflow_name} must not bypass the bounded Gradle distribution retry wrapper"
 assert (root / "tools/run-gradle-with-retry.sh").is_file()
