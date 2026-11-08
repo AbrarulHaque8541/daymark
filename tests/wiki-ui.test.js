@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const wikiApi = require('../wiki-logic.js');
 const ui = require('../wiki-ui.js');
 
@@ -58,7 +60,7 @@ function fakeEnv(options) {
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
-  const storage = {
+  const storage = Object.prototype.hasOwnProperty.call(opts, 'storage') ? opts.storage : {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
@@ -69,7 +71,7 @@ function fakeEnv(options) {
       getElementById(id) { return elements[id] || null; },
       createElement(tag) { return fakeElement(tag); }
     },
-    window: {},
+    window: opts.window || {},
     localStorage: storage,
     wikiApi,
     fetch: opts.fetch,
@@ -177,11 +179,13 @@ test('empty query asks for a search term without touching the network', async ()
   assert.equal(fetchImpl.seen.length, 0);
 });
 
-test('a corrupt cache is ignored instead of crashing attach', () => {
-  const { env, elements } = fakeEnv({ stored: '{not json' });
+test('a corrupt cache is preserved and reported instead of treated as absent', () => {
+  const { env, elements, storageData } = fakeEnv({ stored: '{not json' });
   ui.attachWikiUi(env);
   assert.equal(elements['wiki-list'].children.length, 0);
-  assert.equal(elements['wiki-status'].textContent, 'Type a topic and tap Search.');
+  assert.equal(storageData[ui.STORAGE_KEY], '{not json');
+  assert.ok(elements['wiki-status'].textContent.includes('Saved Wikipedia cache is invalid and was left untouched.'));
+  assert.ok(elements['wiki-status'].textContent.endsWith('Type a topic and tap Search.'));
 });
 
 test('the module exposes its API and stays inert under Node', () => {
@@ -257,4 +261,105 @@ test('Clear button click listener is wired', () => {
   listener.handler();
   assert.equal(elements['wiki-query'].value, '');
   assert.equal(elements['wiki-status'].textContent, 'Cleared. Type a topic and tap Search.');
+});
+
+
+test('a throwing window storage getter does not prevent searching', async () => {
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', fetch: fetchImpl });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', { configurable: true, get() { throw new Error('storage blocked'); } });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.ok(elements['wiki-status'].textContent.startsWith('Updated ·'));
+  assert.ok(elements['wiki-status'].textContent.includes('local storage is unavailable'));
+});
+
+test('storage read failures are reported and never overwritten', async () => {
+  let writes = 0;
+  const storage = { getItem() { throw new Error('storage denied'); }, setItem() { writes++; }, removeItem() { throw new Error('storage denied'); } };
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', fetch: fetchImpl, storage });
+  const handle = ui.attachWikiUi(env);
+  assert.ok(elements['wiki-status'].textContent.includes('could not be read and was left untouched'));
+  await handle.onSearch();
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.equal(writes, 0);
+  assert.ok(elements['wiki-status'].textContent.includes('could not be verified and was left untouched'));
+});
+
+test('a successful search remains visible when cache writes fail', async () => {
+  const storage = { getItem() { return null; }, setItem() { throw new Error('quota exceeded'); }, removeItem() {} };
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', fetch: fetchImpl, storage });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.ok(elements['wiki-status'].textContent.startsWith('Updated ·'));
+  assert.ok(elements['wiki-status'].textContent.includes('Saved Wikipedia cache could not be saved'));
+  assert.equal(elements['wiki-search'].disabled, false);
+});
+
+test('a corrupt cache is not overwritten by a later successful search', async () => {
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements, storageData } = fakeEnv({ query: 'kanyakumari', stored: '{not json', fetch: fetchImpl });
+  const handle = ui.attachWikiUi(env);
+  await handle.onSearch();
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.equal(storageData[ui.STORAGE_KEY], '{not json');
+  assert.ok(elements['wiki-status'].textContent.includes('Saved Wikipedia cache is invalid and was left untouched'));
+});
+
+test('failed Clear preserves visible and persisted Wikipedia data', () => {
+  const stored = JSON.stringify({ version: 1, query: 'kanyakumari',
+    results: [{ title: 'Kanyakumari', snippet: 'A coastal town in Tamil Nadu.', pageId: 2285632, url: 'https://en.wikipedia.org/?curid=2285632' }],
+    fetchedAt: '2026-11-04T09:30:00.000Z' });
+  const storage = { getItem(key) { return key === ui.STORAGE_KEY ? stored : JSON.stringify({ query: 'kanyakumari' }); }, setItem() {}, removeItem() { throw new Error('storage denied'); } };
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', storage });
+  const handle = ui.attachWikiUi(env);
+  const beforeCount = elements['wiki-list'].children.length;
+  const beforeQuery = elements['wiki-query'].value;
+  assert.equal(handle.onClear(), false);
+  assert.equal(elements['wiki-list'].children.length, beforeCount);
+  assert.equal(elements['wiki-query'].value, beforeQuery);
+  assert.ok(elements['wiki-status'].textContent.startsWith('Could not clear saved Wikipedia data'));
+});
+
+test('a partial Clear failure restores the first saved value', () => {
+  const cache = JSON.stringify({ version: 1, query: 'kanyakumari',
+    results: [{ title: 'Kanyakumari', snippet: 'A coastal town in Tamil Nadu.', pageId: 2285632, url: 'https://en.wikipedia.org/?curid=2285632' }],
+    fetchedAt: '2026-11-04T09:30:00.000Z' });
+  const prefs = JSON.stringify({ query: 'kanyakumari' });
+  const data = { [ui.STORAGE_KEY]: cache, [ui.PREFS_KEY]: prefs };
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); },
+    removeItem(key) { if (key === ui.STORAGE_KEY) { delete data[key]; return; } throw new Error('preference removal denied'); }
+  };
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', storage });
+  const handle = ui.attachWikiUi(env);
+  assert.equal(handle.onClear(), false);
+  assert.equal(data[ui.STORAGE_KEY], cache);
+  assert.equal(data[ui.PREFS_KEY], prefs);
+  assert.equal(elements['wiki-list'].children.length, 1);
+  assert.ok(elements['wiki-status'].textContent.startsWith('Could not clear saved Wikipedia data'));
+});
+
+test('typing does not throw when preference persistence fails', () => {
+  const storage = { getItem() { return null; }, setItem() { throw new Error('quota exceeded'); }, removeItem() {} };
+  const { env, elements } = fakeEnv({ storage });
+  ui.attachWikiUi(env);
+  const input = elements['wiki-query'];
+  input.value = 'solar power';
+  const listener = input.listeners.find((entry) => entry.type === 'input');
+  assert.ok(listener);
+  assert.doesNotThrow(() => listener.handler());
+  assert.ok(elements['wiki-status'].textContent.includes('Search preference could not be saved'));
+});
+
+test('browser auto-boot does not eagerly read window.localStorage', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'wiki-ui.js'), 'utf8');
+  assert.ok(source.includes('const boot = () => attachWikiUi({ document, window });'));
+  assert.ok(!source.includes('localStorage: window.localStorage'));
 });
