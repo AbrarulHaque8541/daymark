@@ -59,14 +59,13 @@
         // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
         offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
-      } else if (hasRecoveryBackupNeedingPreservation()) {
-        // Opaque originals are retained only once grouped into an explicit recovery bundle.
+      } else if (hasRecoveryBackupNeedingPreservation(saved)) {
+        // Any backup not proven byte-for-byte redundant with the healthy primary is retained for manual review.
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
       } else {
         setStorageStatus('Saved on this device');
-        // Only a backup containing fully valid task arrays is stale. Partial or opaque
-        // originals remain recoverable even after the primary store becomes healthy.
+        // A backup is cleared only when its exact bytes match the current primary payload.
         clearRecoveryBackup();
       }
       return validated.tasks;
@@ -165,7 +164,37 @@
     }
   }
 
-  function hasRecoveryBackupNeedingPreservation() {
+  function recoveryBackupIsRedundant(raw, primaryRaw) {
+    if (typeof raw !== 'string') return true;
+    if (typeof primaryRaw !== 'string' || primaryRaw.length === 0) return false;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      // Malformed bytes are opaque, not evidence that a backup is stale.
+      return false;
+    }
+
+    if (Array.isArray(parsed)) {
+      // A valid array backup is redundant only when its exact bytes are still
+      // present in the primary store. A different valid array may contain
+      // older tasks that are no longer in the primary payload.
+      return raw === primaryRaw;
+    }
+
+    if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
+        && Array.isArray(parsed.payloads)) {
+      // Preserve every bundle containing unknown, malformed, or distinct data.
+      return parsed.payloads.every((payload) =>
+        typeof payload === 'string' && payload === primaryRaw);
+    }
+
+    // Unknown JSON shapes may be older recovery formats. Keep them intact.
+    return false;
+  }
+
+  function hasRecoveryBackupNeedingPreservation(primaryRaw) {
     let raw;
     try {
       raw = localStorage.getItem(BACKUP_KEY);
@@ -173,18 +202,15 @@
       return true;
     }
     if (typeof raw !== 'string' || raw.length === 0) return false;
-    if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (error) {
-      // Raw malformed backup is stale once the primary store is healthy.
-      // Opaque sources are retained only after being grouped in a recovery bundle.
-      return false;
+
+    if (typeof primaryRaw !== 'string') {
+      try {
+        primaryRaw = localStorage.getItem(STORAGE_KEY);
+      } catch (error) {
+        return true;
+      }
     }
-    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
-    return parsed.payloads.some((payload) => typeof payload !== 'string'
-      || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
+    return !recoveryBackupIsRedundant(raw, primaryRaw);
   }
 
   function persistTasks() {
@@ -200,14 +226,15 @@
         }
         state.recoveryBackupPendingPayload = null;
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
+      const primaryPayload = JSON.stringify(state.tasks);
+      localStorage.setItem(STORAGE_KEY, primaryPayload);
       if (hasPartialRecoveryBackup()) {
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
-      } else if (hasRecoveryBackupNeedingPreservation()) {
+      } else if (hasRecoveryBackupNeedingPreservation(primaryPayload)) {
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
       } else {
         setStorageStatus('Saved on this device');
-        // A full save can clear only a stale backup of fully valid task arrays; partial or opaque originals stay.
+        // A full save can clear a backup only when its exact bytes match the new primary payload.
         clearRecoveryBackup();
       }
       return true;
