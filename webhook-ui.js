@@ -48,6 +48,7 @@
     let queueReadFailed = storageAccessFailed;
     let configWriteFailed = false;
     let queueWriteFailed = false;
+    let flushRequested = false;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -165,6 +166,15 @@
         || storageAccessFailed || queueReadFailed;
     }
 
+    function finishBusyOperation() {
+      setBusy(false);
+      renderQueue();
+      if (flushRequested) {
+        flushRequested = false;
+        void attemptFlush();
+      }
+    }
+
     async function attemptFlush() {
       if (busy) return;
       if (storageAccessFailed || configReadFailed || queueReadFailed) {
@@ -205,10 +215,18 @@
         renderQueue();
         return;
       }
+      // Flush an immutable snapshot. Task completions can arrive while fetch is pending;
+      // reconcile those newly queued IDs after the snapshot completes instead of losing them.
+      const flushingQueue = queue.slice();
+      const flushingIds = new Set(flushingQueue.map((event) => event.id));
       setBusy(true);
       try {
-        const result = await webhookApi.flushQueue(queue, config.url, fetchImpl);
-        queue = result.queue;
+        const result = await webhookApi.flushQueue(flushingQueue, config.url, fetchImpl);
+        const addedWhileFlushing = queue.filter((event) => !flushingIds.has(event.id));
+        queue = addedWhileFlushing.reduce(
+          (pending, event) => webhookApi.enqueueEvent(pending, event),
+          result.queue
+        );
         const persisted = persistQueue(queue);
         const parts = [];
         if (result.deliveredCount > 0) parts.push('Delivered ' + result.deliveredCount + ' event(s).');
@@ -219,8 +237,7 @@
       } catch (error) {
         status('Could not deliver: ' + (error && error.message ? error.message : 'unknown error'));
       } finally {
-        setBusy(false);
-        renderQueue();
+        finishBusyOperation();
       }
     }
 
@@ -291,8 +308,7 @@
       } catch (error) {
         status('Test event failed: ' + (error && error.message ? error.message : 'unknown error'));
       } finally {
-        setBusy(false);
-        renderQueue();
+        finishBusyOperation();
       }
     }
 
@@ -329,7 +345,8 @@
       }
       queue = nextQueue;
       renderQueue();
-      void attemptFlush();
+      if (busy) flushRequested = true;
+      else void attemptFlush();
       return { queued: true, reason: 'queued' };
     }
 

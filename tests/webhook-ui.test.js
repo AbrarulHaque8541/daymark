@@ -152,6 +152,40 @@ test('a completed task online is delivered immediately and the queue empties', a
   assert.equal(elements['webhook-flush'].disabled, true, 'retry disables again once the queue is empty');
 });
 
+test('a task completed during an active flush is retained and sent after the snapshot finishes', async () => {
+  const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  const started = [];
+  let releaseFirst;
+  let firstStartedResolve;
+  let secondStartedResolve;
+  const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
+  const secondStarted = new Promise((resolve) => { secondStartedResolve = resolve; });
+  let calls = 0;
+  env.fetch = async () => {
+    calls += 1;
+    if (calls === 1) {
+      firstStartedResolve();
+      return new Promise((resolve) => { releaseFirst = () => resolve({ ok: true, status: 200 }); });
+    }
+    secondStartedResolve();
+    return { ok: true, status: 200 };
+  };
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  handle.notifyTaskCompleted(TASK);
+  await firstStarted;
+  const secondTask = Object.assign({}, TASK, { id: 'task-2', title: 'Completed during first delivery' });
+  assert.deepEqual(handle.notifyTaskCompleted(secondTask), { queued: true, reason: 'queued' });
+  assert.equal(JSON.parse(storageData[webhookApi.QUEUE_KEY]).length, 2,
+    'the second completion is persisted while the first request is in flight');
+  releaseFirst();
+  await secondStarted;
+  await settle();
+  assert.equal(calls, 2, 'the new completion triggers one follow-up flush after the active one');
+  assert.equal(handle.readQueue().length, 0, 'both completed events are removed only after delivery');
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
+
 test('the retry button flushes a queued event when the endpoint recovers', async () => {
   let fail = true;
   const { env } = fakeEnv({
