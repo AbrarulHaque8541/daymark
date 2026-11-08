@@ -154,7 +154,6 @@ test('a completed task online is delivered immediately and the queue empties', a
 
 test('a task completed during an active flush is retained and sent after the snapshot finishes', async () => {
   const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
-  const started = [];
   let releaseFirst;
   let firstStartedResolve;
   let secondStartedResolve;
