@@ -18,8 +18,8 @@ chmod +x ./gradlew
 
 max_attempts=3
 initial_delay="${DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS:-2}"
-if [[ ! "$initial_delay" =~ ^[0-9]+$ ]]; then
-  echo "DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS must be a non-negative integer" >&2
+if [[ ! "$initial_delay" =~ ^[0-9]{1,2}$ ]] || (( initial_delay > 30 )); then
+  echo "DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS must be an integer from 0 through 30" >&2
   exit 2
 fi
 
