@@ -78,7 +78,7 @@
       try {
         if (typeof storage.getItem !== 'function') return { ok: false, value: null };
         const raw = storage.getItem(webhookApi.CONFIG_KEY);
-        if (!raw) return { ok: true, value: null };
+        if (raw === null) return { ok: true, value: null };
         const parsed = JSON.parse(raw);
         if (parsed === null) return { ok: true, value: null };
         return webhookApi.validateWebhookConfig(parsed)
@@ -119,7 +119,7 @@
       try {
         if (typeof storage.getItem !== 'function') return { ok: false, value: [] };
         const raw = storage.getItem(webhookApi.QUEUE_KEY);
-        if (!raw) return { ok: true, value: [] };
+        if (raw === null) return { ok: true, value: []; };
         const parsed = JSON.parse(raw);
         return webhookApi.validateQueue(parsed)
           ? { ok: true, value: parsed }
@@ -152,7 +152,7 @@
       if (configWriteFailed) problems.push('webhook settings could not be saved');
       if (queueWriteFailed) problems.push('queued webhook events could not be saved');
       return problems.length
-        ? ' Storage warning: ' + problems.join('; ') + '. Existing unreadable data was left untouched.'
+        ? ' Storage warning: ' + problems.join('; ') + '. No unreadable stored values were overwritten.'
         : '';
     }
 
