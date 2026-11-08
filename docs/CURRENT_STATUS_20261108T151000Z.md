@@ -74,3 +74,44 @@ Work by: ChatGPT
 Model: GPT-6  
 Tooling: GitHub connector (live repository/source/PR/Actions and branch/file writes); Code Mode V8 syntax and focused behavior smoke  
 Timestamp (UTC): 2026-11-08T15:10:00Z
+
+
+## Live verification addendum — 2026-11-08T15:20:00Z
+
+### PR #628 exact-head result
+
+The code/test branch head `cb250dca69f51e84baba5981e71fac6276652209` completed all required workflows:
+- Android CI run [42493455366](https://github.com/AbrarulHaque8541/daymark/actions/runs/42493455366): **PASS**; canonical source guard and Android host checks passed; `npm test` **499/499**; both Android debug variants and lint/build passed.
+- Cross-platform contracts [42493455571](https://github.com/AbrarulHaque8541/daymark/actions/runs/42493455571): **PASS** on Ubuntu 24.04 and Windows 2025.
+- Device-test APK [42493455468](https://github.com/AbrarulHaque8541/daymark/actions/runs/42493455468): **PASS**; source checks, both flavor builds, merged manifests and APK verification passed; release-publication job skipped.
+- Re-ran the modified `holidays-ui.js` from the current branch in Code Mode V8: syntax **PASS**, focused behavior smoke **8/8**.
+- PR #628 remains **OPEN / NOT MERGED** pending independent review. Its current head at the time of this addendum is the verified `cb250dca...`; the documentation-only update that contains this addendum will produce a new PR head and therefore needs fresh exact-head Actions.
+
+### Duplicate PR consolidation
+
+PR #629 was closed as superseded after comparing its final diff/commits. Its unique streaming-response test fixture, country-preference write failure, blocked-getter refresh, unreadable-store refresh, and removal-failure coverage were ported into #628. #628 retains additional compare-before-write and compare-before-Clear checks to protect cross-tab changes. No #629 code was merged separately.
+
+### Cross-agent follow-up
+
+- PR #618's latest source/test verifies malformed existing task records fail import before file read/merge/write; original raw task data remains unchanged. Exact-head Android/contracts/device-test APK passed; confirmation comment posted.
+- PR #627 now enforces XML node limit 5,000, aggregate attributes 10,000, and 32 attributes per element, with shallow-node/attribute exhaustion tests. Exact-head Android, Ubuntu/Windows contracts and device-test APK all passed on `45f7ba394c15fe1d8501da3a44406d6866b7fc57`; earlier AST amplification finding resolved.
+- PR #626 now routes both AI and Quick Translate through bounded streaming JSON, checks exact HTTPS origin permissions, rejects redirects, omits credentials, and documents caps. Exact-head Android, contracts and device-test APK passed on `fdfb00e2cbfd26b90e6ca17f1bbe6c1144d6f437`; earlier extension `response.json()` gap resolved.
+- PR #624 still retains a text-only `response.text()` fallback that checks the cap after materialization. A follow-up review comment was posted against latest inspected head `cb05ad4396d023c0f4aeae3bff08fe4631900ae9`; the current exact-head Android/contracts/device APK runs were still in progress at last poll. Do not merge this resource-bound helper while the fallback remains.
+- PR #610 / #616 still have an unresolved Focus emulator repeatability failure: API 29 rightward mode swipe and API 36 task-editor Cancel visibility have not met the required repeat gate. Keep Issue #613 open; do not weaken the ten-run assertions.
+- Issue #476's code/host-test gaps are now superseded on main: long-gap arithmetic, Feb-29 anchor recovery, named New York spring/fall elapsed-lead tests, and reminder policy cases are present. Issue remains open because physical AlarmManager/notification, reboot/Doze/OEM, and physical timezone acceptance are **NOT TESTED**.
+
+### Current whole-project priorities
+
+1. **P0 #160:** physical Android/WebView acceptance with exact device/API/provider/build/APK evidence — **NOT TESTED**.
+2. **P1 #624:** remove or genuinely bound the JSON reader text fallback; exact-head CI pending.
+3. **P1 #610/#616/#613:** resolve API 29/36 Focus emulator repeat failures without weakening assertions.
+4. **P1 #348:** browser reliability and secure downloads; keep fail-closed until redirect-safe transport is validated.
+5. **P1 #628:** obtain independent review; final docs-integrated head requires fresh exact-head CI.
+6. **P1 #604/#607/#617/#618/#619/#620/#621/#623:** independent review and integration checks, avoiding shared-file collisions.
+7. **P1 #476:** physical reminder delivery remains open/not tested.
+8. **P2 #325:** evidence-based cross-platform feasibility work only.
+
+Work by: ChatGPT  
+Model: GPT-6  
+Tooling: GitHub connector (live PR/source/issue/Actions logs and status snapshot update); Code Mode V8 behavior smoke  
+Timestamp (UTC): 2026-11-08T15:20:00Z
