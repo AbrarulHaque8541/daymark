@@ -315,6 +315,18 @@ test("translation requests are bounded, HTTPS-only, and encode user text", async
   assert.equal(MAX_TRANSLATION_RESPONSE_BYTES, 64 * 1024);
 });
 
+
+test("optional API host permissions are HTTPS-only while page features retain HTTP support", () => {
+  const manifest = JSON.parse(fs.readFileSync(
+    path.join(root, "browser-extension/uc-china-lite/manifest.json"),
+    "utf8"
+  ));
+  assert.deepEqual(manifest.optional_host_permissions, ["https://*/*"]);
+  const pageMatches = manifest.content_scripts.flatMap((entry) => entry.matches || []);
+  assert.ok(pageMatches.includes("http://*/*"), "content features still run on plain HTTP pages");
+  assert.ok(pageMatches.includes("https://*/*"), "content features still run on HTTPS pages");
+});
+
 test("extension entry points use the bounded background transport and avoid silent search fallback on request errors", () => {
   const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
   const background = read("browser-extension/uc-china-lite/background.js");
