@@ -199,8 +199,9 @@ test('a task completed during an active flush is retained and sent after the sna
   await firstStarted;
   const secondTask = Object.assign({}, TASK, { id: 'task-2', title: 'Completed during first delivery' });
   const secondNotify = handle.notifyTaskCompleted(secondTask);
-  assert.equal(JSON.parse(storageData[webhookApi.QUEUE_KEY]).length, 1,
-    'the second completion waits for the exclusive lock instead of writing a stale snapshot');
+  await secondNotify;
+  assert.equal(JSON.parse(storageData[webhookApi.QUEUE_KEY]).length, 2,
+    'the second completion is durably appended while the first tab holds the delivery lock');
   releaseFirst();
   await secondStarted;
   await Promise.all([firstNotify, secondNotify]);
@@ -305,8 +306,12 @@ test('a second tab completion waits for an in-flight delivery and is not lost', 
   await firstStarted;
   const secondTask = Object.assign({}, TASK, { id: 'task-b', title: 'Task completed in second tab' });
   const enqueue = secondHandle.notifyTaskCompleted(secondTask);
-  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), [initialEvent],
-    'the waiting tab cannot overwrite the queue while the first tab owns the lock');
+  await settle();
+  const queuedDuringDelivery = JSON.parse(storageData[webhookApi.QUEUE_KEY]);
+  assert.equal(queuedDuringDelivery.length, 2,
+    'the second tab durably appends while the first tab holds only the delivery lock');
+  assert.deepEqual(queuedDuringDelivery.map((event) => JSON.parse(event.payload).task.title),
+    [TASK.title, secondTask.title]);
 
   releaseFirst();
   await Promise.all([flushing, enqueue]);
