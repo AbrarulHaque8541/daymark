@@ -102,6 +102,8 @@ assert "return false;" in active_check[provider_error_catch:provider_error_catch
 assert "openDownloadsFolder()" not in activity, "Downloads must not be a generic document picker"
 assert "ACTION_OPEN_DOCUMENT" not in method, "the downloads list must not be implemented as a generic file picker"
 assert "No Daymark browser downloads are available." in method, "empty state must be explicit"
+assert "Downloads are temporarily unavailable until Daymark can validate every redirect safely." in activity, \
+    "the media discovery dialog must disclose that download actions are currently blocked"
 assert "New browser downloads are temporarily blocked" in method, "empty state must disclose the fail-closed policy"
 assert "No compatible app could open this file." in method, "viewer handoff failure must be disclosed"
 print("PASS browser downloads source checks: bounded history, safe completed-file handoff/cancel, fail-closed new requests, refresh and truthful empty/error states")

@@ -4231,9 +4231,10 @@ public final class MainActivity extends Activity {
     // a redirect-validating transport is available. Protected streaming players (DRM or
     // hidden stream manifests) stay out of scope by design.
     /**
-     * Best-effort in-player download affordance for direct HTTPS HTML5 media.
-     * It creates only a user-clicked page button and a normal HTTPS anchor; there is
-     * no JavaScript-to-native bridge and no DRM/manifest/blob extraction.
+     * Best-effort in-player media discovery affordance for direct HTTPS HTML5 media.
+     * It exposes source links for inspection only; the native download callback remains
+     * fail-closed until Daymark can validate every redirect safely.
+     * There is no JavaScript-to-native bridge and no DRM/manifest/blob extraction.
      */
     private void exitBrowserFullscreen() {
         View view = browserFullscreenView;
@@ -4347,6 +4348,7 @@ public final class MainActivity extends Activity {
         }
         new AlertDialog.Builder(this)
                 .setTitle("Videos & audio on this page")
+                .setMessage("Downloads are temporarily unavailable until Daymark can validate every redirect safely.")
                 .setItems(labels, (dialog, which) -> {
                     String url = urls[which];
                     if (!BrowserAddress.isAllowedWebUrl(url)) {

@@ -59,7 +59,7 @@ assert "Download started for the selected media file" not in activity, \
 assert "(tap to retry)" not in activity and 'setTitle("Retry download?")' not in activity, \
     "failed history must not promise retry while downloads are disabled"
 assert "BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id)" in method, \
-    "the Downloads list should update only entries already owned by Daymark browser enqueue"
+    "the Downloads list may synchronize existing in-memory entries from prior enqueues; new enqueues remain blocked"
 for expected in ("browserDownloadTracker.onQueued(id)", "browserDownloadTracker.onProgress(id, downloaded, total)", \
                  "browserDownloadTracker.onPaused(id)", "browserDownloadTracker.onComplete(id)", \
                  "browserDownloadTracker.onFailure(id, Integer.toString(reason))"):
