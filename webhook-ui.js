@@ -401,7 +401,7 @@
 
     function notifyTaskCompleted(task) {
       if (!webhookApi) return { queued: false, reason: 'unavailable' };
-      if (storageAccessFailed || legacyConfigCleanupFailed) {
+      if (storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed) {
         status('Task completion was not queued or sent because browser storage could not be safely accessed.' + storageWarning());
         return { queued: false, reason: 'storage-unavailable' };
       }
@@ -434,7 +434,9 @@
         const nextQueue = webhookApi.enqueueEvent(state.value, event);
         if (!persistQueue(nextQueue)) {
           queue = nextQueue;
-          if (!memoryOnlyEvents.some((pending) => pending.id === event.id)) memoryOnlyEvents.push(event);
+          if (!memoryOnlyEvents.some((pending) => pending.id === event.id)) {
+            memoryOnlyEvents = webhookApi.enqueueEvent(memoryOnlyEvents, event);
+          }
           queueWriteFailed = true;
           renderQueue();
           status('Webhook event is held only in this tab; it was not sent because the queue could not be saved. '
