@@ -160,8 +160,10 @@ test('a task completed during an active flush is retained and sent after the sna
   const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
   const secondStarted = new Promise((resolve) => { secondStartedResolve = resolve; });
   let calls = 0;
-  env.fetch = async () => {
+  const deliveredTitles = [];
+  env.fetch = async (url, init) => {
     calls += 1;
+    deliveredTitles.push(JSON.parse(init.body).task.title);
     if (calls === 1) {
       firstStartedResolve();
       return new Promise((resolve) => { releaseFirst = () => resolve({ ok: true, status: 200 }); });
@@ -181,6 +183,8 @@ test('a task completed during an active flush is retained and sent after the sna
   await secondStarted;
   await settle();
   assert.equal(calls, 2, 'the new completion triggers one follow-up flush after the active one');
+  assert.deepEqual(deliveredTitles, [TASK.title, secondTask.title],
+    'the follow-up request contains the completion that arrived during the first request');
   assert.equal(handle.readQueue().length, 0, 'both completed events are removed only after delivery');
   assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
 });
