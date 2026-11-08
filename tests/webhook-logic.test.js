@@ -145,7 +145,7 @@ test('a failed flush keeps the event, counts one attempt, and stops there', asyn
   assert.equal(result.queue.length, 2);
   assert.equal(result.queue[0].attempts, 1, 'only the failed event gains an attempt');
   assert.equal(result.queue[1].attempts, 0, 'later events keep their place untouched');
-  assert.match(result.failure, /offline/);
+  assert.match(result.failure, /network error/);
   assert.match(result.failure, /No automatic retry was attempted/);
   const retry = await webhook.flushQueue(result.queue, 'https://hooks.example.com/x', failingFetch);
   assert.equal(retry.queue[0].attempts, 2);
@@ -214,4 +214,22 @@ test('the module exposes its constants and stays inert under Node', () => {
   assert.equal(webhook.CONFIG_KEY, 'daymark.webhook.v1');
   assert.equal(webhook.QUEUE_KEY, 'daymark.webhook.queue.v1');
   assert.equal(typeof globalThis.DaymarkWebhook, 'object');
+});
+
+
+test('network error messages never expose webhook endpoint paths or query secrets', async () => {
+  const secretUrl = 'https://hooks.example.com/private/path?token=super-secret-token';
+  const event = webhook.makeQueueEvent(
+    webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'),
+    '2026-11-04T10:05:00.000Z'
+  );
+  const result = await webhook.flushQueue([event], secretUrl, async () => {
+    throw new Error('Failed to fetch ' + secretUrl);
+  });
+  assert.match(result.failure, /network error/);
+  assert.equal(result.failure.includes('super-secret-token'), false);
+  assert.equal(result.failure.includes('/private/path'), false);
+  assert.equal(result.failure.includes('hooks.example.com'), false);
+  assert.equal(result.queue.length, 1, 'a failed delivery remains queued');
+  assert.equal(result.queue[0].attempts, 1);
 });
