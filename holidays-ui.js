@@ -28,6 +28,7 @@
     let storageAccessFailed = false;
     let storageReadFailed = false;
     let storageWriteFailed = false;
+    let storageRemoveFailed = false;
     let storageConflict = false;
     try {
       storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
@@ -163,7 +164,9 @@
       } catch (error) {
         return { key, state: 'corrupt', raw, value: null };
       }
-      if (!validate(parsed)) return { key, state: 'corrupt', raw, value: null };
+      let valid = false;
+      try { valid = validate(parsed) === true; } catch (error) { valid = false; }
+      if (!valid) return { key, state: 'corrupt', raw, value: null };
       return { key, state: 'valid', raw, value: parsed };
     }
 
@@ -180,6 +183,7 @@
         problems.push('saved country preference is unreadable and was preserved');
       }
       if (storageWriteFailed) problems.push('changes could not be saved in this browser');
+      if (storageRemoveFailed) problems.push('saved holiday data could not be removed');
       return problems.length ? ' · ' + problems.join('; ') : '';
     }
 
@@ -336,18 +340,16 @@
           }
         }
       } catch (error) {
-        storageWriteFailed = true;
+        storageRemoveFailed = true;
         let rollbackFailed = false;
         for (const record of records) {
+          if (record.raw === null) continue; // absent keys were not touched by the removal loop
           try {
-            if (record.raw === null) {
-              if (typeof storage.removeItem === 'function') storage.removeItem(record.key);
-            } else {
-              if (typeof storage.setItem !== 'function') throw new Error('setItem is unavailable');
-              storage.setItem(record.key, record.raw);
-            }
+            if (typeof storage.setItem !== 'function') throw new Error('setItem is unavailable');
+            storage.setItem(record.key, record.raw);
           } catch (rollbackError) {
             rollbackFailed = true;
+            storageWriteFailed = true;
           }
         }
         status((rollbackFailed
@@ -362,6 +364,7 @@
       storageAccessFailed = false;
       storageReadFailed = false;
       storageWriteFailed = false;
+      storageRemoveFailed = false;
       storageConflict = false;
       clearView();
       status('Holidays cleared on this device. Choose a country and tap Refresh.');
