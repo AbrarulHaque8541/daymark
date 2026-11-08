@@ -74,6 +74,20 @@ import sys
 import xml.etree.ElementTree as ET
 
 root = pathlib.Path(sys.argv[1])
+wrapper_text = (root / "gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
+wrapper = {}
+for line in wrapper_text.splitlines():
+    if not line or line.lstrip().startswith("#"):
+        continue
+    key, separator, value = line.partition("=")
+    if separator:
+        wrapper[key.strip()] = value.strip()
+assert wrapper.get("distributionUrl") == r"https\://downloads.gradle.org/distributions/gradle-8.13-bin.zip", \
+    "Gradle 8.13 must use the official direct downloads.gradle.org endpoint"
+assert wrapper.get("distributionSha256Sum") == "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78", \
+    "Gradle 8.13 distribution must remain pinned to the official SHA-256"
+assert wrapper.get("networkTimeout") == "120000" and wrapper.get("validateDistributionUrl") == "true", \
+    "Gradle distribution downloads must keep a bounded 120-second timeout and URL validation"
 android = "{http://schemas.android.com/apk/res/android}"
 manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
 app = manifest.find("application")
