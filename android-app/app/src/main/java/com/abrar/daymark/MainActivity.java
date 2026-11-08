@@ -4242,17 +4242,16 @@ public final class MainActivity extends Activity {
             String filename = BrowserDownloadFilenamePolicy.sanitize(
                     URLUtil.guessFileName(url, contentDisposition, mimeType));
             request.setTitle(filename);
-            request.setDescription("Daymark browser download");
+            request.setDescription("Daymark browser download; site sign-in cookies are not shared for redirect safety");
             if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
             String effectiveUserAgent = userAgent;
             if ((effectiveUserAgent == null || effectiveUserAgent.isEmpty()) && browserWebView != null) {
                 effectiveUserAgent = browserWebView.getSettings().getUserAgentString();
             }
-            if (effectiveUserAgent != null && !effectiveUserAgent.isEmpty()) {
-                request.addRequestHeader("User-Agent", effectiveUserAgent);
+            for (java.util.Map.Entry<String, String> header :
+                    BrowserDownloadRequestHeaders.forDownload(effectiveUserAgent).entrySet()) {
+                request.addRequestHeader(header.getKey(), header.getValue());
             }
-            String cookies = CookieManager.getInstance().getCookie(url);
-            if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             if (Build.VERSION.SDK_INT >= 29) {
                 request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
@@ -4262,8 +4261,8 @@ public final class MainActivity extends Activity {
             long downloadId = manager.enqueue(request);
             if (downloadId > 0L) browserDownloadTracker.start(downloadId, url, filename);
             showToast(Build.VERSION.SDK_INT >= 29
-                    ? "Download started. Check Downloads for progress."
-                    : "Download started. Check Daymark's app Downloads folder.");
+                    ? "Download started. Site cookies are not shared; check Downloads for progress."
+                    : "Download started. Site cookies are not shared; check Daymark's app Downloads folder.");
         } catch (Exception exception) {
             browserDownloadEnqueueGate.release(url);
             showToast("Download could not be started.");

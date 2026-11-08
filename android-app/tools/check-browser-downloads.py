@@ -8,6 +8,14 @@ activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read
 method = activity.split("private void showBrowserDownloadsDialog()", 1)[1].split(
     "private void queueBrowserDownload(", 1
 )[0]
+queue = activity.split("private void queueBrowserDownload(", 1)[1].split(
+    "private void exitBrowserFullscreen", 1
+)[0]
+assert "BrowserDownloadRequestHeaders.forDownload(effectiveUserAgent)" in queue, \
+    "DownloadManager headers must come from the non-sensitive allowlist"
+for forbidden in ("CookieManager.getInstance().getCookie(url)", \
+                  'addRequestHeader("Cookie"', 'addRequestHeader("Authorization"', 'addRequestHeader("Referer"'):
+    assert forbidden not in queue, f"DownloadManager must not receive sensitive redirect-replayed header: {forbidden}"
 
 for marker, explanation in (
     ("manager.query(new DownloadManager.Query())", "Downloads must be queried from the system provider"),

@@ -42,6 +42,13 @@ queue = activity.split("private void queueBrowserDownload(", 1)[1].split("privat
 assert "long downloadId = manager.enqueue(request);" in queue and \
     "browserDownloadTracker.start(downloadId, url, filename)" in queue, \
     "only successfully enqueued Daymark browser downloads should enter the tracker"
+assert "BrowserDownloadRequestHeaders.forDownload(effectiveUserAgent)" in queue, \
+    "download request headers must use the explicit non-sensitive allowlist"
+assert "CookieManager.getInstance().getCookie(url)" not in queue and \
+    'addRequestHeader("Cookie"' not in queue, \
+    "WebView session cookies must never be forwarded to redirect-following DownloadManager requests"
+assert "site sign-in cookies are not shared for redirect safety" in queue, \
+    "the system download notification must disclose the cookie boundary"
 assert "BrowserDownloadTracker.Entry tracked = browserDownloadTracker.get(id)" in method, \
     "the Downloads list should update only entries already owned by Daymark browser enqueue"
 for expected in ("browserDownloadTracker.onQueued(id)", "browserDownloadTracker.onProgress(id, downloaded, total)", \
