@@ -147,16 +147,25 @@
     const groups = (head === '' ? [] : head.split(':'))
       .concat(tail === null || tail === '' ? [] : tail.split(':'));
     if (groups.length > 8) return false;
+    let addressUnits = 0;
     for (let i = 0; i < groups.length; i += 1) {
       const group = groups[i];
-      if (i === groups.length - 1 && group.includes('.') && groups.indexOf(group) === i) {
-        if (!isValidIpv4(group)) return false;
+      if (group.includes('.')) {
+        // An IPv4 tail occupies two 16-bit IPv6 groups and must be last.
+        // With "::", it must be in the post-compression tail: groups omitted
+        // by "::" are to the right, so an IPv4 group before "::" is not last.
+        const followsCompression = doubleColons.length === 0 || (tail !== null && tail !== '');
+        if (i !== groups.length - 1 || !followsCompression || !isValidIpv4(group)) return false;
+        addressUnits += 2;
         continue;
       }
       if (!/^[0-9a-fA-F]{1,4}$/.test(group)) return false;
+      addressUnits += 1;
     }
-    if (doubleColons.length === 0 && groups.length !== 8) return false;
-    if (doubleColons.length === 1 && groups.length >= 8 && body !== '::') return false;
+    // Without "::" exactly eight 16-bit units are required. With "::",
+    // at least one unit must be compressed (except the all-zero "::" form).
+    if (doubleColons.length === 0 && addressUnits !== 8) return false;
+    if (doubleColons.length === 1 && addressUnits >= 8 && body !== '::') return false;
     return true;
   }
 
