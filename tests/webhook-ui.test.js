@@ -292,23 +292,29 @@ test('a throwing localStorage getter does not abort the webhook card or send tas
 test('a queue read failure preserves the unknown queue and pauses task delivery', async () => {
   const { env, elements } = fakeEnv({});
   const config = { version: 1, url: 'https://hooks.example.com/x' };
-  let writes = 0;
+  let queueWrites = 0;
   let fetchCalls = 0;
+  const readKeys = [];
   env.localStorage = {
     getItem(key) {
+      readKeys.push(key);
       if (key === webhookApi.CONFIG_KEY) return JSON.stringify(config);
       throw new Error('queue read blocked');
     },
-    setItem() { writes += 1; },
-    removeItem() { writes += 1; }
+    setItem() { queueWrites += 1; },
+    removeItem(key) { if (key === webhookApi.QUEUE_KEY) queueWrites += 1; }
   };
   env.fetch = async () => { fetchCalls += 1; return { ok: true, status: 200 }; };
   const handle = ui.attachWebhookUi(env);
-  assert.equal(handle.readConfig().url, config.url);
+  assert.equal(handle.readConfig(), null, 'legacy endpoint is not restored');
+  assert.equal(readKeys.includes(webhookApi.CONFIG_KEY), false, 'legacy endpoint is never read');
+  elements['webhook-url'].value = config.url;
+  handle.onSave({ preventDefault() {} });
+  assert.equal(handle.readConfig().url, config.url, 'explicit re-entry keeps the endpoint in memory');
   assert.match(elements['webhook-status'].textContent, /queued webhook events could not be read/);
   assert.deepEqual(handle.notifyTaskCompleted(TASK), { queued: false, reason: 'storage-unavailable' });
   await handle.flush();
-  assert.equal(writes, 0, 'unknown queue state is never overwritten');
+  assert.equal(queueWrites, 0, 'unknown queue state is never overwritten');
   assert.equal(fetchCalls, 0, 'unknown queued events are never flushed');
 });
 
@@ -328,6 +334,7 @@ test('a queue write failure keeps the event in this tab and retries persistence 
     removeItem: backing.removeItem.bind(backing)
   };
   const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
   const queued = handle.notifyTaskCompleted(TASK);
   assert.deepEqual(queued, { queued: true, reason: 'memory-only' });
   assert.equal(handle.readQueue().length, 1);
@@ -411,6 +418,7 @@ test('failed persistence after delivery keeps an empty queue retryable until it 
     removeItem: backing.removeItem.bind(backing)
   };
   const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
   handle.notifyTaskCompleted(TASK);
   await settle();
   assert.equal(handle.readQueue().length, 0, 'the endpoint accepted the event');
