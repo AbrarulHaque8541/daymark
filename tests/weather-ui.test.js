@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const weatherApi = require('../weather-logic.js');
 const ui = require('../weather-ui.js');
+const { createStreamResponse } = require('./helpers/stream-response.js');
 
 const GEOCODING_BODY = JSON.stringify({
   results: [{ name: 'Kolkata', latitude: 22.5625, longitude: 88.375, country: 'India' }]
@@ -72,7 +73,7 @@ function okFetch(routes) {
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
     if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
+      return Promise.resolve(createStreamResponse(body).response);
     }
     return Promise.resolve(body);
   };
