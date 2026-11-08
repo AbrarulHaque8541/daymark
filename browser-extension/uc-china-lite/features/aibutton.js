@@ -118,7 +118,8 @@ function onEnable() {
       btn.style.display = "none";
     }
   });
-  btn.onclick = () => {
+  btn.onclick = (event) => {
+    if (!event || event.isTrusted !== true) return;
     const text = selectedText();
     if (!text) return;
     document.getElementById(PANEL_ID)?.remove();
