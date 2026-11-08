@@ -58,6 +58,7 @@ function fakeEnv(options) {
     'zones-clear': Object.assign(fakeElement('button'), { id: 'zones-clear', type: 'button' }),
     'zones-copy': Object.assign(fakeElement('button'), { id: 'zones-copy', type: 'button' }),
     'zones-share': Object.assign(fakeElement('button'), { id: 'zones-share', type: 'button' }),
+    'zones-save': Object.assign(fakeElement('button'), { id: 'zones-save', type: 'button' }),
     'zones-form': Object.assign(fakeElement('form'), { id: 'zones-form' }),
     'zones-status': Object.assign(fakeElement('p'), { id: 'zones-status' }),
     'zones-list': Object.assign(fakeElement('div'), { id: 'zones-list' })
@@ -73,7 +74,8 @@ function fakeEnv(options) {
     document: {
       readyState: 'complete',
       getElementById(id) { return elements[id] || null; },
-      createElement(tag) { return fakeElement(tag); }
+      createElement(tag) { return fakeElement(tag); },
+      body: fakeElement('body')
     },
     window: {},
     localStorage: storage,
@@ -315,4 +317,32 @@ test('share reports nothing when the zones module is missing', async () => {
   const handle = ui.attachZonesUi(env);
   handle.onShare();
   assert.equal(elements['zones-status'].textContent, 'Nothing to share yet.');
+});
+
+test('save overlap creates a local text file download and reports status', async () => {
+  const { env, elements } = fakeEnv({});
+  const created = [];
+  const originalCreate = globalThis.URL && globalThis.URL.createObjectURL;
+  globalThis.URL = globalThis.URL || {};
+  globalThis.URL.createObjectURL = (blob) => {
+    created.push(blob);
+    return 'blob:fake';
+  };
+  globalThis.URL.revokeObjectURL = () => {};
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-save'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the save button has a click listener');
+  await click.handler();
+  assert.equal(created.length, 1, 'a blob was created');
+  assert.ok(String(created[0]).includes('text/plain') || created[0].type === 'text/plain', 'blob is text');
+  assert.equal(elements['zones-status'].textContent, 'Saved world clock and overlap as daymark-world-clock.txt.');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
+  if (originalCreate) globalThis.URL.createObjectURL = originalCreate;
+});
+
+test('save reports nothing when the zones module is missing', async () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  handle.onSave();
+  assert.equal(elements['zones-status'].textContent, 'Nothing to save yet.');
 });
