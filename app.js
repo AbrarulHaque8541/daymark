@@ -13,7 +13,7 @@
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, taskPrimaryUnreadable: false, focusPrimaryUnreadable: false, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -37,6 +37,7 @@
       primaryUnreadable = true;
     }
     if (primaryUnreadable) {
+      state.taskPrimaryUnreadable = true;
       // Primary key is unreadable. Independently inspect the recovery backup
       // without treating the primary as absent or mutating either key.
       let backupRaw = null;
@@ -211,6 +212,10 @@
   }
 
   function persistTasks() {
+    if (state.taskPrimaryUnreadable) {
+      setStorageStatus('Cannot save tasks safely: primary task data is unreadable. Export the recovery backup before editing.', true);
+      return false;
+    }
     try {
       if (state.recoveryBackupPendingPayload !== null) {
         // Do not overwrite the only remaining copy of rejected/unreadable
@@ -937,11 +942,12 @@
     const task = state.tasks.find((item) => item.id === row?.dataset.taskId);
     if (!task) return;
     if (button.dataset.action === 'toggle') {
+      const wasCompleted = task.completed;
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
+      if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
@@ -1447,6 +1453,7 @@
       primaryUnreadable = true;
     }
     if (primaryUnreadable) {
+      state.focusPrimaryUnreadable = true;
       // Primary Focus key is unreadable. Independently inspect the Focus
       // recovery backup without mutation.
       let backupRaw = null;
@@ -1543,6 +1550,10 @@
 
   function persistFocusState() {
     if (!focus) return false;
+    if (state.focusPrimaryUnreadable) {
+      setStorageStatus('Cannot save Focus data safely: primary Focus data is unreadable. Export the recovery backup before continuing.', true);
+      return false;
+    }
     if (state.focusRecoveryBackupPendingPayload !== null) {
       const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
       if (!backupSaved) {
