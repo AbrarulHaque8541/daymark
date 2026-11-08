@@ -97,7 +97,7 @@
   }
 
   function recoveryBackupPayloads(raw) {
-    if (typeof raw !== 'string' || raw.length === 0) return [];
+    if (typeof raw !== 'string') return [];
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -105,7 +105,7 @@
         return [raw];
       }
       if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
-          && Array.isArray(parsed.payloads)) {
+          && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
         // If a bundle contains unknown payload types, retain the exact outer
         // bytes rather than silently filtering any part of the bundle.
         return parsed.payloads.every((payload) => typeof payload === 'string')
@@ -171,7 +171,7 @@
     }
 
     if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
-        && Array.isArray(parsed.payloads)) {
+        && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
       // Preserve every bundle containing unknown, malformed, or distinct data.
       return parsed.payloads.every((payload) =>
         typeof payload === 'string' && payload === primaryRaw);
@@ -188,7 +188,7 @@
     } catch (error) {
       return true;
     }
-    if (typeof raw !== 'string' || raw.length === 0) return false;
+    if (typeof raw !== 'string') return false;
 
     if (typeof primaryRaw !== 'string') {
       try {
@@ -1027,7 +1027,7 @@
       result.arrays.push(parsed);
       return result;
     }
-    if (parsed && parsed.format === 'daymark-recovery-bundle-v1' && Array.isArray(parsed.payloads)) {
+    if (parsed && parsed.format === 'daymark-recovery-bundle-v1' && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
       parsed.payloads.forEach((payload) => {
         if (typeof payload !== 'string') {
           result.malformedCount += 1;
@@ -1061,7 +1061,7 @@
       result.malformedCount = 1;
       return result;
     }
-    if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1' && Array.isArray(parsed.payloads)) {
+    if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1' && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
       parsed.payloads.forEach((payload) => {
         if (typeof payload !== 'string') {
           result.malformedCount += 1;
@@ -1359,7 +1359,7 @@
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1'
-          && Array.isArray(parsed.payloads)) {
+          && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
         const payloads = parsed.payloads.filter((payload) => typeof payload === 'string' && payload.length > 0);
         return payloads.length > 0 ? payloads : [raw];
       }
