@@ -189,6 +189,88 @@ test('oversized responses are rejected before parsing', async () => {
   );
 });
 
+test('streamed JSON is decoded incrementally across split UTF-8 sequences', async () => {
+  const expected = { place: 'Kolkata', note: '🌦️' };
+  const bytes = new TextEncoder().encode(JSON.stringify(expected));
+  const emojiStart = bytes.findIndex((value) => value === 0xF0);
+  assert.ok(emojiStart >= 0, 'fixture contains a four-byte UTF-8 code point');
+  const splitAt = emojiStart + 2;
+  const chunks = [bytes.slice(0, splitAt), bytes.slice(splitAt)];
+  let index = 0;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: {
+      getReader() {
+        return {
+          async read() {
+            if (index < chunks.length) return { done: false, value: chunks[index++] };
+            return { done: true, value: undefined };
+          },
+          releaseLock() {}
+        };
+      }
+    },
+    text() { throw new Error('stream path must not buffer the whole response'); }
+  };
+  const parsed = await weather.fetchJson('https://example.test/weather', () => Promise.resolve(response));
+  assert.deepEqual(parsed, expected);
+});
+
+test('streamed response is cancelled as soon as the byte limit is exceeded', async () => {
+  let index = 0;
+  let cancelled = false;
+  let textFallbackCalled = false;
+  const chunks = [new Uint8Array(weather.MAX_JSON_BYTES), new Uint8Array([0x7B])];
+  const response = {
+    ok: true,
+    status: 200,
+    body: {
+      getReader() {
+        return {
+          async read() {
+            if (index < chunks.length) return { done: false, value: chunks[index++] };
+            return { done: true, value: undefined };
+          },
+          cancel() { cancelled = true; return Promise.resolve(); },
+          releaseLock() {}
+        };
+      }
+    },
+    text() { textFallbackCalled = true; return Promise.resolve('{}'); }
+  };
+  await assert.rejects(
+    weather.fetchJson('https://example.test/weather', () => Promise.resolve(response)),
+    /too large/
+  );
+  assert.equal(cancelled, true, 'oversized stream should be cancelled');
+  assert.equal(textFallbackCalled, false, 'stream path must not fall back to unbounded text()');
+});
+
+test('oversized Content-Length is rejected before opening the response reader', async () => {
+  let readerOpened = false;
+  let textCalled = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get(name) { return name.toLowerCase() === 'content-length' ? String(weather.MAX_JSON_BYTES + 1) : null; } },
+    body: {
+      getReader() {
+        readerOpened = true;
+        return { async read() { return { done: true }; }, releaseLock() {} };
+      }
+    },
+    text() { textCalled = true; return Promise.resolve('{}'); }
+  };
+  await assert.rejects(
+    weather.fetchJson('https://example.test/weather', () => Promise.resolve(response)),
+    /too large/
+  );
+  assert.equal(readerOpened, false, 'declared oversized body must be rejected before reading');
+  assert.equal(textCalled, false);
+});
+
 test('a hanging request times out', async () => {
   const hanging = () => new Promise(() => {});
   await assert.rejects(
