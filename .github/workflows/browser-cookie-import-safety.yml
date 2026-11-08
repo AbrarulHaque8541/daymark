@@ -42,7 +42,7 @@ jobs:
       - name: Compile and lint both Android debug flavors
         working-directory: android-app
         run: >-
-          ./gradlew --no-daemon
+          bash tools/run-gradle-with-retry.sh --no-daemon
           assembleGithubSideloadDebug
           assemblePlayDebug
           lintGithubSideloadDebug
