@@ -69,7 +69,16 @@ final class ShareIntake {
     }
 
     private static String normalize(CharSequence value) {
-        return value == null ? "" : value.toString().trim();
+        if (value == null) return "";
+        // Android shares arrive from apps with different platform line-ending conventions.
+        // Canonicalize them before detecting the first line, otherwise a classic-Mac CR or
+        // Unicode paragraph separator can be mistaken for a one-line quick-add payload.
+        return value.toString()
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replace('\u2028', '\n')
+                .replace('\u2029', '\n')
+                .trim();
     }
 
     private static String oneLine(String value) {
