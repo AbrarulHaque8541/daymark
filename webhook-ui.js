@@ -272,6 +272,7 @@
               queueReadFailed = false;
               let latest = state.value.slice();
               let changed = false;
+              const recoveringQueueState = queueWriteFailed;
 
               if (memoryOnlyEvents.length) {
                 const seen = new Set(latest.map((event) => event.id));
@@ -307,7 +308,7 @@
               }
 
               queue = latest;
-              return { ok: true, queue: latest.slice() };
+              return { ok: true, queue: latest.slice(), recovered: recoveringQueueState || changed };
             });
 
             if (!snapshot.ok) {
@@ -317,6 +318,9 @@
             }
             if (!snapshot.value || !snapshot.value.ok) break;
             queue = snapshot.value.queue;
+            if (snapshot.value.recovered && !queue.length) {
+              status('Webhook queue state is now saved. No events remain queued.' + storageWarning());
+            }
 
             if (!queue.length) {
               if (queueWriteFailed) {
@@ -398,7 +402,7 @@
               return { ok: true };
             });
 
-            if (!updated.ok) {
+            if (!updated.ok || !updated.value || !updated.value.ok) {
               status('Webhook delivery is paused because its queue update could not be saved safely. '
                 + storageWarning());
               break;
