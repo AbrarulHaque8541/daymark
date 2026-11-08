@@ -463,7 +463,7 @@ test('index markup exposes task-completion webhook controls and session-only dis
     assert.ok(html.includes('id="'+id+'"'),id+' must be present for webhook-ui.js');
   }
   assert.match(html,/kept only in this tab/);
-  assert.match(html,/re-enter after reload/);
+  assert.match(html,/Re-enter the endpoint after reload/);
   assert.doesNotMatch(html,/Local webhook preview/);
 });
 
