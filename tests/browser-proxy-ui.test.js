@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const ui = require('../browser-proxy-ui.js');
 const engine = require('../browser-proxy-logic.js');
 
@@ -79,22 +81,32 @@ test('the card plans a typed address at boot and renders the honest lines', () =
   assert.equal(typeof handle.plan, 'function');
 });
 
-test('form submit re-plans without actually submitting, and notices show up', () => {
+test('form submit strips credentials from the input and remembered storage', () => {
   const doc = makeDoc(ALL_IDS);
   const form = doc.elements['browser-proxy-form'];
-  doc.elements['browser-proxy-address'].value = 'http://alice:secret@proxy.example.org:3128';
-  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine });
+  const input = doc.elements['browser-proxy-address'];
+  const store = {
+    data: {},
+    getItem(k) { return this.data[k] || null; },
+    setItem(k, v) { this.data[k] = String(v); },
+    removeItem(k) { delete this.data[k]; }
+  };
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
+  input.value = 'http://alice:secret@proxy.example.org:3128';
   const submit = form.listeners.submit;
   assert.ok(submit && submit.length === 1, 'a submit listener must be wired');
   const event = makeElement('event');
   submit[0](event);
   assert.equal(event.prevented, true, 'submit must not actually submit');
-  const status = doc.elements['browser-proxy-status'];
-  assert.match(status.textContent, /1 notice/);
-  assert.match(status.className, /has-notices/);
+  assert.match(doc.elements['browser-proxy-status'].textContent, /1 notice/);
+  assert.match(doc.elements['browser-proxy-status'].className, /has-notices/);
+  assert.equal(input.value, 'http://proxy.example.org:3128');
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], 'http://proxy.example.org:3128');
   const text = doc.elements['browser-proxy-result'].children.map((c) => c.textContent).join('\n');
   assert.ok(!text.includes('alice'));
   assert.ok(!text.includes('secret'));
+  assert.ok(!JSON.stringify(store.data).includes('alice'));
+  assert.ok(!JSON.stringify(store.data).includes('secret'));
 });
 
 test('a malformed address fails closed to not-checkable in the card', () => {
@@ -172,6 +184,54 @@ test('ignores an unknown stored address and never throws when storage is broken'
     ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
   });
   assert.equal(doc.elements['browser-proxy-address'].value, '');
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Enter a proxy address/);
+});
+
+test('legacy remembered credentials are sanitized before display and re-persisted', () => {
+  const doc = makeDoc(ALL_IDS);
+  const store = {
+    data: { 'daymark.browser-proxy.last-profile': 'http://alice:secret@proxy.example.org:3128' },
+    getItem(k) { return this.data[k] || null; },
+    setItem(k, v) { this.data[k] = String(v); },
+    removeItem(k) { delete this.data[k]; }
+  };
+  ui.attachBrowserProxyUi({ document: doc, proxyApi: engine, localStorage: store });
+  assert.equal(doc.elements['browser-proxy-address'].value, 'http://proxy.example.org:3128');
+  assert.equal(store.data['daymark.browser-proxy.last-profile'], 'http://proxy.example.org:3128');
+  assert.ok(!JSON.stringify(store.data).includes('alice'));
+  assert.ok(!JSON.stringify(store.data).includes('secret'));
+});
+
+test('a throwing localStorage getter does not prevent the proxy card from working', () => {
+  const doc = makeDoc(ALL_IDS);
+  const env = { document: doc, proxyApi: engine };
+  Object.defineProperty(env, 'localStorage', {
+    get() { throw new Error('SecurityError: storage is blocked'); }
+  });
+  const handle = ui.attachBrowserProxyUi(env);
+  doc.elements['browser-proxy-address'].value = 'proxy.example.org:8080';
+  assert.doesNotThrow(() => handle.plan());
+  assert.match(doc.elements['browser-proxy-status'].textContent, /Planned/);
+});
+
+test('automatic browser boot survives a throwing window.localStorage getter', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.readyState = 'complete';
+  const win = {};
+  Object.defineProperty(win, 'localStorage', {
+    get() { throw new Error('SecurityError: storage is blocked'); }
+  });
+  const context = vm.createContext({
+    window: win,
+    document: doc,
+    DaymarkBrowserProxy: engine,
+    URL,
+    Promise,
+    setTimeout,
+    clearTimeout
+  });
+  const source = fs.readFileSync(require.resolve('../browser-proxy-ui.js'), 'utf8');
+  assert.doesNotThrow(() => vm.runInContext(source, context));
   assert.match(doc.elements['browser-proxy-status'].textContent, /Enter a proxy address/);
 });
 

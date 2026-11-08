@@ -13,13 +13,26 @@
 
   const LAST_PROFILE_KEY = 'daymark.browser-proxy.last-profile';
 
+  function resolveStorage(env) {
+    try {
+      if (Object.prototype.hasOwnProperty.call(env, 'localStorage')) {
+        return env.localStorage || null;
+      }
+      const win = env.window || null;
+      return win ? (win.localStorage || null) : null;
+    } catch (e) {
+      // Storage can throw at property access time in restricted WebView modes.
+      return null;
+    }
+  }
+
   function attachBrowserProxyUi(env) {
     if (!env || !env.document) throw new Error('attachBrowserProxyUi requires a document.');
     const doc = env.document;
     const proxyApi = Object.prototype.hasOwnProperty.call(env, 'proxyApi')
       ? env.proxyApi
       : (root.DaymarkBrowserProxy || null);
-    const storage = env.localStorage || null;
+    const storage = resolveStorage(env);
     const nav = env.navigator || (typeof navigator !== 'undefined' ? navigator : null);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
@@ -50,10 +63,13 @@
     }
 
     function rememberProfile(text) {
-      if (!storage || typeof storage.setItem !== 'function') return;
+      if (!storage || typeof storage.setItem !== 'function' || !text) return false;
       try {
-        if (text) storage.setItem(LAST_PROFILE_KEY, text);
-      } catch (e) { /* fail closed */ }
+        storage.setItem(LAST_PROFILE_KEY, text);
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
 
     function forgetProfile() {
@@ -61,20 +77,32 @@
       try { storage.removeItem(LAST_PROFILE_KEY); } catch (e) { /* fail closed */ }
     }
 
+    function sanitizedAddress(parsed, original) {
+      const authority = parsed.host + (parsed.explicitPort ? ':' + parsed.port : '');
+      const hadScheme = original.trim().includes('://');
+      return hadScheme ? parsed.scheme + '://' + authority : authority;
+    }
+
     function restoreProfile() {
       if (!storage || typeof storage.getItem !== 'function' || !inputEl) return false;
       try {
         const remembered = storage.getItem(LAST_PROFILE_KEY);
         if (typeof remembered === 'string' && remembered
-          && proxyApi && typeof proxyApi.parseProxyAddress === 'function'
-          && proxyApi.parseProxyAddress(remembered)) {
-          inputEl.value = remembered;
-          return true;
+          && proxyApi && typeof proxyApi.parseProxyAddress === 'function') {
+          const parsed = proxyApi.parseProxyAddress(remembered);
+          if (parsed) {
+            const safeAddress = sanitizedAddress(parsed, remembered);
+            inputEl.value = safeAddress;
+            // Older builds may have persisted userinfo. Replace it with the
+            // credential-free authority; if that fails, try to remove the
+            // unsafe legacy value instead of keeping it by design.
+            if (safeAddress !== remembered && !rememberProfile(safeAddress)) forgetProfile();
+            return true;
+          }
         }
       } catch (e) { /* ignore */ }
       return false;
     }
-
     function makeItem(className, text) {
       const item = doc.createElement('div');
       item.className = className;
@@ -136,16 +164,25 @@
           return;
         }
         const text = inputEl && typeof inputEl.value === 'string' ? inputEl.value.trim() : '';
+        const parsed = typeof proxyApi.parseProxyAddress === 'function'
+          ? proxyApi.parseProxyAddress(text) : null;
         const result = proxyApi.planProfile(text);
         renderPlan(result);
         status(buildStatus(result, restored));
         setHasNotices(!!(result && result.notices && result.notices.length > 0));
-        if (result && result.ok) rememberProfile(text);
+        if (result && result.ok && parsed) {
+          const safeAddress = sanitizedAddress(parsed, text);
+          if (inputEl) inputEl.value = safeAddress;
+          if (!rememberProfile(safeAddress)) forgetProfile();
+        } else if (result && result.ok) {
+          // Never persist an address if it cannot be independently parsed
+          // into a credential-free representation.
+          forgetProfile();
+        }
       } finally {
         setAriaBusy(false);
       }
     }
-
     function onClear() {
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
@@ -218,7 +255,7 @@
   root.DaymarkBrowserProxyUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachBrowserProxyUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachBrowserProxyUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
