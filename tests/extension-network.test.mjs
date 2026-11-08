@@ -389,10 +389,10 @@ function makeExtensionFeatureEnvironment() {
 
 function loadExtensionFeature(file, environment) {
   const source = fs.readFileSync(path.join(root, file), "utf8")
-    .replace(/^export\\s+\\{[^}]+\\};\\s*$/m, "")
-    .replace(/^export default \\{[^\\n]*\\};\\s*$/m, "");
+    .replace(/^export\s+\{[^}]+\};\s*$/m, "")
+    .replace(/^export default \{[^\n]*\};\s*$/m, "");
   const factory = new Function("document", "window", "chrome", "alert",
-    source + "\\nreturn { onEnable, onDisable };");
+    source + "\nreturn { onEnable, onDisable }; ");
   return factory(environment.document, environment.window, environment.chrome, environment.alert);
 }
 
