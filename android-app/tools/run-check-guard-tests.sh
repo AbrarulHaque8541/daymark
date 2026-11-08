@@ -98,6 +98,9 @@ python3 "$ROOT/tools/check-browser-history.py" "$ROOT" >/dev/null
 echo "PASS meta: check-browser-history.py passes on current source"
 expect_fail_after_removal check-browser-history.py "BrowserHistory.filter(history, query)" "$ACTIVITY" "$ROOT"
 expect_fail_after_removal check-browser-history.py "BrowserHistory.remove(" "$ACTIVITY" "$ROOT"
+# The HTTP warning must be runtime-wired, not merely defined by a policy helper.
+expect_fail_after_removal check-browser-http-policy.py "BrowserHttpPolicy.isHttp(url)" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP page has no transport security." "$ACTIVITY" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"
