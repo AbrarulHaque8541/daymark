@@ -54,10 +54,10 @@ $("save").onclick = async () => {
     customFilters: $("custom-filters").value,
   };
   const response = await chrome.runtime.sendMessage({ type: "saveOptions", options });
-  if (response && response.error) {
-    $("status").textContent = response.error === "host-permission-required"
+  if (!response || response.error) {
+    $("status").textContent = response && response.error === "host-permission-required"
       ? "Grant the API host permission, then save again."
-      : (response.message || "Settings could not be saved.");
+      : (response && response.message || "Settings could not be saved.");
     return;
   }
   $("status").textContent = "Saved ✓";

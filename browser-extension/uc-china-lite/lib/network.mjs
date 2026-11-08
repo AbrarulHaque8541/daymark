@@ -201,6 +201,8 @@ export async function fetchBoundedJson(url, init = {}, options = {}) {
     });
     if (timedOut) throw networkError("timeout", "The network request timed out.");
     if (!response || !response.ok) {
+      abort(controller);
+      if (response && response.body) cancel(response.body);
       throw networkError("http-error", "The server did not return a successful response.");
     }
     const text = await readResponseText(

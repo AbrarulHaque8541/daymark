@@ -105,6 +105,26 @@ test("bounded JSON reader streams UTF-8 chunks and applies safe request defaults
   assert.equal(state.released, true);
 });
 
+test("HTTP error responses are aborted and their unread bodies are cancelled", async () => {
+  let signal;
+  let cancelled = false;
+  const response = {
+    ok: false,
+    status: 503,
+    headers: { get: () => null },
+    body: { cancel() { cancelled = true; return Promise.resolve(); } },
+  };
+  await assert.rejects(
+    fetchBoundedJson("https://api.example.com/result", {}, {
+      fetchImpl: async (_url, init) => { signal = init.signal; return response; },
+      timeoutMs: 1000,
+    }),
+    (error) => error.code === "http-error"
+  );
+  assert.equal(signal.aborted, true);
+  assert.equal(cancelled, true);
+});
+
 test("declared oversized bodies are rejected before opening the stream", async () => {
   const { response, state } = streamResponse([new Uint8Array(1)], { contentLength: 101 });
   let signal;

@@ -38,7 +38,8 @@ function onEnable() {
   btn.onclick = async () => {
     const text = selectedText();
     if (!text || text.length > 500) return;
-    const lang = await targetLanguage();
+    let lang = "hi";
+    try { lang = await targetLanguage(); } catch (error) { /* use the safe default */ }
     try {
       const response = await chrome.runtime.sendMessage({
         type: "translateRequest",
