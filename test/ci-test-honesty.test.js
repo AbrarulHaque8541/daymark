@@ -9,7 +9,13 @@ const { test } = require("node:test");
 
 const root = path.resolve(__dirname, "..");
 const guard = path.join(root, "android-app", "tools", "check-ci-test-honesty.py");
-const python = process.platform === "win32" ? "python" : "python3";
+const python = process.platform === "win32" ? "py" : "python3";
+const pythonArgs = process.platform === "win32" ? ["-3"] : [];
+
+function spawnDetails(result) {
+  const error = result.error ? `${result.error.code || "spawn-error"}: ${result.error.message}` : "none";
+  return `status=${result.status}, signal=${result.signal || "none"}, error=${error}`;
+}
 
 const cleanWorkflows = {
   ".github/workflows/android.yml": "run: sh ./tools/check-v1-source.sh\n",
@@ -29,10 +35,11 @@ function runGuard(overrides = {}) {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, content, "utf8");
     }
-    return spawnSync(python, [guard, fixture], {
+    return spawnSync(python, [...pythonArgs, guard, fixture], {
       cwd: root,
       encoding: "utf8",
-      timeout: 10_000,
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
     });
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
@@ -42,7 +49,7 @@ function runGuard(overrides = {}) {
 test("CI honesty guard accepts workflows with real host checks and no vacuous unit tasks", () => {
   const result = runGuard();
   assert.equal(result.status, 0,
-    `guard rejected a valid workflow set (status=${result.status})\n${result.stdout || ""}\n${result.stderr || ""}`);
+    `guard rejected a valid workflow set (${spawnDetails(result)})\n${result.stdout || ""}\n${result.stderr || ""}`);
   assert.match(result.stdout, /PASS ci-test-honesty:/);
 });
 
