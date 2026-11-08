@@ -87,34 +87,20 @@
     return offsetFormatters.get(zoneId);
   }
 
-  // The classic wall-clock technique: format the instant in the zone, read the
-  // zone's local calendar fields back as if they were UTC, and compare.
   function zoneOffsetMinutes(zoneId, date) {
     const id = requireZone(zoneId);
-    requireDate(date);
-    let parts;
-    try {
-      parts = offsetFormatter(id).formatToParts(date);
-    } catch (error) {
-      throw new Error('This browser cannot read that time zone.');
-    }
-    const map = {};
-    for (const part of parts) map[part.type] = part.value;
-    const asUtc = Date.UTC(
-      Number(map.year),
-      Number(map.month) - 1,
-      Number(map.day),
-      Number(map.hour) % 24,
-      Number(map.minute),
-      Number(map.second)
-    );
-    return Math.round((asUtc - date.getTime()) / 60000);
+    const when = requireDate(date);
+    const formatter = offsetFormatter(id);
+    const parts = formatter.formatToParts(when);
+    const get = (type) => Number(parts.find((part) => part.type === type).value);
+    const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+    return Math.round((asUtc - when.getTime()) / 60000);
   }
 
   function localMinuteOfDay(zoneOffsetMin, date) {
-    requireDate(date);
-    const utcMinute = Math.floor(date.getTime() / 60000) % 1440;
-    return ((((utcMinute + zoneOffsetMin) % 1440) + 1440) % 1440);
+    const when = requireDate(date);
+    const local = new Date(when.getTime() + zoneOffsetMin * 60000);
+    return local.getUTCHours() * 60 + local.getUTCMinutes();
   }
 
   function isAwake(zoneOffsetMin, date) {
@@ -123,68 +109,61 @@
   }
 
   function formatOffset(offsetMin) {
-    const sign = offsetMin < 0 ? '-' : '+';
-    const absolute = Math.abs(Math.round(offsetMin));
-    const hours = String(Math.floor(absolute / 60)).padStart(2, '0');
-    const minutes = String(absolute % 60).padStart(2, '0');
-    return 'UTC' + sign + hours + ':' + minutes;
+    const sign = offsetMin >= 0 ? '+' : '-';
+    const abs = Math.abs(offsetMin);
+    const hours = Math.floor(abs / 60);
+    const minutes = abs % 60;
+    return 'UTC' + sign + String(hours).padStart(2, '0') + (minutes ? ':' + String(minutes).padStart(2, '0') : '');
   }
 
   function formatZoneTime(zoneId, date) {
     const id = requireZone(zoneId);
-    requireDate(date);
-    let time = '';
-    let dayLabel = '';
-    try {
-      if (!timeFormatters.has(id)) {
-        timeFormatters.set(id, new root.Intl.DateTimeFormat('en-GB', {
-          timeZone: id, hour: '2-digit', minute: '2-digit', hour12: false
-        }));
-      }
-      if (!dayFormatters.has(id)) {
-        dayFormatters.set(id, new root.Intl.DateTimeFormat('en-GB', {
-          timeZone: id, weekday: 'short', day: '2-digit', month: 'short'
-        }));
-      }
-      time = timeFormatters.get(id).format(date);
-      dayLabel = dayFormatters.get(id).format(date);
-    } catch (error) {
-      throw new Error('This browser cannot read that time zone.');
+    const when = requireDate(date);
+    const offsetMin = zoneOffsetMinutes(id, when);
+    if (!timeFormatters.has(id)) {
+      timeFormatters.set(id, new root.Intl.DateTimeFormat('en-GB', {
+        timeZone: id,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }));
     }
-    const offsetMinutes = zoneOffsetMinutes(id, date);
+    if (!dayFormatters.has(id)) {
+      dayFormatters.set(id, new root.Intl.DateTimeFormat('en-GB', {
+        timeZone: id,
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short'
+      }));
+    }
     return {
       zoneId: id,
-      time: time === '24:00' ? '00:00' : time,
-      dayLabel,
-      offsetMinutes,
-      offsetLabel: formatOffset(offsetMinutes)
+      time: timeFormatters.get(id).format(when),
+      dayLabel: dayFormatters.get(id).format(when),
+      offsetMinutes: offsetMin,
+      offsetLabel: formatOffset(offsetMin)
     };
   }
 
   function normalizeZoneList(values) {
-    const zones = [];
     const seen = new Set();
+    const zones = [];
     let dropped = 0;
-    if (Array.isArray(values)) {
-      for (const value of values) {
-        const id = normalizeZoneId(value);
-        if (!id || seen.has(id) || zones.length >= MAX_ZONES) {
-          dropped += 1;
-          continue;
-        }
-        seen.add(id);
-        zones.push(id);
-      }
+    const list = Array.isArray(values) ? values : [];
+    for (const value of list) {
+      const id = normalizeZoneId(value);
+      if (!id) { dropped += 1; continue; }
+      if (seen.has(id)) { dropped += 1; continue; }
+      if (zones.length >= MAX_ZONES) { dropped += 1; continue; }
+      seen.add(id);
+      zones.push(id);
     }
     return { zones, dropped };
   }
 
   function isValidZoneList(zones) {
-    return Boolean(Array.isArray(zones)
-      && zones.length >= MIN_ZONES
-      && zones.length <= MAX_ZONES
-      && zones.every((zone) => typeof zone === 'string' && normalizeZoneId(zone) === zone)
-      && new Set(zones).size === zones.length);
+    return Array.isArray(zones) && zones.length >= MIN_ZONES && zones.length <= MAX_ZONES
+      && zones.every((zoneId, index) => normalizeZoneId(zoneId) === zoneId && zones.indexOf(zoneId) === index);
   }
 
   function validateZonesCache(value) {
@@ -199,6 +178,19 @@
   // many saved zones as possible are inside their local waking hours. Ties
   // prefer the longer window, then the earlier start. Offsets are recomputed
   // per step so daylight-saving shifts are handled exactly.
+  function relativeUntilLabel(startMs, fromDate) {
+    if (startMs == null || !fromDate || typeof fromDate.getTime !== "function") return "";
+    const deltaMs = Number(startMs) - fromDate.getTime();
+    if (Number.isNaN(deltaMs)) return "";
+    if (deltaMs <= 0) return "now";
+    const minutes = Math.round(deltaMs / 60000);
+    if (minutes < 60) return "in " + minutes + " min";
+    const hours = Math.floor(minutes / 60);
+    const rem = minutes % 60;
+    if (rem === 0) return "in " + hours + " h";
+    return "in " + hours + " h " + rem + " min";
+  }
+
   function bestOverlap(zoneIds, from) {
     const ids = (Array.isArray(zoneIds) ? zoneIds : [])
       .map((zoneId) => normalizeZoneId(zoneId))
@@ -255,6 +247,7 @@
     isValidZoneList,
     validateZonesCache,
     bestOverlap,
+    relativeUntilLabel,
     ZONE_CATALOG,
     DEFAULT_ZONE,
     MAX_ZONES,
