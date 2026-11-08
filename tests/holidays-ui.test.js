@@ -92,6 +92,28 @@ function fakeEnv(options) {
   return { env, elements, storageData, storage };
 }
 
+function streamResponse(body) {
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; } },
+    text() { return Promise.resolve(body); }
+  };
+}
+
 function okFetch(routes) {
   const seen = [];
   const impl = (url) => {
@@ -99,9 +121,7 @@ function okFetch(routes) {
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
-    if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
-    }
+    if (typeof body === 'string') return Promise.resolve(streamResponse(body));
     return Promise.resolve(body);
   };
   impl.seen = seen;
@@ -441,4 +461,22 @@ test('auto-boot lets attachHolidaysUi guard the storage getter instead of readin
   const source = fs.readFileSync(path.join(__dirname, '..', 'holidays-ui.js'), 'utf8');
   assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
     'the DOMContentLoaded callback must not evaluate window.localStorage before guarded attachment');
+});
+
+
+test('country preference write failure is reported without throwing from the change handler', () => {
+  const storage = {
+    getItem() { return null; },
+    setItem() { throw new Error('quota exceeded'); },
+    removeItem() {}
+  };
+  const { env, elements } = fakeEnv({ storage });
+  ui.attachHolidaysUi(env);
+  const country = elements['holiday-country'];
+  country.value = 'GB';
+  const change = country.listeners.find((listener) => listener.type === 'change');
+  assert.ok(change, 'country preference listener is registered');
+  assert.doesNotThrow(() => change.handler());
+  assert.match(elements['holiday-status'].textContent, /Country preference was not saved/);
+  assert.match(elements['holiday-status'].textContent, /changes could not be saved/);
 });
