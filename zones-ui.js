@@ -14,6 +14,7 @@
   'use strict';
 
   const STORAGE_KEY = 'daymark.zones.v1';
+  const SAVE_FILENAME = 'daymark-world-clock.txt';
   const DEFAULT_ZONE = 'Asia/Kolkata';
 
   function attachZonesUi(env) {
@@ -31,6 +32,7 @@
     const clearEl = element('zones-clear');
     const copyEl = element('zones-copy');
     const shareEl = element('zones-share');
+    const saveEl = element('zones-save');
     const formEl = element('zones-form');
     const statusEl = element('zones-status');
     const listEl = element('zones-list');
@@ -293,6 +295,40 @@
       setAriaBusy(shareEl, false);
     }
 
+
+    function onSave() {
+      const text = buildCopyText();
+      if (!text) {
+        status('Nothing to save yet.');
+        return;
+      }
+      setAriaBusy(saveEl, true);
+      try {
+        const blob = new Blob([text], { type: 'text/plain' });
+        const urlApi = (typeof URL !== 'undefined' ? URL : null);
+        if (!urlApi || typeof urlApi.createObjectURL !== 'function') {
+          status('Saving is not available in this environment.');
+          setAriaBusy(saveEl, false);
+          return;
+        }
+        const url = urlApi.createObjectURL(blob);
+        const a = doc.createElement('a');
+        a.href = url;
+        a.download = SAVE_FILENAME;
+        if (doc.body && typeof doc.body.appendChild === 'function') {
+          doc.body.appendChild(a);
+          if (typeof a.click === 'function') a.click();
+          doc.body.removeChild(a);
+        }
+        if (typeof urlApi.revokeObjectURL === 'function') urlApi.revokeObjectURL(url);
+        status('Saved world clock plan as ' + SAVE_FILENAME + '.');
+      } catch (e) {
+        status('Could not save the plan.');
+      } finally {
+        setAriaBusy(saveEl, false);
+      }
+    }
+
     function onRefresh() {
       if (!zonesApi) {
         status('World clock is unavailable.');
@@ -351,6 +387,9 @@
     if (shareEl && typeof shareEl.addEventListener === 'function') {
       shareEl.addEventListener('click', () => { onShare(); });
     }
+    if (saveEl && typeof saveEl.addEventListener === 'function') {
+      saveEl.addEventListener('click', () => { onSave(); });
+    }
 
     return {
       onAdd,
@@ -359,6 +398,7 @@
       onClear,
       onCopy,
       onShare,
+      onSave,
       readCache,
       detach() {
         // No document-level listener is registered; the button references are

@@ -58,6 +58,7 @@ function fakeEnv(options) {
     'zones-clear': Object.assign(fakeElement('button'), { id: 'zones-clear', type: 'button' }),
     'zones-copy': Object.assign(fakeElement('button'), { id: 'zones-copy', type: 'button' }),
     'zones-share': Object.assign(fakeElement('button'), { id: 'zones-share', type: 'button' }),
+    'zones-save': Object.assign(fakeElement('button'), { id: 'zones-save', type: 'button' }),
     'zones-form': Object.assign(fakeElement('form'), { id: 'zones-form' }),
     'zones-status': Object.assign(fakeElement('p'), { id: 'zones-status' }),
     'zones-list': Object.assign(fakeElement('div'), { id: 'zones-list' })
@@ -316,3 +317,39 @@ test('share reports nothing when the zones module is missing', async () => {
   handle.onShare();
   assert.equal(elements['zones-status'].textContent, 'Nothing to share yet.');
 });
+
+test('save overlap creates a downloadable text file and reports status', async () => {
+  const { env, elements } = fakeEnv({});
+  let createdUrl = null;
+  let clicked = false;
+  const body = fakeElement('body');
+  env.document.body = body;
+  env.document.createElement = (tag) => {
+    const el = fakeElement(tag);
+    if (tag === 'a') {
+      el.click = () => { clicked = true; };
+    }
+    return el;
+  };
+  global.URL = {
+    createObjectURL(blob) { createdUrl = 'blob:fake'; return createdUrl; },
+    revokeObjectURL() {}
+  };
+  global.Blob = class { constructor(parts, opts) { this.parts = parts; this.type = opts.type; } };
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-save'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the save button has a click listener');
+  await click.handler();
+  assert.ok(createdUrl, 'object URL was created');
+  assert.equal(clicked, true, 'download link was clicked');
+  assert.equal(elements['zones-status'].textContent, 'Saved world clock plan as daymark-world-clock.txt.');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
+});
+
+test('save reports nothing when the zones module is missing', async () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  handle.onSave();
+  assert.equal(elements['zones-status'].textContent, 'Nothing to save yet.');
+});
+
