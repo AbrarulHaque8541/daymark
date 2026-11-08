@@ -83,8 +83,8 @@ for line in wrapper_text.splitlines():
     key, separator, value = line.partition("=")
     if separator:
         wrapper[key.strip()] = value.strip()
-assert wrapper.get("distributionUrl") == r"https\://services.gradle.org/distributions/gradle-8.13-bin.zip", \
-    "Gradle 8.13 must use the canonical services.gradle.org distribution endpoint"
+assert wrapper.get("distributionUrl") == r"https\://mirrors.huaweicloud.com/gradle/gradle-8.13-bin.zip", \
+    "Gradle 8.13 must use the pinned Huawei Cloud transport mirror"
 assert wrapper.get("distributionSha256Sum") == "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78", \
     "Gradle 8.13 distribution must remain pinned to the official SHA-256"
 assert wrapper.get("networkTimeout") == "120000" and wrapper.get("validateDistributionUrl") == "true", \
