@@ -62,7 +62,7 @@
       [saveEl, testEl, flushEl].forEach((button) => {
         if (!button) return;
         button.disabled = isBusy || (button === flushEl
-          && (queue.length === 0 || storageAccessFailed || queueReadFailed));
+          && ((queue.length === 0 && !queueWriteFailed) || storageAccessFailed || queueReadFailed));
         if (button.classList && typeof button.classList.toggle === 'function') {
           button.classList.toggle('is-busy', isBusy);
         }
@@ -80,6 +80,7 @@
         const raw = storage.getItem(webhookApi.CONFIG_KEY);
         if (!raw) return { ok: true, value: null };
         const parsed = JSON.parse(raw);
+        if (parsed === null) return { ok: true, value: null };
         return webhookApi.validateWebhookConfig(parsed)
           ? { ok: true, value: parsed }
           : { ok: false, value: null };
@@ -160,7 +161,8 @@
     }
 
     function renderQueue() {
-      if (flushEl) flushEl.disabled = busy || queue.length === 0 || storageAccessFailed || queueReadFailed;
+      if (flushEl) flushEl.disabled = busy || (queue.length === 0 && !queueWriteFailed)
+        || storageAccessFailed || queueReadFailed;
     }
 
     async function attemptFlush() {
@@ -170,8 +172,20 @@
         renderQueue();
         return;
       }
-      if (!config || !webhookApi || !queue.length) return;
-      if (!persistQueue(queue)) {
+      let queuePersisted = false;
+      if (queueWriteFailed) {
+        queuePersisted = persistQueue(queue);
+        if (!queuePersisted) {
+          status('Webhook delivery is paused because the queued events could not be saved. ' + queueNote() + storageWarning());
+          renderQueue();
+          return;
+        }
+      }
+      if (!config || !webhookApi || !queue.length) {
+        renderQueue();
+        return;
+      }
+      if (!queuePersisted && !persistQueue(queue)) {
         status('Webhook delivery is paused because the queued events could not be saved. ' + queueNote() + storageWarning());
         renderQueue();
         return;
