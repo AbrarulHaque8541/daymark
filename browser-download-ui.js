@@ -33,6 +33,7 @@
     const formEl = element('browser-download-form');
     const clearEl = element('browser-download-clear');
     const copyEl = element('browser-download-copy');
+    const saveEl = element('browser-download-save');
     const planBtn = element('browser-download-check');
 
     function status(message) {
@@ -155,6 +156,29 @@
       return lines.join('\n');
     }
 
+    function onSave() {
+      const text = collectPlanText();
+      if (!text) {
+        status('Nothing to save yet. Plan a journey first.');
+        return;
+      }
+      try {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = doc.createElement('a');
+        a.href = url;
+        a.download = 'daymark-download-plan.txt';
+        a.style.display = 'none';
+        if (doc.body) doc.body.appendChild(a);
+        a.click();
+        if (doc.body) doc.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        status('Saved plan as daymark-download-plan.txt.');
+      } catch (_) {
+        status('Could not save plan.');
+      }
+    }
+
     function onCopy() {
       const text = collectPlanText();
       if (!text) {
@@ -187,6 +211,9 @@
     if (copyEl && typeof copyEl.addEventListener === 'function') {
       copyEl.addEventListener('click', () => { onCopy(); });
     }
+    if (saveEl && typeof saveEl.addEventListener === 'function') {
+      saveEl.addEventListener('click', () => { onSave(); });
+    }
 
     // Restore the last valid journey the user planned, so the card remembers across reloads.
     const remembered = loadLastScenario();
@@ -207,6 +234,7 @@
       plan,
       onClear,
       onCopy,
+      onSave,
       detach() {
         // No document-level listener is registered; the returned handle
         // simply stops being used once it goes out of scope.
