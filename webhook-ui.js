@@ -119,7 +119,7 @@
       try {
         if (typeof storage.getItem !== 'function') return { ok: false, value: [] };
         const raw = storage.getItem(webhookApi.QUEUE_KEY);
-        if (raw === null) return { ok: true, value: []; };
+        if (raw === null) return { ok: true, value: [] };
         const parsed = JSON.parse(raw);
         return webhookApi.validateQueue(parsed)
           ? { ok: true, value: parsed }
