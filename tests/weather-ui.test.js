@@ -68,6 +68,28 @@ function fakeEnv(options) {
   return { env, elements, storageData };
 }
 
+function streamResponse(body) {
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; }, cancel() { return reader.cancel(); } },
+    text() { throw new Error('bounded response reader must not call response.text()'); }
+  };
+}
+
 function okFetch(routes) {
   const seen = [];
   const impl = (url) => {
@@ -75,9 +97,7 @@ function okFetch(routes) {
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
-    if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
-    }
+    if (typeof body === 'string') return Promise.resolve(streamResponse(body));
     return Promise.resolve(body);
   };
   impl.seen = seen;
