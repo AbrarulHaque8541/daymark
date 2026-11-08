@@ -3,23 +3,25 @@
 - Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 - Use the CURRENT snapshot above for live branch/CI/backlog state; older entries below are historical.
 
+# Agent status index
 
-- [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
+**Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
-- [Daymark engineering status — 2026-11-08T04:19:09Z (offline world clock & meeting-overlap card)](./CURRENT_STATUS_20261108T041909Z.md)
+## Latest reviewed snapshot
+- [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 
-- [Timestamp requires correction — 2026-11-08T09:30:00Z is later than the 08:46Z verification; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T093000Z.md)
+- [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
 
-- [Daymark engineering status — 2026-11-08T02:40:00Z (Cycle A: restore complete download UI + task editor)](./CURRENT_STATUS_20261108T024000Z.md)
+## Before acting
 
-- [Daymark engineering status — 2026-11-08T06:35:00Z (Cycle A: download status aria-atomic)](./CURRENT_STATUS_20261108T063500Z.md)
+1. Open the latest snapshot for context.
+2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
+3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they were current.
 
-- [Daymark engineering status — 2026-11-08T05:08:00Z (Cycle B: restore announcement + aria-busy)](./CURRENT_STATUS_20261108T050800Z.md)
+## Snapshot maintenance
 
-- [Daymark engineering status — 2026-11-08T03:15:00Z (Cycle B: clear also forgets download journey)](./CURRENT_STATUS_20261108T031500Z.md)
-
-- [Daymark engineering status — 2026-11-08T03:05:00Z (Cycle A: persist last download journey)](./CURRENT_STATUS_20261108T030500Z.md)
-
-- [Daymark engineering status — 2026-11-08T02:05:00Z (Cycle A: copy-plan for download safety card)](./CURRENT_STATUS_20261108T020500Z.md)
-
-- [Daymark engineering status — 2026-11-08T02:05:00Z (Cycle A: copy-plan for download safety card)](./CURRENT_STATUS_20261108T020500Z.md)
+- Keep durable policy in root `AGENTS.md`; do not repeat it in every snapshot.
+- Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
+- Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
+- Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
+- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
