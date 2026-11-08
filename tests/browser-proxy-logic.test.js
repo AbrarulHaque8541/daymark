@@ -101,6 +101,53 @@ test('IPv4 literals are range-checked', () => {
   assert.equal(engine.parseProxyAddress('999.0.0.1:8080'), null);
 });
 
+test('host validation rejects legacy IPv4 aliases and malformed DNS authorities', () => {
+  const invalid = [
+    '010.0.0.1:8080',
+    '001.002.003.004:8080',
+    '0.00.0.0:8080',
+    '127.1:8080',
+    '0x7f000001:8080',
+    '2130706433:8080',
+    'foo..bar:8080',
+    '-foo.example:8080',
+    'foo-.example:8080',
+    'foo_bar.example:8080',
+    'proxy.example.org?x:8080',
+    'proxy.example.org#x:8080',
+    'proxy.example.org\\evil:8080',
+    'proxy.example.org:'
+  ];
+  for (const input of invalid) {
+    assert.equal(engine.parseProxyAddress(input), null, 'non-canonical host must fail closed: ' + input);
+  }
+  assert.equal(engine.parseProxyAddress('10.0.0.1:8080').host, '10.0.0.1');
+  assert.equal(engine.parseProxyAddress('münich.example:8080').host, 'xn--mnich-kva.example');
+  assert.equal(engine.parseProxyAddress('proxy.example.org.:8080').host, 'proxy.example.org.');
+});
+
+test('IPv6 is parsed as an address and normalized before it is planned', () => {
+  assert.equal(engine.parseProxyAddress('[0:0:0:0:0:0:0:1]:8080').host, '[::1]');
+  for (const input of ['[:::]:8080', '[1:2:3]:8080', '[2001:db8::1]tail:8080']) {
+    assert.equal(engine.parseProxyAddress(input), null, 'invalid IPv6 authority must fail closed: ' + input);
+  }
+});
+
+test('userinfo requires a scheme and is never accepted as a bare authority', () => {
+  assert.equal(engine.parseProxyAddress('alice@proxy.example.org:8080'), null);
+  assert.equal(engine.parseProxyAddress('http://@proxy.example.org:8080'), null);
+  assert.equal(engine.parseProxyAddress('http://alice@bob@proxy.example.org:8080'), null);
+});
+
+test('all IPv4 loopback addresses and localhost subdomains produce a caution', () => {
+  for (const input of ['127.0.0.1:8080', '127.42.1.2:8080', '[0:0:0:0:0:0:0:1]:8080',
+    'api.localhost:8080', 'localhost.:8080']) {
+    const plan = engine.planProfile(input);
+    assert.equal(plan.ok, true, input);
+    assert.ok(plan.notices.some((notice) => /loopback/.test(notice)), input);
+  }
+});
+
 test('socks5 plans disclose local DNS and the socks5h alternative', () => {
   const plan = engine.planProfile('socks5://proxy.example.org:1080');
   assert.match(plan.lines.join('\n'), /resolved on this device first/);

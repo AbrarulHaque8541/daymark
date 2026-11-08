@@ -52,23 +52,60 @@
   function parseHost(text) {
     if (typeof text !== 'string' || !text) return null;
     const host = text.toLowerCase();
+
+    // Let the platform URL parser validate IPv6 syntax and normalize equivalent
+    // spellings (for example, the expanded loopback form to [::1]).
     if (host.startsWith('[')) {
-      const close = host.indexOf(']');
-      if (close === -1) return null;
-      const inner = host.slice(1, close);
-      if (!/^[0-9a-f:.]+$/.test(inner)) return null;
-      return host.slice(0, close + 1);
-    }
-    if (!/^[0-9a-z._-]+$/.test(host)) return null;
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-      const parts = host.split('.');
-      for (let i = 0; i < parts.length; i += 1) {
-        const value = Number(parts[i]);
-        if (parts[i].length > 3 || value > 255) return null;
+      if (!host.endsWith(']') || host.indexOf(']') !== host.length - 1) return null;
+      try {
+        const normalized = new URL('http://' + host + '/').hostname.toLowerCase();
+        return normalized.startsWith('[') && normalized.endsWith(']') ? normalized : null;
+      } catch (e) {
+        return null;
       }
-      return host;
     }
-    return host;
+
+    // A proxy host is an authority, not a URL. Reject delimiters that URL()
+    // would otherwise interpret as path/query/fragment syntax.
+    if (/[\s/?#@%]/.test(host) || host.includes('\\')
+      || host.includes('[') || host.includes(']') || host.includes(':')) return null;
+
+    let normalized;
+    try {
+      normalized = new URL('http://' + host + '/').hostname.toLowerCase();
+    } catch (e) {
+      return null;
+    }
+    if (!normalized) return null;
+
+    // WHATWG URL parsing accepts legacy IPv4 forms (octal, hex, shortened,
+    // or a single integer) and silently rewrites them. Only accept the
+    // canonical dotted-decimal spelling so the planned destination is
+    // exactly what the user entered.
+    const ipv4Parts = normalized.split('.');
+    const isIpv4 = ipv4Parts.length === 4
+      && ipv4Parts.every((part) => /^(0|[1-9]\d{0,2})$/.test(part));
+    if (isIpv4) {
+      if (ipv4Parts.some((part) => Number(part) > 255) || host !== normalized) return null;
+      return normalized;
+    }
+
+    // Validate DNS labels after URL() has converted internationalized names
+    // to ASCII IDNA form. Empty labels, underscores and edge hyphens are not
+    // valid host labels; one final dot is allowed for an absolute DNS name.
+    const dnsName = normalized.endsWith('.') ? normalized.slice(0, -1) : normalized;
+    if (!dnsName || dnsName.length > 253) return null;
+    const labels = dnsName.split('.');
+    if (labels.some((label) => label.length > 63
+      || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))) return null;
+    return normalized;
+  }
+
+  function isLoopbackHost(host) {
+    if (host === '[::1]' || host === 'localhost' || host === 'localhost.'
+      || host.endsWith('.localhost') || host.endsWith('.localhost.')) return true;
+    const parts = host.split('.');
+    return parts.length === 4 && Number(parts[0]) === 127;
   }
 
   // Parses a user-entered proxy address into a structured profile.
@@ -84,6 +121,7 @@
 
     let scheme = 'http';
     const schemeMatch = /^([a-zA-Z0-9+.-]+):\/\//.exec(text);
+    const hasExplicitScheme = !!schemeMatch;
     let credentialsStripped = false;
     if (schemeMatch) {
       scheme = schemeMatch[1].toLowerCase();
@@ -96,7 +134,11 @@
     // plan never echoes credentials back.
     const at = text.lastIndexOf('@');
     if (at !== -1) {
+      const userInfo = text.slice(0, at);
+      if (!hasExplicitScheme || !userInfo || userInfo.includes('@')
+        || /[\s/?#\\]/.test(userInfo)) return null;
       text = text.slice(at + 1);
+      if (!text) return null;
       credentialsStripped = true;
     }
 
@@ -122,7 +164,7 @@
     if (!host) return null;
 
     let port = null;
-    if (portText !== null && portText !== '') {
+    if (portText !== null) {
       if (!/^\d{1,5}$/.test(portText)) return null;
       const value = Number(portText);
       if (value < 1 || value > 65535) return null;
@@ -156,7 +198,7 @@
     if (profile.port !== null && profile.port < 1024) {
       notices.push('Ports below 1024 are usually reserved on the proxy machine; double-check the port number with your provider.');
     }
-    if (profile.host === '127.0.0.1' || profile.host === '[::1]' || profile.host === 'localhost') {
+    if (isLoopbackHost(profile.host)) {
       notices.push('This is a loopback address: the proxy would run on this same device, so traffic leaves only after the proxy app sends it.');
     }
     if (profile.scheme === 'socks5') {
