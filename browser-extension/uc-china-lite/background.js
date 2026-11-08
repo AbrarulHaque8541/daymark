@@ -1,11 +1,16 @@
 // UC China Lite — background service worker (module).
 // Responsibilities: toggle the static DNR ruleset, rebuild dynamic rules
-// from the user's custom filter list, and proxy AI requests so the content
-// script never needs broad host permissions of its own.
+// from the user's custom filter list, and proxy bounded HTTPS API requests.
 
 import { REGISTRY } from "./features/registry.js";
+import {
+  requestAiCompletion,
+  requestTranslation,
+  validateAiEndpointConfig,
+} from "./lib/network.mjs";
 
 const SETTINGS_KEY = "settings";
+const MYMEMORY_ORIGIN = "https://api.mymemory.translated.net";
 
 /** Read settings, applying each feature's defaultEnabled when unset. */
 async function getSettings() {
@@ -29,10 +34,10 @@ async function setAdblockEnabled(enabled) {
 }
 
 /** Convert one custom filter line into a DNR rule.
- *  Supported forms (EasyList-like subset):
+ *  Supported forms:
  *    ||domain.com^   -> block any request whose host ends with domain.com
  *    /path/segment/  -> block URLs containing the path segment
- *    anything else   -> treated as a plain substring of the URL
+ *    anything else  -> treated as a plain substring of the URL
  */
 function ruleFromLine(line, index) {
   const raw = line.trim();
@@ -93,6 +98,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       case "setFeature": {
         const { id, enabled } = message;
+        if (!Object.prototype.hasOwnProperty.call(REGISTRY, id) || typeof enabled !== "boolean") {
+          sendResponse({ error: "invalid-feature" });
+          break;
+        }
         settings.features[id] = enabled;
         await chrome.storage.sync.set({ [SETTINGS_KEY]: settings });
         if (id === "adblock") await setAdblockEnabled(enabled);
@@ -101,55 +110,91 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case "saveOptions": {
-        Object.assign(settings, message.options);
-        await chrome.storage.sync.set({ [SETTINGS_KEY]: settings });
-        await rebuildCustomRules(settings.customFilters || "");
-        if (message.options.apiOrigin) {
-          // Requested here so the user only grants access to their chosen API host.
-          try {
-            await chrome.permissions.request({ origins: [message.options.apiOrigin + "/*"] });
-          } catch (e) {
-            // Without a user gesture this may fail; AI calls then fall back to a search tab.
+        const options = message.options && typeof message.options === "object" && !Array.isArray(message.options)
+          ? message.options : {};
+        const nextSettings = { ...settings, ...options };
+        const endpoint = validateAiEndpointConfig(
+          nextSettings.apiUrl,
+          nextSettings.apiOrigin,
+          nextSettings.apiKey
+        );
+        if (!endpoint.ok) {
+          sendResponse({ error: "invalid-api-endpoint", message: endpoint.error });
+          break;
+        }
+        if (endpoint.origin) {
+          const permission = await chrome.permissions.contains({
+            origins: [endpoint.origin + "/*"],
+          });
+          if (!permission) {
+            sendResponse({ error: "host-permission-required" });
+            break;
           }
         }
+        nextSettings.apiUrl = endpoint.endpoint;
+        nextSettings.apiOrigin = endpoint.origin;
+        await chrome.storage.sync.set({ [SETTINGS_KEY]: nextSettings });
+        await rebuildCustomRules(nextSettings.customFilters || "");
         sendResponse({ ok: true });
         break;
       }
       case "aiRequest": {
-        const { prompt } = message;
-        const { apiKey, apiUrl, model } = settings;
-        if (!apiKey || !apiUrl) {
+        if (!settings.apiKey) {
           sendResponse({ error: "no-api-key" });
           break;
         }
+        const endpoint = validateAiEndpointConfig(
+          settings.apiUrl,
+          settings.apiOrigin,
+          settings.apiKey
+        );
+        if (!endpoint.ok || !endpoint.origin) {
+          sendResponse({ error: "invalid-api-endpoint" });
+          break;
+        }
+        const permission = await chrome.permissions.contains({
+          origins: [endpoint.origin + "/*"],
+        });
+        if (!permission) {
+          sendResponse({ error: "host-permission-required" });
+          break;
+        }
         try {
-          const response = await fetch(apiUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + apiKey,
-            },
-            body: JSON.stringify({
-              model: model || "gpt-4o-mini",
-              messages: [{ role: "user", content: prompt }],
-            }),
+          const text = await requestAiCompletion(settings, message && message.prompt);
+          sendResponse({ text });
+        } catch (error) {
+          const known = new Set([
+            "prompt-too-large", "response-too-large", "invalid-api-endpoint",
+            "no-api-key", "bad-response", "timeout",
+          ]);
+          sendResponse({ error: known.has(error && error.code) ? error.code : "request-failed" });
+        }
+        break;
+      }
+      case "translateRequest": {
+        const permission = await chrome.permissions.contains({
+          origins: [MYMEMORY_ORIGIN + "/*"],
+        });
+        if (!permission) {
+          sendResponse({ error: "host-permission-required" });
+          break;
+        }
+        try {
+          const text = await requestTranslation(message && message.text, message && message.language);
+          sendResponse({ text });
+        } catch (error) {
+          sendResponse({
+            error: error && error.code === "text-too-large" ? "text-too-large" : "translation-failed",
           });
-          const data = await response.json();
-          const text =
-            data &&
-            data.choices &&
-            data.choices[0] &&
-            data.choices[0].message &&
-            data.choices[0].message.content;
-          sendResponse(text ? { text: String(text) } : { error: "bad-response" });
-        } catch (e) {
-          sendResponse({ error: String(e) });
         }
         break;
       }
       default:
         sendResponse({ error: "unknown-message" });
     }
-  })();
+  })().catch(() => {
+    // Never echo provider URLs, response bodies, or credentials into extension UI.
+    sendResponse({ error: "request-failed" });
+  });
   return true; // keep the message channel open for the async sendResponse
 });
