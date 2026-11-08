@@ -12,6 +12,7 @@ public final class NoteFormatSmoke {
         plainTextHasNoSpans();
         inlineCode();
         httpsLinks();
+        httpLinks();
         rejectedLinks();
         codeWinsOverLinks();
         spansAreSortedAndDisjoint();
@@ -68,9 +69,37 @@ public final class NoteFormatSmoke {
                 "explicit port links");
     }
 
+    private static void httpLinks() {
+        String text = "See http://example.com/docs, then https://example.com.";
+        List<NoteFormat.Span> spans = NoteFormat.spans(text);
+        check(spans.size() == 2, "HTTP and HTTPS links are both tappable");
+        check("http://example.com/docs".equals(spans.get(0).target), "HTTP path is preserved");
+        check("https://example.com".equals(spans.get(1).target), "HTTPS trailing punctuation is trimmed");
+        check("http://192.168.1.1/admin".equals(
+                NoteFormat.spans("http://192.168.1.1/admin").get(0).target),
+                "valid HTTP IPv4 links use the browser address validator");
+        check("https://[::1]/dev".equals(
+                NoteFormat.spans("https://[::1]/dev").get(0).target),
+                "valid HTTPS IPv6 links use the browser address validator");
+        check("https://[::1]".equals(
+                NoteFormat.spans("https://[::1]").get(0).target),
+                "the IPv6 authority's closing bracket is not trimmed as punctuation");
+        check("https://[::1]".equals(
+                NoteFormat.spans("https://[::1].").get(0).target),
+                "sentence punctuation after an IPv6 authority is trimmed safely");
+        check("http://localhost:8080/path".equals(
+                NoteFormat.spans("http://localhost:8080/path").get(0).target),
+                "localhost links with ports are supported");
+    }
+
     private static void rejectedLinks() {
-        check(NoteFormat.spans("http://example.com").isEmpty(), "plain HTTP is not linkified");
-        check(NoteFormat.spans("xhttps://example.com").isEmpty(), "scheme must start a token");
+        check(NoteFormat.spans("http://user:pass@example.com").isEmpty(),
+                "HTTP links with embedded credentials are rejected");
+        check(NoteFormat.spans("http://example.com:99999").isEmpty(),
+                "HTTP links with invalid ports are rejected");
+        check(NoteFormat.spans("xhttps://example.com").isEmpty(), "HTTPS scheme must start a token");
+        check(NoteFormat.spans("xhttp://example.com").isEmpty(), "HTTP scheme must start a token");
+        check(NoteFormat.spans("http:///path").isEmpty(), "HTTP URL without an authority is literal");
         check(NoteFormat.spans("https://").isEmpty(), "scheme without host is literal");
         check(NoteFormat.spans("https:///path").isEmpty(), "empty authority is literal");
         check(NoteFormat.spans("https://exa_mple.com").isEmpty(), "underscore host is literal");
@@ -81,13 +110,16 @@ public final class NoteFormatSmoke {
     }
 
     private static void codeWinsOverLinks() {
-        List<NoteFormat.Span> spans = NoteFormat.spans("`https://example.com`");
-        check(spans.size() == 1, "only the code span is produced");
-        check(spans.get(0).kind == NoteFormat.Kind.CODE, "URL inside backticks stays code");
+        List<NoteFormat.Span> spans = NoteFormat.spans(
+                "`http://example.com` and `https://example.com`");
+        check(spans.size() == 2, "both code spans are produced");
+        check(spans.get(0).kind == NoteFormat.Kind.CODE
+                        && spans.get(1).kind == NoteFormat.Kind.CODE,
+                "HTTP and HTTPS URLs inside backticks stay code");
     }
 
     private static void spansAreSortedAndDisjoint() {
-        String text = "`a` https://one.example https://two.example/x `b`";
+        String text = "`a` http://one.example https://two.example/x `b`";
         List<NoteFormat.Span> spans = NoteFormat.spans(text);
         check(spans.size() == 4, "two code and two link spans");
         int previousEnd = -1;

@@ -9,10 +9,9 @@ the contract rather than only the call site:
 1. Tag filtering is an exact tag match ANDed with the category filter and the free-text query.
    The render key must include the selected tag, otherwise the cheap "skip identical rebuild"
    gate would leave a stale list on screen after a chip tap.
-2. Notes are formatted by NoteFormat only: inline code and bare HTTPS links. HTTP is
-   deliberately not linkified, and the formatter must stay pure (no android.* imports) so it is
-   host-testable. A tapped link must go through the same BrowserAddress.isAllowedWebUrl gate as
-   every other navigation.
+2. Notes are formatted by NoteFormat only: inline code and explicit HTTP/HTTPS links. The pure
+   formatter uses BrowserAddress.isAllowedWebUrl so link handling matches the browser's current
+   scheme/host/port allowlist without introducing Android dependencies.
 3. Keyboard shortcuts live in KeyShortcuts (also pure), are dispatched only for unmodified
    Ctrl chords and Escape, and only touch state the activity owns.
 """
@@ -248,10 +247,12 @@ check("import android." not in note, "NoteFormat must stay pure for host tests")
 check("static final int MAX_LINK_CHARS = 2048;" in note, "link length cap missing")
 check("static List<Span> spans(String text)" in note, "spans() entry point missing")
 check("enum Kind { CODE, LINK }" in note, "span kinds missing")
-check("\"https://\"" in note, "only HTTPS is linkified")
-check("http://" in note, "the note must document why HTTP is not linkified")
+check("\"https://\"" in note and "\"http://\"" in note,
+      "only explicit HTTP/HTTPS schemes are linkified")
+check("private static int schemeLengthAt(" in note, "HTTP/HTTPS scheme detection missing")
+check("BrowserAddress.isAllowedWebUrl(text.substring(start, end))" in note,
+      "note links must use the shared browser URL allowlist")
 check("private static boolean isSchemeStart(" in note, "token-boundary check missing")
-check("private static boolean hasHost(" in note, "host validation missing")
 check("isTrailingPunctuation" in note, "trailing punctuation trimming missing")
 
 check("List<NoteFormat.Span> spans = NoteFormat.spans(task.notes);" in ACTIVITY,
@@ -266,7 +267,15 @@ check("paint.setColor(palette.accent);" in ACTIVITY, "link color must come from 
 note_link = region("private void openNoteLink(String url)", "private void showAttachmentManager",
                    "openNoteLink")
 check("BrowserAddress.isAllowedWebUrl(url)" in note_link,
-      "note links must pass the HTTPS gate before navigating")
+      "note links must pass the shared HTTP/HTTPS gate before navigating")
+check('"Only HTTP and HTTPS links can be opened from a note."' in note_link,
+      "note-link errors must describe the current browser scheme policy")
+check('quickCaptureInput.setHint(webMode ? "Search or enter web address"' in ACTIVITY,
+      "the browser address hint must not imply HTTPS-only navigation")
+check("HTTP pages are allowed and labelled" in ACTIVITY and "HTTPS pages are encrypted." in ACTIVITY,
+      "the online-access disclosure must accurately describe HTTP/HTTPS browsing")
+check("HTTP remains blocked." not in ACTIVITY,
+      "the online-access disclosure must not contradict the enabled HTTP browser policy")
 check("confirmBrowserOnlineAccess(() -> loadBrowserAddress(url));" in note_link,
       "note links must respect the Offline default")
 
