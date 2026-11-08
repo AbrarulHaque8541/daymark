@@ -462,8 +462,8 @@ test('index markup exposes task-completion webhook controls and session-only dis
   for (const id of ['webhook-url','webhook-form','webhook-save','webhook-test','webhook-flush','webhook-status']) {
     assert.ok(html.includes('id="'+id+'"'),id+' must be present for webhook-ui.js');
   }
-  assert.match(html,/kept only in this tab/);
-  assert.match(html,/Re-enter the endpoint after reload/);
+  assert.match(html,/stays in this tab only/);
+  assert.match(html,/must be re-entered after reload/);
   assert.doesNotMatch(html,/Local webhook preview/);
 });
 

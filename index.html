@@ -406,7 +406,7 @@
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="webhook-heading">Task-completion webhook</h2>
-          <p class="briefing-description">Send a minimal JSON event to an HTTPS webhook you choose when a task is completed. The endpoint is kept only in this tab and Re-enter the endpoint after reload; queued events stay on this device until you reconnect it. No polling, no timers, no maintainer backend.</p>
+          <p class="briefing-description">Send a minimal JSON event to an HTTPS webhook you choose when a task is completed. The endpoint stays in this tab only and must be re-entered after reload; queued events stay on this device until you reconnect it. No polling, no timers, no maintainer backend.</p>
           <form id="webhook-form" class="feed-form" novalidate>
             <label class="sr-only" for="webhook-url">Webhook URL (https:// only)</label>
             <input id="webhook-url" name="webhookUrl" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off" required>
