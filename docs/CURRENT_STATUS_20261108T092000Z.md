@@ -7,7 +7,7 @@ This is the authoritative handoff for the current engineering cycle. It is based
 - Repository: [AbrarulHaque8541/daymark](https://github.com/AbrarulHaque8541/daymark)
 - Current `main`: `01daaa3b3cef768a273085cd32f096145519bb47`.
 - `AGENTS.md` was fetched and read. It requires source-backed changes, meaningful tests, durable status snapshots, agent attribution, no weakening tests, and independent review for security/build/release-sensitive changes.
-- Live Android build configuration declares `namespace = "com.abrar.daymark"` and `applicationId = "com.abrar.daymark"`. The run-level safety instruction names `com.cue.daymark`. This identity conflict is unresolved. No package ID, namespace, version, manifest permission, signing, or data migration was changed; do not attempt identity work without explicit owner resolution.
+- Live Android build configuration declares `namespace = "com.abrar.daymark"` and `applicationId = "com.abrar.daymark"`. The run-level safety instruction names a different legacy package identifier. This identity conflict is unresolved. No package ID, namespace, version, manifest permission, signing, or data migration was changed; do not attempt identity work without explicit owner resolution.
 - Existing draft release v1.4 was observed and left untouched. No release, tag, or publication action was performed.
 
 ## Work delivered in this cycle
@@ -83,3 +83,6 @@ Independent review of the third-party mirror and cache boundary is requested bef
 - PR #600 is OPEN; PR #599 is OPEN; PR #601 is OPEN. No merge performed in this snapshot.
 - CI emulator/API tests and APK builds are not physical-device acceptance.
 - Work continues beyond any single PR or issue; the repository-wide backlog above is the handoff.
+
+
+Follow-up correction: the exact-head source guard rejected the earlier literal legacy package identifier in this snapshot as a retired path. The identifier has been removed from this document; the underlying instruction/build-configuration conflict remains documented without copying the retired token.
