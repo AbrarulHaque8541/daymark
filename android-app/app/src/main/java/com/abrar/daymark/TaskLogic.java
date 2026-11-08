@@ -427,8 +427,10 @@ final class TaskLogic {
                 if (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now)) next = next.plusWeeks(1);
             } else if (REPEAT_WEEKDAYS.equals(task.repeatRule)) {
                 LocalDate first = nextWeekday(start);
-                LocalDate afterToday = nextWeekday(today);
-                next = afterToday.isAfter(first) ? afterToday : first;
+                // Today can itself be the next weekday occurrence when its reminder trigger
+                // has not fired yet. Starting strictly after today would skip that occurrence.
+                LocalDate onOrAfterToday = isWeekday(today) ? today : nextWeekday(today);
+                next = onOrAfterToday.isAfter(first) ? onOrAfterToday : first;
                 int guard = 0;
                 while (!repeatTriggerMoment(next, time, leadMinutes, zone).isAfter(now) && guard++ < 8) {
                     next = nextWeekday(next);
@@ -467,10 +469,14 @@ final class TaskLogic {
         return LocalDateTime.of(date, dueTime).minusMinutes(leadMinutes).atZone(zone).toInstant();
     }
 
+    private static boolean isWeekday(LocalDate date) {
+        return date.getDayOfWeek() != DayOfWeek.SATURDAY
+                && date.getDayOfWeek() != DayOfWeek.SUNDAY;
+    }
+
     private static LocalDate nextWeekday(LocalDate date) {
         LocalDate next = date.plusDays(1);
-        while (next.getDayOfWeek() == DayOfWeek.SATURDAY
-                || next.getDayOfWeek() == DayOfWeek.SUNDAY) {
+        while (!isWeekday(next)) {
             next = next.plusDays(1);
         }
         return next;

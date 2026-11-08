@@ -55,8 +55,21 @@ jobs:
         with:
           java-version: '17'
           distribution: temurin
-          cache: gradle
 
+      - name: Validate Gradle Wrapper JAR
+        uses: gradle/actions/wrapper-validation@48b5f213c81028ace310571dc5ec0fbbca0b2947
+      - name: Provision cached Gradle 8.13
+        id: setup-gradle
+        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947
+        continue-on-error: true
+        with:
+          gradle-version: '8.13'
+          validate-wrappers: false
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      - name: Report Gradle wrapper fallback
+        if: steps.setup-gradle.outcome != 'success'
+        shell: bash
+        run: echo "::warning::Gradle 8.13 cache provisioning did not complete; the checked wrapper retry helper will be used."
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -75,7 +88,7 @@ jobs:
 
       - name: Build and run Android variant checks
         run: >-
-          ./gradlew --no-daemon --stacktrace --console=plain
+          bash tools/run-gradle-with-retry.sh --no-daemon --stacktrace --console=plain
           assembleGithubSideloadDebug
           lintGithubSideloadDebug
           lintPlayDebug

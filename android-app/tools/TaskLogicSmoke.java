@@ -582,6 +582,19 @@ public final class TaskLogicSmoke {
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
         check("2026-10-09".equals(TaskLogic.advanceRepeat(weekdaysPast, zone, now).dueDate),
                 "weekday repeat rolls forward across missed weekdays and weekends to Friday");
+        Task weekdaysBeforeTrigger = TaskLogic.create("Weekday before trigger", "2026-10-02", "medium", "",
+                "09:00", 30, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        check("2026-10-05".equals(TaskLogic.advanceRepeat(weekdaysBeforeTrigger, zone,
+                        Instant.parse("2026-10-05T08:29:59Z")).dueDate),
+                "weekday catch-up keeps today's occurrence while its reminder trigger is still future");
+        check("2026-10-06".equals(TaskLogic.advanceRepeat(weekdaysBeforeTrigger, zone,
+                        Instant.parse("2026-10-05T08:30:00Z")).dueDate),
+                "weekday catch-up advances after today's reminder trigger fires");
+        Task weekdaysWithoutReminder = TaskLogic.create("Weekday without reminder", "2026-10-02", "medium", "",
+                null, null, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS);
+        check("2026-10-05".equals(TaskLogic.advanceRepeat(weekdaysWithoutReminder, zone,
+                        Instant.parse("2026-10-05T08:00:00Z")).dueDate),
+                "weekday catch-up without a reminder keeps today's default 09:00 occurrence");
         Task yearlyTask = TaskLogic.create("Yearly review", "2025-10-05", "medium", "", null, null,
                 Collections.<Subtask>emptyList(), TaskLogic.REPEAT_YEARLY);
         check(TaskLogic.isValid(yearlyTask) && TaskLogic.REPEAT_YEARLY.equals(yearlyTask.repeatRule)
