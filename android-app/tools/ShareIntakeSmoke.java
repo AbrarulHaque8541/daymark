@@ -11,6 +11,7 @@ public final class ShareIntakeSmoke {
         shortLinesStayInQuickAdd();
         longLinesOpenTheEditor();
         multilineTextIsSplitLosslessly();
+        standaloneCarriageReturnsAndUnicodeSeparatorsAreNormalized();
         aLinkWithASubjectUsesBothFields();
         subjectsAreOneLineAndCapped();
         notesRespectTheEditorLimit();
@@ -59,6 +60,24 @@ public final class ShareIntakeSmoke {
         ShareIntake.Draft trailing = ShareIntake.parse(null, "Only a title\n\nAfter the gap");
         check(trailing.openEditor && "After the gap".equals(trailing.notes),
                 "blank lines around the split are trimmed from notes");
+    }
+
+    private static void standaloneCarriageReturnsAndUnicodeSeparatorsAreNormalized() {
+        ShareIntake.Draft classicMac = ShareIntake.parse(null, "Title\rBody");
+        check(classicMac.openEditor, "a standalone carriage return is a line break, not quick-add text");
+        check("Title".equals(classicMac.title), "the first classic-Mac line becomes the title");
+        check("Body".equals(classicMac.notes), "the remaining classic-Mac text is preserved as notes");
+
+        String mixedText = "Title\r\nBody\rTail" + (char) 0x2028 + "Next" + (char) 0x2029 + "Final";
+        ShareIntake.Draft mixed = ShareIntake.parse(null, mixedText);
+        check("Title".equals(mixed.title), "mixed line endings keep the first line as the title");
+        check("Body\nTail\nNext\nFinal".equals(mixed.notes),
+                "CRLF, CR, line separator, and paragraph separator normalize without dropping text");
+
+        ShareIntake.Draft subject = ShareIntake.parse(
+                "Article title\rignored subject line", "https://example.com/article");
+        check("Article title".equals(subject.title), "a CR-only subject uses only its first line");
+        check("https://example.com/article".equals(subject.notes), "the URL remains the shared note");
     }
 
     private static void aLinkWithASubjectUsesBothFields() {
