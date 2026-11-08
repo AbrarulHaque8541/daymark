@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-09T02:08:00Z (Cycle B: press feedback polish)](./CURRENT_STATUS_20261109T020800Z.md)
 - [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
 - Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 - Use the CURRENT snapshot above for live branch/CI/backlog state; older entries below are historical.
