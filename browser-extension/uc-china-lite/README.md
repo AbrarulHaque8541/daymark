@@ -8,6 +8,8 @@ optional speed-dial new tab and mouse gestures.
 - Pure vanilla JS, no frameworks, no CDNs, no telemetry. Total size ~60 KB.
 - One content loader lazily imports only the feature modules you enable.
 - Settings live in `chrome.storage.sync`.
+- AI and Quick Translate responses are streamed with strict byte limits and request deadlines; unsupported non-streaming responses fail closed.
+- A configured AI provider failure never silently forwards selected page text to Google Search. The search fallback is used only when no API key is configured.
 
 ## Install (Chrome / Edge / Brave)
 

@@ -1,3 +1,7 @@
+import "./response-body.js";
+
+const responseBody = globalThis.DaymarkExtensionResponseBody;
+
 // Quick Translate: floating button next to a text selection that calls
 // the free MyMemory API; falls back to a Google Translate tab on error.
 
@@ -35,12 +39,18 @@ function onEnable() {
   });
   btn.onclick = async () => {
     const text = selectedText();
-    if (!text) return;
+    if (!text || text.length > 500) return;
     const lang = await targetLanguage();
     const url = MYMEMORY + "?q=" + encodeURIComponent(text) + "&langpair=en|" + lang;
     try {
-      const response = await fetch(url);
-      const data = await response.json();
+      const data = await responseBody.fetchJson(url, {}, {
+        timeoutMs: 8000,
+        maxBytes: 64 * 1024,
+        maxChars: 64 * 1024,
+        tooLargeMessage: "Translation response exceeded the safe size limit.",
+        timeoutMessage: "Translation request timed out.",
+        malformedJsonMessage: "Translation provider returned invalid JSON."
+      });
       const translated =
         data && data.responseData && data.responseData.translatedText;
       if (translated) {

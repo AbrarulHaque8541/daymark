@@ -4,6 +4,10 @@
 // script never needs broad host permissions of its own.
 
 import { REGISTRY } from "./features/registry.js";
+import "./features/response-body.js";
+
+const responseBody = globalThis.DaymarkExtensionResponseBody;
+const MAX_AI_PROMPT_CHARS = 12000;
 
 const SETTINGS_KEY = "settings";
 
@@ -122,8 +126,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ error: "no-api-key" });
           break;
         }
+        if (typeof prompt !== "string" || prompt.length > MAX_AI_PROMPT_CHARS) {
+          sendResponse({ error: "prompt-too-large" });
+          break;
+        }
         try {
-          const response = await fetch(apiUrl, {
+          const data = await responseBody.fetchJson(apiUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -133,17 +141,28 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
               model: model || "gpt-4o-mini",
               messages: [{ role: "user", content: prompt }],
             }),
+          }, {
+            timeoutMs: 15000,
+            maxBytes: 512 * 1024,
+            maxChars: 512 * 1024,
+            tooLargeMessage: "AI response exceeded the safe size limit.",
+            timeoutMessage: "AI request timed out.",
+            malformedJsonMessage: "AI provider returned invalid JSON."
           });
-          const data = await response.json();
-          const text =
+          const content =
             data &&
             data.choices &&
             data.choices[0] &&
             data.choices[0].message &&
             data.choices[0].message.content;
-          sendResponse(text ? { text: String(text) } : { error: "bad-response" });
-        } catch (e) {
-          sendResponse({ error: String(e) });
+          sendResponse(content ? { text: String(content).slice(0, 16000) } : { error: "bad-response" });
+        } catch (error) {
+          const messageText = error && typeof error.message === "string" ? error.message : "";
+          const code = /timed out/i.test(messageText) ? "timeout"
+            : /too large/i.test(messageText) ? "response-too-large"
+              : /invalid JSON|malformed/i.test(messageText) ? "bad-response"
+                : "request-failed";
+          sendResponse({ error: code });
         }
         break;
       }

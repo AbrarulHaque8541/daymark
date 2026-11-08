@@ -70,10 +70,23 @@ async function runAction(action, text, panel) {
       : "Translate this to the user's preferred language:\n\n" + text;
   const response = await chrome.runtime.sendMessage({ type: "aiRequest", prompt });
   if (out) {
-    if (response && response.text) out.textContent = response.text;
-    else out.textContent = "No API key set — opened a search tab instead.";
+    if (response && response.text) {
+      out.textContent = response.text;
+    } else if (response && response.error === "no-api-key") {
+      out.textContent = "No API key set — opened a search tab instead.";
+    } else if (response && response.error === "prompt-too-large") {
+      out.textContent = "The selected text is too long for this AI request.";
+    } else if (response && response.error === "timeout") {
+      out.textContent = "The AI request timed out. The selected text was not sent to another provider.";
+    } else if (response && response.error === "response-too-large") {
+      out.textContent = "The AI response exceeded the safe size limit.";
+    } else {
+      out.textContent = "The AI request failed. The selected text was not sent to another provider.";
+    }
   }
-  if (!response || !response.text) {
+  // Only the explicit no-key state uses the documented search fallback. A
+  // provider/network/size failure must not silently disclose the selection to Google.
+  if (response && response.error === "no-api-key") {
     window.open("https://www.google.com/search?q=" + encodeURIComponent(prompt), "_blank");
   }
 }
