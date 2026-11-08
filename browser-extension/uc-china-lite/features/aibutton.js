@@ -41,7 +41,10 @@ function buildPanel(text) {
     const b = document.createElement("button");
     b.textContent = action;
     b.setAttribute("style", "flex:1;border:1px solid #ccc;background:#f5f5f5;border-radius:6px;padding:6px;font:13px sans-serif;cursor:pointer");
-    b.onclick = () => runAction(action, text);
+    b.onclick = (event) => {
+      if (!event || event.isTrusted !== true) return;
+      runAction(action, text);
+    };
     row.appendChild(b);
   }
   const snippet = document.createElement("div");
