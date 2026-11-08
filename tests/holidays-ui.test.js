@@ -413,6 +413,8 @@ test('a partial Clear failure restores saved cache and preference and keeps the 
   assert.equal(elements['holiday-list'].children.length, 1, 'visible data remains after failed Clear');
   assert.equal(elements['holiday-country'].value, 'IN', 'the selected country is not reset');
   assert.match(elements['holiday-status'].textContent, /previous saved data was restored where possible/);
+  assert.match(elements['holiday-status'].textContent, /saved holiday data could not be removed/);
+  assert.doesNotMatch(elements['holiday-status'].textContent, /changes could not be saved/);
   assert.doesNotMatch(elements['holiday-status'].textContent, /^Holidays cleared/);
 });
 
@@ -517,4 +519,37 @@ test('a failed storage read does not block fresh results or overwrite an unreada
   assert.equal(writes, 0, 'unreadable records are never replaced');
   assert.match(elements['holiday-status'].textContent, /saved holiday data could not be read/);
   assert.equal(handle.readCache(), null);
+});
+
+
+test('Clear reports partial storage state when rollback cannot restore original bytes', () => {
+  const cacheRaw = JSON.stringify(makeCache([
+    { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
+  ]));
+  const prefsRaw = JSON.stringify({ countryCode: 'DE' });
+  const data = { [ui.STORAGE_KEY]: cacheRaw, [ui.PREFS_KEY]: prefsRaw };
+  let removeCalls = 0;
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) {
+      if (key === ui.STORAGE_KEY) throw new Error('cache rollback blocked');
+      data[key] = String(value);
+    },
+    removeItem(key) {
+      removeCalls += 1;
+      if (removeCalls === 2) throw new Error('preference removal blocked');
+      delete data[key];
+    }
+  };
+  const { env, elements } = fakeEnv({ storage });
+  const handle = ui.attachHolidaysUi(env);
+  assert.equal(elements['holiday-list'].children.length, 1);
+  handle.onClear();
+  assert.equal(data[ui.STORAGE_KEY], undefined, 'failed rollback is not falsely reported as restored');
+  assert.equal(data[ui.PREFS_KEY], prefsRaw, 'the other original key is restored');
+  assert.equal(elements['holiday-list'].children.length, 1, 'visible data remains for recovery');
+  assert.match(elements['holiday-status'].textContent, /storage may be partially changed/);
+  assert.match(elements['holiday-status'].textContent, /saved holiday data could not be removed/);
+  assert.match(elements['holiday-status'].textContent, /changes could not be saved/);
+  assert.doesNotMatch(elements['holiday-status'].textContent, /^Holidays cleared/);
 });
