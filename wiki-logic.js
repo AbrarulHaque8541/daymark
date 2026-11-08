@@ -133,6 +133,7 @@
         maxChars: MAX_JSON_CHARS,
         tooLargeMessage: 'Wikipedia response too large.',
         malformedMessage: 'Wikipedia response was malformed.',
+        streamRequiredMessage: 'This browser cannot read Wikipedia responses with the required size limit.'
         timeoutMessage: 'Wikipedia request timed out.',
         controller,
         isTimedOut: () => timedOut,
