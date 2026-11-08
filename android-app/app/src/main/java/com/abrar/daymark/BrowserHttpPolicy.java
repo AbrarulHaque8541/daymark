@@ -48,12 +48,23 @@ final class BrowserHttpPolicy {
     }
 
     /**
-     * Returns true if the URL is a bare domain (no scheme) that should be
-     * resolved to HTTPS by default (e.g. "example.com" → "https://example.com").
+     * Returns true if the input is a bare web host (no scheme) that should be
+     * resolved to HTTPS by default: domains, IPv4/IPv6 literals, or localhost.
      */
     static boolean isBareDomain(String input) {
-        if (input == null || input.isEmpty()) return false;
-        return !input.contains("://") && input.contains(".") && !input.startsWith("file:");
+        if (input == null) return false;
+        String candidate = input.trim();
+        if (candidate.isEmpty() || candidate.contains("://") || candidate.startsWith("file:")
+                || candidate.indexOf('@') >= 0
+                || candidate.chars().anyMatch(Character::isWhitespace)) return false;
+        int end = candidate.length();
+        for (char delimiter : new char[]{'/', '?', '#'}) {
+            int index = candidate.indexOf(delimiter);
+            if (index >= 0 && index < end) end = index;
+        }
+        String authority = candidate.substring(0, end);
+        return authority.contains(".") || authority.startsWith("[")
+                || authority.matches("(?i)^localhost(?::[0-9]{1,5})?$");
     }
 
     /** Resolves a bare domain to HTTPS. */

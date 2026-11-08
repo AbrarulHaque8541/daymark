@@ -66,13 +66,53 @@ test('IPv4 literals validate octets and reject partial numeric hosts', () => {
   assert.equal(address.parseAddressInput('http://1.2.3.4.5/').kind, 'search');
 });
 
-test('bracketed IPv6 literals validate with and without ports', () => {
+test('IPv4 literals with leading-zero octets are rejected before WHATWG normalization', () => {
+  for (const host of ['010.0.0.1', '001.002.003.004', '0.00.0.0']) {
+    const bare = address.parseAddressInput(host);
+    assert.equal(bare.kind, 'search', host);
+    assert.equal(bare.searchQuery, host);
+
+    for (const scheme of ['http', 'https']) {
+      const input = scheme + '://' + host + '/';
+      const explicit = address.parseAddressInput(input);
+      assert.equal(explicit.kind, 'search', input);
+      assert.equal(explicit.searchQuery, input);
+    }
+  }
+
+  assert.equal(address.parseAddressInput('0.0.0.0').url, 'https://0.0.0.0');
+  assert.equal(address.parseAddressInput('http://192.0.2.1/').url, 'http://192.0.2.1/');
+  assert.equal(address.parseAddressInput('https://192.0.2.1/').kind, 'navigate');
+});
+
+test('bare IP literals and localhost resolve to HTTPS without losing explicit schemes', () => {
+  assert.equal(address.parseAddressInput('192.168.1.1/admin').url, 'https://192.168.1.1/admin');
+  assert.equal(address.parseAddressInput('192.168.1.1:8080').url, 'https://192.168.1.1:8080');
+  assert.equal(address.parseAddressInput('999.1.1.1').kind, 'search');
+  assert.equal(address.parseAddressInput('1.2.3').kind, 'search');
+  assert.equal(address.parseAddressInput('[::1]/dev').url, 'https://[::1]/dev');
+  assert.equal(address.parseAddressInput('[2001:db8::1]:8443/path').url,
+    'https://[2001:db8::1]:8443/path');
+  assert.equal(address.parseAddressInput('localhost:3000/api').url, 'https://localhost:3000/api');
+  assert.equal(address.parseAddressInput('http://192.168.1.1/admin').url, 'http://192.168.1.1/admin');
+});
+
+test('bracketed IPv6 literals validate with and without ports, including IPv4 tails', () => {
   assert.equal(address.parseAddressInput('[::1]/').url, 'https://[::1]/');
   assert.equal(address.parseAddressInput('https://[2001:db8::1]:8443/x').port, 8443);
   assert.equal(address.parseAddressInput('https://[fe80::1ff:fe23:4567:890a]/').host,
     '[fe80::1ff:fe23:4567:890a]');
   assert.equal(address.parseAddressInput('https://[1:2:3:4:5:6:7:8]').kind, 'navigate');
   assert.equal(address.parseAddressInput('https://[::ffff:192.0.2.128]/').kind, 'navigate');
+  assert.equal(address.parseAddressInput('https://[::ffff:192.000.2.1]/').kind, 'search');
+  assert.equal(address.parseAddressInput('[::ffff:192.000.2.1]').kind, 'search');
+  assert.equal(address.parseAddressInput('https://[::ffff:192.0.2.1]/').kind, 'navigate');
+  assert.equal(address.parseAddressInput('https://[1:2:3:4:5:6:192.0.2.1]/').kind, 'navigate');
+  assert.equal(address.parseAddressInput('https://[1:2:3:4:5:192.0.2.1]/').kind, 'search');
+  assert.equal(address.parseAddressInput('https://[::ffff:192.0.2.999]/').kind, 'search');
+  assert.equal(address.parseAddressInput('https://[192.0.2.1::]/').kind, 'search');
+  assert.equal(address.parseAddressInput('[192.0.2.1::]').kind, 'search');
+  assert.equal(address.parseAddressInput('https://[::192.0.2.1]/').kind, 'navigate');
 
   assert.equal(address.parseAddressInput('https://[1:2:xyz/').kind, 'search');
   assert.equal(address.parseAddressInput('https://[1:2:3:4:5:6:7:8:9]').kind, 'search');
