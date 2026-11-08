@@ -30,6 +30,24 @@ function fakeElement(tag) {
   };
 }
 
+function createLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const tail = previous.then(() => gate);
+      tails.set(name, tail);
+      return previous.then(() => callback({ name, mode: options && options.mode || 'exclusive' }))
+        .finally(() => {
+          release();
+          if (tails.get(name) === tail) tails.delete(name);
+        });
+    }
+  };
+}
+
 function fakeEnv(options) {
   const opts = options || {};
   const elements = {
@@ -40,12 +58,13 @@ function fakeEnv(options) {
     'webhook-flush': Object.assign(fakeElement('button'), { id: 'webhook-flush' }),
     'webhook-status': Object.assign(fakeElement('p'), { id: 'webhook-status' })
   };
-  const storageData = {};
-  const storage = {
+  const storageData = opts.storageData || {};
+  const storage = opts.storage || {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
+  const locks = Object.prototype.hasOwnProperty.call(opts, 'locks') ? opts.locks : createLockManager();
   const env = {
     document: {
       readyState: 'complete',
@@ -53,7 +72,7 @@ function fakeEnv(options) {
     },
     window: { addEventListener() {} },
     localStorage: storage,
-    navigator: { onLine: opts.online !== false },
+    navigator: { onLine: opts.online !== false, locks },
     webhookApi,
     fetch: opts.fetch,
     now: () => '2026-11-04T12:00:00.000Z'
@@ -113,7 +132,7 @@ test('a completed task with a failing endpoint queues the event on this device',
   const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x', fetch: failing });
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  const notified = handle.notifyTaskCompleted(TASK);
+  const notified = await handle.notifyTaskCompleted(TASK);
   assert.equal(notified.queued, true);
   await settle();
   const queued = handle.readQueue();
@@ -129,7 +148,7 @@ test('a completed task while offline queues without touching the network', async
   const { env, elements } = fakeEnv({ url: 'https://hooks.example.com/x', online: false, fetch: async () => { fetchCalled = true; return { ok: true, status: 200 }; } });
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  const notified = handle.notifyTaskCompleted(TASK);
+  const notified = await handle.notifyTaskCompleted(TASK);
   await settle();
   assert.equal(notified.queued, true);
   assert.equal(fetchCalled, false, 'no network call happens while offline');
@@ -142,7 +161,7 @@ test('a completed task online is delivered immediately and the queue empties', a
   const { env, elements } = fakeEnv({ url: 'https://hooks.example.com/x', fetch: async (url, init) => { seen.push({ url, init }); return { ok: true, status: 200 }; } });
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  handle.notifyTaskCompleted(TASK);
+  await handle.notifyTaskCompleted(TASK);
   await settle();
   assert.equal(seen.length, 1, 'exactly one POST was sent');
   assert.equal(seen[0].url, 'https://hooks.example.com/x');
@@ -176,19 +195,170 @@ test('a task completed during an active flush is retained and sent after the sna
   };
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  handle.notifyTaskCompleted(TASK);
+  const firstNotify = handle.notifyTaskCompleted(TASK);
   await firstStarted;
   const secondTask = Object.assign({}, TASK, { id: 'task-2', title: 'Completed during first delivery' });
-  assert.deepEqual(handle.notifyTaskCompleted(secondTask), { queued: true, reason: 'queued' });
+  const secondNotify = handle.notifyTaskCompleted(secondTask);
   assert.equal(JSON.parse(storageData[webhookApi.QUEUE_KEY]).length, 2,
     'the second completion is persisted while the first request is in flight');
   releaseFirst();
   await secondStarted;
+  await Promise.all([firstNotify, secondNotify]);
   await settle();
   assert.equal(calls, 2, 'the new completion triggers one follow-up flush after the active one');
   assert.deepEqual(deliveredTitles, [TASK.title, secondTask.title],
     'the follow-up request contains the completion that arrived during the first request');
   assert.equal(handle.readQueue().length, 0, 'both completed events are removed only after delivery');
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
+
+test('two tabs serialize queue appends so neither task completion is overwritten', async () => {
+  const storageData = {};
+  const locks = createLockManager();
+  const delivered = [];
+  const fetch = async (url, init) => {
+    delivered.push(JSON.parse(init.body).task.title);
+    return { ok: true, status: 200 };
+  };
+  const first = fakeEnv({ storageData, locks, url: 'https://hooks.example.com/x', fetch });
+  const second = fakeEnv({ storageData, locks, url: 'https://hooks.example.com/x', fetch });
+  const firstHandle = ui.attachWebhookUi(first.env);
+  const secondHandle = ui.attachWebhookUi(second.env);
+  firstHandle.onSave({ preventDefault() {} });
+  secondHandle.onSave({ preventDefault() {} });
+
+  const taskA = Object.assign({}, TASK, { title: 'Task A from tab A' });
+  const taskB = Object.assign({}, TASK, { id: 'task-b', title: 'Task B from tab B' });
+  const results = await Promise.all([
+    firstHandle.notifyTaskCompleted(taskA),
+    secondHandle.notifyTaskCompleted(taskB)
+  ]);
+
+  assert.deepEqual(results.map((result) => result.reason), ['queued', 'queued']);
+  assert.deepEqual(delivered.slice().sort(), [taskA.title, taskB.title].sort(),
+    'both events are delivered once even when the tabs append concurrently');
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), [],
+    'the shared durable queue is empty only after both deliveries');
+});
+
+test('two tabs cannot deliver the same stored event concurrently', async () => {
+  const storageData = {};
+  const locks = createLockManager();
+  const event = webhookApi.makeQueueEvent(
+    webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
+    '2026-11-04T12:00:00.000Z'
+  );
+  storageData[webhookApi.QUEUE_KEY] = JSON.stringify([event]);
+  const delivered = [];
+  const fetch = async (url, init) => {
+    delivered.push(JSON.parse(init.body).task.title);
+    await settle();
+    return { ok: true, status: 200 };
+  };
+  const first = fakeEnv({ storageData, locks, online: false, url: 'https://hooks.example.com/x', fetch });
+  const second = fakeEnv({ storageData, locks, online: false, url: 'https://hooks.example.com/x', fetch });
+  const firstHandle = ui.attachWebhookUi(first.env);
+  const secondHandle = ui.attachWebhookUi(second.env);
+  firstHandle.onSave({ preventDefault() {} });
+  secondHandle.onSave({ preventDefault() {} });
+  first.env.navigator.onLine = true;
+  second.env.navigator.onLine = true;
+
+  await Promise.all([firstHandle.flush(), secondHandle.flush()]);
+
+  assert.deepEqual(delivered, [TASK.title], 'only the lock holder sends the shared event');
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
+
+test('a second tab completion waits for an in-flight delivery and is not lost', async () => {
+  const storageData = {};
+  const locks = createLockManager();
+  const initialEvent = webhookApi.makeQueueEvent(
+    webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
+    '2026-11-04T12:00:00.000Z'
+  );
+  storageData[webhookApi.QUEUE_KEY] = JSON.stringify([initialEvent]);
+  let releaseFirst;
+  let firstStartedResolve;
+  const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
+  const delivered = [];
+  const fetch = async (url, init) => {
+    const title = JSON.parse(init.body).task.title;
+    delivered.push(title);
+    if (delivered.length === 1) {
+      firstStartedResolve();
+      return new Promise((resolve) => { releaseFirst = () => resolve({ ok: true, status: 200 }); });
+    }
+    return { ok: true, status: 200 };
+  };
+  const first = fakeEnv({ storageData, locks, online: false, url: 'https://hooks.example.com/x', fetch });
+  const second = fakeEnv({ storageData, locks, online: false, url: 'https://hooks.example.com/x', fetch });
+  const firstHandle = ui.attachWebhookUi(first.env);
+  const secondHandle = ui.attachWebhookUi(second.env);
+  firstHandle.onSave({ preventDefault() {} });
+  secondHandle.onSave({ preventDefault() {} });
+  first.env.navigator.onLine = true;
+  second.env.navigator.onLine = true;
+
+  const flushing = firstHandle.flush();
+  await firstStarted;
+  const secondTask = Object.assign({}, TASK, { id: 'task-b', title: 'Task completed in second tab' });
+  const enqueue = secondHandle.notifyTaskCompleted(secondTask);
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), [initialEvent],
+    'the waiting tab cannot overwrite the queue while the first tab owns the lock');
+
+  releaseFirst();
+  await Promise.all([flushing, enqueue]);
+  assert.deepEqual(delivered, [TASK.title, secondTask.title]);
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
+
+test('webhook queue fails closed when the Web Locks API is unavailable', async () => {
+  let fetchCalls = 0;
+  const { env, elements, storageData } = fakeEnv({
+    url: 'https://hooks.example.com/x',
+    locks: null,
+    fetch: async () => { fetchCalls += 1; return { ok: true, status: 200 }; }
+  });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  const result = handle.notifyTaskCompleted(TASK);
+  assert.deepEqual(result, { queued: false, reason: 'coordination-unavailable' });
+  await handle.flush();
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined, 'no unsafe localStorage read-modify-write occurs');
+  assert.equal(fetchCalls, 0, 'no event is sent without cross-tab serialization');
+  assert.equal(elements['webhook-flush'].disabled, true);
+  assert.match(elements['webhook-status'].textContent, /cross-tab queue coordination is unavailable/);
+});
+
+test('a failed Web Lock request fails closed and a later lock recovery can queue and deliver', async () => {
+  const manager = createLockManager();
+  let fail = true;
+  const locks = {
+    request(name, options, callback) {
+      if (fail) return Promise.reject(new Error('private lock backend detail'));
+      return manager.request(name, options, callback);
+    }
+  };
+  let fetchCalls = 0;
+  const { env, elements, storageData } = fakeEnv({
+    url: 'https://hooks.example.com/x',
+    locks,
+    fetch: async () => { fetchCalls += 1; return { ok: true, status: 200 }; }
+  });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  await settle();
+  const blocked = await handle.notifyTaskCompleted(TASK);
+  assert.deepEqual(blocked, { queued: false, reason: 'coordination-unavailable' });
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
+  assert.equal(fetchCalls, 0);
+  assert.doesNotMatch(elements['webhook-status'].textContent, /private lock backend detail/);
+
+  fail = false;
+  const recovered = await handle.notifyTaskCompleted(TASK);
+  assert.deepEqual(recovered, { queued: true, reason: 'queued' });
+  assert.equal(fetchCalls, 1);
   assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
 });
 
@@ -203,7 +373,7 @@ test('the retry button flushes a queued event when the endpoint recovers', async
   });
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  handle.notifyTaskCompleted(TASK);
+  await handle.notifyTaskCompleted(TASK);
   await settle();
   assert.equal(handle.readQueue().length, 1);
   fail = false;
@@ -335,7 +505,7 @@ test('a queue write failure keeps the event in this tab and retries persistence 
   };
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  const queued = handle.notifyTaskCompleted(TASK);
+  const queued = await handle.notifyTaskCompleted(TASK);
   assert.deepEqual(queued, { queued: true, reason: 'memory-only' });
   assert.equal(handle.readQueue().length, 1);
   assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
@@ -419,7 +589,7 @@ test('failed persistence after delivery keeps an empty queue retryable until it 
   };
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
-  handle.notifyTaskCompleted(TASK);
+  await handle.notifyTaskCompleted(TASK);
   await settle();
   assert.equal(handle.readQueue().length, 0, 'the endpoint accepted the event');
   assert.ok(storageData[webhookApi.QUEUE_KEY] !== '[]',
