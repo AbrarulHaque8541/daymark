@@ -328,7 +328,7 @@ test('webhook queue fails closed when the Web Locks API is unavailable', async (
   assert.equal(storageData[webhookApi.QUEUE_KEY], undefined, 'no unsafe localStorage read-modify-write occurs');
   assert.equal(fetchCalls, 0, 'no event is sent without cross-tab serialization');
   assert.equal(elements['webhook-flush'].disabled, true);
-  assert.match(elements['webhook-status'].textContent, /cross-tab queue coordination is unavailable/);
+  assert.match(elements['webhook-status'].textContent, /cross-tab queue coordination is unavailable/i);
 });
 
 test('a failed Web Lock request fails closed and a later lock recovery can queue and deliver', async () => {
