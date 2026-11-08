@@ -295,3 +295,52 @@ test('webhook boot does not eagerly evaluate window.localStorage', () => {
   assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
     'boot must pass window and let attachWebhookUi guard the storage getter');
 });
+
+
+test('a storage adapter without removeItem clears config with an explicit null marker', () => {
+  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  const backing = env.localStorage;
+  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
+  env.localStorage = {
+    getItem: backing.getItem.bind(backing),
+    setItem: backing.setItem.bind(backing)
+  };
+  const handle = ui.attachWebhookUi(env);
+  elements['webhook-url'].value = '';
+  assert.deepEqual(handle.onSave({ preventDefault() {} }), { saved: false, cleared: true });
+  assert.equal(storageData[webhookApi.CONFIG_KEY], 'null');
+  const restored = ui.attachWebhookUi(env);
+  assert.equal(restored.readConfig(), null);
+  assert.doesNotMatch(elements['webhook-status'].textContent, /storage could not be read/);
+});
+
+test('failed persistence after delivery keeps an empty queue retryable until it is durable', async () => {
+  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x' });
+  const backing = env.localStorage;
+  backing.setItem(webhookApi.CONFIG_KEY, JSON.stringify({ version: 1, url: 'https://hooks.example.com/x' }));
+  let failEmptyQueueOnce = true;
+  env.localStorage = {
+    getItem: backing.getItem.bind(backing),
+    setItem(key, value) {
+      if (key === webhookApi.QUEUE_KEY && value === '[]' && failEmptyQueueOnce) {
+        failEmptyQueueOnce = false;
+        throw new Error('temporary storage write failure');
+      }
+      backing.setItem(key, value);
+    },
+    removeItem: backing.removeItem.bind(backing)
+  };
+  const handle = ui.attachWebhookUi(env);
+  handle.notifyTaskCompleted(TASK);
+  await settle();
+  assert.equal(handle.readQueue().length, 0, 'the endpoint accepted the event');
+  assert.ok(storageData[webhookApi.QUEUE_KEY] !== '[]',
+    'the old persisted queue remains until the empty state can be saved');
+  assert.equal(elements['webhook-flush'].disabled, false,
+    'Retry remains available even though the in-memory queue is empty');
+  assert.match(elements['webhook-status'].textContent, /may be retried after reload/);
+  await handle.flush();
+  assert.equal(storageData[webhookApi.QUEUE_KEY], '[]',
+    'Retry persists the empty queue without sending the already-delivered event again');
+  assert.equal(elements['webhook-flush'].disabled, true);
+});
