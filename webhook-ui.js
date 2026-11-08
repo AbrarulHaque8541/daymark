@@ -402,11 +402,12 @@
               return { ok: true };
             });
 
-            if (!updated.ok || !updated.value || !updated.value.ok) {
+            if (!updated.ok) {
               status('Webhook delivery is paused because its queue update could not be saved safely. '
                 + storageWarning());
               break;
             }
+            if (!updated.value || !updated.value.ok) break;
             if (result.failure) {
               status('Could not deliver webhook events. Check the endpoint and retry. '
                 + (queue.length ? queueNote() : '') + storageWarning());
