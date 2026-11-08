@@ -348,10 +348,24 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         return bounds[0];
     }
 
+    private String findFocusStatusText(android.view.View root) {
+        String[] statuses = {
+                "READY WHEN YOU ARE", "TARGET DURATION", "TIME REMAINING",
+                "FOCUS IN PROGRESS", "PAUSED · READY TO RESUME", "SESSION COMPLETE"
+        };
+        for (String status : statuses) {
+            if (findViewByText(root, status) != null) return status;
+        }
+        return "none";
+    }
+
     private void checkFocusModeState(Activity activity, android.view.View stopwatch,
             android.view.View countdown, boolean countdownExpected, String message) throws Exception {
         boolean[] selected = new boolean[2];
         boolean[] idleState = new boolean[1];
+        String[] actualStatus = new String[1];
+        String[] startDescription = new String[1];
+        String[] startText = new String[1];
         runOnMainSync(() -> {
             selected[0] = stopwatch.isSelected();
             selected[1] = countdown.isSelected();
@@ -360,11 +374,17 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             String expectedStatus = countdownExpected ? "TARGET DURATION" : "READY WHEN YOU ARE";
             android.view.View status = findViewByText(root, expectedStatus);
             idleState[0] = start != null && status != null;
+            actualStatus[0] = findFocusStatusText(root);
+            startDescription[0] = start == null ? "none" : String.valueOf(start.getContentDescription());
+            startText[0] = start instanceof android.widget.TextView
+                    ? String.valueOf(((android.widget.TextView) start).getText()) : "none";
         });
+        String observed = "actual Stopwatch=" + selected[0] + ", Countdown=" + selected[1]
+                + ", idle=" + idleState[0] + ", status=" + actualStatus[0]
+                + ", startDescription=" + startDescription[0] + ", startText=" + startText[0];
         check(selected[0] == !countdownExpected && selected[1] == countdownExpected,
-                message + ": exactly the expected mode is selected (actual Stopwatch="
-                        + selected[0] + ", Countdown=" + selected[1] + ", idle=" + idleState[0] + ")");
-        check(idleState[0], message + ": Start remains available and the timer stays idle");
+                message + ": exactly the expected mode is selected (" + observed + ")");
+        check(idleState[0], message + ": Start remains available and the timer stays idle (" + observed + ")");
     }
 
     private String dispatchTap(android.view.View view) throws Exception {
@@ -384,12 +404,55 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         android.graphics.Rect bounds = stableVisibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0, "swipe target has stable visible screen bounds");
         String target = describeTouchTarget(view, bounds);
+        StringBuilder touchTrace = new StringBuilder();
+        runOnMainSync(() -> {
+            view.setOnTouchListener((targetView, event) -> {
+                appendTouchTrace(touchTrace, "row", targetView, event);
+                return false;
+            });
+            if (view instanceof android.view.ViewGroup) {
+                android.view.ViewGroup group = (android.view.ViewGroup) view;
+                for (int index = 0; index < group.getChildCount(); index++) {
+                    final int childIndex = index;
+                    group.getChildAt(index).setOnTouchListener((targetView, event) -> {
+                        appendTouchTrace(touchTrace, "child" + childIndex, targetView, event);
+                        return false;
+                    });
+                }
+            }
+        });
         float startX = left ? bounds.left + bounds.width() * 0.82f : bounds.left + bounds.width() * 0.18f;
         float endX = left ? bounds.left + bounds.width() * 0.18f : bounds.left + bounds.width() * 0.82f;
         float y = bounds.centerY();
-        injectDrag(startX, y, endX, y);
+        try {
+            injectDrag(startX, y, endX, y);
+        } finally {
+            runOnMainSync(() -> {
+                view.setOnTouchListener(null);
+                if (view instanceof android.view.ViewGroup) {
+                    android.view.ViewGroup group = (android.view.ViewGroup) view;
+                    for (int index = 0; index < group.getChildCount(); index++) {
+                        group.getChildAt(index).setOnTouchListener(null);
+                    }
+                }
+            });
+        }
         return (left ? "leftward" : "rightward") + " swipe " + target
-                + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")";
+                + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")"
+                + " events=[" + touchTrace + "]";
+    }
+
+    private void appendTouchTrace(StringBuilder trace, String target, android.view.View targetView,
+                                  android.view.MotionEvent event) {
+        if (trace.length() > 0) trace.append(';');
+        String label = targetView instanceof android.widget.TextView
+                ? String.valueOf(((android.widget.TextView) targetView).getText())
+                : targetView.getClass().getSimpleName();
+        trace.append(target).append(':').append(android.view.MotionEvent.actionToString(event.getActionMasked()))
+                .append(" label=").append(label)
+                .append(" local=(").append(event.getX()).append(',').append(event.getY()).append(')')
+                .append(" raw=(").append(event.getRawX()).append(',').append(event.getRawY()).append(')')
+                .append(" source=").append(event.getSource());
     }
 
     private void dispatchVerticalSwipe(android.view.View view) throws Exception {
