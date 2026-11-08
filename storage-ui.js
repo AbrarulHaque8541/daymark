@@ -63,11 +63,20 @@
         const row = make('div');
         if (!row) break;
         if (typeof row.setAttribute === 'function') row.setAttribute('class', 'feed-item');
+        const unreadableCount = Array.isArray(category.unreadableKeys)
+          ? category.unreadableKeys.length : 0;
         const title = make('span');
         if (title) {
           if (typeof title.setAttribute === 'function') title.setAttribute('class', 'feed-item-title');
-          title.textContent = category.label
-            + (category.present ? ' — about ' + storageApi.formatBytes(category.bytes) : ' — not present');
+          let state = ' — not present';
+          if (unreadableCount > 0) {
+            state = category.present
+              ? ' — partially readable (about ' + storageApi.formatBytes(category.bytes) + ')'
+              : ' — status unknown (could not read)';
+          } else if (category.present) {
+            state = ' — about ' + storageApi.formatBytes(category.bytes);
+          }
+          title.textContent = category.label + state;
           row.appendChild(title);
         }
         const summary = make('p');
@@ -85,7 +94,9 @@
             button.setAttribute('aria-label', 'Clear ' + category.label + ' from this browser');
           }
           button.textContent = 'Clear';
-          button.disabled = !category.present;
+          // Allow an explicit retry for unknown data; clearCategory itself still
+          // fails closed when it cannot read the key before attempting removal.
+          button.disabled = !category.present && unreadableCount === 0;
           if (typeof button.addEventListener === 'function') {
             button.addEventListener('click', () => { onClearCategory(category.id); });
           }
@@ -93,12 +104,22 @@
         }
         listEl.appendChild(row);
       }
-      status(scan.presentCount === 0
-        ? 'No local data is stored yet. Add a task or use a card to see it here.'
-        : scan.presentCount + ' of ' + scan.categories.length
+      const unreadableCount = Number.isInteger(scan.unreadableCount) ? scan.unreadableCount : 0;
+      if (unreadableCount > 0) {
+        const known = scan.presentCount === 0
+          ? 'No readable local data was found'
+          : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
+            + storageApi.formatBytes(scan.totalBytes) + ' total)';
+        status(known + '; ' + unreadableCount
+          + ' categories could not be checked. Reported sizes exclude unreadable entries.');
+      } else if (scan.presentCount === 0) {
+        status('No local data is stored yet. Add a task or use a card to see it here.');
+      } else {
+        status(scan.presentCount + ' of ' + scan.categories.length
           + ' categories hold data on this device (about '
           + storageApi.formatBytes(scan.totalBytes) + ' total).');
-      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0;
+      }
+      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0 && unreadableCount === 0;
     }
 
     // Returns 'accepted', 'declined', or 'failed'. A failed confirmation prompt
