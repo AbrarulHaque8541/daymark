@@ -35,6 +35,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Keep this CI workflow on the signed Node 24 Gradle actions and open-source Basic cache.
       - name: Validate Gradle Wrapper JAR
         uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c
       - name: Provision cached Gradle 8.13
