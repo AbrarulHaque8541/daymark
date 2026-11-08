@@ -202,6 +202,7 @@ export async function fetchBoundedJson(url, init = {}, options = {}) {
       ...init,
       cache: "no-store",
       credentials: "omit",
+      referrerPolicy: "no-referrer",
       redirect: "error",
       signal: controller ? controller.signal : undefined,
     });

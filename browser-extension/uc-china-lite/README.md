@@ -18,7 +18,7 @@ optional speed-dial new tab and mouse gestures.
 
 ## Network and data safety
 
-- The OpenAI-compatible API endpoint and permission origin must both use HTTPS and match exactly. API requests do not follow redirects, omit ambient browser credentials, and require the exact optional host permission.
+- The OpenAI-compatible API endpoint and permission origin must both use HTTPS and match exactly. API requests do not follow redirects, omit ambient browser credentials, send no referrer, and require the exact optional host permission.
 - AI selections are limited to 12,000 prompt characters. Provider responses are streamed with a 256 KiB byte cap and a 12,000-character display cap; requests time out rather than waiting indefinitely.
 - Quick Translate sends the selected snippet through the extension background worker to MyMemory only after the user enables the feature and grants that exact host permission. Its response is capped at 64 KiB. If the request cannot complete, the user-initiated Translate action can open Google Translate as a fallback.
 - The API key is stored in `chrome.storage.sync`, which may sync it across signed-in browser profiles. Treat it as sensitive and do not configure it in a shared browser profile.

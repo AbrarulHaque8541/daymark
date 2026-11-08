@@ -99,6 +99,7 @@ test("bounded JSON reader streams UTF-8 chunks and applies safe request defaults
   assert.deepEqual(result, { text: "नमस्ते 🌏" });
   assert.equal(seenInit.redirect, "error");
   assert.equal(seenInit.credentials, "omit");
+  assert.equal(seenInit.referrerPolicy, "no-referrer");
   assert.equal(seenInit.cache, "no-store");
   assert.ok(seenInit.signal);
   assert.equal(state.opened, true);
