@@ -172,6 +172,27 @@ test('scanStorage reports per-key read failures as unknown instead of absent', (
     'a failed scan must never mutate stored data');
 });
 
+test('scanStorage never calls the store empty when every managed key is unreadable', () => {
+  const initial = Object.fromEntries(storage.CATEGORIES.flatMap((category) =>
+    category.keys.map((key) => [key, 'still stored'])
+  ));
+  const store = fakeStorage(initial);
+  for (const category of storage.CATEGORIES) {
+    for (const key of category.keys) store.failReadOn(key);
+  }
+
+  const scan = storage.scanStorage(store);
+  assert.equal(scan.complete, false);
+  assert.equal(scan.presentCount, 0);
+  assert.equal(scan.unreadableCount, storage.CATEGORIES.length);
+  assert.equal(scan.unreadableKeys.length, storage.CATEGORIES.reduce(
+    (count, category) => count + category.keys.length, 0
+  ));
+  assert.equal(scan.totalBytes, 0, 'unreadable values are excluded from measured byte totals');
+  assert.ok(Object.values(store.snapshot).every((value) => value === 'still stored'),
+    'a total read failure must not mutate any stored value');
+});
+
 test('formatBytes renders human sizes without inventing precision', () => {
   assert.equal(storage.formatBytes(0), '0 B');
   assert.equal(storage.formatBytes(511), '511 B');
