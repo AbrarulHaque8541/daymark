@@ -104,55 +104,44 @@
 .complete-button,
 .task-row {
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 
-/* Initial loading skeleton for the task list (hidden once list is ready). */
-.task-list-skeleton {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 4px;
-}
- .skeleton-row {
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+/* Skeleton rows for loading states — glass, accent-tinted, no cartoon. */
+.skeleton-row {
   height: 76px;
   border-radius: 16px;
   background: linear-gradient(90deg,
     rgba(255, 255, 255, .55) 0%,
-    rgba(22, 112, 95, .12) 40%,
+    rgba(226, 240, 235, .8) 40%,
     rgba(255, 255, 255, .55) 80%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
-  border: 1px solid rgba(22, 112, 95, .18);
+  border: 1px solid rgba(219, 226, 232, .6);
 }
 @keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
-.task-list.is-ready .task-list-skeleton {
-  display: none;
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-row { animation: none; background: rgba(226, 240, 235, .55); }
 }
 
-/* Storage badge loading pulse while checking. */
+/* Local badge checking state. */
 .local-badge.is-checking {
-  animation: storage-pulse 1.6s ease-in-out infinite;
+  animation: pulse-soft 1.2s ease-in-out infinite;
 }
-@keyframes storage-pulse {
-  50% { border-color: rgba(22, 112, 95, .45); }
+@keyframes pulse-soft {
+  50% { opacity: .65; }
 }
 
-/* Glance card refresh + data-controls busy indicator (accent #16705f spinner, reduced-motion safe).
-   Primary buttons use white spinner; quiet/secondary/tool-button keep accent. Label stays visible with padding. */
+/* Busy spinners on refresh/tool buttons — accent colored, professional. */
 .button.is-busy,
 .feed-refresh.is-busy,
 .weather-refresh.is-busy,
 .currency-refresh.is-busy,
 .tool-button.is-busy {
   position: relative;
-  pointer-events: none;
-  opacity: 0.92;
-  padding-left: 28px;
+  color: transparent !important;
 }
 .button.is-busy::before,
 .feed-refresh.is-busy::before,
@@ -225,4 +214,29 @@
 .briefing-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+}
+
+/* Cycle A: consistent keyboard focus rings and press feedback for task rows/cards (accent #16705f).
+ * Professional glass, no cartoon scale. Honors reduced motion already above.
+ */
+.task-row:focus-visible,
+.card:focus-visible,
+.briefing-card:focus-visible {
+  outline: 2px solid #16705f;
+  outline-offset: 3px;
+  border-color: rgba(22, 112, 95, 0.5);
+  box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.15);
+}
+
+.task-row:active {
+  transform: translateY(1px) scale(0.995);
+  box-shadow: 0 2px 8px rgba(24, 40, 48, 0.06);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-row:active,
+  .card:active {
+    transform: none;
+  }
 }

@@ -1,7 +1,6 @@
-- [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
-- Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
+- [CURRENT — Daymark whole-project engineering status — 2026-11-08T23:35:00Z (Cycle A: a11y focus/press consistency)](./CURRENT_STATUS_20261108T233500Z.md)
+- Previous: [Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
 - Use the CURRENT snapshot above for live branch/CI/backlog state; older entries below are historical.
-
 
 - [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
 
@@ -89,10 +88,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
-
-
-- [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
+- [Daymark whole-project engineering status — 2026-11-08T23:35:00Z (Cycle A: a11y focus/press consistency)](./CURRENT_STATUS_20261108T233500Z.md)
 
 ## Before acting
 
