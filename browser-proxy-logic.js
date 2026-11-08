@@ -49,26 +49,112 @@
 
   // Reduces a host to its bare form: a normal hostname, an IPv4 literal or a
   // bracketed IPv6 literal. Anything else fails closed to null.
+  function parseIpv4Octets(text) {
+    if (typeof text !== 'string'
+      || !/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(text)) return null;
+    const octets = text.split('.').map(Number);
+    if (octets.some((value) => value > 255)) return null;
+    return octets;
+  }
+
+  function parseIpv6Groups(address) {
+    if (typeof address !== 'string' || !address || /[^0-9a-f:.]/i.test(address)) return null;
+    let text = address.toLowerCase();
+
+    // IPv4-embedded IPv6 addresses use the final 32 bits as a dotted quad.
+    if (text.includes('.')) {
+      const lastColon = text.lastIndexOf(':');
+      if (lastColon < 0) return null;
+      const octets = parseIpv4Octets(text.slice(lastColon + 1));
+      if (!octets) return null;
+      const high = ((octets[0] << 8) | octets[1]).toString(16);
+      const low = ((octets[2] << 8) | octets[3]).toString(16);
+      text = text.slice(0, lastColon) + ':' + high + ':' + low;
+    }
+
+    const compression = text.indexOf('::');
+    if (compression !== -1) {
+      if (text.indexOf('::', compression + 2) !== -1) return null;
+      const leftText = text.slice(0, compression);
+      const rightText = text.slice(compression + 2);
+      const left = leftText ? leftText.split(':') : [];
+      const right = rightText ? rightText.split(':') : [];
+      const groups = left.concat(right);
+      if (groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+      const zeroCount = 8 - groups.length;
+      if (zeroCount < 1) return null;
+      return left.map((group) => parseInt(group, 16))
+        .concat(new Array(zeroCount).fill(0), right.map((group) => parseInt(group, 16)));
+    }
+
+    const groups = text.split(':');
+    if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+    return groups.map((group) => parseInt(group, 16));
+  }
+
+  function formatIpv6Groups(groups) {
+    let bestStart = -1;
+    let bestLength = 1;
+    for (let i = 0; i < groups.length; i += 1) {
+      if (groups[i] !== 0) continue;
+      let end = i;
+      while (end < groups.length && groups[end] === 0) end += 1;
+      if (end - i > bestLength) {
+        bestStart = i;
+        bestLength = end - i;
+      }
+      i = end - 1;
+    }
+    if (bestStart === -1) return groups.map((group) => group.toString(16)).join(':');
+    const left = groups.slice(0, bestStart).map((group) => group.toString(16)).join(':');
+    const right = groups.slice(bestStart + bestLength).map((group) => group.toString(16)).join(':');
+    if (!left && !right) return '::';
+    if (!left) return '::' + right;
+    if (!right) return left + '::';
+    return left + '::' + right;
+  }
+
+  // Reduces a host to a canonical hostname, IPv4 literal or bracketed IPv6.
+  // Numeric aliases are rejected rather than allowing browser URL parsers to
+  // reinterpret them as a different IPv4 address.
   function parseHost(text) {
     if (typeof text !== 'string' || !text) return null;
     const host = text.toLowerCase();
+
     if (host.startsWith('[')) {
-      const close = host.indexOf(']');
-      if (close === -1) return null;
-      const inner = host.slice(1, close);
-      if (!/^[0-9a-f:.]+$/.test(inner)) return null;
-      return host.slice(0, close + 1);
+      if (!host.endsWith(']') || host.indexOf(']') !== host.length - 1) return null;
+      const groups = parseIpv6Groups(host.slice(1, -1));
+      return groups ? '[' + formatIpv6Groups(groups) + ']' : null;
     }
-    if (!/^[0-9a-z._-]+$/.test(host)) return null;
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-      const parts = host.split('.');
-      for (let i = 0; i < parts.length; i += 1) {
-        const value = Number(parts[i]);
-        if (parts[i].length > 3 || value > 255) return null;
-      }
-      return host;
-    }
+
+    if (/[\s/?#@%]/.test(host) || host.includes('\\')
+      || host.includes('[') || host.includes(']') || host.includes(':')) return null;
+
+    if (parseIpv4Octets(host)) return host;
+
+    const dnsName = host.endsWith('.') ? host.slice(0, -1) : host;
+    if (!dnsName || dnsName.length > 253) return null;
+    const labels = dnsName.split('.');
+    if (labels.some((label) => label.length > 63
+      || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))) return null;
+
+    // WHATWG treats a numeric or hexadecimal final label as an IPv4 number.
+    // Reject these forms (including shortened/integer IPv4) instead of
+    // accepting a hostname that Chromium may later normalize differently.
+    const lastLabel = labels[labels.length - 1];
+    if (/^\d+$/.test(lastLabel) || /^0x[0-9a-f]*$/i.test(lastLabel)) return null;
     return host;
+  }
+
+  function isLoopbackHost(host) {
+    if (host === 'localhost' || host === 'localhost.'
+      || host.endsWith('.localhost') || host.endsWith('.localhost.')) return true;
+    if (host.startsWith('[')) {
+      const groups = parseIpv6Groups(host.slice(1, -1));
+      return !!groups && groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1;
+    }
+    const octets = parseIpv4Octets(host);
+    return !!octets && octets[0] === 127;
   }
 
   // Parses a user-entered proxy address into a structured profile.
@@ -84,6 +170,7 @@
 
     let scheme = 'http';
     const schemeMatch = /^([a-zA-Z0-9+.-]+):\/\//.exec(text);
+    const hasExplicitScheme = !!schemeMatch;
     let credentialsStripped = false;
     if (schemeMatch) {
       scheme = schemeMatch[1].toLowerCase();
@@ -96,7 +183,11 @@
     // plan never echoes credentials back.
     const at = text.lastIndexOf('@');
     if (at !== -1) {
+      const userInfo = text.slice(0, at);
+      if (!hasExplicitScheme || !userInfo || userInfo.includes('@')
+        || /[\s/?#\\]/.test(userInfo)) return null;
       text = text.slice(at + 1);
+      if (!text) return null;
       credentialsStripped = true;
     }
 
@@ -122,7 +213,7 @@
     if (!host) return null;
 
     let port = null;
-    if (portText !== null && portText !== '') {
+    if (portText !== null) {
       if (!/^\d{1,5}$/.test(portText)) return null;
       const value = Number(portText);
       if (value < 1 || value > 65535) return null;
@@ -156,7 +247,7 @@
     if (profile.port !== null && profile.port < 1024) {
       notices.push('Ports below 1024 are usually reserved on the proxy machine; double-check the port number with your provider.');
     }
-    if (profile.host === '127.0.0.1' || profile.host === '[::1]' || profile.host === 'localhost') {
+    if (isLoopbackHost(profile.host)) {
       notices.push('This is a loopback address: the proxy would run on this same device, so traffic leaves only after the proxy app sends it.');
     }
     if (profile.scheme === 'socks5') {
