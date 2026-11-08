@@ -9,7 +9,7 @@ import java.util.Map;
  *
  * <p>DownloadProvider replays stored request headers while following redirects. A WebView
  * session Cookie header therefore cannot be safely attached to a request whose redirect
- * destinations are not validated by Daymark. Only a bounded, CR/LF-free User-Agent is copied.
+ * destinations are not validated by Daymark. Only a bounded, ASCII-control-free User-Agent is copied.
  * Cookies, Authorization, Referer and other origin-sensitive headers are never accepted.</p>
  */
 final class BrowserDownloadRequestHeaders {
