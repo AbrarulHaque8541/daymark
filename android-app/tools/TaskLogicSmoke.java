@@ -684,6 +684,22 @@ public final class TaskLogicSmoke {
         expectIllegalArgument(() -> TaskLogic.create("Weekday without date", null, "medium", "",
                 null, null, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_WEEKDAYS),
                 "weekday repeat without a due date is rejected");
+
+        check(TaskLogic.nextDueDate("9999-12-31", TaskLogic.REPEAT_DAILY, null) == null,
+                "daily recurrence does not emit a five-digit year beyond the supported date-only range");
+        check(TaskLogic.nextDueDate("9999-12-31", TaskLogic.REPEAT_WEEKLY, null) == null,
+                "weekly recurrence does not emit a five-digit year beyond the supported date-only range");
+        check(TaskLogic.nextDueDate("9999-12-31", TaskLogic.REPEAT_WEEKDAYS, null) == null,
+                "weekday recurrence does not emit a five-digit year beyond the supported date-only range");
+        check(TaskLogic.nextDueDate("9999-12-31", TaskLogic.REPEAT_MONTHLY, 31) == null,
+                "monthly recurrence does not emit a five-digit year beyond the supported date-only range");
+        check(TaskLogic.nextDueDate("9999-02-28", TaskLogic.REPEAT_YEARLY, 29) == null,
+                "yearly leap-day recurrence does not emit a five-digit year beyond the supported date-only range");
+        Task finalYearTask = TaskLogic.create("Final supported date", "9999-12-31", "medium", "",
+                null, null, Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        check(TaskLogic.advanceRepeat(finalYearTask, zone, Instant.parse("9999-12-31T10:00:00Z"))
+                        == finalYearTask,
+                "automatic catch-up keeps the valid task unchanged when no four-digit next date exists");
     }
 
     private static Task task(String id, String title, String dueDate, String priority, boolean completed, int second) {
