@@ -16,6 +16,19 @@ fi
 
 chmod +x ./gradlew
 
+# Prefer the exact Gradle distribution provisioned/cached by gradle/actions/setup-gradle.
+# Fall back to the checked wrapper when the action is unavailable or did not install 8.13.
+gradle_command=(./gradlew)
+if command -v gradle >/dev/null 2>&1; then
+  installed_version="$(gradle --version 2>/dev/null | awk '/^Gradle / { print $2; exit }' || true)"
+  if [[ "$installed_version" == "8.13" ]]; then
+    gradle_command=(gradle)
+    echo "Using cached Gradle 8.13 from setup-gradle."
+  else
+    echo "Gradle 8.13 is not provisioned on PATH; falling back to the checked wrapper."
+  fi
+fi
+
 max_attempts=3
 initial_delay="${DAYMARK_GRADLE_RETRY_INITIAL_DELAY_SECONDS:-2}"
 if [[ ! "$initial_delay" =~ ^[0-9]{1,2}$ ]] || (( initial_delay > 30 )); then
@@ -32,7 +45,7 @@ delay="$initial_delay"
 while true; do
   log_file="$(mktemp)"
   set +e
-  ./gradlew "$@" 2>&1 | tee "$log_file"
+  "${gradle_command[@]}" "$@" 2>&1 | tee "$log_file"
   status=${PIPESTATUS[0]}
   set -e
 
