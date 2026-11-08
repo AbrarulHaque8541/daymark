@@ -102,7 +102,7 @@ for workflow_name in retry_workflows:
     workflow = workflow_path.read_text(encoding="utf-8")
     assert "tools/run-gradle-with-retry.sh" in workflow, \
         f"{workflow_name} must use the bounded Gradle distribution retry wrapper"
-    assert not re.search(r"(?m)^\\s*\\./gradlew\\s", workflow), \
+    assert not re.search(r"(?m)^\s*\./gradlew\s", workflow), \
         f"{workflow_name} must not bypass the bounded Gradle distribution retry wrapper"
 assert (root / "tools/run-gradle-with-retry.sh").is_file()
 android = "{http://schemas.android.com/apk/res/android}"
