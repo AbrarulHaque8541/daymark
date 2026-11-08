@@ -122,7 +122,8 @@ test('host validation rejects legacy IPv4 aliases and malformed DNS authorities'
     assert.equal(engine.parseProxyAddress(input), null, 'non-canonical host must fail closed: ' + input);
   }
   assert.equal(engine.parseProxyAddress('10.0.0.1:8080').host, '10.0.0.1');
-  assert.equal(engine.parseProxyAddress('münich.example:8080').host, 'xn--mnich-kva.example');
+  assert.equal(engine.parseProxyAddress('münich.example:8080'), null, 'non-ASCII hostnames remain fail-closed until explicit IDN support is added');
+  assert.equal(engine.parseProxyAddress('example.123:8080'), null);
   assert.equal(engine.parseProxyAddress('proxy.example.org.:8080').host, 'proxy.example.org.');
 });
 

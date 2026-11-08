@@ -49,63 +49,112 @@
 
   // Reduces a host to its bare form: a normal hostname, an IPv4 literal or a
   // bracketed IPv6 literal. Anything else fails closed to null.
+  function parseIpv4Octets(text) {
+    if (typeof text !== 'string'
+      || !/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(text)) return null;
+    const octets = text.split('.').map(Number);
+    if (octets.some((value) => value > 255)) return null;
+    return octets;
+  }
+
+  function parseIpv6Groups(address) {
+    if (typeof address !== 'string' || !address || /[^0-9a-f:.]/i.test(address)) return null;
+    let text = address.toLowerCase();
+
+    // IPv4-embedded IPv6 addresses use the final 32 bits as a dotted quad.
+    if (text.includes('.')) {
+      const lastColon = text.lastIndexOf(':');
+      if (lastColon < 0) return null;
+      const octets = parseIpv4Octets(text.slice(lastColon + 1));
+      if (!octets) return null;
+      const high = ((octets[0] << 8) | octets[1]).toString(16);
+      const low = ((octets[2] << 8) | octets[3]).toString(16);
+      text = text.slice(0, lastColon) + ':' + high + ':' + low;
+    }
+
+    const compression = text.indexOf('::');
+    if (compression !== -1) {
+      if (text.indexOf('::', compression + 2) !== -1) return null;
+      const leftText = text.slice(0, compression);
+      const rightText = text.slice(compression + 2);
+      const left = leftText ? leftText.split(':') : [];
+      const right = rightText ? rightText.split(':') : [];
+      const groups = left.concat(right);
+      if (groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+      const zeroCount = 8 - groups.length;
+      if (zeroCount < 1) return null;
+      return left.map((group) => parseInt(group, 16))
+        .concat(new Array(zeroCount).fill(0), right.map((group) => parseInt(group, 16)));
+    }
+
+    const groups = text.split(':');
+    if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+    return groups.map((group) => parseInt(group, 16));
+  }
+
+  function formatIpv6Groups(groups) {
+    let bestStart = -1;
+    let bestLength = 1;
+    for (let i = 0; i < groups.length; i += 1) {
+      if (groups[i] !== 0) continue;
+      let end = i;
+      while (end < groups.length && groups[end] === 0) end += 1;
+      if (end - i > bestLength) {
+        bestStart = i;
+        bestLength = end - i;
+      }
+      i = end - 1;
+    }
+    if (bestStart === -1) return groups.map((group) => group.toString(16)).join(':');
+    const left = groups.slice(0, bestStart).map((group) => group.toString(16)).join(':');
+    const right = groups.slice(bestStart + bestLength).map((group) => group.toString(16)).join(':');
+    if (!left && !right) return '::';
+    if (!left) return '::' + right;
+    if (!right) return left + '::';
+    return left + '::' + right;
+  }
+
+  // Reduces a host to a canonical hostname, IPv4 literal or bracketed IPv6.
+  // Numeric aliases are rejected rather than allowing browser URL parsers to
+  // reinterpret them as a different IPv4 address.
   function parseHost(text) {
     if (typeof text !== 'string' || !text) return null;
     const host = text.toLowerCase();
 
-    // Let the platform URL parser validate IPv6 syntax and normalize equivalent
-    // spellings (for example, the expanded loopback form to [::1]).
     if (host.startsWith('[')) {
       if (!host.endsWith(']') || host.indexOf(']') !== host.length - 1) return null;
-      try {
-        const normalized = new URL('http://' + host + '/').hostname.toLowerCase();
-        return normalized.startsWith('[') && normalized.endsWith(']') ? normalized : null;
-      } catch (e) {
-        return null;
-      }
+      const groups = parseIpv6Groups(host.slice(1, -1));
+      return groups ? '[' + formatIpv6Groups(groups) + ']' : null;
     }
 
-    // A proxy host is an authority, not a URL. Reject delimiters that URL()
-    // would otherwise interpret as path/query/fragment syntax.
     if (/[\s/?#@%]/.test(host) || host.includes('\\')
       || host.includes('[') || host.includes(']') || host.includes(':')) return null;
 
-    let normalized;
-    try {
-      normalized = new URL('http://' + host + '/').hostname.toLowerCase();
-    } catch (e) {
-      return null;
-    }
-    if (!normalized) return null;
+    if (parseIpv4Octets(host)) return host;
 
-    // WHATWG URL parsing accepts legacy IPv4 forms (octal, hex, shortened,
-    // or a single integer) and silently rewrites them. Only accept the
-    // canonical dotted-decimal spelling so the planned destination is
-    // exactly what the user entered.
-    const ipv4Parts = normalized.split('.');
-    const isIpv4 = ipv4Parts.length === 4
-      && ipv4Parts.every((part) => /^(0|[1-9]\d{0,2})$/.test(part));
-    if (isIpv4) {
-      if (ipv4Parts.some((part) => Number(part) > 255) || host !== normalized) return null;
-      return normalized;
-    }
-
-    // Validate DNS labels after URL() has converted internationalized names
-    // to ASCII IDNA form. Empty labels, underscores and edge hyphens are not
-    // valid host labels; one final dot is allowed for an absolute DNS name.
-    const dnsName = normalized.endsWith('.') ? normalized.slice(0, -1) : normalized;
+    const dnsName = host.endsWith('.') ? host.slice(0, -1) : host;
     if (!dnsName || dnsName.length > 253) return null;
     const labels = dnsName.split('.');
     if (labels.some((label) => label.length > 63
       || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))) return null;
-    return normalized;
+
+    // WHATWG treats a numeric or hexadecimal final label as an IPv4 number.
+    // Reject these forms (including shortened/integer IPv4) instead of
+    // accepting a hostname that Chromium may later normalize differently.
+    const lastLabel = labels[labels.length - 1];
+    if (/^\d+$/.test(lastLabel) || /^0x[0-9a-f]*$/i.test(lastLabel)) return null;
+    return host;
   }
 
   function isLoopbackHost(host) {
-    if (host === '[::1]' || host === 'localhost' || host === 'localhost.'
+    if (host === 'localhost' || host === 'localhost.'
       || host.endsWith('.localhost') || host.endsWith('.localhost.')) return true;
-    const parts = host.split('.');
-    return parts.length === 4 && Number(parts[0]) === 127;
+    if (host.startsWith('[')) {
+      const groups = parseIpv6Groups(host.slice(1, -1));
+      return !!groups && groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1;
+    }
+    const octets = parseIpv4Octets(host);
+    return !!octets && octets[0] === 127;
   }
 
   // Parses a user-entered proxy address into a structured profile.
