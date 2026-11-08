@@ -34,7 +34,7 @@ function createDeviceCapabilityProfile(input) {
   const richInput = ['touch', 'keyboard', 'pointer'].some((item) => inputs.has(item));
   const simpleInput = richInput || inputs.has('voice') || inputs.has('button');
   const visible = display !== 'none';
-  const taskCaptureInput = inputs.has('voice') || (visible && richInput);
+  const taskCaptureInput = (visible && richInput) || (inputs.has('voice') && features.has('voice-capture'));
   const actions = new Set();
 
   if (surface !== 'car' && features.has('task-capture') && taskCaptureInput) actions.add('capture-task');

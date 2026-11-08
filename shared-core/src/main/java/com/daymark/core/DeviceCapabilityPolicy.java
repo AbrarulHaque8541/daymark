@@ -60,7 +60,8 @@ public final class DeviceCapabilityPolicy {
         boolean richInput = hasAny(Input.TOUCH, Input.KEYBOARD, Input.POINTER);
         boolean simpleInput = richInput || inputs.contains(Input.VOICE) || inputs.contains(Input.BUTTON);
         boolean visible = display != Display.NONE;
-        boolean taskCaptureInput = inputs.contains(Input.VOICE) || (visible && richInput);
+        boolean taskCaptureInput = (visible && richInput)
+                || (inputs.contains(Input.VOICE) && features.contains(Feature.VOICE_CAPTURE));
 
         if (surface != Surface.CAR && features.contains(Feature.TASK_CAPTURE) && taskCaptureInput) {
             actions.add(Action.CAPTURE_TASK);

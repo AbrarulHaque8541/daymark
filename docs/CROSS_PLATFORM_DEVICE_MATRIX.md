@@ -3,7 +3,7 @@
 **Status:** Architecture proposal with one CI-tested Java 17 capability-policy slice; no non-Android Daymark app shell is shipped. This document is not a compatibility claim.
 **Baseline inspected:** `main` at `555ca0745a5a7ddf3ae443c64859fea9ee2a737a`.
 **Owner direction:** Make Daymark useful across device classes and operating systems, including constrained and display-less companions, while preserving the current Android product.
-**Last updated:** 2026-11-08T11:40:00Z
+**Last updated:** 2026-11-08T11:39:41Z
 
 ## 1. Product principle
 
@@ -99,7 +99,7 @@ The first platform-neutral implementation lives in `shared-core/` as Java 17 sou
 
 - `DeviceCapabilityPolicy` accepts an explicit platform-adapter snapshot: surface, display class, input affordances, and declared Daymark features.
 - It returns a deterministic immutable set of available actions. It does not infer capabilities from a device brand/model or silently grant permissions.
-- Button-only/no-display surfaces are limited to focus and reminder commands. Task capture requires either voice input or a visible surface with rich input so the user can supply a task title; a button press alone must not create a blank task. Rich editing and browser actions require a full display and rich input.
+- Button-only/no-display surfaces are limited to focus and reminder commands. Task capture requires declared Daymark voice-capture support or a visible surface with rich input so the user can supply a task title; a button press alone must not create a blank task. Rich editing and browser actions require a full display and rich input.
 - Car surfaces are deliberately restricted to reminder acknowledge/snooze actions. Task editing, browsing, capture, list review and focus controls are not exposed by this policy.
 - Invalid ring/display combinations are rejected. Missing capabilities fail closed.
 

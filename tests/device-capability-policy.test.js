@@ -25,9 +25,12 @@ test('displayless ring and button companion cannot expose task capture, rich edi
   assert.ok(!p.actions.includes('capture-task'), 'a button alone cannot provide a task title');
 });
 
-test('voice-only displayless companion can capture a task without exposing rich editing', () => {
+test('voice-only displayless companion can capture only when voice capture is declared', () => {
   const p = profile('displayless', 'none', ['voice'], ['task-capture', 'voice-capture', 'task-edit']);
   assert.deepEqual(new Set(p.actions), new Set(['capture-task', 'voice-capture']));
+  const withoutVoiceFeature = profile('displayless', 'none', ['voice'], ['task-capture']);
+  assert.ok(!withoutVoiceFeature.actions.includes('capture-task'),
+    'a voice device without Daymark voice-capture support cannot create a task');
 });
 
 test('watch glance surface permits review and short actions but not full editing', () => {

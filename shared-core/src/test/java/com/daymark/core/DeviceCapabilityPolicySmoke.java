@@ -73,6 +73,12 @@ public final class DeviceCapabilityPolicySmoke {
                 "voice capture remains explicitly feature-gated");
         check(!actions.contains(DeviceCapabilityPolicy.Action.EDIT_TASK),
                 "voice capture does not imply rich task editing");
+        DeviceCapabilityPolicy noVoiceFeature = profile(DeviceCapabilityPolicy.Surface.DISPLAYLESS,
+                DeviceCapabilityPolicy.Display.NONE,
+                EnumSet.of(DeviceCapabilityPolicy.Input.VOICE),
+                EnumSet.of(DeviceCapabilityPolicy.Feature.TASK_CAPTURE));
+        check(!noVoiceFeature.availableActions().contains(DeviceCapabilityPolicy.Action.CAPTURE_TASK),
+                "voice hardware alone does not imply Daymark voice-capture support");
     }
 
     private static void watchIsGlanceableNotAFullEditor() {
