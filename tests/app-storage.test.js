@@ -521,7 +521,7 @@ test('an empty primary task payload is preserved before a later task save', () =
     'an empty stored value is reported as unreadable rather than absent');
 
   app.elements.get('#new-title').value = 'Safe task after recovery';
-  app.elements.get('#add-form').dispatch('submit');
+  triggerFormSubmit(app, '#add-form');
 
   assert.equal(app.storedValues.get(BACKUP_KEY), '',
     'a later save must retain the opaque empty recovery source');
@@ -541,7 +541,7 @@ test('an empty primary task payload is not overwritten when its recovery backup 
     /recovery backup could not be created/);
 
   app.elements.get('#new-title').value = 'Must not overwrite the only source';
-  app.elements.get('#add-form').dispatch('submit');
+  triggerFormSubmit(app, '#add-form');
 
   assert.equal(app.storedValues.get(STORAGE_KEY), '',
     'later task saves remain blocked while the only original payload cannot be backed up');
