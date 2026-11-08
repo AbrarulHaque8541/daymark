@@ -60,6 +60,10 @@
         if (busy) planBtn.setAttribute('aria-busy', 'true');
         else planBtn.removeAttribute('aria-busy');
       }
+      if (planBtn.classList) {
+        if (busy) planBtn.classList.add('is-busy');
+        else planBtn.classList.remove('is-busy');
+      }
     }
 
     function rememberProfile(text) {
