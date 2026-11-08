@@ -7,6 +7,7 @@ const ui = require('../zones-ui.js');
 
 const FROZEN_NOW = '2026-11-08T12:00:00.000Z';
 
+
 function fakeElement(tag) {
   const el = {
     tagName: tag,
@@ -42,6 +43,7 @@ function fakeElement(tag) {
   };
   return el;
 }
+
 
 function makeCache(zones, updatedAt) {
   return { version: 1, zones, updatedAt: updatedAt || '2026-11-08T08:30:00.000Z' };
@@ -87,51 +89,337 @@ function rowTexts(listEl) {
   return listEl.children.map((row) => row.children.map((child) => child.textContent));
 }
 
-// Original tests preserved; new save tests appended below.
-
-test('save overlap creates a local text file via Blob and reports status', async () => {
-  let created = null;
-  let clicked = false;
+test('attach renders the default zone and an honest overlap row with no cache', () => {
   const { env, elements } = fakeEnv({});
-  global.URL = {
-    createObjectURL(blob) {
-      created = blob;
-      return 'blob:fake';
-    },
-    revokeObjectURL() {}
+  const handle = ui.attachZonesUi(env);
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0][0], 'UTC+05:30 · Sun 08 Nov');
+  assert.equal(rows[0][1], 'India · Kolkata — 17:30');
+  assert.equal(rows[0][2], 'Remove');
+  assert.equal(rows[1][0], 'Best shared window');
+  assert.ok(rows[1][1].length > 0, 'the overlap row always explains the best window');
+  assert.equal(elements['zones-status'].textContent,
+    'Pick time zones to compare. Everything is computed offline.');
+  assert.equal(typeof handle.onRefresh, 'function');
+});
+
+test('attach restores a saved zone list with a cached note', () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements } = fakeEnv({ stored });
+  ui.attachZonesUi(env);
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[1][1], 'UK · London — 12:00');
+  assert.ok(elements['zones-status'].textContent.startsWith('Cached · updated 2026-11-08 08:30 UTC'));
+});
+
+test('a corrupt cache is ignored instead of crashing', () => {
+  const { env, elements } = fakeEnv({ stored: '{not json' });
+  ui.attachZonesUi(env);
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0][1], 'India · Kolkata — 17:30');
+  assert.equal(elements['zones-status'].textContent,
+    'Pick time zones to compare. Everything is computed offline.');
+});
+
+test('add appends the picked zone, renders it, and persists the list', async () => {
+  const { env, elements, storageData } = fakeEnv({ pick: 'Europe/London' });
+  const handle = ui.attachZonesUi(env);
+  await handle.onAdd();
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[1][1], 'UK · London — 12:00');
+  assert.ok(elements['zones-status'].textContent.startsWith('Added UK · London'));
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.ok(zonesApi.validateZonesCache(saved));
+  assert.deepEqual(saved.zones, ['Asia/Kolkata', 'Europe/London']);
+});
+
+test('adding a zone that is already on the card is rejected honestly', async () => {
+  const { env, elements, storageData } = fakeEnv({ pick: 'Asia/Kolkata' });
+  const handle = ui.attachZonesUi(env);
+  await handle.onAdd();
+  assert.equal(elements['zones-status'].textContent, 'That time zone is already on the card.');
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+});
+
+test('the card caps how many zones it keeps', async () => {
+  const stored = JSON.stringify(makeCache([
+    'Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Tokyo',
+    'Europe/London', 'Europe/Berlin'
+  ]));
+  const { env, elements } = fakeEnv({ stored, pick: 'Pacific/Auckland' });
+  const handle = ui.attachZonesUi(env);
+  await handle.onAdd();
+  assert.equal(elements['zones-status'].textContent,
+    'Up to ' + zonesApi.MAX_ZONES + ' zones fit on the card. Remove one first.');
+});
+
+test('the last zone cannot be removed', async () => {
+  const { env, elements } = fakeEnv({});
+  const handle = ui.attachZonesUi(env);
+  await handle.onRemove('Asia/Kolkata');
+  assert.equal(elements['zones-status'].textContent, 'Keep at least one time zone on the card.');
+  assert.equal(rowTexts(elements['zones-list']).length, 2);
+});
+
+test('remove drops a zone, persists the list, and rerenders', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements, storageData } = fakeEnv({ stored });
+  const handle = ui.attachZonesUi(env);
+  await handle.onRemove('Europe/London');
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 2);
+  assert.ok(elements['zones-status'].textContent.startsWith('Removed UK · London'));
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.deepEqual(saved.zones, ['Asia/Kolkata']);
+});
+
+test('the per-row remove button is wired', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements } = fakeEnv({ stored });
+  ui.attachZonesUi(env);
+  const firstRow = elements['zones-list'].children[0];
+  const removeBtn = firstRow.children.find((child) => child.tagName === 'button');
+  assert.ok(removeBtn, 'each zone row has a remove button');
+  assert.equal(removeBtn.getAttribute('aria-label'), 'Remove India · Kolkata');
+  await removeBtn.listeners[0].handler();
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0][1], 'UK · London — 12:00');
+});
+
+test('refresh recomputes every clock from the current time', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements, storageData } = fakeEnv({ stored });
+  const handle = ui.attachZonesUi(env);
+  await handle.onRefresh();
+  assert.equal(elements['zones-status'].textContent, 'Updated · 2026-11-08 12:00 UTC');
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.equal(saved.updatedAt, FROZEN_NOW);
+  assert.equal(rowTexts(elements['zones-list']).length, 3);
+});
+
+test('clear removes the saved list and resets to the default zone', async () => {
+  const stored = JSON.stringify(makeCache(['Europe/London']));
+  const { env, elements, storageData } = fakeEnv({ stored });
+  const handle = ui.attachZonesUi(env);
+  await handle.onClear();
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(elements['zones-pick'].value, 'Asia/Kolkata');
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0][1], 'India · Kolkata — 17:30');
+  assert.equal(elements['zones-status'].textContent, 'World clock cleared on this device.');
+});
+
+test('form submission is prevented and adds the picked zone', async () => {
+  const { env, elements } = fakeEnv({ pick: 'Asia/Tokyo' });
+  ui.attachZonesUi(env);
+  const submit = elements['zones-form'].listeners.find((listener) => listener.type === 'submit');
+  assert.ok(submit, 'the zones form handles native submit events');
+  let prevented = false;
+  await submit.handler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'native form navigation is prevented');
+  const rows = rowTexts(elements['zones-list']);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[1][1], 'Japan · Tokyo — 21:00');
+});
+
+test('the add button click listener is registered', async () => {
+  const { env, elements } = fakeEnv({ pick: 'Asia/Tokyo' });
+  ui.attachZonesUi(env);
+  const click = elements['zones-add'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the add button has a click listener');
+  await click.handler();
+  assert.equal(rowTexts(elements['zones-list']).length, 3);
+});
+
+test('a missing zones module is reported instead of crashing', () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  assert.equal(elements['zones-status'].textContent, 'World clock is unavailable.');
+  assert.equal(elements['zones-list'].children.length, 0);
+  handle.onAdd();
+  handle.onRefresh();
+  assert.equal(elements['zones-status'].textContent, 'World clock is unavailable.');
+});
+
+test('the module exposes its API and stays inert under Node', () => {
+  assert.equal(typeof ui.attachZonesUi, 'function');
+  assert.equal(ui.STORAGE_KEY, 'daymark.zones.v1');
+  assert.equal(ui.DEFAULT_ZONE, 'Asia/Kolkata');
+  assert.equal(typeof globalThis.DaymarkZonesUi, 'object');
+});
+
+test('copy overlap writes a multi-line summary to an injected clipboard and reports status', async () => {
+  let written = null;
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    clipboard: {
+      writeText(text) {
+        written = text;
+        return Promise.resolve();
+      }
+    }
   };
   const handle = ui.attachZonesUi(env);
-  const click = elements['zones-save'].listeners.find((l) => l.type === 'click');
-  assert.ok(click, 'the save button has a click listener');
-  const origCreate = env.document.createElement;
-  env.document.createElement = (tag) => {
-    const el = origCreate(tag);
-    if (tag === 'a') {
-      el.click = () => { clicked = true; };
-    }
-    return el;
-  };
+  const click = elements['zones-copy'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the copy button has a click listener');
   await click.handler();
-  assert.ok(created instanceof Blob, 'a Blob was created');
-  assert.equal(created.type, 'text/plain');
-  assert.equal(clicked, true, 'the temporary link was clicked');
-  assert.equal(elements['zones-status'].textContent, 'Saved world clock and overlap as daymark-world-clock.txt.');
+  assert.ok(written && written.includes('Daymark world clock'), 'clipboard received the summary');
+  assert.ok(written.includes('India · Kolkata'), 'summary includes the zone');
+  assert.ok(written.includes('Best shared window'), 'summary includes the overlap');
+  assert.equal(elements['zones-status'].textContent, 'Copied world clock and overlap to clipboard.');
+  assert.equal(elements['zones-copy'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
+});
+
+test('copy reports nothing when the zones module is missing', async () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  handle.onCopy();
+  assert.equal(elements['zones-status'].textContent, 'Nothing to copy yet.');
+});
+
+test('share overlap calls navigator.share with the summary and reports status', async () => {
+  let shared = null;
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    share(data) {
+      shared = data;
+      return Promise.resolve();
+    }
+  };
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-share'].listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'the share button has a click listener');
+  await click.handler();
+  assert.ok(shared && shared.text && shared.text.includes('Daymark world clock'), 'share received the summary');
+  assert.equal(shared.title, 'Daymark world clock and overlap');
+  assert.equal(elements['zones-status'].textContent, 'Shared world clock and overlap.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
+});
+
+test('share reports unavailable when navigator.share is missing', async () => {
+  const { env, elements } = fakeEnv({});
+  env.navigator = {};
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-share'].listeners.find((l) => l.type === 'click');
+  assert.ok(click);
+  await click.handler();
+  assert.equal(elements['zones-status'].textContent, 'Sharing is not available in this environment.');
+});
+
+test('share reports nothing when the zones module is missing', async () => {
+  const { env, elements } = fakeEnv({ zonesApi: null });
+  const handle = ui.attachZonesUi(env);
+  handle.onShare();
+  assert.equal(elements['zones-status'].textContent, 'Nothing to share yet.');
+});
+
+test('save overlap downloads the offline summary, cleans up, and clears busy state', async () => {
+  let savedBlob = null;
+  let clicked = false;
+  let revoked = null;
+  let revokeDelay = null;
+  let link = null;
+  const { env, elements } = fakeEnv({});
+  class FakeBlob {
+    constructor(parts, options) {
+      this.parts = parts;
+      this.type = options && options.type;
+    }
+  }
+  env.Blob = FakeBlob;
+  env.URL = {
+    createObjectURL(blob) {
+      savedBlob = blob;
+      return 'blob:fake';
+    },
+    revokeObjectURL(url) { revoked = url; }
+  };
+  env.setTimeout = (callback, delay) => {
+    revokeDelay = delay;
+    callback();
+    return 1;
+  };
+  const createElement = env.document.createElement;
+  env.document.createElement = (tag) => {
+    const element = createElement(tag);
+    if (tag === 'a') {
+      link = element;
+      element.click = () => { clicked = true; };
+    }
+    return element;
+  };
+  const handle = ui.attachZonesUi(env);
+  const click = elements['zones-save'].listeners.find((listener) => listener.type === 'click');
+  assert.ok(click, 'the Save as text button has a click listener');
+  await click.handler();
+  assert.ok(savedBlob, 'a Blob was created');
+  assert.equal(savedBlob.type, 'text/plain;charset=utf-8');
+  assert.ok(savedBlob.parts[0].includes('Daymark world clock'));
+  assert.ok(savedBlob.parts[0].includes('India · Kolkata'));
+  assert.ok(savedBlob.parts[0].includes('Best shared window'));
+  assert.ok(link, 'a temporary anchor was created');
+  assert.equal(link.href, 'blob:fake');
+  assert.equal(link.download, 'daymark-world-clock.txt');
+  assert.equal(clicked, true, 'the temporary link was activated');
+  assert.equal(revoked, 'blob:fake', 'the temporary object URL was revoked');
+  assert.equal(revokeDelay, 1000, 'the URL remains available briefly for the browser download handoff');
+  assert.equal(elements['zones-status'].textContent,
+    'Saved world clock and overlap as daymark-world-clock.txt.');
   assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
 });
 
 test('save reports nothing when the zones module is missing', async () => {
   const { env, elements } = fakeEnv({ zonesApi: null });
   const handle = ui.attachZonesUi(env);
-  handle.onSave();
+  await handle.onSave();
   assert.equal(elements['zones-status'].textContent, 'Nothing to save yet.');
 });
 
-test('save reports unavailable when URL.createObjectURL is missing', async () => {
+test('save fails closed when Blob and object-URL support is unavailable', async () => {
   const { env, elements } = fakeEnv({});
-  delete global.URL;
+  env.Blob = null;
+  env.URL = null;
   const handle = ui.attachZonesUi(env);
-  const click = elements['zones-save'].listeners.find((l) => l.type === 'click');
-  assert.ok(click);
-  await click.handler();
+  await handle.onSave();
   assert.equal(elements['zones-status'].textContent, 'Saving is not available in this environment.');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
+});
+
+test('save fails closed when the document body cannot host a download link', async () => {
+  const { env, elements } = fakeEnv({});
+  env.document.body = null;
+  const handle = ui.attachZonesUi(env);
+  await handle.onSave();
+  assert.equal(elements['zones-status'].textContent, 'Saving is not available in this environment.');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
+});
+
+test('save reports a download failure and revokes the object URL', async () => {
+  let revoked = null;
+  const { env, elements } = fakeEnv({});
+  class FakeBlob {
+    constructor(parts, options) { this.parts = parts; this.type = options && options.type; }
+  }
+  env.Blob = FakeBlob;
+  env.URL = {
+    createObjectURL() { return 'blob:failed'; },
+    revokeObjectURL(url) { revoked = url; }
+  };
+  env.setTimeout = (callback) => { callback(); };
+  const createElement = env.document.createElement;
+  env.document.createElement = (tag) => {
+    if (tag === 'a') throw new Error('blocked');
+    return createElement(tag);
+  };
+  const handle = ui.attachZonesUi(env);
+  await handle.onSave();
+  assert.equal(elements['zones-status'].textContent, 'Could not save the summary as a text file.');
+  assert.equal(revoked, 'blob:failed');
+  assert.equal(elements['zones-save'].getAttribute('aria-busy'), undefined);
 });

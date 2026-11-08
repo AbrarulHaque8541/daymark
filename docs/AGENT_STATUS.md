@@ -1,8 +1,13 @@
-- [Daymark engineering status — 2026-11-08T14:10:00Z (Cycle B: Save as text on world-clock card)](./CURRENT_STATUS_20261108T141000Z.md)
+- [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
+- Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
+- Use the CURRENT snapshot above for live branch/CI/backlog state; older entries below are historical.
+
+
+- [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
 
 - [Daymark engineering status — 2026-11-08T04:19:09Z (offline world clock & meeting-overlap card)](./CURRENT_STATUS_20261108T041909Z.md)
 
-- [Daymark engineering status — 2026-11-08T09:30:00Z (Cycle A: Share plan on download safety card)](./CURRENT_STATUS_20261108T093000Z.md)
+- [Timestamp requires correction — 2026-11-08T09:30:00Z is later than the 08:46Z verification; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T093000Z.md)
 
 - [Daymark engineering status — 2026-11-08T02:40:00Z (Cycle A: restore complete download UI + task editor)](./CURRENT_STATUS_20261108T024000Z.md)
 
@@ -84,7 +89,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark engineering status — 2026-11-08T01:30:00Z (Cycle A: complete download status polish)](./CURRENT_STATUS_20261108T013000Z.md)
+- [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 
 
 - [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)

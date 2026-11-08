@@ -4,6 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
+bash ./tools/run-gradle-with-retry-tests.sh
 python3 ./tools/check-ui-motion-wiring.py "$ROOT"
 sh ./tools/run-browser-address-notice-tests.sh
 python3 ./tools/check-browser-address-notice-integration.py
@@ -74,6 +75,44 @@ import sys
 import xml.etree.ElementTree as ET
 
 root = pathlib.Path(sys.argv[1])
+wrapper_text = (root / "gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
+wrapper = {}
+for line in wrapper_text.splitlines():
+    if not line or line.lstrip().startswith("#"):
+        continue
+    key, separator, value = line.partition("=")
+    if separator:
+        wrapper[key.strip()] = value.strip()
+assert wrapper.get("distributionUrl") == r"https\://mirrors.huaweicloud.com/gradle/gradle-8.13-bin.zip", \
+    "Gradle 8.13 must use the pinned Huawei Cloud transport mirror"
+assert wrapper.get("distributionSha256Sum") == "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78", \
+    "Gradle 8.13 distribution must remain pinned to the official SHA-256"
+assert wrapper.get("networkTimeout") == "120000" and wrapper.get("validateDistributionUrl") == "true", \
+    "Gradle distribution downloads must keep a bounded 120-second timeout and URL validation"
+retry_workflows = (
+    "android.yml",
+    "android-device-acceptance.yml",
+    "android-device-test-release.yml",
+    "browser-cookie-import-safety.yml",
+    "focus-live-update.yml",
+    "focus-timer-ui.yml",
+)
+for workflow_name in retry_workflows:
+    workflow_path = root.parent / ".github/workflows" / workflow_name
+    workflow = workflow_path.read_text(encoding="utf-8")
+    assert "tools/run-gradle-with-retry.sh" in workflow, \
+        f"{workflow_name} must use the bounded Gradle distribution retry wrapper"
+    assert "gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947" in workflow, \
+        f"{workflow_name} must provision/cache the pinned Gradle 8.13 distribution"
+    assert "gradle/actions/wrapper-validation@48b5f213c81028ace310571dc5ec0fbbca0b2947" in workflow, \
+        f"{workflow_name} must validate the Gradle Wrapper JAR"
+    assert "gradle-version: '8.13'" in workflow and "cache-read-only:" in workflow, \
+        f"{workflow_name} must pin Gradle 8.13 and protect fork cache writes"
+    assert "cache: gradle" not in workflow, \
+        f"{workflow_name} must not combine setup-java Gradle caching with setup-gradle caching"
+    assert not re.search(r"(?m)^\s*\./gradlew\s", workflow), \
+        f"{workflow_name} must not bypass the bounded Gradle distribution retry wrapper"
+assert (root / "tools/run-gradle-with-retry.sh").is_file()
 android = "{http://schemas.android.com/apk/res/android}"
 manifest = ET.parse(root / "app/src/main/AndroidManifest.xml").getroot()
 app = manifest.find("application")
