@@ -12,7 +12,7 @@ const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FEED_KEY = 'daymark.feed.v1';
 const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set()) {
   const elements = new Map();
 
   function element(selector) {
@@ -84,7 +84,10 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   };
 
   const localStorage = {
-    getItem: (key) => storedValues.has(key) ? storedValues.get(key) : null,
+    getItem: (key) => {
+      if (failReads.has(key)) throw new Error('SecurityError');
+      return storedValues.has(key) ? storedValues.get(key) : null;
+    },
     setItem: (key, value) => {
       if (failWrites.has(key)) throw new Error('QuotaExceededError');
       storedValues.set(key, String(value));
@@ -487,3 +490,40 @@ test('Briefing confirms when its cache was persisted for offline reading', async
     /Saved for offline reading/,
     'the status only promises offline availability after persistence succeeds');
 });
+
+
+test('unreadable primary task key surfaces readable recovery backup without mutation', () => {
+  const backup = JSON.stringify([validTask('recovered-1', 'Recovered task')]);
+  const storedValues = new Map([
+    [BACKUP_KEY, backup]
+  ]);
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Primary task data unreadable; recovery backup available/);
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false);
+  assert.equal(storedValues.get(BACKUP_KEY), backup, 'backup must remain untouched');
+  assert.equal(storedValues.has(STORAGE_KEY), false, 'primary must not be written');
+});
+
+test('unreadable primary and unreadable backup reports unknown recovery status', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY, BACKUP_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Primary task data unreadable; recovery status unknown/);
+  assert.equal(app.elements.get('#toast-action').hidden, true);
+});
+
+test('unreadable primary with no backup reports no recovery backup found', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Primary task data unreadable; no recovery backup found/);
+});
+
