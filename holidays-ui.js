@@ -270,6 +270,7 @@
       try {
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;
+        storageWriteFailed = false;
         persistCache(cached);
         persistPrefs(code);
         render(cached);
