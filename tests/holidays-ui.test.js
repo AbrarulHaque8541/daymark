@@ -415,7 +415,7 @@ test('failed two-key clear restores the first key and keeps the current list', (
   assert.equal(storageData[ui.STORAGE_KEY], stored, 'cache is restored after the second removal fails');
   assert.equal(storageData[ui.PREFS_KEY], prefs, 'preference remains unchanged');
   assert.equal(elements['holiday-list'].children.length, 1);
-  assert.equal(elements['holiday-country'].value, 'DE');
+  assert.equal(elements['holiday-country'].value, 'IN', 'the cached country remains authoritative while Clear fails');
   assert.ok(elements['holiday-status'].textContent.includes('Could not clear saved holiday data'));
 });
 
