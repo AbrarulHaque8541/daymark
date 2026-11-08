@@ -100,6 +100,7 @@ async function readResponseText(response, controller, setActiveReader, isTimedOu
   const Decoder = globalThis.TextDecoder;
   if (!body || typeof body.getReader !== "function" || typeof Decoder !== "function") {
     abort(controller);
+    if (body) cancel(body);
     throw networkError("stream-unavailable", "A streaming response reader is required for safe API requests.");
   }
 
@@ -111,10 +112,15 @@ async function readResponseText(response, controller, setActiveReader, isTimedOu
     throw networkError("body-unavailable", "The response body could not be read safely.");
   }
   setActiveReader(reader);
-  const decoder = new Decoder("utf-8", { fatal: true });
   let text = "";
   let bytesRead = 0;
   try {
+    let decoder;
+    try {
+      decoder = new Decoder("utf-8", { fatal: true });
+    } catch (error) {
+      throw networkError("decoder-unavailable", "UTF-8 decoding is unavailable for this response.");
+    }
     for (;;) {
       if (isTimedOut()) throw networkError("timeout", "The network request timed out.");
       const part = await reader.read();

@@ -176,6 +176,29 @@ test("malformed UTF-8 and malformed JSON are rejected rather than silently repla
   );
 });
 
+test("decoder construction failures abort and release the acquired reader", async () => {
+  const { response, state } = jsonStream({ ok: true });
+  const originalDecoder = globalThis.TextDecoder;
+  let signal;
+  globalThis.TextDecoder = class {
+    constructor() { throw new Error("decoder initialization failed"); }
+  };
+  try {
+    await assert.rejects(
+      fetchBoundedJson("https://api.example.com/result", {}, {
+        fetchImpl: async (_url, init) => { signal = init.signal; return response; },
+        timeoutMs: 1000,
+      }),
+      (error) => error.code === "decoder-unavailable"
+    );
+  } finally {
+    globalThis.TextDecoder = originalDecoder;
+  }
+  assert.equal(signal.aborted, true);
+  assert.equal(state.cancelled, true);
+  assert.equal(state.released, true);
+});
+
 test("responses without a streaming body fail closed without materializing text", async () => {
   let textRead = false;
   const response = {
