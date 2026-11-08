@@ -75,7 +75,7 @@ jobs:
 
       - name: Build and run Android variant checks
         run: >-
-          ./gradlew --no-daemon --stacktrace --console=plain
+          bash tools/run-gradle-with-retry.sh --no-daemon --stacktrace --console=plain
           assembleGithubSideloadDebug
           lintGithubSideloadDebug
           lintPlayDebug
