@@ -2,8 +2,21 @@
 
 const { isAllowedInsecure, isTrackerUrl } = require('./rules');
 
+const DOCUMENT_RESOURCE_TYPES = new Set(['mainFrame', 'subFrame']);
+const SUBRESOURCE_TYPES = new Set([
+  'stylesheet',
+  'script',
+  'image',
+  'font',
+  'xhr',
+  'ping',
+  'cspReport',
+  'media',
+  'other',
+]);
+
 function isMainFrame(details) {
-  return !details || !details.resourceType || details.resourceType === 'mainFrame';
+  return !!details && details.resourceType === 'mainFrame';
 }
 
 function isAllowedRequest(details, allowedAppFiles, appUiEntry) {
@@ -16,7 +29,6 @@ function isAllowedRequest(details, allowedAppFiles, appUiEntry) {
     return false;
   }
 
-  const mainFrame = isMainFrame(details);
   switch (url.protocol) {
     case 'https:':
       return true;
@@ -26,15 +38,31 @@ function isAllowedRequest(details, allowedAppFiles, appUiEntry) {
       return isAllowedInsecure(url.hostname);
     case 'ws:':
       return details.resourceType === 'webSocket' && isAllowedInsecure(url.hostname);
-    case 'file:':
+    case 'file:': {
       if (!allowedAppFiles || typeof allowedAppFiles.has !== 'function'
         || !allowedAppFiles.has(url.href)) return false;
-      return mainFrame ? url.href === appUiEntry : url.href !== appUiEntry;
+
+      if (url.href === appUiEntry) {
+        return details.resourceType === 'mainFrame';
+      }
+
+      if (url.pathname.endsWith('/app.js')) {
+        return details.resourceType === 'script';
+      }
+
+      if (url.pathname.endsWith('/style.css')) {
+        return details.resourceType === 'stylesheet';
+      }
+
+      return false;
+    }
     case 'data:':
     case 'blob:':
-      return !mainFrame;
+      return SUBRESOURCE_TYPES.has(details.resourceType)
+        && !DOCUMENT_RESOURCE_TYPES.has(details.resourceType);
     case 'about:':
-      return !mainFrame && (url.href === 'about:blank' || url.href === 'about:srcdoc');
+      return details.resourceType === 'subFrame'
+        && (url.href === 'about:blank' || url.href === 'about:srcdoc');
     default:
       return false;
   }
