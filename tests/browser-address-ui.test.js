@@ -120,11 +120,30 @@ test('the provider preference is persisted and restored on the next visit', () =
   assert.equal(secondHandle.currentProvider(), 'wikipedia');
 });
 
-test('a corrupt provider preference is ignored instead of crashing', () => {
-  const { env, elements } = fakeEnv({ stored: '{not json' });
+test('a corrupt provider preference is preserved and never overwritten by a later choice', () => {
+  const raw = '{not json';
+  const { env, elements, storageData } = fakeEnv({ stored: raw, value: 'daymark tasks' });
   const handle = ui.attachBrowserAddressUi(env);
   assert.equal(handle.currentProvider(), 'duckduckgo');
-  assert.equal(elements['browser-address-status'].textContent, 'Nothing typed yet.');
+  assert.match(elements['browser-address-status'].textContent, /provider preference not saved/);
+  elements['browser-address-provider'].value = 'google';
+  const change = elements['browser-address-provider'].listeners.find((listener) => listener.type === 'change');
+  change.handler();
+  assert.equal(storageData[ui.PREFS_KEY], raw, 'corrupt saved preference is not overwritten');
+  assert.equal(handle.currentProvider(), 'google', 'the current page can still use an in-memory choice');
+  assert.match(elements['browser-address-result'].textContent, /www\\.google\\.com/);
+});
+
+test('an empty provider preference is corruption, not an absent key', () => {
+  const { env, elements, storageData } = fakeEnv({ stored: '', value: 'daymark tasks' });
+  const handle = ui.attachBrowserAddressUi(env);
+  assert.equal(handle.currentProvider(), 'duckduckgo');
+  assert.match(elements['browser-address-status'].textContent, /provider preference not saved/);
+  elements['browser-address-provider'].value = 'bing';
+  const change = elements['browser-address-provider'].listeners.find((listener) => listener.type === 'change');
+  change.handler();
+  assert.equal(storageData[ui.PREFS_KEY], '', 'empty corrupt value remains untouched');
+  assert.equal(handle.currentProvider(), 'bing');
 });
 
 test('external handoffs and blocked schemes are surfaced distinctly', () => {

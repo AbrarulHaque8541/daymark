@@ -75,14 +75,20 @@
         storageReadFailed = true;
         return null;
       }
-      if (!raw) return null;
+      if (raw === null) return null;
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.provider === 'string'
           && addressApi && addressApi.isKnownProvider(parsed.provider)) {
           return parsed;
         }
-      } catch (error) { /* a corrupt preference is treated as no preference */ }
+      } catch (error) {
+        // A non-empty but unreadable value is unknown saved state, not an absent preference.
+        storageReadFailed = true;
+        return null;
+      }
+      // Preserve syntactically valid but unsupported values rather than overwriting them.
+      storageReadFailed = true;
       return null;
     }
 
