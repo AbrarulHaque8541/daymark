@@ -158,16 +158,30 @@ test('fetchHolidays reports friendly errors', async () => {
   );
 });
 
-test('oversized responses are rejected before parsing', async () => {
-  const huge = 'x'.repeat(holidays.MAX_JSON_CHARS + 1);
+test('oversized responses are rejected by Content-Length before acquiring the stream', async () => {
+  let readerOpened = false;
+  let bodyCancelled = false;
+  let textCalled = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get(name) { return name.toLowerCase() === 'content-length' ? String(holidays.MAX_JSON_BYTES + 1) : null; } },
+    body: {
+      getReader() { readerOpened = true; throw new Error('oversized body must be rejected before reader acquisition'); },
+      cancel() { bodyCancelled = true; return Promise.resolve(); }
+    },
+    text() { textCalled = true; throw new Error('unbounded text fallback must not be called'); }
+  };
   await assertStrict.rejects(
     holidays.fetchHolidays('IN', routeFetch([
-      { prefix: holidays.ENDPOINT, body: () => ({ ok: true, status: 200, text: () => Promise.resolve(huge) }) }
-    ]), { now: () => '2026-11-06T12:00:00.000Z' }),
+      { prefix: holidays.ENDPOINT, body: () => response }
+    ]]), { now: () => '2026-11-06T12:00:00.000Z' }),
     /too large/
   );
+  assertStrict.equal(readerOpened, false);
+  assertStrict.equal(bodyCancelled, true);
+  assertStrict.equal(textCalled, false);
 });
-
 test('a hanging request times out', async () => {
   const hanging = () => new Promise(() => {});
   await assertStrict.rejects(
