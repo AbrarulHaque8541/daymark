@@ -72,7 +72,7 @@
       if (body && typeof body.getReader === 'function' && Decoder) {
         reader = body.getReader();
         if (onReader) onReader(reader);
-        const decoder = new Decoder('utf-8');
+        const decoder = new Decoder('utf-8', { fatal: true });
         let bytesRead = 0;
         let text = '';
         while (true) {

@@ -62,6 +62,20 @@ test('shared reader incrementally decodes UTF-8 split across chunks', async () =
   assert.equal(state.textCalled, undefined);
 });
 
+
+test('shared reader rejects malformed UTF-8 and cancels the stream', async () => {
+  const controller = new AbortController();
+  const { response, state } = makeStreamResponse([new Uint8Array([0x7B, 0x22, 0x78, 0x22, 0x3A, 0xFF, 0x7D])]);
+  await assert.rejects(
+    responseBody.readBoundedText(response, { controller }),
+    /encoded data|encoding|malformed/i
+  );
+  assert.equal(controller.signal.aborted, true);
+  assert.equal(state.cancelled, true);
+  assert.equal(state.released, true);
+  assert.equal(state.textCalled, undefined);
+});
+
 test('shared reader cancels and aborts immediately after the byte cap is crossed', async () => {
   const controller = new AbortController();
   const { response, state } = makeStreamResponse([
