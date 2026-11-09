@@ -76,7 +76,7 @@ final class BrowserServiceWorkerEnforcement {
         return settingsBlocked || clientInstalled;
     }
 
-    static boolean enforceBlocked() {
+    static synchronized boolean enforceBlocked() {
         if (!installAttempted) return installBeforeFirstWebView();
         try {
             ServiceWorkerController.getInstance().getServiceWorkerWebSettings()
