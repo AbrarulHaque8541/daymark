@@ -1,3 +1,23 @@
+## Latest verified execution — 2026-11-09T22:01:18Z
+
+Main remains 1532838c78ab350b18f95e96a2c547ba384f0831; Android CI and Ubuntu/Windows contracts PASS. Full evidence: [CURRENT_STATUS_20261109T220118Z.md](docs/CURRENT_STATUS_20261109T220118Z.md).
+
+Delivered on existing owner branches:
+- #675: fixed the undefined Focus backup helper and stale hasPayload/hasBackup field mismatch; added four recovery regressions. Exact head d9565581d20fab7d84668ac1b7d9c61f29c0fba6 passes Android CI (768/768 Node tests), contracts and device APK.
+- #688: hardened Node test registration scanning against regex/control-flow and options-object false positives; exact head 2a0e4ea27c5519c7a000ae755bfdfc468b2be3da passes Android CI (684/684), contracts and device APK; ready for review.
+
+Current P0 queue:
+1. #683 — implement a real origin-wide Web Locks mutation contract across app writes/import/recovery/clear/undo; do not merge the localStorage lease branch.
+2. #613/#677/#648 — integrate the tested Task Editor IME fix sequentially; #677 API36 currently fails Cancel while IME is visible.
+3. #646/#160 — owner/admin branch-protection configuration and physical Android/WebView acceptance.
+
+Next P1 queue: #675/#636/#639 recovery/webhook review; #687 malformed extension recovery UI with #659 store APIs and #648 MainActivity ownership; #685/#686 Service Worker compatibility; #671/#678 secure download transport; #684/#476 recurrence; #665/#84 signing/provenance; #656/#676/#682 independent reviews.
+
+Governance: all 11 open PRs target main; no independent APPROVED review and no requested reviewers found. Main reports protected=false, no rulesets, and detailed protection endpoint returns 403. No merge, release, tag, version, signer, package identity or destructive data action was taken.
+
+Work by: ChatGPT (OpenAI) · Model: GPT-6 · Tooling: GitHub connector via Code Mode · Timestamp (UTC): 2026-11-09T22:01:18Z
+
+---
 ## Latest documentation-guard correction — 2026-11-09T21:18:11.184Z
 
 The docs-only PR #675 head `b71b8c0461a5694b2173621c333a5be8893e243b` triggered Android CI and device-test asset workflows; both failed at the package-cleanliness guard because the newly added status snapshot repeated a retired application-identity literal while describing Issue #679. This was a documentation-only failure, not a production-source/test failure.
