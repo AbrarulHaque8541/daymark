@@ -1,4 +1,34 @@
-## Current whole-project execution queue — 2026-11-09T14:47:38.879Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+## Current whole-project execution queue — 2026-11-09T14:55:08Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed exact-head inventory, CI evidence, issue list, work log and safety limitations are in [the 14:55 status snapshot](docs/CURRENT_STATUS_20261109T145508Z.md). Preserve older planning sections below as historical evidence.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Six open PRs, twelve open issues; all six PR bases equal current main. No independent approval and no requested reviewers.
+- Main protection is disabled, rulesets empty; the integration cannot read the detailed protection endpoint (HTTP 403). No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance remains NOT TESTED.
+
+### Current delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: Android CI PASS; Focus UI/Sound and Live Update PASS; API29/API36 Focus lifecycle and device workflows still in progress/pending. New instrumentation translates root-view visible bounds to screen coordinates before UiAutomation injection, positions real controls inside the ScrollView, and guards the ordering. Previous API36 failure was at run 1/10; latest ten-run result not yet verified. Downloads remain fail-closed only on this branch.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545/data-integrity review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device checks PASS; Node 541/541, ExtensionStore smoke 12 assertions, 16 guard mutations; independent extension-security review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device APK PASS; draft. PR/debug builds receive no signing secrets; tag-only signed build and temp-keystore cleanup. Upstream SLSA v1.4.0 still embeds a Node20 artifact action; provenance review required.
+- **#675** `a8d57946cee0645db99304a52b34071e022c3b31`: Android and contracts in progress; device APK pending. Previous head Node 726/726 and all workflows PASS. Current head adds WebCrypto-unavailable tests proving no queue write/network send when SHA-256 is unavailable. Endpoint-partitioned queue stores only SHA-256 destination fingerprints, verifies URL/event match before fetch, preserves other-endpoint events, and requires explicit confirmation for legacy unassigned events. Storage clear preflight and independent task/Focus backup reads remain in the branch.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device acceptance/device APK PASS; ExtensionInjectorSmoke 41 assertions. Page-bound CSS/JS injection and JS-only GM_addStyle bootstrap; physical browser acceptance pending.
+
+### Prioritized whole-project backlog
+1. **P0 — Focus API36 (#648/#613):** finish the latest screen-coordinate/viewport correction and inspect the exact ten-run logs. If it passes, retain and verify real parent-scroll and post-drag tap assertions; if it fails, use the new screen-space diagnostics. No retry or weakened assertions.
+2. **P0 — Webhook/storage/recovery (#675; #636/#639/#640/#603):** finish current exact-head tests, obtain independent security/data-integrity review, verify endpoint partitioning and task-persist-before-notify. Keep unreadable/unknown distinct from absent and preserve opaque backup bytes.
+3. **P0 — Signing boundary (#665/#84):** independent review of PR/debug secret isolation and trusted SLSA transitive action runtime before merge.
+4. **P1 — Extension injection/import (#676/#659):** independent review of page matching, stale navigation, GM_addStyle, default-disabled imports and existing-pack preservation; then physical browser/device acceptance.
+5. **P1 — iCalendar/import-export (#656):** independent RFC5545 review for categories, repeated properties, recurrence, timezone, seconds precision and completion metadata.
+6. **P0 — Browser downloads (#671/#648):** keep current-main downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport enforces downgrade/private-address/host checks, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp-file cleanup and cancellation/error handling. Do not use preflight-then-DownloadManager.
+7. **P0 — Physical Android acceptance (#160):** test current-main APK on real devices with model/API/WebView provider/version and APK SHA. CI/emulator artifacts are not device acceptance.
+8. **P1 — Reminder parity (#476):** recurrence anchors, long-gap catch-up, AlarmManager/Doze/reboot/timezone/OEM behavior.
+9. **P0 — Main governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations and force-push/deletion restrictions.
+10. **P2 — Cross-platform/browser architecture (#325/#348):** measured compatibility and performance work.
+
+## Historical whole-project execution queue — 2026-11-09T14:47:38.879Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
 
 This is a new dated status layer. Older planning sections below are historical; do not rewrite their evidence.
 
