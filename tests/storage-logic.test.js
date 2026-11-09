@@ -31,6 +31,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.tasks.v1',
     'daymark.tasks.v1.backup',
     'daymark.focus.v1',
+    'daymark.focus.preset.v1',
     'daymark.focus.v1.backup',
     'daymark.feed.v1',
     'daymark.weather.v1',
@@ -59,11 +60,16 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
   const proxyKey = proxyUi.match(/const LAST_PROFILE_KEY = '([^']+)'/);
   assert.ok(proxyKey, 'the browser proxy UI must declare its remembered profile key');
   assert.ok(seen.has(proxyKey[1]), 'the remembered browser proxy key must be included in the storage inventory');
+  const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const focusPresetKey = appSource.match(/const FOCUS_PRESET_KEY = '([^']+)'/);
+  assert.ok(focusPresetKey, 'the app must declare its Focus preset storage key');
+  assert.ok(seen.has(focusPresetKey[1]), 'the Focus preset key must be included in the storage inventory');
   assert.equal(storage.isManagedKey('daymark.unknown.v1'), false);
 });
 
 test('planClear returns the exact keys and rejects unknown categories', () => {
   assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
+  assert.deepEqual(storage.planClear('focus-preset'), ['daymark.focus.preset.v1']);
   assert.deepEqual(storage.planClear('browser-proxy'), ['daymark.browser-proxy.last-profile']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
   assert.deepEqual(storage.planClear('webhook-lock'), ['daymark.webhook.lock.v1']);
@@ -269,4 +275,24 @@ test('saved browser proxy profile is inventoried and cleared independently', () 
   assert.equal(store.snapshot['daymark.browser-proxy.last-profile'], undefined);
   assert.equal(store.snapshot['daymark.webhook.queue.v1'], '[]',
     'clearing the remembered proxy profile must not touch queued webhook events');
+});
+
+
+test('Focus preset is inventoried and cleared without touching the active session or history', () => {
+  const focusState = JSON.stringify({ session: { status: 'running' }, log: [] });
+  const store = fakeStorage({
+    'daymark.focus.preset.v1': JSON.stringify({ preset: 'pomodoro' }),
+    'daymark.focus.v1': focusState
+  });
+  const scan = storage.scanStorage(store);
+  const byId = Object.fromEntries(scan.categories.map((entry) => [entry.id, entry]));
+  assert.equal(byId['focus-preset'].present, true);
+  assert.equal(byId.focus.present, true);
+
+  const result = storage.clearCategory(store, 'focus-preset');
+  assert.deepEqual(result.removed, ['daymark.focus.preset.v1']);
+  assert.deepEqual(result.failed, []);
+  assert.equal(store.snapshot['daymark.focus.preset.v1'], undefined);
+  assert.equal(store.snapshot['daymark.focus.v1'], focusState,
+    'clearing the preset must not stop or erase the active Focus session or history');
 });
