@@ -52,13 +52,19 @@ function fakeEnv(options) {
   };
   const storageData = Object.assign({}, opts.data || {});
   const readFailures = new Set(opts.readFailures || []);
+  const readKeys = [];
+  const removedKeys = [];
   const storage = {
     getItem(key) {
+      readKeys.push(key);
       if (readFailures.has(key)) throw new Error('Read access failure');
       return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
     },
     setItem(key, value) { storageData[key] = String(value); },
-    removeItem(key) { delete storageData[key]; }
+    removeItem(key) {
+      removedKeys.push(key);
+      delete storageData[key];
+    }
   };
   const confirmations = [];
   const confirmState = {
@@ -81,7 +87,7 @@ function fakeEnv(options) {
     },
     now: () => '2026-11-04T12:00:00.000Z'
   };
-  return { env, elements, storageData, confirmations, confirmState };
+  return { env, elements, storageData, confirmations, confirmState, readKeys, removedKeys };
 }
 
 test('the module exposes its API and stays inert under Node', () => {
@@ -192,11 +198,13 @@ test('a throwing confirmation fails closed without touching data', () => {
   assert.match(elements['storage-status-line'].textContent, /Could not ask for confirmation\. Nothing was cleared/);
 });
 
-test('clear-all confirms once, removes everything, and leaves foreign keys alone', () => {
-  const { env, elements, storageData, confirmations } = fakeEnv({
+test('clear-all confirms once, removes managed data, and never reads the legacy webhook secret', () => {
+  const legacySecret = 'https://hooks.example.com/x?token=legacy-secret';
+  const { env, elements, storageData, confirmations, readKeys, removedKeys } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
       'daymark.focus.v1': '{}',
+      'daymark.webhook.v1': legacySecret,
       'daymark.webhook.queue.v1': '[]',
       'daymark.webhook.lock.v1': '12345|stale-owner',
       'unrelated.other.key': 'keep me'
@@ -210,6 +218,10 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
   assert.equal(storageData['daymark.focus.v1'], undefined);
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
   assert.equal(storageData['daymark.webhook.lock.v1'], undefined, 'legacy webhook lock is managed and cleared');
+  assert.equal(storageData['daymark.webhook.v1'], legacySecret, 'the secret-bearing legacy endpoint is not touched');
+  assert.equal(readKeys.includes('daymark.webhook.v1'), false, 'the storage UI never reads the endpoint');
+  assert.equal(removedKeys.includes('daymark.webhook.v1'), false, 'the storage UI never removes the endpoint');
+  assert.doesNotMatch(confirmations[0], /legacy webhook settings/i);
   assert.equal(storageData['unrelated.other.key'], 'keep me');
   assert.match(elements['storage-status-line'].textContent, /Cleared all 4 stored item\(s\)/);
   assert.match(elements['storage-status-line'].textContent, /Nothing outside this browser was affected/);
