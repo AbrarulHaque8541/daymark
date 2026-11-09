@@ -1,4 +1,32 @@
-## Current whole-project execution queue — 2026-11-09T15:02:16Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+## Current whole-project execution queue — 2026-11-09T15:17:00Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed seven-PR inventory, exact heads/checks, 12 open issues, delivery log and limitations are in [the 15:17 status snapshot](docs/CURRENT_STATUS_20261109T151700Z.md). The #675 head recorded there is the green code/test head before the snapshot/index/plan documentation commits; the docs-only head is independently re-running CI.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Seven open PRs, twelve open issues; all seven PR bases equal current main. No independent approval and no requested reviewers.
+- Main protection is disabled, rulesets empty; detailed protection endpoint returns HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance remains NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: Android CI, contracts, Focus UI/Sound, Live Update, device acceptance artifact and device-test APK PASS. API29 367 assertions PASS; API36 **10/10 consecutive runs PASS**, 370 assertions each. Root-to-screen coordinate conversion and actual-control viewport positioning fixed the prior injection failures. Physical device acceptance pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545/data-integrity review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device checks PASS; Node 541/541, ExtensionStore smoke 12 assertions, 16 guard mutations; independent extension-security review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device APK PASS; draft. PR/debug builds receive no signing secrets; tag-only signed build and temp-keystore cleanup. Upstream SLSA v1.4.0 still embeds a Node20 artifact action; provenance review required.
+- **#675** `f55ffb2e4e96ad51245ad833a6b76030792224c0`: Android CI #42640818091, Ubuntu/Windows #42640818105 and device-test APK #42640818066 PASS; code/test head `9bda5bf` Node 728/728 and Gradle debug build PASS; release publication skipped. Draft; independent security/data-integrity review pending.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device acceptance/device APK PASS; ExtensionInjectorSmoke 41 assertions. Page-bound CSS/JS injection and JS-only GM_addStyle bootstrap; physical browser acceptance pending.
+- **#677** `925930b88649c25017c2cd8f00af72dbf090e6fa`: draft, 14 commits/9 files/0 behind. Adds TIME_SET/TIMEZONE_CHANGED receiver actions routed through the existing encrypted-task read and `rescheduleAll()`, pure policy smoke tests, manifest/source guards and mutation tests. Current exact-head Android CI, contracts, Focus emulator and device-artifact workflows are IN PROGRESS/PENDING. Previous head `b596f0` passed Android CI/contracts/device-acceptance artifact; Focus emulator/device APK had not completed. Browser docs now disclose nominal 30s in-page checks and background timer throttling.
+
+### Prioritized whole-project backlog
+1. **P0 — Independent review/integration:** #675 webhook endpoint isolation/storage/recovery; #665 signing-secret boundary; #656 import semantics; #659/#676 extension security; #648 Focus/download boundary; #677 reminder system-time re-arming. No merge without fresh independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** current-main APK on real devices with model/API/WebView provider/version, APK SHA and scenario evidence for browser, extensions, SAF, updates, reminders and downloads. CI/emulator artifacts are not physical-device acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep current-main downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport enforces downgrade/private-address/host checks, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp-file cleanup and cancellation/error handling. Do not use preflight-then-DownloadManager.
+4. **P1 — Reminder delivery (#476/#677):** finish exact-head CI; test actual clock/timezone changes and reboot/Doze/OEM behavior on physical devices; retain browser background-throttling limitations.
+5. **P0 — Main governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations and force-push/deletion restrictions.
+6. **P1 — Finish Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or perform a separately reviewed provenance migration.
+7. **P2 — Cross-platform/browser architecture (#325/#348):** measured compatibility and performance work.
+
+## Historical whole-project execution queue — 2026-11-09T15:02:16Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
 
 The detailed exact-head inventory, CI evidence, issue list, work log and safety limitations are in [the 15:02 status snapshot](docs/CURRENT_STATUS_20261109T150216Z.md). The #675 head recorded there is the green code/test head before this snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
 
