@@ -117,7 +117,21 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon clean
 
-      - name: Build and check both Android flavors
+      - name: Build and check both unsigned debug flavors
+        if: ${{ github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/') }}
+        working-directory: android-app
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --continue \
+            assembleGithubSideloadDebug \
+            assemblePlayDebug \
+            lintGithubSideloadDebug \
+            lintPlayDebug \
+            compileGithubSideloadDebugAndroidTestJavaWithJavac \
+            compilePlayDebugAndroidTestJavaWithJavac
+
+      - name: Build and check both signed release flavors
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
         working-directory: android-app
         env:
           RAW_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -126,30 +140,19 @@ jobs:
           RAW_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" == "tag" ]]; then
-            echo "Decoding release keystore..."
-            echo "$RAW_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "Decoding release keystore..."
+          echo "$RAW_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          trap 'rm -f "$RUNNER_TEMP/release.keystore"' EXIT
 
-            KEYSTORE_PATH="$RUNNER_TEMP/release.keystore" \
-            KEYSTORE_PASSWORD="$RAW_KEYSTORE_PASSWORD" \
-            KEY_ALIAS="$RAW_KEY_ALIAS" \
-            KEY_PASSWORD="$RAW_KEY_PASSWORD" \
-            ./gradlew --no-daemon --continue \
-              assembleGithubSideloadRelease \
-              assemblePlayRelease \
-              lintGithubSideloadRelease \
-              lintPlayRelease
-
-            rm -f "$RUNNER_TEMP/release.keystore"
-          else
-            ./gradlew --no-daemon --continue \
-              assembleGithubSideloadDebug \
-              assemblePlayDebug \
-              lintGithubSideloadDebug \
-              lintPlayDebug \
-              compileGithubSideloadDebugAndroidTestJavaWithJavac \
-              compilePlayDebugAndroidTestJavaWithJavac
-          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/release.keystore" \
+          KEYSTORE_PASSWORD="$RAW_KEYSTORE_PASSWORD" \
+          KEY_ALIAS="$RAW_KEY_ALIAS" \
+          KEY_PASSWORD="$RAW_KEY_PASSWORD" \
+          ./gradlew --no-daemon --continue \
+            assembleGithubSideloadRelease \
+            assemblePlayRelease \
+            lintGithubSideloadRelease \
+            lintPlayRelease
 
       - name: Verify merged manifests
         working-directory: android-app
