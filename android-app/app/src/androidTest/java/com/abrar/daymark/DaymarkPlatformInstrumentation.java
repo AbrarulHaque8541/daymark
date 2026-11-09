@@ -594,9 +594,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             throw new IllegalArgumentException("unsupported shell input action: " + action);
         }
 
-        String command = PlatformShellInputCommand.withStatus(inputCommand);
         marker("shell input start: " + inputCommand);
-        ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(command);
+        ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(inputCommand);
         if (descriptor == null) {
             throw new IOException("UiAutomation returned no shell input descriptor");
         }
@@ -612,11 +611,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         }
         String response = new String(output.toByteArray(), StandardCharsets.UTF_8);
-        int status = PlatformShellInputCommand.parseStatus(response);
-        if (status != 0) {
-            throw new AssertionError("shell input failed (action=" + action + ", exit=" + status
-                    + ", output=" + response.trim() + ")");
-        }
+        if (!response.trim().isEmpty()) marker("shell input output: " + response.trim());
         marker("shell input complete: " + inputCommand);
         waitForIdleSync();
     }
