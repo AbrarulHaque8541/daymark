@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
 set -eu
 
-./gradlew --no-daemon :service-worker-test:connectedGithubSideloadDebugAndroidTest
+# The com.android.test module's connectedAndroidTest task runs its configured target variants.
+./gradlew --no-daemon :service-worker-test:connectedAndroidTest

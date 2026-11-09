@@ -13,7 +13,6 @@ android {
     }
 
     targetProjectPath = ":app"
-    targetVariant = "githubSideloadDebug"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
