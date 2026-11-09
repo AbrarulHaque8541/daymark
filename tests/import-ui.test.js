@@ -152,7 +152,7 @@ test('a csv file is intercepted, merged and saved with a status line', async () 
 test('CSV rows with duplicate subtask JSON keys are skipped without changing stored tasks', async () => {
   const cell = (value) => {
     const text = String(value);
-    return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
   };
   const row = [
     'duplicate-subtask', 'Do not drop ambiguous steps', '', '', 'medium', 'false',
