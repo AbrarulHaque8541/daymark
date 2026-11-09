@@ -1,11 +1,11 @@
 // AI Assistant button: a small floating button appears when the user
-// selects text. Clicking it opens a panel with Explain / Summarize /
-// Translate. With an OpenAI-compatible key+URL configured in options the
-// request goes through the background worker; without a key every action
-// falls back to opening a search tab with the selected text.
+// selects text. Clicking it opens Explain / Summarize / Translate.
+// Search fallback is used only when no API key is configured; a failed
+// configured request never forwards selected text to another provider.
 
 const BTN_ID = "uccl-ai-btn";
 const PANEL_ID = "uccl-ai-panel";
+const MAX_SELECTED_TEXT_CHARS = 11800;
 
 function selectedText() {
   const sel = window.getSelection && window.getSelection();
@@ -41,7 +41,10 @@ function buildPanel(text) {
     const b = document.createElement("button");
     b.textContent = action;
     b.setAttribute("style", "flex:1;border:1px solid #ccc;background:#f5f5f5;border-radius:6px;padding:6px;font:13px sans-serif;cursor:pointer");
-    b.onclick = () => runAction(action, text, panel);
+    b.onclick = (event) => {
+      if (!event || event.isTrusted !== true) return;
+      runAction(action, text);
+    };
     row.appendChild(b);
   }
   const snippet = document.createElement("div");
@@ -60,22 +63,42 @@ function buildPanel(text) {
   return panel;
 }
 
-async function runAction(action, text, panel) {
+async function runAction(action, text) {
   const out = document.getElementById(PANEL_ID + "-out");
+  if (text.length > MAX_SELECTED_TEXT_CHARS) {
+    if (out) out.textContent = "Select a shorter passage (maximum 11,800 characters).";
+    return;
+  }
   if (out) out.textContent = "…";
   const prompt = action === "Explain"
     ? "Explain this clearly:\n\n" + text
     : action === "Summarize"
       ? "Summarize this in a few bullet points:\n\n" + text
       : "Translate this to the user's preferred language:\n\n" + text;
-  const response = await chrome.runtime.sendMessage({ type: "aiRequest", prompt });
-  if (out) {
-    if (response && response.text) out.textContent = response.text;
-    else out.textContent = "No API key set — opened a search tab instead.";
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ type: "aiRequest", prompt });
+  } catch (error) {
+    response = { error: "request-failed" };
   }
-  if (!response || !response.text) {
+  if (response && response.text) {
+    if (out) out.textContent = response.text;
+    return;
+  }
+  const code = response && response.error;
+  if (code === "no-api-key") {
+    if (out) out.textContent = "No API key configured. Opening a search tab.";
     window.open("https://www.google.com/search?q=" + encodeURIComponent(prompt), "_blank");
+    return;
   }
+  const messages = {
+    "invalid-api-endpoint": "Configure a matching HTTPS API endpoint and origin in extension options.",
+    "host-permission-required": "Grant the configured API host permission in extension options.",
+    "prompt-too-large": "Select a shorter passage (maximum 12,000 characters).",
+    "response-too-large": "The AI response exceeded the safety limit.",
+    timeout: "The AI request timed out. Your selection was not sent to a search provider.",
+  };
+  if (out) out.textContent = messages[code] || "AI request failed. Your selection was not sent to a search provider.";
 }
 
 function onEnable() {
@@ -84,16 +107,19 @@ function onEnable() {
   document.addEventListener("selectionchange", () => {
     const text = selectedText();
     if (!text) { btn.style.display = "none"; return; }
-    const rect = (window.getSelection().rangeCount > 0)
-      ? window.getSelection().getRangeAt(0).getBoundingClientRect()
-      : null;
+    const selection = window.getSelection();
+    const rect = selection && selection.rangeCount > 0
+      ? selection.getRangeAt(0).getBoundingClientRect() : null;
     if (rect && rect.width + rect.height > 0) {
       btn.style.left = Math.max(4, rect.left) + "px";
       btn.style.top = Math.max(4, rect.top - 40) + "px";
       btn.style.display = "block";
+    } else {
+      btn.style.display = "none";
     }
   });
-  btn.onclick = () => {
+  btn.onclick = (event) => {
+    if (!event || event.isTrusted !== true) return;
     const text = selectedText();
     if (!text) return;
     document.getElementById(PANEL_ID)?.remove();
