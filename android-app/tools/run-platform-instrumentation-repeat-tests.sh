@@ -14,6 +14,13 @@ export RUN_LOG ADB_LOG
 fail() { echo "FAIL: $*" >&2; exit 1; }
 line_count() { wc -l < "$1" | tr -d '[:space:]'; }
 assert_eq() { [ "$1" = "$2" ] || fail "$3 (expected $2, got $1)"; }
+component="$(printf '%s\n' \
+  'package:com.abrar.daymark.test' \
+  'instrumentation:com.abrar.daymark.test/com.abrar.daymark.DaymarkPlatformInstrumentation (target=com.abrar.daymark)' \
+  | parse_platform_instrumentation_component)"
+assert_eq "$component" "com.abrar.daymark.test/com.abrar.daymark.DaymarkPlatformInstrumentation" "registered instrumentation component is parsed from pm output"
+missing="$(printf '%s\n' 'package:com.abrar.daymark' 'instrumentation:other.test/OtherRunner (target=other)' | parse_platform_instrumentation_component)"
+assert_eq "$missing" "" "unrelated instrumentation entries are ignored"
 adb() {
   printf '%s\n' "$*" >> "$ADB_LOG"
   if [ "${ADB_FAIL_STATUS:-0}" -ne 0 ]; then return "$ADB_FAIL_STATUS"; fi
