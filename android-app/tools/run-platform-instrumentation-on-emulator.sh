@@ -53,13 +53,13 @@ echo "Running Android instrumentation component: $instrumentation"
 input_package="com.abrar.daymark"
 run_as_output="$(adb shell run-as "$input_package" mkdir -p files 2>&1)" || {
   run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
-  echo "Target app package $input_package cannot create its files directory: \${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
+  echo "Target app package $input_package cannot create its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
   exit 1
 }
 probe_dir="files/.daymark-host-input-probe-$$"
 run_as_output="$(adb shell run-as "$input_package" mkdir "$probe_dir" 2>&1)" || {
   run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
-  echo "Target app package $input_package cannot write its files directory: \${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
+  echo "Target app package $input_package cannot write its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
   exit 1
 }
 if ! adb shell run-as "$input_package" rmdir "$probe_dir" >/dev/null 2>&1; then
