@@ -39,7 +39,6 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.currency.v1',
     'daymark.zones.v1',
     'daymark.browser-proxy.last-profile',
-    'daymark.webhook.v1',
     'daymark.webhook.queue.v1',
     'daymark.webhook.lock.v1'
   ];
@@ -250,10 +249,36 @@ test('the module exposes its constants and stays inert under Node', () => {
 });
 
 
-test('webhook settings category explains that only legacy endpoints are stored there', () => {
-  const category = storage.categoryById('webhook');
-  assert.match(category.description, /legacy endpoint/i);
-  assert.match(category.description, /active tab only/i);
+test('secret-bearing legacy webhook endpoint is excluded from storage inspection and clearing', () => {
+  const secretKey = 'daymark.webhook.v1';
+  const secretValue = 'https://hooks.example.com/x?token=must-not-be-read';
+  const values = new Map([[secretKey, secretValue], ['daymark.tasks.v1', '[]']]);
+  const reads = [];
+  const removals = [];
+  const store = {
+    getItem(key) {
+      reads.push(key);
+      if (key === secretKey) throw new Error('legacy endpoint must never be read');
+      return values.has(key) ? values.get(key) : null;
+    },
+    removeItem(key) {
+      removals.push(key);
+      values.delete(key);
+    }
+  };
+
+  assert.equal(storage.categoryById('webhook'), null);
+  assert.equal(storage.isManagedKey(secretKey), false);
+  assert.throws(() => storage.planClear('webhook'), /Unknown data category/);
+
+  const scan = storage.scanStorage(store);
+  assert.equal(scan.complete, true);
+  const cleared = storage.clearAll(store);
+  assert.deepEqual(cleared.failedKeys, []);
+  assert.equal(reads.includes(secretKey), false, 'storage inventory never reads the legacy endpoint');
+  assert.equal(removals.includes(secretKey), false, 'clear-all never inspects or removes the endpoint');
+  assert.equal(values.get(secretKey), secretValue, 'webhook privacy cleanup owns blind legacy-key removal');
+  assert.equal(values.has('daymark.tasks.v1'), false, 'ordinary managed data remains clearable');
 });
 
 
