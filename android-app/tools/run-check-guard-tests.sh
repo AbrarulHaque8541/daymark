@@ -121,4 +121,7 @@ done
 python3 "$ROOT/tools/check-attachment-source.py" "$ROOT" >/dev/null
 echo "PASS meta: check-attachment-source.py passes on current source"
 
+python3 "$ROOT/tools/check-focus-coordinate-translation.py" "$ROOT" >/dev/null
+echo "PASS meta: check-focus-coordinate-translation.py passes on current source"
+
 echo "PASS source-check guard regression tests"
