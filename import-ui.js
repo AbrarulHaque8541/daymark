@@ -188,6 +188,14 @@
           parts.push(plural(parsed.invalidDateType, 'date/time field') +
             ' had incompatible DATE/DATE-TIME or TZID parameters; the date/time was omitted.');
         }
+        if (parsed.invalidDateTimeValue > 0) {
+          parts.push(plural(parsed.invalidDateTimeValue, 'invalid date/time value') +
+            ' omitted; affected tasks were kept without that date/time.');
+        }
+        if (parsed.ambiguousComponents > 0) {
+          parts.push(plural(parsed.ambiguousComponents, 'calendar component') +
+            ' with duplicate singleton properties skipped as ambiguous.');
+        }
         if (parsed.cancelled > 0) parts.push(plural(parsed.cancelled, 'cancelled item') + ' skipped.');
         status(parts.join(' '));
       } catch (error) {
