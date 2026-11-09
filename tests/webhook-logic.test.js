@@ -67,6 +67,13 @@ test('endpoint fingerprints are stable for canonical URLs and distinct across de
   assert.notEqual(canonical, different, 'different path/query destinations receive different queue partitions');
 });
 
+test('fingerprint calculation fails closed when Web Crypto is unavailable', async () => {
+  await assert.rejects(
+    webhook.fingerprintWebhookUrl(DEFAULT_ENDPOINT_URL, { subtle: null }, globalThis.TextEncoder),
+    /Web Crypto SHA-256 is unavailable/
+  );
+});
+
 test('queue creation requires a verified endpoint fingerprint', () => {
   const payload = webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z');
   assert.throws(
