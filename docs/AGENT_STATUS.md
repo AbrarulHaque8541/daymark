@@ -1,3 +1,14 @@
+## Latest verified repository-wide run — 2026-11-09T23:26:56Z
+
+- [Current engineering snapshot](CURRENT_STATUS_20261109T232656Z.md)
+- Code delivery: PR #675 head `f0983019e0764b2fd85effece83e3c651bc501bf`; exact-head Android CI, Ubuntu/Windows contracts, and device-test APK workflows PASS.
+- Main remains `1532838c78ab350b18f95e96a2c547ba384f0831`; 11 open PRs, 20 open issues; no independent approvals; main protection disabled.
+- #689 task/webhook queue serialization is implemented on #675; #690 Focus writer/clear serialization remains open and blocks claiming whole Clear All is atomic.
+- #683 cross-tab task mutation is partially integrated; import-vs-save/clear/recovery race coverage remains.
+- #677 API 36 Task Editor IME failure remains; #646 governance and #160 physical-device acceptance remain.
+
+---
+
 - [Daymark whole-project engineering status — 2026-11-09T22:17:56.838Z (main 1532838c; 664 branches, 11 PRs / 18 issues; #688 test-binding guard exact-head CI green)](./CURRENT_STATUS_20261109T221756Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T22:01:18Z (main 1532838c; #675 Focus recovery-state fix and #688 test-source guard exact-head CI green)](./CURRENT_STATUS_20261109T220118Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T21:12:32.998Z (main 1532838c; 663 branches, 11 open PRs / 18 issues; #683 unsafe lock branch reviewed; #688 test-source guard CI pending)](./CURRENT_STATUS_20261109T211232Z.md)

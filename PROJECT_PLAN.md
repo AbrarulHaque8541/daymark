@@ -1,3 +1,15 @@
+## Latest repo-wide engineering handoff — 2026-11-09T23:26:56Z
+
+**Verified code head:** PR #675 `f0983019e0764b2fd85effece83e3c651bc501bf` (base main `1532838c78ab350b18f95e96a2c547ba384f0831`). Android CI, Ubuntu/Windows contracts, and device-test APK verification all PASS on that exact code head. The APK is an artifact only; no physical-device test or release occurred.
+
+**Delivered:** task completion now appends its webhook event inside an awaited task-lock `afterCommit`; Clear Queue, storage-card queue clear and Clear All share task→delivery→queue lock order; rejected locks fail closed; same-tab memory-only webhook events are reset inside the lock scope; script order ensures the lock helper exists before webhook auto-boot. Regression coverage verifies ordering, fail-closed behavior, after-commit timing, in-flight task-lock waiting and memory-only reset. See [full evidence snapshot](docs/CURRENT_STATUS_20261109T232656Z.md).
+
+**Still open:** #690 Focus writer/clear lock and same-tab invalidation; #683 import-vs-normal-save/clear/recovery races; #677 API 36 Task Editor IME failure; #646 main protection; #160 physical-device acceptance; #671 secure download transport; #665 signing/provenance; #687 extension recovery UI; #684/#476 recurrence parity. Do not close #689 until the Focus dependency is integrated.
+
+**Repository baseline:** 11 open PRs, 20 open issues; main `1532838`; no independent approvals; main protection disabled and no rulesets. No merge, release, tag, version/signing/application identity change, or destructive migration was performed.
+
+---
+
 ## Latest verified execution — 2026-11-09T22:17:56.838Z
 
 Main remains `1532838c78ab350b18f95e96a2c547ba384f0831`; exact-main Android CI and Ubuntu/Windows contracts PASS. Full inventory, exact PR heads, run links and device limitations: [CURRENT_STATUS_20261109T221756Z.md](docs/CURRENT_STATUS_20261109T221756Z.md).
