@@ -5,6 +5,7 @@ The guard also mutation-tests the limit checks in memory. No source files,
 including shared activity/UI files, are modified by these meta-tests.
 """
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -30,7 +31,7 @@ def check_sources(parser, store, smoke):
     assert 'sha256Hex(manifest.toString() + "\\nCSS:\\n" + css + "\\nJS:\\n" + js)' in parser, \
         "WebExtension ids must include effective CSS/JS, not manifest metadata alone"
     assert "already installed with id" in install, "installing a different pack under an existing id must fail"
-    assert install.index("already installed with id") < install.index("writeFile(out, json)"), \
+    assert install.index("already installed with id") < install.index("writeFile(out, ExtensionPackageParser.toDaymarkJson(ext))"), \
         "the install conflict check must run before the write"
     writer = store.split("private static void writeFile", 1)[1]
     assert "Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)" in writer, \
@@ -38,6 +39,16 @@ def check_sources(parser, store, smoke):
     assert "file.delete()" not in writer, "failed extension saves must not delete the previous pack"
     assert "ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites)" in install, \
         "same-content re-import must preserve enabled state and per-site pause list"
+    assert "ExtensionPackageParser.prepareNewUserPackInstall(ext)" in install, \
+        "new or corrupt-on-disk user imports must be prepared disabled until explicit activation"
+    assert "existing.enabled" in install, "identical re-import must retain the user's activation choice"
+
+    # Imported scripts run in the matched page's JavaScript context; surface the same warning for every format.
+    assert "IMPORTED_SCRIPT_TRUST_NOTE" in parser, "all imported script formats must use the shared trust disclosure"
+    assert "appendWarning(warnings, IMPORTED_SCRIPT_TRUST_NOTE)" in parser, \
+        "user-pack JSON storage reads must keep the trust disclosure idempotently"
+    assert parser.count("appendWarning(warnings.toString(), IMPORTED_SCRIPT_TRUST_NOTE)") == 2, \
+        "userscript and WebExtension imports must both surface the trust disclosure"
 
     # issue #194: fail-closed match scopes for imported content scripts
     assert 'matches.add("*://*/*")' not in parser, \
@@ -99,6 +110,10 @@ def check_sources(parser, store, smoke):
         '"32 unique aggregated exclude_matches rules limit"',
         "32 repeated patterns are accepted and deduplicated",
         "ExtensionPackageParser.parseWebExtensionArchive(archive)",
+        "not an isolated extension sandbox",
+        "could send that data to an external service",
+        "New imports start disabled",
+        "explicit activation",
     ):
         assert marker in smoke, f"missing import-hardening regression: {marker}"
 
@@ -137,15 +152,25 @@ def test_limit_guard_mutations(parser, store, smoke):
         assert "missing import-hardening regression" in str(rejected)
     else:
         raise AssertionError("source guard accepted removal of host limit regressions")
+    new_install_marker = "ExtensionPackageParser.prepareNewUserPackInstall(ext)"
+    assert store.count(new_install_marker) == 1, "new-import activation policy must have one store call site"
+    try:
+        check_sources(parser, store.replace(new_install_marker, "ext.withEnabled(true)", 1), smoke)
+    except AssertionError as rejected:
+        assert "new or corrupt-on-disk user imports must be prepared disabled" in str(rejected), \
+            f"new-import activation regression failed for an unrelated reason: {rejected}"
+    else:
+        raise AssertionError("source guard accepted removal of the disabled-new-import policy")
     check_sources(parser, store, smoke)
-    print(f"PASS: extension rule-limit source-guard mutation tests — {len(mutations) + 1} rejected mutations; unchanged source accepted")
+    print(f"PASS: extension import source-guard mutation tests — {len(mutations) + 2} rejected mutations; unchanged source accepted")
 
 
 if __name__ == "__main__":
-    root = Path(sys.argv[1])
+    root = Path(sys.argv[1]).resolve()
     parser = (root / "app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java").read_text(encoding="utf-8")
     store = (root / "app/src/main/java/com/abrar/daymark/ExtensionStore.java").read_text(encoding="utf-8")
     smoke = (root / "tools/ExtensionPackageParserSmoke.java").read_text(encoding="utf-8")
     check_sources(parser, store, smoke)
     test_limit_guard_mutations(parser, store, smoke)
+    subprocess.run(["sh", str(root / "tools/run-extension-store-tests.sh")], cwd=root, check=True)
     print("PASS: extension import hardening — bounded archive/rule budgets, SHA-256 ids, fail-closed match scopes, honest effective timing")

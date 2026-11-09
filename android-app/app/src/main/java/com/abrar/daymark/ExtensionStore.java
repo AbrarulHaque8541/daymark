@@ -146,29 +146,30 @@ final class ExtensionStore {
         if (ext.id.startsWith("daymark.builtin.")) {
             throw new IllegalArgumentException("Cannot overwrite built-in id.");
         }
-        String json = ExtensionPackageParser.toDaymarkJson(ext);
         File out = new File(userDir, sanitizeFileName(ext.id) + ".daymark-ext.json");
+        BrowserExtension existing = null;
         if (out.exists()) {
             // Import ids are content-derived, but the install path still fails closed when a
             // different pack already lives at the same filename (issue #193).
-            BrowserExtension existing = null;
             try {
                 existing = ExtensionPackageParser.parseDaymarkJson(readFile(out), false);
             } catch (Exception unreadable) {
                 // A corrupt stored pack is replaced by the fresh confirmed import.
             }
-            if (existing != null && !isSamePack(existing, ext)) {
-                throw new IllegalArgumentException("A different extension pack is already installed with id "
-                        + ext.id + ". Uninstall it before importing a different pack.");
-            }
-            if (existing != null) {
-                // Re-importing identical content must not silently re-enable a pack or clear
-                // the user's per-site pause list.
-                ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites);
-                json = ExtensionPackageParser.toDaymarkJson(ext);
-            }
         }
-        writeFile(out, json);
+        if (existing != null && !isSamePack(existing, ext)) {
+            throw new IllegalArgumentException("A different extension pack is already installed with id "
+                    + ext.id + ". Uninstall it before importing a different pack.");
+        }
+        if (existing == null) {
+            // Treat a new or corrupt-on-disk import as untrusted until the user enables it in the manager.
+            ext = ExtensionPackageParser.prepareNewUserPackInstall(ext);
+        } else {
+            // Re-importing identical content must not silently re-enable a pack or clear
+            // the user's per-site pause list.
+            ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites);
+        }
+        writeFile(out, ExtensionPackageParser.toDaymarkJson(ext));
     }
 
     /** Content comparison used by the install conflict guard; storage-derived metadata is ignored. */

@@ -5,6 +5,8 @@
 Daymark packs **customize the current WebView page** (CSS + page JS).  
 They are **not** Chrome extensions and do **not** provide browser privileges, network blocking, or private Daymark data access.
 
+Imported JavaScript is not sandboxed: Android evaluates it in the currently displayed page's JavaScript context. It can read or change matching page content and data visible to that page, and could send that data to an external service. Daymark exposes no native bridge to imported scripts. New user imports are saved disabled and require a separate enable action in the manager; an identical re-import preserves the existing enabled state.
+
 Suggested in-app copy:
 
 > Daymark packs only customize the current WebView page. They are not Chrome extensions and do not provide browser privileges, network blocking, or private Daymark data access.
@@ -41,7 +43,7 @@ Suggested in-app copy:
 
 - List + enable/disable toggle per pack (built-in vs user pack labeled).
 - **Global kill switch** — "Run extensions in the browser"; when off, nothing is injected into any page (`ExtensionRuntime` checks `ExtensionStore.isGloballyEnabled()` first).
-- Import (auto-detect Daymark JSON / userscript / ZIP-XPI-CRX) with review-before-install and a 5 MB cap.
+- Import (auto-detect Daymark JSON / userscript / ZIP-XPI-CRX) with a page-context trust warning in the review dialog and a 5 MB cap; new packs start disabled until separately enabled.
 - **Details** dialog per pack: source, id, state, run-at, CSS/JS sizes, full match/exclude lists, paused sites, explicit "Permissions: none" statement, and import warnings.
 - **Sites** dialog per pack: pause/resume the pack on specific hosts (host or subdomain); sites are normalized (`example.com`, `https://example.com/page`, case/dot normalization; non-HTTPS/credentialed input rejected).
 - **Export** user packs to a `.daymark-ext.json` document via SAF (`ACTION_CREATE_DOCUMENT`); built-ins are not exportable.
