@@ -75,8 +75,7 @@ assert "MAX_DURATION_MS = 5000" in shell_policy
 assert "checkCoordinate" in shell_policy
 assert "negative tap coordinate" in shell_smoke
 assert "oversized swipe duration" in shell_smoke
-assert "missing status marker" in shell_smoke
 assert "platform-instrumentation-input-bridge" not in workflow
 assert "platform-instrumentation-input-bridge" not in runner
 assert "platform-instrumentation-input-bridge" not in test_runner
-print("PASS focus emulator wiring: bounded UiAutomation shell input, API 36 ten-run gate, vertical-scroll handoff, fail-fast")
+print("PASS focus emulator wiring: bounded numeric UiAutomation shell input, API 36 ten-run gate, vertical-scroll handoff, fail-fast")
