@@ -1,6 +1,6 @@
-# Daymark whole-project engineering status — 2026-11-09T06:40:41.254Z
+# Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z
 
-**Verified UTC:** 2026-11-09T06:40:41.254Z  
+**Verified UTC:** 2026-11-09T06:41:12.544Z  
 **Repository:** `AbrarulHaque8541/daymark`  
 **Default branch:** `main`  
 **Current main SHA:** `7e540c9b5d3a71372cca942af4c869cb3c1b808f`  
@@ -31,7 +31,7 @@ There are **19 open PRs**. #604, #627 and #656 now use the exact current-main ba
 | #643 | webhook/recovery/storage health | `843efe96a1edc0f3f0fa6fda48e2fca336fe5f14` | `2c0e5d577cf05c8fb153a908f2ec0fc634e35e8e` | 55 ahead / 5 behind; exact-head Android 614/614, contracts, device APK PASS; no independent approval |
 | #627 | bounded RSS/Atom streaming | `7e540c9b5d3a71372cca942af4c869cb3c1b808f` | `01fd64ab18b077383b1166d72fa938fbb4c45267` | 7 ahead / 0 behind; Android, contracts, device APK PASS |
 | #631 | desktop WebView security | `60713561597aa594661b7e497bb14d06a1028c68` | `f7d8fbc27da7c35070c71e208c3c58480569ae3b` | Android/contracts/device PASS; desktop Windows retry PASS after Electron download HTTP 504 |
-| #604 | status index / historical snapshots | `7e540c9b5d3a71372cca942af4c869cb3c1b808f` | `0ed142d36d3182dbbe29d74d4c1a616791dbc765` | 18 ahead / 0 behind; docs-only tree diff; Android/contracts/device checks pending |
+| #604 | status index / historical snapshots | `7e540c9b5d3a71372cca942af4c869cb3c1b808f` | `9ac66b516e1f9bb980a54ab8f1b48f59a29b3071` | 19 ahead / 0 behind; docs-only tree diff; Android/contracts/device checks pending |
 | #656 | RFC 5545 iCalendar import | `7e540c9b5d3a71372cca942af4c869cb3c1b808f` | `1d9f7b8576edd744f52009e2042f2a2e8d0bf507` | 10 ahead / 0 behind; Android 545/545, contracts, device APK PASS; draft |
 | #652 | extension import trust/storage | `fbcf1253b18669d36d060b679e1821cf17a6f3a9` | `68fcbecef6c05c15bcac1191d58c111a6511c5de` | Android 541/541, ExtensionStore 12 assertions, 16 guard mutations, contracts, QA/device APK PASS; stale base |
 | #650 | project plan refresh | `fbcf1253b18669d36d060b679e1821cf17a6f3a9` | `c407aab3874ea864d6694cb5c2bce2005ff8b7d2` | Android, contracts, device APK PASS; stale base |
@@ -50,7 +50,7 @@ There are **19 open PRs**. #604, #627 and #656 now use the exact current-main ba
 
 ### Important exact-head workflows
 
-- **#604** head `f732626524ad1551b31d105cda9ace8f23bc6d60`: documentation-only status-index refresh; Android, Ubuntu/Windows and device-test APK checks are running. [Android](https://github.com/AbrarulHaque8541/daymark/actions/runs/42574431637) · [contracts](https://github.com/AbrarulHaque8541/daymark/actions/runs/42574431648) · [device APK](https://github.com/AbrarulHaque8541/daymark/actions/runs/42574431488).
+- **#604** head `9ac66b516e1f9bb980a54ab8f1b48f59a29b3071`: documentation-only status-index refresh; Android, Ubuntu/Windows and device-test APK checks are running. [Android](https://github.com/AbrarulHaque8541/daymark/actions/runs/42574431637) · [contracts](https://github.com/AbrarulHaque8541/daymark/actions/runs/42574431648) · [device APK](https://github.com/AbrarulHaque8541/daymark/actions/runs/42574431488).
 - **#627** head `01fd64ab18b077383b1166d72fa938fbb4c45267`: Android PASS, Ubuntu/Windows PASS, device-test APK build/verification PASS; release publication skipped. [Android](https://github.com/AbrarulHaque8541/daymark/actions/runs/42573285488) · [contracts](https://github.com/AbrarulHaque8541/daymark/actions/runs/42573285375) · [device APK](https://github.com/AbrarulHaque8541/daymark/actions/runs/42573285384). Reader-acquisition and decoder-construction cleanup regressions are on this head.
 - **#643** head `2c0e5d577cf05c8fb153a908f2ec0fc634e35e8e`: Android PASS, **614/614 Node tests**, Ubuntu/Windows PASS, device-test APK build/manifest/archive/signature verification PASS; release publication skipped. [Android](https://github.com/AbrarulHaque8541/daymark/actions/runs/42573742463) · [contracts](https://github.com/AbrarulHaque8541/daymark/actions/runs/42573742397) · [device APK](https://github.com/AbrarulHaque8541/daymark/actions/runs/42573742413). Branch remains 5 commits behind main and requires independent review.
 - **#631** head `f7d8fbc27da7c35070c71e208c3c58480569ae3b`: desktop Windows retry PASS after Electron's installer returned HTTP 504; macOS/Ubuntu desktop tests, Android, contracts, and device APK checks PASS. [Desktop retry](https://github.com/AbrarulHaque8541/daymark/actions/runs/42572035384).
@@ -109,4 +109,4 @@ There are **19 open PRs**. #604, #627 and #656 now use the exact current-main ba
 - **Work by:** ChatGPT (OpenAI).
 - **Model:** GPT-6.
 - **Tooling:** GitHub connector via Code Mode (repository/PR/issue/Actions/file/tree/blob/commit/ref APIs); V8 runtime for focused feed-reader harness.
-- **Timestamp (UTC):** 2026-11-09T06:40:41.254Z
+- **Timestamp (UTC):** 2026-11-09T06:41:12.544Z

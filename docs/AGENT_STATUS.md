@@ -1,4 +1,4 @@
-- [Daymark whole-project engineering status — 2026-11-09T06:40:41.254Z (main 7e540c9b5d3a; PR #604 docs-only status index, feed, webhook and Focus status)](./CURRENT_STATUS_20261109T064041Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z (main 7e540c9b5d3a; PR #604 docs-only status index, feed, webhook and Focus status)](./CURRENT_STATUS_20261109T064041Z.md)
 - Previous snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z (main 7e540c9b5d3a; feed stream cleanup, webhook/recovery integration, Focus and CI blockers)](./CURRENT_STATUS_20261109T063944Z.md)
 - Previous snapshot: [Daymark engineering status — 2026-11-09T04:20:34.434Z (iCalendar open-format import)](./CURRENT_STATUS_20261109T042000Z.md)
 - Historical storage-health snapshot: [2026-11-08T11:50:17.463Z](./CURRENT_STATUS_20261108T115017Z.md)
@@ -94,7 +94,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-09T06:40:41.254Z (verified current-main and exact-head repository audit)](./CURRENT_STATUS_20261109T064041Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z (verified current-main and exact-head repository audit)](./CURRENT_STATUS_20261109T064041Z.md)
 - Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z](./CURRENT_STATUS_20261109T063944Z.md)
 - Earlier reviewed snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 
