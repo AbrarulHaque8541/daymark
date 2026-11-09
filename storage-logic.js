@@ -77,12 +77,6 @@
       keys: ['daymark.browser-proxy.last-profile']
     },
     {
-      id: 'webhook',
-      label: 'Webhook settings',
-      description: 'A legacy endpoint setting from older versions. New webhook endpoints stay in the active tab only and are never saved here.',
-      keys: ['daymark.webhook.v1']
-    },
-    {
       id: 'webhook-queue',
       label: 'Queued webhook events',
       description: 'Completed-task events waiting on this device for an explicit retry.',
@@ -107,8 +101,9 @@
     return CATEGORIES.find((category) => category.id === id) || null;
   }
 
-  // Every daymark.* storage key must belong to exactly one category, so the card
-  // can honestly claim it covers everything the prototype stores.
+  // Every non-secret Daymark storage key managed by this card belongs to exactly
+  // one category. The legacy secret-bearing webhook endpoint is deliberately
+  // excluded: webhook privacy cleanup removes it without reading its value.
   function isManagedKey(key) {
     return ALL_KEY_SET.has(key);
   }
