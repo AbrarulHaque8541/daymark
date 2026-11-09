@@ -4,6 +4,37 @@ Daymark should remain a fast, simple, privacy-first task app that works offline,
 
 **Status snapshot.** This document contains a staged roadmap, not proof that a feature is implemented. Verify live `main`, open PRs/issues, `android-app/app/build.gradle.kts`, and the [Releases page](https://github.com/AbrarulHaque8541/daymark/releases) before making implementation or publication claims. CI/build success does not establish physical-device behavior; device acceptance is tracked separately in issue #160.
 
+## Current execution queue refresh — 2026-11-09T02:36Z
+
+This priority order supersedes the historical **Execution queue (checked 2026-10-13)** below. Older entries remain as audit history; they are not current implementation or workflow claims. Recheck the live status index and exact PR heads before each action.
+
+### P0 — User-data and real-device acceptance
+
+1. **Complete the physical Android acceptance matrix — issue #160.** No physical device was tested in this refresh. Record model, Android API, WebView provider/version, build SHA, APK SHA, scenario and result. Cover browser navigation/renderer recovery, Reader Mode, extensions, downloads/SAF, encrypted task recovery, same-signer upgrade, TalkBack, and notifications. CI/APK verification is not device acceptance.
+2. **Finish Focus Timer API 29/36 lifecycle qualification — issue #613 / PR #648.** Current head `007b755103cab21fe38241ad6877192184278716` is 6 ahead / 0 behind main. Android build/host checks, Focus UI, Ubuntu/Windows contracts, manual QA APK and device-test APK verification pass. API 29 passes; API 36 fails on run 6/10 after runs 1–5 pass, with an empty MotionEvent trace for the horizontal selector swipe (exact job 128949878323). The in-app `sendPointerSync` path remains intermittently unreliable on API 36. Next implementation should coordinate host-side `adb shell input swipe` with an instrumentation request/result checkpoint and fake-adb protocol tests. Keep ten consecutive runs and real MotionEvent/mode-state assertions; no retries or weakened tests. Parent ScrollView vertical-scroll behavior and physical-device acceptance remain separate.
+3. **Keep browser downloads fail-closed until a redirect-validating transport exists — issue #348 / PR #648.** New WebView download requests are deliberately rejected; existing download history/open/cancel behavior is retained. Do not re-enable DownloadManager or claim download completion without an app-owned HTTPS/redirect/credential-safe transport and SAF device tests.
+
+### P1 — Integrate and independently review security/data work
+
+4. **Bounded API streaming plus resilient data cards — PR #649.** Current-main head `a80e24b157c5fff4a7414e351e6ae8533284545e` is 2 ahead / 0 behind. Android build, Ubuntu/Windows contracts and device-test APK verification pass; release publication was skipped. The canonical Node suite is **567/567**. All four providers use the shared bounded reader and now explicitly omit credentials/referrers, disable caching and reject redirects; provider tests assert the request policy. Independent security/data review remains required before merge.
+5. **Webhook privacy and recovery integrity — issues #636/#639/#640, PR #643.** Latest head `24398124ea1478d9c4dfd1df59c4a9a7013fbb65` is 51 ahead / 0 behind. Exact-head Android build, Ubuntu/Windows contracts and device-test APK verification **PASS**; Node **584/584 PASS**; release publication skipped. Endpoint URLs are session-only; task/Focus backups are read independently; task completion persists before webhook notification; queue overflow preserves existing events and refuses new events; cross-tab locks fail closed without Web Locks. The latest commit also cancels unused webhook response bodies on success and HTTP error. Independent security/data-integrity review is pending; PR #643 overlaps storage-health PR #604 in shared storage files.
+6. **Storage health and durable status index — issue #603 / PR #604.** Preserve unreadable keys as UNKNOWN, never treat read errors as absent, and keep partial clear/rollback outcomes truthful. PR #604 is 16 ahead / 13 behind current main; its old-head green checks are not current-main integration evidence. It owns `docs/AGENT_STATUS.md`; refresh that index and add a new dated snapshot without deleting historical links. PR #637 is 11 ahead / 3 behind and also touches the index; its CSS active/hover cascade and historical-link preservation findings remain open. Coordinate one combined owner-reviewed tree rather than overwriting either branch.
+7. **Remove Node 20 action warnings — issue #84 / PR #645.** Exact head `0d673077f79903acda1c698c8bfcc53106b1934e` is 7 ahead / 0 behind; Android build, contracts, QA/device APK and API 29 Focus pass, while API 36 Focus fails on the Task Editor Cancel/IME visibility gate. PR #645 pins the PGP-verified immutable Gradle Actions v6.4.1 commit `8da46b539cd8fe6ab27ca75128919a18d757604c`; its exact Android job log shows no Node 20 warning for those Gradle actions. Current main still has the older pin until #645 integrates. Separate release-assets, production-release and SLSA provenance workflows retain legacy v4 action refs and need independent release-workflow review.
+8. **Complete recurrence/reminder acceptance — issue #476.** The long-gap arithmetic catch-up and four-digit date boundaries are source-tested. Real AlarmManager delivery, Doze, reboot, timezone changes, OEM battery policy and physical notifications remain NOT TESTED.
+9. **Review browser/extension/feed/desktop security — PRs #626, #627, #631 and #638; issue #348.** Their exact heads are current-main descendants and their reported Android/contracts/device-artifact or desktop matrix checks pass. Independent security review and physical browser/desktop qualification remain pending. System WebView is not a full Chrome/Firefox extension engine; do not overstate support.
+
+### P2 — Measured platform expansion
+
+10. **Cross-platform architecture — issue #325.** Keep Android as the current shipped target. Desktop browser policy CI is not proof of a packaged desktop task app or GUI/device behavior. Windows/Linux task shell and secure-storage acceptance remain experimental; HarmonyOS/OpenHarmony remains unqualified until an actual ArkTS/native adapter and device evidence exist.
+
+### Current repository baseline (verified 2026-11-09)
+
+- Main: `fbcf1253b18669d36d060b679e1821cf17a6f3a9`; 15 open PRs and 11 open issues at this snapshot.
+- Source identity: `com.abrar.daymark`, versionName `1.6`, versionCode `13`, minSdk `26`, targetSdk `36`. A run-level safety instruction names a different legacy package identifier and conflicts with root AGENTS.md and live Gradle; no application identity change is authorized or made.
+- Latest published release: v1.5; v1.4 remains draft. No release/tag was created in this refresh.
+- Main reports `protected: false`; rulesets API returned an empty list and the protection-detail endpoint returned HTTP 403. See issue #646; no repository settings were changed.
+- Physical-device acceptance: **NOT TESTED**.
+
 
 ## Execution queue (checked 2026-10-13)
 
@@ -262,3 +293,18 @@ Work by: Cue
 Model: not disclosed by runtime
 Tooling: GitHub connector CLI, git, local source/workflow/documentation review
 Timestamp (UTC): 2026-10-13T14:42:14Z
+
+
+## Current-source refresh — 2026-11-09 (updates to the 2026-10-10 suggestion table)
+
+The suggestion table above is historical as of 2026-10-10; these two entries are no longer “verified absent” or “not verified”:
+
+- **S1 Inbound share target:** implemented and merged via PR #635. Shared text/URLs enter the task capture flow; line-ending normalization is covered by source/host tests. Physical share-sheet acceptance across third-party apps remains pending issue #160.
+- **S6 Focus timer on a task:** the Focus Timer exists in current source. Its gesture/IME/instrumentation integration is under PR #648; API 29/API 36 emulator completion and physical acceptance are still pending. Do not describe the timer as device-verified.
+
+Other suggestions remain proposals unless their acceptance criteria are added to the live execution queue. This refresh does not silently accept or implement S2/S3/S4/S5/S7.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
+Timestamp (UTC): 2026-11-09T02:36:57.068Z
