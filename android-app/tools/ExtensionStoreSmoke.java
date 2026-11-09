@@ -59,6 +59,17 @@ public final class ExtensionStoreSmoke {
             check(!corruptFile.exists(),
                     "the explicit store uninstall path can remove the preserved malformed pack by id");
 
+            String emptyId = "user.empty-corrupt-smoke";
+            File emptyFile = new File(new File(root, "browser_extensions"), emptyId + ".daymark-ext.json");
+            Files.write(emptyFile.toPath(), new byte[0]);
+            BrowserExtension emptyImport = ExtensionPackageParser.parseDaymarkJson(
+                    pack(emptyId, "window.empty = true;", true), false);
+            expectMalformedFailure(store, emptyImport);
+            check(emptyFile.exists() && emptyFile.length() == 0L,
+                    "a readable zero-byte existing pack remains present and byte-for-byte unchanged");
+            store.uninstallUserPack(emptyId);
+            check(!emptyFile.exists(), "explicit uninstall can remove the zero-byte malformed pack");
+
             String oversizedId = "user.oversized-smoke";
             File oversizedFile = new File(new File(root, "browser_extensions"), oversizedId + ".daymark-ext.json");
             byte[] oversizedBytes = new byte[200_001];
