@@ -27,6 +27,8 @@
       storageAccessFailed = true;
     }
     const storageApi = env.storageApi || root.DaymarkStorage || null;
+    const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+    const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
 
@@ -184,37 +186,7 @@
       }
     }
 
-    function onClearCategory(categoryId) {
-      if (!storageApi || !storageAvailable()) {
-        status('Browser storage is unavailable. Nothing was cleared.');
-        return;
-      }
-      const category = storageApi.categoryById(categoryId);
-      if (!category) {
-        status('Unknown data category. Nothing was cleared.');
-        return;
-      }
-      const outcome = confirmOrReport('Clear ' + category.label + '? '
-        + category.description + ' This cannot be undone.');
-      if (outcome === 'failed') {
-        reportFailedConfirmation();
-        return;
-      }
-      if (outcome === 'declined') {
-        status('Cancelled. Nothing was cleared.');
-        return;
-      }
-      setBusy(true);
-      let result = null;
-      try {
-        result = storageApi.clearCategory(storage, categoryId);
-      } catch (error) {
-        setBusy(false);
-        status('Could not clear ' + category.label + ': '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
-        return;
-      }
-      setBusy(false);
+    function finishCategoryClear(result, category) {
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
           ? 'Could not clear ' + category.label + ': ' + result.failed.length
@@ -235,7 +207,64 @@
       }
     }
 
-    function onClearAll() {
+    function onClearCategory(categoryId) {
+      if (!storageApi || !storageAvailable()) {
+        status('Browser storage is unavailable. Nothing was cleared.');
+        return false;
+      }
+      const category = storageApi.categoryById(categoryId);
+      if (!category) {
+        status('Unknown data category. Nothing was cleared.');
+        return false;
+      }
+      const outcome = confirmOrReport('Clear ' + category.label + '? '
+        + category.description + ' This cannot be undone.');
+      if (outcome === 'failed') {
+        reportFailedConfirmation();
+        return false;
+      }
+      if (outcome === 'declined') {
+        status('Cancelled. Nothing was cleared.');
+        return false;
+      }
+      setBusy(true);
+
+      const clear = () => storageApi.clearCategory(storage, categoryId);
+      if (categoryId === 'tasks' || categoryId === 'task-backup') {
+        if (!taskMutation || typeof taskMutation.withTaskMutationLock !== 'function') {
+          setBusy(false);
+          status('Cannot safely clear task data: cross-tab coordination is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return taskMutation.withTaskMutationLock(lockManager, clear).then((locked) => {
+          setBusy(false);
+          if (!locked.ok) {
+            status('Could not safely clear ' + category.label + ': '
+              + (locked.reason === 'coordination-unavailable'
+                ? 'cross-tab coordination is unavailable. Nothing was cleared.'
+                : 'the shared task lock failed. Nothing was cleared.'));
+            return false;
+          }
+          finishCategoryClear(locked.value, category);
+          return true;
+        });
+      }
+
+      let result = null;
+      try {
+        result = clear();
+      } catch (error) {
+        setBusy(false);
+        status('Could not clear ' + category.label + ': '
+          + (error && error.message ? error.message : 'storage is unavailable.'));
+        return false;
+      }
+      setBusy(false);
+      finishCategoryClear(result, category);
+      return true;
+    }
+
+    async function onClearAll() {
       if (!storageApi || !storageAvailable()) {
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
@@ -262,17 +291,21 @@
         status('Cancelled. Nothing was cleared.');
         return;
       }
-      setBusy(true);
-      let result = null;
-      try {
-        result = storageApi.clearAll(storage);
-      } catch (error) {
-        setBusy(false);
-        status('Could not clear all data: '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
-        return;
+      if (!taskMutation || typeof taskMutation.withTaskMutationLock !== 'function') {
+        status('Cannot safely clear all data: cross-tab task coordination is unavailable. Nothing was cleared.');
+        return false;
       }
+      setBusy(true);
+      const locked = await taskMutation.withTaskMutationLock(lockManager, () => storageApi.clearAll(storage));
       setBusy(false);
+      if (!locked.ok) {
+        status('Could not safely clear all data: '
+          + (locked.reason === 'coordination-unavailable'
+            ? 'cross-tab task coordination is unavailable. Nothing was cleared.'
+            : 'the shared task lock failed. Nothing was cleared.'));
+        return false;
+      }
+      const result = locked.value;
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
           + result.failedKeys.length + ' item(s) could not be removed by the browser.';
