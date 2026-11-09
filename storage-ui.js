@@ -326,7 +326,7 @@
       clearStatusEl.addEventListener('click', () => { status(''); });
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
-      clearAllEl.addEventListener('click', () => { onClearAll(); });
+      clearAllEl.addEventListener('click', () => onClearAll());
     }
 
     render();
