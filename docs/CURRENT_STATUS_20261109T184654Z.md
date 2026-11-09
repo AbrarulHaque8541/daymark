@@ -9,7 +9,7 @@
 - Latest merged work: PR #681, merged at 2026-11-09T16:23:01Z. It adds the browser clear-action lifecycle catalog and fixes the browser-error card element-ID wiring.
 - Live inventory: 10 open PRs / 17 open issues.
 - Main branch metadata: protected=false; rulesets list empty. Detailed protection endpoint returns HTTP 403 to this integration. No governance settings changed.
-- Gradle/root AGENTS source identity is com.abrar.daymark; the run-level safety directive says com.cue.daymark. This remains unresolved in #679. No applicationId, namespace, version or signer change was made.
+- Gradle/root AGENTS source identity is com.abrar.daymark. The run-level safety directive specifies a different application identity, conflicting with live Gradle source and root AGENTS.md. No package/namespace change was made; track reconciliation in #679 and do not migrate identity without explicit owner resolution. No applicationId, namespace, version or signer change was made.
 - No release/tag was published, no destructive migration was performed, and no physical-device test is claimed.
 
 ## Integration work in this snapshot

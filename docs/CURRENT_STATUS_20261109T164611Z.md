@@ -9,7 +9,7 @@
 - Latest merged PR: [#681](https://github.com/AbrarulHaque8541/daymark/pull/681), merged 2026-11-09T16:23:01Z as main SHA above. It adds the offline clear-action lifecycle catalog and fixes the browser-error card element-ID wiring.
 - Live inventory: **8 open PRs / 14 open issues**.
 - Main branch API reports `protected=false`; required status-check enforcement is off; repository rulesets API returns `[]`. No governance settings changed.
-- Gradle source currently specifies namespace/applicationId `com.abrar.daymark`, versionCode 13, versionName 1.6. The run-level safety directive requires `com.cue.daymark`; this conflicts with live source and root AGENTS.md. No package/namespace change was made. Track reconciliation in [#679](https://github.com/AbrarulHaque8541/daymark/issues/679); do not migrate identity without explicit owner resolution.
+- Gradle source currently specifies namespace/applicationId com.abrar.daymark, versionCode 13, versionName 1.6. The run-level safety directive specifies a different application identity, conflicting with live Gradle source and root AGENTS.md. No package/namespace change was made; track reconciliation in #679 and do not migrate identity without explicit owner resolution.
 - No release/tag/version/signing-key/applicationId change, no destructive migration, and no physical-device test in this run.
 
 ## Exact open PR inventory
