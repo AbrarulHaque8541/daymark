@@ -104,6 +104,7 @@ assert "horizontal swipe delivers touchscreen events to the ModeSelector or desc
 assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "scrollDescendantIntoScrollView(parentScroll, modeSelector);" in platform_test, "vertical gestures must be injected inside the parent ScrollView viewport"
+assert platform_test.index("scrollDescendantIntoScrollView(parentScroll, modeSelector);") < platform_test.index("String countdownTap = dispatchTap(countdown);"), "initial mode taps must also be inside the ScrollView viewport"
 assert "offsetDescendantRectToMyCoords(descendant, target)" in platform_test
 assert "targetBounds.height() >= targetHeight[0]" in platform_test
 assert "targetBounds.top >= parentBounds.top" in platform_test
