@@ -425,25 +425,29 @@
   function icsDateTaskField(prop) {
     const empty = {
       dueDate: null, dueTime: null, timezonePresent: false,
-      secondsDropped: false, invalidDateType: false
+      secondsDropped: false, invalidDateType: false, invalidDateTimeValue: false
     };
     if (!prop) return empty;
     const params = prop.params || {};
     const valueType = (params.VALUE || '').toUpperCase();
     const hasTzid = Object.prototype.hasOwnProperty.call(params, 'TZID');
     const invalidType = () => ({ ...empty, invalidDateType: true });
+    const invalidValue = () => ({ ...empty, invalidDateTimeValue: true });
     if (valueType && valueType !== 'DATE' && valueType !== 'DATE-TIME') return invalidType();
 
     const asDate = prop.value.match(ICS_DATE);
     if (valueType === 'DATE') {
       // RFC 5545 DATE values cannot carry a TZID parameter.
       if (!asDate || hasTzid) return invalidType();
+      const dueDate = asDate[1] + '-' + asDate[2] + '-' + asDate[3];
+      if (!isDateOnly(dueDate)) return invalidValue();
       return {
-        dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3],
+        dueDate,
         dueTime: null,
         timezonePresent: false,
         secondsDropped: false,
-        invalidDateType: false
+        invalidDateType: false,
+        invalidDateTimeValue: false
       };
     }
     // DATE-TIME is the default value type. A date-only value therefore needs
@@ -451,25 +455,30 @@
     if (asDate) return invalidType();
 
     const asDateTime = prop.value.match(ICS_DATETIME);
-    if (!asDateTime) return empty;
+    if (!asDateTime) return invalidValue();
     // TZID is for local DATE-TIME values and must not accompany a UTC "Z" value.
     if (hasTzid && asDateTime[7] === 'Z') return invalidType();
     const dueDate = asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3];
+    if (!isDateOnly(dueDate)) return invalidValue();
     const dueTime = asDateTime[4] + ':' + asDateTime[5];
     const seconds = Number(asDateTime[6]);
     // RFC 5545 permits 00-60 seconds. Daymark stores minutes only, so valid
     // non-zero seconds are intentionally truncated and reported to the user.
-    // Invalid clock values must not be counted as either a timezone or
-    // precision simplification.
+    // Invalid clock values must be counted separately from timezone or
+    // precision simplification; the task may still be imported without a time.
     if (!isTimeOnly(dueTime) || seconds > 60) {
-      return { dueDate, dueTime: null, timezonePresent: false, secondsDropped: false, invalidDateType: false };
+      return {
+        dueDate, dueTime: null, timezonePresent: false,
+        secondsDropped: false, invalidDateType: false, invalidDateTimeValue: true
+      };
     }
     return {
       dueDate,
       dueTime,
       timezonePresent: asDateTime[7] === 'Z' || hasTzid,
       secondsDropped: seconds !== 0,
-      invalidDateType: false
+      invalidDateType: false,
+      invalidDateTimeValue: false
     };
   }
 
@@ -601,18 +610,31 @@
   function fromIcs(text, ctx) {
     const parsed = parseIcs(text);
     if (!parsed.hasCalendar) throw new Error('Calendar input does not contain a VCALENDAR block.');
-    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, categoriesDropped: 0, invalidCompletion: 0, invalidDateType: 0, cancelled: 0 };
+    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, categoriesDropped: 0, invalidCompletion: 0, invalidDateType: 0, invalidDateTimeValue: 0, ambiguousComponents: 0, cancelled: 0 };
     const tasks = [];
     let skippedRows = 0;
     for (const component of parsed.components) {
-      const byName = {};
+      const byName = Object.create(null);
       const categoryProps = [];
+      const singletonNames = new Set([
+        'UID', 'SUMMARY', 'DUE', 'DTSTART', 'STATUS', 'COMPLETED', 'PRIORITY', 'DESCRIPTION'
+      ]);
+      let hasDuplicateSingleton = false;
       for (const prop of component.props) {
         if (prop.name === 'CATEGORIES') {
           categoryProps.push(prop);
           continue;
         }
-        if (!(prop.name in byName)) byName[prop.name] = prop;
+        if (singletonNames.has(prop.name) && Object.prototype.hasOwnProperty.call(byName, prop.name)) {
+          hasDuplicateSingleton = true;
+          continue;
+        }
+        if (!Object.prototype.hasOwnProperty.call(byName, prop.name)) byName[prop.name] = prop;
+      }
+      if (hasDuplicateSingleton) {
+        stats.ambiguousComponents += 1;
+        skippedRows += 1;
+        continue;
       }
       const status = byName.STATUS ? byName.STATUS.value.trim().toUpperCase() : '';
       if (status === 'CANCELLED') { stats.cancelled += 1; continue; }
@@ -655,6 +677,7 @@
       if (due.secondsDropped && task.dueTime !== null) stats.secondsDropped += 1;
       stats.categoriesDropped += categoriesDropped;
       if (due.invalidDateType) stats.invalidDateType += 1;
+      if (due.invalidDateTimeValue) stats.invalidDateTimeValue += 1;
       if (invalidCompletion) stats.invalidCompletion += 1;
       tasks.push(task);
     }
@@ -667,6 +690,8 @@
       categoriesDropped: stats.categoriesDropped,
       invalidCompletion: stats.invalidCompletion,
       invalidDateType: stats.invalidDateType,
+      invalidDateTimeValue: stats.invalidDateTimeValue,
+      ambiguousComponents: stats.ambiguousComponents,
       cancelled: stats.cancelled
     };
   }
