@@ -26,30 +26,35 @@ def check_sources(parser, store, smoke):
         "private boolean isBuiltinDisabled", 1)[0]
     writer = store.split("private static synchronized void writeFile", 1)[1]
 
-    # The private pack directory itself is a trust boundary; no file-level NOFOLLOW check can
-    # protect against a symlinked parent directory.
+    # The private pack directory itself is a trust boundary; file-level NOFOLLOW is insufficient.
     constructor = store.split("ExtensionStore(Context context)", 1)[1].split(
         "private boolean isSafeUserDirectory", 1)[0]
-    assert "Files.exists(directory, LinkOption.NOFOLLOW_LINKS)" in constructor \\
-        and "Files.createDirectory(directory)" in constructor \\
-        and "userDir.mkdirs()" not in constructor, \\
-        "constructor must not follow a pre-existing private-directory symlink"
-    assert "if (!isSafeUserDirectory()) return new ArrayList<>(byId.values());" in list_all, \\
+    assert (
+        "Files.exists(directory, LinkOption.NOFOLLOW_LINKS)" in constructor
+        and "Files.createDirectory(directory)" in constructor
+        and "userDir.mkdirs()" not in constructor
+    ), "constructor must not follow a pre-existing private-directory symlink"
+    assert "if (!isSafeUserDirectory()) return new ArrayList<>(byId.values());" in list_all, (
         "listAll must fail closed to built-ins when the user-pack parent directory is unsafe"
-    assert "requireSafeUserDirectory();" in install, \\
+    )
+    assert "requireSafeUserDirectory();" in install, (
         "imports must reject an unsafe private pack directory before inspecting/replacing files"
-    assert "if (id == null || !isSafeUserDirectory()) return null;" in find_user, \\
+    )
+    assert "if (id == null || !isSafeUserDirectory()) return null;" in find_user, (
         "user-pack lookup must not traverse an unsafe parent directory"
-    assert "!isSafeUserDirectory()" in uninstall, \\
+    )
+    assert "!isSafeUserDirectory()" in uninstall, (
         "legacy uninstall must not traverse or delete through an unsafe parent directory"
-    assert "!isSafeDirectoryPath(file.getParentFile())" in reader, \\
+    )
+    assert "!isSafeDirectoryPath(file.getParentFile())" in reader, (
         "runtime reads must reject a symlinked parent directory, not only a symlinked file"
-    assert "!isSafeDirectoryPath(file.getParentFile())" in writer, \\
+    )
+    assert "!isSafeDirectoryPath(file.getParentFile())" in writer, (
         "pack writes must reject a symlinked parent directory"
-    assert "parent == null || !isSafeDirectoryPath(parent.toFile())" in store, \\
+    )
+    assert "parent == null || !isSafeDirectoryPath(parent.toFile())" in store, (
         "recovery reads must revalidate the private parent directory"
-    assert "requireSafeUserDirectory();" in recovery, \\
-        "recovery enumeration and actions must reject a symlinked parent directory"
+    )
 
     # Existing extension files are bounded and never silently truncated or replaced after I/O failure.
     assert "MAX_USER_PACK_BYTES = 200_000;" in store, "stored extension reads must keep the 200 KB limit"
@@ -102,6 +107,8 @@ def check_sources(parser, store, smoke):
         "raw recovery reads must remain bounded while streaming"
     assert "readStableBytes" in recovery and "Arrays.equals(first, second)" in recovery, \
         "concurrent file changes must fail closed"
+    assert "requireSafeUserDirectory();" in recovery, \
+        "recovery enumeration and actions must reject a symlinked parent directory"
     assert 'MessageDigest.getInstance("SHA-256")' in recovery, \
         "recovery actions must be bound to a SHA-256 content fingerprint"
     assert "expectedSha256.equals(sha256Hex(bytes))" in recovery, \
