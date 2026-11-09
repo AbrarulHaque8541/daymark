@@ -262,15 +262,6 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'ordinary saves must not drop the rejected task source');
 });
 
-test('a stale malformed backup is still cleared when the primary task store is healthy', () => {
-  const storedValues = new Map([
-    [STORAGE_KEY, JSON.stringify([validTask('valid-1', 'Healthy task')])],
-    [BACKUP_KEY, '{previously unreadable}']
-  ]);
-  bootApp(storedValues);
-  assert.equal(storedValues.has(BACKUP_KEY), false);
-});
-
 
 test('failed recovery backup creation never overwrites the only original task payload', () => {
   const original = JSON.stringify([
@@ -709,4 +700,181 @@ test('task-completion webhook is queued only after a successful new completion w
   assert.equal(order.filter((entry) => entry.type === 'webhook').length, 1,
     'reopening a task must not emit a completion webhook');
   assert.equal(JSON.parse(storedValues.get(STORAGE_KEY))[0].completed, false);
+});
+
+
+test('recovery bundles with unknown top-level fields remain opaque during healthy-primary cleanup', () => {
+  const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
+  const backupWithMetadata = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [healthyPrimary],
+    legacyMetadata: { source: 'older recovery writer', revision: 2 }
+  });
+  const storedValues = new Map([
+    [STORAGE_KEY, healthyPrimary],
+    [BACKUP_KEY, backupWithMetadata]
+  ]);
+  const app = bootApp(storedValues);
+
+  assert.equal(storedValues.get(BACKUP_KEY), backupWithMetadata,
+    'unknown top-level metadata makes the whole envelope opaque, even when payload bytes match');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+});
+
+test('unknown recovery-bundle fields survive when a new partial primary is backed up', () => {
+  const olderPayload = JSON.stringify([
+    validTask('older-valid', 'Older valid task'),
+    validTask('older-invalid', 'x'.repeat(170))
+  ]);
+  const backupWithMetadata = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [olderPayload],
+    legacyMetadata: { source: 'older recovery writer', revision: 2 }
+  });
+  const currentPrimary = JSON.stringify([
+    validTask('current-valid', 'Current valid task'),
+    validTask('current-invalid', 'y'.repeat(170))
+  ]);
+  const storedValues = new Map([
+    [STORAGE_KEY, currentPrimary],
+    [BACKUP_KEY, backupWithMetadata]
+  ]);
+
+  bootApp(storedValues);
+
+  const merged = JSON.parse(storedValues.get(BACKUP_KEY));
+  assert.equal(merged.format, 'daymark-recovery-bundle-v1');
+  assert.deepEqual(merged.payloads, [backupWithMetadata, currentPrimary],
+    'the exact prior envelope must be retained as an opaque payload');
+  assert.deepEqual(JSON.parse(merged.payloads[0]).legacyMetadata,
+    { source: 'older recovery writer', revision: 2 },
+    'unknown metadata must survive byte-for-byte inside the retained envelope');
+});
+
+test('duplicate-key recovery bundles remain opaque instead of losing overwritten values', () => {
+  const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
+  const primaryValue = JSON.stringify(healthyPrimary);
+  const ambiguousBackups = [
+    '{"format":"legacy-recovery-v0","format":"daymark-recovery-bundle-v1","payloads":[' + primaryValue + ']}',
+    '{"format":"daymark-recovery-bundle-v1","payloads":["older-payload"],"payloads":[' + primaryValue + ']}'
+  ];
+
+  for (const ambiguousBackup of ambiguousBackups) {
+    const storedValues = new Map([
+      [STORAGE_KEY, healthyPrimary],
+      [BACKUP_KEY, ambiguousBackup]
+    ]);
+    const app = bootApp(storedValues);
+
+    assert.equal(storedValues.get(BACKUP_KEY), ambiguousBackup,
+      'duplicate keys make the parsed envelope ambiguous; original bytes must remain untouched');
+    assert.match(app.elements.get('#storage-status span').textContent,
+      /recovery backup retained for manual review/);
+  }
+});
+
+test('a malformed backup is retained for manual recovery when the primary task store is healthy', () => {
+  const healthyPrimary = JSON.stringify([validTask('valid-1', 'Healthy task')]);
+  const opaqueBackup = '{previously unreadable}';
+  const storedValues = new Map([
+    [STORAGE_KEY, healthyPrimary],
+    [BACKUP_KEY, opaqueBackup]
+  ]);
+  bootApp(storedValues);
+  assert.equal(storedValues.get(BACKUP_KEY), opaqueBackup,
+    'a healthy primary does not prove opaque backup bytes are redundant');
+});
+
+test('empty backup bytes and empty recovery bundles remain opaque recovery data', () => {
+  const healthyPrimary = JSON.stringify([validTask('healthy-1', 'Healthy primary task')]);
+  const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
+  const priorBackups = [
+    ['empty string backup', ''],
+    ['empty recovery bundle', emptyBundle]
+  ];
+
+  for (const [label, priorBackup] of priorBackups) {
+    const storedValues = new Map([
+      [STORAGE_KEY, healthyPrimary],
+      [BACKUP_KEY, priorBackup]
+    ]);
+    const app = bootApp(storedValues);
+
+    assert.equal(storedValues.get(BACKUP_KEY), priorBackup,
+      label + ' must not be deleted merely because it contains no parseable task payload');
+    assert.match(app.elements.get('#storage-status span').textContent,
+      /recovery backup retained for manual review/,
+      label + ' must be disclosed as retained recovery data');
+  }
+});
+
+test('empty prior recovery sources survive when a new partial task payload is backed up', () => {
+  const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
+  const priorBackups = ['', emptyBundle];
+  const current = JSON.stringify([
+    validTask('current-valid', 'Current valid task'),
+    validTask('current-invalid', 'x'.repeat(170))
+  ]);
+
+  for (const priorBackup of priorBackups) {
+    const storedValues = new Map([
+      [STORAGE_KEY, current],
+      [BACKUP_KEY, priorBackup]
+    ]);
+    bootApp(storedValues);
+
+    const merged = JSON.parse(storedValues.get(BACKUP_KEY));
+    assert.equal(merged.format, 'daymark-recovery-bundle-v1');
+    assert.deepEqual(merged.payloads, [priorBackup, current],
+      'the new recovery bundle must retain the exact prior empty/unknown source bytes');
+  }
+});
+
+
+
+test('empty task recovery backup remains exportable when primary storage is unreadable', () => {
+  const storedValues = new Map([[BACKUP_KEY, '']]);
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'an empty but present task backup remains exportable');
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-partial-recovery-v1');
+  assert.equal(exported.taskBackup, '');
+  assert.equal(exported.taskBackupStatus, 'available');
+  assert.equal(exported.focusBackupStatus, 'absent');
+  assert.equal(storedValues.get(BACKUP_KEY), '');
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+});
+
+test('empty Focus recovery backup remains exportable when primary storage is unreadable', () => {
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, '']]);
+  const failReads = new Set([FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'an empty but present Focus backup remains exportable');
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-partial-recovery-v1');
+  assert.equal(exported.taskBackupStatus, 'absent');
+  assert.equal(exported.focusBackup, '');
+  assert.equal(exported.focusBackupStatus, 'available');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), '');
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+});
+
+test('empty Focus primary payload is backed up as opaque data before any Focus save', () => {
+  const storedValues = new Map([[FOCUS_KEY, '']]);
+  const app = bootApp(storedValues);
+
+  assert.equal(storedValues.get(FOCUS_KEY), '', 'the original empty primary bytes remain unchanged');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), '', 'the exact empty payload is retained as a backup');
+  assert.equal(app.elements.get('#toast-action').hidden, false,
+    'the present empty backup remains available for manual export');
 });

@@ -432,14 +432,6 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('healthy task-array backup is cleared as stale when primary is healthy', () => {
-  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
-  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
-  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
-
-  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
-});
-
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
   const corruptData = '{not valid JSON';
   const { elements, storedValues } = bootApp({ savedValue: corruptData });
@@ -722,4 +714,144 @@ test('failed task persistence never emits a completion webhook', () => {
   assert.equal(notifications, 0, 'a failed local save must not emit an external completion event');
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].completed, false,
     'the stored task remains incomplete when persistence fails');
+});
+
+
+test('re-backing up identical opaque bytes does not duplicate the recovery payload', () => {
+  const opaque = '{legacy recovery bytes that are not parseable JSON';
+  const app = bootApp({ savedValue: opaque, savedBackupValue: opaque });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), opaque,
+    'the exact same opaque payload does not need a second nested copy');
+});
+
+test('backing up a corrupt primary preserves a different valid existing backup', () => {
+  const existingBackup = JSON.stringify([makeImportTask('backup-only-task', 'Older backup task')]);
+  const corruptPrimary = '{not valid JSON';
+  const app = bootApp({ savedValue: corruptPrimary, savedBackupValue: existingBackup });
+
+  const bundle = JSON.parse(app.storedValues.get(BACKUP_KEY));
+  assert.equal(bundle.format, 'daymark-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, [existingBackup, corruptPrimary],
+    'a new corrupt primary must not overwrite a distinct valid recovery copy');
+});
+
+test('different healthy task-array backups are preserved across later task saves', () => {
+  const primaryTask = makeImportTask('primary-task', 'Primary task');
+  const backupTask = makeImportTask('backup-only-task', 'Backup-only task');
+  const primary = JSON.stringify([primaryTask]);
+  const backup = JSON.stringify([backupTask]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'a valid backup with different records is not proven stale');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+
+  triggerTaskCompletion(app, primaryTask.id);
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'a later successful task save must not discard backup-only records');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].completed, true);
+});
+
+test('byte-identical healthy task-array backup is cleared as redundant', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: primary });
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'the backup can be cleared when the exact same payload is already primary');
+});
+
+test('opaque malformed backup is preserved when primary tasks are healthy', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const backup = '{legacy recovery bytes that are not parseable JSON';
+  const app = bootApp({ savedValue: primary, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'unparseable backup bytes may contain the only copy of older tasks');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+});
+
+test('unknown JSON recovery formats are preserved when primary tasks are healthy', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const backup = JSON.stringify({ format: 'legacy-daymark-backup-v0', tasks: [] });
+  const app = bootApp({ savedValue: primary, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'an unrecognized backup format is not assumed to be disposable');
+});
+
+test('recovery bundles with distinct valid task arrays are preserved', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const backupPayload = JSON.stringify([makeImportTask('backup-only-task', 'Backup-only task')]);
+  const bundle = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [backupPayload]
+  });
+  const app = bootApp({ savedValue: primary, savedBackupValue: bundle });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), bundle,
+    'a bundle containing a different valid task array may contain unique user data');
+});
+
+test('a missing primary task key remains a normal empty state without a recovery backup', () => {
+  const app = bootApp({ savedValue: null });
+
+  assert.equal(app.elements.get('#storage-status span').textContent, 'Local storage ready');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'an absent key is not treated as corrupt data and does not create a backup');
+});
+
+test('a missing primary task key surfaces an existing recovery backup for manual review', () => {
+  const backup = JSON.stringify([makeImportTask('backup-only', 'Recoverable older task')]);
+  const app = bootApp({ savedValue: null, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), null,
+    'the missing primary is not silently recreated or overwritten');
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'the existing backup remains byte-for-byte intact');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+  assert.equal(app.toastWriteCount > 0, true,
+    'the user receives an export affordance for the recoverable backup');
+});
+
+test('an empty primary task payload is preserved before a later task save', () => {
+  const app = bootApp({ savedValue: '' });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'the original empty primary payload remains unchanged during recovery');
+  assert.equal(app.storedValues.get(BACKUP_KEY), '',
+    'the present empty-string payload is copied verbatim to the recovery backup');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Saved data could not be read/,
+    'an empty stored value is reported as unreadable rather than absent');
+
+  app.elements.get('#new-title').value = 'Safe task after recovery';
+  triggerFormSubmit(app, '#add-form');
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), '',
+    'a later save must retain the opaque empty recovery source');
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].title, 'Safe task after recovery');
+});
+
+test('an empty primary task payload is not overwritten when its recovery backup cannot be created', () => {
+  const app = bootApp({ savedValue: '', failBackup: true });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'the original empty primary payload remains byte-for-byte unchanged');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'failed backup creation must not claim that recovery data was saved');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup could not be created/);
+
+  app.elements.get('#new-title').value = 'Must not overwrite the only source';
+  triggerFormSubmit(app, '#add-form');
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'later task saves remain blocked while the only original payload cannot be backed up');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false);
 });
