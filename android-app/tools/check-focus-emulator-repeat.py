@@ -58,8 +58,8 @@ assert 'dispatchHostInput("tap"' in platform_test
 assert 'dispatchHostInput("swipe"' in platform_test
 assert "sendPointerSync(event);" not in platform_test
 assert "drive_instrumentation_input_bridge" in runner
-assert 'input_package="com.abrar.daymark"' in runner
-assert 'input_package="com.abrar.daymark.test"' not in runner, "the request/result files live in the target app data directory"
+assert 'input_package="com.abrar.daymark.test"' in runner
+assert "getContext().getFilesDir()" in platform_test
 assert 'adb shell run-as "$input_package" mkdir -p files' in runner
 assert 'adb shell run-as "$input_package" mkdir "$probe_dir"' in runner
 assert 'adb shell run-as "$input_package" rmdir "$probe_dir"' in runner
