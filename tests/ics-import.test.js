@@ -611,7 +611,7 @@ test('duplicate singleton iCalendar properties skip ambiguous components instead
   const result = importer.fromIcs(lines.join('\n'), freshCtx());
 
   assert.equal(result.tasks.length, 1);
-  assert.equal(result.skippedRows, 5);
+  assert.equal(result.skippedRows, 0, 'ambiguous components have their own disclosure counter');
   assert.equal(result.ambiguousComponents, 5);
   assert.equal(result.tasks[0].dueDate, '2026-11-10', 'DUE remains the selected date when one DUE and one DTSTART are present');
   assert.deepEqual(result.tasks[0].tags, ['work', 'travel'], 'repeatable CATEGORIES remains accumulated and deduplicated');
