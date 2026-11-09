@@ -79,8 +79,9 @@ function hasRegisteredTestCase(source) {
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
     .trim();
-  return withoutComments.length > 0
-    && /\b(?:test|it)(?:\.(?:skip|todo|only))?\s*\(\s*['"\x60]/.test(withoutComments);
+  const activeTest = /\b(?:test|it)\s*\(\s*['"\x60]/.test(withoutComments);
+  const focusedTest = /\b(?:test|it)\.only\s*\(/.test(withoutComments);
+  return withoutComments.length > 0 && activeTest && !focusedTest;
 }
 
 test('every repository Node test file registers at least one executable test case', () => {
@@ -92,7 +93,13 @@ test('every repository Node test file registers at least one executable test cas
   assert.equal(hasRegisteredTestCase('// placeholder\n/* no executable test */'), false,
     'comment-only test files must not count as tests');
   assert.equal(hasRegisteredTestCase("test('valid fixture', () => {});"), true,
-    'a named Node test registration must be accepted');
+    'an active named Node test registration must be accepted');
+  assert.equal(hasRegisteredTestCase("test.skip('skipped fixture', () => {});"), false,
+    'a skipped test must not make a file look like an executable regression suite');
+  assert.equal(hasRegisteredTestCase("test.todo('todo fixture');"), false,
+    'a todo-only file must not make a suite look executable');
+  assert.equal(hasRegisteredTestCase("test.only('focused fixture', () => {});"), false,
+    'committed focused-only test files must be rejected');
 
   for (const file of testFiles) {
     const relative = path.relative(testDirectory, file);
