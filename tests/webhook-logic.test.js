@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const nodeCrypto = require('node:crypto');
 const webhook = require('../webhook-logic.js');
 
 const TASK = {
@@ -27,6 +28,25 @@ const failingFetch = async () => {
   throw new Error('offline');
 };
 
+const DEFAULT_ENDPOINT_URL = 'https://hooks.example.com/x';
+const TEST_ENDPOINT_FINGERPRINT = 'a'.repeat(64);
+
+function fingerprintFor(url) {
+  const normalized = new URL(url);
+  normalized.hash = '';
+  return nodeCrypto.createHash('sha256').update(normalized.href).digest('hex');
+}
+
+function makeEvent(payload, now, url) {
+  return webhook.makeQueueEvent(payload, now, url ? fingerprintFor(url) : TEST_ENDPOINT_FINGERPRINT);
+}
+
+function flushForTest(queue, url, fetchImpl, options) {
+  return webhook.flushQueue(queue, url, fetchImpl, Object.assign({}, options || {}, {
+    endpointFingerprint: fingerprintFor(url)
+  }));
+}
+
 test('webhook URLs must be plain https URLs without credentials', () => {
   assert.equal(webhook.isValidWebhookUrl('https://hooks.example.com/abc'), true);
   assert.equal(webhook.isValidWebhookUrl(' https://example.com/hook '), true);
@@ -38,6 +58,51 @@ test('webhook URLs must be plain https URLs without credentials', () => {
   assert.equal(webhook.isValidWebhookUrl(''), false);
   assert.equal(webhook.isValidWebhookUrl(null), false);
   assert.equal(webhook.isValidWebhookUrl(42), false);
+});
+
+test('endpoint fingerprints are stable for canonical URLs and distinct across destinations', async () => {
+  const canonical = await webhook.fingerprintWebhookUrl('https://hooks.example.com/x#ignored-fragment');
+  const same = await webhook.fingerprintWebhookUrl('https://hooks.example.com/x');
+  const different = await webhook.fingerprintWebhookUrl('https://hooks.example.com/x?token=another-secret');
+  assert.match(canonical, /^[a-f0-9]{64}$/);
+  assert.equal(canonical, same, 'fragments do not create a different HTTP destination');
+  assert.notEqual(canonical, different, 'different path/query destinations receive different queue partitions');
+});
+
+test('queue creation requires a verified endpoint fingerprint', () => {
+  const payload = webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z');
+  assert.throws(
+    () => webhook.makeQueueEvent(payload, '2026-11-04T10:05:00.000Z'),
+    /endpoint fingerprint/
+  );
+  const event = makeEvent(payload, '2026-11-04T10:05:00.000Z');
+  assert.equal(webhook.isValidQueueEvent(event), true);
+  const legacy = Object.assign({}, event);
+  delete legacy.endpointFingerprint;
+  assert.equal(webhook.validateQueue([legacy]), true, 'legacy unassigned events remain readable for explicit migration');
+});
+
+test('flush refuses endpoint-mismatched and unassigned events before network access', async () => {
+  const payload = webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z');
+  const event = makeEvent(payload, '2026-11-04T10:05:00.000Z');
+  let fetchCalled = false;
+  await assert.rejects(
+    webhook.flushQueue([event], DEFAULT_ENDPOINT_URL, async () => {
+      fetchCalled = true;
+      return { ok: true, status: 200 };
+    }, { endpointFingerprint: fingerprintFor('https://hooks.example.com/other') }),
+    /does not match/
+  );
+  const legacy = Object.assign({}, event);
+  delete legacy.endpointFingerprint;
+  await assert.rejects(
+    webhook.flushQueue([legacy], DEFAULT_ENDPOINT_URL, async () => {
+      fetchCalled = true;
+      return { ok: true, status: 200 };
+    }, { endpointFingerprint: fingerprintFor(DEFAULT_ENDPOINT_URL) }),
+    /different or unassigned endpoint/
+  );
+  assert.equal(fetchCalled, false);
 });
 
 test('completed-task payloads are minimal and never export IDs or notes', () => {
@@ -79,12 +144,12 @@ test('payload fields are sanitized and overlong titles are clipped', () => {
 });
 
 test('queue events are well-formed, bounded, and validated', () => {
-  const event = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
+  const event = makeEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
   assert.equal(typeof event.id, 'string');
   assert.equal(event.attempts, 0);
   assert.equal(event.queuedAt, '2026-11-04T10:05:00.000Z');
   assert.ok(webhook.isValidQueueEvent(event));
-  assert.throws(() => webhook.makeQueueEvent('x'.repeat(webhook.MAX_PAYLOAD_CHARS + 1)), /too large/);
+  assert.throws(() => makeEvent('x'.repeat(webhook.MAX_PAYLOAD_CHARS + 1)), /too large/);
   assert.equal(webhook.isValidQueueEvent({ id: 'a', payload: 'x', queuedAt: 'nope', attempts: 0 }), false);
   assert.equal(webhook.isValidQueueEvent({ id: 'a', payload: 'x', queuedAt: '2026-11-04T10:05:00.000Z', attempts: -1 }), false);
   assert.equal(webhook.validateQueue([]), true);
@@ -97,11 +162,11 @@ test('the queue refuses overflow and preserves every existing event', () => {
   let queue = [];
   for (let index = 0; index < webhook.MAX_QUEUE_EVENTS; index += 1) {
     const payload = webhook.buildTaskCompletedPayload({ title: 'task-' + index, priority: 'low' }, '2026-11-04T10:05:00.000Z');
-    queue = webhook.enqueueEvent(queue, webhook.makeQueueEvent(payload, '2026-11-04T10:05:00.000Z'));
+    queue = webhook.enqueueEvent(queue, makeEvent(payload, '2026-11-04T10:05:00.000Z'));
   }
   const before = queue.slice();
   const overflowPayload = webhook.buildTaskCompletedPayload({ title: 'overflow-task', priority: 'low' }, '2026-11-04T10:05:00.000Z');
-  const overflowEvent = webhook.makeQueueEvent(overflowPayload, '2026-11-04T10:05:00.000Z');
+  const overflowEvent = makeEvent(overflowPayload, '2026-11-04T10:05:00.000Z');
   assert.throws(
     () => webhook.enqueueEvent(queue, overflowEvent),
     (error) => error && error.code === 'queue-full',
@@ -126,9 +191,9 @@ test('flush delivers queued events in order and empties the queue', async () => 
   let queue = [];
   for (let index = 0; index < 3; index += 1) {
     const payload = webhook.buildTaskCompletedPayload({ title: 'ordered-' + index, priority: 'low' }, '2026-11-04T10:05:00.000Z');
-    queue = webhook.enqueueEvent(queue, webhook.makeQueueEvent(payload, '2026-11-04T10:05:00.000Z'));
+    queue = webhook.enqueueEvent(queue, makeEvent(payload, '2026-11-04T10:05:00.000Z'));
   }
-  const result = await webhook.flushQueue(queue, 'https://hooks.example.com/x', okFetch(seen));
+  const result = await flushForTest(queue, 'https://hooks.example.com/x', okFetch(seen));
   assert.equal(result.deliveredCount, 3);
   assert.equal(result.droppedCount, 0);
   assert.equal(result.failure, null);
@@ -177,24 +242,24 @@ test('deliver cancels unconsumed response bodies on success and HTTP failure', a
 });
 
 test('a failed flush keeps the event, counts one attempt, and stops there', async () => {
-  const event = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
-  const second = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload({ title: 'later', priority: 'low' }, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
-  const result = await webhook.flushQueue([event, second], 'https://hooks.example.com/x', failingFetch);
+  const event = makeEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
+  const second = makeEvent(webhook.buildTaskCompletedPayload({ title: 'later', priority: 'low' }, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
+  const result = await flushForTest([event, second], 'https://hooks.example.com/x', failingFetch);
   assert.equal(result.deliveredCount, 0);
   assert.equal(result.queue.length, 2);
   assert.equal(result.queue[0].attempts, 1, 'only the failed event gains an attempt');
   assert.equal(result.queue[1].attempts, 0, 'later events keep their place untouched');
   assert.match(result.failure, /network error/);
   assert.match(result.failure, /No automatic retry was attempted/);
-  const retry = await webhook.flushQueue(result.queue, 'https://hooks.example.com/x', failingFetch);
+  const retry = await flushForTest(result.queue, 'https://hooks.example.com/x', failingFetch);
   assert.equal(retry.queue[0].attempts, 2);
 });
 
 test('events that exhausted their attempts are dropped during a flush', async () => {
-  const event = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
+  const event = makeEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
   event.attempts = webhook.MAX_ATTEMPTS;
   let fetchCalled = false;
-  const result = await webhook.flushQueue([event], 'https://hooks.example.com/x', async () => {
+  const result = await flushForTest([event], 'https://hooks.example.com/x', async () => {
     fetchCalled = true;
     return { ok: true, status: 200 };
   });
@@ -204,9 +269,9 @@ test('events that exhausted their attempts are dropped during a flush', async ()
 });
 
 test('the final failed attempt drops the event instead of looping forever', async () => {
-  const event = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
+  const event = makeEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
   event.attempts = webhook.MAX_ATTEMPTS - 1;
-  const result = await webhook.flushQueue([event], 'https://hooks.example.com/x', failingFetch);
+  const result = await flushForTest([event], 'https://hooks.example.com/x', failingFetch);
   assert.equal(result.queue.length, 0);
   assert.equal(result.droppedCount, 1);
   assert.match(result.failure, /network error/);
@@ -258,11 +323,12 @@ test('the module exposes its constants and stays inert under Node', () => {
 
 test('network error messages never expose webhook endpoint paths or query secrets', async () => {
   const secretUrl = 'https://hooks.example.com/private/path?token=super-secret-token';
-  const event = webhook.makeQueueEvent(
+  const event = makeEvent(
     webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'),
-    '2026-11-04T10:05:00.000Z'
+    '2026-11-04T10:05:00.000Z',
+    secretUrl
   );
-  const result = await webhook.flushQueue([event], secretUrl, async () => {
+  const result = await flushForTest([event], secretUrl, async () => {
     throw new Error('Failed to fetch ' + secretUrl);
   });
   assert.match(result.failure, /network error/);
@@ -293,14 +359,14 @@ test('webhook requests omit ambient credentials and referrers and reject redirec
 
 
 test('queue IDs are unique and invalid queues are never filtered during append or flush', async () => {
-  const first = webhook.makeQueueEvent(
+  const first = makeEvent(
     webhook.buildTaskCompletedPayload({ title: 'first event', priority: 'low' }, '2026-11-09T10:00:00.000Z'),
     '2026-11-09T10:00:00.000Z'
   );
   const duplicate = Object.assign({}, first, {
     payload: JSON.stringify({ event: 'daymark.task.completed', task: { title: 'different event' } })
   });
-  const later = webhook.makeQueueEvent(
+  const later = makeEvent(
     webhook.buildTaskCompletedPayload({ title: 'later event', priority: 'low' }, '2026-11-09T10:01:00.000Z'),
     '2026-11-09T10:01:00.000Z'
   );
@@ -320,7 +386,7 @@ test('queue IDs are unique and invalid queues are never filtered during append o
 
   let fetchCalled = false;
   await assert.rejects(
-    webhook.flushQueue([first, duplicate], 'https://hooks.example.com/x', async () => {
+    flushForTest([first, duplicate], 'https://hooks.example.com/x', async () => {
       fetchCalled = true;
       return { ok: true, status: 200 };
     }),
