@@ -75,6 +75,12 @@
       label: 'Queued webhook events',
       description: 'Completed-task events waiting on this device for an explicit retry.',
       keys: ['daymark.webhook.queue.v1']
+    },
+    {
+      id: 'webhook-lock',
+      label: 'Legacy webhook coordination lock',
+      description: 'A short-lived localStorage marker from older webhook versions. Newer versions use browser Web Locks; any leftover marker is safe to clear.',
+      keys: ['daymark.webhook.lock.v1']
     }
   ];
 
