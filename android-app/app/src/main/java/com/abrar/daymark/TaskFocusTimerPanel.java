@@ -414,6 +414,17 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         }
 
         @Override
+        public void requestDisallowInterceptTouchEvent(boolean disallow) {
+            // The clickable Stopwatch/Countdown children request disallow-intercept
+            // on ACTION_DOWN to protect taps. Do not let that child request set this
+            // selector's FLAG_DISALLOW_INTERCEPT, otherwise this selector never sees
+            // ACTION_MOVE and cannot classify a horizontal mode swipe. The selector
+            // explicitly forwards its own classified horizontal request to its parent
+            // through disallowParentIntercept(); vertical movement remains available
+            // to the parent Tasks ScrollView.
+        }
+
+        @Override
         public boolean onInterceptTouchEvent(MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
