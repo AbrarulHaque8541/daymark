@@ -877,11 +877,34 @@ test('partial recovery export imports readable tasks and skips an unknown Focus 
   assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
 });
 
-test('partial recovery export imports readable Focus data but never imports bytes marked unknown', () => {
+test('partial recovery export imports readable Focus data when the task source is unknown', () => {
   const existingTask = makeImportTask('partial-task-stays', 'Existing task stays');
-  const forbiddenTask = makeImportTask('partial-unknown-task', 'Must not import unknown bytes');
   const existingFocus = JSON.stringify({ session: null, log: [] });
   const focusEntry = makeFocusLogEntry('partial-readable-focus-log');
+  const readableFocus = JSON.stringify({ session: null, log: [focusEntry] });
+  const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: null,
+    taskBackupStatus: 'unknown',
+    focusBackup: readableFocus,
+    focusBackupStatus: 'available'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 1);
+  assert.match(app.confirmMessages[0], /1 recovery source was marked unknown/);
+  assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), [existingTask],
+    'an unknown task source is not imported or allowed to replace existing task data');
+  const savedFocus = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.ok(savedFocus.log.some((entry) => entry.id === focusEntry.id), 'the readable Focus backup is imported');
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+});
+
+test('partial recovery rejects task bytes supplied for a source marked unknown', () => {
+  const existingTask = makeImportTask('partial-ambiguous-existing', 'Existing task');
+  const forbiddenTask = makeImportTask('partial-ambiguous-forbidden', 'Must not import unknown bytes');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const focusEntry = makeFocusLogEntry('partial-ambiguous-focus-log');
   const readableFocus = JSON.stringify({ session: null, log: [focusEntry] });
   const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: existingFocus });
   const partial = JSON.stringify({
@@ -892,13 +915,13 @@ test('partial recovery export imports readable Focus data but never imports byte
     focusBackupStatus: 'available'
   });
   triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
-  assert.equal(app.confirmMessages.length, 1);
-  assert.match(app.confirmMessages[0], /1 recovery source was marked unknown/);
+  assert.equal(app.confirmMessages.length, 0,
+    'contradictory unknown-source bytes are rejected before recovery confirmation');
   assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), [existingTask],
-    'raw task bytes are ignored when the envelope marks that source unknown');
-  const savedFocus = JSON.parse(app.storedValues.get(FOCUS_KEY));
-  assert.ok(savedFocus.log.some((entry) => entry.id === focusEntry.id), 'the readable Focus backup is imported');
-  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+    'the task store remains byte-for-byte semantically unchanged');
+  assert.equal(app.storedValues.get(FOCUS_KEY), existingFocus,
+    'a malformed envelope cannot partially import the otherwise readable Focus source');
+  assert.match(app.elements.get('#toast').textContent, /partial recovery file is invalid or ambiguous/);
 });
 
 test('empty available partial-recovery payload is reported and does not mutate either store', () => {
