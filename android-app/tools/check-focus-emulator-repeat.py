@@ -104,16 +104,22 @@ assert "horizontal swipe delivers touchscreen events to the ModeSelector or desc
 assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "scrollDescendantIntoScrollView(parentScroll, countdown);" in platform_test, "actual mode controls must be positioned inside the parent ScrollView viewport"
-assert platform_test.index("scrollDescendantIntoScrollView(parentScroll, countdown);") < platform_test.index("String countdownTap = dispatchTap(countdown);"), "initial Countdown tap must be inside the ScrollView viewport"
+assert platform_test.index("scrollDescendantIntoScrollView(parentScroll, countdown);") < platform_test.index('String countdownTap = dispatchTap(mainActivity, "Countdown");'), "initial Countdown tap must follow viewport positioning"
 assert platform_test.index("content.addView(spacer,") < platform_test.index("scrollDescendantIntoScrollView(parentScroll, countdown);"), "scrollable content must exist before the initial control is positioned"
-countdown_swipe = platform_test.index("dispatchVerticalSwipe(countdown);")
-countdown_retap = platform_test.index("String countdownAfterVerticalDrag = dispatchTap(countdown);")
-assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, countdown);", 0, countdown_swipe) >= 0, "Countdown drag must start inside the ScrollView viewport"
-assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, countdown);", countdown_swipe, countdown_retap) >= countdown_swipe, "Countdown must be re-centered before the follow-up tap"
-stopwatch_swipe = platform_test.index("dispatchVerticalSwipe(stopwatch);")
-stopwatch_retap = platform_test.index("String stopwatchAfterVerticalDrag = dispatchTap(stopwatch);")
-assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, stopwatch);", 0, stopwatch_swipe) >= 0, "Stopwatch drag must start inside the ScrollView viewport"
-assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, stopwatch);", stopwatch_swipe, stopwatch_retap) >= stopwatch_swipe, "Stopwatch must be re-centered before the follow-up tap"
+assert 'String countdownTap = dispatchTap(mainActivity, "Countdown");' in platform_test
+assert 'String stopwatchTap = dispatchTap(mainActivity, "Stopwatch");' in platform_test
+assert "private android.view.View findVisibleTextView(" in platform_test
+assert 'findVisibleTextView(root, "Stopwatch")' in platform_test
+assert 'findVisibleTextView(root, "Countdown")' in platform_test
+assert "root.isShown() && root.isAttachedToWindow()" in platform_test
+assert "for (int index = group.getChildCount() - 1; index >= 0; index--)" in platform_test, "current visible controls must be resolved in reverse drawing order"
+assert "current visible " in platform_test and "mode button is attached, enabled and clickable" in platform_test
+assert "findFocusModeSelector(mainActivity)" in platform_test
+assert platform_test.count("modeSelector = findFocusModeSelector(mainActivity);") >= 3, "re-resolve selector after each mode change and before parent-scroll testing"
+assert "dispatchSwipe(modeSelector, true)" in platform_test
+assert "dispatchSwipe(modeSelector, false)" in platform_test
+assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0])" in platform_test
+assert "attached=" in platform_test and "hasClickListener=" in platform_test, "touch failures must identify stale/detached targets"
 assert "offsetDescendantRectToMyCoords(descendant, target)" in platform_test
 assert "targetBounds.height() >= targetHeight[0]" in platform_test
 assert "targetBounds.top >= parentBounds.top" in platform_test
