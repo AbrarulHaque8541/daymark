@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const nodeCrypto = require('node:crypto');
 const webhookApi = require('../webhook-logic.js');
 const ui = require('../webhook-ui.js');
 const fs = require('node:fs');
@@ -14,6 +15,24 @@ const TASK = {
   dueDate: '2026-11-05',
   updatedAt: '2026-11-04T10:00:00.000Z'
 };
+
+const DEFAULT_ENDPOINT_URL = 'https://hooks.example.com/x';
+
+function endpointFingerprintFor(url) {
+  const normalized = new URL(url || DEFAULT_ENDPOINT_URL);
+  normalized.hash = '';
+  return nodeCrypto.createHash('sha256').update(normalized.href).digest('hex');
+}
+
+function makeQueueEvent(payload, now, url) {
+  return webhookApi.makeQueueEvent(payload, now, endpointFingerprintFor(url));
+}
+
+function makeLegacyQueueEvent(payload, now, url) {
+  const event = makeQueueEvent(payload, now, url);
+  delete event.endpointFingerprint;
+  return event;
+}
 
 function fakeElement(tag) {
   return {
@@ -65,19 +84,23 @@ function fakeEnv(options) {
     removeItem(key) { delete storageData[key]; }
   };
   const locks = Object.prototype.hasOwnProperty.call(opts, 'locks') ? opts.locks : createLockManager();
+  const confirmations = [];
   const env = {
     document: {
       readyState: 'complete',
       getElementById(id) { return elements[id] || null; }
     },
     window: { addEventListener() {} },
+    crypto: nodeCrypto.webcrypto,
+    TextEncoder: globalThis.TextEncoder,
+    confirm(message) { confirmations.push(message); return typeof opts.confirm === 'function' ? opts.confirm(message) : true; },
     localStorage: storage,
     navigator: { onLine: opts.online !== false, locks },
     webhookApi,
     fetch: opts.fetch,
     now: () => '2026-11-04T12:00:00.000Z'
   };
-  return { env, elements, storageData };
+  return { env, elements, storageData, confirmations };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
@@ -245,7 +268,7 @@ test('two tabs serialize queue appends so neither task completion is overwritten
 test('two tabs cannot deliver the same stored event concurrently', async () => {
   const storageData = {};
   const locks = createLockManager();
-  const event = webhookApi.makeQueueEvent(
+  const event = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
     '2026-11-04T12:00:00.000Z'
   );
@@ -275,7 +298,7 @@ test('two tabs cannot deliver the same stored event concurrently', async () => {
 test('a second tab completion waits for an in-flight delivery and is not lost', async () => {
   const storageData = {};
   const locks = createLockManager();
-  const initialEvent = webhookApi.makeQueueEvent(
+  const initialEvent = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
     '2026-11-04T12:00:00.000Z'
   );
@@ -391,7 +414,7 @@ test('the retry button flushes a queued event when the endpoint recovers', async
 test('a legacy endpoint is removed without being read and queued events wait for re-entry', async () => {
   const legacyUrl = 'https://hooks.example.com/saved?token=legacy-secret';
   const newUrl = 'https://hooks.example.com/new?token=current-secret';
-  const event = webhookApi.makeQueueEvent(webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'), '2026-11-04T12:00:00.000Z');
+  const event = makeLegacyQueueEvent(webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'), '2026-11-04T12:00:00.000Z', newUrl);
   const seen = [];
   const { env, elements, storageData } = fakeEnv({
     fetch: async (url, init) => { seen.push({ url, init }); return { ok: true, status: 200 }; }
@@ -423,6 +446,65 @@ test('a legacy endpoint is removed without being read and queued events wait for
   assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'the new endpoint is not persisted either');
   assert.equal(elements['webhook-status'].textContent.includes(newUrl), false);
 });
+test('a tab never delivers another tab\'s queued event to a different endpoint', async () => {
+  const storageData = {};
+  const locks = createLockManager();
+  const endpointA = 'https://hooks.example.com/a?token=tab-a';
+  const endpointB = 'https://hooks.example.com/b?token=tab-b';
+  const seenA = [];
+  const seenB = [];
+  const first = fakeEnv({
+    storageData, locks, url: endpointA, online: false,
+    fetch: async (url, init) => { seenA.push({ url, init }); return { ok: true, status: 200 }; }
+  });
+  const firstHandle = ui.attachWebhookUi(first.env);
+  firstHandle.onSave({ preventDefault() {} });
+  const queued = await firstHandle.notifyTaskCompleted(Object.assign({}, TASK, { title: 'Only endpoint A' }));
+  assert.equal(queued.queued, true);
+  assert.equal(firstHandle.readQueue().length, 1);
+
+  const second = fakeEnv({
+    storageData, locks, url: endpointB, online: true,
+    fetch: async (url, init) => { seenB.push({ url, init }); return { ok: true, status: 200 }; }
+  });
+  const secondHandle = ui.attachWebhookUi(second.env);
+  secondHandle.onSave({ preventDefault() {} });
+  await settle();
+  await secondHandle.flush();
+  assert.equal(seenB.length, 0, 'endpoint B cannot send endpoint A events');
+  assert.equal(secondHandle.readQueue().length, 1, 'the other endpoint event remains durable');
+
+  first.env.navigator.onLine = true;
+  await firstHandle.flush();
+  assert.equal(seenA.length, 1, 'the original endpoint can still deliver its event');
+  assert.equal(seenA[0].url, endpointA);
+  assert.equal(firstHandle.readQueue().length, 0);
+});
+
+test('legacy unassigned queue events require explicit confirmation and remain preserved when declined', async () => {
+  const endpoint = 'https://hooks.example.com/x?token=current';
+  const event = makeLegacyQueueEvent(
+    webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
+    '2026-11-04T12:00:00.000Z'
+  );
+  const raw = JSON.stringify([event]);
+  let fetchCalls = 0;
+  const { env, elements, storageData, confirmations } = fakeEnv({
+    url: endpoint,
+    confirm: () => false,
+    fetch: async () => { fetchCalls += 1; return { ok: true, status: 200 }; }
+  });
+  storageData[webhookApi.QUEUE_KEY] = raw;
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  await settle();
+  assert.equal(confirmations.length, 1);
+  assert.match(confirmations[0], /Assign 1 older queued webhook event/);
+  assert.equal(fetchCalls, 0, 'legacy events are never sent without explicit destination assignment');
+  assert.equal(storageData[webhookApi.QUEUE_KEY], raw, 'declining assignment preserves the exact queue bytes');
+  assert.match(elements['webhook-status'].textContent, /were preserved/);
+});
+
 test('corrupt queue data is preserved while any legacy endpoint is removed and delivery stays paused', () => {
   const legacyUrl = 'https://hooks.example.com/legacy?token=secret';
   const { env, elements, storageData } = fakeEnv({});
@@ -476,12 +558,12 @@ test('a final failed delivery durably drops only the exhausted event', async () 
     id: 'task-still-pending',
     title: 'Later queued event'
   });
-  const exhausted = webhookApi.makeQueueEvent(
+  const exhausted = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(exhaustedTask, timestamp),
     timestamp
   );
   exhausted.attempts = webhookApi.MAX_ATTEMPTS - 1;
-  const later = webhookApi.makeQueueEvent(
+  const later = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(laterTask, timestamp),
     timestamp
   );
@@ -716,9 +798,10 @@ test('index markup exposes task-completion webhook controls and session-only dis
 
 test('queued delivery errors never echo the endpoint into status text', async () => {
   const secret = 'https://hooks.example.com/private/path?token=do-not-show';
-  const event = webhookApi.makeQueueEvent(
+  const event = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
-    '2026-11-04T12:00:00.000Z'
+    '2026-11-04T12:00:00.000Z',
+    secret
   );
   const { env, elements, storageData } = fakeEnv({
     url: secret,
@@ -739,7 +822,7 @@ test('a full durable queue rejects a new completion and preserves every existing
       title: 'durable-' + index,
       priority: 'low'
     }, '2026-11-04T12:00:00.000Z');
-    return webhookApi.makeQueueEvent(payload, '2026-11-04T12:00:00.000Z');
+    return makeQueueEvent(payload, '2026-11-04T12:00:00.000Z');
   });
   const storageData = { [webhookApi.QUEUE_KEY]: JSON.stringify(fullQueue) };
   let fetchCalled = false;
@@ -809,7 +892,7 @@ test('tab-local events wait behind a full durable queue and are delivered withou
       title: 'durable-' + index,
       priority: 'low'
     }, '2026-11-04T12:00:00.000Z');
-    return webhookApi.makeQueueEvent(payload, '2026-11-04T12:00:00.000Z');
+    return makeQueueEvent(payload, '2026-11-04T12:00:00.000Z');
   });
   storageData[webhookApi.QUEUE_KEY] = JSON.stringify(fullQueue);
   failQueueWrites = false;
@@ -881,7 +964,7 @@ test('older tab-local webhook events stay ahead of later completions after stora
 
 test('Clear queue uses the cross-tab locks and clears durable plus this-tab pending events', async () => {
   const timestamp = '2026-11-09T08:30:00.000Z';
-  const event = webhookApi.makeQueueEvent(
+  const event = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(TASK, timestamp),
     timestamp
   );
@@ -911,7 +994,7 @@ test('Clear queue uses the cross-tab locks and clears durable plus this-tab pend
 
 test('Clear queue fails closed without Web Locks and preserves the existing queue', async () => {
   const timestamp = '2026-11-09T08:31:00.000Z';
-  const event = webhookApi.makeQueueEvent(
+  const event = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload(TASK, timestamp),
     timestamp
   );
@@ -936,7 +1019,7 @@ test('Clear queue fails closed without Web Locks and preserves the existing queu
 
 
 test('duplicate webhook event IDs fail closed and preserve the original queue bytes', async () => {
-  const first = webhookApi.makeQueueEvent(
+  const first = makeQueueEvent(
     webhookApi.buildTaskCompletedPayload({ title: 'first event', priority: 'low' }, '2026-11-09T10:00:00.000Z'),
     '2026-11-09T10:00:00.000Z'
   );
