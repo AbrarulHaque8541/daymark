@@ -90,7 +90,7 @@ test('queue events are well-formed, bounded, and validated', () => {
   assert.equal(webhook.validateQueue([]), true);
   assert.equal(webhook.validateQueue([event]), true);
   assert.equal(webhook.validateQueue(null), false);
-  assert.equal(webhook.validateQueue([event, event]), true);
+  assert.equal(webhook.validateQueue([event, event]), false, 'queue event IDs must be unique');
 });
 
 test('the queue refuses overflow and preserves every existing event', () => {
@@ -289,4 +289,43 @@ test('webhook requests omit ambient credentials and referrers and reject redirec
   assert.equal(requestInit.redirect, 'error');
   assert.equal(requestInit.cache, 'no-store');
   assert.equal(cancelled, true, 'unused endpoint response bodies are cancelled');
+});
+
+
+test('queue IDs are unique and invalid queues are never filtered during append or flush', async () => {
+  const first = webhook.makeQueueEvent(
+    webhook.buildTaskCompletedPayload({ title: 'first event', priority: 'low' }, '2026-11-09T10:00:00.000Z'),
+    '2026-11-09T10:00:00.000Z'
+  );
+  const duplicate = Object.assign({}, first, {
+    payload: JSON.stringify({ event: 'daymark.task.completed', task: { title: 'different event' } })
+  });
+  const later = webhook.makeQueueEvent(
+    webhook.buildTaskCompletedPayload({ title: 'later event', priority: 'low' }, '2026-11-09T10:01:00.000Z'),
+    '2026-11-09T10:01:00.000Z'
+  );
+
+  assert.equal(webhook.validateQueue([first, duplicate]), false,
+    'two different payloads cannot share the same acknowledgement identity');
+  assert.throws(
+    () => webhook.enqueueEvent([first], duplicate),
+    (error) => error && error.code === 'duplicate-event-id',
+    'an append cannot introduce an ID already present in the queue'
+  );
+  assert.throws(
+    () => webhook.enqueueEvent([first, duplicate], later),
+    /existing webhook queue is invalid/,
+    'an invalid existing queue is rejected instead of silently filtering entries'
+  );
+
+  let fetchCalled = false;
+  await assert.rejects(
+    webhook.flushQueue([first, duplicate], 'https://hooks.example.com/x', async () => {
+      fetchCalled = true;
+      return { ok: true, status: 200 };
+    }),
+    /webhook queue is invalid/,
+    'flush refuses ambiguous event identities before any network request'
+  );
+  assert.equal(fetchCalled, false);
 });
