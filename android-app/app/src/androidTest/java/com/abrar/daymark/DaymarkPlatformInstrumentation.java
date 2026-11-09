@@ -506,19 +506,33 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
-        long downTime = android.os.SystemClock.uptimeMillis();
-        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, startX, startY);
-        final int moveSteps = 5;
-        for (int step = 1; step <= moveSteps; step++) {
-            float progress = step / (float) moveSteps;
-            float x = startX + (endX - startX) * progress;
-            float y = startY + (endY - startY) * progress;
-            injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime,
-                    downTime + step * 50L, x, y);
-        }
-        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime,
-                downTime + (moveSteps + 1) * 50L, endX, endY);
+        // Use the emulator's real touchscreen input service for swipes. sendPointerSync remains
+        // appropriate for taps, but API 36 intermittently stopped delivering injected drag events
+        // after several instrumentation launches even though the call returned successfully.
+        String command = "input swipe "
+                + Math.round(startX) + " "
+                + Math.round(startY) + " "
+                + Math.round(endX) + " "
+                + Math.round(endY)
+                + " 320 2>&1; echo __DAYMARK_INPUT_EXIT:$?";
+        String output = executeShellCommand(command);
+        check(output.contains("__DAYMARK_INPUT_EXIT:0"),
+                "touchscreen swipe command failed: " + output);
         waitForIdleSync();
+    }
+
+    private String executeShellCommand(String command) throws IOException {
+        ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(command);
+        StringBuilder output = new StringBuilder();
+        try (ParcelFileDescriptor.AutoCloseInputStream stream =
+                     new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+            byte[] buffer = new byte[256];
+            int count;
+            while ((count = stream.read(buffer)) != -1) {
+                output.append(new String(buffer, 0, count, StandardCharsets.UTF_8));
+            }
+        }
+        return output.toString();
     }
 
     private void injectPointerEvent(int action, long downTime, long eventTime, float x, float y)
