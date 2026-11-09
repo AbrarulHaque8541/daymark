@@ -12,7 +12,7 @@ read_phase_log() {
   # Bound each best-effort read so diagnostics never outlive the test command.
   if command -v timeout >/dev/null 2>&1; then
     timeout --signal=TERM --kill-after=2s 8s \
-      adb shell run-as "$pkg" sh -c 'cat files/instrumentation-phases.log' 2>/dev/null \
+      adb shell run-as "$pkg" cat files/instrumentation-phases.log 2>/dev/null \
       | tr -d '\r' || true
   fi
   return 0
