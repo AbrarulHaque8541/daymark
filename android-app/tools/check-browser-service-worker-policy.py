@@ -10,6 +10,7 @@ enforcement = (main / "BrowserServiceWorkerEnforcement.java").read_text(encoding
 webview = (main / "DaymarkWebView.java").read_text(encoding="utf-8")
 workspace = (main / "BrowserWorkspaceController.java").read_text(encoding="utf-8")
 docs = (root / "ANDROID_SOURCES.md").read_text(encoding="utf-8")
+test_module = (root / "service-worker-test/build.gradle.kts").read_text(encoding="utf-8")
 
 def require(condition, message):
     if not condition:
@@ -30,7 +31,7 @@ require("BrowserServiceWorkerPolicy.shouldShowCompatibilityNotice()" in webview
 require("ServiceWorkerController.getInstance()" in enforcement,
         "use the process-wide ServiceWorkerController")
 require(re.search(
-            r"getServiceWorkerWebSettings\(\)\s*\.setBlockNetworkLoads\(\s*BrowserServiceWorkerPolicy\.blocksNetworkLoads\(\)",
+            r"getServiceWorkerWebSettings\\(\\)\\s*\\.setBlockNetworkLoads\\(\\s*BrowserServiceWorkerPolicy\\.blocksNetworkLoads\\(\\)",
             enforcement) is not None,
         "set the platform ServiceWorkerWebSettings network block")
 require("controller.setServiceWorkerClient(new ServiceWorkerClient()" in enforcement
@@ -49,10 +50,12 @@ require("BrowserServiceWorkerEnforcement.enforceBlocked();" in workspace
 require("DaymarkWebView.isServiceWorkerNetworkPolicyReady()" in workspace,
         "do not unblock page loads if global Service Worker enforcement could not be installed")
 require(re.search(
-            r"Service\s+Worker network requests remain blocked even while ordinary page navigation is Online",
+            r"Service\\s+Worker network requests remain blocked even while ordinary page navigation is Online",
             docs) is not None,
         "document the fail-closed behavior and compatibility trade-off")
 require("static Decision decide(boolean onlineEnabled, boolean explicitNavigation, String scheme)" in policy,
         "keep Online toggle and explicit navigation distinct from Service Worker network grants")
+require('missingDimensionStrategy("distribution", "githubSideload")' in test_module,
+        "resolve the app's distribution flavor explicitly for the dedicated Service Worker test module")
 
 print("PASS browser service-worker policy source guard")
