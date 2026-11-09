@@ -1470,17 +1470,18 @@
   }
 
   function focusRecoveryPayloads(raw) {
-    if (typeof raw !== 'string' || !raw) return [];
+    if (typeof raw !== 'string') return [];
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1'
           && Array.isArray(parsed.payloads)) {
-        const payloads = parsed.payloads.filter((payload) => typeof payload === 'string' && payload.length > 0);
+        const payloads = parsed.payloads.filter((payload) => typeof payload === 'string');
         return payloads.length > 0 ? payloads : [raw];
       }
     } catch (error) {
       // Legacy backups may be unreadable raw JSON; preserve them byte-for-byte.
     }
+    // Empty strings are opaque backup bytes too; do not treat them as absence.
     return [raw];
   }
 
