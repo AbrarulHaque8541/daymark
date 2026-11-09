@@ -49,7 +49,7 @@ test('the module exposes its API', () => {
   assert.equal(typeof importer.fromMarkdown, 'function');
   assert.equal(typeof importer.mergeTasks, 'function');
   assert.equal(importer.STORAGE_KEY, undefined);
-  assert.deepEqual(importer.FORMATS, ['csv', 'markdown']);
+  assert.deepEqual(importer.FORMATS, ['csv', 'markdown', 'ics']);
   assert.equal(importer.CSV_HEADER, exporter.CSV_HEADER,
     'import and export must agree on the CSV header');
   assert.equal(typeof globalThis.DaymarkImport, 'object');

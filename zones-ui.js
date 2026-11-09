@@ -21,7 +21,17 @@
     if (!env || !env.document) throw new Error('attachZonesUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = env.localStorage !== undefined
+        ? env.localStorage
+        : ((win && win.localStorage) || null);
+    } catch (error) {
+      storageAccessFailed = true;
+    }
+    let storageReadFailed = false;
+    let storageCorrupt = false;
     const zonesApi = env.zonesApi !== undefined ? env.zonesApi : (root.DaymarkZones || null);
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
 
@@ -73,22 +83,54 @@
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
     }
 
-    function persist() {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      const cache = { version: 1, zones, updatedAt: updatedAt || now() };
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    function persist(nextZones, nextUpdatedAt) {
+      if (storageAccessFailed || storageReadFailed || storageCorrupt || !storage
+        || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') return false;
+      const cache = {
+        version: 1,
+        zones: nextZones.slice(),
+        updatedAt: nextUpdatedAt || now()
+      };
+      try {
+        storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+        return true;
+      } catch (error) {
+        return false;
+      }
     }
 
     function readCache() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+      if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+        return null;
+      }
+      let raw = null;
+      try {
+        raw = storage.getItem(STORAGE_KEY);
+      } catch (error) {
+        storageReadFailed = true;
+        return null;
+      }
+      if (raw === null) return null;
+      if (typeof raw !== 'string' || raw.length === 0) {
+        storageCorrupt = true;
+        return null;
+      }
       try {
         const parsed = JSON.parse(raw);
         if (zonesApi && typeof zonesApi.validateZonesCache === 'function'
           && zonesApi.validateZonesCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
+      } catch (error) { /* preserve corrupt saved data; do not treat it as an empty cache */ }
+      storageCorrupt = true;
       return null;
+    }
+
+    function storageProblem() {
+      if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+        return 'Browser storage is unavailable.';
+      }
+      if (storageReadFailed) return 'Saved time zones could not be read.';
+      if (storageCorrupt) return 'Saved time zones are invalid and were left untouched.';
+      return 'Browser storage could not be updated.';
     }
 
     function stamp() {
@@ -179,9 +221,14 @@
         status('Up to ' + zonesApi.MAX_ZONES + ' zones fit on the card. Remove one first.');
         return;
       }
-      zones.push(id);
-      updatedAt = now();
-      persist();
+      const nextZones = zones.concat(id);
+      const nextUpdatedAt = now();
+      if (!persist(nextZones, nextUpdatedAt)) {
+        status(storageProblem() + ' The saved list was not changed.');
+        return;
+      }
+      zones = nextZones;
+      updatedAt = nextUpdatedAt;
       render();
       status('Added ' + (zonesApi.zoneLabel(id) || id) + ' · ' + stamp());
     }
@@ -197,9 +244,14 @@
       }
       const index = zones.indexOf(zoneId);
       if (index === -1) return;
-      zones.splice(index, 1);
-      updatedAt = now();
-      persist();
+      const nextZones = zones.filter((zone, zoneIndex) => zoneIndex !== index);
+      const nextUpdatedAt = now();
+      if (!persist(nextZones, nextUpdatedAt)) {
+        status(storageProblem() + ' The saved list was not changed.');
+        return;
+      }
+      zones = nextZones;
+      updatedAt = nextUpdatedAt;
       render();
       status('Removed ' + (zonesApi.zoneLabel(zoneId) || zoneId) + ' · ' + stamp());
     }
@@ -361,14 +413,30 @@
         status('World clock is unavailable.');
         return;
       }
-      updatedAt = now();
-      persist();
+      const nextUpdatedAt = now();
+      if (!persist(zones, nextUpdatedAt)) {
+        render();
+        status(storageProblem()
+          + ' Current clocks were refreshed for this view; the refresh time was not saved.');
+        return;
+      }
+      updatedAt = nextUpdatedAt;
       render();
       status('Updated · ' + stamp());
     }
 
     function onClear() {
-      if (storage && typeof storage.removeItem === 'function') storage.removeItem(STORAGE_KEY);
+      if (storageAccessFailed || storageReadFailed || !storage
+        || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+        status(storageProblem() + ' Saved time zones were not cleared.');
+        return;
+      }
+      try {
+        storage.removeItem(STORAGE_KEY);
+      } catch (error) {
+        status('Could not clear saved time zones. Stored data was left unchanged.');
+        return;
+      }
       zones = [zonesApi ? zonesApi.DEFAULT_ZONE : DEFAULT_ZONE];
       updatedAt = null;
       if (pickEl && typeof pickEl.value === 'string') pickEl.value = zones[0];
@@ -389,7 +457,15 @@
       } else {
         zones = [zonesApi.DEFAULT_ZONE];
         render();
-        status('Pick time zones to compare. Everything is computed offline.');
+        if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+          status(storageProblem()
+            + ' Showing the default zone for this session; changes cannot be saved.');
+        } else if (storageReadFailed || storageCorrupt) {
+          status(storageProblem()
+            + ' Showing the default zone for this session; stored data was not changed.');
+        } else {
+          status('Pick time zones to compare. Everything is computed offline.');
+        }
       }
     }
 
@@ -440,7 +516,7 @@
   root.DaymarkZonesUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachZonesUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachZonesUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

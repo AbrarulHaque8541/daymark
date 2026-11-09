@@ -36,3 +36,16 @@ test('device QA summary prints Markdown backticks literally without shell comman
   assert.ok(summary.includes('\\`$package_name\\`'), 'package identity still expands');
   assert.ok(summary.includes('\\`$sha256\\`'), 'APK digest still expands');
 });
+
+const deviceTestReleaseWorkflowPath = path.join(__dirname, '..', '.github', 'workflows', 'android-device-test-release.yml');
+const deviceTestReleaseWorkflow = fs.readFileSync(deviceTestReleaseWorkflowPath, 'utf8');
+
+test('tag-triggered device-test verification uses read-only repository permissions', () => {
+  const permissions = deviceTestReleaseWorkflow.match(/^permissions:\n((?:  [^\n]*\n)+)/m);
+  assert.ok(permissions, 'top-level permissions block exists');
+  assert.match(permissions[1], /^  contents: read$/m, 'build-only workflow needs only repository read access');
+  assert.doesNotMatch(permissions[1], /write/, 'tag-triggered APK verification must not receive write permissions');
+  assert.match(deviceTestReleaseWorkflow, /^on:\n  push:\n    tags:/m, 'workflow remains tag-triggered only');
+  assert.doesNotMatch(deviceTestReleaseWorkflow, /softprops\/action-gh-release|gh release (?:create|upload)|actions\/create-release/i,
+    'no release-publishing step is present to justify repository write access');
+});

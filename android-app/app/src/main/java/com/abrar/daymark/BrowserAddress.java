@@ -13,6 +13,11 @@ final class BrowserAddress {
     private static final Pattern SCHEME = Pattern.compile("^[A-Za-z][A-Za-z0-9+.-]*:");
     private static final Pattern BARE_DOMAIN = Pattern.compile(
             "(?i)^(?:[A-Za-z0-9-]+\\.)+[A-Za-z]{2,}(?::[0-9]{1,5})?(?:[/\\?#].*)?$");
+    private static final Pattern BARE_IPV4_HOST = Pattern.compile("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$");
+    private static final Pattern BARE_IPV6_AUTHORITY =
+            Pattern.compile("^\\[[0-9A-Fa-f:.]+\\](?::[0-9]{1,5})?$");
+    private static final Pattern BARE_LOCALHOST_AUTHORITY =
+            Pattern.compile("(?i)^localhost(?::([0-9]{1,5}))?$");
 
     private BrowserAddress() { }
 
@@ -122,6 +127,17 @@ final class BrowserAddress {
             if (host == null || host.trim().isEmpty()) {
                 throw new IllegalArgumentException("Enter a valid web address with a host name.");
             }
+            String hostForIpValidation = host.endsWith(".")
+                    ? host.substring(0, host.length() - 1) : host;
+            if (!isCanonicalIpv4Literal(hostForIpValidation)
+                    && endsInWhatwgIpv4Number(hostForIpValidation)) {
+                throw new IllegalArgumentException(
+                        "IP hosts must use canonical four-octet decimal IPv4 notation.");
+            }
+            if (host.startsWith("[") && !hasCanonicalIpv4Tail(host)) {
+                throw new IllegalArgumentException(
+                        "IPv4 tails in IPv6 addresses must use canonical octets.");
+            }
             if (hasExplicitEmptyPort(uri)) {
                 throw new IllegalArgumentException("Enter a valid port between 1 and 65535.");
             }
@@ -181,7 +197,80 @@ final class BrowserAddress {
             if (asciiHost == null) return false;
             hostPart = asciiHost + (colon < 0 ? "" : hostPart.substring(colon));
         }
-        return BARE_DOMAIN.matcher(hostPart).matches() && hostPart.toLowerCase(Locale.ROOT).contains(".");
+        return isBareIpv4Authority(hostPart)
+                || isBareIpv6Authority(hostPart)
+                || isBareLocalhostAuthority(hostPart)
+                || (BARE_DOMAIN.matcher(hostPart).matches()
+                && hostPart.toLowerCase(Locale.ROOT).contains("."));
+    }
+
+    private static boolean isBareIpv4Authority(String authority) {
+        int colon = authority.lastIndexOf(':');
+        String host = colon < 0 ? authority : authority.substring(0, colon);
+        if (!BARE_IPV4_HOST.matcher(host).matches()) return false;
+        if (colon >= 0 && !isValidPortText(authority.substring(colon + 1))) return false;
+        return isCanonicalIpv4Literal(host);
+    }
+
+    private static boolean isBareIpv6Authority(String authority) {
+        if (!BARE_IPV6_AUTHORITY.matcher(authority).matches()) return false;
+        try {
+            URI uri = new URI("https://" + authority);
+            int port = uri.getPort();
+            String host = uri.getHost();
+            return host != null && host.startsWith("[") && hasCanonicalIpv4Tail(host)
+                    && !hasExplicitEmptyPort(uri) && port != 0 && port <= 65535;
+        } catch (Exception invalid) {
+            return false;
+        }
+    }
+
+    private static boolean isCanonicalIpv4Literal(String host) {
+        if (host == null || !BARE_IPV4_HOST.matcher(host).matches()) return false;
+        String[] octets = host.split("\\.", -1);
+        for (String octet : octets) {
+            if (octet.length() > 1 && octet.charAt(0) == '0') return false;
+            if (Integer.parseInt(octet) > 255) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Mirrors WHATWG's ends-in-a-number check so Chromium cannot reinterpret a
+     * non-canonical DNS-looking host as a shortened, octal, hexadecimal, or
+     * integer IPv4 address after this validator has accepted it.
+     */
+    private static boolean endsInWhatwgIpv4Number(String host) {
+        if (host == null || host.isEmpty()) return false;
+        String[] labels = host.split("\\.", -1);
+        String last = labels[labels.length - 1];
+        return last.matches("[0-9]+")
+                || last.matches("(?i)0x[0-9a-f]*")
+                || (last.length() > 1 && last.charAt(0) == '0'
+                && last.substring(1).matches("[0-7]+"));
+    }
+
+    private static boolean hasCanonicalIpv4Tail(String bracketedHost) {
+        if (bracketedHost == null || !bracketedHost.startsWith("[")
+                || !bracketedHost.endsWith("]")) return false;
+        String literal = bracketedHost.substring(1, bracketedHost.length() - 1);
+        int lastColon = literal.lastIndexOf(':');
+        if (lastColon < 0) return true;
+        String tail = literal.substring(lastColon + 1);
+        return !tail.contains(".") || isCanonicalIpv4Literal(tail);
+    }
+
+    private static boolean isBareLocalhostAuthority(String authority) {
+        java.util.regex.Matcher matcher = BARE_LOCALHOST_AUTHORITY.matcher(authority);
+        if (!matcher.matches()) return false;
+        String port = matcher.group(1);
+        return port == null || isValidPortText(port);
+    }
+
+    private static boolean isValidPortText(String text) {
+        if (text == null || !text.matches("[0-9]{1,5}")) return false;
+        int port = Integer.parseInt(text);
+        return port >= 1 && port <= 65535;
     }
 
     /** Reject an explicit trailing port separator; URI.getPort() reports -1 for it. */

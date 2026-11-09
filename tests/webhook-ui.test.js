@@ -196,3 +196,49 @@ test('the form and buttons are wired on attach', () => {
   assert.ok(elements['webhook-flush'].listeners.some((entry) => entry.type === 'click'));
   handle.detach();
 });
+
+test('concurrent tabs do not lose enqueued events', async () => {
+  const { env, storageData } = fakeEnv({ url: 'https://hooks.example.com/x', fetch: async () => ({ ok: false, status: 500 }) });
+  const handleA = ui.attachWebhookUi(env);
+  const handleB = ui.attachWebhookUi(Object.assign({}, env, { document: env.document }));
+  // Force both to have the config
+  handleA.onSave({ preventDefault() {} });
+  handleB.onSave({ preventDefault() {} });
+  const taskA = Object.assign({}, TASK, { title: 'Task A' });
+  const taskB = Object.assign({}, TASK, { title: 'Task B' });
+  const resA = handleA.notifyTaskCompleted(taskA);
+  const resB = handleB.notifyTaskCompleted(taskB);
+  assert.equal(resA.queued, true);
+  assert.equal(resB.queued, true);
+  await settle();
+  const raw = storageData[webhookApi.QUEUE_KEY];
+  assert.ok(raw, 'queue was persisted');
+  const parsed = JSON.parse(raw);
+  assert.ok(webhookApi.validateQueue(parsed));
+  const titles = parsed.map((ev) => {
+    try { return JSON.parse(ev.payload).task.title; } catch { return ''; }
+  });
+  assert.ok(titles.includes('Task A'), 'Task A survived');
+  assert.ok(titles.includes('Task B'), 'Task B survived');
+});
+
+test('clear queue removes persisted events under the lock', async () => {
+  const { env, elements, storageData } = fakeEnv({ url: 'https://hooks.example.com/x', fetch: async () => ({ ok: false, status: 500 }) });
+  // inject clear button into the fake document
+  elements['webhook-clear-queue'] = Object.assign(fakeElement('button'), { id: 'webhook-clear-queue' });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  handle.notifyTaskCompleted(TASK);
+  await settle();
+  assert.ok(storageData[webhookApi.QUEUE_KEY]);
+  // simulate click
+  const btn = elements['webhook-clear-queue'];
+  const click = btn.listeners.find((l) => l.type === 'click');
+  assert.ok(click, 'clear button is wired');
+  click.handler();
+  await settle();
+  const raw = storageData[webhookApi.QUEUE_KEY];
+  const parsed = raw ? JSON.parse(raw) : [];
+  assert.equal(parsed.length, 0, 'queue is empty after clear');
+  assert.ok(elements['webhook-status'].textContent.includes('cleared'));
+});

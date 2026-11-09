@@ -11,8 +11,9 @@ const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
+const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -30,6 +31,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   let toastWriteCount = 0;
   const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
   if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
+  if (savedFocusBackupValue !== null) storedValues.set(FOCUS_BACKUP_KEY, savedFocusBackupValue);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -82,6 +84,9 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
 
   const localStorage = {
     getItem(key) {
+      if ((key === STORAGE_KEY && failPrimaryRead) || (key === BACKUP_KEY && failBackupRead) || (key === FOCUS_KEY && failFocusPrimaryRead) || (key === FOCUS_BACKUP_KEY && failFocusBackupRead)) {
+        throw new Error('SecurityError: storage read blocked');
+      }
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
@@ -676,4 +681,35 @@ test('initial loading indicators clear only when the real app render and storage
   const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.equal(indexSource.includes('}, 120);'), false,
     'index must not hide loading indicators after an arbitrary timeout');
+});
+
+test('unreadable primary task key with readable backup offers recovery without mutation', () => {
+  const backup = JSON.stringify([{ id: 't1', title: 'Recovered', completed: false, priority: 'medium', createdAt: '2026-01-01T00:00:00.000Z' }]);
+  const app = bootApp({ savedValue: null, savedBackupValue: backup, failPrimaryRead: true });
+  assert.equal(app.storedValues.get(STORAGE_KEY), null, 'primary key must not be written or treated as absent');
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup, 'backup must remain untouched');
+  assert.match(app.elements.get('#storage-status span').textContent, /Primary task data unreadable; recovery backup available/);
+  assert.match(app.elements.get('#toast').textContent, /recovery backup is available/);
+  assert.equal(app.elements.get('#toast-action').hidden, false);
+  assert.equal(app.elements.get('#toast-action').textContent, 'Export recovery');
+});
+
+test('unreadable primary task key with unreadable backup reports unknown recovery status', () => {
+  const app = bootApp({ savedValue: null, failPrimaryRead: true, failBackupRead: true });
+  assert.match(app.elements.get('#storage-status span').textContent, /recovery status unknown/);
+  assert.match(app.elements.get('#toast').textContent, /Recovery status is unknown/);
+});
+
+test('unreadable primary task key with no backup reports no recovery backup found', () => {
+  const app = bootApp({ savedValue: null, failPrimaryRead: true });
+  assert.match(app.elements.get('#storage-status span').textContent, /no recovery backup found/);
+  assert.match(app.elements.get('#toast').textContent, /No recovery backup was found/);
+});
+
+test('unreadable primary focus key with readable backup offers recovery', () => {
+  const focusBackup = JSON.stringify({ session: null, log: [{ id: 'f1', kind: 'focus', finalElapsedMs: 1000 }] });
+  const app = bootApp({ savedValue: null, savedFocusBackupValue: focusBackup, failFocusPrimaryRead: true });
+  assert.equal(app.storedValues.get(FOCUS_KEY), null);
+  assert.equal(app.storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
+  assert.match(app.elements.get('#storage-status span').textContent, /Primary focus data unreadable; recovery backup available/);
 });

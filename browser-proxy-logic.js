@@ -151,7 +151,14 @@
       || host.endsWith('.localhost') || host.endsWith('.localhost.')) return true;
     if (host.startsWith('[')) {
       const groups = parseIpv6Groups(host.slice(1, -1));
-      return !!groups && groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1;
+      if (!groups) return false;
+      // IPv4-mapped IPv6 addresses retain the embedded IPv4 loopback range.
+      // Chromium normalizes dotted tails (for example 127.0.0.1) to hex
+      // groups, so inspect the mapped prefix and the embedded first octet.
+      const isIpv4Mapped = groups.slice(0, 5).every((group) => group === 0)
+        && groups[5] === 0xffff;
+      if (isIpv4Mapped) return (groups[6] >> 8) === 127;
+      return groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1;
     }
     const octets = parseIpv4Octets(host);
     return !!octets && octets[0] === 127;

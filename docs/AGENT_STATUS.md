@@ -1,6 +1,14 @@
-- [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T07:51:24.139Z (main 8238d576ffde; #651/#652 superseded, #656/#657 green, #658/#659 security branches, current webhook/Focus blockers)](./CURRENT_STATUS_20261109T075124Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T07:40:50.709Z (main 8238d576ffde; #656 category-loss disclosure, #657 terminal recurrence coverage, #658/#659 security review, #604 current-main snapshot)](./CURRENT_STATUS_20261109T074050Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (main 8238d576ffde; PR #645 merged; current #643/#656 exact-head audit)](./CURRENT_STATUS_20261109T070843Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z (main 7e540c9b5d3a; PR #604 docs-only status index, feed, webhook and Focus status)](./CURRENT_STATUS_20261109T064041Z.md)
+- Previous snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z (main 7e540c9b5d3a; feed stream cleanup, webhook/recovery integration, Focus and CI blockers)](./CURRENT_STATUS_20261109T063944Z.md)
+- Previous snapshot: [Daymark engineering status — 2026-11-09T04:20:34.434Z (iCalendar open-format import)](./CURRENT_STATUS_20261109T042000Z.md)
+- Historical storage-health snapshot: [2026-11-08T11:50:17.463Z](./CURRENT_STATUS_20261108T115017Z.md)
+- Earlier storage-health snapshot: [2026-11-08T09:51:08Z](./CURRENT_STATUS_20261108T095108Z.md)
+- [Historical snapshot — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
 - Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
-- Use the CURRENT snapshot above for live branch/CI/backlog state; older entries below are historical.
+- Use the latest reviewed snapshot above for live branch/CI/backlog state; older entries below are historical.
 
 
 - [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
@@ -89,7 +97,10 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (verified current main, merged #645, current PR heads, exact-head checks and this run's fixes)](./CURRENT_STATUS_20261109T070843Z.md)
+- Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z](./CURRENT_STATUS_20261109T064041Z.md)
+- Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z](./CURRENT_STATUS_20261109T063944Z.md)
+- Earlier reviewed snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 
 
 - [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)

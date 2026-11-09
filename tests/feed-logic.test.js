@@ -47,6 +47,47 @@ const ATOM = ['<?xml version="1.0" encoding="utf-8"?>',
 '  </entry>',
 '</feed>'].join('\n');
 
+function streamedResponse(xml, options) {
+  const opts = options || {};
+  const bytes = Buffer.from(xml, 'utf8');
+  const chunkSize = Number.isSafeInteger(opts.chunkSize) && opts.chunkSize > 0 ? opts.chunkSize : 1024;
+  let offset = 0;
+  const state = { cancelled: false, released: false, textCalled: false };
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true };
+      const end = Math.min(bytes.length, offset + chunkSize);
+      const value = bytes.subarray(offset, end);
+      offset = end;
+      return { done: false, value };
+    },
+    cancel() {
+      state.cancelled = true;
+      offset = bytes.length;
+      return Promise.resolve();
+    },
+    releaseLock() { state.released = true; }
+  };
+  return {
+    state,
+    bytes,
+    response: {
+      ok: true,
+      status: 200,
+      headers: {
+        get(name) {
+          return name.toLowerCase() === 'content-length' ? String(bytes.length) : null;
+        }
+      },
+      body: { getReader: () => reader },
+      async text() {
+        state.textCalled = true;
+        throw new Error('stream path must not call response.text()');
+      }
+    }
+  };
+}
+
 test('RSS 2.0 feeds parse channel metadata and items with CDATA and entities', () => {
   const parsed = feed.parseFeed(RSS);
   assert.equal(parsed.format, 'rss');
@@ -96,6 +137,30 @@ test('XML parser rejects excessive nesting before JavaScript stack exhaustion', 
     '<title>Nested payload</title><description>' + nested +
     '</description></item></channel></rss>';
   assert.throws(() => feed.parseFeed(xml), /XML nesting limit exceeded/);
+});
+
+
+test('XML parser rejects shallow documents that exceed the total node budget', () => {
+  const manyNodes = '<x/>'.repeat(feed.MAX_XML_NODES + 1);
+  const xml = '<rss><channel><title>Bounded</title><item><title>Dense</title>' +
+    manyNodes + '</item></channel></rss>';
+  assert.throws(() => feed.parseFeed(xml), /XML node limit exceeded/);
+});
+
+test('XML parser rejects per-element and aggregate attribute exhaustion', () => {
+  const tooManyOnOneElement = Array.from(
+    { length: feed.MAX_XML_ATTRIBUTES_PER_ELEMENT + 1 },
+    (_, index) => `a${index}="v"`
+  ).join(' ');
+  assert.throws(
+    () => feed.parseFeed(`<rss ${tooManyOnOneElement}><channel><item><title>x</title></item></channel></rss>`),
+    /XML attribute limit exceeded/
+  );
+
+  const manyAttributes = '<x a="1" b="2" c="3"/>'.repeat(Math.ceil(feed.MAX_XML_ATTRIBUTES / 3));
+  const xml = '<rss><channel><title>Bounded</title><item><title>Dense</title>' +
+    manyAttributes + '</item></channel></rss>';
+  assert.throws(() => feed.parseFeed(xml), /XML attribute limit exceeded/);
 });
 
 test('feed URLs must be plain http(s) URLs without credentials', () => {
@@ -177,18 +242,17 @@ test('non-empty invalid feed URL never silently falls back to a cached URL', () 
   assert.equal(feed.resolveFeedTarget('', 'ftp://example.com/invalid'), null);
 });
 
-test('feed fetch timeout covers a stalled response body and aborts the request', async () => {
+test('feed fetch timeout aborts a request stalled before response headers', async () => {
   let capturedSignal = null;
-  const response = { ok: true, status: 200, text: () => new Promise(() => {}) };
   await assert.rejects(
-    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+    feed.fetchFeed('https://example.com/feed.xml', (_url, options) => {
       capturedSignal = options.signal;
-      return response;
+      return new Promise(() => {});
     }, 30),
     /timed out/
   );
   assert.ok(capturedSignal, 'AbortController signal is passed to fetch');
-  assert.equal(capturedSignal.aborted, true, 'timeout aborts even after response headers arrived');
+  assert.equal(capturedSignal.aborted, true, 'timeout aborts a stalled fetch request');
 });
 
 test('streamed feed bodies preserve UTF-8 split across chunks', async () => {
@@ -266,15 +330,28 @@ test('Content-Length above the feed limit is rejected before reading the body', 
   assert.equal(textCalled, false);
 });
 
-test('non-streaming response fallback still enforces the decoded XML limit', async () => {
+test('non-streaming feed responses fail closed without materializing response.text()', async () => {
+  let textCalled = false;
+  let capturedSignal = null;
+  const response = {
+    ok: true,
+    status: 200,
+    body: null,
+    async text() {
+      textCalled = true;
+      return RSS;
+    }
+  };
   await assert.rejects(
-    feed.fetchFeed('https://example.com/feed.xml', async () => ({
-      ok: true,
-      status: 200,
-      text: async () => 'x'.repeat(feed.MAX_XML_CHARS + 1)
-    }), 1000),
-    /too large to parse safely/
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 1000),
+    /streaming response reader is required/
   );
+  assert.ok(capturedSignal, 'AbortController signal is passed to fetch');
+  assert.equal(capturedSignal.aborted, true, 'unsupported response bodies abort the request');
+  assert.equal(textCalled, false, 'unbounded response.text() is never called');
 });
 
 test('feed timeout cancels an active streaming reader after headers', async () => {
@@ -313,14 +390,135 @@ test('feed timeout cancels an active streaming reader after headers', async () =
   assert.equal(released, true, 'reader lock is released after cancellation');
 });
 
-test('feed fetch parses a successful response and rejects non-success status', async () => {
-  const parsed = await feed.fetchFeed('https://example.com/feed.xml', async () => ({
-    ok: true, status: 200, text: async () => RSS
-  }), 1000);
+test('feed requests reject redirects and omit ambient credentials and referrer', async () => {
+  let capturedOptions = null;
+  const streamed = streamedResponse(RSS);
+  const parsed = await feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+    capturedOptions = options;
+    return streamed.response;
+  }, 1000);
   assert.equal(parsed.title, 'Example News');
+  assert.equal(capturedOptions.redirect, 'error');
+  assert.equal(capturedOptions.credentials, 'omit');
+  assert.equal(capturedOptions.referrerPolicy, 'no-referrer');
+});
+
+test('malformed UTF-8 split across chunks aborts, cancels and releases the reader', async () => {
+  const bytes = Buffer.concat([Buffer.from(RSS, 'utf8'), Buffer.from([0xc3, 0x28])]);
+  const chunks = [
+    bytes.subarray(0, bytes.length - 2),
+    bytes.subarray(bytes.length - 2, bytes.length - 1),
+    bytes.subarray(bytes.length - 1)
+  ];
+  let index = 0;
+  let cancelled = false;
+  let released = false;
+  let textCalled = false;
+  let capturedSignal = null;
+  const reader = {
+    async read() {
+      if (index >= chunks.length) return { done: true };
+      return { done: false, value: chunks[index++] };
+    },
+    async cancel() { cancelled = true; },
+    releaseLock() { released = true; }
+  };
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => String(bytes.length) },
+    body: { getReader: () => reader },
+    async text() { textCalled = true; return RSS; }
+  };
+  await assert.rejects(
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 1000),
+    /encoded data|UTF-8|utf-8/i
+  );
+  assert.ok(capturedSignal, 'AbortController signal is passed to fetch');
+  assert.equal(capturedSignal.aborted, true, 'decoder failure aborts the network request');
+  assert.equal(cancelled, true, 'decoder failure cancels the active reader');
+  assert.equal(released, true, 'decoder failure releases the reader lock');
+  assert.equal(textCalled, false, 'stream path never materializes response.text()');
+});
+
+test('feed reader acquisition failure aborts without an unbounded text fallback', async () => {
+  let capturedSignal = null;
+  let textCalled = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: { getReader() { throw new Error('stream is already locked'); } },
+    async text() { textCalled = true; return RSS; }
+  };
+  await assert.rejects(
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 1000),
+    /stream is already locked/
+  );
+  assert.ok(capturedSignal);
+  assert.equal(capturedSignal.aborted, true, 'reader acquisition failure aborts the request');
+  assert.equal(textCalled, false, 'reader acquisition failure never falls back to response.text()');
+});
+
+test('decoder initialization failure cancels and releases an acquired reader', async () => {
+  const originalTextDecoder = globalThis.TextDecoder;
+  let capturedSignal = null;
+  let cancelled = false;
+  let released = false;
+  let textCalled = false;
+  const reader = {
+    async read() { throw new Error('read must not start when decoder construction fails'); },
+    async cancel() { cancelled = true; },
+    releaseLock() { released = true; }
+  };
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: { getReader: () => reader },
+    async text() { textCalled = true; return RSS; }
+  };
+  try {
+    globalThis.TextDecoder = class {
+      constructor() { throw new Error('decoder initialization failed'); }
+    };
+    await assert.rejects(
+      feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+        capturedSignal = options.signal;
+        return response;
+      }, 1000),
+      /decoder initialization failed/
+    );
+  } finally {
+    globalThis.TextDecoder = originalTextDecoder;
+  }
+  assert.ok(capturedSignal);
+  assert.equal(capturedSignal.aborted, true, 'decoder initialization failure aborts the request');
+  assert.equal(cancelled, true, 'the acquired reader is cancelled');
+  assert.equal(released, true, 'the acquired reader lock is released');
+  assert.equal(textCalled, false, 'decoder failure never falls back to response.text()');
+});
+
+test('feed fetch parses a streamed response and cancels non-success response bodies', async () => {
+  const streamed = streamedResponse(RSS);
+  const parsed = await feed.fetchFeed('https://example.com/feed.xml', async () => streamed.response, 1000);
+  assert.equal(parsed.title, 'Example News');
+  assert.equal(streamed.state.released, true);
+  assert.equal(streamed.state.textCalled, false);
+
+  let cancelled = false;
   await assert.rejects(feed.fetchFeed('https://example.com/feed.xml', async () => ({
-    ok: false, status: 503, text: async () => ''
+    ok: false,
+    status: 503,
+    body: { cancel() { cancelled = true; return Promise.resolve(); } }
   }), 1000), /HTTP 503/);
+  assert.equal(cancelled, true, 'unread HTTP error bodies are cancelled');
 });
 
 test('RSS camel-case pubDate element is matched case-insensitively', () => {

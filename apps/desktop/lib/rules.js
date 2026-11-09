@@ -47,14 +47,20 @@ function isHttps(url) {
 
 function isAllowedInsecure(hostname) {
   if (!hostname) return false;
-  return INSECURE_ALLOWED_HOSTNAMES.has(hostname.toLowerCase());
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return INSECURE_ALLOWED_HOSTNAMES.has(normalized);
 }
 
 function isAllowedUrl(url) {
-  const hostname = hostnameOf(url);
-  if (!hostname) return false;
-  if (isHttps(url)) return true;
-  return isAllowedInsecure(hostname);
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!parsed.hostname || parsed.username || parsed.password) return false;
+  if (parsed.protocol === 'https:') return true;
+  return parsed.protocol === 'http:' && isAllowedInsecure(parsed.hostname);
 }
 
 // Upgrade typed addresses to https:// automatically. Plain http:// is
@@ -71,8 +77,14 @@ function httpsUpgradeUrl(input) {
   } catch {
     throw new Error('invalid-address');
   }
-  if (u.protocol === 'http:' && !isAllowedInsecure(u.hostname)) {
-    u.protocol = 'https:';
+  // Never retain credentials in browser history, address state, popup routing,
+  // or request admission. Only HTTPS and the explicit localhost HTTP exception
+  // are valid top-level address schemes.
+  if (!u.hostname || u.username || u.password) throw new Error('invalid-address');
+  if (u.protocol === 'http:') {
+    if (!isAllowedInsecure(u.hostname)) u.protocol = 'https:';
+  } else if (u.protocol !== 'https:') {
+    throw new Error('invalid-address');
   }
   return u.toString();
 }
