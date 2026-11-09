@@ -47,6 +47,9 @@ import javax.crypto.spec.SecretKeySpec;
 public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private static final String TASK_ID = "instrumentation-task-v1";
     private static final String LOG_TAG = "DaymarkInstr";
+    private static final String INPUT_REQUEST_FILE = "daymark-instrumentation-input-request.txt";
+    private static final String INPUT_RESULT_FILE = "daymark-instrumentation-input-result.txt";
+    private int inputSequence;
     private int assertions;
 
     @Override
@@ -422,11 +425,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         String target = describeTouchTarget(view, bounds);
         float x = bounds.centerX();
         float y = bounds.centerY();
-        long downTime = android.os.SystemClock.uptimeMillis();
-        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, x, y);
-        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime, downTime + 60L, x, y);
-        waitForIdleSync();
-        return target + " tapCenter=(" + x + "," + y + ") source=touchscreen/finger";
+        dispatchHostInput("tap", x, y, x, y, 100);
+        return target + " tapCenter=(" + x + "," + y + ") source=host-adb-touchscreen/finger";
     }
 
     private String dispatchSwipe(android.view.View view, boolean left) throws Exception {
@@ -589,36 +589,73 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
-        // Use the same instrumented-window pointer path that successfully delivers taps.
-        // Shell input swipe was accepted by the emulator but frequently produced empty
-        // MotionEvent traces on the Focus mode selector under CI load.
-        long downTime = android.os.SystemClock.uptimeMillis();
-        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, startX, startY);
-        final int moveSteps = 8;
-        for (int step = 1; step <= moveSteps; step++) {
-            float progress = step / (float) moveSteps;
-            float x = startX + (endX - startX) * progress;
-            float y = startY + (endY - startY) * progress;
-            injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime,
-                    downTime + step * 40L, x, y);
-        }
-        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime,
-                downTime + (moveSteps + 1) * 40L, endX, endY);
-        waitForIdleSync();
+        // The host-side adb input command targets the active app window under shell UID.
+        // This avoids Android 15+ Instrumentation.sendPointerSync cross-UID restrictions.
+        dispatchHostInput("swipe", startX, startY, endX, endY, 360);
     }
 
-    private void injectPointerEvent(int action, long downTime, long eventTime, float x, float y)
-            throws Exception {
-        android.view.MotionEvent event = android.view.MotionEvent.obtain(
-                downTime, eventTime, action, x, y, 0);
-        event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
-        try {
-            // Instrumentation.sendPointerSync routes the touchscreen event through the
-            // target application's window. UiAutomation accepted the same events on API 29,
-            // but the Focus selector and its children received no MotionEvents (trace=[]).
-            sendPointerSync(event);
-        } finally {
-            event.recycle();
+    private void dispatchHostInput(String action, float startX, float startY,
+                                   float endX, float endY, int durationMs) throws Exception {
+        if (!"tap".equals(action) && !"swipe".equals(action)) {
+            throw new IllegalArgumentException("unsupported host input action: " + action);
+        }
+        int sequence = ++inputSequence;
+        File filesDir = getTargetContext().getFilesDir();
+        File request = new File(filesDir, INPUT_REQUEST_FILE);
+        File result = new File(filesDir, INPUT_RESULT_FILE);
+        File temporary = new File(filesDir, INPUT_REQUEST_FILE + ".tmp");
+        request.delete();
+        result.delete();
+        temporary.delete();
+
+        String requestLine = sequence + "|" + action + "|" + Math.round(startX) + "|"
+                + Math.round(startY) + "|" + Math.round(endX) + "|" + Math.round(endY)
+                + "|" + durationMs + "\n";
+        try (FileOutputStream output = new FileOutputStream(temporary)) {
+            output.write(requestLine.getBytes(StandardCharsets.US_ASCII));
+            output.getFD().sync();
+        }
+        if (!temporary.renameTo(request)) {
+            temporary.delete();
+            throw new IOException("could not publish host input request " + sequence);
+        }
+
+        long deadline = android.os.SystemClock.uptimeMillis() + 15000L;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            if (result.isFile()) {
+                String response = readSmallTextFile(result).trim();
+                String[] fields = response.split("\\|", -1);
+                if (fields.length == 2 && Integer.toString(sequence).equals(fields[0])) {
+                    result.delete();
+                    request.delete();
+                    int status = Integer.parseInt(fields[1]);
+                    if (status != 0) {
+                        throw new AssertionError("host input command failed (action=" + action
+                                + ", sequence=" + sequence + ", exit=" + status + ")");
+                    }
+                    waitForIdleSync();
+                    return;
+                }
+            }
+            android.os.SystemClock.sleep(25L);
+        }
+        request.delete();
+        throw new AssertionError("timed out waiting for host input bridge (action=" + action
+                + ", sequence=" + sequence + ")");
+    }
+
+    private String readSmallTextFile(File file) throws IOException {
+        try (FileInputStream input = new FileInputStream(file);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[128];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                if (output.size() + count > 256) {
+                    throw new IOException("host input result exceeded its size limit");
+                }
+                output.write(buffer, 0, count);
+            }
+            return output.toString(StandardCharsets.US_ASCII.name());
         }
     }
 
