@@ -473,8 +473,8 @@ test('unreadable task and Focus primaries with no backups do not create replacem
   const app = bootApp(storedValues, new Set(), false, true, failReads);
 
   assert.match(app.elements.get('#storage-status span').textContent,
-    /Primary task data unreadable; no recovery backup found/,
-  'the task-primary warning is shown first when both primaries are unreadable');
+    /Task and Focus primary data unreadable; no recovery backup found/,
+  'the combined warning is shown when both primaries and both backups are unavailable');
   app.elements.get('#new-title').value = 'Session-only task';
   app.elements.get('#add-form').dispatch('submit');
   assert.equal(storedValues.has(STORAGE_KEY), false);
