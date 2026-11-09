@@ -163,7 +163,7 @@ final class ExtensionStore {
         }
         File out = new File(userDir, sanitizeFileName(ext.id) + ".daymark-ext.json");
         BrowserExtension existing = null;
-        if (out.exists()) {
+        if (Files.exists(out.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             // Read failures are not parse failures: never replace a file that could not be
             // inspected (including an oversized file or a non-regular path).
             String existingJson;
@@ -446,6 +446,7 @@ final class ExtensionStore {
         synchronized (ExtensionStore.class) {
             if (id == null || id.startsWith("daymark.builtin.")) return;
             File out = new File(userDir, sanitizeFileName(id) + ".daymark-ext.json");
+            if (!Files.isRegularFile(out.toPath(), LinkOption.NOFOLLOW_LINKS)) return;
             //noinspection ResultOfMethodCallIgnored
             out.delete();
         }
@@ -474,7 +475,7 @@ final class ExtensionStore {
     }
 
     private static String readFile(File file) throws IOException {
-        if (file == null || !file.isFile()) {
+        if (file == null || !Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Extension pack path is not a regular file.");
         }
         long initialLength = file.length();
