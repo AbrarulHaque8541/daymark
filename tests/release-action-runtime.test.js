@@ -106,7 +106,7 @@ test('pull-request device-test builds never receive production signing secrets',
   const allowedSecretBlocks = new Set();
   for (let index = validation.start; index < validation.end; index += 1) allowedSecretBlocks.add(index);
   for (let index = signed.start; index < signed.end; index += 1) allowedSecretBlocks.add(index);
-  const secretLines = lines.map((line, index) => line.includes('secrets.') ? index : -1).filter((index) => index >= 0);
+  const secretLines = lines.map((line, index) => line.includes('${{ secrets.') ? index : -1).filter((index) => index >= 0);
   assert.equal(secretLines.length, 8, 'only the two tag-gated steps may reference the four signing secrets');
   for (const index of secretLines) {
     assert.equal(allowedSecretBlocks.has(index), true,
