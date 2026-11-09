@@ -91,8 +91,8 @@ function fakeEnv(options) {
       getElementById(id) { return elements[id] || null; }
     },
     window: { addEventListener() {} },
-    crypto: nodeCrypto.webcrypto,
-    TextEncoder: globalThis.TextEncoder,
+    crypto: Object.prototype.hasOwnProperty.call(opts, 'crypto') ? opts.crypto : nodeCrypto.webcrypto,
+    TextEncoder: Object.prototype.hasOwnProperty.call(opts, 'TextEncoder') ? opts.TextEncoder : globalThis.TextEncoder,
     confirm(message) { confirmations.push(message); return typeof opts.confirm === 'function' ? opts.confirm(message) : true; },
     localStorage: storage,
     navigator: { onLine: opts.online !== false, locks },
@@ -446,6 +446,21 @@ test('a legacy endpoint is removed without being read and queued events wait for
   assert.equal(storageData[webhookApi.CONFIG_KEY], undefined, 'the new endpoint is not persisted either');
   assert.equal(elements['webhook-status'].textContent.includes(newUrl), false);
 });
+test('task completion fails closed without Web Crypto and never persists or sends an unbound event', async () => {
+  let fetchCalls = 0;
+  const { env, storageData } = fakeEnv({
+    crypto: { subtle: null },
+    fetch: async () => { fetchCalls += 1; return { ok: true, status: 200 }; }
+  });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  const result = await handle.notifyTaskCompleted(TASK);
+  assert.deepEqual(result, { queued: false, reason: 'fingerprint-unavailable' });
+  assert.equal(handle.readQueue().length, 0);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
+  assert.equal(fetchCalls, 0);
+});
+
 test('a tab never delivers another tab\'s queued event to a different endpoint', async () => {
   const storageData = {};
   const locks = createLockManager();
