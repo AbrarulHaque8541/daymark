@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-09T15:20:06Z (main 59e6961c0645; seven open PRs, twelve issues; PR #677 time-change re-arm, inherited Focus API36 gate failure)](./CURRENT_STATUS_20261109T152006Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T15:17:00Z (main 59e6961c0645; seven open PRs, twelve issues; Focus API36 10/10, webhook 728/728, reminder time-change PR #677)](./CURRENT_STATUS_20261109T151700Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T15:02:16Z (main 59e6961c0645; six open PRs, twelve issues; Focus API36 10/10, webhook 728/728, extension injection 41 assertions)](./CURRENT_STATUS_20261109T150216Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T14:55:08Z (main 59e6961c0645; six open PRs, twelve issues; webhook endpoint isolation, Focus screen-coordinate correction, extension page-scope)](./CURRENT_STATUS_20261109T145508Z.md)
