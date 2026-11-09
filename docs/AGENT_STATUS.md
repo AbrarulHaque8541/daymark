@@ -94,6 +94,8 @@
 
 # Agent status index
 
+- [2026-11-09T12:00:49Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T120049Z.md)
+
 - [2026-11-09T11:39:14Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T113914Z.md)
 
 - [2026-11-09T11:21:40Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T112140Z.md)
@@ -101,6 +103,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [2026-11-09T12:00:49Z — current main 1d29085](./CURRENT_STATUS_20261109T120049Z.md)
+- Previous reviewed snapshot: [2026-11-09T11:39:14Z](./CURRENT_STATUS_20261109T113914Z.md)
 - [2026-11-09T11:39:14Z — current main 1d29085](./CURRENT_STATUS_20261109T113914Z.md)
 - Previous reviewed snapshot: [2026-11-09T11:21:40Z](./CURRENT_STATUS_20261109T112140Z.md)
 - [2026-11-09T11:21:40Z — current main 1d29085](./CURRENT_STATUS_20261109T112140Z.md)
