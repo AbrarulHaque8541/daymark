@@ -1053,6 +1053,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(switched != null && switched.isPaused()
                             && alternateTask.id.equals(switched.timer.taskId()),
                     "choosing task B changes the paused session identity without resuming it");
+            check(switched.notificationPublished,
+                    "switching a paused session reports successful notification publication");
             TaskFocusTimer persistedSwitch = new TaskFocusTimerStore(isolated).load(
                     android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis(), -1);
             check(persistedSwitch != null && persistedSwitch.isPaused()
@@ -1182,11 +1184,41 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 && "Finish".contentEquals(notification.actions[1].title);
     }
 
+    private static String describeNotification(android.app.Notification notification) {
+        if (notification == null) return "missing";
+        android.os.Bundle extras = notification.extras;
+        if (extras == null) return "extras=missing flags=0x"
+                + Integer.toHexString(notification.flags);
+        StringBuilder actions = new StringBuilder("[");
+        if (notification.actions != null) {
+            for (int i = 0; i < notification.actions.length; i++) {
+                if (i > 0) actions.append(", ");
+                CharSequence title = notification.actions[i] == null
+                        ? null : notification.actions[i].title;
+                actions.append(title == null ? "<null>" : title);
+            }
+        }
+        actions.append(']');
+        return "title=" + extras.getString(android.app.Notification.EXTRA_TITLE)
+                + ", text=" + extras.getString(android.app.Notification.EXTRA_TEXT)
+                + ", flags=0x" + Integer.toHexString(notification.flags)
+                + ", chronometer=" + extras.getBoolean(
+                        android.app.Notification.EXTRA_SHOW_CHRONOMETER, false)
+                + ", progressMax=" + extras.getInt(
+                        android.app.Notification.EXTRA_PROGRESS_MAX, 0)
+                + ", progress=" + extras.getInt(
+                        android.app.Notification.EXTRA_PROGRESS, 0)
+                + ", indeterminate=" + extras.getBoolean(
+                        android.app.Notification.EXTRA_PROGRESS_INDETERMINATE, true)
+                + ", actions=" + actions;
+    }
+
     private void checkPausedNotification(android.app.NotificationManager manager,
             int id, String expectedTitle, String lifecycleAction) throws InterruptedException {
         android.app.Notification notification = awaitPausedNotification(manager, id, expectedTitle);
         check(isExpectedPausedNotification(notification, expectedTitle),
-                lifecycleAction + " eventually publishes the expected paused notification state");
+                lifecycleAction + " eventually publishes the expected paused notification state; observed="
+                        + describeNotification(notification));
         check(notification != null && notification.extras != null
                         && expectedTitle.equals(notification.extras.getString(
                                 android.app.Notification.EXTRA_TITLE)),
