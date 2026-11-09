@@ -22,6 +22,12 @@
     return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
   }
 
+  // Recurrence must never emit a five-digit year that task storage cannot accept.
+  function dateOnlyOrNull(date) {
+    const value = localDateOf(date);
+    return isDateOnlyString(value) ? value : null;
+  }
+
   function parseDateOnly(value) {
     if (!isDateOnlyString(value)) return null;
     const [year, month, day] = value.split('-').map(Number);
@@ -127,16 +133,17 @@
           ? Math.max(1, difference + 1)
           : Math.max(1, Math.floor(difference / 7) + 1);
       }
-      return localDateOf(occurrenceAt(start, repeatRule, steps, anchorDay));
+      return dateOnlyOrNull(occurrenceAt(start, repeatRule, steps, anchorDay));
     }
 
     if (repeatRule === 'weekdays') {
       const firstAfterStart = nextWeekday(start);
-      if (!todayStart) return localDateOf(firstAfterStart);
+      if (!todayStart) return dateOnlyOrNull(firstAfterStart);
       const firstAfterToday = nextWeekday(todayStart);
-      return localDateOf(firstAfterToday) > localDateOf(firstAfterStart)
-        ? localDateOf(firstAfterToday)
-        : localDateOf(firstAfterStart);
+      // Compare actual dates, not their strings: five-digit intermediate years sort before 9999.
+      const next = firstAfterToday.getTime() > firstAfterStart.getTime()
+        ? firstAfterToday : firstAfterStart;
+      return dateOnlyOrNull(next);
     }
 
     if (repeatRule === 'monthly') {
@@ -148,7 +155,7 @@
         if (steps === monthDifference
             && localDateOf(occurrenceAt(start, repeatRule, steps, anchorDay)) <= todayString) steps += 1;
       }
-      return localDateOf(occurrenceAt(start, repeatRule, steps, anchorDay));
+      return dateOnlyOrNull(occurrenceAt(start, repeatRule, steps, anchorDay));
     }
 
     if (repeatRule === 'yearly') {
@@ -159,7 +166,7 @@
         if (steps === yearDifference
             && localDateOf(occurrenceAt(start, repeatRule, steps, anchorDay)) <= todayString) steps += 1;
       }
-      return localDateOf(occurrenceAt(start, repeatRule, steps, anchorDay));
+      return dateOnlyOrNull(occurrenceAt(start, repeatRule, steps, anchorDay));
     }
     return null;
   }
