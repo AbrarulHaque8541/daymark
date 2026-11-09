@@ -66,11 +66,19 @@ test('the exact GNU grep guard excludes test/dependency directories without hidi
 
 
 
+const NODE_TEST_FILE_RE = /^(?:test(?:-.*)?|.*-test|.*\.test)\.(?:js|mjs|cjs)$/i;
+const GENERATED_TEST_SCAN_EXCLUSIONS = new Set([
+  ".git", ".gradle", ".idea", ".cache", "node_modules",
+  "build", "dist", "out", "coverage", "target"
+]);
+
 function collectNodeTestFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return collectNodeTestFiles(fullPath);
-    return entry.isFile() && /\.test\.(?:js|mjs|cjs)$/.test(entry.name) ? [fullPath] : [];
+    if (entry.isDirectory()) {
+      return GENERATED_TEST_SCAN_EXCLUSIONS.has(entry.name) ? [] : collectNodeTestFiles(fullPath);
+    }
+    return entry.isFile() && NODE_TEST_FILE_RE.test(entry.name) ? [fullPath] : [];
   }).sort();
 }
 
@@ -85,8 +93,8 @@ function hasRegisteredTestCase(source) {
 }
 
 test('every repository Node test file registers at least one executable test case', () => {
-  const testDirectory = path.join(__dirname);
-  const testFiles = collectNodeTestFiles(testDirectory);
+  const repositoryRoot = path.resolve(__dirname, '..');
+  const testFiles = collectNodeTestFiles(repositoryRoot);
 
   assert.ok(testFiles.length > 0, 'the repository must retain its Node regression suite');
   assert.equal(hasRegisteredTestCase('placeholder'), false, 'literal placeholder files must not count as tests');
@@ -104,7 +112,7 @@ test('every repository Node test file registers at least one executable test cas
     'a test-like string literal must not count as a test registration');
 
   for (const file of testFiles) {
-    const relative = path.relative(testDirectory, file);
+    const relative = path.relative(repositoryRoot, file);
     const source = fs.readFileSync(file, 'utf8');
     assert.ok(hasRegisteredTestCase(source),
       relative + ' must register at least one named test(); a placeholder/helper-only file is not a regression suite');
