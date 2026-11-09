@@ -1,4 +1,1 @@
-(() => {
-  'use strict';
-  // TEMP RESTORE MARKER - will be replaced
-})();
+@/tmp/daymark/app.js
