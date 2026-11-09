@@ -33,6 +33,8 @@
     }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
+    const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+    const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     let idCounter = 0;
     const makeId = () => {
@@ -146,24 +148,65 @@
             ? importApi.fromMarkdown(text, { now: now(), makeId })
             : importApi.fromIcs(text, { now: now(), makeId });
         const merge = importApi.mergeTasks(validated.tasks, parsed.tasks, logic);
+        let addedCount = 0;
+        let concurrentDuplicates = 0;
         if (merge.added.length > 0) {
-          if (typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') {
-            throw new Error('browser storage is unavailable; nothing was changed');
+          if (!taskMutation || typeof taskMutation.commitTaskSnapshot !== 'function') {
+            throw new Error('safe cross-tab task coordination is unavailable; nothing was changed');
           }
-          // The file read is asynchronous. Compare the original raw value
-          // immediately before writing so a newer task store from another tab
-          // is never overwritten by this stale import.
-          const currentRaw = storage.getItem(STORAGE_KEY);
-          if (currentRaw !== raw) {
-            throw new Error('saved tasks changed while import was being prepared; nothing was changed');
+          const committed = await taskMutation.commitTaskSnapshot({
+            lockManager,
+            storage,
+            key: STORAGE_KEY,
+            baseTasks: validated.tasks,
+            desiredTasks: merge.merged,
+            readCurrent: (currentRaw) => {
+              if (currentRaw === null) {
+                return validated.tasks.length
+                  ? { ok: false, reason: 'current-removed' }
+                  : { ok: true, tasks: [] };
+              }
+              if (typeof currentRaw !== 'string' || currentRaw.length === 0
+                  || logic.hasDuplicateJsonKeys(currentRaw)) {
+                return { ok: false, reason: 'invalid-current' };
+              }
+              let currentParsed;
+              try {
+                currentParsed = JSON.parse(currentRaw);
+              } catch (error) {
+                return { ok: false, reason: 'invalid-current' };
+              }
+              if (!Array.isArray(currentParsed)) return { ok: false, reason: 'invalid-current' };
+              const currentValidated = logic.validateStoredTasks(currentParsed);
+              if (!currentValidated || !Array.isArray(currentValidated.tasks)
+                  || currentValidated.rejectedCount > 0) {
+                return { ok: false, reason: 'invalid-current' };
+              }
+              return { ok: true, tasks: currentValidated.tasks };
+            }
+          });
+          if (!committed.ok) {
+            const failures = {
+              'coordination-unavailable': 'safe cross-tab task coordination is unavailable',
+              'lock-failed': 'cross-tab task coordination failed',
+              'conflict': 'an imported task conflicts with a newer task from another tab',
+              'current-removed': 'the saved task list was removed while import was being prepared',
+              'invalid-current': 'the saved task list changed to an unreadable value',
+              'storage-read-failed': 'browser storage could not be read',
+              'storage-write-failed': 'browser storage rejected the task write',
+              'storage-unavailable': 'browser storage is unavailable'
+            };
+            throw new Error((failures[committed.reason] || 'the task list could not be updated') + '; nothing was changed');
           }
-          storage.setItem(STORAGE_KEY, JSON.stringify(merge.merged));
+          addedCount = Array.isArray(committed.addedIds) ? committed.addedIds.length : merge.added.length;
+          concurrentDuplicates = Math.max(0, merge.added.length - addedCount);
           notifySaved();
         }
         const parts = [];
-        if (merge.added.length > 0) parts.push('Imported ' + plural(merge.added.length, 'task') + ' from ' + fileLabel + '.');
+        if (addedCount > 0) parts.push('Imported ' + plural(addedCount, 'task') + ' from ' + fileLabel + '.');
         else parts.push('No new tasks were imported from ' + fileLabel + '.');
-        if (merge.duplicates > 0) parts.push(plural(merge.duplicates, 'duplicate') + ' skipped.');
+        const duplicateCount = merge.duplicates + concurrentDuplicates;
+        if (duplicateCount > 0) parts.push(plural(duplicateCount, 'duplicate') + ' skipped.');
         if (merge.invalid > 0) parts.push(plural(merge.invalid, 'invalid task') + ' skipped.');
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
         if (parsed.recurring > 0) {
