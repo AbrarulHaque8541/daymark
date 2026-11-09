@@ -65,6 +65,7 @@ function fakeEnv(options) {
     'storage-clear-all': Object.assign(fakeElement('button'), { id: 'storage-clear-all' })
   };
   const storageData = Object.assign({}, opts.data || {});
+  const dispatched = [];
   const locks = opts.locks === false ? null : (opts.lockManager || makeLockManager());
   const readFailures = new Set(opts.readFailures || []);
   const readKeys = [];
@@ -92,7 +93,12 @@ function fakeEnv(options) {
       getElementById(id) { return elements[id] || null; },
       createElement(tag) { return fakeElement(tag); }
     },
-    window: { navigator: locks ? { locks } : {}, addEventListener() {} },
+    window: {
+      navigator: locks ? { locks } : {},
+      StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } },
+      dispatchEvent(event) { dispatched.push(event); return true; },
+      addEventListener() {}
+    },
     localStorage: storage,
     storageApi,
     taskMutation: mutation,
@@ -104,7 +110,7 @@ function fakeEnv(options) {
     },
     now: () => '2026-11-04T12:00:00.000Z'
   };
-  return { env, elements, storageData, confirmations, confirmState, readKeys, removedKeys, locks };
+  return { env, elements, storageData, confirmations, confirmState, readKeys, removedKeys, locks, dispatched };
 }
 
 test('the module exposes its API and stays inert under Node', () => {
@@ -112,9 +118,24 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkStorageUi, 'object');
 });
 
+test('clearing only task recovery backups refreshes recovery status under the shared lock', async () => {
+  const { env, elements, storageData, dispatched } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': '[]',
+      'daymark.tasks.v1.backup': 'opaque backup'
+    }
+  });
+  const handle = ui.attachStorageUi(env);
+  await handle.onClearCategory('task-backup');
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'primary tasks remain untouched');
+  assert.equal(storageData['daymark.tasks.v1.backup'], undefined, 'only the recovery backup is cleared');
+  assert.equal(dispatched.length, 1);
+  assert.equal(dispatched[0].key, null, 'the app reloads recovery metadata after backup removal');
+});
+
 test('task and clear-all deletion fail closed when the shared lock is unavailable', async () => {
   const original = '[]';
-  const { env, elements, storageData, confirmations } = fakeEnv({
+  const { env, elements, storageData, confirmations, dispatched } = fakeEnv({
     data: { 'daymark.tasks.v1': original },
     locks: false
   });
@@ -126,6 +147,7 @@ test('task and clear-all deletion fail closed when the shared lock is unavailabl
   await handle.onClearAll();
   assert.equal(storageData['daymark.tasks.v1'], original);
   assert.equal(confirmations.length, 2, 'both explicit destructive actions still require confirmation');
+  assert.equal(dispatched.length, 0, 'a blocked action never announces a clear');
 });
 
 test('the production HTML storage controls match the UI wiring', () => {
@@ -200,7 +222,7 @@ test('attach with data reports category counts, sizes, and enables clearing', ()
 });
 
 test('clearing one category asks for confirmation and removes only its keys', async () => {
-  const { env, elements, storageData, confirmations } = fakeEnv({
+  const { env, elements, storageData, confirmations, dispatched } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
       'daymark.tasks.v1.backup': '[]',
@@ -215,6 +237,8 @@ test('clearing one category asks for confirmation and removes only its keys', as
   assert.equal(storageData['daymark.tasks.v1'], undefined, 'the task data is removed');
   assert.equal(storageData['daymark.tasks.v1.backup'], '[]', 'the recovery backup keeps its own category');
   assert.equal(storageData['daymark.webhook.v1'] !== undefined, true, 'webhook settings are untouched');
+  assert.equal(dispatched.length, 1, 'same-tab task state is notified after the locked clear');
+  assert.equal(dispatched[0].key, 'daymark.tasks.v1');
   assert.match(elements['storage-status-line'].textContent, /Cleared Tasks \(1 item\(s\) removed\)/);
   assert.match(elements['storage-status-line'].textContent, /Nothing else was touched/);
 });
@@ -239,7 +263,7 @@ test('a throwing confirmation fails closed without touching data', () => {
 
 test('clear-all confirms once, removes managed data, and never reads the legacy webhook secret', async () => {
   const legacySecret = 'https://hooks.example.com/x?token=legacy-secret';
-  const { env, elements, storageData, confirmations, readKeys, removedKeys } = fakeEnv({
+  const { env, elements, storageData, confirmations, readKeys, removedKeys, dispatched } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
       'daymark.focus.v1': '{}',
@@ -262,6 +286,8 @@ test('clear-all confirms once, removes managed data, and never reads the legacy 
   assert.equal(removedKeys.includes('daymark.webhook.v1'), false, 'the storage UI never removes the endpoint');
   assert.doesNotMatch(confirmations[0], /legacy webhook settings/i);
   assert.equal(storageData['unrelated.other.key'], 'keep me');
+  assert.equal(dispatched.length, 1, 'same-tab task state is notified after clear-all');
+  assert.equal(dispatched[0].key, null, 'clear-all notification reloads the whole task state');
   assert.match(elements['storage-status-line'].textContent, /Cleared all 4 stored item\(s\)/);
   assert.match(elements['storage-status-line'].textContent, /Nothing outside this browser was affected/);
   assert.equal(elements['storage-clear-all'].disabled, true, 'clear-all disables after the store is empty');
