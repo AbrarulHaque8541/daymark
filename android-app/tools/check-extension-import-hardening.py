@@ -76,6 +76,12 @@ def check_sources(parser, store, smoke):
         "raw export must return an independent exact-byte copy"
     assert "Files.delete(path);" in recovery, \
         "confirmed recovery removal must delete only the selected verified file"
+    writer = store.split("private static synchronized void writeFile", 1)[1]
+    assert "private static synchronized void writeFile" in store, \
+        "pack writes must share the recovery/removal monitor"
+    uninstall = store.split("void uninstallUserPack", 1)[1].split("private boolean isBuiltinDisabled", 1)[0]
+    assert "synchronized (ExtensionStore.class)" in uninstall, \
+        "explicit uninstall must serialize with fingerprint-checked recovery removal"
     assert "ExtensionPackageParser.prepareNewUserPackInstall(ext)" in install, \
         "new user imports must be prepared disabled until explicit activation"
     assert "existing.enabled" in install, "identical re-import must retain the user's activation choice"
