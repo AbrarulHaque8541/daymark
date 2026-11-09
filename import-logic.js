@@ -467,37 +467,99 @@
   function parseIcs(text) {
     const lines = unfoldIcsLines(text);
     const components = [];
+    const stack = [];
     let hasCalendar = false;
+    let calendarClosed = false;
     let current = null;
-    let skipDepth = 0;
+    let currentDepth = 0;
+
     for (const line of lines) {
-      const beginMatch = line.match(/^BEGIN:(.+)$/);
+      if (line.trim().length === 0) continue;
+
+      const beginMatch = line.match(/^BEGIN:(.+)$/i);
       if (beginMatch) {
         const type = beginMatch[1].trim().toUpperCase();
-        if (type === 'VCALENDAR') { hasCalendar = true; continue; }
-        if (current === null && (type === 'VTODO' || type === 'VEVENT')) {
-          current = { type, props: [] };
-          continue;
+        if (!type) throw new Error('Calendar input contains an empty component name.');
+
+        if (stack.length === 0) {
+          if (hasCalendar || calendarClosed) {
+            throw new Error('Calendar input contains more than one VCALENDAR block.');
+          }
+          if (type !== 'VCALENDAR') {
+            throw new Error('Calendar component appears outside the VCALENDAR block.');
+          }
+          hasCalendar = true;
+        } else {
+          if (type === 'VCALENDAR') {
+            throw new Error('Calendar input contains a nested VCALENDAR block.');
+          }
+          if (calendarClosed) {
+            throw new Error('Calendar component appears after the VCALENDAR block.');
+          }
+          if ((type === 'VTODO' || type === 'VEVENT') && stack.length !== 1) {
+            throw new Error(type + ' components cannot be nested inside another calendar component.');
+          }
         }
-        if (current !== null) skipDepth += 1;
+
+        const parentDepth = stack.length;
+        stack.push(type);
+        if (parentDepth === 1 && (type === 'VTODO' || type === 'VEVENT')) {
+          current = { type, props: [] };
+          currentDepth = stack.length;
+        }
         continue;
       }
-      const endMatch = line.match(/^END:(.+)$/);
+
+      const endMatch = line.match(/^END:(.+)$/i);
       if (endMatch) {
         const type = endMatch[1].trim().toUpperCase();
-        if (type === 'VCALENDAR') continue;
-        if (current !== null) {
-          if (type === current.type) { components.push(current); current = null; skipDepth = 0; continue; }
-          if (skipDepth > 0) skipDepth -= 1;
+        if (stack.length === 0) {
+          throw new Error('Calendar input contains an unmatched END:' + type + '.');
+        }
+        const openType = stack[stack.length - 1];
+        if (openType !== type) {
+          throw new Error('Calendar END:' + type + ' does not match BEGIN:' + openType + '.');
+        }
+
+        if (current && stack.length === currentDepth && type === current.type) {
+          components.push(current);
+          current = null;
+          currentDepth = 0;
+        }
+        stack.pop();
+        if (stack.length === 0) {
+          if (type !== 'VCALENDAR') {
+            throw new Error('Calendar input ended outside its VCALENDAR block.');
+          }
+          calendarClosed = true;
         }
         continue;
       }
-      if (current !== null && skipDepth === 0) {
+
+      if (stack.length === 0) {
+        if (!hasCalendar) {
+          throw new Error('Calendar input does not contain a VCALENDAR block.');
+        }
+        if (calendarClosed) {
+          throw new Error('Calendar input contains content after END:VCALENDAR.');
+        }
+        throw new Error('Calendar property appears outside the VCALENDAR block.');
+      }
+
+      // Only direct VTODO/VEVENT properties are imported. Nested components
+      // (including VALARM) are balanced above but never leak properties.
+      if (current && stack.length === currentDepth) {
         const prop = icsProperty(line);
         if (prop) current.props.push(prop);
       }
     }
-    return { components, hasCalendar };
+
+    if (!hasCalendar) return { components, hasCalendar: false };
+    if (!calendarClosed || stack.length !== 0 || current) {
+      const openType = stack.length > 0 ? stack[stack.length - 1] : 'VCALENDAR';
+      throw new Error('Calendar input contains an unclosed ' + openType + ' component.');
+    }
+    return { components, hasCalendar: true };
   }
 
   // Parses task-shaped iCalendar into stored tasks. VTODO and VEVENT both
@@ -528,9 +590,11 @@
       const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
       const due = icsDateTaskField(dueProp);
       const completionProp = byName.COMPLETED || null;
-      const validCompletion = component.type === 'VTODO'
-        && status === 'COMPLETED'
-        && isValidIcsCompletion(completionProp);
+      // RFC 5545 defines COMPLETED as the actual completion timestamp on
+      // VTODO. It is independent of STATUS (the RFC example pairs it with
+      // STATUS:NEEDS-ACTION), so a valid UTC timestamp is completion evidence
+      // even when STATUS is absent or has not been updated.
+      const validCompletion = component.type === 'VTODO' && isValidIcsCompletion(completionProp);
       const invalidCompletion = (completionProp !== null && !validCompletion) ||
         (component.type !== 'VTODO' && status === 'COMPLETED');
       const priorityValue = byName.PRIORITY ? byName.PRIORITY.value.trim() : '';
@@ -544,7 +608,7 @@
         dueDate: due.dueDate,
         dueTime: due.dueTime,
         priority,
-        completed: component.type === 'VTODO' && status === 'COMPLETED',
+        completed: component.type === 'VTODO' && (status === 'COMPLETED' || validCompletion),
         repeat: null,
         tags: categoryProps.reduce((all, prop) => all.concat(icsSplitList(prop.value)), []),
         notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
