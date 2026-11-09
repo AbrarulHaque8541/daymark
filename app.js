@@ -143,6 +143,136 @@
     }
   }
 
+  function hasDuplicateJsonKeys(raw) {
+    if (typeof raw !== 'string') return false;
+    let index = 0;
+    let duplicate = false;
+    let tooDeep = false;
+    const whitespace = () => {
+      while (index < raw.length && /\\s/.test(raw[index])) index += 1;
+    };
+    const readString = () => {
+      const start = index;
+      index += 1;
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character === '\\\\') {
+          index += 2;
+          continue;
+        }
+        if (character === '"') {
+          index += 1;
+          return JSON.parse(raw.slice(start, index));
+        }
+        if (character.charCodeAt(0) < 0x20) throw new Error('invalid JSON string');
+        index += 1;
+      }
+      throw new Error('unterminated JSON string');
+    };
+    const readValue = (depth) => {
+      if (depth > 128) {
+        tooDeep = true;
+        throw new Error('JSON nesting limit exceeded');
+      }
+      whitespace();
+      const character = raw[index];
+      if (character === '"') {
+        readString();
+        return;
+      }
+      if (character === '{') {
+        index += 1;
+        whitespace();
+        if (raw[index] === '}') {
+          index += 1;
+          return;
+        }
+        const keys = new Set();
+        for (;;) {
+          whitespace();
+          if (raw[index] !== '"') throw new Error('invalid JSON object key');
+          const key = readString();
+          if (keys.has(key)) duplicate = true;
+          keys.add(key);
+          whitespace();
+          if (raw[index] !== ':') throw new Error('missing JSON object colon');
+          index += 1;
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === '}') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON object separator');
+          index += 1;
+        }
+      }
+      if (character === '[') {
+        index += 1;
+        whitespace();
+        if (raw[index] === ']') {
+          index += 1;
+          return;
+        }
+        for (;;) {
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === ']') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON array separator');
+          index += 1;
+        }
+      }
+      const rest = raw.slice(index);
+      const literal = rest.match(/^(?:true|false|null)/);
+      if (literal) {
+        index += literal[0].length;
+        return;
+      }
+      const number = rest.match(/^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?/);
+      if (number) {
+        index += number[0].length;
+        return;
+      }
+      throw new Error('invalid JSON value');
+    };
+    try {
+      readValue(0);
+      whitespace();
+      return index === raw.length && (duplicate || tooDeep);
+    } catch (error) {
+      return tooDeep;
+    }
+  }
+
+  function isValidPartialRecoveryEnvelope(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+    const expectedKeys = [
+      'format', 'taskBackup', 'taskBackupStatus', 'focusBackup', 'focusBackupStatus'
+    ];
+    const keys = Object.keys(parsed);
+    if (keys.length !== expectedKeys.length
+        || !expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(parsed, key))) return false;
+    if (parsed.format !== 'daymark-partial-recovery-v1') return false;
+    const validStatuses = ['available', 'unknown', 'absent'];
+    if (!validStatuses.includes(parsed.taskBackupStatus)
+        || !validStatuses.includes(parsed.focusBackupStatus)) return false;
+    const validSource = (payload, status) => status === 'available'
+      ? typeof payload === 'string'
+      : payload === null;
+    if (!validSource(parsed.taskBackup, parsed.taskBackupStatus)
+        || !validSource(parsed.focusBackup, parsed.focusBackupStatus)) return false;
+    const anyAvailable = parsed.taskBackupStatus === 'available' || parsed.focusBackupStatus === 'available';
+    if (!anyAvailable) return false;
+    // The writer uses the partial envelope only when one source is unknown/absent
+    // or at least one available source is the opaque empty string.
+    if (parsed.taskBackupStatus === 'available' && parsed.focusBackupStatus === 'available'
+        && parsed.taskBackup.length > 0 && parsed.focusBackup.length > 0) return false;
+    return true;
+  }
+
   function isKnownRecoveryBundle(parsed, raw) {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
     const keys = Object.keys(parsed);
@@ -1433,6 +1563,10 @@
         : `Recovery import finished — ${message}.`);
   }
   function applyImportedText(text) {
+    if (hasDuplicateJsonKeys(text)) {
+      showToast('That file contains duplicate JSON keys or unsupported nesting. Nothing was changed.');
+      return;
+    }
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -1450,6 +1584,10 @@
         || Object.prototype.hasOwnProperty.call(parsed, 'log')
       );
       if (isRecovery) {
+        if (parsed.format === 'daymark-partial-recovery-v1' && !isValidPartialRecoveryEnvelope(parsed)) {
+          showToast('That partial recovery file is invalid or ambiguous. Nothing was changed.');
+          return;
+        }
         applyImportedRecovery(parsed, text);
         return;
       }

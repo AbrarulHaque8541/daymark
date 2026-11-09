@@ -107,14 +107,22 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     addEventListener() {}
   };
   const animationFrames = [];
+  let confirmCalls = 0;
   const window = {
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
     DaymarkFocus: focus,
     DaymarkWebhookUi: webhookUi,
+    confirm() { confirmCalls += 1; return true; },
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
+  class MockFileReader {
+    readAsText(file) {
+      this.result = file.text;
+      if (typeof this.onload === 'function') this.onload();
+    }
+  }
 
   vm.runInNewContext(APP_SOURCE, {
     Date,
@@ -126,6 +134,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     window,
     Blob: supportBlob ? MockBlob : undefined,
     URL: supportBlob ? mockURL : { revokeObjectURL(url) { revokedObjectUrls.push(url); } },
+    FileReader: MockFileReader,
     fetch: async () => ({ ok: true, status: 200, text: async () => FEED_XML }),
     clearTimeout(id) { timers.delete(id); },
     setTimeout(callback, delay = 0) {
@@ -138,6 +147,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
 
   return {
     elements,
+    getConfirmCalls: () => confirmCalls,
     getLastBlob: () => lastBlob,
     getRevokedObjectUrls: () => revokedObjectUrls.slice(),
     getPendingTimeouts: () => Array.from(timers.entries()).map(([id, timer]) => ({ id, delay: timer.delay })),
@@ -775,6 +785,83 @@ test('duplicate-key recovery bundles remain opaque instead of losing overwritten
     assert.match(app.elements.get('#storage-status span').textContent,
       /recovery backup retained for manual review/);
   }
+});
+
+test('partial recovery imports reject duplicate envelope keys before JSON.parse can overwrite them', () => {
+  const backup = JSON.stringify([validTask('partial-incoming', 'Partial incoming task')]);
+  const backupLiteral = JSON.stringify(backup);
+  const focusStatus = '"focusBackup":null,"focusBackupStatus":"unknown"';
+  const ambiguous = [
+    '{"format":"legacy","format":"daymark-partial-recovery-v1","taskBackup":' + backupLiteral
+      + ',"taskBackupStatus":"available",' + focusStatus + '}',
+    '{"format":"daymark-partial-recovery-v1","taskBackup":null,"taskBackup":' + backupLiteral
+      + ',"taskBackupStatus":"available",' + focusStatus + '}',
+    '{"format":"daymark-partial-recovery-v1","taskBackup":' + backupLiteral
+      + ',"taskBackupStatus":"unknown","taskBackup\\u0053tatus":"available",' + focusStatus + '}'
+  ];
+  for (const raw of ambiguous) {
+    const original = JSON.stringify([validTask('partial-existing', 'Existing task')]);
+    const storedValues = new Map([[STORAGE_KEY, original]]);
+    const app = bootApp(storedValues);
+    const input = app.elements.get('#import-file');
+    input.files = [{ size: raw.length, text: raw }];
+    input.dispatch('change');
+    assert.equal(app.getConfirmCalls(), 0, 'ambiguous recovery must be rejected before import confirmation');
+    assert.equal(storedValues.get(STORAGE_KEY), original, 'ambiguous recovery must not mutate tasks');
+    assert.match(app.elements.get('#toast').textContent, /duplicate JSON keys/);
+  }
+});
+
+test('partial recovery envelopes require exact keys and consistent source status/payload pairs', () => {
+  const backup = JSON.stringify([validTask('partial-incoming', 'Partial incoming task')]);
+  const base = {
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: backup,
+    taskBackupStatus: 'available',
+    focusBackup: null,
+    focusBackupStatus: 'unknown'
+  };
+  const invalid = [
+    Object.assign({}, base, { extra: 'unexpected' }),
+    Object.assign({}, base, { taskBackupStatus: 'unknown' }),
+    Object.assign({}, base, { taskBackup: null }),
+    Object.assign({}, base, { taskBackupStatus: 'unreadable' }),
+    { format: base.format, taskBackup: null, taskBackupStatus: 'unknown', focusBackup: null, focusBackupStatus: 'absent' }
+  ];
+  for (const envelope of invalid) {
+    const original = JSON.stringify([validTask('partial-existing', 'Existing task')]);
+    const storedValues = new Map([[STORAGE_KEY, original]]);
+    const app = bootApp(storedValues);
+    const raw = JSON.stringify(envelope);
+    const input = app.elements.get('#import-file');
+    input.files = [{ size: raw.length, text: raw }];
+    input.dispatch('change');
+    assert.equal(app.getConfirmCalls(), 0, 'invalid partial envelope must not reach confirmation');
+    assert.equal(storedValues.get(STORAGE_KEY), original);
+    assert.match(app.elements.get('#toast').textContent, /partial recovery file is invalid or ambiguous/);
+  }
+});
+
+test('a valid partial recovery imports only the available source after confirmation', () => {
+  const existing = validTask('partial-existing', 'Existing task');
+  const incoming = validTask('partial-incoming', 'Incoming task');
+  const envelope = {
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: JSON.stringify([incoming]),
+    taskBackupStatus: 'available',
+    focusBackup: null,
+    focusBackupStatus: 'unknown'
+  };
+  const storedValues = new Map([[STORAGE_KEY, JSON.stringify([existing])]]);
+  const app = bootApp(storedValues);
+  const raw = JSON.stringify(envelope);
+  const input = app.elements.get('#import-file');
+  input.files = [{ size: raw.length, text: raw }];
+  input.dispatch('change');
+  assert.equal(app.getConfirmCalls(), 1, 'valid partial recovery requires explicit confirmation');
+  assert.deepEqual(JSON.parse(storedValues.get(STORAGE_KEY)).map((task) => task.id),
+    ['partial-existing', 'partial-incoming']);
+  assert.match(app.elements.get('#toast').textContent, /restored/);
 });
 
 test('a malformed backup is retained for manual recovery when the primary task store is healthy', () => {
