@@ -668,8 +668,10 @@
     } catch (error) {
       // Preserve the independently readable task backup, if any.
     }
-    const hasTaskBackup = taskReadable && typeof taskBackup === 'string' && taskBackup.length > 0;
-    const hasFocusBackup = focusReadable && typeof focusBackup === 'string' && focusBackup.length > 0;
+    // Empty strings are opaque backup bytes too. Preserve/export them rather
+    // than treating a readable zero-byte value as if the key were absent.
+    const hasTaskBackup = taskReadable && typeof taskBackup === 'string';
+    const hasFocusBackup = focusReadable && typeof focusBackup === 'string';
     if (hasTaskBackup && hasFocusBackup) {
       return JSON.stringify({
         format: 'daymark-combined-recovery-v1',
@@ -682,7 +684,7 @@
 
   function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
     const raw = readRecoveryExportPayload();
-    if (typeof raw !== 'string' || raw.length === 0) return;
+    if (typeof raw !== 'string') return;
     showToast(message, {
       label: 'Export recovery',
       run: exportRecoveryBackup
@@ -693,7 +695,7 @@
     if (state.recoveryExportInProgress) return;
 
     const raw = readRecoveryExportPayload();
-    if (typeof raw !== 'string' || raw.length === 0) {
+    if (typeof raw !== 'string') {
       showToast('No recovery backup is available to export.');
       return;
     }
