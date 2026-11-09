@@ -186,7 +186,27 @@
       }
     }
 
+    function notifyTaskStorageChange(key) {
+      if (!win || typeof win.dispatchEvent !== 'function') return;
+      try {
+        let event = null;
+        if (typeof win.StorageEvent === 'function') {
+          event = new win.StorageEvent('storage', { key });
+        } else if (typeof win.Event === 'function') {
+          event = new win.Event('storage');
+          Object.defineProperty(event, 'key', { value: key });
+        }
+        if (event) win.dispatchEvent(event);
+      } catch (error) {
+        // The destructive action is already complete; a later page reload
+        // still observes the canonical storage state if notification fails.
+      }
+    }
+
     function finishCategoryClear(result, category) {
+      if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
+        notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
+      }
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
           ? 'Could not clear ' + category.label + ': ' + result.failed.length
@@ -306,6 +326,7 @@
         return false;
       }
       const result = locked.value;
+      if (result.removed.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
           + result.failedKeys.length + ' item(s) could not be removed by the browser.';
