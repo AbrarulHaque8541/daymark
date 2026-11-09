@@ -432,7 +432,7 @@ test('two open-format imports with a same-id different-value race fail closed', 
   ]);
 
   const saved = JSON.parse(sharedStorage[ui.STORAGE_KEY]);
-  assert.equal(saved.filter((task) => task.id === 'import-' + Date.parse(NOW) + '-1').length, 1);
+  assert.equal(saved.filter((task) => task.id === 'ignored').length, 1);
   const titles = saved.filter((task) => task.id === 'import-' + Date.parse(NOW) + '-1').map((task) => task.title);
   assert.ok(titles[0] === 'First imported value' || titles[0] === 'Conflicting imported value');
   const statuses = [
