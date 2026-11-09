@@ -72,6 +72,15 @@
       for (let i = 0; i < lines.length; i += 1) {
         resultEl.appendChild(makeItem('feed-item', lines[i]));
       }
+      // Subtle motion for professional polish; respects reduced-motion via CSS.
+      if (resultEl.classList && typeof resultEl.classList.add === 'function') {
+        resultEl.classList.add('is-updating');
+        setTimeout(() => {
+          if (resultEl.classList && typeof resultEl.classList.remove === 'function') {
+            resultEl.classList.remove('is-updating');
+          }
+        }, 180);
+      }
     }
 
     function explain() {
@@ -102,6 +111,18 @@
       if (typeof clearEl.setAttribute === 'function') {
         clearEl.setAttribute('aria-label', 'Clear explanation only; no task or storage data is changed');
       }
+      // Press feedback consistent with other tool buttons.
+      if (typeof clearEl.addEventListener === 'function') {
+        clearEl.addEventListener('pointerdown', () => {
+          if (clearEl.classList && typeof clearEl.classList.add === 'function') clearEl.classList.add('is-pressed');
+        });
+        clearEl.addEventListener('pointerup', () => {
+          if (clearEl.classList && typeof clearEl.classList.remove === 'function') clearEl.classList.remove('is-pressed');
+        });
+        clearEl.addEventListener('pointercancel', () => {
+          if (clearEl.classList && typeof clearEl.classList.remove === 'function') clearEl.classList.remove('is-pressed');
+        });
+      }
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -117,6 +138,7 @@
       clearEl.addEventListener('click', () => { onClear(); });
     }
 
+    // Initial explain for loading-state completeness.
     explain();
 
     return {
