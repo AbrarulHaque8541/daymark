@@ -244,6 +244,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             android.view.View modeSelector = findAncestorWithSimpleName(modeRow, "ModeSelector");
             check(modeSelector != null && modeSelector.getClass().getSimpleName().equals("ModeSelector"),
                     "mode buttons are wrapped by the real Focus ModeSelector that owns horizontal interception");
+            android.widget.ScrollView parentScroll = findParentScrollView(modeSelector);
+            check(parentScroll != null,
+                    "Focus mode selector remains inside the parent Tasks ScrollView");
             scrollViewIntoFocus(modeRow);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "fresh Focus Timer panel starts in Stopwatch mode");
@@ -261,18 +264,20 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             String rightSwipe = dispatchSwipe(modeSelector, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
-            android.widget.ScrollView parentScroll = findParentScrollView(modeSelector);
-            check(parentScroll != null,
-                    "Focus mode selector remains inside the parent Tasks ScrollView");
             runOnMainSync(() -> {
                 android.view.ViewGroup frame = (android.view.ViewGroup) parentScroll.getChildAt(0);
                 android.view.ViewGroup content = (android.view.ViewGroup) frame.getChildAt(0);
                 android.view.View spacer = new android.view.View(mainActivity);
                 content.addView(spacer, new android.widget.LinearLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1200));
-                parentScroll.scrollTo(0, 0);
+                content.requestLayout();
+                parentScroll.requestLayout();
             });
             waitForIdleSync();
+            // Keep the injected gesture inside the ScrollView's actual hit rectangle.
+            // A child may draw beyond an unclipped ancestor, but the ScrollView cannot
+            // receive a touch whose screen coordinates fall outside its viewport.
+            scrollDescendantIntoScrollView(parentScroll, modeSelector);
             boolean[] canScroll = new boolean[2];
             int[] scrollY = new int[2];
             runOnMainSync(() -> {
@@ -343,6 +348,35 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         }
         return null;
+    }
+
+    private void scrollDescendantIntoScrollView(android.widget.ScrollView scrollView,
+                                                   android.view.View descendant) throws Exception {
+        int[] targetHeight = new int[1];
+        runOnMainSync(() -> {
+            targetHeight[0] = descendant.getHeight();
+            android.graphics.Rect target = new android.graphics.Rect(
+                    0, 0, descendant.getWidth(), descendant.getHeight());
+            scrollView.offsetDescendantRectToMyCoords(descendant, target);
+            int viewportHeight = Math.max(1,
+                    scrollView.getHeight() - scrollView.getPaddingTop() - scrollView.getPaddingBottom());
+            int contentHeight = scrollView.getChildAt(0).getHeight();
+            int maximumScroll = Math.max(0, contentHeight - viewportHeight);
+            int desiredScroll = target.centerY() - viewportHeight / 2;
+            scrollView.scrollTo(0, Math.max(0, Math.min(desiredScroll, maximumScroll)));
+        });
+        waitForIdleSync();
+        android.graphics.Rect parentBounds = visibleBounds(scrollView);
+        android.graphics.Rect targetBounds = visibleBounds(descendant);
+        int[] actualScroll = new int[1];
+        runOnMainSync(() -> actualScroll[0] = scrollView.getScrollY());
+        check(targetBounds.height() >= targetHeight[0]
+                        && targetBounds.top >= parentBounds.top
+                        && targetBounds.bottom <= parentBounds.bottom,
+                "Focus selector is fully inside the parent Tasks ScrollView before vertical drag"
+                        + " (target=" + targetBounds.toShortString()
+                        + ", parent=" + parentBounds.toShortString()
+                        + ", scrollY=" + actualScroll[0] + ")");
     }
 
     private void scrollViewIntoFocus(android.view.View view) throws Exception {
