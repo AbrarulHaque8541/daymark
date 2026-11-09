@@ -435,6 +435,9 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                     downY = event.getY();
                     horizontalGesture = false;
                     verticalGesture = false;
+                    // Clear any stale parent-disallow state before direction is known.
+                    // The parent ScrollView must be free to claim a vertical drag from ACTION_DOWN.
+                    disallowParentIntercept(false);
                     return false;
                 case MotionEvent.ACTION_MOVE:
                     if (closed || actionPending || timer != null && !timer.isFinished()) {
