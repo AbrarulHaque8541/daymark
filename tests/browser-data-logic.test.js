@@ -70,20 +70,24 @@ test('listClearActions exposes honest delete flags', () => {
   assert.equal(actions.find((action) => action.id === 'clear-search').deletesData, false);
 });
 
-test('planClearSequence approves export before delete with no warnings', () => {
+test('planClearSequence warns that a preceding Export is not a verified complete backup', () => {
   const plan = engine.planClearSequence(['export-backup', 'clear-completed']);
   assert.equal(plan.ok, true);
   assert.deepEqual(plan.ids, ['export-backup', 'clear-completed']);
   assert.equal(plan.steps.length, 2);
-  assert.equal(plan.warnings.length, 0);
-  assert.equal(plan.note, 'Daymark runs nothing automatically; this plan only explains.');
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /planned Export step is not proof that a complete backup was created/);
+  assert.match(plan.warnings[0], /verify the file is present and contains the intended data/);
+  assert.match(plan.warnings[0], /If recovery is pending, use Export recovery/);
+  assert.match(plan.warnings[0], /Undo lasts only 7 seconds/);
+  assert.match(plan.note, /does not inspect storage\/recovery state or verify an export/);
 });
 
 test('planClearSequence warns when data is deleted with no export first', () => {
   const plan = engine.planClearSequence(['clear-completed']);
   assert.equal(plan.ok, true);
   assert.equal(plan.warnings.length, 1);
-  assert.match(plan.warnings[0], /without a durable Export step before it/);
+  assert.match(plan.warnings[0], /No Export step is planned before this deletion/);
   assert.match(plan.warnings[0], /Undo lasts only 7 seconds/);
 });
 
@@ -141,7 +145,7 @@ test('storage status is not advertised as an available action until its controls
 test('export explanation distinguishes in-memory JSON, saved-store open formats and plaintext privacy', () => {
   const entry = engine.explainClearAction('export-backup');
   assert.match(entry.summary, /in-memory task list/);
-  assert.match(entry.summary, /CSV, Markdown and iCalendar exports read and validate the saved task store/);
+  assert.match(entry.summary, /CSV, Markdown and iCalendar exports read the saved task store and validate parsed tasks/);
   assert.match(entry.recovery, /plaintext export/);
   assert.match(entry.recovery, /not a raw recovery export or encrypted backup/);
   assert.match(entry.recovery, /use Export recovery instead/);
@@ -177,4 +181,16 @@ test('export catalog stays aligned with JSON memory export and saved-store open-
   assert.match(jsonExport, /JSON\.stringify\(state\.tasks/);
   assert.doesNotMatch(jsonExport, /localStorage\.getItem/);
   assert.match(exportUiSource, /storage\.getItem\(STORAGE_KEY\)/);
+});
+
+test('export catalog discloses when the current exporter treats empty storage as absent', () => {
+  const entry = engine.explainClearAction('export-backup');
+  const treatsEmptyAsMissing = /const parsed = raw \? JSON\.parse\(raw\) : \[\]/.test(exportUiSource);
+  if (treatsEmptyAsMissing) {
+    assert.match(entry.summary, /present empty-string value is treated like a missing key and can yield an empty export/);
+    assert.match(entry.summary, /successful empty export does not prove storage is healthy/);
+  } else {
+    assert.doesNotMatch(entry.summary, /present empty-string value is treated like a missing key/);
+    assert.match(entry.summary, /read the saved task store and validate parsed tasks/);
+  }
 });
