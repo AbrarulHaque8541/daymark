@@ -602,3 +602,49 @@ test('unreadable primary with no backup reports no recovery backup found', () =>
     /Primary task data unreadable; no recovery backup found/);
 });
 
+
+
+
+test('recovery export preserves readable task backup when Focus backup read is unknown', () => {
+  const backup = JSON.stringify([validTask('task-backup', 'Keep readable task backup')]);
+  const storedValues = new Map([[BACKUP_KEY, backup]]);
+  const failReads = new Set([STORAGE_KEY, FOCUS_BACKUP_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false, 'a readable task backup remains exportable');
+  assert.match(app.elements.get('#toast').textContent, /Another recovery key could not be read/);
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-partial-recovery-v1');
+  assert.equal(exported.taskBackup, backup, 'the task backup bytes are preserved exactly');
+  assert.equal(exported.taskBackupStatus, 'available');
+  assert.equal(exported.focusBackup, null);
+  assert.equal(exported.focusBackupStatus, 'unknown',
+    'an unreadable Focus backup is not misreported as absent');
+  assert.equal(storedValues.get(BACKUP_KEY), backup);
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+});
+
+test('recovery export preserves readable Focus backup when task backup read is unknown', () => {
+  const backup = JSON.stringify({ session: null, log: [{ id: 'focus-log', duration: 25 }] });
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, backup]]);
+  const failReads = new Set([BACKUP_KEY, FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false, 'a readable Focus backup remains exportable');
+  assert.match(app.elements.get('#toast').textContent, /Another recovery key could not be read/);
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-partial-recovery-v1');
+  assert.equal(exported.taskBackup, null);
+  assert.equal(exported.taskBackupStatus, 'unknown',
+    'an unreadable task backup is not misreported as absent');
+  assert.equal(exported.focusBackup, backup, 'the Focus backup bytes are preserved exactly');
+  assert.equal(exported.focusBackupStatus, 'available');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), backup);
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+});
