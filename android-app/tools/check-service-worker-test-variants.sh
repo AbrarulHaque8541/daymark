@@ -14,9 +14,8 @@ done
 
 runner="$(cat tools/run-service-worker-instrumentation-on-emulator.sh)"
 for required in \
-  'pm list instrumentation' \
-  'androidx.test.runner.AndroidJUnitRunner' \
-  'DaymarkServiceWorkerInstrumentation' \
+  'Starting 1 tests on' \
+  'Finished 1 tests on' \
   'DaymarkSWRuntime:I' \
   'runToken' \
   'all Service Worker runtime phases passed' \
@@ -62,6 +61,10 @@ done
 
 if printf '%s\n' "$runner" | grep -Fq 'adb logcat -c'; then
   echo "Service Worker runner must not depend on clearing logcat buffers." >&2
+  exit 1
+fi
+if printf '%s\n' "$runner" | grep -Fq 'pm list instrumentation'; then
+  echo "Service Worker runner must not require the test APK to remain installed after connectedAndroidTest." >&2
   exit 1
 fi
 
