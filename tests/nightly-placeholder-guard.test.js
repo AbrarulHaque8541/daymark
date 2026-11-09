@@ -446,8 +446,8 @@ test('every repository Node test file registers at least one executable test cas
     'single-quoted fake registrations must be ignored');
   assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "example test('fake')" + String.fromCharCode(96) + ";"), false,
     'template raw text must not count as an executable registration');
-  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "${test('real', () => {})}" + String.fromCharCode(96) + ";"), true,
-    'an actual registration inside a template interpolation remains executable');
+  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "${test('real', () => assert.ok(true))}" + String.fromCharCode(96) + ";"), true,
+    'an actual registration with an executable callback inside a template interpolation remains executable');
   assert.equal(hasRegisteredTestCase("const example = /test(foo)/;"), false,
     'regular-expression literals must not count as executable registrations');
   assert.equal(hasRegisteredTestCase("// test('fake')\\n/* it('fake') */"), false,
