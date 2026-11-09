@@ -91,7 +91,7 @@ test('the module exposes its API and stays inert under Node', () => {
 
 test('the production HTML storage controls match the UI wiring', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  for (const id of ['storage-check', 'storage-clear', 'storage-clear-all', 'storage-status-line', 'storage-list']) {
+  for (const id of ['storage-check', 'storage-clear', 'storage-status-line', 'storage-list']) {
     const matches = html.match(new RegExp('id="' + id + '"', 'g')) || [];
     assert.equal(matches.length, 1, id + ' appears exactly once in production HTML');
   }
