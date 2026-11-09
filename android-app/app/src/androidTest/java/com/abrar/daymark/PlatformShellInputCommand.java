@@ -8,6 +8,9 @@ final class PlatformShellInputCommand {
     static final String STATUS_MARKER = "__DAYMARK_INPUT_STATUS__=";
     private static final int MAX_COORDINATE = 10000;
     private static final int MAX_DURATION_MS = 5000;
+    private static final Pattern TAP_PATTERN = Pattern.compile("input tap ([0-9]{1,5}) ([0-9]{1,5})");
+    private static final Pattern SWIPE_PATTERN =
+            Pattern.compile("input swipe ([0-9]{1,5}) ([0-9]{1,5}) ([0-9]{1,5}) ([0-9]{1,5}) ([0-9]{1,4})");
     private static final Pattern STATUS_PATTERN =
             Pattern.compile("(?m)^" + Pattern.quote(STATUS_MARKER) + "([0-9]{1,3})$");
 
@@ -31,8 +34,16 @@ final class PlatformShellInputCommand {
     }
 
     static String withStatus(String command) {
-        if (command == null || !(command.startsWith("input tap ") || command.startsWith("input swipe "))) {
-            throw new IllegalArgumentException("unsupported shell input command");
+        if (command == null) throw new IllegalArgumentException("shell input command is required");
+        Matcher tap = TAP_PATTERN.matcher(command);
+        if (tap.matches()) {
+            tap(Integer.parseInt(tap.group(1)), Integer.parseInt(tap.group(2)));
+        } else {
+            Matcher swipe = SWIPE_PATTERN.matcher(command);
+            if (!swipe.matches()) throw new IllegalArgumentException("unsupported shell input command");
+            swipe(Integer.parseInt(swipe.group(1)), Integer.parseInt(swipe.group(2)),
+                    Integer.parseInt(swipe.group(3)), Integer.parseInt(swipe.group(4)),
+                    Integer.parseInt(swipe.group(5)));
         }
         return command + "; code=$?; printf '\\n" + STATUS_MARKER + "%s\\n' \"$code\"";
     }
