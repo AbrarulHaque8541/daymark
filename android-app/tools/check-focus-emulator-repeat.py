@@ -72,6 +72,7 @@ assert "event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN)" in platfor
 assert "sendPointerSync(event)" in platform_test, "pre-29 instrumentation fallback must remain"
 assert "MAX_COORDINATE = 10000" in touch_sequence
 assert "MAX_DURATION_MS = 5000" in touch_sequence
+assert "MIN_SWIPE_DURATION_MS = SWIPE_MOVE_STEPS + 1" in touch_sequence
 assert "SWIPE_MOVE_STEPS = 8" in touch_sequence
 assert "checkPoint" in touch_sequence
 assert "PlatformShellInputCommand" not in platform_test
