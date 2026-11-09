@@ -252,12 +252,34 @@ function triggerTaskEdit(app, taskId) {
   for (const handler of handlers) handler({ target });
 }
 
+async function triggerClick(app, selector) {
+  const target = app.elements.get(selector);
+  const handlers = app.listeners.get(`${selector}:click`) || [];
+  for (const handler of handlers) await handler({ currentTarget: target, target, preventDefault() {} });
+}
+
 async function triggerTaskImport(app, file) {
   const input = app.elements.get('#import-file');
   input.files = [file];
   const handlers = app.listeners.get('#import-file:change') || [];
   for (const handler of handlers) await handler({ currentTarget: input });
 }
+
+test('undo waits for lock-backed persistence before reporting a restored task', async () => {
+  const completed = makeImportTask('completed-undo', 'Completed task');
+  completed.completed = true;
+  const app = bootApp({ savedValue: JSON.stringify([completed]) });
+  await app.settle();
+
+  await triggerClick(app, '#clear-completed');
+  assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), [],
+    'the completed task is cleared before Undo is offered');
+  await triggerClick(app, '#toast-action');
+
+  assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), [completed],
+    'Undo waits for the shared lock and persists the restored task');
+  assert.match(app.elements.get('#toast').textContent, /Completed tasks restored/);
+});
 
 test('two tabs adding different tasks preserve both committed mutations', async () => {
   const initial = makeImportTask('existing', 'Existing');
