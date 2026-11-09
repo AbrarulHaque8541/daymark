@@ -64,6 +64,13 @@ assert "PlatformShellInputCommand.tap" in platform_test
 assert "PlatformShellInputCommand.swipe" in platform_test
 assert "getUiAutomation().executeShellCommand(inputCommand)" in platform_test
 assert "vertical drag delivers touchscreen events to target" in platform_test
+assert 'findAncestorWithSimpleName(modeRow, "ModeSelector")' in platform_test
+assert "dispatchSwipe(modeSelector, true)" in platform_test
+assert "dispatchSwipe(modeSelector, false)" in platform_test
+assert "dispatchVerticalScrollSwipe(modeSelector, canScroll[0])" in platform_test
+assert "attachTouchTraceListeners(view" in platform_test
+assert "scrollDeadline" in platform_test
+assert "horizontal swipe delivers touchscreen events to the ModeSelector or descendants" in platform_test
 assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert 'System.out.println("INSTRUMENTATION_PHASE: " + message);' in platform_test
