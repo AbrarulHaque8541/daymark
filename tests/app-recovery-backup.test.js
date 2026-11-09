@@ -557,6 +557,66 @@ test('unreadable task backup is reported as unknown when the primary key is abse
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
 });
 
+test('an empty task backup remains exportable when the primary task read throws', () => {
+  const storedValues = new Map([[BACKUP_KEY, '']]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([STORAGE_KEY]));
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false,
+    'a readable zero-byte task backup is still present when the primary key is unreadable');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], '',
+    'manual recovery export must preserve the exact zero-byte task backup');
+  assert.equal(storedValues.get(BACKUP_KEY), '',
+    'the zero-byte recovery source must remain unchanged');
+});
+
+test('an empty Focus backup remains exportable when the primary Focus read throws', () => {
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, '']]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(['daymark.focus.v1']), focusLogic);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false,
+    'a readable zero-byte Focus backup must not be reported as absent');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], '',
+    'manual recovery export must preserve the exact zero-byte Focus backup');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), '',
+    'the zero-byte Focus recovery source must remain unchanged');
+});
+
+test('an empty primary Focus value is preserved as opaque recovery data', () => {
+  const storedValues = new Map([['daymark.focus.v1', '']]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(storedValues.get('daymark.focus.v1'), '',
+    'the unreadable zero-byte primary must not be rewritten');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), '',
+    'the exact zero-byte primary must be retained as a recovery backup');
+  assert.equal(action.hidden, false);
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], '',
+    'the recovery export must preserve the exact primary bytes');
+});
+
+test('empty strings are malformed recovery payloads, not absent recovery sources', () => {
+  const taskStart = APP_SOURCE.indexOf('function readTaskRecoveryPayloads(raw) {');
+  const focusStart = APP_SOURCE.indexOf('function readFocusRecoveryStates(raw) {');
+  const importStart = APP_SOURCE.indexOf('function applyImportedRecovery(recovery, rawText) {');
+  assert.ok(taskStart >= 0 && focusStart > taskStart && importStart > focusStart,
+    'task and Focus recovery parser sections must exist');
+  const taskParser = APP_SOURCE.slice(taskStart, focusStart);
+  const focusParser = APP_SOURCE.slice(focusStart, importStart);
+  assert.match(taskParser, /if \(raw\.length === 0\) \{ result\.malformedCount = 1; return result; \}/);
+  assert.match(focusParser, /if \(raw\.length === 0\) \{ result\.malformedCount = 1; return result; \}/);
+  const focusLoaderStart = APP_SOURCE.indexOf('function loadFocusState() {');
+  const focusPersistStart = APP_SOURCE.indexOf('function persistFocusState() {', focusLoaderStart);
+  const focusLoader = APP_SOURCE.slice(focusLoaderStart, focusPersistStart);
+  assert.match(focusLoader, /if \(saved === null\)/);
+  assert.doesNotMatch(focusLoader, /if \(!saved\)/);
+});
+
 test('app.js parses before browser runtime boot', () => {
   try {
     new vm.Script(APP_SOURCE, { filename: 'app.js' });
