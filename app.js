@@ -33,8 +33,27 @@
       saved = localStorage.getItem(STORAGE_KEY);
     } catch (error) {
       console.warn('Could not read Daymark storage:', error);
-      setStorageStatus('Storage unavailable', true);
-      showToast('Browser storage is unavailable. You can still use this page for now.');
+      // Primary key is unreadable. Do not treat it as absent or overwrite it.
+      // Independently inspect the recovery backup key.
+      let backupRaw = null;
+      let backupReadable = false;
+      try {
+        backupRaw = localStorage.getItem(BACKUP_KEY);
+        backupReadable = true;
+      } catch (backupError) {
+        console.warn('Could not read Daymark recovery backup:', backupError);
+      }
+      if (backupReadable && typeof backupRaw === 'string' && backupRaw.length > 0) {
+        setStorageStatus('Primary task data unreadable; recovery backup available', true);
+        showToast('Saved tasks could not be read, but a recovery backup is available for export.');
+        offerRecoveryExport('Primary task data is unreadable. A recovery backup is available for export.');
+      } else if (!backupReadable) {
+        setStorageStatus('Primary and recovery data unreadable; recovery status unknown', true);
+        showToast('Browser storage is unavailable. Recovery status is unknown.');
+      } else {
+        setStorageStatus('Primary task data unreadable; no recovery backup found', true);
+        showToast('Saved tasks could not be read. No recovery backup was found.');
+      }
       return [];
     }
     if (!saved) {
@@ -1420,7 +1439,23 @@
       saved = localStorage.getItem(FOCUS_KEY);
     } catch (error) {
       console.warn('Could not read Daymark focus storage:', error);
-      setStorageStatus('Focus storage unavailable', true);
+      // Primary focus key is unreadable. Independently inspect its recovery backup.
+      let backupRaw = null;
+      let backupReadable = false;
+      try {
+        backupRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
+        backupReadable = true;
+      } catch (backupError) {
+        console.warn('Could not read Daymark focus recovery backup:', backupError);
+      }
+      if (backupReadable && typeof backupRaw === 'string' && backupRaw.length > 0) {
+        setStorageStatus('Primary focus data unreadable; recovery backup available', true);
+        offerRecoveryExport('Primary focus data is unreadable. A recovery backup is available for export.');
+      } else if (!backupReadable) {
+        setStorageStatus('Primary and focus recovery data unreadable; recovery status unknown', true);
+      } else {
+        setStorageStatus('Primary focus data unreadable; no recovery backup found', true);
+      }
       return empty;
     }
     if (!saved) {
