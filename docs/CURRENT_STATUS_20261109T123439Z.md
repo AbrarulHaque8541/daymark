@@ -84,7 +84,7 @@
 ## Identity, release and safety
 
 - Current Gradle identity: namespace/applicationId com.abrar.daymark; minSdk 26; targetSdk 36; versionName 1.6; versionCode 13. Build file blob: b42c93ea1ff2317ec7b2afc5fed7876543dd9964.
-- Root AGENTS.md approves com.abrar.daymark and signer pin ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580. The run-level safety instruction also mentions com.cue.daymark; no identity was changed. Resolve any future identity change only with explicit owner approval.
+- Root AGENTS.md approves com.abrar.daymark and signer pin ad6be60bd89c076c2d3985ec20c30533dd9ff10e07418d64ad1d825418030580. The run-level safety instruction also mentions a different legacy application identifier; no identity was changed. Resolve any future identity change only with explicit owner approval.
 - Latest published release: v1.5. v1.4 remains draft. No release or tag was published in this cycle.
 - No signing keys/secrets, package identity, version, manifest permissions, database schema, migration or user data were changed.
 - Physical-device acceptance: **NOT TESTED**. Emulator workflow/artifact checks are not physical-device verification.
