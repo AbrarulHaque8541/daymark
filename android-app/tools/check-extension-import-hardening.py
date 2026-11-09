@@ -29,6 +29,9 @@ def check_sources(parser, store, smoke):
     assert "catch (IOException unreadable)" in install, "I/O failures must be surfaced before any replacement"
     assert "refusing to replace it" in install, "unreadable existing packs must be preserved"
     assert "catch (Exception unreadable)" not in install, "read errors must not be swallowed as parse errors"
+    assert "catch (Exception malformed)" in install, "readable malformed packs must be distinguished from I/O failures"
+    assert 'throw new IOException("Existing extension pack is malformed; refusing to replace it.", malformed);' in install, \
+        "readable malformed existing packs must be preserved rather than silently overwritten"
 
     # issue #190: decompressed budgets across every entry, including skipped file types
     assert "MAX_ARCHIVE_DECOMPRESSED_BYTES" in archive and "MAX_ENTRY_DECOMPRESSED_BYTES" in archive, \
@@ -169,10 +172,19 @@ def test_limit_guard_mutations(parser, store, smoke):
     try:
         check_sources(parser, store.replace(new_install_marker, "ext.withEnabled(true)", 1), smoke)
     except AssertionError as rejected:
-        assert "new or corrupt-on-disk user imports must be prepared disabled" in str(rejected), \
+        assert "new user imports must be prepared disabled" in str(rejected), \
             f"new-import activation regression failed for an unrelated reason: {rejected}"
     else:
         raise AssertionError("source guard accepted removal of the disabled-new-import policy")
+
+    malformed_guard = 'throw new IOException("Existing extension pack is malformed; refusing to replace it.", malformed);'
+    assert store.count(malformed_guard) == 1, "malformed-pack preservation guard must be unique"
+    try:
+        check_sources(parser, store.replace(malformed_guard, "// silently ignore malformed stored pack", 1), smoke)
+    except AssertionError as rejected:
+        assert "readable malformed existing packs must be preserved" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted silent replacement of a malformed stored pack")
 
     size_guard = "if (initialLength > MAX_USER_PACK_BYTES)"
     assert store.count(size_guard) == 1, "stored pack size guard must be unique"
@@ -203,6 +215,9 @@ if __name__ == "__main__":
     smoke = (root / "tools/ExtensionPackageParserSmoke.java").read_text(encoding="utf-8")
     store_smoke = (root / "tools/ExtensionStoreSmoke.java").read_text(encoding="utf-8")
     for marker in (
+        "a readable but malformed existing extension pack is rejected without replacing its exact bytes",
+        "a failed malformed-pack import does not leave a partial temporary file",
+        "the explicit store uninstall path can remove the preserved malformed pack by id",
         "an oversized existing extension file is rejected without truncation or replacement",
         "an unreadable existing extension path and its contents are preserved",
     ):
@@ -210,4 +225,4 @@ if __name__ == "__main__":
     check_sources(parser, store, smoke)
     test_limit_guard_mutations(parser, store, smoke)
     subprocess.run(["sh", str(root / "tools/run-extension-store-tests.sh")], cwd=root, check=True)
-    print("PASS: extension import hardening — bounded archive/rule budgets, fail-closed scopes, default-disabled imports, and preservation of unreadable/oversized stored packs")
+    print("PASS: extension import hardening — bounded archive/rule budgets, fail-closed scopes, default-disabled imports, and preservation of malformed/unreadable/oversized stored packs")
