@@ -88,7 +88,12 @@
         setStorageStatus(backupSaved
           ? 'Some saved tasks were ignored; the originals were kept in a backup'
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
-        if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
+        const recovery = readRecoveryExportPayload();
+        if (recovery.payload) {
+          offerRecoveryExport(backupSaved
+            ? 'Some saved tasks were ignored; originals were kept in a browser backup.'
+            : 'Some saved tasks were ignored; other readable recovery data remains available for export.');
+        }
       } else if (hasPartialRecoveryBackup()) {
         state.taskRecoveryNoticeActive = true;
         // Keep task records rejected by validation until the user can recover them.
@@ -119,7 +124,12 @@
       showToast(backupSaved
         ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
         : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged');
-      if (backupSaved) offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
+      const recovery = readRecoveryExportPayload();
+      if (recovery.payload) {
+        offerRecoveryExport(backupSaved
+          ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
+          : 'Saved tasks could not be read; other readable recovery data remains available for export.');
+      }
       return [];
     }
   }
