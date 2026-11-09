@@ -12,7 +12,7 @@ This section supersedes older queue summaries. Full exact-head inventory, test e
 8. **P1 — #476/#679:** current-main recurrence/DST source fixes are present; physical alarm behavior and application identity conflict remain open.
 9. **P2 — #325/#348:** resume measured browser UX/accessibility/performance and cross-platform architecture after P0 data/security gates.
 
-No merge, release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred in this cycle.
+No pull request was merged; no release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred in this cycle. The normal mainline merge commit into PR #675 is recorded in the latest status snapshot.
 
 ---
 
