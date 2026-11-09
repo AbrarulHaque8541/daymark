@@ -241,6 +241,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             android.view.View modeRow = (android.view.View) stopwatch.getParent();
             check(countdown.getParent() == modeRow,
                     "Stopwatch and Countdown are sibling buttons in the real mode selector");
+            android.view.View modeSelector = findAncestorWithSimpleName(modeRow, "ModeSelector");
+            check(modeSelector != null && modeSelector.getClass().getSimpleName().equals("ModeSelector"),
+                    "mode buttons are wrapped by the real Focus ModeSelector that owns horizontal interception");
             scrollViewIntoFocus(modeRow);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "fresh Focus Timer panel starts in Stopwatch mode");
@@ -252,13 +255,13 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a real tap selects Stopwatch (" + stopwatchTap + ")");
 
-            String leftSwipe = dispatchSwipe(modeRow, true);
+            String leftSwipe = dispatchSwipe(modeSelector, true);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a leftward horizontal swipe selects Countdown (" + leftSwipe + ")");
-            String rightSwipe = dispatchSwipe(modeRow, false);
+            String rightSwipe = dispatchSwipe(modeSelector, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
-            android.widget.ScrollView parentScroll = findParentScrollView(modeRow);
+            android.widget.ScrollView parentScroll = findParentScrollView(modeSelector);
             check(parentScroll != null,
                     "Focus mode selector remains inside the parent Tasks ScrollView");
             runOnMainSync(() -> {
@@ -279,8 +282,13 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             });
             check(canScroll[0] || canScroll[1],
                     "Tasks workspace has scrollable content for the vertical-gesture regression");
-            dispatchVerticalScrollSwipe(modeRow, canScroll[0]);
-            runOnMainSync(() -> scrollY[1] = parentScroll.getScrollY());
+            dispatchVerticalScrollSwipe(modeSelector, canScroll[0]);
+            long scrollDeadline = android.os.SystemClock.uptimeMillis() + 2000L;
+            do {
+                runOnMainSync(() -> scrollY[1] = parentScroll.getScrollY());
+                if (canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0]) break;
+                android.os.SystemClock.sleep(50L);
+            } while (android.os.SystemClock.uptimeMillis() < scrollDeadline);
             check(canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0],
                     "parent Tasks ScrollView scrolls after a vertical Focus-mode drag"
                             + " (startY=" + scrollY[0] + ", endY=" + scrollY[1]
@@ -422,22 +430,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(bounds.width() > 0 && bounds.height() > 0, "swipe target has stable visible screen bounds");
         String target = describeTouchTarget(view, bounds);
         StringBuilder touchTrace = new StringBuilder();
-        runOnMainSync(() -> {
-            view.setOnTouchListener((targetView, event) -> {
-                appendTouchTrace(touchTrace, "row", targetView, event);
-                return false;
-            });
-            if (view instanceof android.view.ViewGroup) {
-                android.view.ViewGroup group = (android.view.ViewGroup) view;
-                for (int index = 0; index < group.getChildCount(); index++) {
-                    final int childIndex = index;
-                    group.getChildAt(index).setOnTouchListener((targetView, event) -> {
-                        appendTouchTrace(touchTrace, "child" + childIndex, targetView, event);
-                        return false;
-                    });
-                }
-            }
-        });
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        runOnMainSync(() -> attachTouchTraceListeners(view, "selector", touchTrace, tracedViews));
         float startX = left ? bounds.left + bounds.width() * 0.82f : bounds.left + bounds.width() * 0.18f;
         float endX = left ? bounds.left + bounds.width() * 0.18f : bounds.left + bounds.width() * 0.82f;
         float y = bounds.centerY();
@@ -445,22 +439,33 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             injectDrag(startX, y, endX, y);
         } finally {
             runOnMainSync(() -> {
-                view.setOnTouchListener(null);
-                if (view instanceof android.view.ViewGroup) {
-                    android.view.ViewGroup group = (android.view.ViewGroup) view;
-                    for (int index = 0; index < group.getChildCount(); index++) {
-                        group.getChildAt(index).setOnTouchListener(null);
-                    }
-                }
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
             });
         }
         String[] capturedTouchTrace = new String[1];
         runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
         check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
-                "horizontal swipe delivers touchscreen events to the selector or child (" + target + ")");
+                "horizontal swipe delivers touchscreen events to the ModeSelector or descendants (" + target + ")");
         return (left ? "leftward" : "rightward") + " swipe " + target
                 + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")"
                 + " events=[" + capturedTouchTrace[0] + "]";
+    }
+
+    private void attachTouchTraceListeners(android.view.View view, String label,
+                                            StringBuilder trace,
+                                            java.util.List<android.view.View> tracedViews) {
+        view.setOnTouchListener((targetView, event) -> {
+            appendTouchTrace(trace, label, targetView, event);
+            return false;
+        });
+        tracedViews.add(view);
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                attachTouchTraceListeners(group.getChildAt(index), label + "." + index,
+                        trace, tracedViews);
+            }
+        }
     }
 
     private void appendTouchTrace(StringBuilder trace, String target, android.view.View targetView,
@@ -496,6 +501,16 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
                 "vertical drag delivers touchscreen events to target ("
                         + view.getClass().getSimpleName() + ")");
+    }
+
+    private android.view.View findAncestorWithSimpleName(android.view.View view, String simpleName) {
+        android.view.View current = view;
+        while (current != null) {
+            if (simpleName.equals(current.getClass().getSimpleName())) return current;
+            android.view.ViewParent parent = current.getParent();
+            current = parent instanceof android.view.View ? (android.view.View) parent : null;
+        }
+        return null;
     }
 
     private android.widget.ScrollView findParentScrollView(android.view.View view) {
