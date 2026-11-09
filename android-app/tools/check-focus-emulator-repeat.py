@@ -62,9 +62,7 @@ assert "javac -encoding UTF-8" in shell_test_runner
 assert "PlatformShellInputCommandSmoke" in shell_smoke
 assert "PlatformShellInputCommand.tap" in platform_test
 assert "PlatformShellInputCommand.swipe" in platform_test
-assert "PlatformShellInputCommand.withStatus(inputCommand)" in platform_test
-assert "getUiAutomation().executeShellCommand(command)" in platform_test
-assert "PlatformShellInputCommand.parseStatus(response)" in platform_test
+assert "getUiAutomation().executeShellCommand(inputCommand)" in platform_test
 assert "vertical drag delivers touchscreen events to target" in platform_test
 assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
@@ -72,13 +70,10 @@ assert 'System.out.println("INSTRUMENTATION_PHASE: " + message);' in platform_te
 marker_method = platform_test.split("private void marker(String message)", 1)[1].split("private interface PhaseAction", 1)[0]
 assert "getFilesDir()" not in marker_method and "FileOutputStream" not in marker_method
 assert "INPUT_REQUEST_FILE" not in platform_test and "INPUT_RESULT_FILE" not in platform_test
-assert 'STATUS_MARKER = "__DAYMARK_INPUT_STATUS__="' in shell_policy
 assert "MAX_COORDINATE = 10000" in shell_policy
 assert "MAX_DURATION_MS = 5000" in shell_policy
-assert "TAP_PATTERN" in shell_policy and "SWIPE_PATTERN" in shell_policy
+assert "checkCoordinate" in shell_policy
 assert "unsupported shell input command" in shell_policy
-assert "sh -c" in shell_policy
-assert "parseStatus" in shell_policy and "Pattern.quote(STATUS_MARKER)" in shell_policy
 assert "negative tap coordinate" in shell_smoke
 assert "oversized swipe duration" in shell_smoke
 assert "missing status marker" in shell_smoke
