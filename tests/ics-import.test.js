@@ -182,18 +182,26 @@ test('the import UI intercepts .ics files, saves them, and discloses the simplif
     { id: 'old-1', title: 'Existing task', dueDate: null, priority: 'medium', completed: false, createdAt: NOW, updatedAt: NOW }
   ]);
   const storageData = {};
+  storageData[ui.STORAGE_KEY] = stored;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
+  const created = [];
   const element = {
     id: 'import-file', value: 'stale', files: [{ name: 'calendar.ics', size: googleLikeIcs.length, text: async () => googleLikeIcs }],
     textContent: ''
   };
   const doc = {
     readyState: 'complete',
+    body: { appendChild(el) { created.push(el); return el; } },
     getElementById(id) { return id === 'import-file' ? element : null; },
+    createElement(tag) {
+      const el = { tagName: tag, id: '', className: '', textContent: '', setAttribute() {} };
+      created.push(el);
+      return el;
+    },
     addEventListener() {},
     removeEventListener() {}
   };
@@ -214,11 +222,14 @@ test('the import UI intercepts .ics files, saves them, and discloses the simplif
   assert.equal(event.propagationStopped, true);
   const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
   assert.equal(saved.length, 5, 'the existing task plus four imported calendar tasks');
+  assert.equal(saved[0].title, 'Existing task', 'existing tasks keep their position and data');
   assert.equal(saved[1].title, 'Submit tax paperwork');
-  assert.match(element.textContent, /Imported 4 tasks from calendar\.ics\./);
-  assert.match(element.textContent, /1 recurring item imported once as a one-time task\./);
-  assert.match(element.textContent, /Times were kept as written; time zones were not applied\./);
-  assert.match(element.textContent, /1 cancelled item skipped\./);
+  const status = created.find((el) => el.id === 'import-status');
+  assert.ok(status, 'a status element exists');
+  assert.match(status.textContent, /Imported 4 tasks from calendar\.ics\./);
+  assert.match(status.textContent, /1 recurring item imported once as a one-time task\./);
+  assert.match(status.textContent, /Times were kept as written; time zones were not applied\./);
+  assert.match(status.textContent, /1 cancelled item skipped\./);
 });
 
 test('index.html offers the calendar format in the import file picker', () => {
