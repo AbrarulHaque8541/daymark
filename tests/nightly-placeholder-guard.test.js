@@ -451,9 +451,9 @@ test('every repository Node test file registers at least one executable test cas
     'an empty callback must not make a placeholder-only file look like a regression suite');
   assert.equal(hasRegisteredTestCase("test('comment-only', () => { /* no assertions or work */ });"), false,
     'a comment-only callback must not count as an executable test');
-  assert.equal(hasRegisteredTestCase("test('valid fixture', () => { assert.equal(1, 1); });"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test');\ntest('valid fixture', () => { assert.equal(1, 1); });"), true,
     'an active named registration with an executable callback must be accepted');
-  assert.equal(hasRegisteredTestCase("test(\n  'valid multiline fixture',\n  async () => {\n    assert.equal(await Promise.resolve(1), 1);\n  }\n);"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test');\ntest(\n  'valid multiline fixture',\n  async () => {\n    assert.equal(await Promise.resolve(1), 1);\n  }\n);"), true,
     'a valid multiline registration must be accepted');
   assert.equal(hasRegisteredTestCase("function test() { assert.equal(1, 1); }"), false,
     'a function declaration named test must not count as a node:test registration');
@@ -473,13 +473,13 @@ test('every repository Node test file registers at least one executable test cas
     'single-quoted fake registrations must be ignored');
   assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "example test('fake')" + String.fromCharCode(96) + ";"), false,
     'template raw text must not count as an executable registration');
-  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "${test('real', () => assert.ok(true))}" + String.fromCharCode(96) + ";"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); const example = " + String.fromCharCode(96) + "${test('real', () => assert.ok(true))}" + String.fromCharCode(96) + ";"), true,
     'an actual registration with an executable callback inside a template interpolation remains executable');
   assert.equal(hasRegisteredTestCase("const example = /test(foo)/;"), false,
     'regular-expression literals must not count as executable registrations');
   assert.equal(hasRegisteredTestCase("// test('fake')\\n/* it('fake') */"), false,
     'line and block comments must not count as executable registrations');
-  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => assert.ok(true));"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => assert.ok(true));"), true,
     'focused-test text inside a template literal must not reject a real test');
   assert.equal(hasRegisteredTestCase("const note = \"not test('fake')\";"), false,
     'prose before a test-like phrase inside a quoted string must not count as a registration');
@@ -496,11 +496,11 @@ test('every repository Node test file registers at least one executable test cas
     'an arrow nested inside test options is not the test callback');
   assert.equal(hasRegisteredTestCase("test('fake', { setup: () => assert.ok(true) }, () => {});"), false,
     'an empty final callback must not be rescued by an arrow nested in options');
-  assert.equal(hasRegisteredTestCase("test('valid async', async () => { await Promise.resolve(); assert.ok(true); });"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); test('valid async', async () => { await Promise.resolve(); assert.ok(true); });"), true,
     'an async inline callback must be accepted');
-  assert.equal(hasRegisteredTestCase("test('valid function', function () { assert.ok(true); });"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); test('valid function', function () { assert.ok(true); });"), true,
     'a non-empty function-expression callback must be accepted');
-  assert.equal(hasRegisteredTestCase("test('valid parenthesized function', (function () { assert.ok(true); }));"), true,
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); test('valid parenthesized function', (function () { assert.ok(true); }));"), true,
     'a parenthesized function-expression callback must be accepted');
   assert.equal(hasRegisteredTestCase("test('empty function', function () { /* no executable body */ });"), false,
     'an empty function-expression callback must not count as an executable test');
