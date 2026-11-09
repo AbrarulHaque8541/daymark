@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-09T18:46:54.363Z (main 1532838c; #675 mainline conflict resolved; #686 Service Worker boundary five workflows green; 10 open PRs / 17 issues)](./CURRENT_STATUS_20261109T184654Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T16:46:11.546Z (main 1532838c; 8 open PRs, 14 issues; #675 absent-primary recovery fix pushed, exact-head CI pending)](./CURRENT_STATUS_20261109T164611Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T15:24:39Z (main 59e6961c0645; seven open PRs, twelve issues; #675 exact-head docs/plan CI green, #677 Focus API36 dependency recorded)](./CURRENT_STATUS_20261109T152439Z.md)

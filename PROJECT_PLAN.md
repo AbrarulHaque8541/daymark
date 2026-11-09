@@ -1,3 +1,21 @@
+## Current execution queue — 2026-11-09T18:46:54.363Z (main 1532838c; #675 merge commit fce085fc; #686 Service Worker policy green)
+
+This section supersedes older queue summaries. Full exact-head inventory, test evidence and the prioritized backlog are in [CURRENT_STATUS_20261109T184654Z.md](docs/CURRENT_STATUS_20261109T184654Z.md).
+
+1. **P0 — #675 recovery/webhook:** mainline conflict resolved with a normal two-parent merge commit; 48 ahead/0 behind, mergeable=true. Run exact-head CI and complete independent data-integrity/security review before integration.
+2. **P0 — #685 Service Worker boundary:** #686 exact-head policy, Android, contracts and device APK workflows all PASS. Add API 26/29/36 controlled-server request-trace instrumentation; keep fail-closed and issue open until runtime/physical proof.
+3. **P0 — #646/#160 governance and physical acceptance:** main protection remains disabled, rulesets empty; owner-side settings and independent reviews required. Physical Android/WebView/OEM acceptance remains NOT TESTED.
+4. **P1 — #671 browser downloads:** finish Daymark-owned redirect validation, same-origin credentials, bounded streaming, cancellation and cleanup; keep fail-closed until integrated.
+5. **P1 — #656/#659/#665/#676/#682:** complete independent RFC 5545, extension-security, signing/provenance and browser-data reviews; do not merge without approvals.
+6. **P1 — #677/#613:** integrate #648's tested Focus instrumentation/correction, then rerun #677's own API36 ten-run gate. Physical reminder/AlarmManager tests remain pending.
+7. **P1 — #683/#684:** resolve cross-tab writes and repeat-completion contract only after coordinating #675/#648 file ownership and product semantics.
+8. **P1 — #476/#679:** current-main recurrence/DST source fixes are present; physical alarm behavior and application identity conflict remain open.
+9. **P2 — #325/#348:** resume measured browser UX/accessibility/performance and cross-platform architecture after P0 data/security gates.
+
+No merge, release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred in this cycle.
+
+---
+
 ## Current whole-project execution queue — 2026-11-09T15:24:39Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
 
 The detailed exact-head inventory, CI evidence, issue list and safety limitations are in [the 15:24 status snapshot](docs/CURRENT_STATUS_20261109T152439Z.md). The #675 head recorded there is the fully green plan-refresh head before this new snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
