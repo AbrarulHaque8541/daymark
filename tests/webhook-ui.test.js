@@ -449,6 +449,7 @@ test('a legacy endpoint is removed without being read and queued events wait for
 test('task completion fails closed without Web Crypto and never persists or sends an unbound event', async () => {
   let fetchCalls = 0;
   const { env, storageData } = fakeEnv({
+    url: DEFAULT_ENDPOINT_URL,
     crypto: { subtle: null },
     fetch: async () => { fetchCalls += 1; return { ok: true, status: 200 }; }
   });
