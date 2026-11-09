@@ -10,7 +10,7 @@ final class PlatformShellInputCommand {
     static String tap(int x, int y) {
         checkCoordinate(x, "tap x");
         checkCoordinate(y, "tap y");
-        return "input tap " + x + " " + y;
+        return "/system/bin/input tap " + x + " " + y + " 2>&1";
     }
 
     static String swipe(int startX, int startY, int endX, int endY, int durationMs) {
@@ -21,7 +21,7 @@ final class PlatformShellInputCommand {
         if (durationMs < 1 || durationMs > MAX_DURATION_MS) {
             throw new IllegalArgumentException("swipe duration is outside 1.." + MAX_DURATION_MS);
         }
-        return "input swipe " + startX + " " + startY + " " + endX + " " + endY + " " + durationMs;
+        return "/system/bin/input swipe " + startX + " " + startY + " " + endX + " " + endY + " " + durationMs + " 2>&1";
     }
 
     private static void checkCoordinate(int value, String label) {
