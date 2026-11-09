@@ -899,3 +899,25 @@ test('task recovery notice remains visible when a Focus backup is also present',
   assert.equal(exported.focusBackup, focusBackup);
   assert.equal(storedValues.get(STORAGE_KEY), corruptTask);
 });
+
+
+
+test('Focus backup remains exportable when task recovery backup creation fails', () => {
+  const corruptTask = '{not valid task JSON';
+  const focusBackup = JSON.stringify({ session: null, log: [{ id: 'focus-only', durationMinutes: 25 }] });
+  const storedValues = new Map([[STORAGE_KEY, corruptTask], [FOCUS_BACKUP_KEY, focusBackup]]);
+  const app = bootApp(storedValues, new Set([BACKUP_KEY]));
+
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false,
+    'a readable Focus backup remains exportable even when task backup creation fails');
+  action.dispatch('click');
+
+  assert.equal(app.getLastBlob().parts[0], focusBackup,
+    'the exact readable Focus backup is exported without inventing task backup bytes');
+  assert.equal(storedValues.get(STORAGE_KEY), corruptTask,
+    'the unreadable task primary is unchanged');
+  assert.equal(storedValues.has(BACKUP_KEY), false,
+    'failed backup creation does not write a placeholder task backup');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
+});
