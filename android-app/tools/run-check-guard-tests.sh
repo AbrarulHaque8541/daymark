@@ -111,6 +111,8 @@ expect_fail_after_removal check-focus-emulator-repeat.py "getUiAutomation().exec
 expect_fail_after_removal check-focus-emulator-repeat.py 'while [ "$attempt" -le 20 ]' "$ROOT/tools/run-platform-instrumentation-on-emulator.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parse_platform_instrumentation_component()" "$REPEAT_HELPER" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "MAX_COORDINATE = 10000" "$SHELL_POLICY" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py 'findAncestorWithSimpleName(modeRow, "ModeSelector")' "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "scrollDeadline" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "/system/bin/input tap " "$SHELL_POLICY" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "run-platform-instrumentation-shell-input-tests.sh" "$ROOT/tools/run-platform-instrumentation-repeat-tests.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
