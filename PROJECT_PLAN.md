@@ -1,3 +1,22 @@
+## Latest verified execution — 2026-11-09T22:17:56.838Z
+
+Main remains `1532838c78ab350b18f95e96a2c547ba384f0831`; exact-main Android CI and Ubuntu/Windows contracts PASS. Full inventory, exact PR heads, run links and device limitations: [CURRENT_STATUS_20261109T221756Z.md](docs/CURRENT_STATUS_20261109T221756Z.md).
+
+New delivery on #688: `8e1f562ee24c2f7094d8006e980cbc4e3d3991c8` tracks the exact `node:test` imported identifier, rejecting local `test`/`it` impostors. Exact-source V8 12/12 PASS; Node 684/684 PASS; Android CI, Ubuntu/Windows contracts and both-flavor device-test APK PASS. PR remains unmerged pending independent approval.
+
+Current P0 queue:
+1. #683 — implement origin-wide Web Locks for task writes/import/recovery/recurrence/clear/undo; reread and apply mutation intent inside lock; deterministic two-tab tests. Webhook queue locks do not protect task storage.
+2. #613/#677/#648 — integrate tested Focus/IME fix sequentially into reminder branch; #677 API36 still fails Cancel with IME visible.
+3. #646/#160 — owner-approved branch protection and physical Android/WebView acceptance.
+
+Next P1: #675 recovery review; #687 malformed-extension recovery UI; #685/#686 Service Worker Online compatibility; #671/#678 complete secure download transport; #684/#476 recurrence parity; #665/#84 signing/provenance; #656/#676/#682 independent data/security review.
+
+No merge, release, tag, version, signing-key, package-identity, manifest-permission or destructive data change this cycle. Physical-device testing NOT TESTED.
+
+Work by: ChatGPT (OpenAI) · Model: GPT-6 · Tooling: GitHub connector via Code Mode · Timestamp (UTC): 2026-11-09T22:17:56.838Z
+
+---
+
 ## Latest verified execution — 2026-11-09T22:01:18Z
 
 Main remains 1532838c78ab350b18f95e96a2c547ba384f0831; Android CI and Ubuntu/Windows contracts PASS. Full evidence: [CURRENT_STATUS_20261109T220118Z.md](docs/CURRENT_STATUS_20261109T220118Z.md).
