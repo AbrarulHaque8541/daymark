@@ -54,6 +54,28 @@ def check_sources(parser, store, smoke):
     assert "file.delete()" not in writer, "failed extension saves must not delete the previous pack"
     assert "ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites)" in install, \
         "same-content re-import must preserve enabled state and per-site pause list"
+
+    # issue #687: malformed packs must be discoverable and recoverable without executing or normalizing bytes.
+    recovery = store.split("List<MalformedUserPack> listMalformedUserPacks()", 1)[1].split(
+        "private File findUserPack", 1)[0]
+    assert "Files.readAttributes" in recovery and "LinkOption.NOFOLLOW_LINKS" in recovery, \
+        "recovery enumeration must not follow symlinks"
+    assert "Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)" in recovery, \
+        "raw recovery reads must open the selected regular file without following links"
+    assert "MAX_USER_PACK_BYTES" in recovery and "read > MAX_USER_PACK_BYTES - total" in recovery, \
+        "raw recovery reads must remain bounded while streaming"
+    assert "readStableBytes" in recovery and "Arrays.equals(first, second)" in recovery, \
+        "concurrent file changes must fail closed"
+    assert 'MessageDigest.getInstance("SHA-256")' in recovery, \
+        "recovery actions must be bound to a SHA-256 content fingerprint"
+    assert "expectedSha256.equals(sha256Hex(bytes))" in recovery, \
+        "export/removal must reject a pack changed after it was listed"
+    assert "isMalformedPackBytes(bytes)" in recovery, \
+        "only still-malformed files may use the malformed-pack recovery actions"
+    assert "return bytes.clone();" in recovery, \
+        "raw export must return an independent exact-byte copy"
+    assert "Files.delete(path);" in recovery, \
+        "confirmed recovery removal must delete only the selected verified file"
     assert "ExtensionPackageParser.prepareNewUserPackInstall(ext)" in install, \
         "new user imports must be prepared disabled until explicit activation"
     assert "existing.enabled" in install, "identical re-import must retain the user's activation choice"
@@ -217,11 +239,17 @@ if __name__ == "__main__":
     for marker in (
         "a readable but malformed existing extension pack is rejected without replacing its exact bytes",
         "a readable zero-byte existing pack remains present and byte-for-byte unchanged",
-        "explicit uninstall can remove the zero-byte malformed pack",
         "a failed malformed-pack import does not leave a partial temporary file",
-        "the explicit store uninstall path can remove the preserved malformed pack by id",
         "an oversized existing extension file is rejected without truncation or replacement",
         "an unreadable existing extension path and its contents are preserved",
+        "readable malformed pack appears as a disabled recovery record with explicit safe actions",
+        "raw malformed-pack export is byte-identical to the original bytes",
+        "zero-byte malformed pack is surfaced and exported as exactly zero bytes",
+        "oversized pack is visible as non-actionable recovery metadata",
+        "non-regular extension paths are visible but never exported or removed",
+        "invalid UTF-8 malformed packs can be exported byte-for-byte without text normalization",
+        "a pack changed after listing is neither exported under a stale fingerprint nor deleted",
+        "symbolic links are listed as non-regular and are never followed",
     ):
         assert marker in store_smoke, f"missing ExtensionStore preservation regression: {marker}"
     check_sources(parser, store, smoke)
