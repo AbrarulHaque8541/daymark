@@ -11,6 +11,8 @@ workspace = (main / "BrowserWorkspaceController.java").read_text(encoding="utf-8
 docs = (root / "ANDROID_SOURCES.md").read_text(encoding="utf-8")
 docs_flat = " ".join(docs.split())
 test_module = (root / "service-worker-test/build.gradle.kts").read_text(encoding="utf-8")
+variant_guard = (root / "tools/check-service-worker-test-variants.sh").read_text(encoding="utf-8")
+runtime_workflow = (root.parent / ".github/workflows/browser-service-worker-runtime.yml").read_text(encoding="utf-8")
 
 def require(condition, message):
     if not condition:
@@ -53,7 +55,15 @@ require("Service Worker network requests remain blocked even while ordinary page
         "document the fail-closed behavior and compatibility trade-off")
 require("static Decision decide(boolean onlineEnabled, boolean explicitNavigation, String scheme)" in policy,
         "keep Online toggle and explicit navigation distinct from Service Worker network grants")
-require('missingDimensionStrategy("distribution", "githubSideload")' in test_module,
-        "resolve the app's distribution flavor explicitly for the dedicated Service Worker test module")
+require('flavorDimensions += "distribution"' in test_module
+        and 'create("githubSideload")' in test_module
+        and 'create("play")' in test_module
+        and test_module.count('dimension = "distribution"') >= 2,
+        "mirror both target-app distribution flavors in the dedicated Service Worker test module")
+require("connectedGithubSideloadDebugAndroidTest" in variant_guard
+        and "connectedPlayDebugAndroidTest" in variant_guard,
+        "verify that both target-app instrumentation variants are registered")
+require("tools/check-service-worker-test-variants.sh" in runtime_workflow,
+        "run the explicit Service Worker target-variant check before emulator instrumentation")
 
 print("PASS browser service-worker policy source guard")
