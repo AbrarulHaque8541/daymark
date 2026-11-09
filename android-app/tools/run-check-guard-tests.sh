@@ -8,6 +8,7 @@ RECEIVER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java"
 SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
 RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
 FOCUS_PANEL="$ROOT/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
+PLATFORM_TEST="$ROOT/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
 PROVIDER_BACKUP=$(mktemp)
@@ -106,6 +107,8 @@ expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP
 python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
 echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
 expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "sendPointerSync(event);" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" "$PLATFORM_TEST" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"

@@ -437,9 +437,13 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 }
             });
         }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
+                "horizontal swipe delivers touchscreen events to the selector or child (" + target + ")");
         return (left ? "leftward" : "rightward") + " swipe " + target
                 + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")"
-                + " events=[" + touchTrace + "]";
+                + " events=[" + capturedTouchTrace[0] + "]";
     }
 
     private void appendTouchTrace(StringBuilder trace, String target, android.view.View targetView,
@@ -523,9 +527,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 downTime, eventTime, action, x, y, 0);
         event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
         try {
-            if (!getUiAutomation().injectInputEvent((android.view.InputEvent) event, true)) {
-                throw new AssertionError("touchscreen event injection was rejected: action=" + action);
-            }
+            // Instrumentation.sendPointerSync routes the touchscreen event through the
+            // target application's window. UiAutomation accepted the same events on API 29,
+            // but the Focus selector and its children received no MotionEvents (trace=[]).
+            sendPointerSync(event);
         } finally {
             event.recycle();
         }
