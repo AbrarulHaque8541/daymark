@@ -51,13 +51,17 @@ assert "no retry was attempted" in helper
 assert "sh ./tools/run-platform-instrumentation-repeat-tests.sh" in canonical
 assert 'python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT"' in canonical
 assert "run_instrumentation_repeated" in test_runner
-assert "event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN)" in platform_test
-assert "sendPointerSync(event);" in platform_test  # taps and instrumented-window swipes
-assert "injectPointerEvent(android.view.MotionEvent.ACTION_DOWN" in platform_test
-assert "injectPointerEvent(android.view.MotionEvent.ACTION_MOVE" in platform_test
-assert "injectPointerEvent(android.view.MotionEvent.ACTION_UP" in platform_test
+input_bridge = (root / "tools/platform-instrumentation-input-bridge.sh").read_text(encoding="utf-8")
+input_bridge_tests = (root / "tools/run-platform-instrumentation-input-bridge-tests.sh").read_text(encoding="utf-8")
+assert "INPUT_REQUEST_FILE" in platform_test and "INPUT_RESULT_FILE" in platform_test
+assert "dispatchHostInput" in platform_test
+assert "sendPointerSync(event);" not in platform_test
+assert "drive_instrumentation_input_bridge" in runner
+assert ". tools/platform-instrumentation-input-bridge.sh" in runner
+assert "adb shell input tap" in input_bridge and "adb shell input swipe" in input_bridge
+assert "run-platform-instrumentation-input-bridge-tests.sh" in test_runner
+assert "duplicate request sequence" in input_bridge_tests
 assert "vertical drag delivers touchscreen events to target" in platform_test
-assert "getUiAutomation().injectInputEvent" not in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "stableVisibleBounds" in platform_test
 assert "findParentScrollView" in platform_test
