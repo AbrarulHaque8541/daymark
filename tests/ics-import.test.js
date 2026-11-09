@@ -327,6 +327,78 @@ test('calendar time seconds are validated and non-zero precision loss is counted
   assert.equal(result.timezoneDropped, 2);
 });
 
+test('escaped RFC TEXT semicolons remain inside one CATEGORIES value', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'UID:escaped-semicolon@example.com',
+    'SUMMARY:Escaped semicolon',
+    'CATEGORIES:work\\\\;urgent,finance',
+    'END:VTODO',
+    'END:VCALENDAR'
+  ].join('\\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.equal(result.tasks.length, 1);
+  assert.deepEqual(result.tasks[0].tags, ['finance'],
+    'the escaped semicolon is unescaped within one unsupported tag, not treated as a list separator');
+});
+
+test('import UI discloses invalid completion metadata without marking the task done', async () => {
+  const storageData = {};
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    setItem(key, value) { storageData[key] = String(value); },
+    removeItem(key) { delete storageData[key]; }
+  };
+  const created = [];
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'UID:invalid-completion-ui@example.com',
+    'SUMMARY:Keep this task open',
+    'COMPLETED:garbage',
+    'END:VTODO',
+    'END:VCALENDAR'
+  ].join('\\n');
+  const element = {
+    id: 'import-file', value: '', files: [{ name: 'invalid-completion.ics', size: ics.length, text: async () => ics }],
+    textContent: ''
+  };
+  const doc = {
+    readyState: 'complete',
+    body: { appendChild(el) { created.push(el); return el; } },
+    getElementById(id) { return id === 'import-file' ? element : null; },
+    createElement(tag) {
+      const el = { tagName: tag, id: '', className: '', textContent: '', setAttribute() {} };
+      created.push(el);
+      return el;
+    },
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const win = {
+    StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } },
+    dispatchEvent() { return true; }
+  };
+  const handle = ui.attachImportUi({
+    document: doc, window: win, localStorage: storage,
+    importApi: importer,
+    logic: { validateStoredTasks: () => ({ tasks: [] }), isValidTask: () => true },
+    now: () => NOW
+  });
+  await handle.onChange({
+    target: element,
+    preventDefault() {},
+    stopPropagation() {}
+  });
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].completed, false);
+  const status = created.find((el) => el.id === 'import-status');
+  assert.ok(status);
+  assert.match(status.textContent, /1 item had invalid completion metadata ignored; left open\\./);
+});
+
 test('skipped recurring components do not inflate the recurrence or timezone counts', () => {
   const ics = [
     'BEGIN:VCALENDAR',
