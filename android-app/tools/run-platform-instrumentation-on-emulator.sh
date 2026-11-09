@@ -22,7 +22,7 @@ report_failure() {
   body="$1"
   phase_log="${2:-}"
   if [ -z "$phase_log" ]; then
-    for pkg in com.abrar.daymark com.abrar.daymark.debug; do
+    for pkg in "$input_package" com.abrar.daymark com.abrar.daymark.debug; do
       phase_log="$(read_phase_log "$pkg")"
       [ -n "$phase_log" ] && break
     done
@@ -50,20 +50,20 @@ if [ -z "$instrumentation" ]; then
 fi
 
 echo "Running Android instrumentation component: $instrumentation"
-input_package="com.abrar.daymark"
+input_package="com.abrar.daymark.test"
 run_as_output="$(adb shell run-as "$input_package" mkdir -p files 2>&1)" || {
   run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
-  echo "Target app package $input_package cannot create its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
+  echo "Instrumentation test package $input_package cannot create its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
   exit 1
 }
 probe_dir="files/.daymark-host-input-probe-$$"
 run_as_output="$(adb shell run-as "$input_package" mkdir "$probe_dir" 2>&1)" || {
   run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
-  echo "Target app package $input_package cannot write its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
+  echo "Instrumentation test package $input_package cannot write its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
   exit 1
 }
 if ! adb shell run-as "$input_package" rmdir "$probe_dir" >/dev/null 2>&1; then
-  echo "Target app package $input_package could not remove its temporary host-input probe directory." >&2
+  echo "Instrumentation test package $input_package could not remove its temporary host-input probe directory." >&2
   exit 1
 }
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
@@ -71,7 +71,7 @@ phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 run_instrumentation_once() {
 status_file="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-status.$$"
 rm -f "$status_file"
-adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp >/dev/null 2>&1 || true
+adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp files/instrumentation-phases.log >/dev/null 2>&1 || true
 (
   set +e
   if command -v timeout >/dev/null 2>&1; then
@@ -102,7 +102,7 @@ if [ "$bridge_status" -ne 0 ]; then
   output="${output}
 INPUT_BRIDGE_ERROR: host input bridge exited with status $bridge_status."
 fi
-adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp >/dev/null 2>&1 || true
+adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp files/instrumentation-phases.log >/dev/null 2>&1 || true
 if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
   phase_log=""
   for pkg in com.abrar.daymark com.abrar.daymark.debug; do
