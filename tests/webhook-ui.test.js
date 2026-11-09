@@ -793,6 +793,8 @@ test('index markup exposes task-completion webhook controls and session-only dis
   }
   assert.match(html,/stays in this tab only/);
   assert.match(html,/must be re-entered after reload/);
+  assert.match(html,/SHA-256 destination fingerprint/);
+  assert.match(html,/Clear all queued events/);
   assert.doesNotMatch(html,/Local webhook preview/);
 });
 
