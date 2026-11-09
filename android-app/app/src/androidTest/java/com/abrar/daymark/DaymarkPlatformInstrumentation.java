@@ -570,7 +570,21 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
         java.util.ArrayList<android.view.View> tracedAncestors = new java.util.ArrayList<>();
         int[] parentScrollY = new int[2];
+        String[] parentScrollState = new String[1];
         runOnMainSync(() -> {
+            android.graphics.Rect parentScrollBounds = new android.graphics.Rect();
+            int[] parentScrollLocation = new int[2];
+            parentScroll.getGlobalVisibleRect(parentScrollBounds);
+            parentScroll.getLocationOnScreen(parentScrollLocation);
+            parentScrollState[0] = "parentScrollState={enabled=" + parentScroll.isEnabled()
+                    + ", shown=" + parentScroll.isShown()
+                    + ", clickable=" + parentScroll.isClickable()
+                    + ", visibility=" + parentScroll.getVisibility()
+                    + ", locationOnScreen=(" + parentScrollLocation[0] + "," + parentScrollLocation[1] + ")"
+                    + ", visibleBounds=" + parentScrollBounds.toShortString()
+                    + ", height=" + parentScroll.getHeight()
+                    + ", childCount=" + parentScroll.getChildCount()
+                    + ", canScrollDown=" + parentScroll.canScrollVertically(1) + "}";
             parentScrollY[0] = parentScroll.getScrollY();
             attachTouchTraceListeners(view, "vertical-selector", selectorTrace, tracedViews);
             android.view.ViewParent parent = view.getParent();
@@ -599,7 +613,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         }
         String[] traces = new String[1];
         runOnMainSync(() -> traces[0] = "selector=[" + selectorTrace + "] ancestors=[" + ancestorTrace + "]");
-        return traces[0] + " start=(" + bounds.centerX() + "," + startY + ")"
+        return parentScrollState[0] + " " + traces[0] + " start=(" + bounds.centerX() + "," + startY + ")"
                 + " end=(" + bounds.centerX() + "," + endY + ")"
                 + " parentScrollYBefore=" + parentScrollY[0]
                 + " parentScrollYAfter=" + parentScrollY[1];
