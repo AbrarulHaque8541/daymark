@@ -120,7 +120,7 @@ expect_fail_after_removal check-focus-emulator-repeat.py "dropShellPermissionIde
 expect_fail_after_removal check-focus-emulator-repeat.py "disallowParentIntercept(false);" "$FOCUS_PANEL" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "PlatformTouchSequence.swipe" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "trace.append(target).append(':').append(android.view.MotionEvent.actionToString(event.getActionMasked()))" "$PLATFORM_TEST" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py "scrollDescendantIntoScrollView(parentScroll, modeSelector);" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "scrollDescendantIntoScrollView(parentScroll, countdown);" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "automation.injectInputEvent(event, true)" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" "$PLATFORM_TEST" "$ROOT"
