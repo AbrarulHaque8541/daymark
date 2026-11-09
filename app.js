@@ -43,7 +43,7 @@
       } catch (backupError) {
         console.warn('Could not read Daymark recovery backup:', backupError);
       }
-      if (backupReadable && typeof backupRaw === 'string' && backupRaw.length > 0) {
+      if (backupReadable && typeof backupRaw === 'string') {
         setStorageStatus('Primary task data unreadable; recovery backup available', true);
         showToast('Saved tasks could not be read, but a recovery backup is available for export.');
         offerRecoveryExport('Primary task data is unreadable. A recovery backup is available for export.');
@@ -1056,7 +1056,8 @@
 
   function readTaskRecoveryPayloads(raw) {
     const result = { arrays: [], malformedCount: 0 };
-    if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (typeof raw !== 'string') return result;
+    if (raw.length === 0) { result.malformedCount = 1; return result; }
     if (logic.hasDuplicateJsonKeys(raw)) { result.malformedCount = 1; return result; }
     let parsed;
     try {
@@ -1092,7 +1093,8 @@
 
   function readFocusRecoveryStates(raw) {
     const result = { states: [], malformedCount: 0 };
-    if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (typeof raw !== 'string') return result;
+    if (raw.length === 0) { result.malformedCount = 1; return result; }
     if (logic.hasDuplicateJsonKeys(raw)) { result.malformedCount = 1; return result; }
     if (!focus) {
       result.malformedCount = 1;
@@ -1494,7 +1496,7 @@
       } catch (backupError) {
         console.warn('Could not read Daymark focus recovery backup:', backupError);
       }
-      if (backupReadable && typeof backupRaw === 'string' && backupRaw.length > 0) {
+      if (backupReadable && typeof backupRaw === 'string') {
         setStorageStatus('Primary focus data unreadable; recovery backup available', true);
         offerRecoveryExport('Primary focus data is unreadable. A recovery backup is available for export.');
       } else if (!backupReadable) {
@@ -1504,7 +1506,7 @@
       }
       return empty;
     }
-    if (!saved) {
+    if (saved === null) {
       if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
       return empty;
     }
