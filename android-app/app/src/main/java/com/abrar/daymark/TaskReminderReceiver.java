@@ -15,9 +15,9 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Shows one scheduled task reminder, and restores the alarm schedule after a reboot.
- * The receiver is not exported: only Daymark's own alarms and protected system boot
- * broadcasts can reach it. No reminder text leaves the device.
+ * Shows one scheduled task reminder and restores the alarm schedule after boot or
+ * a system clock/timezone change. The receiver is not exported: only Daymark's own
+ * alarms and protected system broadcasts can reach it. No reminder text leaves the device.
  */
 public final class TaskReminderReceiver extends BroadcastReceiver {
     static final String EXTRA_NOTIFICATION_ID = "daymark.extra.notification_id";
@@ -48,9 +48,8 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             dismissReminder(context, intent);
             return;
         }
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action)
-                || "android.intent.action.QUICKBOOT_POWERON".equals(action)) {
-            rescheduleAfterBoot(context);
+        if (ReminderSchedulePolicy.shouldRescheduleForSystemChange(action)) {
+            rescheduleAfterSystemChange(context);
             return;
         }
         showReminder(context, intent);
@@ -235,7 +234,7 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         }
     }
 
-    private void rescheduleAfterBoot(Context context) {
+    private void rescheduleAfterSystemChange(Context context) {
         try {
             EncryptedTaskStore store = new EncryptedTaskStore(context);
             List<Task> tasks = store.load();
@@ -243,7 +242,7 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
             context.getSharedPreferences(TaskReminderScheduler.REMINDER_PREFERENCES, Context.MODE_PRIVATE)
                     .edit().remove(TaskReminderScheduler.BOOT_RESCHEDULE_FAILED_KEY).apply();
         } catch (Exception reminderRescheduleFailed) {
-            Log.w("DaymarkReminder", "Boot reschedule failed; alarms retry on the next app open.",
+            Log.w("DaymarkReminder", "System-time reschedule failed; alarms retry on the next app open.",
                     reminderRescheduleFailed);
             context.getSharedPreferences(TaskReminderScheduler.REMINDER_PREFERENCES, Context.MODE_PRIVATE)
                     .edit().putBoolean(TaskReminderScheduler.BOOT_RESCHEDULE_FAILED_KEY, true).apply();
