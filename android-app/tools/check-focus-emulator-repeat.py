@@ -17,6 +17,7 @@ selector_end = focus_panel.index("private void chooseDisplayUnit", selector_star
 selector = focus_panel[selector_start:selector_end]
 
 assert "disallowParentIntercept(true);" in selector
+assert "disallowParentIntercept(false);" in down_branch, "parent ScrollView must remain eligible from ACTION_DOWN"
 assert "disallowParentIntercept(false);" in selector
 down_branch = selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split("case MotionEvent.ACTION_MOVE:", 1)[0]
 assert "disallowParentIntercept(true);" not in down_branch, "vertical Tasks scrolling must remain available until direction is known"
