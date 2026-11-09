@@ -61,9 +61,14 @@ test('the card explains the selected clear action at boot', () => {
   const expected = engine.explainClearAction('clear-completed');
   assert.equal(result.children.length,
     1 + expected.removes.length + expected.keeps.length + 3 + (expected.undoWindowSeconds > 0 ? 1 : 0));
-  assert.match(result.children[1].textContent, /^Removes · /);
-  assert.match(result.children[2].textContent, /^Keeps · /);
-  let recoveryIndex = 1 + expected.removes.length + expected.keeps.length;
+  let lineIndex = 1;
+  for (let i = 0; i < expected.removes.length; i += 1) {
+    assert.match(result.children[lineIndex++].textContent, /^Removes · /);
+  }
+  for (let i = 0; i < expected.keeps.length; i += 1) {
+    assert.match(result.children[lineIndex++].textContent, /^Keeps · /);
+  }
+  let recoveryIndex = lineIndex;
   if (expected.undoWindowSeconds > 0) {
     assert.equal(result.children[recoveryIndex].textContent, 'Undo window · 7 seconds');
     recoveryIndex += 1;
@@ -241,7 +246,7 @@ test('unavailable storage controls are disclosed without claiming an action ran'
   doc.elements['browser-data-action'].value = 'storage-clear-status';
   ui.attachBrowserDataUi({ document: doc, dataApi: engine });
   assert.match(doc.elements['browser-data-status'].textContent,
-    /^Unavailable · Storage status controls are unavailable · no action was run/);
+    /^Unavailable · Clear storage status · no action was run/);
   assert.match(doc.elements['browser-data-result'].children[0].children[1].textContent,
     /neither operation currently runs/);
 });

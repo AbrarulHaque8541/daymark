@@ -162,7 +162,7 @@ function sourceSection(source, start, end) {
 test('clear-action catalog stays aligned with real Undo expiry and backup cleanup', () => {
   const clearCompleted = sourceSection(appSource, 'function clearCompleted() {', 'function exportTasks() {');
   const showToast = sourceSection(appSource, 'function showToast(message, action = null) {', 'function readRecoveryExportPayload() {');
-  const persistTasks = sourceSection(appSource, 'function persistTasks() {', 'function loadTasks() {');
+  const persistTasks = sourceSection(appSource, 'function persistTasks() {', 'function clearRecoveryBackup() {');
   const clearBackup = sourceSection(appSource, 'function clearRecoveryBackup() {', 'function hasPartialRecoveryBackup() {');
   assert.match(clearCompleted, /label: 'Undo'/);
   assert.match(showToast, /action \? 7000 : 2600/);
