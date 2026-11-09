@@ -590,7 +590,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
         // The host-side adb input command targets the active app window under shell UID.
-        // This avoids Android 15+ Instrumentation.sendPointerSync cross-UID restrictions.
+        // This avoids Android 15+ targeted instrumentation pointer injection cross-UID restrictions.
         dispatchHostInput("swipe", startX, startY, endX, endY, 360);
     }
 
