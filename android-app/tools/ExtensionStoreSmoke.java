@@ -3,8 +3,10 @@ package com.abrar.daymark;
 import android.content.Context;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 /** Real filesystem/persistence checks for ExtensionStore using isolated host-only Android stubs. */
 public final class ExtensionStoreSmoke {
@@ -49,9 +51,33 @@ public final class ExtensionStoreSmoke {
                     pack(corruptId, "window.recovered = true;", true), false);
             store.installUserPack(recovered);
             check(!stored(store, corruptId).enabled,
-                    "replacing a corrupt stored import also persists the pack disabled");
+                    "replacing a readable but corrupt stored import also persists the pack disabled");
 
-            System.out.println("PASS: ExtensionStoreSmoke: new/corrupt imports disabled; identical re-import state preserved; conflicting import rejected without overwrite ("
+            String oversizedId = "user.oversized-smoke";
+            File oversizedFile = new File(new File(root, "browser_extensions"), oversizedId + ".daymark-ext.json");
+            byte[] oversizedBytes = new byte[200_001];
+            Arrays.fill(oversizedBytes, (byte) 'x');
+            Files.write(oversizedFile.toPath(), oversizedBytes);
+            BrowserExtension oversizedImport = ExtensionPackageParser.parseDaymarkJson(
+                    pack(oversizedId, "window.oversized = true;", true), false);
+            expectReadFailure(store, oversizedImport);
+            check(Arrays.equals(oversizedBytes, Files.readAllBytes(oversizedFile.toPath())),
+                    "an oversized existing extension file is rejected without truncation or replacement");
+
+            String unreadableId = "user.unreadable-smoke";
+            File unreadablePath = new File(new File(root, "browser_extensions"), unreadableId + ".daymark-ext.json");
+            Files.createDirectory(unreadablePath.toPath());
+            File marker = new File(unreadablePath, "preserve.txt");
+            byte[] markerBytes = "preserve-existing-pack".getBytes(StandardCharsets.UTF_8);
+            Files.write(marker.toPath(), markerBytes);
+            BrowserExtension unreadableImport = ExtensionPackageParser.parseDaymarkJson(
+                    pack(unreadableId, "window.unreadable = true;", true), false);
+            expectReadFailure(store, unreadableImport);
+            check(unreadablePath.isDirectory() && marker.exists()
+                            && Arrays.equals(markerBytes, Files.readAllBytes(marker.toPath())),
+                    "an unreadable existing extension path and its contents are preserved");
+
+            System.out.println("PASS: ExtensionStoreSmoke: new/corrupt imports disabled; identical re-import state preserved; conflicts rejected; unreadable/oversized existing packs preserved ("
                     + assertions + " assertions)");
         } finally {
             deleteTree(root);
@@ -79,6 +105,18 @@ public final class ExtensionStoreSmoke {
             throw new AssertionError("expected a different script under the same id to be rejected");
         } catch (IllegalArgumentException expected) {
             // Conflict correctly rejected.
+        }
+    }
+
+    private static void expectReadFailure(ExtensionStore store, BrowserExtension ext) throws Exception {
+        assertions++;
+        try {
+            store.installUserPack(ext);
+            throw new AssertionError("expected an unreadable existing extension path to be preserved");
+        } catch (IOException expected) {
+            if (!expected.getMessage().contains("refusing to replace it")) {
+                throw new AssertionError("read failure must be reported as a preservation refusal", expected);
+            }
         }
     }
 
