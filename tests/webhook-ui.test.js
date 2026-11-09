@@ -103,7 +103,7 @@ function fakeEnv(options) {
   return { env, elements, storageData, confirmations };
 }
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
 
 test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachWebhookUi, 'function');
