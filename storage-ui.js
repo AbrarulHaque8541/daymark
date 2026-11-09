@@ -252,7 +252,7 @@
         return;
       }
       const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, caches, the saved browser proxy profile, legacy webhook settings/lock, and queued events will be removed. '
+        + 'Tasks, Focus history, the Focus Timer preset, caches, the saved browser proxy profile, legacy webhook settings/lock, and queued events will be removed. '
         + 'This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
