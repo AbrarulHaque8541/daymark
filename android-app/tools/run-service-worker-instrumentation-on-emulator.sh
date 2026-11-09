@@ -18,8 +18,8 @@ run_variant() {
   cat "$gradle_log"
 
   # Gradle may uninstall the test APK after connectedAndroidTest. Do not query
-  # pm list instrumentation after the task: the successful test result and its
-  # unique in-process marker are the authoritative evidence that it ran.
+  # package-manager instrumentation metadata after the task: the successful test
+  # result and its unique in-process marker are the authoritative evidence that it ran.
   if ! grep -Fq "Starting 1 tests on" "$gradle_log" \
       || ! grep -Fq "Finished 1 tests on" "$gradle_log"; then
     echo "Expected exactly one discovered and finished Service Worker JUnit test for $task." >&2
