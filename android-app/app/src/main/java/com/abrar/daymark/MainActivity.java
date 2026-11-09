@@ -4228,45 +4228,60 @@ public final class MainActivity extends Activity {
             showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
             return;
         }
-        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        if (manager == null) {
-            showToast("Downloads are unavailable on this device.");
-            return;
-        }
         if (!browserDownloadEnqueueGate.tryAcquire(url, android.os.SystemClock.elapsedRealtime())) {
             showToast("This download was just started. Wait a moment before retrying.");
             return;
         }
-        try {
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            String filename = BrowserDownloadFilenamePolicy.sanitize(
-                    URLUtil.guessFileName(url, contentDisposition, mimeType));
-            request.setTitle(filename);
-            request.setDescription("Daymark browser download");
-            if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
-            String effectiveUserAgent = userAgent;
-            if ((effectiveUserAgent == null || effectiveUserAgent.isEmpty()) && browserWebView != null) {
-                effectiveUserAgent = browserWebView.getSettings().getUserAgentString();
-            }
-            if (effectiveUserAgent != null && !effectiveUserAgent.isEmpty()) {
-                request.addRequestHeader("User-Agent", effectiveUserAgent);
-            }
-            String cookies = CookieManager.getInstance().getCookie(url);
-            if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            if (Build.VERSION.SDK_INT >= 29) {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
-            } else {
-                request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, filename);
-            }
-            long downloadId = manager.enqueue(request);
-            if (downloadId > 0L) browserDownloadTracker.start(downloadId, url, filename);
-            showToast(Build.VERSION.SDK_INT >= 29
-                    ? "Download started. Check Downloads for progress."
-                    : "Download started. Check Daymark's app Downloads folder.");
-        } catch (Exception exception) {
-            browserDownloadEnqueueGate.release(url);
-            showToast("Download could not be started.");
+        String effectiveUserAgent = userAgent;
+        if ((effectiveUserAgent == null || effectiveUserAgent.isEmpty()) && browserWebView != null) {
+            effectiveUserAgent = browserWebView.getSettings().getUserAgentString();
+        }
+        String cookies = CookieManager.getInstance().getCookie(url);
+        String filename = BrowserDownloadFilenamePolicy.sanitize(
+                URLUtil.guessFileName(url, contentDisposition, mimeType));
+        File tempDir = getCacheDir();
+        showToast("Download started. Validating and saving…");
+        new Thread(() -> {
+            BrowserDownloadTransport.Result result = BrowserDownloadTransport.download(
+                    url, effectiveUserAgent, cookies, tempDir);
+            runOnUiThread(() -> {
+                browserDownloadEnqueueGate.release(url);
+                if (!result.success || result.file == null) {
+                    showToast("Download failed: " + (result.error != null ? result.error : "unknown"));
+                    return;
+                }
+                File destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (!destDir.exists() && !destDir.mkdirs()) {
+                    result.file.delete();
+                    showToast("Could not create Downloads folder.");
+                    return;
+                }
+                File dest = new File(destDir, filename);
+                int suffix = 1;
+                while (dest.exists()) {
+                    dest = new File(destDir, filename.replaceFirst("(\.[^.]+)?$", "-" + suffix + "$1"));
+                    suffix++;
+                }
+                if (result.file.renameTo(dest) || copyFile(result.file, dest)) {
+                    result.file.delete();
+                    showToast("Download complete: " + dest.getName());
+                } else {
+                    result.file.delete();
+                    showToast("Could not save the download.");
+                }
+            });
+        }).start();
+    }
+
+    private boolean copyFile(File src, File dest) {
+        try (java.io.InputStream in = new java.io.FileInputStream(src);
+             java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
         }
     }
 
