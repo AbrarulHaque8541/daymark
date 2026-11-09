@@ -220,14 +220,14 @@ async function triggerTaskCompletion(app, taskId) {
       return selector === 'button[data-action]' ? button : null;
     }
   };
-  for (const handler of handlers) handler({ target });
+  for (const handler of handlers) await handler({ target });
 }
 
 function triggerFormInput(app, selector, value) {
   const input = app.elements.get(selector);
   input.value = value;
   const handlers = app.listeners.get(`${selector}:input`) || [];
-  for (const handler of handlers) await handler({ currentTarget: input });
+  for (const handler of handlers) handler({ currentTarget: input });
 }
 
 async function triggerFormSubmit(app, selector) {
@@ -256,7 +256,7 @@ async function triggerTaskImport(app, file) {
   const input = app.elements.get('#import-file');
   input.files = [file];
   const handlers = app.listeners.get('#import-file:change') || [];
-  for (const handler of handlers) handler({ currentTarget: input });
+  for (const handler of handlers) await handler({ currentTarget: input });
 }
 
 test('two tabs adding different tasks preserve both committed mutations', async () => {
@@ -288,7 +288,7 @@ test('task writes fail closed when Web Locks are unavailable', async () => {
   assert.match(app.elements.get('#toast').textContent, /Could not save/i);
 });
 
-test('monthly task completed on a clamped date retains its original day anchor', async () => {{
+test('monthly task completed on a clamped date retains its original day anchor', async () => {
   const recurring = makeImportTask('monthly-31', 'Month-end task');
   recurring.dueDate = '2026-02-28';
   recurring.repeat = 'monthly';
@@ -304,7 +304,7 @@ test('monthly task completed on a clamped date retains its original day anchor',
   assert.equal(saved[1].repeatDayOfMonth, 31, 'the recurring series anchor is carried forward');
 });
 
-test('task import previews additions, duplicates and invalid rows before appending', async () => {{
+test('task import previews additions, duplicates and invalid rows before appending', async () => {
   const existing = makeImportTask('same-id', 'Original task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue });
@@ -329,7 +329,7 @@ test('task import previews additions, duplicates and invalid rows before appendi
   assert.equal(saved[1].title, 'New task');
 });
 
-test('declining task import confirmation leaves storage unchanged', async () => {{
+test('declining task import confirmation leaves storage unchanged', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue, confirmResult: false });
@@ -342,7 +342,7 @@ test('declining task import confirmation leaves storage unchanged', async () => 
   assert.match(app.elements.get('#toast').textContent, /Import cancelled\. Nothing was changed/);
 });
 
-test('confirmation failure fails closed without mutating imported tasks', async () => {{
+test('confirmation failure fails closed without mutating imported tasks', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue, confirmThrows: true });
@@ -355,7 +355,7 @@ test('confirmation failure fails closed without mutating imported tasks', async 
   assert.match(app.elements.get('#toast').textContent, /confirmation could not be displayed/);
 });
 
-test('failed task import save rolls back in-memory state and reports no import', async () => {{
+test('failed task import save rolls back in-memory state and reports no import', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue, failPrimarySave: true });
@@ -369,7 +369,7 @@ test('failed task import save rolls back in-memory state and reports no import',
   assert.match(app.elements.get('#toast').textContent, /No tasks were imported/);
 });
 
-test('oversized task backup is rejected before FileReader allocation', async () => {{
+test('oversized task backup is rejected before FileReader allocation', async () => {
   const app = bootApp({ savedValue: JSON.stringify([]) });
   await triggerTaskImport(app, { size: 8 * 1024 * 1024 + 1, content: '[]' });
 
@@ -378,7 +378,7 @@ test('oversized task backup is rejected before FileReader allocation', async () 
   assert.match(app.elements.get('#toast').textContent, /maximum 8 MiB/);
 });
 
-test('combined recovery import appends task and Focus logs while preserving current session', async () => {{
+test('combined recovery import appends task and Focus logs while preserving current session', async () => {
   const existingTask = makeImportTask('task-existing', 'Existing task');
   const incomingTask = makeImportTask('task-new', 'Recovered task');
   const existingLog = makeFocusLogEntry('focus-log-existing');
@@ -413,7 +413,7 @@ test('combined recovery import appends task and Focus logs while preserving curr
   assert.deepEqual(focusState.log.map((entry) => entry.id), ['focus-log-existing', 'focus-log-new']);
 });
 
-test('Focus-only recovery import restores a session when no current session exists', async () => {{
+test('Focus-only recovery import restores a session when no current session exists', async () => {
   const recoveredSession = makeFocusSession('recover-focus-session');
   const focusBackup = JSON.stringify({ session: recoveredSession, log: [] });
   const app = bootApp({ savedValue: JSON.stringify([]), savedFocusValue: JSON.stringify({ session: null, log: [] }) });
@@ -426,7 +426,7 @@ test('Focus-only recovery import restores a session when no current session exis
   assert.equal(restored.session.id, 'recover-focus-session');
 });
 
-test('declining combined recovery import leaves task and Focus storage unchanged', async () => {{
+test('declining combined recovery import leaves task and Focus storage unchanged', async () => {
   const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
   const savedFocus = JSON.stringify({ session: null, log: [makeFocusLogEntry('keep-focus-log')] });
   const incoming = JSON.stringify({
@@ -444,7 +444,7 @@ test('declining combined recovery import leaves task and Focus storage unchanged
   assert.match(app.elements.get('#toast').textContent, /Recovery import cancelled/);
 });
 
-test('Focus recovery storage failure rolls back in-memory history and preserves saved data', async () => {{
+test('Focus recovery storage failure rolls back in-memory history and preserves saved data', async () => {
   const savedFocus = JSON.stringify({ session: null, log: [] });
   const incoming = JSON.stringify({ session: null, log: [makeFocusLogEntry('incoming-focus-log')] });
   const app = bootApp({ savedValue: JSON.stringify([]), savedFocusValue: savedFocus, failFocusSave: true });
@@ -456,7 +456,7 @@ test('Focus recovery storage failure rolls back in-memory history and preserves 
   assert.match(app.elements.get('#toast').textContent, /Focus log restore failed; current history was kept/);
 });
 
-test('malformed combined recovery bundle fails closed without prompting or mutation', async () => {{
+test('malformed combined recovery bundle fails closed without prompting or mutation', async () => {
   const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
   const savedFocus = JSON.stringify({ session: null, log: [] });
   const malformed = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup: '{bad', focusBackup: '{bad' });
@@ -470,7 +470,7 @@ test('malformed combined recovery bundle fails closed without prompting or mutat
   assert.match(app.elements.get('#toast').textContent, /No valid recovery data/);
 });
 
-test('opaque task recovery backup survives healthy primary load and later save', async () => {{
+test('opaque task recovery backup survives healthy primary load and later save', async () => {
   const existing = makeImportTask('existing-task', 'Existing task');
   const savedValue = JSON.stringify([existing]);
   const opaqueBackup = '{legacy recovery bytes that are not parseable JSON';
@@ -528,7 +528,9 @@ test('simultaneous reminders are summarized in one toast instead of overwriting 
     updatedAt: timestamp,
     reminderLeadMinutes: 0
   }));
-  const { elements, storedValues } = bootApp({ savedValue: JSON.stringify(tasks) });
+  const app = bootApp({ savedValue: JSON.stringify(tasks) });
+  await app.settle();
+  const { elements, storedValues } = app;
 
   const toast = elements.get('#toast').textContent;
   assert.match(toast, /First reminder/);
@@ -549,7 +551,7 @@ test('date-only reminder helper uses accessible live-status markup in both forms
   }
 });
 
-test('add form shows date-only reminder guidance only for a date with no time and saves null time with the selected lead', async () => {{
+test('add form shows date-only reminder guidance only for a date with no time and saves null time with the selected lead', async () => {
   const app = bootApp({ savedValue: JSON.stringify([]) });
   const hint = app.elements.get('#new-date-only-reminder-hint');
   assert.equal(hint.hidden, true);
@@ -625,7 +627,7 @@ function makeDateOnlyReminderTask(id, dueDate, reminderLeadMinutes, reminderShow
   return task;
 }
 
-test('date-only reminder persists with null dueTime and fires once at the disclosed 9 AM local time', () => withTimeZone('America/New_York', async () => {{
+test('date-only reminder persists with null dueTime and fires once at the disclosed 9 AM local time', () => withTimeZone('America/New_York', async () => {
   const first = bootApp({
     savedValue: JSON.stringify([]),
     dateNow: '2026-11-20T13:59:00.000Z'
@@ -667,7 +669,7 @@ test('date-only reminder persists with null dueTime and fires once at the disclo
   assert.equal(reloaded.toastWriteCount, toastWritesAfterFirstFire, 'the repeated interval check does not write/show another toast');
 }));
 
-test('editing a date-only reminder reschedules it without changing null-time or lead semantics', () => withTimeZone('America/New_York', async () => {{
+test('editing a date-only reminder reschedules it without changing null-time or lead semantics', () => withTimeZone('America/New_York', async () => {
   const task = makeDateOnlyReminderTask('date-only-reschedule', '2026-11-20', 0, '2026-11-20T14:00:00.000Z');
   const app = bootApp({
     savedValue: JSON.stringify([task]),
@@ -690,7 +692,7 @@ test('editing a date-only reminder reschedules it without changing null-time or 
   assert.match(app.elements.get('#toast').textContent, /Reminder: “Reminder date-only-reschedule” is due\./);
 }));
 
-test('date-only reminders recalculate their 9 AM instant after a timezone change', () => withTimeZone('America/Los_Angeles', async () => {{
+test('date-only reminders recalculate their 9 AM instant after a timezone change', () => withTimeZone('America/Los_Angeles', async () => {
   const task = makeDateOnlyReminderTask('date-only-timezone', '2026-11-06', 0);
   const app = bootApp({ savedValue: JSON.stringify([task]), dateNow: '2026-11-06T14:00:00.000Z' });
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
@@ -703,7 +705,7 @@ test('date-only reminders recalculate their 9 AM instant after a timezone change
     'the same instant is 09:00 in New York and becomes due without changing stored fields');
 }));
 
-test('date-only 9 AM scheduling stays local across the spring DST transition', () => withTimeZone('America/New_York', async () => {{
+test('date-only 9 AM scheduling stays local across the spring DST transition', () => withTimeZone('America/New_York', async () => {
   const task = makeDateOnlyReminderTask('date-only-dst', '2026-03-08', 1440);
   const app = bootApp({ savedValue: JSON.stringify([task]), dateNow: '2026-03-07T13:59:00.000Z' });
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
@@ -798,7 +800,7 @@ test('empty Focus recovery backup bytes survive a malformed-primary backup write
     'the empty prior backup and malformed primary must both remain byte-for-byte recoverable');
 });
 
-test('completion webhook runs once and only after the completed task is persisted', async () => {{
+test('completion webhook runs once and only after the completed task is persisted', async () => {
   const task = makeImportTask('webhook-order-success', 'Persist before notifying');
   const notifications = [];
   let app;
@@ -820,7 +822,7 @@ test('completion webhook runs once and only after the completed task is persiste
   assert.equal(notifications.length, 1, 'reopening a task must not emit another completion event');
 });
 
-test('failed task persistence never emits a completion webhook', async () => {{
+test('failed task persistence never emits a completion webhook', async () => {
   const task = makeImportTask('webhook-order-failure', 'Do not notify an unsaved completion');
   let notifications = 0;
   const app = bootApp({
