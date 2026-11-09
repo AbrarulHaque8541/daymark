@@ -603,7 +603,7 @@ test('corrupt startup data is copied byte-for-byte under the shared task lock', 
   assert.deepEqual(writes.filter((entry) => entry.key === BACKUP_KEY),
     [{ key: BACKUP_KEY, lockHeld: true }],
     'recovery backup creation must happen inside the shared task lock');
-  assert.match(app.elements.get('#toast').textContent, /preserved in a browser backup/);
+  assert.match(app.elements.get('#toast').textContent, /kept in a browser backup/);
 });
 
 test('backup failure is reported honestly and leaves the original entry untouched', async () => {

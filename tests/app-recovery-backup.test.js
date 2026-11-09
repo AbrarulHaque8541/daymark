@@ -391,7 +391,7 @@ test('failed recovery backup creation never overwrites the only original task pa
     'the primary remains byte-for-byte intact when backup creation fails');
   assert.equal(storedValues.has(BACKUP_KEY), false);
   assert.match(app.elements.get('#storage-status span').textContent,
-    /recovery backup could not be created/);
+    /Recovery backup could not be created/);
 
   app.elements.get('#new-title').value = 'First unsaved edit';
   await app.elements.get('#add-form').dispatch('submit');
