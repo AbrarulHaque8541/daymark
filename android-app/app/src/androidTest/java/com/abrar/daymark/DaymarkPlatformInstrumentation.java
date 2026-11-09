@@ -612,9 +612,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 android.view.MotionEvent event = android.view.MotionEvent.obtain(
                         downTime, sample.eventTime, sample.action, sample.x, sample.y, 0);
                 event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
-                if (android.os.Build.VERSION.SDK_INT >= 29) {
-                    event.setDisplayId(android.view.Display.DEFAULT_DISPLAY);
-                }
+                // UiAutomation injects onto the default display; setDisplayId is hidden API.
                 try {
                     boolean injected;
                     if (android.os.Build.VERSION.SDK_INT >= 29) {

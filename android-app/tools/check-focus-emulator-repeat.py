@@ -67,7 +67,8 @@ assert "PlatformTouchSequence.swipe" in platform_test
 assert "automation.injectInputEvent(event, true)" in platform_test
 assert 'adoptShellPermissionIdentity("android.permission.INJECT_EVENTS")' in platform_test
 assert "dropShellPermissionIdentity()" in platform_test
-assert "event.setDisplayId(android.view.Display.DEFAULT_DISPLAY)" in platform_test
+assert "event.setDisplayId(" not in platform_test, "instrumentation must not call hidden MotionEvent display APIs"
+assert "event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN)" in platform_test
 assert "sendPointerSync(event)" in platform_test, "pre-29 instrumentation fallback must remain"
 assert "MAX_COORDINATE = 10000" in touch_sequence
 assert "MAX_DURATION_MS = 5000" in touch_sequence
