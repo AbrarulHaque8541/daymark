@@ -160,6 +160,15 @@ public final class ExtensionStoreSmoke {
             check(Files.isSymbolicLink(symlinkFile.toPath())
                             && Arrays.equals(targetBytes, Files.readAllBytes(targetFile.toPath())),
                     "rejected symlink recovery actions preserve both link and target");
+            check(store.listAll().stream().noneMatch(extension -> symlinkId.equals(extension.id)),
+                    "symlinked extension packs are never loaded into the executable extension list");
+            BrowserExtension symlinkImport = ExtensionPackageParser.parseDaymarkJson(
+                    pack(symlinkId, "window.symlink = true;", true), false);
+            expectReadFailure(store, symlinkImport);
+            store.uninstallUserPack(symlinkId);
+            check(Files.isSymbolicLink(symlinkFile.toPath())
+                            && Arrays.equals(targetBytes, Files.readAllBytes(targetFile.toPath())),
+                    "legacy install/uninstall paths also preserve symlink and target bytes");
 
             System.out.println("PASS: ExtensionStoreSmoke: disabled imports, conflict preservation, malformed-pack listing, exact-byte export, fingerprint-checked removal and fail-closed unsafe paths ("
                     + assertions + " assertions)");
