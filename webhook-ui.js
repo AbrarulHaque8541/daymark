@@ -547,6 +547,31 @@
           return { queued: false, reason: 'storage-unavailable' };
         }
         queueReadFailed = false;
+        // Never persist a newer completion ahead of older events that are
+        // still held only in this tab. Keep the whole pending suffix in FIFO
+        // order until the durable queue can accept it under the delivery lock.
+        if (memoryOnlyEvents.length || queueWriteFailed) {
+          try {
+            memoryOnlyEvents = webhookApi.enqueueEvent(memoryOnlyEvents, event);
+          } catch (error) {
+            if (error && error.code === 'queue-full') {
+              queue = state.value;
+              queueWriteFailed = true;
+              status('This tab\'s in-memory webhook queue is full. No new event was queued; existing pending events were preserved. '
+                + queueNote() + storageWarning());
+              renderQueue();
+              return { queued: false, reason: 'queue-full' };
+            }
+            throw error;
+          }
+          queue = state.value;
+          queueWriteFailed = true;
+          renderQueue();
+          status('Webhook event is held only in this tab behind earlier pending events; it was not sent because the queue could not be safely saved. '
+            + queueNote() + storageWarning());
+          return { queued: true, reason: 'memory-only' };
+        }
+
         let nextQueue;
         try {
           nextQueue = webhookApi.enqueueEvent(state.value, event);
@@ -595,7 +620,8 @@
           return { queued: false, reason: 'coordination-unavailable' };
         }
         const result = locked.value;
-        if (result && result.queued && result.reason === 'queued') {
+        if (result && result.queued
+            && (result.reason === 'queued' || result.reason === 'memory-only')) {
           if (busy) flushRequested = true;
           else await attemptFlush();
         }
