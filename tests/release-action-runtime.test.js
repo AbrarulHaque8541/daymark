@@ -148,3 +148,38 @@ test('SLSA provenance uploads are restricted to mainline device-test tag pushes'
   assert.match(provenance, /contents: write/);
   assert.match(provenance, /upload-assets: true/);
 });
+
+
+test('private main test APK remains owner-gated and ciphertext-only', () => {
+  const workflowPath = '.github/workflows/android-private-main-test-apk.yml';
+  const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
+  const jobStart = content.indexOf('  private-main-test:');
+  const runnerStart = content.indexOf('    runs-on:', jobStart);
+  assert.ok(jobStart >= 0 && runnerStart > jobStart, 'missing private main test job');
+  const guard = content.slice(jobStart, runnerStart);
+  assert.match(guard, /github\.repository == 'AbrarulHaque8541\/daymark'/);
+  assert.match(guard, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(guard, /github\.actor == 'AbrarulHaque8541'/);
+  assert.match(guard, /github\.triggering_actor == 'AbrarulHaque8541'/);
+
+  assert.match(content, /on:\s*\n\s+workflow_dispatch:/);
+  assert.doesNotMatch(content, /pull_request:/,
+    'private signing workflow must not be triggerable by pull requests');
+  assert.match(content, /AGE_RECIPIENT.*age1/);
+  assert.match(content, /age --encrypt --recipient "\$AGE_RECIPIENT"/);
+
+  const uploadStart = content.indexOf('      - name: Upload only the short-lived encrypted transfer');
+  const cleanupStart = content.indexOf('      - name: Remove the keystore and local transfer material', uploadStart);
+  assert.ok(uploadStart >= 0 && cleanupStart > uploadStart, 'missing encrypted upload/cleanup steps');
+  const upload = content.slice(uploadStart, cleanupStart);
+  assert.match(upload, /path:.*\.apk\.age/);
+  assert.match(upload, /retention-days: 1/);
+  assert.doesNotMatch(upload, /app-githubSideload-release\.apk/,
+    'the plaintext production APK must never be uploaded by the private workflow');
+
+  assert.match(content, /rm -f "\$RUNNER_TEMP\/daymark-release\.keystore"/);
+  assert.match(content, /rm -rf "\$GITHUB_WORKSPACE\/android-app\/app\/build"/);
+  assert.match(content, /rm -rf "\$RUNNER_TEMP\/daymark-private-gradle" "\$RUNNER_TEMP\/private-test-transfer"/);
+  assert.doesNotMatch(content, /id-token:\s*write/,
+    'private APK transfer does not need an OIDC provenance token');
+});
