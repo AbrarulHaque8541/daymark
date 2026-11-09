@@ -920,7 +920,12 @@
     const webhookUi = window.DaymarkWebhookUi;
     if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
     try {
-      webhookUi.notifyTaskCompleted(task);
+      const result = webhookUi.notifyTaskCompleted(task);
+      if (result && typeof result.catch === 'function') {
+        result.catch((error) => {
+          console.warn('Could not queue the Daymark task-completed webhook:', error);
+        });
+      }
     } catch (error) {
       console.warn('Could not queue the Daymark task-completed webhook:', error);
     }
@@ -933,11 +938,12 @@
     const task = state.tasks.find((item) => item.id === row?.dataset.taskId);
     if (!task) return;
     if (button.dataset.action === 'toggle') {
+      const wasCompleted = task.completed;
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
+      if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {

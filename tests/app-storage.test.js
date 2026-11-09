@@ -13,7 +13,7 @@ const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null, webhookUi = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -109,6 +109,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     })
     : logic;
   const window = {
+    DaymarkWebhookUi: webhookUi,
     DaymarkLogic: appLogic,
     DaymarkFocus: focus,
     DaymarkRepeat: repeat,
@@ -712,4 +713,48 @@ test('unreadable primary focus key with readable backup offers recovery', () => 
   assert.equal(app.storedValues.get(FOCUS_KEY), null);
   assert.equal(app.storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
   assert.match(app.elements.get('#storage-status span').textContent, /Primary focus data unreadable; recovery backup available/);
+});
+
+test('completion webhook runs once and only after the completed task is persisted', () => {
+  const task = makeImportTask('webhook-order-success', 'Persist before notifying');
+  const notifications = [];
+  let app;
+  const webhookUi = {
+    notifyTaskCompleted(candidate) {
+      const persisted = JSON.parse(app.storedValues.get(STORAGE_KEY))
+        .find((item) => item.id === candidate.id);
+      notifications.push({ taskId: candidate.id, persistedCompleted: persisted?.completed });
+      return Promise.resolve();
+    }
+  };
+  app = bootApp({ savedValue: JSON.stringify([task]), webhookUi });
+
+  triggerTaskCompletion(app, task.id);
+  assert.deepEqual(notifications, [{ taskId: task.id, persistedCompleted: true }],
+    'the webhook callback must observe the successfully persisted completed task');
+
+  triggerTaskCompletion(app, task.id);
+  assert.equal(notifications.length, 1, 'reopening a task must not emit another completion event');
+});
+
+test('failed task persistence never emits a completion webhook', () => {
+  const task = makeImportTask('webhook-order-failure', 'Do not notify an unsaved completion');
+  let notifications = 0;
+  const app = bootApp({
+    savedValue: JSON.stringify([task]),
+    failPrimarySave: true,
+    webhookUi: {
+      notifyTaskCompleted() {
+        notifications += 1;
+        return Promise.resolve();
+      }
+    }
+  });
+
+  triggerTaskCompletion(app, task.id);
+  assert.equal(notifications, 0, 'a failed local save must not emit an external completion event');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].completed, false,
+    'the original persisted task remains open');
+  assert.match(app.elements.get('#toast').textContent, /Could not save to this browser/,
+    'the user is told that the local completion did not persist');
 });
