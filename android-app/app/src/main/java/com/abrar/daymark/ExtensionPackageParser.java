@@ -29,6 +29,11 @@ final class ExtensionPackageParser {
     /** Effective-timing disclosure appended whenever an import requests document_start (issue #192). */
     private static final String TIMING_NOTE =
             "document_start run timing is not supported: Daymark injects after the page has loaded (document_end, best effort)";
+    /** Imported page scripts share the matched page's JavaScript context and require explicit activation. */
+    static final String IMPORTED_SCRIPT_TRUST_NOTE =
+            "When enabled, CSS and any JavaScript apply to the matching page. JavaScript runs in that page's context, not an isolated extension sandbox. "
+                    + "It can read and change that page's content and data visible to the page, and could send that data to an external service. "
+                    + "Daymark exposes no native bridge to the script. New imports start disabled; re-importing the same pack preserves its current enabled state.";
     private static final Pattern USERSCRIPT_HEADER = Pattern.compile(
             "(?s)==UserScript==\\s*(.*?)==/UserScript==");
     // Keys may contain hyphens (@run-at); w alone never matched them, so
@@ -78,6 +83,7 @@ final class ExtensionPackageParser {
                 && !warnings.contains("document_start run timing is not supported")) {
             warnings = warnings.isEmpty() ? TIMING_NOTE : warnings + " " + TIMING_NOTE;
         }
+        if (!builtIn) warnings = appendWarning(warnings, IMPORTED_SCRIPT_TRUST_NOTE);
         return new BrowserExtension(
                 id, name, o.optString("version", "1.0.0"), o.optString("description", ""),
                 o.optBoolean("enabled", true), builtIn, matches, excludes, css, js,
@@ -91,6 +97,12 @@ final class ExtensionPackageParser {
     /** Import a WebExtension manifest by translating only page-local content_scripts. */
     static BrowserExtension parseWebExtensionManifest(String raw) throws Exception {
         return buildWebExtension(new JSONObject(requirePackText(raw)), null);
+    }
+
+    private static String appendWarning(String warnings, String note) {
+        String current = warnings == null ? "" : warnings.trim();
+        if (current.contains(note)) return current;
+        return current.isEmpty() ? note : current + "; " + note;
     }
 
     /** Import ZIP/XPI/CRX3 packages without executing privileged extension APIs. */
@@ -189,7 +201,8 @@ final class ExtensionPackageParser {
         // each other through the 32-bit String.hashCode id (issue #193).
         String id = "webext." + sha256Hex(manifest.toString() + "\nCSS:\n" + css + "\nJS:\n" + js);
         return new BrowserExtension(id, name, version, manifest.optString("description", ""), true, false,
-                matches, excludes, css.toString(), js.toString(), runAt, warnings.toString());
+                matches, excludes, css.toString(), js.toString(), runAt,
+                appendWarning(warnings.toString(), IMPORTED_SCRIPT_TRUST_NOTE));
     }
 
     /** Validate explicit scopes and never replace an absent scope with an all-sites wildcard. */
@@ -370,7 +383,14 @@ final class ExtensionPackageParser {
         }
 
         return new BrowserExtension(id, name, version, description, true, false,
-                matches, excludes, "", body, runAt, warnings.toString());
+                matches, excludes, "", body, runAt,
+                appendWarning(warnings.toString(), IMPORTED_SCRIPT_TRUST_NOTE));
+    }
+
+    /** New user imports must not run page code until the user separately enables the pack. */
+    static BrowserExtension prepareNewUserPackInstall(BrowserExtension ext) {
+        if (ext == null || ext.builtIn) throw new IllegalArgumentException("Invalid imported pack.");
+        return ext.withEnabled(false);
     }
 
     static String toDaymarkJson(BrowserExtension ext) throws Exception {

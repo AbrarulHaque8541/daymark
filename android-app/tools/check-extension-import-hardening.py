@@ -5,6 +5,7 @@ The guard also mutation-tests the limit checks in memory. No source files,
 including shared activity/UI files, are modified by these meta-tests.
 """
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -16,6 +17,18 @@ def check_sources(parser, store, smoke):
     patterns = parser.split("private static List<String> readValidatedPatterns", 1)[1].split(
         "static boolean isSupportedMatchPattern", 1)[0]
     install = store.split("void installUserPack", 1)[1].split("private File findUserPack", 1)[0]
+    reader = store.split("private static String readFile", 1)[1].split("private static void writeFile", 1)[0]
+
+    # Existing extension files are bounded and never silently truncated or replaced after I/O failure.
+    assert "MAX_USER_PACK_BYTES = 200_000;" in store, "stored extension reads must keep the 200 KB limit"
+    assert "if (initialLength > MAX_USER_PACK_BYTES)" in reader, "oversized stored packs must be rejected before reading"
+    assert "read > MAX_USER_PACK_BYTES - total" in reader, "streaming read must enforce the byte limit"
+    assert "total != initialLength" in reader, "concurrent file changes must not be accepted as complete reads"
+    assert "Math.min(file.length()" not in reader, "stored extension reads must not silently truncate"
+    assert "existingJson = readFile(out);" in install, "existing content must be read before parse handling"
+    assert "catch (IOException unreadable)" in install, "I/O failures must be surfaced before any replacement"
+    assert "refusing to replace it" in install, "unreadable existing packs must be preserved"
+    assert "catch (Exception unreadable)" not in install, "read errors must not be swallowed as parse errors"
 
     # issue #190: decompressed budgets across every entry, including skipped file types
     assert "MAX_ARCHIVE_DECOMPRESSED_BYTES" in archive and "MAX_ENTRY_DECOMPRESSED_BYTES" in archive, \
@@ -30,7 +43,7 @@ def check_sources(parser, store, smoke):
     assert 'sha256Hex(manifest.toString() + "\\nCSS:\\n" + css + "\\nJS:\\n" + js)' in parser, \
         "WebExtension ids must include effective CSS/JS, not manifest metadata alone"
     assert "already installed with id" in install, "installing a different pack under an existing id must fail"
-    assert install.index("already installed with id") < install.index("writeFile(out, json)"), \
+    assert install.index("already installed with id") < install.index("writeFile(out, ExtensionPackageParser.toDaymarkJson(ext))"), \
         "the install conflict check must run before the write"
     writer = store.split("private static void writeFile", 1)[1]
     assert "Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)" in writer, \
@@ -38,6 +51,16 @@ def check_sources(parser, store, smoke):
     assert "file.delete()" not in writer, "failed extension saves must not delete the previous pack"
     assert "ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites)" in install, \
         "same-content re-import must preserve enabled state and per-site pause list"
+    assert "ExtensionPackageParser.prepareNewUserPackInstall(ext)" in install, \
+        "new or corrupt-on-disk user imports must be prepared disabled until explicit activation"
+    assert "existing.enabled" in install, "identical re-import must retain the user's activation choice"
+
+    # Imported scripts run in the matched page's JavaScript context; surface the same warning for every format.
+    assert "IMPORTED_SCRIPT_TRUST_NOTE" in parser, "all imported script formats must use the shared trust disclosure"
+    assert "appendWarning(warnings, IMPORTED_SCRIPT_TRUST_NOTE)" in parser, \
+        "user-pack JSON storage reads must keep the trust disclosure idempotently"
+    assert parser.count("appendWarning(warnings.toString(), IMPORTED_SCRIPT_TRUST_NOTE)") == 2, \
+        "userscript and WebExtension imports must both surface the trust disclosure"
 
     # issue #194: fail-closed match scopes for imported content scripts
     assert 'matches.add("*://*/*")' not in parser, \
@@ -99,6 +122,10 @@ def check_sources(parser, store, smoke):
         '"32 unique aggregated exclude_matches rules limit"',
         "32 repeated patterns are accepted and deduplicated",
         "ExtensionPackageParser.parseWebExtensionArchive(archive)",
+        "not an isolated extension sandbox",
+        "could send that data to an external service",
+        "New imports start disabled",
+        "explicit activation",
     ):
         assert marker in smoke, f"missing import-hardening regression: {marker}"
 
@@ -137,15 +164,50 @@ def test_limit_guard_mutations(parser, store, smoke):
         assert "missing import-hardening regression" in str(rejected)
     else:
         raise AssertionError("source guard accepted removal of host limit regressions")
+    new_install_marker = "ExtensionPackageParser.prepareNewUserPackInstall(ext)"
+    assert store.count(new_install_marker) == 1, "new-import activation policy must have one store call site"
+    try:
+        check_sources(parser, store.replace(new_install_marker, "ext.withEnabled(true)", 1), smoke)
+    except AssertionError as rejected:
+        assert "new or corrupt-on-disk user imports must be prepared disabled" in str(rejected), \
+            f"new-import activation regression failed for an unrelated reason: {rejected}"
+    else:
+        raise AssertionError("source guard accepted removal of the disabled-new-import policy")
+
+    size_guard = "if (initialLength > MAX_USER_PACK_BYTES)"
+    assert store.count(size_guard) == 1, "stored pack size guard must be unique"
+    try:
+        check_sources(parser, store.replace(size_guard, "if (false)", 1), smoke)
+    except AssertionError as rejected:
+        assert "oversized stored packs must be rejected" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the stored-pack size limit")
+
+    stream_guard = "if (read > MAX_USER_PACK_BYTES - total)"
+    assert store.count(stream_guard) == 1, "streaming read limit must be unique"
+    try:
+        check_sources(parser, store.replace(stream_guard, "if (false)", 1), smoke)
+    except AssertionError as rejected:
+        assert "streaming read must enforce the byte limit" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the streaming read limit")
+
     check_sources(parser, store, smoke)
-    print(f"PASS: extension rule-limit source-guard mutation tests — {len(mutations) + 1} rejected mutations; unchanged source accepted")
+    print(f"PASS: extension import source-guard mutation tests — {len(mutations) + 2} rejected mutations; unchanged source accepted")
 
 
 if __name__ == "__main__":
-    root = Path(sys.argv[1])
+    root = Path(sys.argv[1]).resolve()
     parser = (root / "app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java").read_text(encoding="utf-8")
     store = (root / "app/src/main/java/com/abrar/daymark/ExtensionStore.java").read_text(encoding="utf-8")
     smoke = (root / "tools/ExtensionPackageParserSmoke.java").read_text(encoding="utf-8")
+    store_smoke = (root / "tools/ExtensionStoreSmoke.java").read_text(encoding="utf-8")
+    for marker in (
+        "an oversized existing extension file is rejected without truncation or replacement",
+        "an unreadable existing extension path and its contents are preserved",
+    ):
+        assert marker in store_smoke, f"missing ExtensionStore preservation regression: {marker}"
     check_sources(parser, store, smoke)
     test_limit_guard_mutations(parser, store, smoke)
-    print("PASS: extension import hardening — bounded archive/rule budgets, SHA-256 ids, fail-closed match scopes, honest effective timing")
+    subprocess.run(["sh", str(root / "tools/run-extension-store-tests.sh")], cwd=root, check=True)
+    print("PASS: extension import hardening — bounded archive/rule budgets, fail-closed scopes, default-disabled imports, and preservation of unreadable/oversized stored packs")
