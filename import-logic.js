@@ -1,8 +1,10 @@
 /*
- * Daymark open-format task import (CSV / Markdown).
+ * Daymark open-format task import (CSV / Markdown / iCalendar).
  *
  * Counterpart of export-logic.js: parses Daymark's own open-format exports
- * back into stored tasks and accepts hand-written CSV with the same header.
+ * back into stored tasks, accepts hand-written CSV with the same header, and
+ * imports task-shaped VTODO/VEVENT components from RFC 5545 iCalendar
+ * (.ics) files such as Google Calendar or Apple Calendar exports.
  * Pure, dependency-free: no network, no storage, no DOM. mergeTasks
  * validates through an injected task-logic so imported tasks must be exactly
  * as valid as stored ones. Lenient with foreign data, strict about the
@@ -11,7 +13,7 @@
 ((root) => {
   'use strict';
 
-  const FORMATS = ['csv', 'markdown'];
+  const FORMATS = ['csv', 'markdown', 'ics'];
   const CSV_HEADER = 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt';
   const PRIORITIES = ['low', 'medium', 'high'];
   const REPEATS = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
@@ -34,11 +36,16 @@
     return typeof name === 'string' && /[.](md|markdown)$/i.test(name);
   }
 
+  function isIcsFileName(name) {
+    return typeof name === 'string' && /[.]ics$/i.test(name);
+  }
+
   // null means "not an open-format import" and the JSON backup handler stays
   // in charge.
   function formatFromFileName(name) {
     if (isCsvFileName(name)) return 'csv';
     if (isMarkdownFileName(name)) return 'markdown';
+    if (isIcsFileName(name)) return 'ics';
     return null;
   }
 
@@ -295,6 +302,182 @@
     return { tasks, skippedRows };
   }
 
+  // --- iCalendar (RFC 5545 subset, offline and dependency-free) ---
+
+  // Undoes RFC 5545 text escaping: \n \N newline, \, comma, \; semicolon,
+  // \\ backslash. Any other backslash pair is kept as written (fail-closed on
+  // data we do not understand instead of silently dropping characters).
+  function icsUnescape(text) {
+    let out = '';
+    for (let i = 0; i < text.length; i += 1) {
+      if (text.charAt(i) === '\\' && i + 1 < text.length) {
+        const next = text.charAt(i + 1);
+        if (next === 'n' || next === 'N') { out += '\n'; i += 1; continue; }
+        if (next === ',' || next === ';' || next === '\\') { out += next; i += 1; continue; }
+      }
+      out += text.charAt(i);
+    }
+    return out;
+  }
+
+  // RFC 5545 3.1: a line beginning with a space or tab continues the previous
+  // logical line; that leading whitespace is removed when unfolding.
+  function unfoldIcsLines(text) {
+    requireString(text);
+    const logical = [];
+    for (const rawLine of text.split('\n')) {
+      const line = rawLine.replace(/\r$/, '');
+      if (logical.length > 0 && (line.charAt(0) === ' ' || line.charAt(0) === '\t')) {
+        logical[logical.length - 1] += line.slice(1);
+        continue;
+      }
+      logical.push(line);
+    }
+    return logical;
+  }
+
+  // Splits "NAME;PARAM=VALUE;...:value". Parameter values may be quoted, so
+  // the content colon is the first colon outside quotes.
+  function icsProperty(line) {
+    let inQuotes = false;
+    let colon = -1;
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line.charAt(i);
+      if (ch === '"') inQuotes = !inQuotes;
+      else if (ch === ':' && !inQuotes) { colon = i; break; }
+    }
+    if (colon < 1) return null;
+    const head = line.slice(0, colon);
+    const value = line.slice(colon + 1);
+    const headParts = head.split(';');
+    const name = headParts[0].toUpperCase();
+    const params = {};
+    for (let i = 1; i < headParts.length; i += 1) {
+      const eq = headParts[i].indexOf('=');
+      if (eq < 1) continue;
+      const key = headParts[i].slice(0, eq).toUpperCase();
+      params[key] = headParts[i].slice(eq + 1).replace(/^"|"$/g, '');
+    }
+    return { name, params, value };
+  }
+
+  const ICS_DATE = /^(\d{4})(\d{2})(\d{2})$/;
+  const ICS_DATETIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/;
+
+  // Maps a DUE/DTSTART property onto stored dueDate/dueTime. The clock time
+  // is kept exactly as written: a Z suffix or a TZID parameter is counted as
+  // a dropped time zone, never silently re-interpreted.
+  function icsDateTaskField(prop, stats) {
+    if (!prop) return { dueDate: null, dueTime: null };
+    const declaredDate = (prop.params.VALUE || '').toUpperCase() === 'DATE';
+    const asDate = prop.value.match(ICS_DATE);
+    if (declaredDate || asDate) {
+      if (!asDate) return { dueDate: null, dueTime: null };
+      return { dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3], dueTime: null };
+    }
+    const asDateTime = prop.value.match(ICS_DATETIME);
+    if (!asDateTime) return { dueDate: null, dueTime: null };
+    if (asDateTime[7] === 'Z' || prop.params.TZID) stats.timezoneDropped += 1;
+    return {
+      dueDate: asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3],
+      dueTime: asDateTime[4] + ':' + asDateTime[5]
+    };
+  }
+
+  // Collects the VTODO/VEVENT components of an unfolded iCalendar stream.
+  // Nested sub-components (VALARM and friends) are skipped. hasCalendar is
+  // false when no BEGIN:VCALENDAR line exists at all.
+  function parseIcs(text) {
+    const lines = unfoldIcsLines(text);
+    const components = [];
+    let hasCalendar = false;
+    let current = null;
+    let skipDepth = 0;
+    for (const line of lines) {
+      const beginMatch = line.match(/^BEGIN:(.+)$/);
+      if (beginMatch) {
+        const type = beginMatch[1].trim().toUpperCase();
+        if (type === 'VCALENDAR') { hasCalendar = true; continue; }
+        if (current === null && (type === 'VTODO' || type === 'VEVENT')) {
+          current = { type, props: [] };
+          continue;
+        }
+        if (current !== null) skipDepth += 1;
+        continue;
+      }
+      const endMatch = line.match(/^END:(.+)$/);
+      if (endMatch) {
+        const type = endMatch[1].trim().toUpperCase();
+        if (type === 'VCALENDAR') continue;
+        if (current !== null) {
+          if (type === current.type) { components.push(current); current = null; skipDepth = 0; continue; }
+          if (skipDepth > 0) skipDepth -= 1;
+        }
+        continue;
+      }
+      if (current !== null && skipDepth === 0) {
+        const prop = icsProperty(line);
+        if (prop) current.props.push(prop);
+      }
+    }
+    return { components, hasCalendar };
+  }
+
+  // Parses task-shaped iCalendar into stored tasks. VTODO and VEVENT both
+  // map to tasks: SUMMARY -> title, DUE (todos) or DTSTART (events) -> due
+  // date/time, DESCRIPTION -> notes, CATEGORIES -> tags, PRIORITY 1-4 high /
+  // 5 medium / 6-9 low, STATUS:COMPLETED -> done, STATUS:CANCELLED skipped.
+  // Recurrence rules are NOT expanded: a recurring item imports once as a
+  // plain task and the recurring count says so honestly. Time zones are
+  // never re-interpreted: the written clock time is kept, the drop counted.
+  function fromIcs(text, ctx) {
+    const parsed = parseIcs(text);
+    if (!parsed.hasCalendar) throw new Error('Calendar input does not contain a VCALENDAR block.');
+    const stats = { recurring: 0, timezoneDropped: 0, cancelled: 0 };
+    const tasks = [];
+    let skippedRows = 0;
+    for (const component of parsed.components) {
+      const byName = {};
+      for (const prop of component.props) {
+        if (!(prop.name in byName)) byName[prop.name] = prop;
+      }
+      const status = byName.STATUS ? byName.STATUS.value.trim().toUpperCase() : '';
+      if (status === 'CANCELLED') { stats.cancelled += 1; continue; }
+      const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
+      const due = icsDateTaskField(dueProp, stats);
+      const priorityValue = byName.PRIORITY ? byName.PRIORITY.value.trim() : '';
+      const priorityNumber = /^\d+$/.test(priorityValue) ? Number(priorityValue) : 0;
+      const priority = priorityNumber >= 1 && priorityNumber <= 4 ? 'high'
+        : priorityNumber >= 6 && priorityNumber <= 9 ? 'low'
+        : 'medium';
+      const raw = {
+        id: byName.UID ? byName.UID.value.trim() : null,
+        title: byName.SUMMARY ? icsUnescape(byName.SUMMARY.value) : '',
+        dueDate: due.dueDate,
+        dueTime: due.dueTime,
+        priority,
+        completed: status === 'COMPLETED' || Boolean(byName.COMPLETED),
+        repeat: null,
+        tags: byName.CATEGORIES ? icsUnescape(byName.CATEGORIES.value).split(/[,;]/) : [],
+        notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
+        subtasks: [],
+        createdAt: ctx && ctx.now,
+        updatedAt: ctx && ctx.now
+      };
+      if (byName.RRULE) stats.recurring += 1;
+      const task = buildTask(raw, ctx);
+      if (task === null) { skippedRows += 1; continue; }
+      tasks.push(task);
+    }
+    return {
+      tasks,
+      skippedRows,
+      recurring: stats.recurring,
+      timezoneDropped: stats.timezoneDropped,
+      cancelled: stats.cancelled
+    };
+  }
+
   // Merges imported tasks into the existing stored list. Existing ids win:
   // an imported task with a colliding id is counted as a duplicate and
   // skipped, never overwriting current data. Imported tasks must pass the
@@ -325,11 +508,17 @@
     isFormat,
     isCsvFileName,
     isMarkdownFileName,
+    isIcsFileName,
     formatFromFileName,
     parseCsv,
     mdUnescape,
     fromCsv,
     fromMarkdown,
+    icsUnescape,
+    unfoldIcsLines,
+    icsProperty,
+    parseIcs,
+    fromIcs,
     mergeTasks
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
