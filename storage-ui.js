@@ -213,10 +213,17 @@
       }
       setBusy(false);
       if (result.failed.length > 0) {
-        const message = 'Cleared ' + category.label + ', but ' + result.failed.length
-          + ' item(s) could not be removed by the browser.';
+        const message = result.removed.length === 0
+          ? 'Could not clear ' + category.label + ': ' + result.failed.length
+            + ' item(s) could not be checked or removed. Nothing was cleared.'
+          : 'Cleared ' + category.label + ' (' + result.removed.length
+            + ' item(s) removed), but ' + result.failed.length
+            + ' item(s) could not be removed by the browser.';
         render();
         status(message);
+      } else if (result.removed.length === 0) {
+        render();
+        status('No stored data was found for ' + category.label + '. Nothing was changed.');
       } else {
         const message = 'Cleared ' + category.label + ' (' + result.removed.length
           + ' item(s) removed). Nothing else was touched.';
