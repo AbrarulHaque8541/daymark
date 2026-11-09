@@ -105,6 +105,7 @@ assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in pla
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "scrollDescendantIntoScrollView(parentScroll, countdown);" in platform_test, "actual mode controls must be positioned inside the parent ScrollView viewport"
 assert platform_test.index("scrollDescendantIntoScrollView(parentScroll, countdown);") < platform_test.index("String countdownTap = dispatchTap(countdown);"), "initial Countdown tap must be inside the ScrollView viewport"
+assert platform_test.index("content.addView(spacer,") < platform_test.index("scrollDescendantIntoScrollView(parentScroll, countdown);"), "scrollable content must exist before the initial control is positioned"
 countdown_swipe = platform_test.index("dispatchVerticalSwipe(countdown);")
 countdown_retap = platform_test.index("String countdownAfterVerticalDrag = dispatchTap(countdown);")
 assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, countdown);", 0, countdown_swipe) >= 0, "Countdown drag must start inside the ScrollView viewport"
