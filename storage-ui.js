@@ -206,6 +206,8 @@
     function finishCategoryClear(result, category) {
       if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
         notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
+      } else if (result.removed.length > 0 && category.id === 'webhook-queue') {
+        notifyTaskStorageChange('daymark.webhook.queue.v1');
       }
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
@@ -250,6 +252,27 @@
       setBusy(true);
 
       const clear = () => storageApi.clearCategory(storage, categoryId);
+      if (categoryId === 'webhook-queue') {
+        if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
+            || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)) {
+          setBusy(false);
+          status('Cannot safely clear the webhook queue: shared task/webhook coordination is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return taskMutation.withLocksInOrder(lockManager, taskMutation.CLEAR_ALL_LOCK_ORDER, clear).then((locked) => {
+          setBusy(false);
+          if (!locked.ok) {
+            status('Could not safely clear ' + category.label + ': '
+              + (locked.reason === 'coordination-unavailable'
+                ? 'shared task/webhook coordination is unavailable. Nothing was cleared.'
+                : 'a shared task/webhook lock failed. Nothing was cleared.'));
+            return false;
+          }
+          finishCategoryClear(locked.value, category);
+          return true;
+        });
+      }
+
       if (categoryId === 'tasks' || categoryId === 'task-backup') {
         if (!taskMutation || typeof taskMutation.withTaskMutationLock !== 'function') {
           setBusy(false);
@@ -311,18 +334,23 @@
         status('Cancelled. Nothing was cleared.');
         return;
       }
-      if (!taskMutation || typeof taskMutation.withTaskMutationLock !== 'function') {
-        status('Cannot safely clear all data: cross-tab task coordination is unavailable. Nothing was cleared.');
+      if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
+          || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)) {
+        status('Cannot safely clear all data: shared task/webhook coordination is unavailable. Nothing was cleared.');
         return false;
       }
       setBusy(true);
-      const locked = await taskMutation.withTaskMutationLock(lockManager, () => storageApi.clearAll(storage));
+      const locked = await taskMutation.withLocksInOrder(
+        lockManager,
+        taskMutation.CLEAR_ALL_LOCK_ORDER,
+        () => storageApi.clearAll(storage)
+      );
       setBusy(false);
       if (!locked.ok) {
         status('Could not safely clear all data: '
           + (locked.reason === 'coordination-unavailable'
-            ? 'cross-tab task coordination is unavailable. Nothing was cleared.'
-            : 'the shared task lock failed. Nothing was cleared.'));
+            ? 'shared task/webhook coordination is unavailable. Nothing was cleared.'
+            : 'a shared task/webhook lock failed. Nothing was cleared.'));
         return false;
       }
       const result = locked.value;

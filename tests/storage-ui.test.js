@@ -118,6 +118,94 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkStorageUi, 'object');
 });
 
+test('webhook queue category clear acquires task, delivery and queue locks before removal', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      calls.push(name);
+      return Promise.resolve().then(callback);
+    }
+  };
+  const { env, storageData, dispatched } = fakeEnv({
+    data: { 'daymark.webhook.queue.v1': '[]' },
+    lockManager: locks
+  });
+  await ui.attachStorageUi(env).onClearCategory('webhook-queue');
+  assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
+  assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
+  assert.equal(dispatched.length, 1);
+  assert.equal(dispatched[0].key, 'daymark.webhook.queue.v1');
+});
+
+test('clear-all acquires the global task/delivery/queue lock order before deleting data', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      calls.push(name);
+      return Promise.resolve().then(callback);
+    }
+  };
+  const { env, storageData } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': '[]',
+      'daymark.webhook.queue.v1': '[]',
+      'daymark.focus.v1': '{}'
+    },
+    lockManager: locks
+  });
+  await ui.attachStorageUi(env).onClearAll();
+  assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
+  assert.equal(storageData['daymark.tasks.v1'], undefined);
+  assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
+});
+
+test('webhook queue and clear-all fail closed if any ordered lock is rejected', async () => {
+  for (const action of ['webhook-queue', 'all']) {
+    const calls = [];
+    const locks = {
+      request(name, options, callback) {
+        calls.push(name);
+        if (name === mutation.WEBHOOK_QUEUE_LOCK) return Promise.reject(new Error('lock unavailable'));
+        return Promise.resolve().then(callback);
+      }
+    };
+    const queueBytes = '[{"id":"pending"}]';
+    const { env, storageData, elements, removedKeys } = fakeEnv({
+      data: { 'daymark.tasks.v1': '[]', 'daymark.webhook.queue.v1': queueBytes },
+      lockManager: locks
+    });
+    const handle = ui.attachStorageUi(env);
+    if (action === 'all') await handle.onClearAll();
+    else await handle.onClearCategory('webhook-queue');
+    assert.deepEqual(removedKeys, [], 'a later lock failure prevents every storage removal');
+    assert.equal(storageData['daymark.tasks.v1'], '[]');
+    assert.equal(storageData['daymark.webhook.queue.v1'], queueBytes);
+    assert.match(elements['storage-status-line'].textContent, /Nothing was cleared/);
+    assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
+  }
+});
+
+test('a webhook queue clear waits for an in-flight task completion transaction', async () => {
+  const locks = makeLockManager();
+  let releaseTask;
+  let started;
+  const isStarted = new Promise((resolve) => { started = resolve; });
+  const taskHeld = locks.request(mutation.TASK_MUTATION_LOCK, { mode: 'exclusive' }, () =>
+    new Promise((resolve) => { releaseTask = resolve; started(); }));
+  await isStarted;
+  const { env, storageData } = fakeEnv({
+    data: { 'daymark.webhook.queue.v1': '[]' },
+    lockManager: locks
+  });
+  const clear = ui.attachStorageUi(env).onClearCategory('webhook-queue');
+  await Promise.resolve();
+  assert.equal(storageData['daymark.webhook.queue.v1'], '[]', 'clear waits while a task completion holds the task lock');
+  releaseTask();
+  await taskHeld;
+  await clear;
+  assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
+});
+
 test('clearing only task recovery backups refreshes recovery status under the shared lock', async () => {
   const { env, elements, storageData, dispatched } = fakeEnv({
     data: {

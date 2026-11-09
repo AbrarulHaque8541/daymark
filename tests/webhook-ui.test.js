@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const nodeCrypto = require('node:crypto');
 const webhookApi = require('../webhook-logic.js');
 const ui = require('../webhook-ui.js');
+const mutation = require('../task-mutation-logic.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -96,6 +97,7 @@ function fakeEnv(options) {
     confirm(message) { confirmations.push(message); return typeof opts.confirm === 'function' ? opts.confirm(message) : true; },
     localStorage: storage,
     navigator: { onLine: opts.online !== false, locks },
+    taskMutation: mutation,
     webhookApi,
     fetch: opts.fetch,
     now: () => '2026-11-04T12:00:00.000Z'
@@ -109,6 +111,40 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachWebhookUi, 'function');
   assert.equal(typeof globalThis.DaymarkWebhookUi, 'object');
   assert.deepEqual(ui.notifyTaskCompleted(TASK), { queued: false, reason: 'not-attached' });
+});
+
+test('Clear Queue acquires task, delivery and queue locks in the shared global order', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      calls.push(name);
+      return Promise.resolve().then(callback);
+    }
+  };
+  const event = makeQueueEvent(webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
+    '2026-11-04T12:00:00.000Z');
+  const { env, storageData } = fakeEnv({ locks, storageData: { [webhookApi.QUEUE_KEY]: JSON.stringify([event]) } });
+  const handle = ui.attachWebhookUi(env);
+  const result = await handle.clearQueue();
+  assert.equal(result.cleared, true);
+  assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
+
+test('Clear Queue fails closed when the shared queue lock cannot be acquired', async () => {
+  const locks = {
+    request(name, options, callback) {
+      if (name === mutation.WEBHOOK_QUEUE_LOCK) return Promise.reject(new Error('queue lock unavailable'));
+      return Promise.resolve().then(callback);
+    }
+  };
+  const event = makeQueueEvent(webhookApi.buildTaskCompletedPayload(TASK, '2026-11-04T12:00:00.000Z'),
+    '2026-11-04T12:00:00.000Z');
+  const initial = JSON.stringify([event]);
+  const { env, storageData } = fakeEnv({ locks, storageData: { [webhookApi.QUEUE_KEY]: initial } });
+  const result = await ui.attachWebhookUi(env).clearQueue();
+  assert.equal(result.cleared, false);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], initial);
 });
 
 test('attach without a saved webhook prompts for a session-only endpoint and ignores completions', () => {

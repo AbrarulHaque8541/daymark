@@ -25,6 +25,10 @@
     if (!env || !env.document) throw new Error('attachWebhookUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
+    const nav = env.navigator || (win && win.navigator)
+      || (typeof navigator !== 'undefined' ? navigator : null);
+    const lockManager = env.lockManager || (nav && nav.locks) || null;
+    const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
     let storage = null;
     let storageAccessFailed = false;
     try {
@@ -96,7 +100,7 @@
 
     function queueCoordinatorAvailable() {
       try {
-        return !!(navigator && navigator.locks && typeof navigator.locks.request === 'function');
+        return !!(lockManager && typeof lockManager.request === 'function');
       } catch (error) {
         return false;
       }
@@ -112,12 +116,7 @@
     }
 
     async function withNamedLock(lockName, operation) {
-      let locks = null;
-      try {
-        locks = navigator && navigator.locks;
-      } catch (error) {
-        locks = null;
-      }
+      const locks = lockManager;
       if (!locks || typeof locks.request !== 'function') {
         coordinationFailed = true;
         return { ok: false, reason: 'unavailable' };
@@ -585,12 +584,19 @@
         return { cleared: false, reason: 'coordination-unavailable' };
       }
 
-      // Use the same delivery-then-queue lock order as attemptFlush. This waits
-      // for any in-flight POST before clearing the durable queue and this tab's
-      // memory-only suffix; another tab's unsaved in-memory events are untouched.
+      // Use the repository-wide task -> delivery -> queue order. Completion
+      // appends its durable event before releasing the task lock, so a clear
+      // cannot be followed by an earlier completion's delayed queue append.
+      // The delivery lock still waits for any in-flight POST before removal.
+      if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
+          || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)) {
+        status('Could not clear the webhook queue because shared task/webhook coordination is unavailable. Existing events were preserved.' + storageWarning());
+        renderQueue();
+        return { cleared: false, reason: 'coordination-unavailable' };
+      }
       setBusy(true);
       try {
-        const delivery = await withDeliveryLock(async () => withQueueLock(() => {
+        const locked = await taskMutation.withLocksInOrder(lockManager, taskMutation.CLEAR_ALL_LOCK_ORDER, () => {
           const state = readQueue();
           if (!state.ok) {
             queueReadFailed = true;
@@ -606,13 +612,11 @@
           resolvedUnpersistedIds.clear();
           queueWriteFailed = false;
           return { cleared: true };
-        }));
+        });
 
-        if (!delivery.ok || !delivery.value || !delivery.value.ok
-            || !delivery.value.value || !delivery.value.value.cleared) {
-          const reason = !delivery.ok ? 'coordination-failed'
-            : delivery.value && delivery.value.value && delivery.value.value.reason
-              ? delivery.value.value.reason : 'clear-failed';
+        if (!locked.ok || !locked.value || !locked.value.cleared) {
+          const reason = !locked.ok ? locked.reason
+            : locked.value && locked.value.reason ? locked.value.reason : 'clear-failed';
           status('Could not clear the webhook queue safely. Existing stored events were preserved.' + storageWarning());
           renderQueue();
           return { cleared: false, reason };
@@ -693,7 +697,8 @@
       }
     }
 
-    function notifyTaskCompleted(task) {
+    function notifyTaskCompleted(task, options) {
+      const deferDelivery = !!(options && options.deferDelivery === true);
       if (!webhookApi) return { queued: false, reason: 'unavailable' };
       if (storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed) {
         status('Task completion was not queued or sent because browser storage could not be safely accessed.' + storageWarning());
@@ -808,7 +813,14 @@
         if (result && result.queued
             && (result.reason === 'queued' || result.reason === 'memory-only')) {
           if (busy) flushRequested = true;
-          else await attemptFlush();
+          else if (deferDelivery) {
+            // The caller still holds the task mutation lock. Persist the queue
+            // append now, but schedule network delivery outside that callback.
+            Promise.resolve().then(() => {
+              if (busy) flushRequested = true;
+              else void attemptFlush();
+            });
+          } else await attemptFlush();
         }
         return result;
         });
@@ -843,7 +855,8 @@
       // is informational only; all read-modify-write and delivery operations
       // still require the Web Locks exclusive lock above.
       win.addEventListener('storage', (event) => {
-        if (!event || !webhookApi || event.key !== webhookApi.QUEUE_KEY) return;
+        if (!event || !webhookApi
+            || (event.key !== webhookApi.QUEUE_KEY && event.key !== null)) return;
         const state = readQueue();
         if (!state.ok) {
           queueReadFailed = true;

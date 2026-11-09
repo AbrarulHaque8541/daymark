@@ -320,6 +320,28 @@ test('two tabs adding different tasks preserve both committed mutations', async 
     ['Created in tab A', 'Created in tab B', 'Existing']);
 });
 
+test('task completion webhook is durably queued inside the task mutation lock after the task write', async () => {
+  const task = makeImportTask('completion-webhook-lock', 'Complete under shared lock');
+  const lockManager = makeObservedLockManager();
+  const sharedStorage = new Map([[STORAGE_KEY, JSON.stringify([task])], [FOCUS_KEY, null]]);
+  let observed = null;
+  const webhookUi = {
+    async notifyTaskCompleted(committedTask, options) {
+      observed = {
+        held: lockManager.isHeld(),
+        committed: JSON.parse(sharedStorage.get(STORAGE_KEY)).find((item) => item.id === committedTask.id),
+        options
+      };
+      return { queued: true, reason: 'queued' };
+    }
+  };
+  const app = bootApp({ storageData: sharedStorage, lockManager, webhookUi });
+  await triggerTaskCompletion(app, task.id);
+  assert.equal(observed.held, true, 'the webhook append callback runs before the task lock is released');
+  assert.equal(observed.committed.completed, true, 'the task write is durable before notification');
+  assert.deepEqual(observed.options, { deferDelivery: true }, 'network delivery is deferred outside the task lock callback');
+});
+
 test('task writes fail closed when Web Locks are unavailable', async () => {
   const app = bootApp({ savedValue: JSON.stringify([]), lockManager: false });
   app.elements.get('#new-title').value = 'Must not be falsely saved';

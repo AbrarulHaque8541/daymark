@@ -225,7 +225,7 @@
     return JSON.parse(JSON.stringify(Array.isArray(tasks) ? tasks : []));
   }
 
-  async function persistTaskSnapshot(desiredTasks) {
+  async function persistTaskSnapshot(desiredTasks, afterCommit) {
     const mutation = window.DaymarkTaskMutation;
     if (!mutation || typeof mutation.commitTaskSnapshot !== 'function') {
       setStorageStatus('Task changes not saved: safe cross-tab coordination is unavailable.', true);
@@ -296,7 +296,8 @@
             setStorageStatus('Tasks were saved, but a redundant recovery backup could not be cleared; it remains available.', true);
           }
         }
-      }
+      },
+      afterCommit: typeof afterCommit === 'function' ? afterCommit : undefined
     });
 
     if (!result.ok) {
@@ -325,21 +326,23 @@
       // while the lock was pending remains in memory and is not overwritten.
       setStorageStatus('Saved an earlier task change; a newer local edit conflicts and needs review.', true);
     }
-    if (result.warning) {
+    if (result.warning === 'post-commit-action-failed') {
+      setStorageStatus('Tasks were saved, but a follow-up action did not finish. Review the related status and retry if needed.', true);
+    } else if (result.warning) {
       setStorageStatus('Tasks were saved, but recovery-backup maintenance needs review.', true);
     }
     return true;
   }
 
-  function persistTasks() {
+  function persistTasks(afterCommit) {
     // Serialize same-tab saves too. Each queued operation takes its baseline
     // after the preceding local save has committed, while the Web Lock handles
     // cooperating tabs and windows for this origin.
     const desiredTasks = cloneTaskList(state.tasks);
     const previous = state.taskSaveQueue || Promise.resolve();
     const queued = previous.then(
-      () => persistTaskSnapshot(desiredTasks),
-      () => persistTaskSnapshot(desiredTasks)
+      () => persistTaskSnapshot(desiredTasks, afterCommit),
+      () => persistTaskSnapshot(desiredTasks, afterCommit)
     );
     state.taskSaveQueue = queued.then(() => undefined, () => undefined);
     return queued;
@@ -1153,18 +1156,16 @@
     syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
   }
 
-  function notifyWebhookTaskCompleted(task) {
+  async function notifyWebhookTaskCompleted(task, options) {
     const webhookUi = window.DaymarkWebhookUi;
-    if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
+    if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') {
+      return { queued: false, reason: 'unavailable' };
+    }
     try {
-      const result = webhookUi.notifyTaskCompleted(task);
-      if (result && typeof result.catch === 'function') {
-        result.catch((error) => {
-          console.warn('Could not queue the Daymark task-completed webhook:', error);
-        });
-      }
+      return await webhookUi.notifyTaskCompleted(task, options);
     } catch (error) {
       console.warn('Could not queue the Daymark task-completed webhook:', error);
+      return { queued: false, reason: 'queue-failed' };
     }
   }
 
@@ -1179,8 +1180,20 @@
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
-      const saved = await persistTasks();
-      if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);
+      const afterCommit = task.completed && !wasCompleted
+        ? async (commit) => {
+          const previous = commit.previousTasks.find((item) => item.id === task.id);
+          const committed = commit.tasks.find((item) => item.id === task.id);
+          if (!commit.changedIds.includes(task.id) || !previous || previous.completed
+              || !committed || !committed.completed) return;
+          const queued = await notifyWebhookTaskCompleted(committed, { deferDelivery: true });
+          if (!queued.queued && queued.reason !== 'disabled' && queued.reason !== 'unavailable') {
+            setStorageStatus('Task was saved, but its webhook event was not queued: '
+              + queued.reason + '.', true);
+          }
+        }
+        : null;
+      const saved = await persistTasks(afterCommit);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
