@@ -165,7 +165,8 @@ test('private main test APK remains owner-gated and ciphertext-only', () => {
   assert.match(content, /on:\s*\n\s+workflow_dispatch:/);
   assert.doesNotMatch(content, /pull_request:/,
     'private signing workflow must not be triggerable by pull requests');
-  assert.match(content, /AGE_RECIPIENT.*age1/);
+  assert.equal(content.includes('[[ "$AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]]'), true,
+    "the one-time age recipient must be validated before any encryption or signing");
   assert.match(content, /age --encrypt --recipient "\$AGE_RECIPIENT"/);
 
   const uploadStart = content.indexOf('      - name: Upload only the short-lived encrypted transfer');
