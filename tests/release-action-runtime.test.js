@@ -103,6 +103,10 @@ test('pull-request device-test builds never receive production signing secrets',
   assert.match(signed.text, /if: \$\{\{ github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\) \}\}/);
   assert.equal(signed.text.includes('secrets.KEYSTORE_BASE64'), true);
   assert.match(signed.text, /trap .*release\.keystore.* EXIT/);
+  const cleanupTrap = signed.text.indexOf("trap 'rm -f");
+  const keystoreDecode = signed.text.indexOf('base64 -d > "$RUNNER_TEMP/release.keystore"');
+  assert.ok(cleanupTrap >= 0 && cleanupTrap < keystoreDecode,
+    'the EXIT cleanup trap must be installed before keystore decoding can create a partial file');
   assert.match(signed.text, /assembleGithubSideloadRelease/);
   assert.match(signed.text, /assemblePlayRelease/);
 
