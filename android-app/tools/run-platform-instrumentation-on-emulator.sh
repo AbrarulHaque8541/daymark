@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 set -eu
+. tools/platform-instrumentation-repeat.sh
 
 # Emits the real instrumentation failure lines and the app-local phase log as
 # workflow error annotations so the failing phase/assertion is visible from the
@@ -50,6 +51,7 @@ fi
 echo "Running Android instrumentation component: $instrumentation"
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
 phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
+run_instrumentation_once() {
 set +e
 if command -v timeout >/dev/null 2>&1; then
   timeout --signal=TERM --kill-after=10s 300s adb shell am instrument -w -r "$instrumentation" >"$instrumentation_output" 2>&1
@@ -78,12 +80,16 @@ INSTRUMENTATION_ERROR: host command exceeded its 300-second timeout (exit $instr
   cat "$phase_log_path"
   echo "::endgroup::"
   report_failure "$output" "$phase_log"
-  exit 1
+  return 1
 fi
 printf '%s\n' "$output"
 if [ "$instrument_status" -ne 0 ] \
    || ! printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: result=passed' \
    || ! printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: main_activity_tabs_transition=passed'; then
   report_failure "$output"
-  exit 1
+  return 1
 fi
+
+}
+
+run_instrumentation_repeated run_instrumentation_once
