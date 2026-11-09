@@ -183,7 +183,7 @@ test('iCalendar import status discloses categories the Daymark tag model cannot 
   assert.deepEqual(saved[1].tags, ['work', 'finance']);
   const status = created.find((el) => el.id === 'import-status');
   assert.match(status.textContent,
-    /1 category value could not be represented by Daymark tags and were skipped\\./);
+    /1 category value could not be represented by Daymark tags and were skipped\./);
 });
 
 test('oversize and unreadable files fail closed without touching storage', async () => {
