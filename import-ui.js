@@ -22,7 +22,15 @@
     if (!env || !env.document) throw new Error('attachImportUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
@@ -101,6 +109,29 @@
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
         }
+        if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+          throw new Error('browser storage is unavailable; nothing was changed');
+        }
+        if (!logic || typeof logic.validateStoredTasks !== 'function') {
+          throw new Error('task logic is unavailable');
+        }
+        const raw = storage.getItem(STORAGE_KEY);
+        let stored = [];
+        if (raw !== null) {
+          stored = JSON.parse(raw);
+          if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
+        }
+        const validated = logic.validateStoredTasks(stored);
+        if (!validated || !Array.isArray(validated.tasks)
+          || !Number.isSafeInteger(validated.rejectedCount) || validated.rejectedCount < 0) {
+          throw new Error('saved tasks could not be validated; nothing was changed');
+        }
+        if (validated.rejectedCount > 0) {
+          throw new Error('existing saved tasks contain ' + validated.rejectedCount
+            + ' invalid or duplicate record(s); import was not applied');
+        }
+        // Validate the existing store before reading the selected file so an
+        // import cannot silently sanitize malformed or duplicate user data.
         const text = await readText(file);
         if (format === 'ics' && typeof importApi.fromIcs !== 'function') {
           throw new Error('calendar import is unavailable in this build');
@@ -110,20 +141,17 @@
           : format === 'markdown'
             ? importApi.fromMarkdown(text, { now: now(), makeId })
             : importApi.fromIcs(text, { now: now(), makeId });
-        if (!logic || typeof logic.validateStoredTasks !== 'function') {
-          throw new Error('task logic is unavailable');
-        }
-        const raw = storage && typeof storage.getItem === 'function' ? storage.getItem(STORAGE_KEY) : null;
-        let stored = [];
-        if (raw) {
-          stored = JSON.parse(raw);
-          if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
-        }
-        const validated = logic.validateStoredTasks(stored);
         const merge = importApi.mergeTasks(validated.tasks, parsed.tasks, logic);
         if (merge.added.length > 0) {
-          if (!storage || typeof storage.setItem !== 'function') {
+          if (typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') {
             throw new Error('browser storage is unavailable; nothing was changed');
+          }
+          // The file read is asynchronous. Compare the original raw value
+          // immediately before writing so a newer task store from another tab
+          // is never overwritten by this stale import.
+          const currentRaw = storage.getItem(STORAGE_KEY);
+          if (currentRaw !== raw) {
+            throw new Error('saved tasks changed while import was being prepared; nothing was changed');
           }
           storage.setItem(STORAGE_KEY, JSON.stringify(merge.merged));
           notifySaved();
@@ -179,7 +207,7 @@
   root.DaymarkImportUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachImportUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachImportUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
