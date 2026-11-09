@@ -31,15 +31,25 @@
     'clear-completed': {
       label: 'Clear completed tasks',
       title: 'Clear completed tasks',
-      summary: 'Removes every task you marked done from this device\u2019s local storage. Open tasks, their notes and tags, and Focus history are untouched. Nothing is sent anywhere.',
-      removes: ['Completed tasks from local storage (daymark.tasks.v1)'],
-      keeps: ['Open tasks, with notes and tags', 'Focus session history', 'Reminders that belong to open tasks'],
-      recoverable: false,
-      recovery: 'Deleted completed tasks cannot be brought back. Use Export first to save a backup file, and keep that file somewhere safe.',
+      summary: 'Removes completed tasks from the current task list and attempts to save the remaining list. If saving fails, the removal is only for this session and the previously saved list remains.',
+      removes: [
+        'Completed tasks from the saved task list when the save succeeds',
+        'A fully valid stale task recovery backup may also be cleared after a successful save'
+      ],
+      keeps: [
+        'Open tasks, with notes and tags',
+        'Focus session history',
+        'Reminders that belong to open tasks',
+        'Partial or opaque recovery backups that still need preservation'
+      ],
+      recoverable: true,
+      undoWindowSeconds: 7,
+      recovery: 'Undo is available in the toast for 7 seconds. After it expires, there is no built-in undo. Export a backup first for durable recovery. If saving fails, the removal is session-only and the previously saved task list remains.',
       deletesData: true,
       scope: 'This device only',
-      network: 'None \u2014 this never contacts the network'
+      network: 'None — this never contacts the network'
     },
+
     'clear-search': {
       label: 'Clear task search',
       title: 'Clear task search',
@@ -66,16 +76,18 @@
     },
     'storage-clear-status': {
       label: 'Clear storage status',
-      title: 'Clear storage status',
-      summary: 'Only empties the status line on the storage health card. No storage key, task, or any other data is touched.',
-      removes: ['The status text on the storage health card'],
-      keeps: ['Every stored task and setting'],
+      title: 'Storage status controls are unavailable',
+      summary: 'The visible Check and Clear status controls are not connected to the storage UI module in this build, so neither operation currently runs. No storage data is changed.',
+      removes: [],
+      keeps: ['All stored tasks and settings; no storage operation runs'],
+      available: false,
       recoverable: true,
-      recovery: 'Press Check again and the status is recomputed from the same local data.',
+      recovery: 'Unavailable until the storage card wiring is repaired. This explanation does not inspect or clear storage.',
       deletesData: false,
-      scope: 'The current view only',
+      scope: 'Not available in this build',
       network: 'None'
     },
+
     'import-merge': {
       label: 'Import a backup',
       title: 'Import a backup',
@@ -91,15 +103,16 @@
     'export-backup': {
       label: 'Export a backup',
       title: 'Export a backup',
-      summary: 'Reads your tasks from local storage and writes a backup file for you to save. Storage itself is not changed in any way.',
+      summary: 'Creates a local task export without changing stored data. The JSON backup uses the current in-memory task list; CSV, Markdown and iCalendar exports read and validate the saved task store. If storage is unreadable or recovery is pending, a normal export may be incomplete.',
       removes: [],
-      keeps: ['All tasks in local storage, unchanged'],
+      keeps: ['Saved task data and existing recovery backups are not changed', 'The current task list remains in Daymark'],
       recoverable: true,
-      recovery: 'Export changes nothing, so there is nothing to recover from.',
+      recovery: 'This is a normal plaintext export, not a raw recovery export or encrypted backup. Exported files may contain private task details; keep them private. If storage is unreadable or recovery is pending, use Export recovery instead.',
       deletesData: false,
       scope: 'A new local file',
-      network: 'None \u2014 the file never leaves this device unless you share it yourself'
+      network: 'None — the file never leaves this device unless you share it yourself'
     }
+
   };
 
   // The honest fallback used whenever an action id is not in the catalog.
@@ -109,6 +122,7 @@
     summary: 'This prototype has no honest description for the requested action, so instead of guessing, Daymark says so plainly. No data was touched.',
     removes: [],
     keeps: ['Everything, out of caution'],
+    available: false,
     recoverable: true,
     recovery: 'Nothing ran, so nothing needs recovering.',
     deletesData: false,
@@ -134,6 +148,8 @@
       removes: entry.removes.slice(),
       keeps: entry.keeps.slice(),
       recoverable: entry.recoverable,
+      undoWindowSeconds: Number.isSafeInteger(entry.undoWindowSeconds) ? entry.undoWindowSeconds : 0,
+      available: entry.available !== false,
       recovery: entry.recovery,
       deletesData: entry.deletesData,
       scope: entry.scope,
@@ -146,6 +162,8 @@
     return CLEAR_ACTION_IDS.map((id) => ({
       id,
       label: CATALOG[id].label,
+      available: CATALOG[id].available !== false,
+      undoWindowSeconds: Number.isSafeInteger(CATALOG[id].undoWindowSeconds) ? CATALOG[id].undoWindowSeconds : 0,
       deletesData: CATALOG[id].deletesData
     }));
   }
@@ -186,12 +204,18 @@
     let exported = false;
     for (let i = 0; i < ids.length; i += 1) {
       const entry = explainClearAction(ids[i]);
+      if (!entry.available) {
+        return fail(entry.label + ' is unavailable in this build; no plan was created.');
+      }
       steps.push(entry.label + ' \u2014 ' + (entry.deletesData
         ? 'deletes data on this device'
         : 'changes no stored data'));
       if (ids[i] === 'export-backup') exported = true;
       if (entry.deletesData && !exported) {
-        warnings.push(entry.label + ' deletes data with no Export step before it; deleted data cannot come back.');
+        warnings.push(entry.label + ' deletes data without a durable Export step before it; '
+          + (entry.undoWindowSeconds > 0
+            ? 'the temporary Undo lasts only ' + entry.undoWindowSeconds + ' seconds and is not a durable backup.'
+            : 'this action has no built-in undo.'));
       }
     }
     return {
