@@ -713,3 +713,18 @@ test('unreadable primary focus key with readable backup offers recovery', () => 
   assert.equal(app.storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
   assert.match(app.elements.get('#storage-status span').textContent, /Primary focus data unreadable; recovery backup available/);
 });
+
+test('empty Focus recovery backup bytes survive a malformed-primary backup write', () => {
+  const malformedPrimary = '{"session":';
+  const app = bootApp({
+    savedValue: JSON.stringify([]),
+    savedFocusValue: malformedPrimary,
+    savedFocusBackupValue: ''
+  });
+
+  const storedBackup = app.storedValues.get(FOCUS_BACKUP_KEY);
+  const bundle = JSON.parse(storedBackup);
+  assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, ['', malformedPrimary],
+    'the empty prior backup and malformed primary must both remain byte-for-byte recoverable');
+});
