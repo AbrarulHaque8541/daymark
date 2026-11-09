@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -32,24 +33,33 @@ final class ExtensionInjector {
         // onPageFinished can be stale if a newer navigation has already started.
         if (!pageUrl.equals(webView.getUrl())) return;
 
+        String bootstrap = loadSpaBootstrap(webView);
+        if (bootstrap == null) return;
+
         List<BrowserExtension> enabled = new ArrayList<>();
+        boolean tooManyPacks = false;
         for (BrowserExtension ext : packs) {
             if (ext == null || !ext.enabled) continue;
             if ((ext.css == null || ext.css.isEmpty()) && (ext.js == null || ext.js.isEmpty())) continue;
             if (enabled.size() >= MAX_SPA_PACKS) {
-                // Fail closed rather than silently omit an installed pack's future SPA scope.
-                return;
+                tooManyPacks = true;
+                break;
             }
             enabled.add(ext);
         }
 
-        String config = spaConfig(pageUrl, enabled);
-        if (config == null || config.length() > MAX_SPA_CONFIG_CHARS) return;
-        String bootstrap = loadSpaBootstrap(webView);
-        if (bootstrap == null) return;
+        if (tooManyPacks) {
+            // Fail closed and remove prior Daymark styles instead of leaving stale CSS active.
+            submitSpaConfig(webView, pageUrl, Collections.<BrowserExtension>emptyList(), bootstrap);
+            return;
+        }
 
-        // Configuration and bootstrap execute in one page-bound WebView submission.
-        // The bootstrap owns only style elements carrying Daymark's data attributes.
+        String config = spaConfig(pageUrl, enabled);
+        if (config == null || config.length() > MAX_SPA_CONFIG_CHARS) {
+            // Oversized configuration must not leave previously injected styles on this page.
+            submitSpaConfig(webView, pageUrl, Collections.<BrowserExtension>emptyList(), bootstrap);
+            return;
+        }
         webView.evaluateJavascript("window.__daymarkSpaConfig=" + config + ";\n" + bootstrap, null);
 
         StringBuilder js = new StringBuilder();
@@ -81,6 +91,15 @@ final class ExtensionInjector {
             // A navigation between the bootstrap and script submissions must not retarget scripts.
             webView.evaluateJavascript(jsScript(jsonString(pageUrl), js.toString()), null);
         }
+    }
+
+    private static void submitSpaConfig(WebView webView, String pageUrl,
+                                        List<BrowserExtension> packs, String bootstrap) {
+        String config = spaConfig(pageUrl, packs);
+        if (config == null || config.length() > MAX_SPA_CONFIG_CHARS) {
+            config = spaConfig(pageUrl, Collections.<BrowserExtension>emptyList());
+        }
+        webView.evaluateJavascript("window.__daymarkSpaConfig=" + config + ";\n" + bootstrap, null);
     }
 
     private static String spaConfig(String pageUrl, List<BrowserExtension> packs) {

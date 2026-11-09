@@ -86,12 +86,19 @@ function makeHarness(initialUrl, packs, options) {
     packs
   };
 
-  vm.runInNewContext(bootstrap, { window, document, URL, console });
+  function executeBootstrap() {
+    vm.runInNewContext(bootstrap, { window, document, URL, console });
+  }
+  executeBootstrap();
 
   return {
     window,
     location,
     history,
+    refreshConfig(config) {
+      window.__daymarkSpaConfig = config;
+      executeBootstrap();
+    },
     styles() {
       return root.children.filter((element) =>
         element.tagName === 'STYLE' && element.getAttribute('data-daymark-managed') === 'true');
@@ -206,6 +213,21 @@ test('userscript-created GM_addStyle nodes are removed with their owning pack', 
   assert.equal(h.styles().length, 1);
 
   h.history.pushState({}, '', '/public');
+
+  assert.equal(h.styles().length, 0);
+});
+
+test('a later empty configuration removes styles from packs that were disabled or removed', () => {
+  const h = makeHarness('https://example.com/private/home', [
+    pack('private', ['https://example.com/private/*'], 'body{color:red}')
+  ]);
+  assert.equal(h.styles().length, 1);
+
+  h.refreshConfig({
+    expectedUrl: h.location.href,
+    maxEnabled: 8,
+    packs: []
+  });
 
   assert.equal(h.styles().length, 0);
 });

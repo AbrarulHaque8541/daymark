@@ -19,6 +19,7 @@ public final class ExtensionInjectorSmoke {
         serializesFutureScopesButRunsOnlyCurrentScripts();
         skipsInvalidAndEmptyInputs();
         boundsSubmissionsAndEnabledPacks();
+        oversizedPackSetClearsPreviouslyOwnedStyles();
         escapesExpectedUrlAsJavaScriptString();
         System.out.println("PASS ExtensionInjectorSmoke: " + assertions + " assertions");
     }
@@ -122,7 +123,7 @@ public final class ExtensionInjectorSmoke {
     private static void boundsSubmissionsAndEnabledPacks() {
         WebView cssOnly = new WebView(PAGE);
         ExtensionInjector.apply(cssOnly, PAGE, Collections.singletonList(
-                pack("css-only", true, "https://example.com/*", "body{}", "")));
+                pack("css-only", true, "https://example.com/*", "body{}", ""));
         equal(1, cssOnly.getEvaluatedScripts().size(), "CSS-only pack uses one SPA bootstrap submission");
 
         WebView jsOnly = new WebView(PAGE);
@@ -145,6 +146,20 @@ public final class ExtensionInjectorSmoke {
         }
         notContains(payload, "window.__pack8=1;", "ninth enabled pack is not injected");
         notContains(payload, "window.__pack9=1;", "tenth enabled pack is not injected");
+    }
+
+    private static void oversizedPackSetClearsPreviouslyOwnedStyles() {
+        List<BrowserExtension> many = new ArrayList<>();
+        for (int i = 0; i <= 64; i++) {
+            many.add(pack("overflow-" + i, true, "https://example.com/*", "body{}", ""));
+        }
+        WebView webView = new WebView(PAGE);
+        ExtensionInjector.apply(webView, PAGE, many);
+        equal(1, webView.getEvaluatedScripts().size(), "over-limit configuration sends only the clearing bootstrap");
+        contains(webView.getEvaluatedScripts().get(0), "\"packs\":[]",
+                "over-limit configuration clears previous Daymark styles instead of leaving stale CSS");
+        notContains(webView.getEvaluatedScripts().get(0), "\"id\":\"overflow-0\"",
+                "over-limit configuration does not partially apply packs");
     }
 
     private static void escapesExpectedUrlAsJavaScriptString() {
