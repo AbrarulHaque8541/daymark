@@ -191,6 +191,33 @@ test('a second tab importing an identical task is idempotent and reports no new 
   assert.equal(JSON.parse(storage.raw).filter((task) => task.id === 'same-import').length, 1);
 });
 
+test('destructive data actions share the exact same origin-wide task lock', async () => {
+  const locks = makeLockManager();
+  const order = [];
+  const first = mutation.withTaskMutationLock(locks, async () => {
+    order.push('first-start');
+    await Promise.resolve();
+    order.push('first-end');
+    return 'first';
+  });
+  const second = mutation.withTaskMutationLock(locks, () => {
+    order.push('second');
+    return 'second';
+  });
+
+  const results = await Promise.all([first, second]);
+  assert.deepEqual(order, ['first-start', 'first-end', 'second']);
+  assert.deepEqual(results.map((result) => result.value), ['first', 'second']);
+});
+
+test('destructive data actions fail closed when the shared task lock is unavailable', async () => {
+  let called = false;
+  const result = await mutation.withTaskMutationLock(null, () => { called = true; });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'coordination-unavailable');
+  assert.equal(called, false);
+});
+
 test('task equality is independent of object property insertion order', () => {
   const left = [{ id: 'a', title: 'A', completed: false }];
   const right = [{ completed: false, title: 'A', id: 'a' }];
