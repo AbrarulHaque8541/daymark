@@ -7,6 +7,10 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        // The target app has both githubSideload and play flavors. Resolve the
+        // test module's missing distribution dimension explicitly so Gradle
+        // never guesses between two equally compatible debug APKs.
+        missingDimensionStrategy("distribution", "githubSideload")
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "com.abrar.daymark.DaymarkServiceWorkerInstrumentation"
