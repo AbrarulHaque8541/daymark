@@ -4,9 +4,22 @@ set -eu
 
 ./gradlew --no-daemon installGithubSideloadDebug installGithubSideloadDebugAndroidTest
 
-instrumentation="$(adb shell pm list instrumentation | tr -d '\r' | awk '/^instrumentation:/ && /DaymarkPlatformInstrumentation/ { sub(/^instrumentation:/, ""); sub(/ .*/, ""); print; exit }')"
+find_instrumentation_component() {
+  adb shell pm list instrumentation 2>/dev/null | tr -d '\r' | parse_platform_instrumentation_component
+}
+
+# PackageManager can briefly lag the Gradle install task. Wait for registration
+# only; once instrumentation starts, failures remain fail-fast with no retries.
+instrumentation=""
+attempt=1
+while [ "$attempt" -le 20 ]; do
+  instrumentation="$(find_instrumentation_component || true)"
+  [ -n "$instrumentation" ] && break
+  sleep 1
+  attempt=$((attempt + 1))
+done
 if [ -z "$instrumentation" ]; then
-  echo "DaymarkPlatformInstrumentation was not installed" >&2
+  echo "DaymarkPlatformInstrumentation was not registered after install" >&2
   adb shell pm list instrumentation >&2
   exit 1
 fi
