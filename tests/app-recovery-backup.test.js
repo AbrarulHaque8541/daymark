@@ -868,6 +868,63 @@ test('duplicate keys in primary Focus state are backed up without rewriting the 
   assert.match(app.elements.get('#storage-status span').textContent, /Focus data recovery backup retained/);
 });
 
+
+
+test('a valid primary Focus state still exposes a readable opaque recovery backup', () => {
+  const primary = JSON.stringify({ session: null, log: [] });
+  const backup = '{opaque Focus recovery bytes';
+  const storedValues = new Map([
+    [STORAGE_KEY, '[]'],
+    ['daymark.focus.v1', primary],
+    [FOCUS_BACKUP_KEY, backup]
+  ]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+
+  assert.equal(app.elements.get('#toast-action').hidden, false,
+    'a present Focus backup must remain exportable even when the primary state is valid');
+  assert.equal(app.elements.get('#toast-action').textContent, 'Export recovery');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus data recovery backup retained/);
+  app.elements.get('#toast-action').dispatch('click');
+  assert.ok(app.getLastBlob().parts[0].includes(backup),
+    'the manual recovery export must include the exact opaque Focus backup bytes');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), backup,
+    'loading and exporting must not alter the original backup');
+});
+
+test('a normal Focus save succeeds when no recovery backup exists', () => {
+  const primary = JSON.stringify({ session: null, log: [] });
+  const storedValues = new Map([[ 'daymark.focus.v1', primary ]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+
+  app.elements.get('#focus-start').dispatch('click');
+
+  const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
+  assert.ok(saved.session, 'the new running Focus session is persisted');
+  assert.match(app.elements.get('#toast').textContent, /Focus started — 25:00 on the clock/,
+    'the UI reports success after the primary Focus write succeeds');
+  assert.doesNotMatch(app.elements.get('#toast').textContent, /could not be saved/,
+    'an absent recovery backup is not a save failure');
+});
+
+test('a Focus save succeeds but reports unknown when the recovery backup is unreadable', () => {
+  const primary = JSON.stringify({ session: null, log: [] });
+  const storedValues = new Map([[ 'daymark.focus.v1', primary ]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([FOCUS_BACKUP_KEY]), focusLogic);
+
+  app.elements.get('#focus-start').dispatch('click');
+
+  const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
+  assert.ok(saved.session, 'the valid primary Focus state is saved');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus recovery backup status unknown/i,
+    'the app must disclose that the independent backup could not be inspected');
+  assert.match(app.elements.get('#toast').textContent, /Focus started — 25:00 on the clock/,
+    'an unreadable backup does not falsely report that the primary save failed');
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false,
+    'the unreadable backup key is not recreated or overwritten');
+});
+
 test('duplicate keys in a Focus recovery envelope remain opaque and exportable', () => {
   const ambiguous = '{"format":"daymark-focus-recovery-bundle-v1","payloads":[],"payloads":["{}"]}';
   const storedValues = new Map([
