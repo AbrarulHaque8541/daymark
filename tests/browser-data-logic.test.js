@@ -91,6 +91,13 @@ test('planClearSequence warns when data is deleted with no export first', () => 
   assert.match(plan.warnings[0], /Undo lasts only 7 seconds/);
 });
 
+test('planClearSequence does not count an Export step that occurs after deletion', () => {
+  const plan = engine.planClearSequence(['clear-completed', 'export-backup']);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /No Export step is planned before this deletion/);
+});
+
 test('planClearSequence does not demand an export for delete-free actions', () => {
   const plan = engine.planClearSequence(['clear-search']);
   assert.equal(plan.ok, true);
