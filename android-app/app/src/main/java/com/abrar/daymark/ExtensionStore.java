@@ -443,10 +443,12 @@ final class ExtensionStore {
     }
 
     void uninstallUserPack(String id) {
-        if (id == null || id.startsWith("daymark.builtin.")) return;
-        File out = new File(userDir, sanitizeFileName(id) + ".daymark-ext.json");
-        //noinspection ResultOfMethodCallIgnored
-        out.delete();
+        synchronized (ExtensionStore.class) {
+            if (id == null || id.startsWith("daymark.builtin.")) return;
+            File out = new File(userDir, sanitizeFileName(id) + ".daymark-ext.json");
+            //noinspection ResultOfMethodCallIgnored
+            out.delete();
+        }
     }
 
     private boolean isBuiltinDisabled(String id) {
@@ -498,7 +500,7 @@ final class ExtensionStore {
         return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
 
-    private static void writeFile(File file, String content) throws Exception {
+    private static synchronized void writeFile(File file, String content) throws Exception {
         File tmp = new File(file.getAbsolutePath() + ".tmp");
         try {
             try (FileOutputStream out = new FileOutputStream(tmp)) {
