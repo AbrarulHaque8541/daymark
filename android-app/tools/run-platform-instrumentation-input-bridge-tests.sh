@@ -24,6 +24,10 @@ if [ "$1" = shell ] && [ "$2" = input ]; then
   exit "${FAKE_INPUT_STATUS:-0}"
 fi
 if [ "$1" = shell ] && [ "$2" = run-as ] && [ "$4" = sh ] && [ "$5" = -c ]; then
+  if [ "${FAKE_PUBLISH_STATUS:-0}" -ne 0 ]; then
+    echo "fake result publish denied" >&2
+    exit "$FAKE_PUBLISH_STATUS"
+  fi
   printf '%s|%s\n' "$8" "$9" > "$FAKE_DEVICE_DIR/instrumentation-input-result.txt"
   if [ "${FAKE_STOP_AFTER_READS:-0}" -eq 0 ]; then
     touch "$FAKE_STOP_FILE"
