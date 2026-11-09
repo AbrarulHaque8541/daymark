@@ -1,3 +1,54 @@
+## Current whole-project execution queue — 2026-11-09T14:47:38.879Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+This is a new dated status layer. Older planning sections below are historical; do not rewrite their evidence.
+
+### Live baseline and governance
+- Default branch: `main`; current SHA: `59e6961c0645a423eb736d16d129eb0e9cc871f7`.
+- Main Android CI #42619910395: **PASS**. Main Ubuntu/Windows contracts #42619910295: **PASS**.
+- Live inventory: **6 open PRs / 12 open issues**.
+- Main branch API: `protected=false`; required status-check enforcement `off`; rulesets API returns `[]`. Detailed branch-protection endpoint returns HTTP 403 to this integration. No repository settings changed.
+- No open PR has an independent approval record. All six remain unmerged.
+- Source/AGENTS identity is `com.abrar.daymark`; the run-level safety directive names `com.cue.daymark`. No identity, namespace, manifest or signer change was made; resolve only with explicit owner approval.
+
+### Exact open PR inventory and current checks
+| PR | Exact head (base main) | Latest exact-head evidence | Gate / next action |
+|---|---|---|---|
+| #648 Focus + fail-closed downloads | `dd73640ebdd5b9b12ee668812f9a7c6600de57b7` | Android CI, contracts, Focus UI/Sound, Live Update and device artifacts **PASS**; API 29 lifecycle **PASS**; API 36 lifecycle #42637328004 **FAIL** at run 1/10 after Countdown tap following vertical drag. | Fix coordinate-space mismatch: `getGlobalVisibleRect()` returns root-view coordinates, but `UiAutomation.injectInputEvent()` needs screen coordinates. Keep all gesture assertions and API 36 ten-run gate. No physical device tested. |
+| #656 iCalendar/import-export | `abc85397ebf13375238e6004acd1bd6b6e38b8d8` | Android CI #42633721799, contracts #42633722495, device APK #42633721795 **PASS**. | Independent RFC 5545/data-integrity review pending; no merge yet. |
+| #659 extension trust | `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd` | Android CI #42622038075, contracts #42622038055, device acceptance #42622038156 and device APK #42622038116 **PASS**. | Independent extension-security review pending; no merge yet. |
+| #665 signing/Node24 | `d3cf902b36e47d1eca512df095fc883bbcd4ebbd` | Android CI #42622047147, contracts #42622047145, device APK #42622047583 **PASS**; release publication skipped. | Independent release-security/provenance review pending; review the trusted SLSA generator's transitive Node 20 action. |
+| #675 webhook/storage/recovery | `dbbf2b9b0852fe00feca89396e7ef3fe36aedb04` | Android CI #42636529872 **PASS**, Node **726/726**, contracts #42636529926 **PASS**, device APK #42636529875 **PASS**. | Draft; independent data-storage/security review pending. Duplicate-key guard now covers primary task/Focus, outer and nested recovery payloads and selected imports. Keep #640/#603/#639/#636 open until merge and acceptance. |
+| #676 page-bound extension injection | `59830d290f023c7b0b2cf2828a10de8bedaf195a` | Contracts #42637746292 **PASS**; Android CI #42637746064, device acceptance #42637746399 and device APK #42637746704 **IN PROGRESS**. Prior head #6836 failed on a stale JS-only one-submission assertion; #59830 corrects it to the expected two submissions (bootstrap + script). | Draft; wait for exact-head Android/device checks and independent review. No physical device tested. |
+
+### Prioritized whole-project backlog
+1. **P0 — Focus API 36 interaction (#648/#613):** fix root-relative versus screen-space coordinates before display injection; verify with non-zero root origin and post-scroll bounds; retain real tap/swipe/vertical-scroll checks and ten consecutive API 36 passes. Current API 29 pass does not waive API 36 failure.
+2. **P0 — Browser download security (#671):** current main still enqueues `DownloadManager.Request` and forwards the WebView Cookie header while redirects are followed internally. The fail-closed policy exists only on unmerged #648. Keep the branch fail-closed; implement a Daymark-owned redirect-by-redirect transport with downgrade/private-address rejection, same-origin cookies only, no referrer/ambient credentials, bounded streaming, temporary files and cancellation/error cleanup. Do not create a competing MainActivity edit while #648 owns it.
+3. **P1 — Recovery/storage/webhook (#675; #640/#603/#639/#636):** independent review and merge-gate verification; preserve unreadable/unknown versus absent, exact ambiguous bytes, task-persist-before-notify, Web Locks and session-only endpoint secrets. Physical recovery acceptance remains NOT TESTED.
+4. **P1 — iCalendar/import-export (#656):** independent RFC 5545 review for categories, recurrence/timezone/date semantics, repeated properties and completion metadata.
+5. **P1 — Extension trust (#659):** independent review of default-disabled imports, page-local capabilities, match/exclude scope, archive limits and preservation of existing packs on failed reads.
+6. **P1 — Signing/Node24 (#665/#84):** independent security review; PR/debug builds must not receive signing secrets; inspect direct and transitive action runtimes. No release publication.
+7. **P0 — Governance (#646):** owner configures PR-only main, independent approval, stable required Android/Ubuntu/Windows checks, stale-review dismissal, conversation resolution and force-push/deletion restrictions. Integration cannot inspect the protection endpoint; no settings changed.
+8. **P0 — Physical Android acceptance (#160):** test current-main APK on actual devices; record model, API, WebView provider/version, build SHA and APK SHA. CI/emulator artifacts are not physical-device acceptance.
+9. **P1 — Reminder parity (#476):** validate Android/web recurrence anchors and long-gap catch-up; physical AlarmManager/Doze/reboot/timezone/OEM delivery remains open.
+10. **P2 — Browser UX/architecture (#348/#325):** continue compatibility, Reader Mode, app links, performance and measured cross-platform contracts after the P0/P1 security and data-integrity gates.
+
+### Run-specific engineering log
+- Corrected the CSS bootstrap guard-order host-test assertion on #676 (commits `fd34e50ca6366fa2dab0054edb997cbf781dc105` and `1c11500fb47b79b39578649439c5567906e51ff6`). The later exact head failed for a separate stale JS-only submission-count assertion; that was reported and corrected by commit `59830d290f023c7b0b2cf2828a10de8bedaf195a`. The new exact-head checks are pending.
+- Reproduced #648 API 36 failure on head `dd73640`: Countdown bounds `[519,1688][938,1814]`, `getLocationOnScreen=(540,1904)`, injected tap center `(728,1751)`; API 29 passed, API 36 failed at run 1/10. Posted the Android API coordinate-space diagnosis in #613; no competing instrumentation/MainActivity edits made.
+- Revalidated #675 exact-head Android/Node/contracts/device-artifact results and duplicate-key guard coverage; verified #656 and #675 use byte-identical `task-logic.js` helper blobs.
+- Rechecked #659's active import paths: parser warnings appear in both review dialogs; new imported packs remain disabled until user activation. No independent review claimed.
+- Rechecked #665's direct old action references and posted exact-head evidence to #84; no signing secrets, release workflow, tag or release was changed.
+- Confirmed main's browser download path still uses DownloadManager plus Cookie header; posted the unmerged fail-closed/transport distinction to #671.
+- Updated #646 with live unprotected-branch/ruleset evidence; updated #613 with repeated API 36 failures; updated #640 with current duplicate-key coverage; updated #675 with stale status-snapshot inventory.
+- No PR merged by this run. No production release/tag/version bump, signer/package change, destructive migration, automatic restore or user-data mutation. Physical-device acceptance: **NOT TESTED**.
+
+**Work by:** ChatGPT (OpenAI)  
+**Model:** GPT-6  
+**Tooling:** GitHub connector via Code Mode; exact-source/PR/workflow inspection; Android API documentation  
+**Timestamp (UTC):** 2026-11-09T14:47:38.879Z
+
+---
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
