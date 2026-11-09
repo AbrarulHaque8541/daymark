@@ -25,9 +25,8 @@
     if (!env || !env.document) throw new Error('attachWebhookUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const nav = env.navigator || (win && win.navigator)
-      || (typeof navigator !== 'undefined' ? navigator : null);
-    const lockManager = env.lockManager || (nav && nav.locks) || null;
+    const navigator = env.navigator || (win && win.navigator) || null;
+    const lockManager = env.lockManager || (navigator && navigator.locks) || null;
     const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
     let storage = null;
     let storageAccessFailed = false;
@@ -42,8 +41,6 @@
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
-    const navigator = env.navigator || (win && win.navigator) || null;
-
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const urlEl = element('webhook-url');
     const formEl = element('webhook-form');
@@ -630,6 +627,21 @@
       }
     }
 
+    function resetQueueAfterExternalClear() {
+      // Called only after a coordinated storage clear removed (or confirmed
+      // absent) the durable queue key. It also drops this tab's memory-only
+      // suffix so a later Retry cannot recreate events the user just cleared.
+      queue = [];
+      memoryOnlyEvents = [];
+      resolvedUnpersistedIds.clear();
+      queueWriteFailed = false;
+      queueReadFailed = false;
+      coordinationFailed = false;
+      renderQueue();
+      status('Webhook queue cleared by local data controls.' + storageWarning());
+      return true;
+    }
+
     function onSave(event) {
       if (event && typeof event.preventDefault === 'function') event.preventDefault();
       const raw = urlEl && typeof urlEl.value === 'string' ? urlEl.value.trim() : '';
@@ -881,6 +893,7 @@
       notifyTaskCompleted,
       flush: attemptFlush,
       clearQueue: onClearQueue,
+      resetQueueAfterExternalClear,
       readConfig: () => config,
       readQueue: () => pendingQueueView(),
       detach() {
@@ -896,6 +909,10 @@
     notifyTaskCompleted(task, options) {
       if (activeHandle) return activeHandle.notifyTaskCompleted(task, options);
       return { queued: false, reason: 'not-attached' };
+    },
+    resetQueueAfterExternalClear() {
+      if (activeHandle) return activeHandle.resetQueueAfterExternalClear();
+      return false;
     }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

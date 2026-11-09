@@ -139,6 +139,27 @@ test('Clear Queue acquires task, delivery and queue locks in the shared global o
   assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
 });
 
+test('external storage clear resets this tab memory-only webhook events without retrying them', async () => {
+  const storageData = {};
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    setItem(key, value) {
+      if (key === webhookApi.QUEUE_KEY) throw new Error('quota');
+      storageData[key] = String(value);
+    },
+    removeItem(key) { delete storageData[key]; }
+  };
+  const { env } = fakeEnv({ url: DEFAULT_ENDPOINT_URL, online: false, storage });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  const queued = await handle.notifyTaskCompleted(TASK, { deferDelivery: true });
+  assert.equal(queued.queued, true);
+  assert.equal(queued.reason, 'memory-only');
+  assert.equal(handle.readQueue().length, 1);
+  assert.equal(handle.resetQueueAfterExternalClear(), true);
+  assert.deepEqual(handle.readQueue(), []);
+});
+
 test('Clear Queue fails closed when the shared queue lock cannot be acquired', async () => {
   const locks = {
     request(name, options, callback) {

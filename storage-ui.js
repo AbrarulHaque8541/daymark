@@ -28,6 +28,7 @@
     }
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+    const webhookUi = env.webhookUi || root.DaymarkWebhookUi || null;
     const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
@@ -206,8 +207,12 @@
     function finishCategoryClear(result, category) {
       if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
         notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
-      } else if (result.removed.length > 0 && category.id === 'webhook-queue') {
-        notifyTaskStorageChange('daymark.webhook.queue.v1');
+      } else if (category.id === 'webhook-queue') {
+        if (result.failed.length === 0 && webhookUi
+            && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
+          webhookUi.resetQueueAfterExternalClear();
+        }
+        if (result.removed.length > 0) notifyTaskStorageChange('daymark.webhook.queue.v1');
       }
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
@@ -354,6 +359,10 @@
         return false;
       }
       const result = locked.value;
+      if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
+          && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
+        webhookUi.resetQueueAfterExternalClear();
+      }
       if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '

@@ -102,6 +102,7 @@ function fakeEnv(options) {
     localStorage: storage,
     storageApi,
     taskMutation: mutation,
+    webhookUi: opts.webhookUi,
     lockManager: locks,
     confirm(message) {
       confirmations.push(String(message));
@@ -126,8 +127,10 @@ test('webhook queue category clear acquires task, delivery and queue locks befor
       return Promise.resolve().then(callback);
     }
   };
+  let resetCount = 0;
   const { env, storageData, dispatched } = fakeEnv({
     data: { 'daymark.webhook.queue.v1': '[]' },
+    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; } },
     lockManager: locks
   });
   await ui.attachStorageUi(env).onClearCategory('webhook-queue');
@@ -135,6 +138,7 @@ test('webhook queue category clear acquires task, delivery and queue locks befor
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
   assert.equal(dispatched.length, 1);
   assert.equal(dispatched[0].key, 'daymark.webhook.queue.v1');
+  assert.equal(resetCount, 1, 'same-tab memory-only webhook events are cleared too');
 });
 
 test('clear-all acquires the global task/delivery/queue lock order before deleting data', async () => {
@@ -145,18 +149,21 @@ test('clear-all acquires the global task/delivery/queue lock order before deleti
       return Promise.resolve().then(callback);
     }
   };
+  let resetCount = 0;
   const { env, storageData } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
       'daymark.webhook.queue.v1': '[]',
       'daymark.focus.v1': '{}'
     },
+    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; } },
     lockManager: locks
   });
   await ui.attachStorageUi(env).onClearAll();
   assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
   assert.equal(storageData['daymark.tasks.v1'], undefined);
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
+  assert.equal(resetCount, 1, 'Clear All also clears the same tab memory-only queue');
 });
 
 test('webhook queue and clear-all fail closed if any ordered lock is rejected', async () => {
