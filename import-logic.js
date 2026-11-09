@@ -633,7 +633,6 @@
       }
       if (hasDuplicateSingleton) {
         stats.ambiguousComponents += 1;
-        skippedRows += 1;
         continue;
       }
       const status = byName.STATUS ? byName.STATUS.value.trim().toUpperCase() : '';
