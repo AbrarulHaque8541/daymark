@@ -10,7 +10,7 @@ const NOW = '2026-11-07T05:00:00.000Z';
 
 function freshCtx() {
   let n = 0;
-  return { now: NOW, makeId: () => 'gen-' + String(++n) };
+  return { now: NOW, makeId: () => 'gen-' + String(++n), hasDuplicateJsonKeys: logic.hasDuplicateJsonKeys };
 }
 
 const sampleTasks = [
@@ -116,6 +116,29 @@ test('fromCsv skips malformed rows and fills lenient defaults', () => {
   assert.equal(task.repeat, null, 'unknown repeat values are dropped');
   assert.deepEqual(task.tags, ['goodtag'], 'invalid tags are dropped, valid ones kept');
   assert.equal(task.createdAt, NOW, 'unparseable createdAt falls back to now()');
+});
+
+test('fromCsv skips malformed or duplicate-key subtask JSON instead of silently dropping subtasks', () => {
+  const cell = (value) => {
+    const text = String(value);
+    return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  };
+  const row = (id, title, subtasks) => [
+    id, title, '', '', 'medium', 'false', '', '', '', subtasks, NOW, NOW
+  ].map(cell).join(',');
+  const duplicate = '[{"id":"s1","title":"First","title":"Overwritten","done":false}]';
+  const malformed = '[{"id":"s2"';
+  const valid = '[{"id":"s3","title":"Keep me","done":false}]';
+  const csv = [
+    importer.CSV_HEADER,
+    row('duplicate-subtask', 'Duplicate subtask keys', duplicate),
+    row('malformed-subtask', 'Malformed subtask JSON', malformed),
+    row('valid-subtask', 'Valid subtasks', valid)
+  ].join('\\r\\n') + '\\r\\n';
+  const result = importer.fromCsv(csv, freshCtx());
+  assert.equal(result.skippedRows, 2, 'ambiguous or malformed nested JSON skips the whole CSV row');
+  assert.equal(result.tasks.length, 1);
+  assert.deepEqual(result.tasks[0].subtasks.map((subtask) => subtask.title), ['Keep me']);
 });
 
 test('fromCsv rejects a wrong header instead of guessing columns', () => {
