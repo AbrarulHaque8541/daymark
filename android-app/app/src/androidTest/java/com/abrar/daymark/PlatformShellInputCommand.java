@@ -12,7 +12,7 @@ final class PlatformShellInputCommand {
     private static final Pattern SWIPE_PATTERN =
             Pattern.compile("input swipe ([0-9]{1,5}) ([0-9]{1,5}) ([0-9]{1,5}) ([0-9]{1,5}) ([0-9]{1,4})");
     private static final Pattern STATUS_PATTERN =
-            Pattern.compile("(?m)^" + Pattern.quote(STATUS_MARKER) + "([0-9]{1,3})$");
+            Pattern.compile(Pattern.quote(STATUS_MARKER) + "([0-9]{1,3})");
 
     private PlatformShellInputCommand() { }
 
@@ -45,7 +45,7 @@ final class PlatformShellInputCommand {
                     Integer.parseInt(swipe.group(3)), Integer.parseInt(swipe.group(4)),
                     Integer.parseInt(swipe.group(5)));
         }
-        return command + "; code=$?; printf '\\n" + STATUS_MARKER + "%s\\n' \"$code\"";
+        return "sh -c '" + command + "; code=$?; echo " + STATUS_MARKER + "$code'";
     }
 
     static int parseStatus(String output) {
@@ -54,7 +54,7 @@ final class PlatformShellInputCommand {
         int status = -1;
         while (matcher.find()) status = Integer.parseInt(matcher.group(1));
         if (status < 0 || status > 255) {
-            throw new IllegalArgumentException("shell input status marker missing or invalid");
+            throw new IllegalArgumentException("shell input status marker missing or invalid; output=" + output.substring(0, Math.min(output.length(), 512)));
         }
         return status;
     }
