@@ -50,12 +50,17 @@ if [ -z "$instrumentation" ]; then
 fi
 
 echo "Running Android instrumentation component: $instrumentation"
+input_package="com.abrar.daymark.test"
+if ! adb shell run-as "$input_package" sh -c 'test -d files && test -w files' >/dev/null 2>&1; then
+  echo "Instrumentation test package $input_package is not accessible through run-as; host input bridge cannot operate." >&2
+  exit 1
+fi
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
 phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 run_instrumentation_once() {
 status_file="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-status.$$"
 rm -f "$status_file"
-adb shell run-as com.abrar.daymark sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
+adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
 (
   set +e
   if command -v timeout >/dev/null 2>&1; then
@@ -70,7 +75,7 @@ adb shell run-as com.abrar.daymark sh -c 'rm -f files/daymark-instrumentation-in
 ) &
 instrumentation_pid=$!
 bridge_status=0
-drive_instrumentation_input_bridge com.abrar.daymark "$status_file" || bridge_status=$?
+drive_instrumentation_input_bridge "$input_package" "$status_file" || bridge_status=$?
 set +e
 wait "$instrumentation_pid"
 wait_status=$?
@@ -86,7 +91,7 @@ if [ "$bridge_status" -ne 0 ]; then
   output="${output}
 INPUT_BRIDGE_ERROR: host input bridge exited with status $bridge_status."
 fi
-adb shell run-as com.abrar.daymark sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
+adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
 if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
   phase_log=""
   for pkg in com.abrar.daymark com.abrar.daymark.debug; do
