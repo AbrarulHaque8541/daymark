@@ -462,8 +462,22 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private void dispatchVerticalSwipe(android.view.View view) throws Exception {
         android.graphics.Rect bounds = stableVisibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0, "vertical-gesture target has stable visible screen bounds");
-        injectDrag(bounds.centerX(), bounds.centerY() - Math.min(bounds.height() * 0.70f, 48f) / 2f,
-                bounds.centerX(), bounds.centerY() + Math.min(bounds.height() * 0.70f, 48f) / 2f);
+        StringBuilder touchTrace = new StringBuilder();
+        runOnMainSync(() -> view.setOnTouchListener((targetView, event) -> {
+            appendTouchTrace(touchTrace, "vertical", targetView, event);
+            return false;
+        }));
+        try {
+            injectDrag(bounds.centerX(), bounds.centerY() - Math.min(bounds.height() * 0.70f, 48f) / 2f,
+                    bounds.centerX(), bounds.centerY() + Math.min(bounds.height() * 0.70f, 48f) / 2f);
+        } finally {
+            runOnMainSync(() -> view.setOnTouchListener(null));
+        }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
+                "vertical drag delivers touchscreen events to target ("
+                        + view.getClass().getSimpleName() + ")");
     }
 
     private android.graphics.Rect stableVisibleBounds(android.view.View view) throws Exception {
@@ -506,18 +520,18 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
-        // Use the emulator's real touchscreen input service for swipes. sendPointerSync remains
-        // appropriate for taps, but API 36 intermittently stopped delivering injected drag events
-        // after several instrumentation launches even though the call returned successfully.
+        // The Android input command is intentionally invoked without shell control operators.
+        // UiAutomation's command pipe may return empty stdout for a successful silent input
+        // command; the caller verifies delivery through actual View MotionEvents and mode state.
+        // Keep the command to one executable plus numeric arguments so it also works when the
+        // platform launches it without an intermediate shell parser.
         String command = "input swipe "
                 + Math.round(startX) + " "
                 + Math.round(startY) + " "
                 + Math.round(endX) + " "
                 + Math.round(endY)
-                + " 320 2>&1; echo __DAYMARK_INPUT_EXIT:$?";
-        String output = executeShellCommand(command);
-        check(output.contains("__DAYMARK_INPUT_EXIT:0"),
-                "touchscreen swipe command failed: " + output);
+                + " 320";
+        executeShellCommand(command);
         waitForIdleSync();
     }
 

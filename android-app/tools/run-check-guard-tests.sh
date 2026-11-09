@@ -109,6 +109,7 @@ echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
 expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "sendPointerSync(event);" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "executeShellCommand(command)" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" "$PLATFORM_TEST" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
