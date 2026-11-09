@@ -7,6 +7,7 @@
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
   const FEED_KEY = 'daymark.feed.v1';
+  const FILTER_KEY = 'daymark.filter.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
@@ -33,8 +34,27 @@
       saved = localStorage.getItem(STORAGE_KEY);
     } catch (error) {
       console.warn('Could not read Daymark storage:', error);
-      setStorageStatus('Storage unavailable', true);
-      showToast('Browser storage is unavailable. You can still use this page for now.');
+      // Primary key is unreadable. Independently inspect the recovery backup
+      // without treating the primary as absent or mutating either key.
+      let backup = null;
+      let backupUnreadable = false;
+      try {
+        backup = localStorage.getItem(BACKUP_KEY);
+      } catch (backupError) {
+        console.warn('Could not read Daymark recovery backup:', backupError);
+        backupUnreadable = true;
+      }
+      if (backupUnreadable) {
+        setStorageStatus('Task primary data unreadable; recovery backup status unknown', true);
+        showToast('Browser storage is unavailable. You can still use this page for now.');
+      } else if (backup && typeof backup === 'string' && backup.length > 0) {
+        setStorageStatus('Task primary data unreadable; recovery backup available', true);
+        showToast('Primary task data could not be read. A recovery backup is available for export.');
+        offerRecoveryExport('Primary task data could not be read. A recovery backup is available.');
+      } else {
+        setStorageStatus('Task primary data unreadable; no recovery backup found', true);
+        showToast('Browser storage is unavailable. You can still use this page for now.');
+      }
       return [];
     }
     if (!saved) {
@@ -1420,7 +1440,26 @@
       saved = localStorage.getItem(FOCUS_KEY);
     } catch (error) {
       console.warn('Could not read Daymark focus storage:', error);
-      setStorageStatus('Focus storage unavailable', true);
+      // Independently check Focus recovery backup when primary is unreadable.
+      let backup = null;
+      let backupUnreadable = false;
+      try {
+        backup = localStorage.getItem(FOCUS_BACKUP_KEY);
+      } catch (backupError) {
+        console.warn('Could not read Daymark focus recovery backup:', backupError);
+        backupUnreadable = true;
+      }
+      if (backupUnreadable) {
+        setStorageStatus('Focus primary data unreadable; recovery backup status unknown', true);
+      } else if (backup && typeof backup === 'string' && backup.length > 0) {
+        setStorageStatus('Focus primary data unreadable; recovery backup available', true);
+        // Offer export if the shared recovery path is available.
+        if (typeof offerRecoveryExport === 'function') {
+          offerRecoveryExport('Focus primary data could not be read. A recovery backup is available.');
+        }
+      } else {
+        setStorageStatus('Focus primary data unreadable; no recovery backup found', true);
+      }
       return empty;
     }
     if (!saved) {
@@ -1928,6 +1967,10 @@
 
   function setUp() {
     state.tasks = loadTasks();
+    try {
+      const savedFilter = localStorage.getItem(FILTER_KEY);
+      if (['all', 'open', 'completed', 'overdue'].includes(savedFilter)) state.filter = savedFilter;
+    } catch (error) { /* ignore preference load failure */ }
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
@@ -1966,6 +2009,7 @@
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
+      try { localStorage.setItem(FILTER_KEY, state.filter); } catch (error) { /* preference save is best-effort */ }
       render();
     }));
     taskList.addEventListener('click', handleTaskAction);
