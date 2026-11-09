@@ -14,6 +14,7 @@ public final class ExtensionInjectorSmoke {
 
     public static void main(String[] args) {
         bindsEverySubmissionToTheFinishedPage();
+        jsOnlyUserscriptsReceiveTheStyleHelper();
         skipsStaleOnPageFinishedCallbacks();
         skipsDisabledAndNonmatchingPacks();
         skipsInvalidAndEmptyInputs();
@@ -45,6 +46,24 @@ public final class ExtensionInjectorSmoke {
         contains(scripts.get(0), "window.GM_addStyle", "userscript style helper remains available");
         contains(scripts.get(0), "history.pushState", "SPA CSS reapply remains available");
         contains(scripts.get(1), "window.__daymarkRan", "per-pack duplicate-run guard remains available");
+    }
+
+    private static void jsOnlyUserscriptsReceiveTheStyleHelper() {
+        WebView webView = new WebView(PAGE);
+        BrowserExtension pack = pack("script-only", true, "https://example.com/*",
+                "", "GM_addStyle('body{color:red}');");
+        ExtensionInjector.apply(webView, PAGE, Collections.singletonList(pack));
+
+        List<String> scripts = webView.getEvaluatedScripts();
+        equal(2, scripts.size(), "JS-only userscripts receive bootstrap and script in two submissions");
+        contains(scripts.get(0), "window.GM_addStyle", "JS-only bootstrap installs the userscript style helper");
+        contains(scripts.get(1), "GM_addStyle('body{color:red}')", "JS-only script can call GM_addStyle");
+        String bootstrapGuard = "if(String(window.location.href)!==expected)return;";
+        before(scripts.get(0), bootstrapGuard, "window.GM_addStyle",
+                "JS-only bootstrap is page-bound before exposing the style helper");
+        String guard = "if(String(window.location.href)!==" + ExtensionInjector.jsonString(PAGE) + ")return;";
+        before(scripts.get(1), guard, "GM_addStyle('body{color:red}')",
+                "JS-only pack code runs only after the page URL guard");
     }
 
     private static void skipsStaleOnPageFinishedCallbacks() {
