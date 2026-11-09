@@ -1,3 +1,28 @@
+## Current execution queue — 2026-11-09T20:35:23.409Z (main 1532838c; #686 multi-origin runtime coverage; #659 host-smoke compile fix)
+
+Full exact-head inventory and delivery ledger: [CURRENT_STATUS_20261109T203523Z.md](docs/CURRENT_STATUS_20261109T203523Z.md).
+
+1. **P0 #683:** shared cross-tab task mutation contract across app writes, imports, recovery, clear and undo; coordinate #675/#656.
+2. **P0 #613/#677/#648:** integrate Focus/IME correction and rerun strict API 29/36 reminder lifecycle acceptance.
+3. **P0 #646/#160:** owner-side required checks/independent review and physical Android/WebView acceptance.
+4. **P1 #675/#640/#636/#639:** independent recovery/webhook security review and exact-byte/manual recovery acceptance.
+5. **P1 #687/#659:** accessible malformed-extension recovery/export/removal UI, coordinated with MainActivity owner.
+6. **P1 #685/#686:** finish multi-origin/Activity/renderer Service Worker acceptance; owner decision on global block while Online.
+7. **P1 #671/#678:** complete secure app-owned browser download transport; keep downloads fail-closed until then.
+8. **P1 #684/#476:** align Android/web recurrence semantics and validate reminders/Doze/reboot/timezone/OEM behavior.
+9. **P1 #665/#84:** independent signing/provenance and Actions runtime review.
+10. **P1 #656/#676/#682:** independent import/export, extension and browser-data reviews.
+11. **P2 #325/#348:** measured cross-platform, browser UX, accessibility and performance work.
+
+No release, tag, version, signer, application identity, destructive migration, force push or protection bypass is authorized.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T20:35:23.409Z
+
+---
+
 ## Current execution queue — 2026-11-09T20:26:52.786Z (main 1532838c; #659 malformed-pack recovery store API CI green; #686 Service Worker API26/API36 runtime green)
 
 Full exact-head evidence, all ten open PR heads, issue inventory and delivery ledger are in [CURRENT_STATUS_20261109T202652Z.md](docs/CURRENT_STATUS_20261109T202652Z.md).
