@@ -24,7 +24,6 @@ restore() {
   rm -f "$BACKUP" "$PROVIDER_BACKUP" "$RENDER_GATE_BACKUP"
 }
 trap restore EXIT INT TERM
-
 expect_fail_after_removal() {
   checker="$1"
   marker="$2"
@@ -57,7 +56,6 @@ PY
   fi
   echo "PASS meta: $checker fails when marker is missing"
 }
-
 expect_fail_after_removal check-text-scale.py "TextScalePolicy.combined("
 WINDOW="$ROOT/app/src/main/java/com/abrar/daymark/Api30Window.java"
 if [ -f "$WINDOW" ]; then
@@ -109,11 +107,10 @@ expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP
 python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
 echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
 expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py "getUiAutomation().executeShellCommand(command)" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "getUiAutomation().executeShellCommand(inputCommand)" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py 'while [ "$attempt" -le 20 ]' "$ROOT/tools/run-platform-instrumentation-on-emulator.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parse_platform_instrumentation_component()" "$REPEAT_HELPER" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py 'STATUS_MARKER = "__DAYMARK_INPUT_STATUS__="' "$SHELL_POLICY" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py "TAP_PATTERN" "$SHELL_POLICY" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "MAX_COORDINATE = 10000" "$SHELL_POLICY" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "run-platform-instrumentation-shell-input-tests.sh" "$ROOT/tools/run-platform-instrumentation-repeat-tests.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" "$PLATFORM_TEST" "$ROOT"
@@ -122,12 +119,10 @@ expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTra
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "openReliablePipeHelper(" "$PROVIDER" "$ROOT"
-
 for checker in check-text-scale.py check-window-insets.py check-web-mode-state.py check-silent-catch.py check-press-feedback.py check-task-ux.py; do
   python3 "$ROOT/tools/$checker" >/dev/null
   echo "PASS meta: $checker passes on current source"
 done
 python3 "$ROOT/tools/check-attachment-source.py" "$ROOT" >/dev/null
 echo "PASS meta: check-attachment-source.py passes on current source"
-
 echo "PASS source-check guard regression tests"
