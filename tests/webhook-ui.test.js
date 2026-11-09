@@ -466,6 +466,56 @@ test('a throwing localStorage getter does not abort the webhook card or send tas
   assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
 });
 
+test('a final failed delivery durably drops only the exhausted event', async () => {
+  const timestamp = '2026-11-09T09:55:00.000Z';
+  const exhaustedTask = Object.assign({}, TASK, {
+    id: 'task-exhausted',
+    title: 'Exhausted webhook event'
+  });
+  const laterTask = Object.assign({}, TASK, {
+    id: 'task-still-pending',
+    title: 'Later queued event'
+  });
+  const exhausted = webhookApi.makeQueueEvent(
+    webhookApi.buildTaskCompletedPayload(exhaustedTask, timestamp),
+    timestamp
+  );
+  exhausted.attempts = webhookApi.MAX_ATTEMPTS - 1;
+  const later = webhookApi.makeQueueEvent(
+    webhookApi.buildTaskCompletedPayload(laterTask, timestamp),
+    timestamp
+  );
+  const storageData = {
+    [webhookApi.QUEUE_KEY]: JSON.stringify([exhausted, later])
+  };
+  let fetchCalls = 0;
+  const { env, elements } = fakeEnv({
+    url: 'https://hooks.example.com/x',
+    storageData,
+    fetch: async () => {
+      fetchCalls += 1;
+      throw new Error('offline');
+    }
+  });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+
+  await handle.flush();
+
+  const persisted = JSON.parse(storageData[webhookApi.QUEUE_KEY]);
+  assert.equal(fetchCalls, 1, 'the exhausted event receives exactly its final permitted attempt');
+  assert.deepEqual(persisted.map((event) => event.id), [later.id],
+    'the exhausted event is durably removed while later events remain');
+  assert.deepEqual(handle.readQueue().map((event) => event.id), [later.id],
+    'the in-memory queue agrees with durable storage');
+  assert.match(elements['webhook-status'].textContent,
+    /1 event was dropped after too many attempts/i,
+    'the user is told why the event disappeared');
+  assert.match(elements['webhook-status'].textContent,
+    /remaining webhook events.*retry/i,
+    'remaining events remain actionable');
+});
+
 test('a queue read failure preserves the unknown queue and pauses task delivery', async () => {
   const { env, elements } = fakeEnv({});
   const config = { version: 1, url: 'https://hooks.example.com/x' };
