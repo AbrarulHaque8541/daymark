@@ -23,16 +23,20 @@ if [ "$1" = shell ] && [ "$2" = input ]; then
   printf '%s\n' "$*" >> "$FAKE_INPUT_LOG"
   exit "${FAKE_INPUT_STATUS:-0}"
 fi
-if [ "$1" = shell ] && [ "$2" = run-as ] && [ "$4" = sh ] && [ "$5" = -c ]; then
-  if [ "${FAKE_PUBLISH_STATUS:-0}" -ne 0 ]; then
-    echo "fake result publish denied" >&2
-    exit "$FAKE_PUBLISH_STATUS"
-  fi
-  printf '%s|%s\n' "$8" "$9" > "$FAKE_DEVICE_DIR/instrumentation-input-result.txt"
-  if [ "${FAKE_STOP_AFTER_READS:-0}" -eq 0 ]; then
-    touch "$FAKE_STOP_FILE"
-  fi
-  exit 0
+if [ "$1" = shell ] && [ "$#" -eq 2 ]; then
+  case "$2" in
+    "run-as "*)
+      if [ "${FAKE_PUBLISH_STATUS:-0}" -ne 0 ]; then
+        echo "fake result publish denied" >&2
+        exit "$FAKE_PUBLISH_STATUS"
+      fi
+      printf '%s|%s\n' "$DAYMARK_HOST_INPUT_BRIDGE_SEQ" "$DAYMARK_HOST_INPUT_BRIDGE_STATUS" > "$FAKE_DEVICE_DIR/instrumentation-input-result.txt"
+      if [ "${FAKE_STOP_AFTER_READS:-0}" -eq 0 ]; then
+        touch "$FAKE_STOP_FILE"
+      fi
+      exit 0
+      ;;
+  esac
 fi
 echo "unexpected fake adb arguments: $*" >&2
 exit 90
