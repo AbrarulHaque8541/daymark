@@ -222,6 +222,37 @@ test('a failed removal during clear-all is reported honestly', () => {
   assert.match(elements['storage-status-line'].textContent, /could not be removed by the browser/);
 });
 
+test('a failed rescan clears stale rows and disables destructive controls', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]', 'daymark.weather.v1': '{}' }
+  });
+  const original = env.storageApi;
+  let scans = 0;
+  env.storageApi = Object.assign({}, original, {
+    scanStorage(storage) {
+      scans += 1;
+      if (scans === 1) return original.scanStorage(storage);
+      throw new Error('storage scan became unavailable');
+    }
+  });
+  const handle = ui.attachStorageUi(env);
+  assert.ok(elements['storage-list'].children.length > 0, 'initial successful scan renders categories');
+  assert.equal(elements['storage-clear-all'].disabled, false, 'known data enables clear-all initially');
+
+  handle.render();
+
+  assert.equal(elements['storage-list'].children.length, 0,
+    'a failed rescan must not leave stale category sizes or clear buttons visible');
+  assert.equal(elements['storage-clear-all'].disabled, true,
+    'destructive clear-all is disabled while the latest scan is unknown');
+  assert.equal(elements['storage-check'].disabled, false,
+    'the read-only refresh remains available for a later retry');
+  assert.match(elements['storage-status-line'].textContent,
+    /Local data status is unknown; nothing was changed/);
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(storageData['daymark.weather.v1'], '{}');
+});
+
 test('unreadable data is shown as unknown and clear-all fails closed', () => {
   const { env, elements, storageData, confirmations } = fakeEnv({
     data: { 'daymark.tasks.v1': '[]' },
