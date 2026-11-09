@@ -125,3 +125,26 @@ test('pull-request device-test builds never receive production signing secrets',
   assert.match(lines.slice(publishStart, publishStart + 8).join('\n'),
     /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
 });
+
+
+test('SLSA provenance uploads are restricted to mainline device-test tag pushes', () => {
+  const workflowPath = '.github/workflows/generator-generic-ossf-slsa3-publish.yml';
+  const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
+  const verificationStart = content.indexOf('      - name: Verify device-test tag is on main');
+  const setupJavaStart = content.indexOf('      - name: Set up JDK 17');
+  const provenanceStart = content.indexOf('  provenance:');
+  assert.ok(verificationStart >= 0 && setupJavaStart > verificationStart,
+    'tag ancestry must be verified before building the provenance subject');
+  const verification = content.slice(verificationStart, setupJavaStart);
+  assert.match(verification, /if: github\.event_name == 'push'/);
+  assert.match(verification, /git merge-base --is-ancestor "\$GITHUB_SHA" refs\/remotes\/origin\/main/,
+    'a pushed device-test tag must point to a commit reachable from main');
+
+  assert.match(content, /workflow_dispatch:/,
+    'manual dispatch remains available for a non-publishing build check');
+  const provenance = content.slice(provenanceStart);
+  assert.match(provenance, /if: github\.event_name == 'push' && github\.ref_type == 'tag'/,
+    'the reusable provenance publisher must be skipped for workflow_dispatch');
+  assert.match(provenance, /contents: write/);
+  assert.match(provenance, /upload-assets: true/);
+});
