@@ -371,11 +371,11 @@ test('every repository Node test file registers at least one executable test cas
     'line and block comments must not count as executable registrations');
   assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => {});"), true,
     'focused-test text inside a template literal must not reject a real test');
-  assert.equal(hasRegisteredTestCase('const note = "not test(\\'fake\\')";'), false,
+  assert.equal(hasRegisteredTestCase("const note = \"not test('fake')\";"), false,
     'prose before a test-like phrase inside a quoted string must not count as a registration');
   assert.equal(hasRegisteredTestCase("const note = " + String.fromCharCode(96) + "example test('fake')" + String.fromCharCode(96) + ";"), false,
     'prose before a test-like phrase inside template raw text must not count as a registration');
-  assert.equal(hasRegisteredTestCase('const note = "// test(\\'fake\\') /* it(\\'fake\\') */";'), false,
+  assert.equal(hasRegisteredTestCase("const note = \"// test('fake') /* it('fake') */\";"), false,
     'comment markers and test-like text inside strings must remain inert');
 
   for (const file of testFiles) {
