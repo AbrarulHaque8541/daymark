@@ -123,7 +123,7 @@ public final class ExtensionInjectorSmoke {
     private static void boundsSubmissionsAndEnabledPacks() {
         WebView cssOnly = new WebView(PAGE);
         ExtensionInjector.apply(cssOnly, PAGE, Collections.singletonList(
-                pack("css-only", true, "https://example.com/*", "body{}", ""));
+                pack("css-only", true, "https://example.com/*", "body{}", "")));
         equal(1, cssOnly.getEvaluatedScripts().size(), "CSS-only pack uses one SPA bootstrap submission");
 
         WebView jsOnly = new WebView(PAGE);
