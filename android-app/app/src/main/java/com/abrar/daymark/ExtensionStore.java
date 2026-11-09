@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -43,9 +44,39 @@ final class ExtensionStore {
         Context app = context.getApplicationContext();
         this.preferences = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         this.userDir = new File(app.getFilesDir(), USER_DIR);
-        if (!userDir.exists()) {
-            //noinspection ResultOfMethodCallIgnored
-            userDir.mkdirs();
+        // Never follow a pre-existing symlink at the private extension directory itself.
+        try {
+            Path directory = userDir.toPath();
+            if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
+                try {
+                    Files.createDirectory(directory);
+                } catch (FileAlreadyExistsException racedCreation) {
+                    // Re-check the resulting path below on every operation.
+                }
+            }
+        } catch (IOException ignored) {
+            // Operations fail closed through requireSafeUserDirectory()/isSafeUserDirectory().
+        }
+    }
+
+    private boolean isSafeUserDirectory() {
+        return isSafeDirectoryPath(userDir);
+    }
+
+    private void requireSafeUserDirectory() throws IOException {
+        if (!isSafeUserDirectory()) {
+            throw new IOException("Private extension pack directory is not a real directory; refusing user-pack access.");
+        }
+    }
+
+    private static boolean isSafeDirectoryPath(File directory) {
+        if (directory == null) return false;
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(
+                    directory.toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            return attributes.isDirectory() && !attributes.isSymbolicLink();
+        } catch (IOException | SecurityException unsafe) {
+            return false;
         }
     }
 
@@ -119,6 +150,8 @@ final class ExtensionStore {
             byId.put(builtIn.id, builtIn.withEnabled(enabled)
                     .withDisabledSites(disabledSitesForBuiltin(builtIn.id)));
         }
+        // A symlinked/unreadable user directory must never be traversed for executable packs.
+        if (!isSafeUserDirectory()) return new ArrayList<>(byId.values());
         File[] files = userDir.listFiles((dir, name) -> name != null && name.endsWith(".daymark-ext.json"));
         if (files != null) {
             for (File file : files) {
@@ -156,6 +189,7 @@ final class ExtensionStore {
     }
 
     void installUserPack(BrowserExtension ext) throws Exception {
+        requireSafeUserDirectory();
         if (ext == null || ext.builtIn) throw new IllegalArgumentException("Invalid pack.");
         if (ext.id.startsWith("daymark.builtin.")) {
             throw new IllegalArgumentException("Cannot overwrite built-in id.");
@@ -256,11 +290,8 @@ final class ExtensionStore {
      */
     List<MalformedUserPack> listMalformedUserPacks() throws IOException {
         synchronized (ExtensionStore.class) {
-            Path directory = userDir.toPath();
-            if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) return new ArrayList<>();
-            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
-                throw new IOException("Extension pack directory is not a regular directory.");
-            }
+            requireSafeUserDirectory();
+            Path directory = userDir.toPath().toAbsolutePath().normalize();
             List<MalformedUserPack> result = new ArrayList<>();
             try (DirectoryStream<Path> files = Files.newDirectoryStream(directory)) {
                 for (Path path : files) {
@@ -342,6 +373,7 @@ final class ExtensionStore {
     }
 
     private Path resolveSafeUserPackPath(String fileName) throws IOException {
+        requireSafeUserDirectory();
         if (!isSafeUserPackFileName(fileName)) {
             throw new IOException("Invalid extension recovery filename.");
         }
@@ -363,6 +395,10 @@ final class ExtensionStore {
     }
 
     private static byte[] readBoundedBytes(Path path) throws IOException {
+        Path parent = path.getParent();
+        if (parent == null || !isSafeDirectoryPath(parent.toFile())) {
+            throw new IOException("Private extension pack directory is unsafe; refusing to read.");
+        }
         BasicFileAttributes before = Files.readAttributes(
                 path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         if (!before.isRegularFile()) {
@@ -387,6 +423,9 @@ final class ExtensionStore {
             if (total != expectedLength) {
                 throw new IOException("Extension recovery file changed while being read.");
             }
+        }
+        if (!isSafeDirectoryPath(parent.toFile())) {
+            throw new IOException("Private extension pack directory changed while being read.");
         }
         BasicFileAttributes after = Files.readAttributes(
                 path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -436,14 +475,14 @@ final class ExtensionStore {
     }
 
     private File findUserPack(String id) {
-        if (id == null) return null;
+        if (id == null || !isSafeUserDirectory()) return null;
         File file = new File(userDir, sanitizeFileName(id) + ".daymark-ext.json");
         return file.exists() ? file : null;
     }
 
     void uninstallUserPack(String id) {
         synchronized (ExtensionStore.class) {
-            if (id == null || id.startsWith("daymark.builtin.")) return;
+            if (id == null || id.startsWith("daymark.builtin.") || !isSafeUserDirectory()) return;
             File out = new File(userDir, sanitizeFileName(id) + ".daymark-ext.json");
             if (!Files.isRegularFile(out.toPath(), LinkOption.NOFOLLOW_LINKS)) return;
             //noinspection ResultOfMethodCallIgnored
@@ -474,7 +513,8 @@ final class ExtensionStore {
     }
 
     private static String readFile(File file) throws IOException {
-        if (file == null || !Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+        if (file == null || !isSafeDirectoryPath(file.getParentFile())
+                || !Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Extension pack path is not a regular file.");
         }
         long initialLength = file.length();
@@ -501,6 +541,9 @@ final class ExtensionStore {
     }
 
     private static synchronized void writeFile(File file, String content) throws Exception {
+        if (file == null || !isSafeDirectoryPath(file.getParentFile())) {
+            throw new IOException("Private extension pack directory is unsafe; refusing to write.");
+        }
         File tmp = new File(file.getAbsolutePath() + ".tmp");
         try {
             try (FileOutputStream out = new FileOutputStream(tmp)) {
