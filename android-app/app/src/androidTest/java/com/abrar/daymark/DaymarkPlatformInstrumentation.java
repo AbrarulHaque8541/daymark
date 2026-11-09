@@ -47,9 +47,6 @@ import javax.crypto.spec.SecretKeySpec;
 public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private static final String TASK_ID = "instrumentation-task-v1";
     private static final String LOG_TAG = "DaymarkInstr";
-    private static final String INPUT_REQUEST_FILE = "daymark-instrumentation-input-request.txt";
-    private static final String INPUT_RESULT_FILE = "daymark-instrumentation-input-result.txt";
-    private int inputSequence;
     private int assertions;
 
     @Override
@@ -107,19 +104,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         marker("PHASE " + name + ": ok (" + assertions + " assertions so far)");
     }
 
-    /**
-     * Markers go to logcat and to an app-local file; verbose CI boot logging rotates logcat
-     * quickly, and the file survives rotation and is readable through run-as on a debug build.
-     */
+    /** Emits phase markers to logcat and instrumentation output; no cross-UID file access. */
     private void marker(String message) {
         android.util.Log.i(LOG_TAG, message);
-        try {
-            File log = new File(getContext().getFilesDir(), "instrumentation-phases.log");
-            try (FileOutputStream out = new FileOutputStream(log, true)) {
-                out.write((System.currentTimeMillis() + " " + message + "\n")
-                        .getBytes(StandardCharsets.UTF_8));
-            }
-        } catch (Throwable suppressed) { }
+        System.out.println("INSTRUMENTATION_PHASE: " + message);
     }
 
     @FunctionalInterface
@@ -596,70 +584,45 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private void dispatchHostInput(String action, float startX, float startY,
                                    float endX, float endY, int durationMs) throws Exception {
-        if (!"tap".equals(action) && !"swipe".equals(action)) {
-            throw new IllegalArgumentException("unsupported host input action: " + action);
-        }
-        int sequence = ++inputSequence;
-        File filesDir = getContext().getFilesDir();
-        System.out.println("HOST_INPUT_BRIDGE package=" + getContext().getPackageName()
-                + " filesDir=" + filesDir.getAbsolutePath()
-                + " target=" + getTargetContext().getPackageName());
-        File request = new File(filesDir, INPUT_REQUEST_FILE);
-        File result = new File(filesDir, INPUT_RESULT_FILE);
-        File temporary = new File(filesDir, INPUT_REQUEST_FILE + ".tmp");
-        request.delete();
-        result.delete();
-        temporary.delete();
-
-        String requestLine = sequence + "|" + action + "|" + Math.round(startX) + "|"
-                + Math.round(startY) + "|" + Math.round(endX) + "|" + Math.round(endY)
-                + "|" + durationMs + "\n";
-        try (FileOutputStream output = new FileOutputStream(temporary)) {
-            output.write(requestLine.getBytes(StandardCharsets.US_ASCII));
-            output.getFD().sync();
-        }
-        if (!temporary.renameTo(request)) {
-            temporary.delete();
-            throw new IOException("could not publish host input request " + sequence);
+        String inputCommand;
+        if ("tap".equals(action)) {
+            inputCommand = PlatformShellInputCommand.tap(Math.round(startX), Math.round(startY));
+        } else if ("swipe".equals(action)) {
+            inputCommand = PlatformShellInputCommand.swipe(Math.round(startX), Math.round(startY),
+                    Math.round(endX), Math.round(endY), durationMs);
+        } else {
+            throw new IllegalArgumentException("unsupported shell input action: " + action);
         }
 
-        long deadline = android.os.SystemClock.uptimeMillis() + 15000L;
-        while (android.os.SystemClock.uptimeMillis() < deadline) {
-            if (result.isFile()) {
-                String response = readSmallTextFile(result).trim();
-                String[] fields = response.split("\\|", -1);
-                if (fields.length == 2 && Integer.toString(sequence).equals(fields[0])) {
-                    result.delete();
-                    request.delete();
-                    int status = Integer.parseInt(fields[1]);
-                    if (status != 0) {
-                        throw new AssertionError("host input command failed (action=" + action
-                                + ", sequence=" + sequence + ", exit=" + status + ")");
+        String command = PlatformShellInputCommand.withStatus(inputCommand);
+        marker("shell input start: " + inputCommand);
+        ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(command);
+        if (descriptor == null) {
+            throw new IOException("UiAutomation returned no shell input descriptor");
+        }
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try {
+            try (FileInputStream input = new FileInputStream(descriptor.getFileDescriptor())) {
+                byte[] buffer = new byte[256];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    if (output.size() + count > 4096) {
+                        throw new IOException("shell input output exceeded its size limit");
                     }
-                    waitForIdleSync();
-                    return;
+                    output.write(buffer, 0, count);
                 }
             }
-            android.os.SystemClock.sleep(25L);
+        } finally {
+            descriptor.close();
         }
-        request.delete();
-        throw new AssertionError("timed out waiting for host input bridge (action=" + action
-                + ", sequence=" + sequence + ")");
-    }
-
-    private String readSmallTextFile(File file) throws IOException {
-        try (FileInputStream input = new FileInputStream(file);
-             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[128];
-            int count;
-            while ((count = input.read(buffer)) != -1) {
-                if (output.size() + count > 256) {
-                    throw new IOException("host input result exceeded its size limit");
-                }
-                output.write(buffer, 0, count);
-            }
-            return output.toString(StandardCharsets.US_ASCII.name());
+        String response = new String(output.toByteArray(), StandardCharsets.UTF_8);
+        int status = PlatformShellInputCommand.parseStatus(response);
+        if (status != 0) {
+            throw new AssertionError("shell input failed (action=" + action + ", exit=" + status
+                    + ", output=" + response.trim() + ")");
         }
+        marker("shell input complete: " + inputCommand);
+        waitForIdleSync();
     }
 
     private void clickWorkspaceTab(android.view.View tab, String transition) throws Exception {
