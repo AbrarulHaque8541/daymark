@@ -114,7 +114,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     private void marker(String message) {
         android.util.Log.i(LOG_TAG, message);
         try {
-            File log = new File(getTargetContext().getFilesDir(), "instrumentation-phases.log");
+            File log = new File(getContext().getFilesDir(), "instrumentation-phases.log");
             try (FileOutputStream out = new FileOutputStream(log, true)) {
                 out.write((System.currentTimeMillis() + " " + message + "\n")
                         .getBytes(StandardCharsets.UTF_8));
