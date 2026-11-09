@@ -93,7 +93,7 @@ assert "ancestor == parentScroll ? \"parent-scroll\"" in platform_test
 assert "ancestor.setOnTouchListener" in platform_test
 assert "appendTouchTrace(ancestorTrace, label, targetView, event)" in platform_test
 assert "selectorTrace" in platform_test
-assert "parentTrace" in platform_test
+assert "ancestorTrace" in platform_test
 assert "attachTouchTraceListeners(view" in platform_test
 assert "scrollDeadline" in platform_test
 assert "horizontal swipe delivers touchscreen events to the ModeSelector or descendants" in platform_test
