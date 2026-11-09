@@ -11,9 +11,9 @@ public final class PlatformShellInputCommandSmoke {
         equal("input tap 12 34; code=$?; printf '\\n__DAYMARK_INPUT_STATUS__=%s\\n' \"$code\"",
                 PlatformShellInputCommand.withStatus(PlatformShellInputCommand.tap(12, 34)),
                 "status wrapper");
-        equal(0, PlatformShellInputCommand.parseStatus("input tap 12 34\\n__DAYMARK_INPUT_STATUS__=0\\n"),
+        equal(0, PlatformShellInputCommand.parseStatus("input tap 12 34\n__DAYMARK_INPUT_STATUS__=0\n"),
                 "zero exit status");
-        equal(7, PlatformShellInputCommand.parseStatus("input failed\\r\\n__DAYMARK_INPUT_STATUS__=7\\r\\n"),
+        equal(7, PlatformShellInputCommand.parseStatus("input failed\r\n__DAYMARK_INPUT_STATUS__=7\r\n"),
                 "non-zero exit status");
         rejects(() -> PlatformShellInputCommand.tap(-1, 0), "negative tap coordinate");
         rejects(() -> PlatformShellInputCommand.withStatus("input tap 1 2; echo unsafe"), "shell metacharacters");
