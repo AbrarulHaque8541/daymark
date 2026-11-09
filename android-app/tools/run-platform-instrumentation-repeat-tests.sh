@@ -4,7 +4,6 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 sh -n "$ROOT/tools/run-platform-instrumentation-on-emulator.sh"
 sh -n "$ROOT/tools/run-platform-instrumentation-touch-sequence-tests.sh"
 sh -n "$ROOT/tools/platform-instrumentation-repeat.sh"
-sh -n "$ROOT/tools/run-platform-instrumentation-touch-sequence-tests.sh"
 . "$ROOT/tools/platform-instrumentation-repeat.sh"
 TMP=$(mktemp -d "daymark-instrumentation-repeat.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
