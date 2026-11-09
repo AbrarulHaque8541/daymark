@@ -249,14 +249,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "Focus mode selector remains inside the parent Tasks ScrollView");
             // Add scrollable content before any mode tap so the actual controls can be
             // positioned inside the ScrollView viewport, not merely drawn beyond it.
+            final android.widget.ScrollView initialParentScroll = parentScroll;
             runOnMainSync(() -> {
-                android.view.ViewGroup frame = (android.view.ViewGroup) parentScroll.getChildAt(0);
+                android.view.ViewGroup frame = (android.view.ViewGroup) initialParentScroll.getChildAt(0);
                 android.view.ViewGroup content = (android.view.ViewGroup) frame.getChildAt(0);
                 android.view.View spacer = new android.view.View(mainActivity);
                 content.addView(spacer, new android.widget.LinearLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1200));
                 content.requestLayout();
-                parentScroll.requestLayout();
+                initialParentScroll.requestLayout();
             });
             waitForIdleSync();
             scrollViewIntoFocus(modeRow);
@@ -290,17 +291,19 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             scrollDescendantIntoScrollView(parentScroll, modeSelector);
             boolean[] canScroll = new boolean[2];
             int[] scrollY = new int[2];
+            final android.widget.ScrollView scrollForMeasurement = parentScroll;
             runOnMainSync(() -> {
-                canScroll[0] = parentScroll.canScrollVertically(1);
-                canScroll[1] = parentScroll.canScrollVertically(-1);
-                scrollY[0] = parentScroll.getScrollY();
+                canScroll[0] = scrollForMeasurement.canScrollVertically(1);
+                canScroll[1] = scrollForMeasurement.canScrollVertically(-1);
+                scrollY[0] = scrollForMeasurement.getScrollY();
             });
             check(canScroll[0] || canScroll[1],
                     "Tasks workspace has scrollable content for the vertical-gesture regression");
             String verticalScrollTrace = dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0]);
             long scrollDeadline = android.os.SystemClock.uptimeMillis() + 2000L;
+            final android.widget.ScrollView scrollForCurrentPosition = parentScroll;
             do {
-                runOnMainSync(() -> scrollY[1] = parentScroll.getScrollY());
+                runOnMainSync(() -> scrollY[1] = scrollForCurrentPosition.getScrollY());
                 if (canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0]) break;
                 android.os.SystemClock.sleep(50L);
             } while (android.os.SystemClock.uptimeMillis() < scrollDeadline);
