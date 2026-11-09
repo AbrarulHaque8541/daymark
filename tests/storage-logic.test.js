@@ -35,6 +35,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.holidays.v1',
     'daymark.currency.v1',
     'daymark.zones.v1',
+    'daymark.browser-proxy.last-profile',
     'daymark.webhook.v1',
     'daymark.webhook.queue.v1',
     'daymark.webhook.lock.v1'
@@ -57,6 +58,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
 
 test('planClear returns the exact keys and rejects unknown categories', () => {
   assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
+  assert.deepEqual(storage.planClear('browser-proxy'), ['daymark.browser-proxy.last-profile']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
   assert.deepEqual(storage.planClear('webhook-lock'), ['daymark.webhook.lock.v1']);
   assert.throws(() => storage.planClear('nope'), /Unknown data category/);
@@ -240,4 +242,25 @@ test('webhook settings category explains that only legacy endpoints are stored t
   const category = storage.categoryById('webhook');
   assert.match(category.description, /legacy endpoint/i);
   assert.match(category.description, /active tab only/i);
+});
+
+
+test('saved browser proxy profile is inventoried and cleared independently', () => {
+  const store = fakeStorage({
+    'daymark.browser-proxy.last-profile': 'proxy.example:8080',
+    'daymark.webhook.queue.v1': '[]'
+  });
+  const scan = storage.scanStorage(store);
+  const category = scan.categories.find((entry) => entry.id === 'browser-proxy');
+  assert.ok(category, 'the saved proxy profile has its own visible category');
+  assert.equal(category.present, true);
+  assert.equal(category.bytes, 'proxy.example:8080'.length);
+  assert.equal(storage.isManagedKey('daymark.browser-proxy.last-profile'), true);
+
+  const result = storage.clearCategory(store, 'browser-proxy');
+  assert.deepEqual(result.removed, ['daymark.browser-proxy.last-profile']);
+  assert.deepEqual(result.failed, []);
+  assert.equal(store.snapshot['daymark.browser-proxy.last-profile'], undefined);
+  assert.equal(store.snapshot['daymark.webhook.queue.v1'], '[]',
+    'clearing the remembered proxy profile must not touch queued webhook events');
 });
