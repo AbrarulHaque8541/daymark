@@ -434,7 +434,11 @@ test('storage UI selectors stay connected to the production HTML contract', () =
 
 test('clear-all confirmation discloses the remembered browser proxy profile', () => {
   const { env, confirmations, confirmState, storageData } = fakeEnv({
-    data: { 'daymark.browser-proxy.last-profile': 'proxy.example:8080' },
+    data: {
+      'daymark.browser-proxy.last-profile': 'proxy.example:8080',
+      'daymark.wiki.prefs.v1': '{"query":"offline"}',
+      'daymark.browser-download.last-scenario': 'expired-link'
+    },
     confirmResult: false
   });
   const handle = ui.attachStorageUi(env);
@@ -443,6 +447,10 @@ test('clear-all confirmation discloses the remembered browser proxy profile', ()
   assert.equal(confirmations.length, 1);
   assert.match(confirmations[0], /saved browser proxy profile/i);
   assert.match(confirmations[0], /Focus Timer preset/i);
+  assert.match(confirmations[0], /saved Wikipedia\/weather\/holiday\/currency and browser-search preferences/i);
+  assert.match(confirmations[0], /remembered browser download journey/i);
+  assert.equal(storageData['daymark.wiki.prefs.v1'], '{"query":"offline"}', 'declining clear-all preserves saved search preferences');
+  assert.equal(storageData['daymark.browser-download.last-scenario'], 'expired-link', 'declining clear-all preserves the download journey');
   assert.equal(storageData['daymark.browser-proxy.last-profile'], 'proxy.example:8080',
     'declining the confirmation must preserve the remembered profile');
   assert.equal(confirmState.result, false);

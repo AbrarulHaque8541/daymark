@@ -34,11 +34,18 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.focus.preset.v1',
     'daymark.focus.v1.backup',
     'daymark.feed.v1',
+    'daymark.wiki.v1',
+    'daymark.wiki.prefs.v1',
     'daymark.weather.v1',
+    'daymark.weather.prefs.v1',
     'daymark.holidays.v1',
+    'daymark.holidays.prefs.v1',
     'daymark.currency.v1',
+    'daymark.currency.prefs.v1',
     'daymark.zones.v1',
     'daymark.browser-proxy.last-profile',
+    'daymark.browser-address.prefs.v1',
+    'daymark.browser-download.last-scenario',
     'daymark.webhook.queue.v1',
     'daymark.webhook.lock.v1'
   ];
@@ -63,6 +70,25 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
   const focusPresetKey = appSource.match(/const FOCUS_PRESET_KEY = '([^']+)'/);
   assert.ok(focusPresetKey, 'the app must declare its Focus preset storage key');
   assert.ok(seen.has(focusPresetKey[1]), 'the Focus preset key must be included in the storage inventory');
+
+  // Discover literal key declarations across all root-level JS modules. A new
+  // card preference/cache must not silently escape the health inventory.
+  const root = path.join(__dirname, '..');
+  const discoveredKeys = new Set();
+  for (const fileName of fs.readdirSync(root).filter((name) => name.endsWith('.js'))) {
+    const source = fs.readFileSync(path.join(root, fileName), 'utf8');
+    for (const match of source.matchAll(/\b(?:const|let|var)\s+[A-Z][A-Z0-9_]*KEY\s*=\s*(['"])(daymark\.[^'"]+)\1/g)) {
+      discoveredKeys.add(match[2]);
+    }
+  }
+  const excludedSecretKeys = new Set(['daymark.webhook.v1']);
+  assert.ok(discoveredKeys.has('daymark.webhook.v1'),
+    'the legacy secret-bearing endpoint key remains known to the webhook module');
+  assert.deepEqual([...discoveredKeys].filter((key) => !excludedSecretKeys.has(key)).sort(),
+    [...expectedKeys].sort(),
+    'every non-secret literal daymark storage key declared by a root JS module must be inventoried');
+  assert.equal(storage.isManagedKey('daymark.webhook.v1'), false,
+    'the secret-bearing legacy endpoint must never be read by the storage health card');
   assert.equal(storage.isManagedKey('daymark.unknown.v1'), false);
 });
 
@@ -72,6 +98,13 @@ test('planClear returns the exact keys and rejects unknown categories', () => {
   assert.deepEqual(storage.planClear('browser-proxy'), ['daymark.browser-proxy.last-profile']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
   assert.deepEqual(storage.planClear('webhook-lock'), ['daymark.webhook.lock.v1']);
+  assert.deepEqual(storage.planClear('wiki'), ['daymark.wiki.v1']);
+  assert.deepEqual(storage.planClear('wiki-preferences'), ['daymark.wiki.prefs.v1']);
+  assert.deepEqual(storage.planClear('weather-preferences'), ['daymark.weather.prefs.v1']);
+  assert.deepEqual(storage.planClear('holiday-preferences'), ['daymark.holidays.prefs.v1']);
+  assert.deepEqual(storage.planClear('currency-preferences'), ['daymark.currency.prefs.v1']);
+  assert.deepEqual(storage.planClear('browser-address'), ['daymark.browser-address.prefs.v1']);
+  assert.deepEqual(storage.planClear('browser-download'), ['daymark.browser-download.last-scenario']);
   assert.throws(() => storage.planClear('nope'), /Unknown data category/);
   assert.throws(() => storage.planClear(null), /Unknown data category/);
   // The plan is a copy: mutating it must not change future plans.
@@ -147,10 +180,18 @@ test('clearAll sweeps every managed key once and aggregates the outcome', () => 
     'daymark.tasks.v1': '[]',
     'daymark.focus.v1': '{}',
     'daymark.feed.v1': '{}',
+    'daymark.wiki.prefs.v1': '{"query":"offline"}',
+    'daymark.browser-download.last-scenario': 'expired-link',
     'unrelated.other.key': 'keep me'
   });
   const result = storage.clearAll(store);
-  assert.deepEqual(result.removedKeys.sort(), ['daymark.focus.v1', 'daymark.tasks.v1', 'daymark.feed.v1'].sort());
+  assert.deepEqual(result.removedKeys.sort(), [
+    'daymark.focus.v1',
+    'daymark.tasks.v1',
+    'daymark.feed.v1',
+    'daymark.wiki.prefs.v1',
+    'daymark.browser-download.last-scenario'
+  ].sort());
   assert.deepEqual(result.failedKeys, []);
   assert.equal(result.results.length, storage.CATEGORIES.length);
   assert.equal(store.snapshot['unrelated.other.key'], 'keep me', 'keys outside the prototype are never touched');
@@ -248,6 +289,26 @@ test('the module exposes its constants and stays inert under Node', () => {
   assert.equal(storage.categoryById('nope'), null);
 });
 
+
+test('saved card preferences and browser journeys are inventoried and cleared independently', () => {
+  const entries = [
+    ['wiki', 'daymark.wiki.v1'],
+    ['wiki-preferences', 'daymark.wiki.prefs.v1'],
+    ['weather-preferences', 'daymark.weather.prefs.v1'],
+    ['holiday-preferences', 'daymark.holidays.prefs.v1'],
+    ['currency-preferences', 'daymark.currency.prefs.v1'],
+    ['browser-address', 'daymark.browser-address.prefs.v1'],
+    ['browser-download', 'daymark.browser-download.last-scenario']
+  ];
+  const store = fakeStorage(Object.fromEntries(entries.map(([id, key]) => [key, id])));
+  for (const [id, key] of entries) {
+    const result = storage.clearCategory(store, id);
+    assert.deepEqual(result.removed, [key], id + ' removes only its own remembered value');
+    assert.deepEqual(result.failed, []);
+    assert.equal(store.snapshot[key], undefined);
+  }
+  assert.equal(Object.keys(store.snapshot).length, 0);
+});
 
 test('secret-bearing legacy webhook endpoint is excluded from storage inspection and clearing', () => {
   const secretKey = 'daymark.webhook.v1';

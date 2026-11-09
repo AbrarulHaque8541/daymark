@@ -47,10 +47,28 @@
       keys: ['daymark.feed.v1']
     },
     {
+      id: 'wiki',
+      label: 'Wikipedia cache',
+      description: 'The last successful Wikipedia results, cached here so they stay readable offline.',
+      keys: ['daymark.wiki.v1']
+    },
+    {
+      id: 'wiki-preferences',
+      label: 'Wikipedia search preference',
+      description: 'The last search term remembered for the next Wikipedia visit.',
+      keys: ['daymark.wiki.prefs.v1']
+    },
+    {
       id: 'weather',
       label: 'Weather cache',
       description: 'The last weather result for the place you last checked.',
       keys: ['daymark.weather.v1']
+    },
+    {
+      id: 'weather-preferences',
+      label: 'Weather place preference',
+      description: 'The last place name entered for the weather card.',
+      keys: ['daymark.weather.prefs.v1']
     },
     {
       id: 'holidays',
@@ -59,10 +77,22 @@
       keys: ['daymark.holidays.v1']
     },
     {
+      id: 'holiday-preferences',
+      label: 'Holiday country preference',
+      description: 'The last country selected for the public-holidays card.',
+      keys: ['daymark.holidays.prefs.v1']
+    },
+    {
       id: 'currency',
       label: 'Currency cache',
       description: 'The last exchange-rate pair you looked up.',
       keys: ['daymark.currency.v1']
+    },
+    {
+      id: 'currency-preferences',
+      label: 'Currency preferences',
+      description: 'The last amount and currency pair selected for conversion.',
+      keys: ['daymark.currency.prefs.v1']
     },
     {
       id: 'zones',
@@ -75,6 +105,18 @@
       label: 'Saved browser proxy profile',
       description: 'The last proxy address entered in the offline planner. Saving this plan does not route browser traffic.',
       keys: ['daymark.browser-proxy.last-profile']
+    },
+    {
+      id: 'browser-address',
+      label: 'Browser search provider preference',
+      description: 'The search provider selected for the browser address bar.',
+      keys: ['daymark.browser-address.prefs.v1']
+    },
+    {
+      id: 'browser-download',
+      label: 'Browser download journey preference',
+      description: 'The last offline download scenario selected in the safety planner; no downloaded files or URLs are stored here.',
+      keys: ['daymark.browser-download.last-scenario']
     },
     {
       id: 'webhook-queue',
