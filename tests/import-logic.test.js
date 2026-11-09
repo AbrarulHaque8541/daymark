@@ -121,7 +121,10 @@ test('fromCsv skips malformed rows and fills lenient defaults', () => {
 test('fromCsv skips malformed or duplicate-key subtask JSON instead of silently dropping subtasks', () => {
   const cell = (value) => {
     const text = String(value);
-    return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    const cr = String.fromCharCode(13);
+    const lf = String.fromCharCode(10);
+    return text.includes('"') || text.includes(',') || text.includes(cr) || text.includes(lf)
+      ? '"' + text.replace(/"/g, '""') + '"' : text;
   };
   const row = (id, title, subtasks) => [
     id, title, '', '', 'medium', 'false', '', '', '', subtasks, NOW, NOW
@@ -129,12 +132,13 @@ test('fromCsv skips malformed or duplicate-key subtask JSON instead of silently 
   const duplicate = '[{"id":"s1","title":"First","title":"Overwritten","done":false}]';
   const malformed = '[{"id":"s2"';
   const valid = '[{"id":"s3","title":"Keep me","done":false}]';
+  const crlf = String.fromCharCode(13, 10);
   const csv = [
     importer.CSV_HEADER,
     row('duplicate-subtask', 'Duplicate subtask keys', duplicate),
     row('malformed-subtask', 'Malformed subtask JSON', malformed),
     row('valid-subtask', 'Valid subtasks', valid)
-  ].join('\\r\\n') + '\\r\\n';
+  ].join(crlf) + crlf;
   const result = importer.fromCsv(csv, freshCtx());
   assert.equal(result.skippedRows, 2, 'ambiguous or malformed nested JSON skips the whole CSV row');
   assert.equal(result.tasks.length, 1);
