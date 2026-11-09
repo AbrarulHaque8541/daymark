@@ -602,7 +602,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try {
-            try (FileInputStream input = new FileInputStream(descriptor.getFileDescriptor())) {
+            try (ParcelFileDescriptor.AutoCloseInputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
                 byte[] buffer = new byte[256];
                 int count;
                 while ((count = input.read(buffer)) != -1) {
@@ -612,8 +612,6 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     output.write(buffer, 0, count);
                 }
             }
-        } finally {
-            descriptor.close();
         }
         String response = new String(output.toByteArray(), StandardCharsets.UTF_8);
         int status = PlatformShellInputCommand.parseStatus(response);
