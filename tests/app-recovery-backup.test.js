@@ -504,6 +504,59 @@ test('recovery export uses encoded data URL when Blob URL APIs are unavailable',
     'data URLs do not need object-URL revocation');
 });
 
+test('a valid task recovery backup is surfaced when the primary task key is absent', () => {
+  const backup = JSON.stringify([validTask('backup-task', 'Recover this task')]);
+  const storedValues = new Map([[BACKUP_KEY, backup]]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(storedValues.has(STORAGE_KEY), false,
+    'the absent primary key must not be created or auto-restored');
+  assert.equal(action.hidden, false, 'a readable backup must expose manual export');
+  assert.equal(action.textContent, 'Export recovery');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup available for manual export/i);
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], backup,
+    'manual export must preserve the exact original backup bytes');
+  assert.equal(storedValues.get(BACKUP_KEY), backup,
+    'surfacing/exporting recovery data must not mutate the backup');
+});
+
+test('empty and malformed task backups remain exportable when the primary key is absent', () => {
+  for (const backup of ['', '{opaque recovery bytes']) {
+    const storedValues = new Map([[BACKUP_KEY, backup]]);
+    const app = bootApp(storedValues);
+    const action = app.elements.get('#toast-action');
+
+    assert.equal(storedValues.has(STORAGE_KEY), false,
+      'opaque recovery data must never be auto-restored into the primary key');
+    assert.equal(action.hidden, false,
+      'a present zero-byte or malformed backup is still a recovery source');
+    action.dispatch('click');
+    assert.equal(app.getLastBlob().parts[0], backup,
+      'manual export must preserve opaque bytes exactly');
+    assert.equal(storedValues.get(BACKUP_KEY), backup,
+      'the original opaque backup must remain unchanged');
+  }
+});
+
+test('unreadable task backup is reported as unknown when the primary key is absent', () => {
+  const focusBackup = '{independent focus recovery bytes';
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, focusBackup]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([BACKUP_KEY]));
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup status unknown/i);
+  assert.equal(action.hidden, false,
+    'an independently readable Focus backup remains exportable');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], focusBackup);
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
+});
+
 test('app.js parses before browser runtime boot', () => {
   try {
     new vm.Script(APP_SOURCE, { filename: 'app.js' });
