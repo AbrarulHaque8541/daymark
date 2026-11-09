@@ -497,8 +497,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             return false;
         }));
         try {
-            injectDrag(bounds.centerX(), bounds.centerY() - Math.min(bounds.height() * 0.70f, 48f) / 2f,
-                    bounds.centerX(), bounds.centerY() + Math.min(bounds.height() * 0.70f, 48f) / 2f);
+            float distance = verticalGestureDistance(view, bounds);
+            injectDrag(bounds.centerX(), bounds.centerY() - distance / 2f,
+                    bounds.centerX(), bounds.centerY() + distance / 2f);
         } finally {
             runOnMainSync(() -> view.setOnTouchListener(null));
         }
@@ -520,12 +521,25 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         return null;
     }
 
+    private float verticalGestureDistance(android.view.View view, android.graphics.Rect bounds) {
+        int touchSlop = android.view.ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
+        // A fixed 48px cap can be below touch slop on high-density emulators
+        // (for example, 16dp at 3x density), so ScrollView treats the gesture as a tap.
+        float distance = Math.min(bounds.height() * 0.70f, Math.max(48f, touchSlop * 4f));
+        if (distance <= touchSlop) {
+            throw new AssertionError("vertical gesture distance must exceed scaled touch slop"
+                    + " (distance=" + distance + ", touchSlop=" + touchSlop
+                    + ", boundsHeight=" + bounds.height() + ")");
+        }
+        return distance;
+    }
+
     private void dispatchVerticalScrollSwipe(android.view.View view, boolean fingerMovesUp)
             throws Exception {
         android.graphics.Rect bounds = stableVisibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0,
                 "vertical-scroll target has stable visible screen bounds");
-        float distance = Math.min(bounds.height() * 0.70f, 48f);
+        float distance = verticalGestureDistance(view, bounds);
         float startY = fingerMovesUp
                 ? bounds.centerY() + distance / 2f
                 : bounds.centerY() - distance / 2f;
