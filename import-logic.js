@@ -390,28 +390,57 @@
   const ICS_DATE = /^(\d{4})(\d{2})(\d{2})$/;
   const ICS_DATETIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/;
 
-  // Maps a DUE/DTSTART property onto stored dueDate/dueTime. The clock time
-  // is kept exactly as written: a Z suffix or a TZID parameter is counted as
-  // a dropped time zone, never silently re-interpreted.
+  // Maps DUE/DTSTART onto Daymark's date + minute-precision time fields.
+  // Time-zone conversion is deliberately not attempted. Non-zero seconds are
+  // truncated (and disclosed) because the stored task contract is HH:MM.
   function icsDateTaskField(prop) {
-    if (!prop) return { dueDate: null, dueTime: null, timezonePresent: false };
+    const empty = { dueDate: null, dueTime: null, timezonePresent: false, secondsDropped: false };
+    if (!prop) return empty;
     const declaredDate = (prop.params.VALUE || '').toUpperCase() === 'DATE';
     const asDate = prop.value.match(ICS_DATE);
     if (declaredDate || asDate) {
-      if (!asDate) return { dueDate: null, dueTime: null, timezonePresent: false };
-      return { dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3], dueTime: null, timezonePresent: false };
+      if (!asDate) return empty;
+      return {
+        dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3],
+        dueTime: null,
+        timezonePresent: false,
+        secondsDropped: false
+      };
     }
     const asDateTime = prop.value.match(ICS_DATETIME);
-    if (!asDateTime) return { dueDate: null, dueTime: null, timezonePresent: false };
-    const timezonePresent = asDateTime[7] === 'Z' || Boolean(prop.params.TZID);
+    if (!asDateTime) return empty;
     const dueDate = asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3];
     const dueTime = asDateTime[4] + ':' + asDateTime[5];
-    // Validate time before claiming a timezone drop. Invalid clock times are
-    // dropped without counting a timezone simplification.
-    if (!isTimeOnly(dueTime)) {
-      return { dueDate, dueTime: null, timezonePresent: false };
+    const seconds = Number(asDateTime[6]);
+    // RFC 5545 permits 00-60 seconds. Daymark stores minutes only, so valid
+    // non-zero seconds are intentionally truncated and reported to the user.
+    // Invalid clock values must not be counted as either a timezone or
+    // precision simplification.
+    if (!isTimeOnly(dueTime) || seconds > 60) {
+      return { dueDate, dueTime: null, timezonePresent: false, secondsDropped: false };
     }
-    return { dueDate, dueTime, timezonePresent };
+    return {
+      dueDate,
+      dueTime,
+      timezonePresent: asDateTime[7] === 'Z' || Boolean(prop.params.TZID),
+      secondsDropped: seconds !== 0
+    };
+  }
+
+  // COMPLETED is a VTODO DATE-TIME property and must be UTC. Merely having
+  // the property is not evidence that a task is complete.
+  function isValidIcsCompletion(prop) {
+    if (!prop || typeof prop.value !== 'string') return false;
+    const valueType = (prop.params.VALUE || '').toUpperCase();
+    if (valueType && valueType !== 'DATE-TIME') return false;
+    if (prop.params.TZID) return false;
+    const match = prop.value.match(ICS_DATETIME);
+    if (!match || match[7] !== 'Z') return false;
+    const date = match[1] + '-' + match[2] + '-' + match[3];
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+    return isDateOnly(date) && hour <= 23 && minute <= 59 && second <= 60;
   }
 
   // Collects the VTODO/VEVENT components of an unfolded iCalendar stream.
@@ -463,18 +492,27 @@
   function fromIcs(text, ctx) {
     const parsed = parseIcs(text);
     if (!parsed.hasCalendar) throw new Error('Calendar input does not contain a VCALENDAR block.');
-    const stats = { recurring: 0, timezoneDropped: 0, cancelled: 0 };
+    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, invalidCompletion: 0, cancelled: 0 };
     const tasks = [];
     let skippedRows = 0;
     for (const component of parsed.components) {
       const byName = {};
+      const categoryProps = [];
       for (const prop of component.props) {
+        if (prop.name === 'CATEGORIES') {
+          categoryProps.push(prop);
+          continue;
+        }
         if (!(prop.name in byName)) byName[prop.name] = prop;
       }
       const status = byName.STATUS ? byName.STATUS.value.trim().toUpperCase() : '';
       if (status === 'CANCELLED') { stats.cancelled += 1; continue; }
       const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
       const due = icsDateTaskField(dueProp);
+      const completionProp = byName.COMPLETED || null;
+      const validCompletion = component.type === 'VTODO' && isValidIcsCompletion(completionProp);
+      const invalidCompletion = (completionProp !== null && !validCompletion) ||
+        (component.type !== 'VTODO' && status === 'COMPLETED');
       const priorityValue = byName.PRIORITY ? byName.PRIORITY.value.trim() : '';
       const priorityNumber = /^\d+$/.test(priorityValue) ? Number(priorityValue) : 0;
       const priority = priorityNumber >= 1 && priorityNumber <= 4 ? 'high'
@@ -486,9 +524,9 @@
         dueDate: due.dueDate,
         dueTime: due.dueTime,
         priority,
-        completed: status === 'COMPLETED' || Boolean(byName.COMPLETED),
+        completed: component.type === 'VTODO' && (status === 'COMPLETED' || validCompletion),
         repeat: null,
-        tags: byName.CATEGORIES ? icsSplitList(byName.CATEGORIES.value) : [],
+        tags: categoryProps.reduce((all, prop) => all.concat(icsSplitList(prop.value)), []),
         notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
         subtasks: [],
         createdAt: ctx && ctx.now,
@@ -499,6 +537,8 @@
       // Count simplifications only for successfully imported tasks.
       if (byName.RRULE || byName.RDATE || byName['RECURRENCE-ID']) stats.recurring += 1;
       if (due.timezonePresent && task.dueTime !== null) stats.timezoneDropped += 1;
+      if (due.secondsDropped && task.dueTime !== null) stats.secondsDropped += 1;
+      if (invalidCompletion) stats.invalidCompletion += 1;
       tasks.push(task);
     }
     return {
@@ -506,6 +546,8 @@
       skippedRows,
       recurring: stats.recurring,
       timezoneDropped: stats.timezoneDropped,
+      secondsDropped: stats.secondsDropped,
+      invalidCompletion: stats.invalidCompletion,
       cancelled: stats.cancelled
     };
   }
