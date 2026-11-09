@@ -34,7 +34,11 @@ if ! printf '%s\n' "$module_build" | grep -Fq 'testInstrumentationRunner = "andr
 fi
 if ! printf '%s\n' "$test_source_content" | grep -Fq "extends InstrumentationTestCase" \
   || ! printf '%s\n' "$test_source_content" | grep -Fq "public void testServiceWorkerNetworkPolicy()" \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getString("runToken")'; then
+  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getString("runToken")' \
+  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getInstrumentation().getTargetContext()' \
+  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getInstrumentation().runOnMainSync' \
+  || ! printf '%s\n' "$test_source_content" | grep -Fq 'BrowserWorkspaceController' \
+  || ! printf '%s\n' "$test_source_content" | grep -Fq 'enforceOffline.invoke(null, offlinePolicy, Collections.emptyList())'; then
   echo "Service Worker runtime class must expose a discoverable, run-token-bound JUnit3 test." >&2
   exit 1
 fi

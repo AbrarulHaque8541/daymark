@@ -19,6 +19,8 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -44,8 +46,6 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     private static final String TAG = "DaymarkSWRuntime";
     private static final long WAIT_MS = 15000L;
     private static final String WEB_VIEW_CLASS = "com.abrar.daymark.DaymarkWebView";
-    private static final String ENFORCEMENT_CLASS =
-            "com.abrar.daymark.BrowserServiceWorkerEnforcement";
 
     private int assertions;
     private String runToken;
@@ -136,11 +136,20 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
             // Simulate a settings reset and exercise Daymark's actual Offline reassertion method.
             // No request is issued during the temporary test reset.
             controller.getServiceWorkerWebSettings().setBlockNetworkLoads(false);
-            Class<?> enforcement = Class.forName(ENFORCEMENT_CLASS, true, targetLoader);
-            Method reassert = enforcement.getDeclaredMethod("enforceBlocked");
-            reassert.setAccessible(true);
-            check(Boolean.TRUE.equals(reassert.invoke(null)),
-                    "Daymark Offline reassertion must report an installed enforcement layer");
+            Class<?> policyType = Class.forName(
+                    "com.abrar.daymark.BrowserNetworkPolicy", true, targetLoader);
+            java.lang.reflect.Constructor<?> offlineConstructor =
+                    policyType.getDeclaredConstructor(boolean.class);
+            offlineConstructor.setAccessible(true);
+            Object offlinePolicy = offlineConstructor.newInstance(false);
+            Class<?> workspaceController = Class.forName(
+                    "com.abrar.daymark.BrowserWorkspaceController", true, targetLoader);
+            Method enforceOffline = workspaceController.getDeclaredMethod(
+                    "enforceOffline", policyType, List.class);
+            enforceOffline.setAccessible(true);
+            // Exercise the real production Online/Offline transition with no retained tabs.
+            // Service Worker enforcement is process-wide and must not depend on a tab list.
+            enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
             check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "Offline reassertion must restore the process-wide Service Worker block");
 
@@ -193,7 +202,7 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     private WebView createWebView() throws Exception {
         WebView[] result = new WebView[1];
         getInstrumentation().runOnMainSync(() -> {
-            WebView view = new WebView(getTargetContext());
+            WebView view = new WebView(getInstrumentation().getTargetContext());
             WebSettings settings = view.getSettings();
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
@@ -206,18 +215,18 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     }
 
     private void load(WebView view, String url) throws Exception {
-        runOnMainSync(() -> view.loadUrl(url));
+        getInstrumentation().runOnMainSync(() -> view.loadUrl(url));
         awaitBoolean(view, "document.readyState === 'complete'", WAIT_MS,
                 "the controlled page must finish loading");
     }
 
     private void setPageNetworkBlocked(WebView view, boolean blocked) throws Exception {
-        runOnMainSync(() -> view.getSettings().setBlockNetworkLoads(blocked));
+        getInstrumentation().runOnMainSync(() -> view.getSettings().setBlockNetworkLoads(blocked));
     }
 
     private void execute(WebView view, String script) throws Exception {
         CountDownLatch completed = new CountDownLatch(1);
-        runOnMainSync(() -> view.evaluateJavascript(script, ignored -> completed.countDown()));
+        getInstrumentation().runOnMainSync(() -> view.evaluateJavascript(script, ignored -> completed.countDown()));
         if (!completed.await(5, TimeUnit.SECONDS)) {
             throw new AssertionError("WebView did not execute the acceptance script");
         }
@@ -226,7 +235,7 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     private boolean evaluateBoolean(WebView view, String expression) throws Exception {
         AtomicReference<String> value = new AtomicReference<>();
         CountDownLatch completed = new CountDownLatch(1);
-        runOnMainSync(() -> view.evaluateJavascript(expression, result -> {
+        getInstrumentation().runOnMainSync(() -> view.evaluateJavascript(expression, result -> {
             value.set(result);
             completed.countDown();
         }));
@@ -263,7 +272,7 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     }
 
     private void destroy(WebView view) throws Exception {
-        runOnMainSync(() -> {
+        getInstrumentation().runOnMainSync(() -> {
             view.stopLoading();
             view.destroy();
         });
