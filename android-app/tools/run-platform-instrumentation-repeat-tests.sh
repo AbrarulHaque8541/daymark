@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+bash -n "$ROOT/tools/run-platform-instrumentation-on-emulator.sh"
+sh -n "$ROOT/tools/platform-instrumentation-input-bridge.sh"
 . "$ROOT/tools/platform-instrumentation-repeat.sh"
 TMP=$(mktemp -d "daymark-instrumentation-repeat.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
