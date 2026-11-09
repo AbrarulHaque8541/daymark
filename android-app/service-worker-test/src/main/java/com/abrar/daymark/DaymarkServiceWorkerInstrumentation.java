@@ -52,13 +52,13 @@ public final class DaymarkServiceWorkerInstrumentation {
     private static final long WAIT_MS = 15000L;
     private static final String WEB_VIEW_CLASS = "com.abrar.daymark.DaymarkWebView";
 
-    private final Instrumentation instrumentation = InstrumentationRegistry.instrumentation;
+    private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
     private int assertions;
     private String runToken;
 
     @Test
     public void testServiceWorkerNetworkPolicy() throws Exception {
-        Bundle arguments = instrumentation.getArguments();
+        Bundle arguments = InstrumentationRegistry.getArguments();
         runToken = arguments == null ? null : arguments.getString("runToken");
         if (runToken == null || !runToken.matches("[A-Za-z0-9._-]{1,120}")) {
             throw new AssertionError("A unique runToken instrumentation argument is required.");

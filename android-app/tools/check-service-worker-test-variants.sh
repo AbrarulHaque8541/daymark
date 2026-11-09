@@ -50,7 +50,7 @@ for required in \
   '@RunWith(AndroidJUnit4.class)' \
   '@Test' \
   'InstrumentationRegistry.getInstrumentation()' \
-  'instrumentation.getArguments()' \
+  'InstrumentationRegistry.getArguments()' \
   'BrowserWorkspaceController' \
   'enforceOffline.invoke(null, offlinePolicy, Collections.emptyList())'
 do
