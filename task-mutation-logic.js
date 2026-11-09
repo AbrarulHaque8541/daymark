@@ -63,12 +63,13 @@
     const desired = indexTasks(desiredTasks);
     const current = indexTasks(currentTasks);
     if (!base || !desired || !current) {
-      return { ok: false, reason: 'invalid-task-list', conflicts: [], tasks: [] };
+      return { ok: false, reason: 'invalid-task-list', conflicts: [], addedIds: [], tasks: [] };
     }
 
     const merged = cloneTaskList(currentTasks);
     const ids = new Set([...base.keys(), ...desired.keys()]);
     const conflicts = [];
+    const addedIds = [];
 
     for (const id of ids) {
       const before = base.get(id);
@@ -79,6 +80,7 @@
       if (before === undefined) {
         if (latest === undefined) {
           merged.push(JSON.parse(JSON.stringify(after)));
+          addedIds.push(id);
         } else if (!areTaskListsEqual([latest], [after])) {
           conflicts.push(id);
         }
@@ -112,10 +114,11 @@
         ok: false,
         reason: 'conflict',
         conflicts: Array.from(new Set(conflicts)).sort(),
+        addedIds: [],
         tasks: []
       };
     }
-    return { ok: true, reason: null, conflicts: [], tasks: merged };
+    return { ok: true, reason: null, conflicts: [], addedIds, tasks: merged };
   }
 
   async function commitTaskSnapshot(options) {
@@ -204,6 +207,7 @@
           ok: true,
           reason: null,
           conflicts: [],
+          addedIds: merged.addedIds.slice(),
           tasks: cloneTaskList(merged.tasks),
           payload,
           warning
