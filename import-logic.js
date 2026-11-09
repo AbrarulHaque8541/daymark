@@ -394,21 +394,37 @@
   // Time-zone conversion is deliberately not attempted. Non-zero seconds are
   // truncated (and disclosed) because the stored task contract is HH:MM.
   function icsDateTaskField(prop) {
-    const empty = { dueDate: null, dueTime: null, timezonePresent: false, secondsDropped: false };
+    const empty = {
+      dueDate: null, dueTime: null, timezonePresent: false,
+      secondsDropped: false, invalidDateType: false
+    };
     if (!prop) return empty;
-    const declaredDate = (prop.params.VALUE || '').toUpperCase() === 'DATE';
+    const params = prop.params || {};
+    const valueType = (params.VALUE || '').toUpperCase();
+    const hasTzid = Object.prototype.hasOwnProperty.call(params, 'TZID');
+    const invalidType = () => ({ ...empty, invalidDateType: true });
+    if (valueType && valueType !== 'DATE' && valueType !== 'DATE-TIME') return invalidType();
+
     const asDate = prop.value.match(ICS_DATE);
-    if (declaredDate || asDate) {
-      if (!asDate) return empty;
+    if (valueType === 'DATE') {
+      // RFC 5545 DATE values cannot carry a TZID parameter.
+      if (!asDate || hasTzid) return invalidType();
       return {
         dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3],
         dueTime: null,
         timezonePresent: false,
-        secondsDropped: false
+        secondsDropped: false,
+        invalidDateType: false
       };
     }
+    // DATE-TIME is the default value type. A date-only value therefore needs
+    // an explicit VALUE=DATE parameter; never infer DATE from its shape.
+    if (asDate) return invalidType();
+
     const asDateTime = prop.value.match(ICS_DATETIME);
     if (!asDateTime) return empty;
+    // TZID is for local DATE-TIME values and must not accompany a UTC "Z" value.
+    if (hasTzid && asDateTime[7] === 'Z') return invalidType();
     const dueDate = asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3];
     const dueTime = asDateTime[4] + ':' + asDateTime[5];
     const seconds = Number(asDateTime[6]);
@@ -417,13 +433,14 @@
     // Invalid clock values must not be counted as either a timezone or
     // precision simplification.
     if (!isTimeOnly(dueTime) || seconds > 60) {
-      return { dueDate, dueTime: null, timezonePresent: false, secondsDropped: false };
+      return { dueDate, dueTime: null, timezonePresent: false, secondsDropped: false, invalidDateType: false };
     }
     return {
       dueDate,
       dueTime,
-      timezonePresent: asDateTime[7] === 'Z' || Boolean(prop.params.TZID),
-      secondsDropped: seconds !== 0
+      timezonePresent: asDateTime[7] === 'Z' || hasTzid,
+      secondsDropped: seconds !== 0,
+      invalidDateType: false
     };
   }
 
@@ -493,7 +510,7 @@
   function fromIcs(text, ctx) {
     const parsed = parseIcs(text);
     if (!parsed.hasCalendar) throw new Error('Calendar input does not contain a VCALENDAR block.');
-    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, invalidCompletion: 0, cancelled: 0 };
+    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, invalidCompletion: 0, invalidDateType: 0, cancelled: 0 };
     const tasks = [];
     let skippedRows = 0;
     for (const component of parsed.components) {
@@ -541,6 +558,7 @@
       if (byName.RRULE || byName.RDATE || byName['RECURRENCE-ID']) stats.recurring += 1;
       if (due.timezonePresent && task.dueTime !== null) stats.timezoneDropped += 1;
       if (due.secondsDropped && task.dueTime !== null) stats.secondsDropped += 1;
+      if (due.invalidDateType) stats.invalidDateType += 1;
       if (invalidCompletion) stats.invalidCompletion += 1;
       tasks.push(task);
     }
@@ -551,6 +569,7 @@
       timezoneDropped: stats.timezoneDropped,
       secondsDropped: stats.secondsDropped,
       invalidCompletion: stats.invalidCompletion,
+      invalidDateType: stats.invalidDateType,
       cancelled: stats.cancelled
     };
   }

@@ -353,7 +353,7 @@ test('escaped RFC TEXT semicolons remain inside one CATEGORIES value', () => {
     'the escaped semicolon is unescaped within one unsupported tag, not treated as a list separator');
 });
 
-test('import UI discloses invalid completion metadata without marking the task done', async () => {
+test('import UI discloses invalid completion and date metadata without corrupting the task', async () => {
   const storageData = {};
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
@@ -367,6 +367,7 @@ test('import UI discloses invalid completion metadata without marking the task d
     'UID:invalid-completion-ui@example.com',
     'SUMMARY:Keep this task open',
     'COMPLETED:garbage',
+    'DUE:20261109',
     'END:VTODO',
     'END:VCALENDAR'
   ].join('\n');
@@ -407,6 +408,7 @@ test('import UI discloses invalid completion metadata without marking the task d
   const status = created.find((el) => el.id === 'import-status');
   assert.ok(status);
   assert.match(status.textContent, /1 item had invalid completion metadata ignored; left open\./);
+  assert.match(status.textContent, /1 date\/time field had incompatible DATE\/DATE-TIME or TZID parameters; the date\/time was omitted\./);
 });
 
 test('skipped recurring components do not inflate the recurrence or timezone counts', () => {
@@ -447,6 +449,56 @@ test('RDATE and RECURRENCE-ID are recognized as recurrence-bearing', () => {
   const result = importer.fromIcs(ics, freshCtx());
   assert.equal(result.tasks.length, 1);
   assert.equal(result.recurring, 1);
+});
+
+test('DATE and DATE-TIME value types and TZID combinations are validated', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'SUMMARY:Implicit date is not DATE',
+    'DUE:20261109',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:DATE-TIME parameter with date value',
+    'DUE;VALUE=DATE-TIME:20261110',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:DATE parameter with date-time value',
+    'DUE;VALUE=DATE:20261111T091500',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:DATE cannot have TZID',
+    'DUE;VALUE=DATE;TZID=Asia/Kolkata:20261112',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:UTC cannot have TZID',
+    'DUE;TZID=UTC:20261113T091500Z',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Valid DATE',
+    'DUE;VALUE=DATE:20261114',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Valid default DATE-TIME',
+    'DUE:20261115T091500',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Valid local DATE-TIME with TZID',
+    'DUE;TZID=Asia/Kolkata:20261116T091500',
+    'END:VTODO',
+    'END:VCALENDAR'
+  ].join('\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.equal(result.tasks.length, 8);
+  assert.deepEqual(result.tasks.slice(0, 5).map((task) => [task.dueDate, task.dueTime]),
+    [[null, null], [null, null], [null, null], [null, null], [null, null]]);
+  assert.deepEqual(result.tasks.slice(5).map((task) => [task.dueDate, task.dueTime]), [
+    ['2026-11-14', null],
+    ['2026-11-15', '09:15'],
+    ['2026-11-16', '09:15']
+  ]);
+  assert.equal(result.invalidDateType, 5);
+  assert.equal(result.timezoneDropped, 1);
 });
 
 test('invalid clock times are dropped without counting a timezone simplification', () => {

@@ -148,6 +148,10 @@
           parts.push(parsed.invalidCompletion + ' item' + (parsed.invalidCompletion === 1 ? '' : 's') +
             ' had invalid completion metadata ignored; left open.');
         }
+        if (parsed.invalidDateType > 0) {
+          parts.push(plural(parsed.invalidDateType, 'date/time field') +
+            ' had incompatible DATE/DATE-TIME or TZID parameters; the date/time was omitted.');
+        }
         if (parsed.cancelled > 0) parts.push(plural(parsed.cancelled, 'cancelled item') + ' skipped.');
         status(parts.join(' '));
       } catch (error) {
