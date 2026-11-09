@@ -66,3 +66,55 @@ test('release and provenance build workflows pin Node 24 actions to immutable co
     }
   }
 });
+
+
+test('pull-request device-test builds never receive production signing secrets', () => {
+  const workflowPath = '.github/workflows/android-release-assets.yml';
+  const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
+  const lines = content.split(/\r?\n/);
+
+  function stepBlock(name) {
+    const start = lines.findIndex((line) => line.trim() === '- name: ' + name);
+    assert.equal(start >= 0, true, 'missing workflow step: ' + name);
+    let end = lines.length;
+    for (let index = start + 1; index < lines.length; index += 1) {
+      if (/^      - name: /.test(lines[index])) {
+        end = index;
+        break;
+      }
+    }
+    return { start, end, text: lines.slice(start, end).join('\n') };
+  }
+
+  const validation = stepBlock('Validate required release secrets');
+  const debug = stepBlock('Build and check both unsigned debug flavors');
+  const signed = stepBlock('Build and check both signed release flavors');
+
+  assert.match(validation.text, /if: github.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
+  assert.match(debug.text, /if: \$\{\{ github\.event_name != 'push' \|\| !startsWith\(github\.ref, 'refs\/tags\/'\) \}\}/);
+  assert.equal(debug.text.includes('secrets.'), false,
+    'the pull-request debug step must not receive production secrets');
+  assert.match(debug.text, /assembleGithubSideloadDebug/);
+  assert.match(debug.text, /assemblePlayDebug/);
+
+  assert.match(signed.text, /if: \$\{\{ github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\) \}\}/);
+  assert.equal(signed.text.includes('secrets.KEYSTORE_BASE64'), true);
+  assert.match(signed.text, /trap .*release\.keystore.* EXIT/);
+  assert.match(signed.text, /assembleGithubSideloadRelease/);
+  assert.match(signed.text, /assemblePlayRelease/);
+
+  const allowedSecretBlocks = new Set();
+  for (let index = validation.start; index < validation.end; index += 1) allowedSecretBlocks.add(index);
+  for (let index = signed.start; index < signed.end; index += 1) allowedSecretBlocks.add(index);
+  const secretLines = lines.map((line, index) => line.includes('secrets.') ? index : -1).filter((index) => index >= 0);
+  assert.equal(secretLines.length, 8, 'only the two tag-gated steps may reference the four signing secrets');
+  for (const index of secretLines) {
+    assert.equal(allowedSecretBlocks.has(index), true,
+      'signing secret reference outside a tag-gated step at line ' + (index + 1));
+  }
+
+  const publishStart = lines.findIndex((line) => line.trim() === 'publish-release:');
+  assert.equal(publishStart >= 0, true, 'missing publish-release job');
+  assert.match(lines.slice(publishStart, publishStart + 8).join('\n'),
+    /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
+});
