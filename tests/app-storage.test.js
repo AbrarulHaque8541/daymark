@@ -715,6 +715,26 @@ test('unreadable primary focus key with readable backup offers recovery', () => 
   assert.match(app.elements.get('#storage-status span').textContent, /Primary focus data unreadable; recovery backup available/);
 });
 
+test('present opaque Focus backup is surfaced when the primary Focus key is absent', () => {
+  for (const backup of ['', '{"session":', 'null']) {
+    const app = bootApp({
+      savedValue: JSON.stringify([]),
+      savedFocusValue: null,
+      savedFocusBackupValue: backup
+    });
+    const action = app.elements.get('#toast-action');
+
+    assert.equal(app.storedValues.get(FOCUS_KEY), null);
+    assert.equal(app.storedValues.get(FOCUS_BACKUP_KEY), backup,
+      'the original empty or malformed backup bytes must remain unchanged');
+    assert.equal(action.hidden, false,
+      'a present opaque backup must be offered even when no payload can be parsed');
+    assert.equal(action.textContent, 'Export recovery');
+    assert.match(app.elements.get('#storage-status span').textContent,
+      /Focus data recovery backup retained/);
+  }
+});
+
 test('empty Focus recovery backup bytes survive a malformed-primary backup write', () => {
   const malformedPrimary = '{"session":';
   const app = bootApp({

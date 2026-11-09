@@ -1442,12 +1442,14 @@
       const raw = localStorage.getItem(FOCUS_BACKUP_KEY);
       return {
         readable: true,
-        hasPayload: focusRecoveryPayloads(raw).length > 0
+        // Any present string is opaque recovery data, including empty or malformed bytes.
+        // Parsing here would hide a backup that the user may still need to export verbatim.
+        hasBackup: typeof raw === 'string'
       };
     } catch (error) {
       // Unknown is not absence: callers must surface the uncertainty and must
       // never clear or replace a key whose contents could not be inspected.
-      return { readable: false, hasPayload: false };
+      return { readable: false, hasBackup: false };
     }
   }
 
@@ -1529,7 +1531,7 @@
       const backupState = readFocusRecoveryBackupState();
       if (!backupState.readable) {
         reportUnknownFocusRecoveryBackup();
-      } else if (backupState.hasPayload) {
+      } else if (backupState.hasBackup) {
         reportFocusRecovery(true);
       }
       return empty;
