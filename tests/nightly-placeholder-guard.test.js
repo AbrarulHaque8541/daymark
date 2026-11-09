@@ -374,8 +374,35 @@ function hasNonEmptyTestCallback(callbackSource) {
   return hasExecutableCallbackBody(source.slice(bodyStart + 1, bodyEnd));
 }
 
+function hasNodeTestBinding(source, code) {
+  // A plausible test(name, callback) call is not enough: a placeholder can
+  // define its own no-op function named test/it. Require the identifier to be
+  // imported from Node's built-in test module first.
+  const commonJsBinding = /(^|[^A-Za-z0-9_$.])(?:const|let|var)\s+(?:test|it|\{\s*(?:test|it)\s*\})\s*=\s*require\s*\(/gm;
+  let match;
+  while ((match = commonJsBinding.exec(code))) {
+    const requireIndex = code.indexOf("require", match.index + match[1].length);
+    const openIndex = code.indexOf("(", requireIndex + "require".length);
+    const closeIndex = findClosingDelimiter(code, openIndex, "(", ")");
+    if (closeIndex < 0) continue;
+    const moduleArgument = source.slice(openIndex + 1, closeIndex).trim();
+    if (/^(['"])node:test\1$/.test(moduleArgument)) return true;
+  }
+
+  const esmBinding = /(^|[^A-Za-z0-9_$.])import\s+(?:test|it|\{\s*(?:test|it)\s*\})\s+from\s+/gm;
+  while ((match = esmBinding.exec(code))) {
+    const fromOffset = match[0].lastIndexOf("from") + 4;
+    let specifierStart = match.index + fromOffset;
+    while (/\s/.test(source[specifierStart] || "")) specifierStart += 1;
+    const moduleSpecifier = source.slice(specifierStart);
+    if (/^(['"])node:test\1/.test(moduleSpecifier)) return true;
+  }
+  return false;
+}
+
 function hasRegisteredTestCase(source) {
   const code = maskJavaScriptNonCode(source);
+  if (!hasNodeTestBinding(source, code)) return false;
   const focusedTest = /(^|[^A-Za-z0-9_$.])(?:test|it|describe)\s*\.\s*only\s*\(/m.test(code);
   if (focusedTest) return false;
 
@@ -477,6 +504,20 @@ test('every repository Node test file registers at least one executable test cas
     'a parenthesized function-expression callback must be accepted');
   assert.equal(hasRegisteredTestCase("test('empty function', function () { /* no executable body */ });"), false,
     'an empty function-expression callback must not count as an executable test');
+  assert.equal(hasRegisteredTestCase("function test() {}\ntest('fake', () => assert.ok(true));"), false,
+    'a locally defined no-op test function must not impersonate node:test');
+  assert.equal(hasRegisteredTestCase("const test = () => {}; test('fake', () => assert.ok(true));"), false,
+    'a locally assigned no-op test function must not impersonate node:test');
+  assert.equal(hasRegisteredTestCase("const test = require('./fake-test'); test('fake', () => assert.ok(true));"), false,
+    'a test helper from another module must not impersonate node:test');
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); test('valid', () => assert.ok(true));"), true,
+    'a CommonJS default node:test binding must be accepted');
+  assert.equal(hasRegisteredTestCase("const { test } = require('node:test'); test('valid', () => assert.ok(true));"), true,
+    'a CommonJS named node:test binding must be accepted');
+  assert.equal(hasRegisteredTestCase("import test from 'node:test'; test('valid', () => assert.ok(true));"), true,
+    'an ES module default node:test binding must be accepted');
+  assert.equal(hasRegisteredTestCase("import { test } from 'node:test'; test('valid', () => assert.ok(true));"), true,
+    'an ES module named node:test binding must be accepted');
 
   for (const file of testFiles) {
     const relative = path.relative(repositoryRoot, file);
