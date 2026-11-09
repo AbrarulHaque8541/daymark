@@ -637,8 +637,8 @@ test('status never echoes a webhook endpoint from a network error', async () => 
 
 test('the app persists a newly completed task before queueing its webhook', () => {
   const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-  assert.match(app, /const result = webhookUi\\.notifyTaskCompleted\\(task\\);/);
-  assert.match(app, /result\\.catch\\(\\(error\\) =>/);
+  assert.ok(app.includes("const result = webhookUi.notifyTaskCompleted(task);"));
+  assert.ok(app.includes("result.catch((error) =>"));
 
   const toggleStart = app.indexOf("if (button.dataset.action === 'toggle')");
   const toggleEnd = app.indexOf("} else if", toggleStart);
@@ -648,7 +648,7 @@ test('the app persists a newly completed task before queueing its webhook', () =
   const notifyAt = toggle.indexOf('notifyWebhookTaskCompleted(task)');
   assert.ok(persistAt >= 0 && notifyAt > persistAt,
     'the external webhook must never be queued before the local task write succeeds');
-  assert.match(toggle, /if\\s*\\(saved\\s*&&\\s*task\\.completed\\s*&&\\s*!wasCompleted\\)\\s*notifyWebhookTaskCompleted\\(task\\)/,
+  assert.ok(toggle.includes('if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);'),
     'only a successfully persisted transition from open to completed may emit an event');
 });
 
