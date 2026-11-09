@@ -229,13 +229,21 @@ def test_limit_guard_mutations(parser, store, smoke):
         raise AssertionError("source guard accepted removal of the stored-pack size limit")
 
     stream_guard = "if (read > MAX_USER_PACK_BYTES - total)"
-    assert store.count(stream_guard) == 1, "streaming read limit must be unique"
+    assert store.count(stream_guard) == 2, "both stored-pack and recovery readers must enforce the streaming byte limit"
     try:
         check_sources(parser, store.replace(stream_guard, "if (false)", 1), smoke)
     except AssertionError as rejected:
         assert "streaming read must enforce the byte limit" in str(rejected)
     else:
-        raise AssertionError("source guard accepted removal of the streaming read limit")
+        raise AssertionError("source guard accepted removal of the stored-pack streaming read limit")
+    first, remainder = store.split(stream_guard, 1)
+    recovery_mutation = first + stream_guard + remainder.replace(stream_guard, "if (false)", 1)
+    try:
+        check_sources(parser, recovery_mutation, smoke)
+    except AssertionError as rejected:
+        assert "raw recovery reads must remain bounded while streaming" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the malformed-pack recovery streaming limit")
 
     check_sources(parser, store, smoke)
     print(f"PASS: extension import source-guard mutation tests — {len(mutations) + 2} rejected mutations; unchanged source accepted")
