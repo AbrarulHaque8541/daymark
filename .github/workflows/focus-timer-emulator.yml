@@ -20,6 +20,8 @@ on:
       - "android-app/tools/check-v1-source.sh"
       - "android-app/tools/run-core-tests.sh"
       - "android-app/tools/run-platform-instrumentation-on-emulator.sh"
+      - "android-app/tools/platform-instrumentation-input-bridge.sh"
+      - "android-app/tools/run-platform-instrumentation-input-bridge-tests.sh"
       - "android-app/tools/platform-instrumentation-repeat.sh"
       - "android-app/tools/run-platform-instrumentation-repeat-tests.sh"
       - "android-app/tools/check-focus-emulator-repeat.py"
