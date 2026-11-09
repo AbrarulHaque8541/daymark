@@ -765,3 +765,11 @@ test('failed task persistence never emits a completion webhook', () => {
       }
     }
   });
+
+  triggerTaskCompletion(app, task.id);
+  assert.equal(notifications, 0, 'a failed local save must not emit an external completion event');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].completed, false,
+    'the original persisted task remains open');
+  assert.match(app.elements.get('#toast').textContent, /Could not save to this browser/,
+    'the user is told that the local completion did not persist');
+});
