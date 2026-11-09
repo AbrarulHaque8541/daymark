@@ -67,6 +67,8 @@ assert "INPUT_REQUEST_FILE" not in platform_test and "INPUT_RESULT_FILE" not in 
 assert 'STATUS_MARKER = "__DAYMARK_INPUT_STATUS__="' in shell_policy
 assert "MAX_COORDINATE = 10000" in shell_policy
 assert "MAX_DURATION_MS = 5000" in shell_policy
+assert "TAP_PATTERN" in shell_policy and "SWIPE_PATTERN" in shell_policy
+assert "unsupported shell input command" in shell_policy
 assert "parseStatus" in shell_policy and "Pattern.quote(STATUS_MARKER)" in shell_policy
 assert "negative tap coordinate" in shell_smoke
 assert "oversized swipe duration" in shell_smoke
