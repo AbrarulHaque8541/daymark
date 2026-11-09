@@ -125,4 +125,7 @@ assert "INPUT_REQUEST_FILE" not in platform_test and "INPUT_RESULT_FILE" not in 
 assert "platform-instrumentation-input-bridge" not in workflow
 assert "platform-instrumentation-input-bridge" not in runner
 assert "platform-instrumentation-input-bridge" not in test_runner
+assert "view.getRootView()" in platform_test and "rootView.getLocationOnScreen(rootLocation)" in platform_test, "global visible bounds must be translated from root-view to screen coordinates before UiAutomation injection"
+assert "bounds[0].offset(rootLocation[0], rootLocation[1]);" in platform_test, "screen-space translation must be applied to visible touch bounds"
+assert "parentScrollBounds.offset(rootLocation[0], rootLocation[1]);" in platform_test, "parent ScrollView diagnostics must use the same screen coordinate space"
 print("PASS focus emulator wiring: shell-identity UiAutomation touchscreen injection, API 36 ten-run gate, vertical-scroll handoff, fail-fast")
