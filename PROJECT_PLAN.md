@@ -1,4 +1,31 @@
-## Current whole-project execution queue — 2026-11-09T14:55:08Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+## Current whole-project execution queue — 2026-11-09T15:02:16Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed exact-head inventory, CI evidence, issue list, work log and safety limitations are in [the 15:02 status snapshot](docs/CURRENT_STATUS_20261109T150216Z.md). The #675 head recorded there is the green code/test head before this snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Six open PRs, twelve open issues; all six PR bases equal current main. No independent approval and no requested reviewers.
+- Main protection is disabled, rulesets empty; detailed protection endpoint returns HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance remains NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: Android CI, contracts, Focus UI/Sound, Live Update, device acceptance artifact and device-test APK PASS. API29 367 assertions PASS; API36 **10/10 consecutive runs PASS**, 370 assertions each. Root-view-to-screen conversion and real-control viewport positioning fixed the prior wrong-coordinate injection. Physical device acceptance still pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545/data-integrity review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device checks PASS; Node 541/541, ExtensionStore smoke 12 assertions, 16 guard mutations; independent extension-security review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device APK PASS; draft. PR/debug builds receive no signing secrets; tag-only signed build and temp-keystore cleanup. Upstream SLSA v1.4.0 still embeds a Node20 artifact action; provenance review required.
+- **#675** `9bda5bfcc2278fdc60522e3492b383340b4b57f8`: Node 728/728, Android CI and Gradle debug build PASS, Ubuntu/Windows contracts PASS, device-test APK PASS (release publication skipped). Current webhook endpoint fingerprints, cross-endpoint queue isolation, legacy confirmation, WebCrypto fail-closed tests, storage clear preflight and independent recovery backup reads all pass. Draft; independent security/data-integrity review pending.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device acceptance/device APK PASS; ExtensionInjectorSmoke 41 assertions. Page-bound CSS/JS injection and JS-only GM_addStyle bootstrap; physical browser acceptance pending.
+
+### Prioritized whole-project backlog
+1. **P0 — Independent review/integration:** #675 webhook endpoint isolation, storage-clear preflight and recovery; #665 signing-secret boundary; #656 import/data semantics; #659/#676 extension security. No merge without fresh independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** current-main APK on real devices with model/API/WebView provider/version, APK SHA and scenario evidence for browser, extensions, SAF, updates, reminders and downloads. Emulator/CI artifacts are not physical-device acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep current-main downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport enforces downgrade/private-address/host checks, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp-file cleanup and cancellation/error handling. Do not use preflight-then-DownloadManager.
+4. **P1 — Reminder parity (#476):** recurrence anchors, long-gap catch-up, AlarmManager/Doze/reboot/timezone/OEM behavior.
+5. **P0 — Main governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations and force-push/deletion restrictions.
+6. **P1 — Finish Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or perform a separately reviewed provenance migration.
+7. **P2 — Cross-platform/browser architecture (#325/#348):** measured compatibility and performance work.
+
+## Historical whole-project execution queue — 2026-11-09T14:55:08Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
 
 The detailed exact-head inventory, CI evidence, issue list, work log and safety limitations are in [the 14:55 status snapshot](docs/CURRENT_STATUS_20261109T145508Z.md). Preserve older planning sections below as historical evidence.
 
