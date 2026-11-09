@@ -13,7 +13,7 @@
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, taskPrimaryUnreadable: false, focusPrimaryUnreadable: false, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, taskPrimaryUnreadable: false, taskRecoveryNoticeActive: false, focusPrimaryUnreadable: false, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -38,6 +38,7 @@
     }
     if (primaryUnreadable) {
       state.taskPrimaryUnreadable = true;
+      state.taskRecoveryNoticeActive = true;
       const recovery = readRecoveryExportPayload();
       if (recovery.hasUnknownBackup) {
         setStorageStatus('Primary task data unreadable; recovery status unknown', true);
@@ -59,6 +60,7 @@
     }
     if (saved === null) {
       const recovery = readRecoveryExportPayload();
+      if (recovery.hasUnknownBackup || recovery.taskBackupStatus === 'available' || recovery.focusBackupStatus === 'available') state.taskRecoveryNoticeActive = true;
       if (recovery.hasUnknownBackup) {
         setStorageStatus('No current task list; recovery status unknown', true);
         showToast('No current task list is present. At least one recovery backup could not be read. No data was changed.');
@@ -77,6 +79,7 @@
       if (!Array.isArray(parsed)) throw new Error('Saved task data is not a list.');
       const validated = logic.validateStoredTasks(parsed);
       if (validated.rejectedCount > 0) {
+        state.taskRecoveryNoticeActive = true;
         // Some records failed validation and are about to be dropped. If backup
         // storage is full/unavailable, keep the original primary payload and
         // retry backup creation before any later save can replace it.
@@ -87,10 +90,12 @@
           : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
         if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
       } else if (hasPartialRecoveryBackup()) {
+        state.taskRecoveryNoticeActive = true;
         // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
         offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
       } else if (hasRecoveryBackupNeedingPreservation(saved)) {
+        state.taskRecoveryNoticeActive = true;
         // Any backup not proven byte-for-byte redundant with the healthy primary is retained for manual review.
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
@@ -101,6 +106,7 @@
       }
       return validated.tasks;
     } catch (error) {
+      state.taskRecoveryNoticeActive = true;
       console.warn('Could not load saved Daymark tasks:', error);
       setStorageStatus('Saved data could not be read', true);
       // Preserve the unreadable payload instead of silently discarding it, so a
@@ -1546,6 +1552,8 @@
   function loadFocusState() {
     const empty = { session: null, log: [] };
     if (!focus) return empty;
+    const suppressRecoveryNotice = state.taskRecoveryNoticeActive;
+    state.taskRecoveryNoticeActive = false;
     let saved = null;
     let primaryUnreadable = false;
     try {
@@ -1556,35 +1564,35 @@
     }
     if (primaryUnreadable) {
       state.focusPrimaryUnreadable = true;
-      const recovery = readRecoveryExportPayload();
-      if (recovery.hasUnknownBackup) {
-        setStorageStatus('Focus data unreadable; recovery status unknown', true);
-        showToast('Focus data could not be read. At least one recovery backup could not be read. No data was changed.');
-      } else if (recovery.focusBackupStatus === 'available') {
-        setStorageStatus('Focus data unreadable; recovery backup available', true);
-        showToast('Focus data could not be read. A recovery backup is available for export. No data was changed.');
-      } else if (recovery.taskBackupStatus === 'available') {
-        setStorageStatus('Focus data unreadable; task recovery backup available', true);
-        showToast('Focus data could not be read. A task recovery backup is available for export. No data was changed.');
-      } else {
-        setStorageStatus('Focus data unreadable; no recovery backup found', true);
-        showToast('Focus data could not be read. No recovery backup was found. No data was changed.');
-      }
-      if (recovery.payload) {
-        offerRecoveryExport('Focus data is unreadable. Export available recovery data for manual review.');
+      if (!suppressRecoveryNotice) {
+        const recovery = readRecoveryExportPayload();
+        if (recovery.hasUnknownBackup) {
+          setStorageStatus('Focus data unreadable; recovery status unknown', true);
+          showToast('Focus data could not be read. At least one recovery backup could not be read. No data was changed.');
+        } else if (recovery.focusBackupStatus === 'available') {
+          setStorageStatus('Focus data unreadable; recovery backup available', true);
+          showToast('Focus data could not be read. A recovery backup is available for export. No data was changed.');
+        } else if (recovery.taskBackupStatus === 'available') {
+          setStorageStatus('Focus data unreadable; task recovery backup available', true);
+          showToast('Focus data could not be read. A task recovery backup is available for export. No data was changed.');
+        } else {
+          setStorageStatus('Focus data unreadable; no recovery backup found', true);
+          showToast('Focus data could not be read. No recovery backup was found. No data was changed.');
+        }
+        if (recovery.payload) offerRecoveryExport('Focus data is unreadable. Export available recovery data for manual review.');
       }
       return empty;
     }
     if (saved === null) {
-      const recovery = readRecoveryExportPayload();
-      if (recovery.focusBackupStatus === 'unknown') {
-        setStorageStatus('Focus recovery status unknown', true);
-        showToast('Focus recovery backup status is unknown. No data was changed.');
-        if (recovery.payload) offerRecoveryExport('Focus recovery status is unknown; export any readable recovery data.');
-      } else if (recovery.focusBackupStatus === 'available') {
-        reportFocusRecovery(true);
-      } else if (recovery.payload) {
-        offerRecoveryExport('Focus recovery data is available for manual review.');
+      if (!suppressRecoveryNotice) {
+        const recovery = readRecoveryExportPayload();
+        if (recovery.focusBackupStatus === 'unknown') {
+          setStorageStatus('Focus recovery status unknown', true);
+          showToast('Focus recovery backup status is unknown. No data was changed.');
+          if (recovery.payload) offerRecoveryExport('Focus recovery status is unknown; export any readable recovery data.');
+        } else if (recovery.focusBackupStatus === 'available') {
+          reportFocusRecovery(true);
+        }
       }
       return empty;
     }
@@ -1604,9 +1612,9 @@
         // must remain recoverable through future saves and reloads.
         const backupSaved = backUpRawFocusPayload(saved);
         if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-        reportFocusRecovery(backupSaved);
+        if (!suppressRecoveryNotice) reportFocusRecovery(backupSaved);
       } else if (hasFocusRecoveryBackup()) {
-        reportFocusRecovery(true);
+        if (!suppressRecoveryNotice) reportFocusRecovery(true);
       }
 
       const completedSession = restoreResult.completedSession;
@@ -1622,7 +1630,7 @@
         if (state.focusRecoveryBackupPendingPayload !== null) {
           const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
           if (!backupSaved) {
-            reportFocusRecovery(false);
+            if (!suppressRecoveryNotice) reportFocusRecovery(false);
             return { session, log: entries };
           }
           state.focusRecoveryBackupPendingPayload = null;
@@ -1632,7 +1640,7 @@
         // completion log. On quota failure the original primary value remains.
         try {
           localStorage.setItem(FOCUS_KEY, JSON.stringify({ session: null, log: entries }));
-          if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
+          if (hasFocusRecoveryBackup() && !suppressRecoveryNotice) reportFocusRecovery(true);
         } catch (saveError) {
           const backupSaved = backUpRawFocusPayload(saved);
           if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
@@ -1650,7 +1658,7 @@
       // only remaining copy if browser storage cannot create the backup.
       const backupSaved = backUpRawFocusPayload(saved);
       if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-      reportFocusRecovery(backupSaved);
+      if (!suppressRecoveryNotice) reportFocusRecovery(backupSaved);
       return empty;
     }
   }
