@@ -18,7 +18,7 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 - Alarms use `AlarmManager.setAndAllowWhileIdle` (RTC_WAKEUP) — **no foreground service, no polling**.
 - Alarms are (re)scheduled when the app opens, after every successful task save, after device boot, and after system clock/timezone changes. The non-exported receiver listens only for `BOOT_COMPLETED`, `QUICKBOOT_POWERON`, `TIME_SET`, and `TIMEZONE_CHANGED`; the time-change broadcasts cause Daymark to re-resolve local due times using the new system zone and re-arm the absolute RTC alarms.
 - If a notification is missed (device off, Doze), the in-app dialog on the next app open still covers it.
-- If boot rescheduling fails, a flag is stored and the next app open retries.
+- If boot or system-time rescheduling fails, a flag is stored and the next app open retries.
 
 ## Permissions (honest scope)
 
