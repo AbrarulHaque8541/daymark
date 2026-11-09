@@ -28,6 +28,26 @@ function makeLockManager() {
   };
 }
 
+function makeObservedLockManager() {
+  const tails = new Map();
+  let held = false;
+  return {
+    isHeld() { return held; },
+    request(name, options, callback) {
+      assert.equal(options.mode, 'exclusive');
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(async () => {
+        held = true;
+        try { return await callback(); }
+        finally { held = false; }
+      }).finally(release);
+    }
+  };
+}
+
 function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null, webhookUi = null, storageData = null, lockManager = null }) {
   const elements = new Map();
   const classSets = new Map();
@@ -544,29 +564,100 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('byte-identical healthy task-array backup is cleared as redundant', () => {
+test('byte-identical healthy task-array backup is cleared only while holding the shared task lock', async () => {
   const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
-  const app = bootApp({ savedValue: primary, savedBackupValue: primary });
+  const locks = makeObservedLockManager();
+  const storageData = new Map([[STORAGE_KEY, primary], [BACKUP_KEY, primary], [FOCUS_KEY, null]]);
+  const removals = [];
+  const originalDelete = storageData.delete.bind(storageData);
+  storageData.delete = (key) => {
+    removals.push({ key, lockHeld: locks.isHeld() });
+    return originalDelete(key);
+  };
+  const app = bootApp({ storageData, lockManager: locks });
+  await app.settle();
 
   assert.equal(app.storedValues.has(BACKUP_KEY), false,
     'only a byte-identical fully valid backup is redundant with the healthy primary');
+  assert.deepEqual(removals.filter((entry) => entry.key === BACKUP_KEY),
+    [{ key: BACKUP_KEY, lockHeld: true }],
+    'startup cleanup must reread and remove recovery data inside the shared lock');
 });
 
-test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
+test('corrupt startup data is copied byte-for-byte under the shared task lock', async () => {
   const corruptData = '{not valid JSON';
-  const { elements, storedValues } = bootApp({ savedValue: corruptData });
+  const locks = makeObservedLockManager();
+  const storageData = new Map([[STORAGE_KEY, corruptData], [FOCUS_KEY, null]]);
+  const writes = [];
+  const originalSet = storageData.set.bind(storageData);
+  storageData.set = (key, value) => {
+    writes.push({ key, lockHeld: locks.isHeld() });
+    return originalSet(key, value);
+  };
+  const app = bootApp({ storageData, lockManager: locks });
+  await app.settle();
 
-  assert.equal(storedValues.get(BACKUP_KEY), corruptData);
-  assert.match(elements.get('#toast').textContent, /kept in a browser backup/);
+  assert.equal(app.storedValues.get(BACKUP_KEY), corruptData);
+  assert.equal(app.storedValues.get(STORAGE_KEY), corruptData,
+    'startup recovery maintenance never overwrites the unreadable primary');
+  assert.deepEqual(writes.filter((entry) => entry.key === BACKUP_KEY),
+    [{ key: BACKUP_KEY, lockHeld: true }],
+    'recovery backup creation must happen inside the shared task lock');
+  assert.match(app.elements.get('#toast').textContent, /kept in a browser backup/);
 });
 
-test('backup failure is reported honestly and leaves the original entry untouched', () => {
+test('backup failure is reported honestly and leaves the original entry untouched', async () => {
   const corruptData = '{not valid JSON';
-  const { elements, storedValues } = bootApp({ savedValue: corruptData, failBackup: true });
+  const app = bootApp({ savedValue: corruptData, failBackup: true });
+  await app.settle();
 
-  assert.equal(storedValues.has(BACKUP_KEY), false);
-  assert.equal(storedValues.get(STORAGE_KEY), corruptData);
-  assert.match(elements.get('#toast').textContent, /could not create a recovery backup/);
+  assert.equal(app.storedValues.has(BACKUP_KEY), false);
+  assert.equal(app.storedValues.get(STORAGE_KEY), corruptData);
+  assert.match(app.elements.get('#toast').textContent, /Recovery backup could not be created/);
+});
+
+test('partially valid startup tasks are backed up byte-for-byte under the shared task lock', async () => {
+  const valid = makeImportTask('valid-task', 'Valid task');
+  const raw = JSON.stringify([valid, { id: 'invalid-task' }]);
+  const locks = makeObservedLockManager();
+  const storageData = new Map([[STORAGE_KEY, raw], [FOCUS_KEY, null]]);
+  const writes = [];
+  const originalSet = storageData.set.bind(storageData);
+  storageData.set = (key, value) => {
+    writes.push({ key, lockHeld: locks.isHeld() });
+    return originalSet(key, value);
+  };
+  const app = bootApp({ storageData, lockManager: locks });
+  await app.settle();
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), raw);
+  assert.equal(app.storedValues.get(STORAGE_KEY), raw,
+    'startup validation must not replace the original partially valid payload');
+  assert.deepEqual(writes.filter((entry) => entry.key === BACKUP_KEY),
+    [{ key: BACKUP_KEY, lockHeld: true }]);
+});
+
+test('startup recovery backup fails closed when Web Locks are unavailable', async () => {
+  const corruptData = '{not valid JSON';
+  const app = bootApp({ savedValue: corruptData, lockManager: false });
+  await app.settle();
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false);
+  assert.equal(app.storedValues.get(STORAGE_KEY), corruptData,
+    'the unreadable primary remains byte-for-byte untouched without coordination');
+  assert.match(app.elements.get('#storage-status span').textContent, /safe cross-tab coordination/);
+  assert.match(app.elements.get('#toast').textContent, /coordination is unavailable/);
+});
+
+test('startup recovery backup fails closed when the Web Lock request rejects', async () => {
+  const corruptData = '{not valid JSON';
+  const lockManager = { request: () => Promise.reject(new Error('lock unavailable')) };
+  const app = bootApp({ savedValue: corruptData, lockManager });
+  await app.settle();
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false);
+  assert.equal(app.storedValues.get(STORAGE_KEY), corruptData);
+  assert.match(app.elements.get('#storage-status span').textContent, /shared task lock/);
 });
 
 

@@ -13,7 +13,7 @@
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -87,15 +87,11 @@
       if (!Array.isArray(parsed)) throw new Error('Saved task data is not a list.');
       const validated = logic.validateStoredTasks(parsed);
       if (validated.rejectedCount > 0) {
-        // Some records failed validation and are about to be dropped. If backup
-        // storage is full/unavailable, keep the original primary payload and
-        // retry backup creation before any later save can replace it.
-        const backupSaved = backUpRawPayload(saved);
-        if (!backupSaved) state.recoveryBackupPendingPayload = saved;
-        setStorageStatus(backupSaved
-          ? 'Some saved tasks were ignored; the originals were kept in a backup'
-          : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
-        if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
+        // Startup is read-only. Preserve the original bytes under the shared
+        // task lock before any later save can replace the partially valid list.
+        state.recoveryBackupPendingPayload = saved;
+        state.recoveryBackupCleanupPending = false;
+        setStorageStatus('Some saved tasks were ignored; original bytes are awaiting a safe recovery backup.', true);
       } else if (hasPartialRecoveryBackup()) {
         // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
@@ -106,9 +102,14 @@
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
       } else {
         setStorageStatus('Saved on this device');
-        // Only a backup containing fully valid task arrays is stale. Partial or opaque
-        // originals remain recoverable even after the primary store becomes healthy.
-        clearRecoveryBackup();
+        // A byte-identical valid backup is optional cleanup, not a startup write.
+        // Defer removal until the shared task lock is held and the primary is reread.
+        let backupRaw = null;
+        try { backupRaw = localStorage.getItem(BACKUP_KEY); } catch (error) {
+          // The earlier preservation check already reports unreadable backup state.
+        }
+        state.recoveryBackupCleanupPending = typeof backupRaw === 'string'
+          && recoveryBackupIsRedundant(backupRaw, saved);
       }
       return validated.tasks;
     } catch (error) {
@@ -116,15 +117,12 @@
       setStorageStatus('Saved data could not be read', true);
       // Preserve the unreadable payload instead of silently discarding it, so a
       // future fix or manual recovery can still reach the original data.
-      const backupSaved = backUpRawPayload(saved);
-      if (!backupSaved) {
-        state.recoveryBackupPendingPayload = saved;
-        setStorageStatus('Saved data could not be read; recovery backup could not be created. Free storage before saving', true);
-      }
-      showToast(backupSaved
-        ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
-        : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged');
-      if (backupSaved) offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
+      // Keep the exact unreadable bytes in memory until the shared task lock
+      // can safely write the recovery copy. The primary entry remains untouched.
+      state.recoveryBackupPendingPayload = saved;
+      state.recoveryBackupCleanupPending = false;
+      setStorageStatus('Saved data could not be read; original bytes are awaiting a safe recovery backup.', true);
+      showToast('Saved tasks could not be read. The original data remains in place while a recovery backup is prepared safely.');
       return [];
     }
   }
@@ -289,8 +287,14 @@
           setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         } else {
           setStorageStatus('Saved on this device');
-          // Clear only a stale backup of fully valid task arrays.
-          clearRecoveryBackup();
+          // Clear only a stale backup of fully valid task arrays while still
+          // inside the shared task mutation transaction.
+          if (clearRecoveryBackup()) {
+            state.recoveryBackupCleanupPending = false;
+          } else {
+            state.recoveryBackupCleanupPending = true;
+            setStorageStatus('Tasks were saved, but a redundant recovery backup could not be cleared; it remains available.', true);
+          }
         }
       }
     });
@@ -344,9 +348,121 @@
   function clearRecoveryBackup() {
     try {
       localStorage.removeItem(BACKUP_KEY);
+      return true;
     } catch (error) {
       console.warn('Could not clear the Daymark recovery backup:', error);
+      return false;
     }
+  }
+
+  async function maintainRecoveryBackupUnderTaskLock() {
+    const needsBackup = state.recoveryBackupPendingPayload !== null;
+    const needsCleanup = state.recoveryBackupCleanupPending;
+    if (!needsBackup && !needsCleanup) return true;
+
+    const mutation = window.DaymarkTaskMutation;
+    const lockManager = window.navigator && window.navigator.locks;
+    if (!mutation || typeof mutation.withTaskMutationLock !== 'function') {
+      if (needsBackup) {
+        setStorageStatus('Recovery backup maintenance is waiting for safe cross-tab coordination; primary task data was not changed.', true);
+        showToast('Recovery backup could not be prepared safely because cross-tab coordination is unavailable. Original task data remains in place.');
+        return false;
+      }
+      state.recoveryBackupCleanupPending = false;
+      return true;
+    }
+
+    const locked = await mutation.withTaskMutationLock(lockManager, () => {
+      let backupCreated = false;
+      const pendingPayload = state.recoveryBackupPendingPayload;
+      if (pendingPayload !== null) {
+        if (!backUpRawPayload(pendingPayload)) {
+          return { ok: false, reason: 'backup-write-failed' };
+        }
+        if (state.recoveryBackupPendingPayload === pendingPayload) {
+          state.recoveryBackupPendingPayload = null;
+        }
+        backupCreated = true;
+      }
+
+      if (state.recoveryBackupCleanupPending) {
+        let primaryRaw;
+        try {
+          primaryRaw = localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+          return { ok: false, reason: 'primary-read-failed' };
+        }
+
+        if (typeof primaryRaw === 'string' && primaryRaw.length > 0
+            && !logic.hasDuplicateJsonKeys(primaryRaw)) {
+          let parsed = null;
+          try { parsed = JSON.parse(primaryRaw); } catch (error) { parsed = null; }
+          if (Array.isArray(parsed)) {
+            const validated = logic.validateStoredTasks(parsed);
+            if (validated.rejectedCount === 0) {
+              let backupRaw;
+              try {
+                backupRaw = localStorage.getItem(BACKUP_KEY);
+              } catch (error) {
+                return { ok: false, reason: 'backup-read-failed' };
+              }
+              if (typeof backupRaw === 'string'
+                  && recoveryBackupIsRedundant(backupRaw, primaryRaw)
+                  && !clearRecoveryBackup()) {
+                return { ok: false, reason: 'backup-cleanup-failed' };
+              }
+            }
+          }
+        }
+        // Missing, malformed, partial or opaque current data is never proof
+        // that the existing backup is disposable.
+        state.recoveryBackupCleanupPending = false;
+      }
+      return { ok: true, backupCreated };
+    });
+
+    if (!locked.ok) {
+      if (!needsBackup) {
+        // Failure to remove an optional redundant copy is harmless; retain it.
+        state.recoveryBackupCleanupPending = false;
+        return true;
+      }
+      const coordinationUnavailable = locked.reason === 'coordination-unavailable';
+      const message = coordinationUnavailable
+        ? 'Recovery backup maintenance is waiting for safe cross-tab coordination. Primary task data was not changed.'
+        : 'Recovery backup maintenance could not acquire the shared task lock. Primary task data was not changed.';
+      setStorageStatus(message, true);
+      showToast('Recovery backup maintenance could not run safely. Original task data remains in place; retry after coordination is available.');
+      return false;
+    }
+
+    if (!locked.value || locked.value.ok !== true) {
+      const reason = locked.value && locked.value.reason;
+      const message = reason === 'backup-write-failed'
+        ? 'Recovery backup could not be created. Free browser storage before saving tasks.'
+        : reason === 'primary-read-failed' || reason === 'backup-read-failed'
+          ? 'Recovery storage could not be checked safely. Existing data was left unchanged.'
+          : 'Recovery backup cleanup failed. Existing recovery data was left in place.';
+      setStorageStatus(message, true);
+      showToast(message);
+      return false;
+    }
+
+    if (locked.value.backupCreated) {
+      setStorageStatus('Saved data could not be read; the original bytes are preserved in a recovery backup.', true);
+      offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
+    }
+    return true;
+  }
+
+  function scheduleRecoveryBackupMaintenance() {
+    const previous = state.recoveryBackupMaintenancePromise || Promise.resolve();
+    const queued = previous.then(
+      () => maintainRecoveryBackupUnderTaskLock(),
+      () => maintainRecoveryBackupUnderTaskLock()
+    );
+    state.recoveryBackupMaintenancePromise = queued.then(() => undefined, () => undefined);
+    return queued;
   }
 
   function showSaveResult(saved, successMessage) {
@@ -2238,6 +2354,7 @@
         if (!hasLocalChanges) {
           state.tasks = loadTasks();
           state.persistedTasks = cloneTaskList(state.tasks);
+          scheduleRecoveryBackupMaintenance();
           render();
         } else {
           setStorageStatus('Another tab changed saved tasks; your pending edits will be reconciled when saved.', true);
@@ -2275,6 +2392,7 @@
       state.reminderTimer = setInterval(checkReminders, 30000);
       checkReminders();
     }
+    scheduleRecoveryBackupMaintenance();
   }
 
   setUp();
