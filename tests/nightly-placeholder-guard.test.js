@@ -64,20 +64,21 @@ test('the exact GNU grep guard excludes test/dependency directories without hidi
   }
 });
 
+
 test('every Node test file registers at least one executable test case', () => {
   const testDirectory = path.join(__dirname);
   const testFiles = fs.readdirSync(testDirectory)
     .filter((name) => name.endsWith('.test.js'))
     .sort();
-  const registration = /\\b(?:test|it|describe)(?:\\.(?:skip|todo|only))?\\s*\\(\\s*['"`]/;
+  const registration = /\b(?:test|it|describe)(?:\.(?:skip|todo|only))?\s*\(\s*['"\x60]/;
 
   assert.ok(testFiles.length > 0, 'the repository must retain its Node regression suite');
 
   for (const name of testFiles) {
     const source = fs.readFileSync(path.join(testDirectory, name), 'utf8');
     const withoutComments = source
-      .replace(/\\/\\*[\\s\\S]*?\\*\\//g, '')
-      .replace(/^\\s*\\/\\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
       .trim();
     assert.ok(withoutComments.length > 0, name + ' must not be empty or comment-only');
     assert.match(withoutComments, registration,
