@@ -29,6 +29,12 @@
       keys: ['daymark.focus.v1']
     },
     {
+      id: 'focus-preset',
+      label: 'Focus timer preset',
+      description: 'The preset selected for a new Focus session. The active session and completed-session history are stored separately.',
+      keys: ['daymark.focus.preset.v1']
+    },
+    {
       id: 'focus-backup',
       label: 'Focus recovery backup',
       description: 'A safety copy kept on this device when Focus data could not be read.',
