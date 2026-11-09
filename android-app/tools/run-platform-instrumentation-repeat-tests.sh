@@ -3,11 +3,11 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 sh -n "$ROOT/tools/run-platform-instrumentation-on-emulator.sh"
 sh -n "$ROOT/tools/platform-instrumentation-repeat.sh"
-sh -n "$ROOT/tools/run-platform-instrumentation-shell-input-tests.sh"
+sh -n "$ROOT/tools/run-platform-instrumentation-touch-sequence-tests.sh"
 . "$ROOT/tools/platform-instrumentation-repeat.sh"
 TMP=$(mktemp -d "daymark-instrumentation-repeat.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
-sh "$ROOT/tools/run-platform-instrumentation-shell-input-tests.sh"
+sh "$ROOT/tools/run-platform-instrumentation-touch-sequence-tests.sh"
 RUN_LOG="$TMP/runs.log"
 ADB_LOG="$TMP/adb.log"
 export RUN_LOG ADB_LOG
