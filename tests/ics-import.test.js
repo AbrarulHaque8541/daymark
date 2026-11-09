@@ -148,7 +148,7 @@ test('a component without a usable SUMMARY is counted as a skipped row', () => {
   assert.equal(result.skippedRows, 2);
 });
 
-test('only valid VTODO completion metadata marks imported tasks done', () => {
+test('valid VTODO COMPLETED timestamps mark tasks done independently of STATUS', () => {
   const ics = [
     'BEGIN:VCALENDAR',
     'BEGIN:VTODO',
@@ -161,7 +161,8 @@ test('only valid VTODO completion metadata marks imported tasks done', () => {
     'COMPLETED;VALUE=DATE-TIME:20261108T100000Z',
     'END:VTODO',
     'BEGIN:VTODO',
-    'SUMMARY:Completion date without completed status',
+    'SUMMARY:Completion date without status (RFC 5545 example)',
+    'STATUS:NEEDS-ACTION',
     'COMPLETED:20261108T100000Z',
     'END:VTODO',
     'BEGIN:VTODO',
@@ -199,14 +200,33 @@ test('only valid VTODO completion metadata marks imported tasks done', () => {
   const result = importer.fromIcs(ics, freshCtx());
   assert.equal(result.tasks.length, 10);
   assert.deepEqual(result.tasks.map((task) => task.completed),
-    [true, true, false, false, false, false, false, false, false, false]);
-  assert.equal(result.invalidCompletion, 8,
+    [true, true, true, true, false, false, false, false, false, false]);
+  assert.equal(result.invalidCompletion, 6,
     'malformed VTODO metadata and VEVENT completion misuse are disclosed, not trusted');
 });
 
 test('calendar input without a VCALENDAR block fails closed', () => {
   assert.throws(() => importer.fromIcs('SUMMARY:no calendar wrapper', freshCtx()), /does not contain a VCALENDAR block/);
   assert.throws(() => importer.fromIcs('', freshCtx()), /does not contain a VCALENDAR block/);
+});
+
+
+test('iCalendar requires one balanced VCALENDAR envelope and direct task components', () => {
+  const task = 'BEGIN:VTODO\\nSUMMARY:Orphan task\\nEND:VTODO\\n';
+  const malformed = [
+    ['task before the calendar root', task + 'BEGIN:VCALENDAR\\nEND:VCALENDAR\\n'],
+    ['task after the calendar root', 'BEGIN:VCALENDAR\\nEND:VCALENDAR\\n' + task],
+    ['unclosed calendar root', 'BEGIN:VCALENDAR\\nBEGIN:VEVENT\\nSUMMARY:Open event\\nEND:VEVENT\\n'],
+    ['nested calendar root', 'BEGIN:VCALENDAR\\nBEGIN:VCALENDAR\\nEND:VCALENDAR\\nEND:VCALENDAR\\n'],
+    ['mismatched component end', 'BEGIN:VCALENDAR\\nBEGIN:VEVENT\\nSUMMARY:Mismatch\\nEND:VTODO\\nEND:VCALENDAR\\n'],
+    ['unclosed task component', 'BEGIN:VCALENDAR\\nBEGIN:VTODO\\nSUMMARY:Open task\\nEND:VCALENDAR\\n'],
+    ['unmatched component end', 'BEGIN:VCALENDAR\\nEND:VEVENT\\nEND:VCALENDAR\\n'],
+    ['duplicate calendar roots', 'BEGIN:VCALENDAR\\nEND:VCALENDAR\\nBEGIN:VCALENDAR\\nEND:VCALENDAR\\n'],
+    ['nested task component', 'BEGIN:VCALENDAR\\nBEGIN:VTODO\\nSUMMARY:Outer\\nBEGIN:VEVENT\\nSUMMARY:Nested\\nEND:VEVENT\\nEND:VTODO\\nEND:VCALENDAR\\n']
+  ];
+  for (const [label, input] of malformed) {
+    assert.throws(() => importer.fromIcs(input, freshCtx()), /VCALENDAR|component|BEGIN|END/i, label);
+  }
 });
 
 test('oversized calendar input is rejected by the shared size guard', () => {
@@ -269,6 +289,64 @@ test('the import UI intercepts .ics files, saves them, and discloses the simplif
   assert.match(status.textContent, /Time zones were not converted; the written hour and minute values were kept\./);
   assert.match(status.textContent, /1 imported time had non-zero seconds; seconds were truncated to minute precision\./);
   assert.match(status.textContent, /1 cancelled item skipped\./);
+});
+
+
+test('a malformed calendar envelope cannot write or partially import existing tasks', async () => {
+  const original = JSON.stringify([
+    { id: 'keep-1', title: 'Keep existing task', dueDate: null, priority: 'medium', completed: false, createdAt: NOW, updatedAt: NOW }
+  ]);
+  const storageData = { [ui.STORAGE_KEY]: original };
+  let writes = 0;
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    setItem(key, value) { writes += 1; storageData[key] = String(value); },
+    removeItem(key) { delete storageData[key]; }
+  };
+  const created = [];
+  const malformed = [
+    'BEGIN:VTODO',
+    'UID:orphan@example.com',
+    'SUMMARY:Must not be imported',
+    'END:VTODO',
+    'BEGIN:VCALENDAR',
+    'END:VCALENDAR'
+  ].join('\\n');
+  const element = {
+    id: 'import-file', value: '', files: [{ name: 'malformed.ics', size: malformed.length, text: async () => malformed }],
+    textContent: ''
+  };
+  const doc = {
+    readyState: 'complete',
+    body: { appendChild(el) { created.push(el); return el; } },
+    getElementById(id) { return id === 'import-file' ? element : null; },
+    createElement(tag) {
+      const el = { tagName: tag, id: '', className: '', textContent: '', setAttribute() {} };
+      created.push(el);
+      return el;
+    },
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const win = {
+    StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } },
+    dispatchEvent() { return true; }
+  };
+  const handle = ui.attachImportUi({
+    document: doc, window: win, localStorage: storage,
+    importApi: importer, logic, now: () => NOW
+  });
+  const event = {
+    target: element,
+    preventDefault() {},
+    stopPropagation() {}
+  };
+  await handle.onChange(event);
+  assert.equal(writes, 0, 'invalid envelope is rejected before the task store is written');
+  assert.equal(storageData[ui.STORAGE_KEY], original, 'existing task bytes remain unchanged');
+  const status = created.find((el) => el.id === 'import-status');
+  assert.ok(status);
+  assert.match(status.textContent, /Import failed: Calendar component appears outside the VCALENDAR block\\. Nothing was changed\\./);
 });
 
 test('index.html offers the calendar format in the import file picker', () => {
