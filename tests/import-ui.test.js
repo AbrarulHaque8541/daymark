@@ -276,6 +276,29 @@ test('blocked storage getter keeps the import handler attached and changes no ta
   assert.match(status.textContent, /Import failed: browser storage is unavailable; nothing was changed/);
 });
 
+test('a task-store write failure preserves the original data and sends no refresh event', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const csv = exporter.toCsv([
+    { id: 'write-failure-1', title: 'Must not replace saved data', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
+    stored: original,
+    files: [csvFile(csv)]
+  });
+  env.localStorage.setItem = () => {
+    throw new Error('quota exceeded');
+  };
+
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+
+  assert.equal(storageData[ui.STORAGE_KEY], original, 'the original task bytes remain unchanged');
+  assert.equal(writes.length, 0, 'a failed setItem is not recorded as a successful write');
+  assert.equal(dispatched.length, 0, 'no refresh event is sent after a failed save');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /Import failed: quota exceeded.*Nothing was changed/);
+});
+
 test('import auto-boot does not eagerly evaluate window.localStorage', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'import-ui.js'), 'utf8');
   assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
