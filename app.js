@@ -75,6 +75,9 @@
       return [];
     }
     try {
+      if (hasDuplicateJsonKeys(saved)) {
+        throw new Error('Saved task data contains duplicate JSON keys or unsupported nesting.');
+      }
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) throw new Error('Saved task data is not a list.');
       const validated = logic.validateStoredTasks(parsed);
@@ -135,6 +138,7 @@
   }
 
   function isPartialRecoveryPayload(raw) {
+    if (hasDuplicateJsonKeys(raw)) return true;
     try {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
@@ -1283,6 +1287,10 @@
       result.malformedCount = 1;
       return result;
     }
+    if (hasDuplicateJsonKeys(raw)) {
+      result.malformedCount = 1;
+      return result;
+    }
     let parsed;
     try {
       parsed = JSON.parse(raw);
@@ -1297,6 +1305,10 @@
     if (parsed && parsed.format === 'daymark-recovery-bundle-v1' && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
       parsed.payloads.forEach((payload) => {
         if (typeof payload !== 'string') {
+          result.malformedCount += 1;
+          return;
+        }
+        if (hasDuplicateJsonKeys(payload)) {
           result.malformedCount += 1;
           return;
         }
@@ -1325,6 +1337,10 @@
       result.malformedCount = 1;
       return result;
     }
+    if (hasDuplicateJsonKeys(raw)) {
+      result.malformedCount = 1;
+      return result;
+    }
     let parsed;
     try {
       parsed = JSON.parse(raw);
@@ -1335,6 +1351,10 @@
     if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1' && Array.isArray(parsed.payloads) && parsed.payloads.length > 0) {
       parsed.payloads.forEach((payload) => {
         if (typeof payload !== 'string') {
+          result.malformedCount += 1;
+          return;
+        }
+        if (hasDuplicateJsonKeys(payload)) {
           result.malformedCount += 1;
           return;
         }
