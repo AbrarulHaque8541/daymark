@@ -144,6 +144,10 @@
           parts.push(parsed.secondsDropped + ' imported time' + (parsed.secondsDropped === 1 ? '' : 's') +
             ' had non-zero seconds; seconds were truncated to minute precision.');
         }
+        if (parsed.categoriesDropped > 0) {
+          parts.push(plural(parsed.categoriesDropped, 'category value') +
+            ' could not be represented by Daymark tags and were skipped.');
+        }
         if (parsed.invalidCompletion > 0) {
           parts.push(parsed.invalidCompletion + ' item' + (parsed.invalidCompletion === 1 ? '' : 's') +
             ' had invalid completion metadata ignored; left open.');

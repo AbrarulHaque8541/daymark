@@ -163,6 +163,29 @@ test('a markdown file imports with generated ids', async () => {
   assert.match(status.textContent, /Imported 1 task from notes\.md\./);
 });
 
+test('iCalendar import status discloses categories the Daymark tag model cannot retain', async () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'UID:category-disclosure@example.com',
+    'SUMMARY:Calendar task',
+    'CATEGORIES:work,personal\\,private;urgent,finance',
+    'END:VTODO',
+    'END:VCALENDAR'
+  ].join('\n');
+  const { env, elements, created, storageData } = fakeEnv({
+    stored: JSON.stringify(sampleTasks),
+    files: [{ name: 'calendar.ics', size: ics.length, text: async () => ics }]
+  });
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.equal(saved.length, 2);
+  assert.deepEqual(saved[1].tags, ['work', 'finance']);
+  const status = created.find((el) => el.id === 'import-status');
+  assert.match(status.textContent,
+    /1 category value could not be represented by Daymark tags and were skipped\\./);
+});
+
 test('oversize and unreadable files fail closed without touching storage', async () => {
   const original = JSON.stringify(sampleTasks);
   const big = fakeEnv({ stored: original, files: [{ name: 'huge.csv', size: ui.MAX_IMPORT_FILE_BYTES + 1, text: async () => 'x' }] });

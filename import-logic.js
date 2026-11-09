@@ -140,6 +140,29 @@
     return tags;
   }
 
+  // iCalendar import reports categories the Daymark tag contract cannot retain.
+  // Mirror cleanTags normalization/deduplication/cap without silently hiding losses.
+  function countDroppedTags(candidates) {
+    const accepted = [];
+    let dropped = 0;
+    for (const raw of candidates) {
+      if (typeof raw !== 'string') continue;
+      const tag = raw.trim().toLowerCase().replace(/ /g, '-');
+      if (!tag) continue;
+      if (!isTag(tag)) {
+        dropped += 1;
+        continue;
+      }
+      if (accepted.indexOf(tag) !== -1) continue;
+      if (accepted.length >= MAX_TAGS) {
+        dropped += 1;
+        continue;
+      }
+      accepted.push(tag);
+    }
+    return dropped;
+  }
+
   function cleanSubtasks(raw, makeId) {
     if (!Array.isArray(raw)) return null;
     const subtasks = [];
@@ -572,7 +595,7 @@
   function fromIcs(text, ctx) {
     const parsed = parseIcs(text);
     if (!parsed.hasCalendar) throw new Error('Calendar input does not contain a VCALENDAR block.');
-    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, invalidCompletion: 0, invalidDateType: 0, cancelled: 0 };
+    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, categoriesDropped: 0, invalidCompletion: 0, invalidDateType: 0, cancelled: 0 };
     const tasks = [];
     let skippedRows = 0;
     for (const component of parsed.components) {
@@ -589,6 +612,8 @@
       if (status === 'CANCELLED') { stats.cancelled += 1; continue; }
       const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
       const due = icsDateTaskField(dueProp);
+      const rawCategories = categoryProps.reduce((all, prop) => all.concat(icsSplitList(prop.value)), []);
+      const categoriesDropped = countDroppedTags(rawCategories);
       const completionProp = byName.COMPLETED || null;
       // RFC 5545 defines COMPLETED as the actual completion timestamp on
       // VTODO. It is independent of STATUS (the RFC example pairs it with
@@ -610,7 +635,7 @@
         priority,
         completed: component.type === 'VTODO' && (status === 'COMPLETED' || validCompletion),
         repeat: null,
-        tags: categoryProps.reduce((all, prop) => all.concat(icsSplitList(prop.value)), []),
+        tags: rawCategories,
         notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
         subtasks: [],
         createdAt: ctx && ctx.now,
@@ -622,6 +647,7 @@
       if (byName.RRULE || byName.RDATE || byName['RECURRENCE-ID']) stats.recurring += 1;
       if (due.timezonePresent && task.dueTime !== null) stats.timezoneDropped += 1;
       if (due.secondsDropped && task.dueTime !== null) stats.secondsDropped += 1;
+      stats.categoriesDropped += categoriesDropped;
       if (due.invalidDateType) stats.invalidDateType += 1;
       if (invalidCompletion) stats.invalidCompletion += 1;
       tasks.push(task);
@@ -632,6 +658,7 @@
       recurring: stats.recurring,
       timezoneDropped: stats.timezoneDropped,
       secondsDropped: stats.secondsDropped,
+      categoriesDropped: stats.categoriesDropped,
       invalidCompletion: stats.invalidCompletion,
       invalidDateType: stats.invalidDateType,
       cancelled: stats.cancelled

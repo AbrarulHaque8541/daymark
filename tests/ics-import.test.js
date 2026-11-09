@@ -368,6 +368,7 @@ test('CATEGORIES splits only on unescaped commas; semicolons remain inside value
   const result = importer.fromIcs(ics, freshCtx());
   assert.equal(result.tasks.length, 1);
   assert.deepEqual(result.tasks[0].tags, ['work', 'finance'], 'the escaped comma and semicolon stay inside one unsupported value');
+  assert.equal(result.categoriesDropped, 1, 'the unsupported category value is disclosed instead of silently lost');
 });
 
 test('repeated CATEGORIES properties are accumulated in order and deduplicated', () => {
@@ -429,6 +430,22 @@ test('escaped RFC TEXT semicolons remain inside one CATEGORIES value', () => {
   assert.equal(result.tasks.length, 1);
   assert.deepEqual(result.tasks[0].tags, ['finance'],
     'the escaped semicolon is unescaped within one unsupported tag, not treated as a list separator');
+  assert.equal(result.categoriesDropped, 1, 'the unrepresentable escaped-semicolon value is counted');
+});
+
+test('iCalendar categories beyond the five-tag storage limit are disclosed', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'UID:category-limit@example.com',
+    'SUMMARY:Too many categories',
+    'CATEGORIES:one,two,three,four,five,six',
+    'END:VTODO',
+    'END:VCALENDAR'
+  ].join('\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.deepEqual(result.tasks[0].tags, ['one', 'two', 'three', 'four', 'five']);
+  assert.equal(result.categoriesDropped, 1, 'the sixth distinct category is reported as dropped');
 });
 
 test('import UI discloses invalid completion and date metadata without corrupting the task', async () => {
