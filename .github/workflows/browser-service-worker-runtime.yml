@@ -4,8 +4,9 @@ on:
   pull_request:
     paths:
       - ".github/workflows/browser-service-worker-runtime.yml"
-      - "android-app/app/src/androidTest/AndroidManifest.xml"
-      - "android-app/app/src/androidTest/java/com/abrar/daymark/DaymarkServiceWorkerInstrumentation.java"
+      - "android-app/build.gradle.kts"
+      - "android-app/settings.gradle.kts"
+      - "android-app/service-worker-test/**"
       - "android-app/tools/run-service-worker-instrumentation-on-emulator.sh"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerEnforcement.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerPolicy.java"
