@@ -100,6 +100,7 @@ expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIM
 expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIME_SET" "$MANIFEST" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIMEZONE_CHANGED" "$MANIFEST" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "ReminderSchedulePolicy.shouldRescheduleForSystemChange(action)" "$RECEIVER" "$ROOT"
+expect_fail_after_removal check-focus-coordinate-translation.py "bounds[0].offset(rootLocation[0], rootLocation[1]);" "$ROOT/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java" "$ROOT"
 # Site history search and single-site removal must fail closed.
 python3 "$ROOT/tools/check-browser-history.py" "$ROOT" >/dev/null
 echo "PASS meta: check-browser-history.py passes on current source"
