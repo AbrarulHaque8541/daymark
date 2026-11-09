@@ -374,11 +374,12 @@ function hasNonEmptyTestCallback(callbackSource) {
   return hasExecutableCallbackBody(source.slice(bodyStart + 1, bodyEnd));
 }
 
-function hasNodeTestBinding(source, code) {
-  // A plausible test(name, callback) call is not enough: a placeholder can
-  // define its own no-op function named test/it. Require the identifier to be
-  // imported from Node's built-in test module first.
-  const commonJsBinding = /(^|[^A-Za-z0-9_$.])(?:const|let|var)\s+(?:test|it|\{\s*(?:test|it)\s*\})\s*=\s*require\s*\(/gm;
+function getNodeTestBindings(source, code) {
+  // A plausible test()/it() call is not enough: placeholders can define
+  // local no-op functions. Track the exact identifiers imported from
+  // Node's built-in test module and only accept registrations through them.
+  const bindings = new Set();
+  const commonJsBinding = /(^|[^A-Za-z0-9_$.])(?:const|let|var)\s+(test|it|\{\s*(?:test|it)(?:\s*,\s*(?:test|it))*\s*\})\s*=\s*require\s*\(/gm;
   let match;
   while ((match = commonJsBinding.exec(code))) {
     const requireIndex = code.indexOf("require", match.index + match[1].length);
@@ -386,31 +387,37 @@ function hasNodeTestBinding(source, code) {
     const closeIndex = findClosingDelimiter(code, openIndex, "(", ")");
     if (closeIndex < 0) continue;
     const moduleArgument = source.slice(openIndex + 1, closeIndex).trim();
-    if (/^(['"])node:test\1$/.test(moduleArgument)) return true;
+    if (!/^(['"])node:test\1$/.test(moduleArgument)) continue;
+    if (match[2] === "test" || match[2] === "it") bindings.add(match[2]);
+    else for (const name of match[2].match(/\b(?:test|it)\b/g) || []) bindings.add(name);
   }
 
-  const esmBinding = /(^|[^A-Za-z0-9_$.])import\s+(?:test|it|\{\s*(?:test|it)\s*\})\s+from\s+/gm;
+  const esmBinding = /(^|[^A-Za-z0-9_$.])import\s+(test|it|\{\s*(?:test|it)(?:\s*,\s*(?:test|it))*\s*\})\s+from\s+/gm;
   while ((match = esmBinding.exec(code))) {
     const fromOffset = match[0].lastIndexOf("from") + 4;
     let specifierStart = match.index + fromOffset;
     while (/\s/.test(source[specifierStart] || "")) specifierStart += 1;
     const moduleSpecifier = source.slice(specifierStart);
-    if (/^(['"])node:test\1/.test(moduleSpecifier)) return true;
+    if (!/^(['"])node:test\1/.test(moduleSpecifier)) continue;
+    if (match[2] === "test" || match[2] === "it") bindings.add(match[2]);
+    else for (const name of match[2].match(/\b(?:test|it)\b/g) || []) bindings.add(name);
   }
-  return false;
+  return bindings;
 }
 
 function hasRegisteredTestCase(source) {
   const code = maskJavaScriptNonCode(source);
-  if (!hasNodeTestBinding(source, code)) return false;
+  const nodeTestBindings = getNodeTestBindings(source, code);
+  if (nodeTestBindings.size === 0) return false;
   const focusedTest = /(^|[^A-Za-z0-9_$.])(?:test|it|describe)\s*\.\s*only\s*\(/m.test(code);
   if (focusedTest) return false;
 
-  const registration = /(^|[^A-Za-z0-9_$.])(?:test|it)\s*\(/gm;
+  const registration = /(^|[^A-Za-z0-9_$.])(test|it)\s*\(/gm;
   let match;
   while ((match = registration.exec(code))) {
     const identifierStart = match.index + match[1].length;
-    const openIndex = code.indexOf("(", identifierStart);
+    if (!nodeTestBindings.has(match[2])) continue;
+    const openIndex = code.indexOf("(", identifierStart + match[2].length);
     const closeIndex = findClosingDelimiter(code, openIndex, "(", ")");
     if (closeIndex < 0) continue;
 
@@ -508,6 +515,12 @@ test('every repository Node test file registers at least one executable test cas
     'a locally defined no-op test function must not impersonate node:test');
   assert.equal(hasRegisteredTestCase("const test = () => {}; test('fake', () => assert.ok(true));"), false,
     'a locally assigned no-op test function must not impersonate node:test');
+  assert.equal(hasRegisteredTestCase("function it() {}\nit('fake', () => assert.ok(true));"), false,
+    'a locally defined it() helper must not impersonate node:test');
+  assert.equal(hasRegisteredTestCase("const test = require('node:test'); const it = () => {}; it('fake', () => assert.ok(true));"), false,
+    'an imported test binding must not authorize a locally defined it() helper');
+  assert.equal(hasRegisteredTestCase("const { it } = require('node:test'); it('valid', () => assert.ok(true));"), true,
+    'a genuine CommonJS it binding must be accepted');
   assert.equal(hasRegisteredTestCase("const test = require('./fake-test'); test('fake', () => assert.ok(true));"), false,
     'a test helper from another module must not impersonate node:test');
   assert.equal(hasRegisteredTestCase("const test = require('node:test'); test('valid', () => assert.ok(true));"), true,
