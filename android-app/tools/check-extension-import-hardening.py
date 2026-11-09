@@ -17,7 +17,7 @@ def check_sources(parser, store, smoke):
     patterns = parser.split("private static List<String> readValidatedPatterns", 1)[1].split(
         "static boolean isSupportedMatchPattern", 1)[0]
     install = store.split("void installUserPack", 1)[1].split("private File findUserPack", 1)[0]
-    reader = store.split("private static String readFile", 1)[1].split("private static void writeFile", 1)[0]
+    reader = store.split("private static String readFile", 1)[1].split("private static synchronized void writeFile", 1)[0]
 
     # Existing extension files are bounded and never silently truncated or replaced after I/O failure.
     assert "MAX_USER_PACK_BYTES = 200_000;" in store, "stored extension reads must keep the 200 KB limit"
@@ -48,7 +48,7 @@ def check_sources(parser, store, smoke):
     assert "already installed with id" in install, "installing a different pack under an existing id must fail"
     assert install.index("already installed with id") < install.index("writeFile(out, ExtensionPackageParser.toDaymarkJson(ext))"), \
         "the install conflict check must run before the write"
-    writer = store.split("private static void writeFile", 1)[1]
+    writer = store.split("private static synchronized void writeFile", 1)[1]
     assert "Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)" in writer, \
         "failed extension saves must preserve the previous pack"
     assert "file.delete()" not in writer, "failed extension saves must not delete the previous pack"
@@ -76,7 +76,6 @@ def check_sources(parser, store, smoke):
         "raw export must return an independent exact-byte copy"
     assert "Files.delete(path);" in recovery, \
         "confirmed recovery removal must delete only the selected verified file"
-    writer = store.split("private static synchronized void writeFile", 1)[1]
     assert "private static synchronized void writeFile" in store, \
         "pack writes must share the recovery/removal monitor"
     uninstall = store.split("void uninstallUserPack", 1)[1].split("private boolean isBuiltinDisabled", 1)[0]
