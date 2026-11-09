@@ -4,8 +4,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -21,6 +23,7 @@ final class ExtensionStore {
     private static final String KEY_EXTENSIONS_ENABLED = "extensions_enabled";
     private static final String KEY_DISABLED_SITES_PREFIX = "disabled_sites.";
     private static final String USER_DIR = "browser_extensions";
+    private static final int MAX_USER_PACK_BYTES = 200_000;
 
     private final SharedPreferences preferences;
     private final File userDir;
@@ -149,12 +152,13 @@ final class ExtensionStore {
         File out = new File(userDir, sanitizeFileName(ext.id) + ".daymark-ext.json");
         BrowserExtension existing = null;
         if (out.exists()) {
-            // Import ids are content-derived, but the install path still fails closed when a
-            // different pack already lives at the same filename (issue #193).
+            // Read failures are not parse failures: never replace a file that could not be
+            // inspected (including an oversized file or a non-regular path).
+            String existingJson = readFile(out);
             try {
-                existing = ExtensionPackageParser.parseDaymarkJson(readFile(out), false);
-            } catch (Exception unreadable) {
-                // A corrupt stored pack is replaced by the fresh confirmed import.
+                existing = ExtensionPackageParser.parseDaymarkJson(existingJson, false);
+            } catch (Exception malformed) {
+                // A readable but malformed stored pack may be replaced by this confirmed import.
             }
         }
         if (existing != null && !isSamePack(existing, ext)) {
@@ -231,26 +235,31 @@ final class ExtensionStore {
         return id.replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
-    private static String readFile(File file) throws Exception {
-        int max = (int) Math.min(file.length(), 200_000);
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(max);
+    private static String readFile(File file) throws IOException {
+        if (file == null || !file.isFile()) {
+            throw new IOException("Extension pack path is not a regular file.");
+        }
+        long initialLength = file.length();
+        if (initialLength > MAX_USER_PACK_BYTES) {
+            throw new IOException("Extension pack exceeds the " + MAX_USER_PACK_BYTES + " byte read limit.");
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream((int) initialLength);
         try (FileInputStream in = new FileInputStream(file)) {
             byte[] buffer = new byte[8192];
             int read;
             int total = 0;
             while ((read = in.read(buffer)) != -1) {
-                if (total + read > max) {
-                    read = max - total;
-                    if (read <= 0) break;
+                if (read > MAX_USER_PACK_BYTES - total) {
+                    throw new IOException("Extension pack exceeded the byte limit while being read.");
                 }
                 out.write(buffer, 0, read);
                 total += read;
-                if (total >= max) break;
+            }
+            if (total != initialLength) {
+                throw new IOException("Extension pack changed while being read.");
             }
         }
-        byte[] bytes = out.toByteArray();
-        if (bytes.length == 0) return "";
-        return new String(bytes, StandardCharsets.UTF_8);
+        return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
 
     private static void writeFile(File file, String content) throws Exception {
