@@ -7,7 +7,18 @@ drive_instrumentation_input_bridge() {
   stop_file="$2"
   last_seq=""
   while [ ! -f "$stop_file" ]; do
-    request="$(adb shell run-as "$package" cat files/daymark-instrumentation-input-request.txt 2>/dev/null | tr -d '\r' || true)"
+    set +e
+    request_output="$(adb shell run-as "$package" cat files/daymark-instrumentation-input-request.txt 2>&1)"
+    request_status=$?
+    set -e
+    request_output="$(printf '%s' "$request_output" | tr -d '\r')"
+    case "$request_output" in
+      *"No such file or directory"*) request_output="" ;;
+    esac
+    if [ "$request_status" -ne 0 ] && [ -n "$request_output" ]; then
+      echo "Host input bridge poll failed for $package: $request_output" >&2
+    fi
+    request="$request_output"
     if [ -n "$request" ]; then
       seq=""
       action=""
@@ -21,6 +32,7 @@ $request
 EOF
       case "$seq" in ''|*[!0-9]*) seq="" ;; esac
       if [ -n "$seq" ] && [ "$seq" != "$last_seq" ]; then
+        echo "Host input bridge received sequence $seq ($action) for $package"
         invalid=0
         for value in "$x1" "$y1" "$x2" "$y2" "$duration"; do
           case "$value" in ''|*[!0-9]*) invalid=1 ;; esac
@@ -64,6 +76,7 @@ EOF
           fi
           return 1
         }
+        echo "Host input bridge completed sequence $seq with status $input_status"
         last_seq="$seq"
       fi
     fi
