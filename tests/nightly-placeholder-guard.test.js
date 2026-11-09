@@ -253,11 +253,68 @@ function maskJavaScriptNonCode(source) {
   return output.join("");
 }
 
+function findClosingDelimiter(source, openIndex, opening, closing) {
+  let depth = 0;
+  for (let index = openIndex; index < source.length; index += 1) {
+    if (source[index] === opening) depth += 1;
+    else if (source[index] === closing) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function hasNonEmptyTestCallback(argumentsSource) {
+  const arrow = argumentsSource.indexOf("=>");
+  if (arrow >= 0) {
+    let bodyStart = arrow + 2;
+    while (/\s/.test(argumentsSource[bodyStart] || "")) bodyStart += 1;
+    if (argumentsSource[bodyStart] === "{") {
+      const bodyEnd = findClosingDelimiter(argumentsSource, bodyStart, "{", "}");
+      if (bodyEnd < 0) return false;
+      const body = argumentsSource.slice(bodyStart + 1, bodyEnd).replace(/[\s;{}]/g, "");
+      return body.length > 0 && !/^(?:returnundefined|void0)$/.test(body);
+    }
+    const expression = argumentsSource.slice(bodyStart).replace(/[\s;,]/g, "");
+    return expression.length > 0 && expression !== "undefined" && expression !== "void0";
+  }
+
+  const functionMatch = /\bfunction\s*\*?\s*(?:[A-Za-z_$][\w$]*)?\s*\(/.exec(argumentsSource);
+  if (!functionMatch) return false;
+  const parameterStart = argumentsSource.indexOf("(", functionMatch.index);
+  const parameterEnd = findClosingDelimiter(argumentsSource, parameterStart, "(", ")");
+  if (parameterEnd < 0) return false;
+  const bodyStart = argumentsSource.indexOf("{", parameterEnd + 1);
+  if (bodyStart < 0) return false;
+  const bodyEnd = findClosingDelimiter(argumentsSource, bodyStart, "{", "}");
+  if (bodyEnd < 0) return false;
+  const body = argumentsSource.slice(bodyStart + 1, bodyEnd).replace(/[\s;{}]/g, "");
+  return body.length > 0 && !/^(?:returnundefined|void0)$/.test(body);
+}
+
 function hasRegisteredTestCase(source) {
-  const code = maskJavaScriptNonCode(source).trim();
-  const activeTest = /(^|[^A-Za-z0-9_$.])(?:test|it)\s*\(/m.test(code);
+  const code = maskJavaScriptNonCode(source);
   const focusedTest = /(^|[^A-Za-z0-9_$.])(?:test|it|describe)\s*\.\s*only\s*\(/m.test(code);
-  return code.length > 0 && activeTest && !focusedTest;
+  if (focusedTest) return false;
+
+  const registration = /(^|[^A-Za-z0-9_$.])(?:test|it)\s*\(/gm;
+  let match;
+  while ((match = registration.exec(code))) {
+    const identifierStart = match.index + match[1].length;
+    const openIndex = code.indexOf("(", identifierStart);
+    const closeIndex = findClosingDelimiter(code, openIndex, "(", ")");
+    if (closeIndex < 0) continue;
+
+    let afterCall = closeIndex + 1;
+    while (/\s/.test(code[afterCall] || "")) afterCall += 1;
+    // A function declaration or object/class method named test()/it() is
+    // not a node:test registration; both are followed by a method body.
+    if (code[afterCall] === "{") continue;
+
+    if (hasNonEmptyTestCallback(code.slice(openIndex + 1, closeIndex))) return true;
+  }
+  return false;
 }
 
 test('every repository Node test file registers at least one executable test case', () => {
@@ -280,8 +337,18 @@ test('every repository Node test file registers at least one executable test cas
   assert.equal(hasRegisteredTestCase('placeholder'), false, 'literal placeholder files must not count as tests');
   assert.equal(hasRegisteredTestCase('// placeholder\n/* no executable test */'), false,
     'comment-only test files must not count as tests');
-  assert.equal(hasRegisteredTestCase("test('valid fixture', () => {});"), true,
-    'an active named Node test registration must be accepted');
+  assert.equal(hasRegisteredTestCase("test('placeholder', () => {});"), false,
+    'an empty callback must not make a placeholder-only file look like a regression suite');
+  assert.equal(hasRegisteredTestCase("test('comment-only', () => { /* no assertions or work */ });"), false,
+    'a comment-only callback must not count as an executable test');
+  assert.equal(hasRegisteredTestCase("test('valid fixture', () => { assert.equal(1, 1); });"), true,
+    'an active named registration with an executable callback must be accepted');
+  assert.equal(hasRegisteredTestCase("test(\n  'valid multiline fixture',\n  async () => {\n    assert.equal(await Promise.resolve(1), 1);\n  }\n);"), true,
+    'a valid multiline registration must be accepted');
+  assert.equal(hasRegisteredTestCase("function test() { assert.equal(1, 1); }"), false,
+    'a function declaration named test must not count as a node:test registration');
+  assert.equal(hasRegisteredTestCase("const suite = { test() { assert.equal(1, 1); } };"), false,
+    'an object method named test must not count as a node:test registration');
   assert.equal(hasRegisteredTestCase("test.skip('skipped fixture', () => {});"), false,
     'a skipped test must not make a file look like an executable regression suite');
   assert.equal(hasRegisteredTestCase("test.todo('todo fixture');"), false,
@@ -304,6 +371,12 @@ test('every repository Node test file registers at least one executable test cas
     'line and block comments must not count as executable registrations');
   assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => {});"), true,
     'focused-test text inside a template literal must not reject a real test');
+  assert.equal(hasRegisteredTestCase('const note = "not test(\\'fake\\')";'), false,
+    'prose before a test-like phrase inside a quoted string must not count as a registration');
+  assert.equal(hasRegisteredTestCase("const note = " + String.fromCharCode(96) + "example test('fake')" + String.fromCharCode(96) + ";"), false,
+    'prose before a test-like phrase inside template raw text must not count as a registration');
+  assert.equal(hasRegisteredTestCase('const note = "// test(\\'fake\\') /* it(\\'fake\\') */";'), false,
+    'comment markers and test-like text inside strings must remain inert');
 
   for (const file of testFiles) {
     const relative = path.relative(repositoryRoot, file);
