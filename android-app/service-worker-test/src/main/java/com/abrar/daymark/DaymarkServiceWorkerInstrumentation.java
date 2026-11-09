@@ -1,8 +1,7 @@
-package com.abrar.daymark;
+package com.abrar.daymark.serviceworkertest;
 
-import android.app.Activity;
-import android.app.Instrumentation;
 import android.os.Bundle;
+import android.test.InstrumentationTestCase;
 import android.os.SystemClock;
 import android.webkit.ServiceWorkerController;
 import android.webkit.WebSettings;
@@ -41,7 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * This runner is separate from DaymarkPlatformInstrumentation so it does not race PR #648's
  * active Focus lifecycle changes to that shared runner.
  */
-public final class DaymarkServiceWorkerInstrumentation extends Instrumentation {
+public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTestCase {
     private static final String TAG = "DaymarkSWRuntime";
     private static final long WAIT_MS = 15000L;
     private static final String WEB_VIEW_CLASS = "com.abrar.daymark.DaymarkWebView";
@@ -49,17 +48,14 @@ public final class DaymarkServiceWorkerInstrumentation extends Instrumentation {
             "com.abrar.daymark.BrowserServiceWorkerEnforcement";
 
     private int assertions;
+    private String runToken;
 
-    @Override
-    public void onCreate(Bundle arguments) {
-        super.onCreate(arguments);
-        start();
-    }
-
-    @Override
-    public void onStart() {
-        Bundle result = new Bundle();
-        int resultCode = Activity.RESULT_OK;
+    public void testServiceWorkerNetworkPolicy() throws Exception {
+        Bundle arguments = getInstrumentation().getArguments();
+        runToken = arguments == null ? null : arguments.getString("runToken");
+        if (runToken == null || !runToken.matches("[A-Za-z0-9._-]{1,120}")) {
+            throw new AssertionError("A unique runToken instrumentation argument is required.");
+        }
         ControlledServer server = null;
         WebView seed = null;
         WebView active = null;
@@ -83,7 +79,7 @@ public final class DaymarkServiceWorkerInstrumentation extends Instrumentation {
             destroy(seed);
             seed = null;
 
-            ClassLoader targetLoader = getTargetContext().getClassLoader();
+            ClassLoader targetLoader = getInstrumentation().getTargetContext().getClassLoader();
             Class<?> daymarkWebView = Class.forName(WEB_VIEW_CLASS, true, targetLoader);
             Method readyMethod = daymarkWebView.getDeclaredMethod(
                     "isServiceWorkerNetworkPolicyReady");
@@ -177,18 +173,12 @@ public final class DaymarkServiceWorkerInstrumentation extends Instrumentation {
             awaitBoolean(recreated, "document.title === 'cleanup-done'", WAIT_MS,
                     "the instrumentation must clean up its Service Worker and cache");
 
-            result.putString("service_worker_runtime", "passed");
-            result.putInt("api_level", android.os.Build.VERSION.SDK_INT);
-            result.putInt("assertions", assertions);
             marker("all Service Worker runtime phases passed; " + assertions + " assertions");
         } catch (Throwable failure) {
-            resultCode = Activity.RESULT_CANCELED;
-            result.putString("service_worker_runtime", "failed");
-            result.putInt("api_level", android.os.Build.VERSION.SDK_INT);
-            result.putInt("assertions", assertions);
-            result.putString("failure", stackTrace(failure));
             Log.e(TAG, "runtime acceptance failed after " + assertions + " assertions", failure);
             marker("FAIL after " + assertions + " assertions: " + failure);
+            throw new AssertionError("Service Worker runtime acceptance failed after "
+                    + assertions + " assertions", failure);
         } finally {
             if (recreated != null) destroyQuietly(recreated);
             if (active != null) destroyQuietly(active);
@@ -198,12 +188,11 @@ public final class DaymarkServiceWorkerInstrumentation extends Instrumentation {
                 catch (IOException error) { Log.w(TAG, "could not close controlled server", error); }
             }
         }
-        finish(resultCode, result);
     }
 
     private WebView createWebView() throws Exception {
         WebView[] result = new WebView[1];
-        runOnMainSync(() -> {
+        getInstrumentation().runOnMainSync(() -> {
             WebView view = new WebView(getTargetContext());
             WebSettings settings = view.getSettings();
             settings.setJavaScriptEnabled(true);
@@ -291,7 +280,7 @@ public final class DaymarkServiceWorkerInstrumentation extends Instrumentation {
     }
 
     private void marker(String message) {
-        Log.i(TAG, message);
+        Log.i(TAG, "run=" + runToken + " " + message);
     }
 
     private static String stackTrace(Throwable failure) {
