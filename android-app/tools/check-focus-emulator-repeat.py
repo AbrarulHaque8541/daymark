@@ -88,7 +88,10 @@ assert "dispatchSwipe(modeSelector, true)" in platform_test
 assert "dispatchSwipe(modeSelector, false)" in platform_test
 assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0])" in platform_test
 assert '"parent-scroll"' in platform_test
-assert "parent-scroll:ACTION_MOVE" in platform_test, "vertical dispatch diagnostics must retain the parent ScrollView MOVE trace marker"
+# MotionEvent.actionToString(ACTION_MOVE) returns "MOVE", not "ACTION_MOVE".
+trace_method = platform_test.split("private void appendTouchTrace(", 1)[1].split("private void dispatchVerticalSwipe(", 1)[0]
+assert "trace.append(target).append(':').append(android.view.MotionEvent.actionToString(event.getActionMasked()))" in trace_method, "parent/selector trace must use the actual Android action formatter"
+
 assert "MotionEvent.actionToString(event.getActionMasked())" in platform_test
 assert "ancestor == parentScroll ? \"parent-scroll\"" in platform_test
 assert "ancestor.setOnTouchListener" in platform_test
