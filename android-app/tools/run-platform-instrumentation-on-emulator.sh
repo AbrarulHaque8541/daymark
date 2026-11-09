@@ -65,7 +65,7 @@ run_as_output="$(adb shell run-as "$input_package" mkdir "$probe_dir" 2>&1)" || 
 if ! adb shell run-as "$input_package" rmdir "$probe_dir" >/dev/null 2>&1; then
   echo "Instrumentation test package $input_package could not remove its temporary host-input probe directory." >&2
   exit 1
-}
+fi
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
 phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 run_instrumentation_once() {
