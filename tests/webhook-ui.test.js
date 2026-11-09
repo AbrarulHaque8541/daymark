@@ -668,3 +668,95 @@ test('queued delivery errors never echo the endpoint into status text', async ()
   assert.match(elements['webhook-status'].textContent, /Could not deliver webhook events/);
   assert.equal(elements['webhook-status'].textContent.includes(secret), false);
 });
+
+
+test('a full durable queue rejects a new completion and preserves every existing event', async () => {
+  const fullQueue = Array.from({ length: webhookApi.MAX_QUEUE_EVENTS }, (_, index) => {
+    const payload = webhookApi.buildTaskCompletedPayload({
+      title: 'durable-' + index,
+      priority: 'low'
+    }, '2026-11-04T12:00:00.000Z');
+    return webhookApi.makeQueueEvent(payload, '2026-11-04T12:00:00.000Z');
+  });
+  const storageData = { [webhookApi.QUEUE_KEY]: JSON.stringify(fullQueue) };
+  let fetchCalled = false;
+  const { env, elements } = fakeEnv({
+    url: 'https://hooks.example.com/x',
+    online: false,
+    storageData,
+    fetch: async () => { fetchCalled = true; return { ok: true, status: 200 }; }
+  });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  await settle();
+
+  const result = await handle.notifyTaskCompleted(Object.assign({}, TASK, {
+    id: 'overflow-task',
+    title: 'Must not evict an older completion'
+  }));
+
+  assert.deepEqual(result, { queued: false, reason: 'queue-full' });
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), fullQueue,
+    'the durable queue is byte-for-byte equivalent after overflow is rejected');
+  assert.equal(handle.readQueue().length, webhookApi.MAX_QUEUE_EVENTS);
+  assert.match(elements['webhook-status'].textContent, /queue is full/i);
+  assert.match(elements['webhook-status'].textContent, /existing events were preserved/i);
+  assert.equal(fetchCalled, false, 'offline queue-full handling never touches the network');
+});
+
+test('tab-local events wait behind a full durable queue and are delivered without eviction', async () => {
+  const storageData = {};
+  let failQueueWrites = true;
+  const storage = {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
+    setItem(key, value) {
+      if (key === webhookApi.QUEUE_KEY && failQueueWrites) throw new Error('quota');
+      storageData[key] = String(value);
+    },
+    removeItem(key) { delete storageData[key]; }
+  };
+  const { env } = fakeEnv({
+    url: 'https://hooks.example.com/x',
+    online: false,
+    storage
+  });
+  const deliveredTitles = [];
+  env.fetch = async (url, init) => {
+    deliveredTitles.push(JSON.parse(init.body).task.title);
+    return { ok: true, status: 200 };
+  };
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+  await settle();
+
+  const memoryOnlyTask = Object.assign({}, TASK, {
+    id: 'memory-only-task',
+    title: 'memory-only-after-durable-queue'
+  });
+  const queued = await handle.notifyTaskCompleted(memoryOnlyTask);
+  assert.deepEqual(queued, { queued: true, reason: 'memory-only' });
+  assert.equal(handle.readQueue().length, 1);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined,
+    'the failed write keeps the event only in this tab');
+
+  const fullQueue = Array.from({ length: webhookApi.MAX_QUEUE_EVENTS }, (_, index) => {
+    const payload = webhookApi.buildTaskCompletedPayload({
+      title: 'durable-' + index,
+      priority: 'low'
+    }, '2026-11-04T12:00:00.000Z');
+    return webhookApi.makeQueueEvent(payload, '2026-11-04T12:00:00.000Z');
+  });
+  storageData[webhookApi.QUEUE_KEY] = JSON.stringify(fullQueue);
+  failQueueWrites = false;
+  env.navigator.onLine = true;
+
+  await handle.flush();
+
+  assert.deepEqual(deliveredTitles, fullQueue.map((event) => JSON.parse(event.payload).task.title)
+    .concat('memory-only-after-durable-queue'),
+  'all existing durable events are delivered before the tab-local event, with no eviction');
+  assert.equal(handle.readQueue().length, 0);
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});

@@ -212,12 +212,18 @@
         : '';
     }
 
+    function pendingQueueView() {
+      const seen = new Set(queue.map((event) => event.id));
+      return queue.concat(memoryOnlyEvents.filter((event) => !seen.has(event.id)));
+    }
+
     function queueNote() {
-      return queue.length ? queue.length + ' event(s) queued on this device.' : '';
+      const count = pendingQueueView().length;
+      return count ? count + ' event(s) queued on this device.' : '';
     }
 
     function renderQueue() {
-      if (flushEl) flushEl.disabled = busy || (queue.length === 0 && !queueWriteFailed)
+      if (flushEl) flushEl.disabled = busy || pendingQueueView().length === 0
         || storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed || !queueCoordinatorAvailable();
     }
 
@@ -273,17 +279,7 @@
               let latest = state.value.slice();
               let changed = false;
               const recoveringQueueState = queueWriteFailed;
-
-              if (memoryOnlyEvents.length) {
-                const seen = new Set(latest.map((event) => event.id));
-                memoryOnlyEvents.forEach((event) => {
-                  if (!seen.has(event.id)) {
-                    latest = webhookApi.enqueueEvent(latest, event);
-                    seen.add(event.id);
-                    changed = true;
-                  }
-                });
-              }
+              const remainingMemoryOnlyEvents = [];
 
               if (resolvedUnpersistedIds.size) {
                 const reconciled = latest.filter((event) => !resolvedUnpersistedIds.has(event.id));
@@ -291,6 +287,20 @@
                   latest = reconciled;
                   changed = true;
                 }
+              }
+
+              if (memoryOnlyEvents.length) {
+                const seen = new Set(latest.map((event) => event.id));
+                memoryOnlyEvents.forEach((event) => {
+                  if (resolvedUnpersistedIds.has(event.id) || seen.has(event.id)) return;
+                  if (latest.length >= webhookApi.MAX_QUEUE_EVENTS) {
+                    remainingMemoryOnlyEvents.push(event);
+                    return;
+                  }
+                  latest = webhookApi.enqueueEvent(latest, event);
+                  seen.add(event.id);
+                  changed = true;
+                });
               }
 
               if (changed || queueWriteFailed) {
@@ -302,9 +312,12 @@
                   renderQueue();
                   return { ok: false };
                 }
-                memoryOnlyEvents = [];
+                memoryOnlyEvents = remainingMemoryOnlyEvents;
                 resolvedUnpersistedIds.clear();
-                queueWriteFailed = false;
+                queueWriteFailed = remainingMemoryOnlyEvents.length > 0;
+              } else {
+                memoryOnlyEvents = remainingMemoryOnlyEvents;
+                queueWriteFailed = remainingMemoryOnlyEvents.length > 0;
               }
 
               queue = latest;
@@ -379,6 +392,7 @@
               const index = latest.findIndex((item) => item.id === event.id);
               if (index < 0) {
                 queue = latest;
+                queueWriteFailed = memoryOnlyEvents.length > 0;
                 return { ok: true, missing: true };
               }
 
@@ -398,7 +412,7 @@
                 return { ok: false };
               }
               queue = latest;
-              queueWriteFailed = false;
+              queueWriteFailed = memoryOnlyEvents.length > 0;
               return { ok: true };
             });
 
@@ -446,7 +460,7 @@
           return { saved: false, cleared: true, sessionOnly: true };
         }
         status('Add an https:// webhook URL to enable automation. The endpoint stays in this tab only and must be re-entered after reload.'
-          + (queue.length ? ' ' + queueNote() : '') + storageWarning());
+          + (pendingQueueView().length ? ' ' + queueNote() : '') + storageWarning());
         return { saved: false, cleared: false };
       }
       if (!webhookApi || !webhookApi.isValidWebhookUrl(raw)) {
@@ -493,7 +507,7 @@
       try {
         const payload = webhookApi.buildTaskCompletedPayload({ title: 'Daymark test event', priority: 'medium' }, now());
         await webhookApi.deliverWebhook(raw, payload, fetchImpl);
-        status('Test event delivered. Your endpoint is reachable.' + (queue.length ? ' ' + queueNote() : ''));
+        status('Test event delivered. Your endpoint is reachable.' + (pendingQueueView().length ? ' ' + queueNote() : ''));
       } catch (error) {
         status('Test event failed. Check the endpoint and retry.');
       } finally {
@@ -533,12 +547,36 @@
           return { queued: false, reason: 'storage-unavailable' };
         }
         queueReadFailed = false;
-        const nextQueue = webhookApi.enqueueEvent(state.value, event);
-        if (!persistQueue(nextQueue)) {
-          queue = nextQueue;
-          if (!memoryOnlyEvents.some((pending) => pending.id === event.id)) {
-            memoryOnlyEvents = webhookApi.enqueueEvent(memoryOnlyEvents, event);
+        let nextQueue;
+        try {
+          nextQueue = webhookApi.enqueueEvent(state.value, event);
+        } catch (error) {
+          if (error && error.code === 'queue-full') {
+            queue = state.value;
+            status('Webhook queue is full. No new event was queued; existing events were preserved. '
+              + 'Deliver or clear queued events before retrying. ' + queueNote() + storageWarning());
+            renderQueue();
+            return { queued: false, reason: 'queue-full' };
           }
+          throw error;
+        }
+        if (!persistQueue(nextQueue)) {
+          if (!memoryOnlyEvents.some((pending) => pending.id === event.id)) {
+            try {
+              memoryOnlyEvents = webhookApi.enqueueEvent(memoryOnlyEvents, event);
+            } catch (error) {
+              if (error && error.code === 'queue-full') {
+                queue = state.value;
+                queueWriteFailed = true;
+                status('This tab\'s in-memory webhook queue is full. No new event was queued; existing pending events were preserved. '
+                  + queueNote() + storageWarning());
+                renderQueue();
+                return { queued: false, reason: 'queue-full' };
+              }
+              throw error;
+            }
+          }
+          queue = state.value;
           queueWriteFailed = true;
           renderQueue();
           status('Webhook event is held only in this tab; it was not sent because the queue could not be saved. '
@@ -612,7 +650,7 @@
       notifyTaskCompleted,
       flush: attemptFlush,
       readConfig: () => config,
-      readQueue: () => queue.slice(),
+      readQueue: () => pendingQueueView(),
       detach() {
         setBusy(false);
       }

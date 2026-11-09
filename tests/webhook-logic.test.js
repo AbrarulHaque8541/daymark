@@ -93,17 +93,24 @@ test('queue events are well-formed, bounded, and validated', () => {
   assert.equal(webhook.validateQueue([event, event]), true);
 });
 
-test('the queue is capped and drops the oldest events first', () => {
+test('the queue refuses overflow and preserves every existing event', () => {
   let queue = [];
-  for (let index = 0; index < webhook.MAX_QUEUE_EVENTS + 5; index += 1) {
+  for (let index = 0; index < webhook.MAX_QUEUE_EVENTS; index += 1) {
     const payload = webhook.buildTaskCompletedPayload({ title: 'task-' + index, priority: 'low' }, '2026-11-04T10:05:00.000Z');
     queue = webhook.enqueueEvent(queue, webhook.makeQueueEvent(payload, '2026-11-04T10:05:00.000Z'));
   }
+  const before = queue.slice();
+  const overflowPayload = webhook.buildTaskCompletedPayload({ title: 'overflow-task', priority: 'low' }, '2026-11-04T10:05:00.000Z');
+  const overflowEvent = webhook.makeQueueEvent(overflowPayload, '2026-11-04T10:05:00.000Z');
+  assert.throws(
+    () => webhook.enqueueEvent(queue, overflowEvent),
+    (error) => error && error.code === 'queue-full',
+    'a full queue rejects the new event with an explicit reason'
+  );
+  assert.deepEqual(queue, before, 'the caller-owned queue remains unchanged');
   assert.equal(queue.length, webhook.MAX_QUEUE_EVENTS);
-  const firstPayload = JSON.parse(queue[0].payload);
-  const lastPayload = JSON.parse(queue[queue.length - 1].payload);
-  assert.equal(firstPayload.task.title, 'task-5', 'the oldest events were dropped');
-  assert.equal(lastPayload.task.title, 'task-' + (webhook.MAX_QUEUE_EVENTS + 4));
+  assert.equal(JSON.parse(queue[0].payload).task.title, 'task-0', 'the oldest event is preserved');
+  assert.equal(JSON.parse(queue[queue.length - 1].payload).task.title, 'task-' + (webhook.MAX_QUEUE_EVENTS - 1));
   assert.throws(() => webhook.enqueueEvent(queue, { nope: true }), /well-formed/);
 });
 

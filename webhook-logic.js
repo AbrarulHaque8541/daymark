@@ -105,9 +105,12 @@
   function enqueueEvent(queue, event) {
     if (!isValidQueueEvent(event)) throw new Error('Only well-formed webhook events can be queued.');
     const list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    if (list.length >= MAX_QUEUE_EVENTS) {
+      const error = new Error('The webhook queue is full; existing events were preserved.');
+      error.code = 'queue-full';
+      throw error;
+    }
     list.push(event);
-    // Bounded storage: when the queue is full the oldest events are dropped first.
-    while (list.length > MAX_QUEUE_EVENTS) list.shift();
     return list;
   }
 
