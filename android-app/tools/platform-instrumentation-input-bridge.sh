@@ -54,9 +54,9 @@ EOF
           esac
         fi
         publish_output="$(adb shell run-as "$package" sh -c \
-          'printf "%s|%s\\n" "$1" "$2" > files/daymark-instrumentation-input-result.tmp && mv files/daymark-instrumentation-input-result.tmp files/daymark-instrumentation-input-result.txt' \
+          'printf "%s|%s\n" "$1" "$2" > files/daymark-instrumentation-input-result.tmp && mv files/daymark-instrumentation-input-result.tmp files/daymark-instrumentation-input-result.txt' \
           sh "$seq" "$input_status" 2>&1)" || {
-          publish_output="$(printf '%s' "$publish_output" | tr -d '\\r')"
+          publish_output="$(printf '%s' "$publish_output" | tr -d '\r')"
           if [ -n "$publish_output" ]; then
             echo "Could not publish host input result for sequence $seq: $publish_output" >&2
           else
