@@ -9,6 +9,8 @@
   // no network, no timers, so it can be unit-tested directly and loaded in the
   // browser as window.DaymarkStorage.
 
+  const LEGACY_WEBHOOK_LOCK_KEY = 'daymark.webhook.lock.v1';
+
   const CATEGORIES = [
     {
       id: 'tasks',
@@ -128,7 +130,7 @@
       id: 'webhook-lock',
       label: 'Legacy webhook coordination lock',
       description: 'A short-lived localStorage marker from older webhook versions. Newer versions use browser Web Locks; any leftover marker is safe to clear.',
-      keys: ['daymark.webhook.lock.v1']
+      keys: [LEGACY_WEBHOOK_LOCK_KEY]
     }
   ];
 

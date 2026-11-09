@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const feedLogic = require('../feed-logic.js');
+const focusLogic = require('../focus-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
@@ -45,7 +46,7 @@ function streamedFeedResponse() {
   };
 }
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set()) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set(), focusApi = null) {
   const elements = new Map();
 
   function element(selector) {
@@ -139,6 +140,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   const window = {
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
+    DaymarkFocus: focusApi,
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
@@ -676,7 +678,7 @@ test('duplicate keys in a task recovery backup remain opaque and are never auto-
 test('duplicate keys in primary Focus state are backed up without rewriting the primary', () => {
   const ambiguous = '{"session":null,"session":{"id":"ambiguous-session"},"log":[]}';
   const storedValues = new Map([['daymark.focus.v1', ambiguous]]);
-  const app = bootApp(storedValues);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
   assert.equal(storedValues.get('daymark.focus.v1'), ambiguous);
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), ambiguous);
   assert.match(app.elements.get('#storage-status span').textContent, /Focus data recovery backup retained/);
