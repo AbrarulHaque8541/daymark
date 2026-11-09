@@ -95,8 +95,8 @@ expect_fail_after_removal check-web-clip.py 'saveTasksAsync("Saving offline clip
 # Reminder notification must retain the per-duration action labels and only re-arm its alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + minutes + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"
-expect_fail_after_removal check-reminder-lifecycle.py "ACTION_TIME_CHANGED" "$POLICY" "$ROOT"
-expect_fail_after_removal check-reminder-lifecycle.py "ACTION_TIMEZONE_CHANGED" "$POLICY" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIME_SET" "$POLICY" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIMEZONE_CHANGED" "$POLICY" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIME_SET" "$MANIFEST" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIMEZONE_CHANGED" "$MANIFEST" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "ReminderSchedulePolicy.shouldRescheduleForSystemChange(action)" "$RECEIVER" "$ROOT"
