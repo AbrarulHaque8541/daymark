@@ -140,9 +140,10 @@ jobs:
           RAW_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          # Register cleanup before decoding so a partial file is removed if base64 fails.
+          trap 'rm -f "$RUNNER_TEMP/release.keystore"' EXIT
           echo "Decoding release keystore..."
           echo "$RAW_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          trap 'rm -f "$RUNNER_TEMP/release.keystore"' EXIT
 
           KEYSTORE_PATH="$RUNNER_TEMP/release.keystore" \
           KEYSTORE_PASSWORD="$RAW_KEYSTORE_PASSWORD" \
