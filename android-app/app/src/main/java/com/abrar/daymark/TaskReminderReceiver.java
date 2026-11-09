@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Shows one scheduled task reminder and restores the alarm schedule after boot or
  * a system clock/timezone change. The receiver is not exported: only Daymark's own
- * alarms and protected system broadcasts can reach it. No reminder text leaves the device.
+ * alarms and platform boot/time broadcasts can reach it. No reminder text leaves the device.
  */
 public final class TaskReminderReceiver extends BroadcastReceiver {
     static final String EXTRA_NOTIFICATION_ID = "daymark.extra.notification_id";
