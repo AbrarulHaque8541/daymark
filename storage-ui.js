@@ -70,8 +70,11 @@
       try {
         scan = storageApi.scanStorage(storage);
       } catch (error) {
-        status('Could not read local data: '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
+        // A failed rescan must not leave old sizes or destructive controls visible.
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        if (typeof listEl.setAttribute === 'function') listEl.setAttribute('aria-busy', 'false');
+        status('Could not read local data. Local data status is unknown; nothing was changed.');
         return;
       }
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
