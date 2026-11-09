@@ -130,6 +130,12 @@ test('task and clear-all deletion fail closed when the shared lock is unavailabl
 
 test('the production HTML storage controls match the UI wiring', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const coordinatorAt = html.indexOf('task-mutation-logic.js');
+  assert.ok(coordinatorAt >= 0, 'the shared task coordinator is loaded in production');
+  for (const dependentScript of ['storage-ui.js', 'app.js', 'import-ui.js']) {
+    assert.ok(coordinatorAt < html.indexOf(dependentScript),
+      'the task coordinator must execute before ' + dependentScript);
+  }
   for (const id of ['storage-check', 'storage-clear', 'storage-status-line', 'storage-list']) {
     const matches = html.match(new RegExp('id="' + id + '"', 'g')) || [];
     assert.equal(matches.length, 1, id + ' appears exactly once in production HTML');
