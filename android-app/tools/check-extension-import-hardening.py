@@ -18,6 +18,38 @@ def check_sources(parser, store, smoke):
         "static boolean isSupportedMatchPattern", 1)[0]
     install = store.split("void installUserPack", 1)[1].split("private File findUserPack", 1)[0]
     reader = store.split("private static String readFile", 1)[1].split("private static synchronized void writeFile", 1)[0]
+    list_all = store.split("List<BrowserExtension> listAll()", 1)[1].split(
+        "List<BrowserExtension> enabledMatching", 1)[0]
+    find_user = store.split("private File findUserPack", 1)[1].split(
+        "void uninstallUserPack", 1)[0]
+    uninstall = store.split("void uninstallUserPack", 1)[1].split(
+        "private boolean isBuiltinDisabled", 1)[0]
+    writer = store.split("private static synchronized void writeFile", 1)[1]
+
+    # The private pack directory itself is a trust boundary; no file-level NOFOLLOW check can
+    # protect against a symlinked parent directory.
+    constructor = store.split("ExtensionStore(Context context)", 1)[1].split(
+        "private boolean isSafeUserDirectory", 1)[0]
+    assert "Files.exists(directory, LinkOption.NOFOLLOW_LINKS)" in constructor \\
+        and "Files.createDirectory(directory)" in constructor \\
+        and "userDir.mkdirs()" not in constructor, \\
+        "constructor must not follow a pre-existing private-directory symlink"
+    assert "if (!isSafeUserDirectory()) return new ArrayList<>(byId.values());" in list_all, \\
+        "listAll must fail closed to built-ins when the user-pack parent directory is unsafe"
+    assert "requireSafeUserDirectory();" in install, \\
+        "imports must reject an unsafe private pack directory before inspecting/replacing files"
+    assert "if (id == null || !isSafeUserDirectory()) return null;" in find_user, \\
+        "user-pack lookup must not traverse an unsafe parent directory"
+    assert "!isSafeUserDirectory()" in uninstall, \\
+        "legacy uninstall must not traverse or delete through an unsafe parent directory"
+    assert "!isSafeDirectoryPath(file.getParentFile())" in reader, \\
+        "runtime reads must reject a symlinked parent directory, not only a symlinked file"
+    assert "!isSafeDirectoryPath(file.getParentFile())" in writer, \\
+        "pack writes must reject a symlinked parent directory"
+    assert "parent == null || !isSafeDirectoryPath(parent.toFile())" in store, \\
+        "recovery reads must revalidate the private parent directory"
+    assert "requireSafeUserDirectory();" in recovery, \\
+        "recovery enumeration and actions must reject a symlinked parent directory"
 
     # Existing extension files are bounded and never silently truncated or replaced after I/O failure.
     assert "MAX_USER_PACK_BYTES = 200_000;" in store, "stored extension reads must keep the 200 KB limit"
@@ -228,6 +260,31 @@ def test_limit_guard_mutations(parser, store, smoke):
     else:
         raise AssertionError("source guard accepted removal of the stored-pack size limit")
 
+    parent_list_guard = "if (!isSafeUserDirectory()) return new ArrayList<>(byId.values());"
+    try:
+        check_sources(parser, store.replace(parent_list_guard, "if (false)", 1), smoke)
+    except AssertionError as rejected:
+        assert "listAll must fail closed to built-ins" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the symlinked-parent listAll check")
+
+    parent_read_guard = "!isSafeDirectoryPath(file.getParentFile())"
+    assert store.count(parent_read_guard) == 2, "both file read and write paths must verify their parent"
+    try:
+        check_sources(parser, store.replace(parent_read_guard, "false", 1), smoke)
+    except AssertionError as rejected:
+        assert "runtime reads must reject a symlinked parent directory" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the symlinked-parent read check")
+    first_parent, remainder_parent = store.split(parent_read_guard, 1)
+    parent_write_mutation = first_parent + parent_read_guard + remainder_parent.replace(parent_read_guard, "false", 1)
+    try:
+        check_sources(parser, parent_write_mutation, smoke)
+    except AssertionError as rejected:
+        assert "pack writes must reject a symlinked parent directory" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the symlinked-parent write check")
+
     stream_guard = "if (read > MAX_USER_PACK_BYTES - total)"
     assert store.count(stream_guard) == 2, "both recovery and stored-pack readers must enforce the streaming byte limit"
     try:
@@ -271,6 +328,10 @@ if __name__ == "__main__":
         "symbolic links are listed as non-regular and are never followed",
         "symlinked extension packs are never loaded into the executable extension list",
         "legacy install/uninstall paths also preserve symlink and target bytes",
+        "store construction never follows or replaces a symlinked private extension directory",
+        "a valid pack behind a symlinked parent directory is never loaded for execution",
+        "user-pack lookup fails closed when the private directory is a symlink",
+        "all parent-symlink recovery, install and uninstall attempts preserve the external pack bytes",
     ):
         assert marker in store_smoke, f"missing ExtensionStore preservation regression: {marker}"
     check_sources(parser, store, smoke)
