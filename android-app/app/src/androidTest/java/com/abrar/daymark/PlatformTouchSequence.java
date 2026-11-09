@@ -14,6 +14,7 @@ final class PlatformTouchSequence {
     static final int DEFAULT_TAP_DURATION_MS = 60;
     static final int DEFAULT_SWIPE_DURATION_MS = 360;
     static final int SWIPE_MOVE_STEPS = 8;
+    static final int MIN_SWIPE_DURATION_MS = SWIPE_MOVE_STEPS + 1;
 
     private PlatformTouchSequence() { }
 
@@ -31,8 +32,8 @@ final class PlatformTouchSequence {
         checkPoint(startX, startY);
         checkPoint(endX, endY);
         checkDownTime(downTime);
-        if (durationMs < 1 || durationMs > MAX_DURATION_MS) {
-            throw new IllegalArgumentException("swipe duration is outside 1.." + MAX_DURATION_MS);
+        if (durationMs < MIN_SWIPE_DURATION_MS || durationMs > MAX_DURATION_MS) {
+            throw new IllegalArgumentException("swipe duration is outside " + MIN_SWIPE_DURATION_MS + ".." + MAX_DURATION_MS);
         }
         ArrayList<Sample> samples = new ArrayList<>();
         samples.add(new Sample(ACTION_DOWN, downTime, startX, startY));
