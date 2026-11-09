@@ -48,6 +48,9 @@
   transform: translateY(0);
   box-shadow: 0 2px 10px rgba(24, 40, 48, .05);
 }
+.suggestion-item:active {
+  transform: translateY(0) scale(.995);
+}
 
 /* Subtle accent-tinted glass edge on primary surfaces for professional depth. */
 .button-primary,
@@ -102,7 +105,8 @@
 .filter-button,
 .date-chip,
 .complete-button,
-.task-row {
+.task-row,
+.suggestion-item {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -113,7 +117,7 @@
   gap: 8px;
   margin-bottom: 4px;
 }
- .skeleton-row {
+.skeleton-row {
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   height: 76px;
@@ -225,4 +229,17 @@
 .briefing-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+}
+
+/* Empty state polish: gentler sway and stronger glass presence. */
+.empty-illustration {
+  transition: transform .3s var(--ease-spring, ease);
+}
+.empty-state:hover .empty-illustration {
+  transform: rotate(-2deg) scale(1.04);
+}
+@media (prefers-reduced-motion: reduce) {
+  .empty-state:hover .empty-illustration {
+    transform: none;
+  }
 }
