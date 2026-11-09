@@ -297,7 +297,7 @@
 
     if (!result.ok) {
       const messages = {
-        'coordination-unavailable': 'Task changes not saved: this browser does not support safe cross-tab locking. Retry in a supported browser.',
+        'coordination-unavailable': 'Task changes not saved: safe cross-tab coordination is unavailable in this browser. Retry in a supported browser.',
         'lock-failed': 'Task changes not saved: the cross-tab lock failed. Retry without closing this tab.',
         'conflict': 'Task changes conflict with another tab. Reload the task list and retry your edit.',
         'storage-unavailable': 'Task changes not saved: browser storage is unavailable.',
