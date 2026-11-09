@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const feedLogic = require('../feed-logic.js');
 const focusLogic = require('../focus-logic.js');
+const mutation = require('../task-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
@@ -42,6 +43,19 @@ function streamedFeedResponse() {
     body: { getReader: () => reader },
     text() {
       throw new Error('Briefing fixture must use the bounded streaming feed reader');
+    }
+  };
+}
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
     }
   };
 }
@@ -138,6 +152,8 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   };
   const animationFrames = [];
   const window = {
+    DaymarkTaskMutation: mutation,
+    navigator: { locks: makeLockManager() },
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
     DaymarkFocus: focusApi,
@@ -192,7 +208,7 @@ function validTask(id, title) {
   };
 }
 
-test('partially rejected saved tasks survive a subsequent edit and page reload', () => {
+test('partially rejected saved tasks survive a subsequent edit and page reload', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -204,7 +220,7 @@ test('partially rejected saved tasks survive a subsequent edit and page reload',
     'the full original payload is backed up when validation rejects a record');
 
   first.elements.get('#new-title').value = 'New task';
-  first.elements.get('#add-form').dispatch('submit');
+  await first.elements.get('#add-form').dispatch('submit');
   assert.equal(first.elements.get('#storage-status span').textContent,
     'Saved on this device; ignored originals remain in a recovery backup');
   assert.equal(storedValues.get(BACKUP_KEY), original,
@@ -220,7 +236,7 @@ test('partially rejected saved tasks survive a subsequent edit and page reload',
     /ignored originals remain in a recovery backup/);
 });
 
-test('a new partial recovery backup preserves earlier rejected task records', () => {
+test('a new partial recovery backup preserves earlier rejected task records', async () => {
   const earlier = JSON.stringify([
     validTask('earlier-valid', 'Earlier valid task'),
     validTask('earlier-invalid', 'x'.repeat(170))
@@ -241,7 +257,7 @@ test('a new partial recovery backup preserves earlier rejected task records', ()
     'backing up a new rejected payload must not overwrite the previous recovery source');
 
   first.elements.get('#new-title').value = 'Another task';
-  first.elements.get('#add-form').dispatch('submit');
+  await first.elements.get('#add-form').dispatch('submit');
   assert.deepEqual(JSON.parse(storedValues.get(BACKUP_KEY)).payloads, [earlier, current],
     'subsequent saves must retain all recovery sources');
 
@@ -250,7 +266,7 @@ test('a new partial recovery backup preserves earlier rejected task records', ()
     'reload must recognize the recovery bundle and retain it');
 });
 
-test('an opaque prior backup survives when a new partially invalid task payload is backed up', () => {
+test('an opaque prior backup survives when a new partially invalid task payload is backed up', async () => {
   const priorOpaqueBackup = '{older recovery bytes that are not parseable JSON';
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -270,7 +286,7 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'the newly rejected primary payload must also be retained');
 
   app.elements.get('#new-title').value = 'Safe follow-up edit';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
   const afterSave = JSON.parse(storedValues.get(BACKUP_KEY));
   assert.ok(afterSave.payloads.includes(priorOpaqueBackup),
     'ordinary saves must not drop the opaque older recovery source');
@@ -290,7 +306,7 @@ test('an opaque backup is retained when the primary task store is healthy', () =
   assert.match(app.elements.get('#storage-status span').textContent, /recovery backup retained for manual review/);
 });
 
-test('a different valid task backup is retained when the primary task store is healthy', () => {
+test('a different valid task backup is retained when the primary task store is healthy', async () => {
   const older = JSON.stringify([validTask('older-task', 'Older recoverable task')]);
   const primary = JSON.stringify([validTask('current-task', 'Current task')]);
   const storedValues = new Map([[STORAGE_KEY, primary], [BACKUP_KEY, older]]);
@@ -298,7 +314,7 @@ test('a different valid task backup is retained when the primary task store is h
   assert.equal(storedValues.get(BACKUP_KEY), older,
     'a different valid backup may contain tasks absent from the primary payload');
   app.elements.get('#new-title').value = 'Follow-up edit';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
   assert.equal(storedValues.get(BACKUP_KEY), older,
     'a later save must not erase the distinct older recovery copy');
 });
@@ -354,7 +370,7 @@ test('primary task JSON with duplicate keys is preserved byte-for-byte for manua
     'the preserved ambiguous payload remains available for manual export');
 });
 
-test('failed recovery backup creation never overwrites the only original task payload', () => {
+test('failed recovery backup creation never overwrites the only original task payload', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -370,13 +386,13 @@ test('failed recovery backup creation never overwrites the only original task pa
     /recovery backup could not be created/);
 
   app.elements.get('#new-title').value = 'First unsaved edit';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
   assert.equal(storedValues.get(STORAGE_KEY), original,
     'a later task save must not overwrite the only original copy');
 
   failWrites.delete(BACKUP_KEY);
   app.elements.get('#new-title').value = 'Retry after freeing storage';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
 
   assert.equal(storedValues.get(BACKUP_KEY), original,
     'retry must create the recovery backup before changing primary storage');
