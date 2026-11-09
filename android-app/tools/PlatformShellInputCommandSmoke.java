@@ -8,11 +8,12 @@ public final class PlatformShellInputCommandSmoke {
         equal("input tap 12 34", PlatformShellInputCommand.tap(12, 34), "tap command");
         equal("input swipe 1 2 300 400 360",
                 PlatformShellInputCommand.swipe(1, 2, 300, 400, 360), "swipe command");
-        equal("input tap 12 34; code=$?; printf '\\n__DAYMARK_INPUT_STATUS__=%s\\n' \"$code\"",
+        equal("sh -c 'input tap 12 34; code=$?; echo __DAYMARK_INPUT_STATUS__=$code'",
                 PlatformShellInputCommand.withStatus(PlatformShellInputCommand.tap(12, 34)),
                 "status wrapper");
-        equal(0, PlatformShellInputCommand.parseStatus("input tap 12 34\n__DAYMARK_INPUT_STATUS__=0\n"),
+        equal(0, PlatformShellInputCommand.parseStatus("input tap 12 34 __DAYMARK_INPUT_STATUS__=0 shell finished"),
                 "zero exit status");
+        equal(7, PlatformShellInputCommand.parseStatus("shell output __DAYMARK_INPUT_STATUS__=7 trailing text"), "embedded non-zero status");
         equal(7, PlatformShellInputCommand.parseStatus("input failed\r\n__DAYMARK_INPUT_STATUS__=7\r\n"),
                 "non-zero exit status");
         rejects(() -> PlatformShellInputCommand.tap(-1, 0), "negative tap coordinate");
