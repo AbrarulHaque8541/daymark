@@ -93,7 +93,13 @@
   }
 
   function validateQueue(value) {
-    return Array.isArray(value) && value.length <= MAX_QUEUE_EVENTS && value.every(isValidQueueEvent);
+    if (!Array.isArray(value) || value.length > MAX_QUEUE_EVENTS) return false;
+    const ids = new Set();
+    for (const event of value) {
+      if (!isValidQueueEvent(event) || ids.has(event.id)) return false;
+      ids.add(event.id);
+    }
+    return true;
   }
 
   function validateWebhookConfig(value) {
@@ -104,11 +110,35 @@
 
   function enqueueEvent(queue, event) {
     if (!isValidQueueEvent(event)) throw new Error('Only well-formed webhook events can be queued.');
-    const list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    const list = Array.isArray(queue) ? queue.slice() : [];
+    if (!validateQueue(list)) {
+      throw new Error('The existing webhook queue is invalid; no events were changed.');
+    }
+    if (list.some((item) => item.id === event.id)) {
+      const error = new Error('Webhook event IDs must be unique.');
+      error.code = 'duplicate-event-id';
+      throw error;
+    }
+    if (list.length >= MAX_QUEUE_EVENTS) {
+      const error = new Error('The webhook queue is full; existing events were preserved.');
+      error.code = 'queue-full';
+      throw error;
+    }
     list.push(event);
-    // Bounded storage: when the queue is full the oldest events are dropped first.
-    while (list.length > MAX_QUEUE_EVENTS) list.shift();
     return list;
+  }
+
+  function cancelResponseBody(response) {
+    const body = response && response.body;
+    if (!body || typeof body.cancel !== 'function') return;
+    try {
+      const cancellation = body.cancel();
+      if (cancellation && typeof cancellation.catch === 'function') {
+        cancellation.catch(() => {});
+      }
+    } catch (error) {
+      // Response cleanup must not turn a completed webhook POST into a failure.
+    }
   }
 
   async function deliverWebhook(url, payload, fetchImpl, timeoutMs) {
@@ -134,16 +164,23 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
           body,
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
           redirect: 'error',
           cache: 'no-store',
           signal: controller ? controller.signal : undefined
         });
       } catch (error) {
         if (timedOut) throw new Error(TIMEOUT_MESSAGE);
-        throw new Error('Webhook delivery failed: '
-          + (error && error.message ? error.message : 'network error')
-          + '. No automatic retry was attempted.');
+        // Fetch implementations may include the full endpoint in their
+        // error text. Never surface arbitrary network errors: webhook URLs may
+        // contain bearer tokens in their path or query string.
+        throw new Error('Webhook delivery failed due to a network error. No automatic retry was attempted.');
       }
+      // Webhook responses are not needed. Cancel their bodies on both
+      // success and HTTP failure so a hostile endpoint cannot make Daymark
+      // download an unbounded response after the POST has completed.
+      cancelResponseBody(response);
       if (!response || !response.ok) {
         throw new Error('Webhook endpoint returned HTTP '
           + (response ? response.status : 'unknown')
@@ -161,7 +198,10 @@
   async function flushQueue(queue, url, fetchImpl, options) {
     const opts = options && typeof options === 'object' ? options : {};
     const maxAttempts = Number.isInteger(opts.maxAttempts) && opts.maxAttempts > 0 ? opts.maxAttempts : MAX_ATTEMPTS;
-    let list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    if (!Array.isArray(queue) || !validateQueue(queue)) {
+      throw new Error('The webhook queue is invalid; no events were changed.');
+    }
+    let list = queue.slice();
     let deliveredCount = 0;
     let droppedCount = 0;
     let failure = null;

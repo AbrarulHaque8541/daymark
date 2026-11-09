@@ -13,7 +13,7 @@ const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null, webhookUi = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -109,6 +109,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     })
     : logic;
   const window = {
+    DaymarkWebhookUi: webhookUi,
     DaymarkLogic: appLogic,
     DaymarkFocus: focus,
     DaymarkRepeat: repeat,
@@ -436,12 +437,12 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('healthy task-array backup is cleared as stale when primary is healthy', () => {
+test('byte-identical healthy task-array backup is cleared as redundant', () => {
   const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
-  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
-  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
+  const app = bootApp({ savedValue: primary, savedBackupValue: primary });
 
-  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'only a byte-identical fully valid backup is redundant with the healthy primary');
 });
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
@@ -713,3 +714,54 @@ test('unreadable primary focus key with readable backup offers recovery', () => 
   assert.equal(app.storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
   assert.match(app.elements.get('#storage-status span').textContent, /Primary focus data unreadable; recovery backup available/);
 });
+
+test('empty Focus recovery backup bytes survive a malformed-primary backup write', () => {
+  const malformedPrimary = '{"session":';
+  const app = bootApp({
+    savedValue: JSON.stringify([]),
+    savedFocusValue: malformedPrimary,
+    savedFocusBackupValue: ''
+  });
+
+  const storedBackup = app.storedValues.get(FOCUS_BACKUP_KEY);
+  const bundle = JSON.parse(storedBackup);
+  assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, ['', malformedPrimary],
+    'the empty prior backup and malformed primary must both remain byte-for-byte recoverable');
+});
+
+test('completion webhook runs once and only after the completed task is persisted', () => {
+  const task = makeImportTask('webhook-order-success', 'Persist before notifying');
+  const notifications = [];
+  let app;
+  const webhookUi = {
+    notifyTaskCompleted(candidate) {
+      const persisted = JSON.parse(app.storedValues.get(STORAGE_KEY))
+        .find((item) => item.id === candidate.id);
+      notifications.push({ taskId: candidate.id, persistedCompleted: persisted?.completed });
+      return Promise.resolve();
+    }
+  };
+  app = bootApp({ savedValue: JSON.stringify([task]), webhookUi });
+
+  triggerTaskCompletion(app, task.id);
+  assert.deepEqual(notifications, [{ taskId: task.id, persistedCompleted: true }],
+    'the webhook callback must observe the successfully persisted completed task');
+
+  triggerTaskCompletion(app, task.id);
+  assert.equal(notifications.length, 1, 'reopening a task must not emit another completion event');
+});
+
+test('failed task persistence never emits a completion webhook', () => {
+  const task = makeImportTask('webhook-order-failure', 'Do not notify an unsaved completion');
+  let notifications = 0;
+  const app = bootApp({
+    savedValue: JSON.stringify([task]),
+    failPrimarySave: true,
+    webhookUi: {
+      notifyTaskCompleted() {
+        notifications += 1;
+        return Promise.resolve();
+      }
+    }
+  });

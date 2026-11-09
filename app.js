@@ -27,6 +27,110 @@
     status.classList.remove('is-checking');
   }
 
+  function hasDuplicateJsonKeys(raw) {
+    if (typeof raw !== 'string') return false;
+    let index = 0;
+    let duplicate = false;
+    let tooDeep = false;
+    const whitespace = () => {
+      while (index < raw.length && /\s/.test(raw[index])) index += 1;
+    };
+    const readString = () => {
+      const start = index;
+      index += 1;
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character === '\\') {
+          index += 2;
+          continue;
+        }
+        if (character === '"') {
+          index += 1;
+          return JSON.parse(raw.slice(start, index));
+        }
+        if (character.charCodeAt(0) < 0x20) throw new Error('invalid JSON string');
+        index += 1;
+      }
+      throw new Error('unterminated JSON string');
+    };
+    const readValue = (depth) => {
+      if (depth > 128) {
+        tooDeep = true;
+        throw new Error('JSON nesting limit exceeded');
+      }
+      whitespace();
+      const character = raw[index];
+      if (character === '"') {
+        readString();
+        return;
+      }
+      if (character === '{') {
+        index += 1;
+        whitespace();
+        if (raw[index] === '}') {
+          index += 1;
+          return;
+        }
+        const keys = new Set();
+        for (;;) {
+          whitespace();
+          if (raw[index] !== '"') throw new Error('invalid JSON object key');
+          const key = readString();
+          if (keys.has(key)) duplicate = true;
+          keys.add(key);
+          whitespace();
+          if (raw[index] !== ':') throw new Error('missing JSON object colon');
+          index += 1;
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === '}') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON object separator');
+          index += 1;
+        }
+      }
+      if (character === '[') {
+        index += 1;
+        whitespace();
+        if (raw[index] === ']') {
+          index += 1;
+          return;
+        }
+        for (;;) {
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === ']') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON array separator');
+          index += 1;
+        }
+      }
+      const rest = raw.slice(index);
+      const literal = rest.match(/^(?:true|false|null)/);
+      if (literal) {
+        index += literal[0].length;
+        return;
+      }
+      const number = rest.match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+      if (number) {
+        index += number[0].length;
+        return;
+      }
+      throw new Error('invalid JSON value');
+    };
+    try {
+      readValue(0);
+      whitespace();
+      return index === raw.length && (duplicate || tooDeep);
+    } catch (error) {
+      return tooDeep;
+    }
+  }
+
   function loadTasks() {
     let saved = null;
     try {
@@ -61,6 +165,7 @@
       return [];
     }
     try {
+      if (hasDuplicateJsonKeys(saved)) throw new Error('Saved task data contains duplicate JSON keys or unsupported nesting.');
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) throw new Error('Saved task data is not a list.');
       const validated = logic.validateStoredTasks(parsed);
@@ -78,7 +183,7 @@
         // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
         offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
-      } else if (hasRecoveryBackupNeedingPreservation()) {
+      } else if (hasRecoveryBackupNeedingPreservation(saved)) {
         // Opaque originals are retained only once grouped into an explicit recovery bundle.
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
@@ -116,50 +221,53 @@
     }
   }
 
+  function isKnownRecoveryBundle(parsed, raw) {
+    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1'
+        || !Array.isArray(parsed.payloads)
+        || !parsed.payloads.every((payload) => typeof payload === 'string')) return false;
+    const keys = Object.keys(parsed).sort();
+    return keys.length === 2 && keys[0] === 'format' && keys[1] === 'payloads'
+      && JSON.stringify(parsed) === raw;
+  }
+
   function recoveryBackupPayloads(raw) {
-    if (typeof raw !== 'string' || !raw) return [];
+    if (typeof raw !== 'string') return [];
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return isPartialRecoveryPayload(raw) ? [raw] : [];
-      }
-      if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
-          && Array.isArray(parsed.payloads)) {
-        return parsed.payloads.filter((payload) => typeof payload === 'string');
-      }
+      if (Array.isArray(parsed)) return [raw];
+      if (isKnownRecoveryBundle(parsed, raw)) return parsed.payloads.length > 0 ? parsed.payloads : [raw];
     } catch (error) {
-      // An opaque/malformed backup may itself be the only surviving copy of
-      // older data. Preserve its exact bytes when a new damaged payload arrives.
+      // Opaque bytes, including an empty string, may be the only surviving copy.
     }
     return [raw];
   }
 
-  function isHealthyTaskPayload(raw) {
-    if (typeof raw !== 'string' || !raw) return false;
+  function recoveryBackupIsRedundant(raw, primaryRaw) {
+    if (typeof raw !== 'string') return true;
+    if (typeof primaryRaw !== 'string' || primaryRaw.length === 0) return false;
+    let parsed;
     try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount === 0;
+      parsed = JSON.parse(raw);
     } catch (error) {
+      // Malformed/opaque bytes are not evidence that a backup is stale.
       return false;
     }
+    if (Array.isArray(parsed)) return raw === primaryRaw;
+    if (isKnownRecoveryBundle(parsed, raw)) {
+      return parsed.payloads.length > 0 && parsed.payloads.every((payload) => payload === primaryRaw);
+    }
+    // Unknown JSON shapes or metadata are opaque recovery data.
+    return false;
   }
 
   function backUpRawPayload(raw) {
     try {
       const existing = localStorage.getItem(BACKUP_KEY);
       const existingPayloads = recoveryBackupPayloads(existing);
-      const existingParsed = (() => {
-        try { return JSON.parse(existing); } catch (error) { return null; }
-      })();
-      const existingIsBundle = Boolean(existingParsed
-        && existingParsed.format === 'daymark-recovery-bundle-v1'
-        && Array.isArray(existingParsed.payloads));
       const preserveExisting = existingPayloads.length > 0
-        && (existingIsBundle || !isHealthyTaskPayload(existing));
+        && existing !== raw
+        && !recoveryBackupIsRedundant(existing, raw);
       if (preserveExisting) {
-        // A recovery bundle, partial payload, or opaque prior backup may hold
-        // unique user data. Merge it with the newly rejected original rather
-        // than replacing it. Healthy task-array backups remain stale.
         const payloads = Array.from(new Set([...existingPayloads, raw]));
         localStorage.setItem(BACKUP_KEY, JSON.stringify({
           format: 'daymark-recovery-bundle-v1',
@@ -184,26 +292,15 @@
     }
   }
 
-  function hasRecoveryBackupNeedingPreservation() {
+  function hasRecoveryBackupNeedingPreservation(primaryRaw) {
     let raw;
     try {
       raw = localStorage.getItem(BACKUP_KEY);
     } catch (error) {
       return true;
     }
-    if (typeof raw !== 'string' || raw.length === 0) return false;
-    if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (error) {
-      // Raw malformed backup is stale once the primary store is healthy.
-      // Opaque sources are retained only after being grouped in a recovery bundle.
-      return false;
-    }
-    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
-    return parsed.payloads.some((payload) => typeof payload !== 'string'
-      || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
+    if (typeof raw !== 'string') return false;
+    return !recoveryBackupIsRedundant(raw, primaryRaw);
   }
 
   function persistTasks() {
@@ -219,10 +316,11 @@
         }
         state.recoveryBackupPendingPayload = null;
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
+      const primaryPayload = JSON.stringify(state.tasks);
+      localStorage.setItem(STORAGE_KEY, primaryPayload);
       if (hasPartialRecoveryBackup()) {
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
-      } else if (hasRecoveryBackupNeedingPreservation()) {
+      } else if (hasRecoveryBackupNeedingPreservation(primaryPayload)) {
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
       } else {
         setStorageStatus('Saved on this device');
@@ -552,16 +650,28 @@
   }
 
   function readRecoveryExportPayload() {
+    // Task and Focus backups are independent recovery sources. A read failure
+    // for one key must not hide a readable backup under the other key.
     let taskBackup = null;
     let focusBackup = null;
+    let taskReadable = false;
+    let focusReadable = false;
     try {
       taskBackup = localStorage.getItem(BACKUP_KEY);
-      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
+      taskReadable = true;
     } catch (error) {
-      return null;
+      // Preserve the independently readable Focus backup, if any.
     }
-    const hasTaskBackup = typeof taskBackup === 'string' && taskBackup.length > 0;
-    const hasFocusBackup = typeof focusBackup === 'string' && focusBackup.length > 0;
+    try {
+      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
+      focusReadable = true;
+    } catch (error) {
+      // Preserve the independently readable task backup, if any.
+    }
+    // Empty strings are opaque backup bytes too. Preserve/export them rather
+    // than treating a readable zero-byte value as if the key were absent.
+    const hasTaskBackup = taskReadable && typeof taskBackup === 'string';
+    const hasFocusBackup = focusReadable && typeof focusBackup === 'string';
     if (hasTaskBackup && hasFocusBackup) {
       return JSON.stringify({
         format: 'daymark-combined-recovery-v1',
@@ -574,7 +684,7 @@
 
   function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
     const raw = readRecoveryExportPayload();
-    if (typeof raw !== 'string' || raw.length === 0) return;
+    if (typeof raw !== 'string') return;
     showToast(message, {
       label: 'Export recovery',
       run: exportRecoveryBackup
@@ -585,7 +695,7 @@
     if (state.recoveryExportInProgress) return;
 
     const raw = readRecoveryExportPayload();
-    if (typeof raw !== 'string' || raw.length === 0) {
+    if (typeof raw !== 'string') {
       showToast('No recovery backup is available to export.');
       return;
     }
@@ -920,7 +1030,12 @@
     const webhookUi = window.DaymarkWebhookUi;
     if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
     try {
-      webhookUi.notifyTaskCompleted(task);
+      const result = webhookUi.notifyTaskCompleted(task);
+      if (result && typeof result.catch === 'function') {
+        result.catch((error) => {
+          console.warn('Could not queue the Daymark task-completed webhook:', error);
+        });
+      }
     } catch (error) {
       console.warn('Could not queue the Daymark task-completed webhook:', error);
     }
@@ -933,11 +1048,12 @@
     const task = state.tasks.find((item) => item.id === row?.dataset.taskId);
     if (!task) return;
     if (button.dataset.action === 'toggle') {
+      const wasCompleted = task.completed;
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
+      if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
@@ -1360,17 +1476,18 @@
   }
 
   function focusRecoveryPayloads(raw) {
-    if (typeof raw !== 'string' || !raw) return [];
+    if (typeof raw !== 'string') return [];
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1'
           && Array.isArray(parsed.payloads)) {
-        const payloads = parsed.payloads.filter((payload) => typeof payload === 'string' && payload.length > 0);
+        const payloads = parsed.payloads.filter((payload) => typeof payload === 'string');
         return payloads.length > 0 ? payloads : [raw];
       }
     } catch (error) {
       // Legacy backups may be unreadable raw JSON; preserve them byte-for-byte.
     }
+    // Empty strings are opaque backup bytes too; do not treat them as absence.
     return [raw];
   }
 
