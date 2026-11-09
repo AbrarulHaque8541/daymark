@@ -96,6 +96,7 @@ function maskJavaScriptNonCode(source) {
     "new", "of", "return", "throw", "typeof", "void", "yield",
     "as", "extends"
   ]);
+  const controlParenKeywords = new Set(["catch", "for", "if", "switch", "while", "with"]);
 
   function skipQuoted(start, quote) {
     let index = start + 1;
@@ -164,6 +165,8 @@ function maskJavaScriptNonCode(source) {
     let index = start;
     let braceDepth = 0;
     let canStartRegex = true;
+    let pendingControlParen = false;
+    const controlParenStack = [];
     while (index < textValue.length) {
       const character = textValue[index];
       const next = textValue[index + 1];
@@ -194,11 +197,13 @@ function maskJavaScriptNonCode(source) {
         blank(index, end);
         index = end;
         canStartRegex = false;
+        pendingControlParen = false;
         continue;
       }
       if (character === templateQuote) {
         index = scanTemplate(index);
         canStartRegex = false;
+        pendingControlParen = false;
         continue;
       }
       if (character === "/" && canStartRegex) {
@@ -207,13 +212,16 @@ function maskJavaScriptNonCode(source) {
           blank(index, end);
           index = end;
           canStartRegex = false;
+          pendingControlParen = false;
           continue;
         }
       }
       if (/[A-Za-z_$]/.test(character)) {
         let end = index + 1;
         while (end < textValue.length && /[A-Za-z0-9_$]/.test(textValue[end])) end += 1;
-        canStartRegex = regexPrefixKeywords.has(textValue.slice(index, end));
+        const word = textValue.slice(index, end);
+        pendingControlParen = controlParenKeywords.has(word);
+        canStartRegex = regexPrefixKeywords.has(word);
         index = end;
         continue;
       }
@@ -222,18 +230,35 @@ function maskJavaScriptNonCode(source) {
         while (end < textValue.length && /[A-Za-z0-9_.]/.test(textValue[end])) end += 1;
         index = end;
         canStartRegex = false;
+        pendingControlParen = false;
+        continue;
+      }
+      if (character === "(") {
+        controlParenStack.push(pendingControlParen);
+        pendingControlParen = false;
+        index += 1;
+        canStartRegex = true;
+        continue;
+      }
+      if (character === ")") {
+        const closesControlParen = controlParenStack.pop() === true;
+        pendingControlParen = false;
+        index += 1;
+        canStartRegex = closesControlParen;
         continue;
       }
       if (stopAtTemplateBrace && character === "{") {
         braceDepth += 1;
         index += 1;
         canStartRegex = true;
+        pendingControlParen = false;
         continue;
       }
       if (stopAtTemplateBrace && character === "}" && braceDepth > 0) {
         braceDepth -= 1;
         index += 1;
         canStartRegex = false;
+        pendingControlParen = false;
         continue;
       }
       const three = textValue.slice(index, index + 3);
@@ -245,6 +270,7 @@ function maskJavaScriptNonCode(source) {
       index += token.length;
       canStartRegex = ![")", "]", "}", ".", "?.", "++", "--"].includes(token);
       if (token === ";") canStartRegex = true;
+      pendingControlParen = false;
     }
     return index;
   }
@@ -265,32 +291,87 @@ function findClosingDelimiter(source, openIndex, opening, closing) {
   return -1;
 }
 
-function hasNonEmptyTestCallback(argumentsSource) {
-  const arrow = argumentsSource.indexOf("=>");
+function splitTopLevelArguments(source) {
+  const argumentsList = [];
+  let start = 0;
+  let parentheses = 0;
+  let braces = 0;
+  let brackets = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "(") parentheses += 1;
+    else if (character === ")") parentheses -= 1;
+    else if (character === "{") braces += 1;
+    else if (character === "}") braces -= 1;
+    else if (character === "[") brackets += 1;
+    else if (character === "]") brackets -= 1;
+    else if (character === "," && parentheses === 0 && braces === 0 && brackets === 0) {
+      argumentsList.push(source.slice(start, index));
+      start = index + 1;
+    }
+  }
+  argumentsList.push(source.slice(start));
+  return argumentsList;
+}
+
+function findTopLevelArrow(source) {
+  let parentheses = 0;
+  let braces = 0;
+  let brackets = 0;
+  for (let index = 0; index < source.length - 1; index += 1) {
+    const character = source[index];
+    if (character === "(") parentheses += 1;
+    else if (character === ")") parentheses -= 1;
+    else if (character === "{") braces += 1;
+    else if (character === "}") braces -= 1;
+    else if (character === "[") brackets += 1;
+    else if (character === "]") brackets -= 1;
+    else if (character === "=" && source[index + 1] === ">" &&
+      parentheses === 0 && braces === 0 && brackets === 0) return index;
+  }
+  return -1;
+}
+
+function hasExecutableCallbackBody(bodySource) {
+  const body = bodySource.replace(/[\s;{}]/g, "");
+  return body.length > 0 && !/^(?:return|returnundefined|void0)$/.test(body);
+}
+
+function hasNonEmptyTestCallback(callbackSource) {
+  let source = callbackSource.trim();
+  if (!source) return false;
+
+  // Permit a parenthesized inline function expression without mistaking a
+  // nested function in an options object for the test callback.
+  while (source.startsWith("(") && source.endsWith(")") &&
+    findClosingDelimiter(source, 0, "(", ")") === source.length - 1) {
+    source = source.slice(1, -1).trim();
+  }
+
+  const arrow = findTopLevelArrow(source);
   if (arrow >= 0) {
     let bodyStart = arrow + 2;
-    while (/\s/.test(argumentsSource[bodyStart] || "")) bodyStart += 1;
-    if (argumentsSource[bodyStart] === "{") {
-      const bodyEnd = findClosingDelimiter(argumentsSource, bodyStart, "{", "}");
+    while (/\s/.test(source[bodyStart] || "")) bodyStart += 1;
+    if (source[bodyStart] === "{") {
+      const bodyEnd = findClosingDelimiter(source, bodyStart, "{", "}");
       if (bodyEnd < 0) return false;
-      const body = argumentsSource.slice(bodyStart + 1, bodyEnd).replace(/[\s;{}]/g, "");
-      return body.length > 0 && !/^(?:returnundefined|void0)$/.test(body);
+      return hasExecutableCallbackBody(source.slice(bodyStart + 1, bodyEnd));
     }
-    const expression = argumentsSource.slice(bodyStart).replace(/[\s;,]/g, "");
+    const expression = source.slice(bodyStart).replace(/[\s;,]/g, "");
     return expression.length > 0 && expression !== "undefined" && expression !== "void0";
   }
 
-  const functionMatch = /\bfunction\s*\*?\s*(?:[A-Za-z_$][\w$]*)?\s*\(/.exec(argumentsSource);
+  const functionMatch = /^(?:async\s+)?function\s*\*?\s*(?:[A-Za-z_$][\w$]*)?\s*\(/.exec(source);
   if (!functionMatch) return false;
-  const parameterStart = argumentsSource.indexOf("(", functionMatch.index);
-  const parameterEnd = findClosingDelimiter(argumentsSource, parameterStart, "(", ")");
+  const parameterStart = source.indexOf("(", functionMatch.index);
+  const parameterEnd = findClosingDelimiter(source, parameterStart, "(", ")");
   if (parameterEnd < 0) return false;
-  const bodyStart = argumentsSource.indexOf("{", parameterEnd + 1);
-  if (bodyStart < 0) return false;
-  const bodyEnd = findClosingDelimiter(argumentsSource, bodyStart, "{", "}");
+  let bodyStart = parameterEnd + 1;
+  while (/\s/.test(source[bodyStart] || "")) bodyStart += 1;
+  if (source[bodyStart] !== "{") return false;
+  const bodyEnd = findClosingDelimiter(source, bodyStart, "{", "}");
   if (bodyEnd < 0) return false;
-  const body = argumentsSource.slice(bodyStart + 1, bodyEnd).replace(/[\s;{}]/g, "");
-  return body.length > 0 && !/^(?:returnundefined|void0)$/.test(body);
+  return hasExecutableCallbackBody(source.slice(bodyStart + 1, bodyEnd));
 }
 
 function hasRegisteredTestCase(source) {
@@ -312,7 +393,9 @@ function hasRegisteredTestCase(source) {
     // not a node:test registration; both are followed by a method body.
     if (code[afterCall] === "{") continue;
 
-    if (hasNonEmptyTestCallback(code.slice(openIndex + 1, closeIndex))) return true;
+    const callArguments = splitTopLevelArguments(code.slice(openIndex + 1, closeIndex));
+    const callbackSource = callArguments[callArguments.length - 1] || "";
+    if (hasNonEmptyTestCallback(callbackSource)) return true;
   }
   return false;
 }
@@ -377,6 +460,23 @@ test('every repository Node test file registers at least one executable test cas
     'prose before a test-like phrase inside template raw text must not count as a registration');
   assert.equal(hasRegisteredTestCase("const note = \"// test('fake') /* it('fake') */\";"), false,
     'comment markers and test-like text inside strings must remain inert');
+
+  assert.equal(hasRegisteredTestCase("if (enabled) /test('fake', () => assert.ok(true))/.test('x');"), false,
+    'a regex literal after a control-flow parenthesis must not count as a registration');
+  assert.equal(hasRegisteredTestCase("while (enabled) /it('fake', () => assert.ok(true))/.test('x');"), false,
+    'a regex literal after a while condition must not count as a registration');
+  assert.equal(hasRegisteredTestCase("test('fake', { setup: () => assert.ok(true) });"), false,
+    'an arrow nested inside test options is not the test callback');
+  assert.equal(hasRegisteredTestCase("test('fake', { setup: () => assert.ok(true) }, () => {});"), false,
+    'an empty final callback must not be rescued by an arrow nested in options');
+  assert.equal(hasRegisteredTestCase("test('valid async', async () => { await Promise.resolve(); assert.ok(true); });"), true,
+    'an async inline callback must be accepted');
+  assert.equal(hasRegisteredTestCase("test('valid function', function () { assert.ok(true); });"), true,
+    'a non-empty function-expression callback must be accepted');
+  assert.equal(hasRegisteredTestCase("test('valid parenthesized function', (function () { assert.ok(true); }));"), true,
+    'a parenthesized function-expression callback must be accepted');
+  assert.equal(hasRegisteredTestCase("test('empty function', function () { /* no executable body */ });"), false,
+    'an empty function-expression callback must not count as an executable test');
 
   for (const file of testFiles) {
     const relative = path.relative(repositoryRoot, file);
