@@ -600,7 +600,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             throw new IllegalArgumentException("unsupported host input action: " + action);
         }
         int sequence = ++inputSequence;
-        File filesDir = getTargetContext().getFilesDir();
+        File filesDir = getContext().getFilesDir();
+        System.out.println("HOST_INPUT_BRIDGE package=" + getContext().getPackageName()
+                + " filesDir=" + filesDir.getAbsolutePath()
+                + " target=" + getTargetContext().getPackageName());
         File request = new File(filesDir, INPUT_REQUEST_FILE);
         File result = new File(filesDir, INPUT_RESULT_FILE);
         File temporary = new File(filesDir, INPUT_REQUEST_FILE + ".tmp");
