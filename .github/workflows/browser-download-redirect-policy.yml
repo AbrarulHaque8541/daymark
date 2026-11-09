@@ -3,15 +3,29 @@ name: Browser download redirect policy
 on:
   push:
     branches: ["main"]
+    paths:
+      - ".github/workflows/browser-download-redirect-policy.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadRedirectPolicy.java"
+      - "android-app/tools/BrowserDownloadRedirectPolicySmoke.java"
+      - "android-app/tools/run-browser-download-redirect-policy-tests.sh"
   pull_request:
     branches: ["main"]
+    paths:
+      - ".github/workflows/browser-download-redirect-policy.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadRedirectPolicy.java"
+      - "android-app/tools/BrowserDownloadRedirectPolicySmoke.java"
+      - "android-app/tools/run-browser-download-redirect-policy-tests.sh"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: browser-download-redirect-policy-${{ github.ref }}
+  group: browser-download-redirect-policy-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
