@@ -1,3 +1,44 @@
+## Current execution queue refresh — 2026-11-09T12:00:49Z (main 1d29085)
+
+Latest whole-project snapshot: [CURRENT_STATUS_20261109T120049Z.md](docs/CURRENT_STATUS_20261109T120049Z.md).
+
+Current main: `1d29085b9c4f9ff3489711fd7e18cc88ab368767`. Root AGENTS: `492ed21e2219a8d1b80c7d6e63575525c98a5a91`. Open inventory: **10 PRs / 11 issues**.
+
+### P0 — security and runtime acceptance
+1. **#665 signing-secret isolation:** exact head `530ba59607f944358f18f8bcd1f2881d9e0e8aaa`, Node 659/659 and Android/contracts/device-test PASS. Current main PR/debug build logs expose masked signing variables to PR-controlled Gradle build steps; no exfiltration evidence. Independent security review required.
+2. **#648 Focus Timer:** exact head `49e4c1bee459dd0afb33d8bc0b3d2fc32de8cda2`, 101 ahead / 0 behind. Direct numeric-only UiAutomation shell input replaces the failed cross-UID bridge and status-marker wrapper. Local host smoke 8 assertions PASS. Exact-head Android/Focus API29+36 workflows queued/in progress; no emulator pass claimed.
+3. **#662 webhook:** exact head `4c3252ee5b303184d2e7cac07deb6a3f18d9f865`, Node 684/684 and Android/contracts/device-test PASS. Session-only endpoint and Web Locks replace merged #655 localStorage secret/lock behavior. Independent review required.
+4. **#664 recovery:** exact head `fc104fd590d3a61deb02efc1808439cbda1c6d41`, Android/contracts/device-test PASS; independent review and physical/manual export acceptance pending.
+5. **#160 physical Android/WebView/OEM acceptance:** APK artifacts are not physical-device tests.
+
+### P1 — data integrity, extension, recurrence and integration
+- #656 import/export: exact head `60ed05002237f172a9f9931390b024f5d30756ad`, Node 679/679 and Android/contracts/device-test PASS; independent review pending.
+- #659 extension import trust: exact head `3e95f41c5cad12474345875b8078d75249154dc9`; Android/contracts/device acceptance/device-test PASS; independent review pending.
+- #666 storage health: exact head `4ebb8256926ae9a3d3fb7ba774da4cc517add7ec`, Node 671/671 and Android/contracts/device-test PASS.
+- #657 recurrence: exact head `0bf58040c9186de574c3e760e61f1bf0cedd04ad`; CI/non-publishing acceptance PASS; actual Doze/reboot/timezone/OEM delivery pending.
+- #670 CSS press feedback: exact head `59e8825fa1c36b6329a5a1a27212f478c70c2b30`, Node 658/658 and Android/contracts/device-test PASS; PR ready for review.
+- #637 closed without merge after CSS transplant; stale status snapshots and duplicate HTTP guard were not copied.
+- #669 docs snapshot/status index: preceding exact head passed Android/contracts/device-test; this refreshed snapshot commit requires new checks.
+
+### P0 governance and release blockers
+- #646: main protection disabled, rulesets empty, dedicated endpoint HTTP 403; require owner-side independent approvals and Android/contracts checks.
+- Resolve application identity policy conflict between source/root AGENTS and user-mandated target; no identity change without explicit owner decision.
+- v1.5 remains latest published; v1.4 draft. No release/tag/version/signing changes authorized.
+- No physical-device tests claimed.
+
+### Latest execution ledger
+- #648: abandoned cross-UID file bridge after API29 EACCES and removed unreliable status marker; direct bounded UiAutomation shell input, host smoke 8 assertions, runner awk component discovery and source/mutation guards. Exact head `49e4c1bee459dd0afb33d8bc0b3d2fc32de8cda2`; Android CI/Focus API29+36 workflows in progress.
+- #656: imported #618 storage-safety changes into iCalendar branch; exact head `60ed05002237f172a9f9931390b024f5d30756ad`; Node 679/679, Android/contracts/device-test PASS; not merged.
+- #662: merged #663 markup/test into webhook branch; exact head `4c3252ee5b303184d2e7cac07deb6a3f18d9f865`; Node 684/684, Android/contracts/device-test PASS; not merged.
+- #665: tag-only signing-secret environment; exact head `530ba59607f944358f18f8bcd1f2881d9e0e8aaa`; Node 659/659, Android/contracts/device-test PASS; not merged.
+- #666: storage-health read-unknown behavior; exact head `4ebb8256926ae9a3d3fb7ba774da4cc517add7ec`; Node 671/671, Android/contracts/device-test PASS; not merged.
+- #657/#659/#664: current-main-based branch sync completed with exact-head CI green.
+- #670: CSS/accessibility transplant; exact head `59e8825fa1c36b6329a5a1a27212f478c70c2b30`; Node 658/658, Android/contracts/device-test PASS; ready for review, not merged.
+- #669: retired-namespace documentation guard failure fixed; preceding head passed Android/contracts/device-test; current snapshot refresh is the new pending docs change.
+- #618/#637/#668 closed without merge; #604/#650/#655/#663 merged by concurrent automation. No PR merged by this run.
+- Issues updated: #84, #160, #325, #348, #476, #603, #613, #636, #639, #640, #646.
+- No production release, tag, version bump, signing-key change, application identity change, or destructive migration.
+
 ## Current execution queue refresh — 2026-11-09T11:39:14Z (main 1d29085)
 
 Latest whole-project snapshot: [CURRENT_STATUS_20261109T113914Z.md](docs/CURRENT_STATUS_20261109T113914Z.md).
