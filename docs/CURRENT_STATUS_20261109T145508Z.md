@@ -10,7 +10,7 @@
 - Live inventory: **6 open PRs / 12 open issues**. All six open PRs are based on the current main SHA (zero commits behind).
 - Main branch API reports `protected=false`; rulesets API returns `[]`; detailed branch-protection endpoint returns HTTP 403 to this integration. No repository settings changed.
 - No independent approval is recorded for any open PR; requested-reviewer lists are empty. All six remain unmerged.
-- The root policy/Gradle package identity is `com.abrar.daymark`; the run-level safety directive names `com.cue.daymark`. No applicationId, namespace, manifest, signer or package migration was changed. Explicit owner reconciliation is required before any identity change.
+- Root AGENTS.md and Gradle specify the repository's owner-approved package identity; the run-level safety directive specifies a different package ID. No applicationId, namespace, manifest, signer or package migration was changed. Explicit owner reconciliation is required before any identity change.
 - Releases: v1.5 published (2026-10-23); v1.4 draft. No release/tag/version bump was created in this run.
 
 ## Exact open PR inventory
