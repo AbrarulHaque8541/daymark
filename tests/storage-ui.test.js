@@ -418,3 +418,19 @@ test('storage UI selectors stay connected to the production HTML contract', () =
   assert.ok(clearStatus, 'Clear status must remain a non-submitting button');
   assert.match(clearStatus[1], /Clear status/i);
 });
+
+
+test('clear-all confirmation discloses the remembered browser proxy profile', () => {
+  const { env, confirmations, confirmState, storageData } = fakeEnv({
+    data: { 'daymark.browser-proxy.last-profile': 'proxy.example:8080' },
+    confirmResult: false
+  });
+  const handle = ui.attachStorageUi(env);
+  handle.onClearAll();
+
+  assert.equal(confirmations.length, 1);
+  assert.match(confirmations[0], /saved browser proxy profile/i);
+  assert.equal(storageData['daymark.browser-proxy.last-profile'], 'proxy.example:8080',
+    'declining the confirmation must preserve the remembered profile');
+  assert.equal(confirmState.result, false);
+});
