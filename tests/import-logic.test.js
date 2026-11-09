@@ -121,7 +121,7 @@ test('fromCsv skips malformed rows and fills lenient defaults', () => {
 test('fromCsv skips malformed or duplicate-key subtask JSON instead of silently dropping subtasks', () => {
   const cell = (value) => {
     const text = String(value);
-    return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
   };
   const row = (id, title, subtasks) => [
     id, title, '', '', 'medium', 'false', '', '', '', subtasks, NOW, NOW
