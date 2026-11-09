@@ -4,7 +4,7 @@ set -eu
 
 ./gradlew --no-daemon installGithubSideloadDebug installGithubSideloadDebugAndroidTest
 
-instrumentation="$(adb shell pm list instrumentation | tr -d '\r' | sed -n 's/^instrumentation:\\([^ ]*DaymarkPlatformInstrumentation\\).*/\\1/p' | head -n 1)"
+instrumentation="$(adb shell pm list instrumentation | tr -d '\r' | awk '/^instrumentation:/ && /DaymarkPlatformInstrumentation/ { sub(/^instrumentation:/, ""); sub(/ .*/, ""); print; exit }')"
 if [ -z "$instrumentation" ]; then
   echo "DaymarkPlatformInstrumentation was not installed" >&2
   adb shell pm list instrumentation >&2
