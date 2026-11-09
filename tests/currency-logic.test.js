@@ -35,14 +35,17 @@ function jsonResponse(body) {
 
 function routeFetch(routes) {
   const seen = [];
-  const impl = (url) => {
+  const seenInit = [];
+  const impl = (url, init) => {
     seen.push(url);
+    seenInit.push(init || {});
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url: ' + url));
     if (typeof route.body === 'function') return Promise.resolve(route.body(url));
     return Promise.resolve(jsonResponse(route.body));
   };
   impl.seen = seen;
+  impl.seenInit = seenInit;
   return impl;
 }
 
@@ -127,6 +130,10 @@ test('fetchLatestRates returns a valid cache entry', async () => {
     now: () => '2026-11-03T12:00:00.000Z'
   });
   assert.equal(fetchImpl.seen.length, 1);
+  assert.equal(fetchImpl.seenInit[0].credentials, 'omit');
+  assert.equal(fetchImpl.seenInit[0].referrerPolicy, 'no-referrer');
+  assert.equal(fetchImpl.seenInit[0].cache, 'no-store');
+  assert.equal(fetchImpl.seenInit[0].redirect, 'error');
   assert.equal(fetchImpl.seen[0], 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR');
   assert.equal(result.version, 1);
   assert.equal(result.from, 'USD');

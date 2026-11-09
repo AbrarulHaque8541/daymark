@@ -209,7 +209,10 @@
       const response = await fetchImpl(url, {
         signal: controller ? controller.signal : undefined,
         cache: 'no-store',
-        redirect: 'follow'
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        redirect: 'error'
       });
       if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
       if (!responseBodyApi || typeof responseBodyApi.readBoundedText !== 'function') {

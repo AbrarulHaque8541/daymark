@@ -45,14 +45,17 @@ function jsonResponse(body) {
 
 function routeFetch(routes) {
   const seen = [];
-  const impl = (url) => {
+  const seenInit = [];
+  const impl = (url, init) => {
     seen.push(url);
+    seenInit.push(init || {});
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url: ' + url));
     if (typeof route.body === 'function') return Promise.resolve(route.body(url));
     return Promise.resolve(jsonResponse(route.body));
   };
   impl.seen = seen;
+  impl.seenInit = seenInit;
   return impl;
 }
 
@@ -153,6 +156,12 @@ test('fetchWeatherByPlace geocodes then fetches the forecast', async () => {
     now: () => '2026-11-03T12:00:00.000Z'
   });
   assert.equal(fetchImpl.seen.length, 2);
+  for (const init of fetchImpl.seenInit) {
+    assert.equal(init.credentials, 'omit');
+    assert.equal(init.referrerPolicy, 'no-referrer');
+    assert.equal(init.cache, 'no-store');
+    assert.equal(init.redirect, 'error');
+  }
   assert.ok(fetchImpl.seen[0].includes('name=kolkata'));
   assert.equal(result.version, 1);
   assert.equal(result.place.name, 'Kolkata');

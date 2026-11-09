@@ -95,8 +95,10 @@ test('validateWikiCache accepts a complete cache and rejects corrupt ones', () =
 
 test('searchWikipedia returns a versioned cache payload', async () => {
   const seen = [];
+  let seenInit = null;
   const fetchImpl = (url, init) => {
     seen.push(url);
+    seenInit = init;
     assert.ok(!init || typeof init === 'object');
     const bytes = new TextEncoder().encode(SAMPLE_BODY);
     let offset = 0;
@@ -124,6 +126,10 @@ test('searchWikipedia returns a versioned cache payload', async () => {
   assert.equal(result.fetchedAt, '2026-11-05T12:00:00.000Z');
   assert.equal(result.results.length, 2);
   assert.ok(seen[0].includes('srsearch=kanyakumari'));
+  assert.equal(seenInit.credentials, 'omit');
+  assert.equal(seenInit.referrerPolicy, 'no-referrer');
+  assert.equal(seenInit.cache, 'no-store');
+  assert.equal(seenInit.redirect, 'error');
 });
 
 test('searchWikipedia surfaces empty-query and HTTP failures as errors', async () => {

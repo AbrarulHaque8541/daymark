@@ -120,7 +120,11 @@
     });
     const request = (async () => {
       const response = await fetchImpl(url, {
-        signal: controller ? controller.signal : undefined
+        signal: controller ? controller.signal : undefined,
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        redirect: 'error'
       });
       if (!response || !response.ok) {
         throw new Error('Wikipedia request failed (' + (response ? response.status : 'no response') + ').');
