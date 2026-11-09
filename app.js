@@ -27,110 +27,6 @@
     status.classList.remove('is-checking');
   }
 
-  function hasDuplicateJsonKeys(raw) {
-    if (typeof raw !== 'string') return false;
-    let index = 0;
-    let duplicate = false;
-    let tooDeep = false;
-    const whitespace = () => {
-      while (index < raw.length && /\s/.test(raw[index])) index += 1;
-    };
-    const readString = () => {
-      const start = index;
-      index += 1;
-      while (index < raw.length) {
-        const character = raw[index];
-        if (character === '\\') {
-          index += 2;
-          continue;
-        }
-        if (character === '"') {
-          index += 1;
-          return JSON.parse(raw.slice(start, index));
-        }
-        if (character.charCodeAt(0) < 0x20) throw new Error('invalid JSON string');
-        index += 1;
-      }
-      throw new Error('unterminated JSON string');
-    };
-    const readValue = (depth) => {
-      if (depth > 128) {
-        tooDeep = true;
-        throw new Error('JSON nesting limit exceeded');
-      }
-      whitespace();
-      const character = raw[index];
-      if (character === '"') {
-        readString();
-        return;
-      }
-      if (character === '{') {
-        index += 1;
-        whitespace();
-        if (raw[index] === '}') {
-          index += 1;
-          return;
-        }
-        const keys = new Set();
-        for (;;) {
-          whitespace();
-          if (raw[index] !== '"') throw new Error('invalid JSON object key');
-          const key = readString();
-          if (keys.has(key)) duplicate = true;
-          keys.add(key);
-          whitespace();
-          if (raw[index] !== ':') throw new Error('missing JSON object colon');
-          index += 1;
-          readValue(depth + 1);
-          whitespace();
-          if (raw[index] === '}') {
-            index += 1;
-            return;
-          }
-          if (raw[index] !== ',') throw new Error('invalid JSON object separator');
-          index += 1;
-        }
-      }
-      if (character === '[') {
-        index += 1;
-        whitespace();
-        if (raw[index] === ']') {
-          index += 1;
-          return;
-        }
-        for (;;) {
-          readValue(depth + 1);
-          whitespace();
-          if (raw[index] === ']') {
-            index += 1;
-            return;
-          }
-          if (raw[index] !== ',') throw new Error('invalid JSON array separator');
-          index += 1;
-        }
-      }
-      const rest = raw.slice(index);
-      const literal = rest.match(/^(?:true|false|null)/);
-      if (literal) {
-        index += literal[0].length;
-        return;
-      }
-      const number = rest.match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
-      if (number) {
-        index += number[0].length;
-        return;
-      }
-      throw new Error('invalid JSON value');
-    };
-    try {
-      readValue(0);
-      whitespace();
-      return index === raw.length && (duplicate || tooDeep);
-    } catch (error) {
-      return tooDeep;
-    }
-  }
-
   function loadTasks() {
     let saved = null;
     try {
@@ -165,7 +61,7 @@
       return [];
     }
     try {
-      if (hasDuplicateJsonKeys(saved)) throw new Error('Saved task data contains duplicate JSON keys or unsupported nesting.');
+      if (logic.hasDuplicateJsonKeys(saved)) throw new Error('Saved task data contains duplicate JSON keys or unsupported nesting.');
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) throw new Error('Saved task data is not a list.');
       const validated = logic.validateStoredTasks(parsed);
@@ -213,6 +109,7 @@
   }
 
   function isPartialRecoveryPayload(raw) {
+    if (logic.hasDuplicateJsonKeys(raw)) return false;
     try {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
@@ -232,6 +129,7 @@
 
   function recoveryBackupPayloads(raw) {
     if (typeof raw !== 'string') return [];
+    if (logic.hasDuplicateJsonKeys(raw)) return [raw];
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return [raw];
@@ -244,6 +142,7 @@
 
   function recoveryBackupIsRedundant(raw, primaryRaw) {
     if (typeof raw !== 'string') return true;
+    if (logic.hasDuplicateJsonKeys(raw)) return false;
     if (typeof primaryRaw !== 'string' || primaryRaw.length === 0) return false;
     let parsed;
     try {
@@ -1137,6 +1036,7 @@
   function readTaskRecoveryPayloads(raw) {
     const result = { arrays: [], malformedCount: 0 };
     if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (logic.hasDuplicateJsonKeys(raw)) { result.malformedCount = 1; return result; }
     let parsed;
     try {
       parsed = JSON.parse(raw);
@@ -1154,6 +1054,7 @@
           result.malformedCount += 1;
           return;
         }
+        if (logic.hasDuplicateJsonKeys(payload)) { result.malformedCount += 1; return; }
         try {
           const records = JSON.parse(payload);
           if (Array.isArray(records)) result.arrays.push(records);
@@ -1171,6 +1072,7 @@
   function readFocusRecoveryStates(raw) {
     const result = { states: [], malformedCount: 0 };
     if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (logic.hasDuplicateJsonKeys(raw)) { result.malformedCount = 1; return result; }
     if (!focus) {
       result.malformedCount = 1;
       return result;
@@ -1188,6 +1090,7 @@
           result.malformedCount += 1;
           return;
         }
+        if (logic.hasDuplicateJsonKeys(payload)) { result.malformedCount += 1; return; }
         try {
           const recovered = JSON.parse(payload);
           if (recovered && typeof recovered === 'object' && !Array.isArray(recovered)) result.states.push(recovered);
@@ -1377,6 +1280,10 @@
         : `Recovery import finished — ${message}.`);
   }
   function applyImportedText(text) {
+    if (logic.hasDuplicateJsonKeys(text)) {
+      showToast('That file contains duplicate JSON keys or unsupported nesting. Nothing was changed.');
+      return;
+    }
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -1477,6 +1384,7 @@
 
   function focusRecoveryPayloads(raw) {
     if (typeof raw !== 'string') return [];
+    if (logic.hasDuplicateJsonKeys(raw)) return [raw];
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.format === 'daymark-focus-recovery-bundle-v1'
@@ -1580,6 +1488,7 @@
       return empty;
     }
     try {
+      if (logic.hasDuplicateJsonKeys(saved)) throw new Error('Saved Focus data contains duplicate JSON keys or unsupported nesting.');
       const parsed = JSON.parse(saved);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Saved focus data is not an object.');
       const log = focus.validateFocusLog(parsed.log);

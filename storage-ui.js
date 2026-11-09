@@ -15,23 +15,35 @@
     if (!env || !env.document) throw new Error('attachStorageUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = Boolean(env.storageAccessFailed);
+    try {
+      if (!storageAccessFailed) {
+        storage = env.localStorage !== undefined
+          ? env.localStorage
+          : ((win && win.localStorage) || null);
+      }
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
-    const listEl = element('data-list');
-    const statusEl = element('data-status');
-    const refreshEl = element('data-refresh');
-    const clearAllEl = element('data-clear-all');
+    const listEl = element('storage-list');
+    const statusEl = element('storage-status-line');
+    const refreshEl = element('storage-check');
+    const clearStatusEl = element('storage-clear');
+    const clearAllEl = element('storage-clear-all');
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
     }
 
     function storageAvailable() {
-      if (!storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+      if (storageAccessFailed
+        || !storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
         return false;
       }
       try {
@@ -48,12 +60,21 @@
         return;
       }
       if (!listEl || typeof listEl.appendChild !== 'function') return;
+      if (storageAccessFailed) {
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        status('Browser storage could not be accessed. Local data status is unknown; nothing was changed.');
+        return;
+      }
       let scan = null;
       try {
         scan = storageApi.scanStorage(storage);
       } catch (error) {
-        status('Could not read local data: '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
+        // A failed rescan must not leave old sizes or destructive controls visible.
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        if (typeof listEl.setAttribute === 'function') listEl.setAttribute('aria-busy', 'false');
+        status('Could not read local data. Local data status is unknown; nothing was changed.');
         return;
       }
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
@@ -63,11 +84,20 @@
         const row = make('div');
         if (!row) break;
         if (typeof row.setAttribute === 'function') row.setAttribute('class', 'feed-item');
+        const unreadableCount = Array.isArray(category.unreadableKeys)
+          ? category.unreadableKeys.length : 0;
         const title = make('span');
         if (title) {
           if (typeof title.setAttribute === 'function') title.setAttribute('class', 'feed-item-title');
-          title.textContent = category.label
-            + (category.present ? ' — about ' + storageApi.formatBytes(category.bytes) : ' — not present');
+          let state = ' — not present';
+          if (unreadableCount > 0) {
+            state = category.present
+              ? ' — partially readable (about ' + storageApi.formatBytes(category.bytes) + ')'
+              : ' — status unknown (could not read)';
+          } else if (category.present) {
+            state = ' — about ' + storageApi.formatBytes(category.bytes);
+          }
+          title.textContent = category.label + state;
           row.appendChild(title);
         }
         const summary = make('p');
@@ -85,7 +115,9 @@
             button.setAttribute('aria-label', 'Clear ' + category.label + ' from this browser');
           }
           button.textContent = 'Clear';
-          button.disabled = !category.present;
+          // Allow an explicit retry for unknown data; clearCategory itself still
+          // fails closed when it cannot read the key before attempting removal.
+          button.disabled = !category.present && unreadableCount === 0;
           if (typeof button.addEventListener === 'function') {
             button.addEventListener('click', () => { onClearCategory(category.id); });
           }
@@ -93,12 +125,22 @@
         }
         listEl.appendChild(row);
       }
-      status(scan.presentCount === 0
-        ? 'No local data is stored yet. Add a task or use a card to see it here.'
-        : scan.presentCount + ' of ' + scan.categories.length
+      const unreadableCount = Number.isInteger(scan.unreadableCount) ? scan.unreadableCount : 0;
+      if (unreadableCount > 0) {
+        const known = scan.presentCount === 0
+          ? 'No readable local data was found'
+          : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
+            + storageApi.formatBytes(scan.totalBytes) + ' total)';
+        status(known + '; ' + unreadableCount
+          + ' categories could not be checked. Reported sizes exclude unreadable entries.');
+      } else if (scan.presentCount === 0) {
+        status('No local data is stored yet. Add a task or use a card to see it here.');
+      } else {
+        status(scan.presentCount + ' of ' + scan.categories.length
           + ' categories hold data on this device (about '
           + storageApi.formatBytes(scan.totalBytes) + ' total).');
-      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0;
+      }
+      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0 || unreadableCount > 0;
     }
 
     // Returns 'accepted', 'declined', or 'failed'. A failed confirmation prompt
@@ -131,7 +173,7 @@
       }
       if (listEl) listEl.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (typeof doc.querySelectorAll === 'function') {
-        doc.querySelectorAll('#data-list .tool-button').forEach(btn => {
+        doc.querySelectorAll('#storage-list .tool-button').forEach(btn => {
           if (btn) {
             btn.disabled = busy;
             if (typeof btn.classList !== 'undefined') {
@@ -174,10 +216,17 @@
       }
       setBusy(false);
       if (result.failed.length > 0) {
-        const message = 'Cleared ' + category.label + ', but ' + result.failed.length
-          + ' item(s) could not be removed by the browser.';
+        const message = result.removed.length === 0
+          ? 'Could not clear ' + category.label + ': ' + result.failed.length
+            + ' item(s) could not be checked or removed. Nothing was cleared.'
+          : 'Cleared ' + category.label + ' (' + result.removed.length
+            + ' item(s) removed), but ' + result.failed.length
+            + ' item(s) could not be removed by the browser.';
         render();
         status(message);
+      } else if (result.removed.length === 0) {
+        render();
+        status('No stored data was found for ' + category.label + '. Nothing was changed.');
       } else {
         const message = 'Cleared ' + category.label + ' (' + result.removed.length
           + ' item(s) removed). Nothing else was touched.';
@@ -191,8 +240,19 @@
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
       }
+      let scan = null;
+      try {
+        scan = storageApi.scanStorage(storage);
+      } catch (error) {
+        status('Could not verify local data. Nothing was cleared.');
+        return;
+      }
+      if (!scan || scan.complete !== true) {
+        status('Cannot clear all local data while some categories are unreadable. Nothing was cleared.');
+        return;
+      }
       const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, caches, webhook settings, and queued events will be removed. '
+        + 'Tasks, Focus history, the Focus Timer preset, cached data, saved Wikipedia/weather/holiday/currency and browser-search preferences, the remembered browser download journey, the saved browser proxy profile, the legacy webhook coordination lock, and queued events will be removed. The secret-bearing legacy endpoint is excluded and handled without reading. '
         + 'This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
@@ -229,6 +289,9 @@
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
       refreshEl.addEventListener('click', () => { render(); });
     }
+    if (clearStatusEl && typeof clearStatusEl.addEventListener === 'function') {
+      clearStatusEl.addEventListener('click', () => { status(''); });
+    }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
       clearAllEl.addEventListener('click', () => { onClearAll(); });
     }
@@ -252,7 +315,16 @@
   root.DaymarkStorageUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachStorageUi({ document, window, localStorage: window.localStorage });
+    const boot = () => {
+      let localStorage = null;
+      let storageAccessFailed = false;
+      try {
+        localStorage = window.localStorage;
+      } catch (error) {
+        storageAccessFailed = true;
+      }
+      attachStorageUi({ document, window, localStorage, storageAccessFailed });
+    };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

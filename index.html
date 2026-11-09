@@ -422,7 +422,7 @@
         <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="storage-heading">Browser storage health</h2>
-          <p class="briefing-description">Local-only check of this origin’s storage. No network.</p>
+          <p class="briefing-description">Local-only check of non-secret storage. The legacy webhook endpoint is excluded; webhook privacy cleanup removes it without reading. No network.</p>
           <form id="storage-form" class="feed-form" novalidate>
             <button class="button button-primary" id="storage-check" type="button">Check</button>
             <button class="button button-quiet" id="storage-clear" type="button">Clear status</button>

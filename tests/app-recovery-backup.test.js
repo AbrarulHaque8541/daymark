@@ -660,3 +660,35 @@ test('Focus recovery backup remains exportable when the task backup key is unrea
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup, 'the original Focus backup remains untouched');
   assert.equal(storedValues.has(BACKUP_KEY), false, 'the unreadable task backup is not recreated as an empty value');
 });
+
+test('duplicate keys in a task recovery backup remain opaque and are never auto-cleared', () => {
+  const record = JSON.stringify(validTask('backup-duplicate', 'Original title'))
+    .replace('"title":"Original title"', '"title":"Original title","title":"Overwritten title"');
+  const ambiguousBackup = '[' + record + ']';
+  const storedValues = new Map([
+    [STORAGE_KEY, JSON.stringify([validTask('primary', 'Healthy primary')])],
+    [BACKUP_KEY, ambiguousBackup]
+  ]);
+  bootApp(storedValues);
+  assert.equal(storedValues.get(BACKUP_KEY), ambiguousBackup);
+});
+
+test('duplicate keys in primary Focus state are backed up without rewriting the primary', () => {
+  const ambiguous = '{"session":null,"session":{"id":"ambiguous-session"},"log":[]}';
+  const storedValues = new Map([['daymark.focus.v1', ambiguous]]);
+  const app = bootApp(storedValues);
+  assert.equal(storedValues.get('daymark.focus.v1'), ambiguous);
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), ambiguous);
+  assert.match(app.elements.get('#storage-status span').textContent, /Focus data recovery backup retained/);
+});
+
+test('duplicate keys in a Focus recovery envelope remain opaque and exportable', () => {
+  const ambiguous = '{"format":"daymark-focus-recovery-bundle-v1","payloads":[],"payloads":["{}"]}';
+  const storedValues = new Map([
+    [STORAGE_KEY, JSON.stringify([validTask('primary', 'Healthy primary')])],
+    [FOCUS_BACKUP_KEY, ambiguous]
+  ]);
+  const app = bootApp(storedValues);
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), ambiguous);
+  assert.equal(app.elements.get('#toast-action').hidden, false);
+});
