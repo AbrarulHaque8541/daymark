@@ -18,7 +18,8 @@ public final class ExtensionStoreSmoke {
                 "daymark-extension-store-smoke-" + System.nanoTime());
         if (!root.mkdirs()) throw new AssertionError("could not create owned temporary test directory");
         try {
-            ExtensionStore store = new ExtensionStore(new Context(root));
+            Context context = new Context(root);
+            ExtensionStore store = new ExtensionStore(context);
             String id = "user.store-smoke";
             BrowserExtension incoming = ExtensionPackageParser.parseDaymarkJson(pack(id, "window.sample = 1;", true), false);
             store.installUserPack(incoming);
