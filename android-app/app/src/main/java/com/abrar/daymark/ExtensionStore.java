@@ -154,7 +154,12 @@ final class ExtensionStore {
         if (out.exists()) {
             // Read failures are not parse failures: never replace a file that could not be
             // inspected (including an oversized file or a non-regular path).
-            String existingJson = readFile(out);
+            String existingJson;
+            try {
+                existingJson = readFile(out);
+            } catch (IOException unreadable) {
+                throw new IOException("Existing extension pack could not be read; refusing to replace it.", unreadable);
+            }
             try {
                 existing = ExtensionPackageParser.parseDaymarkJson(existingJson, false);
             } catch (Exception malformed) {
