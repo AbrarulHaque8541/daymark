@@ -33,8 +33,13 @@ public final class ExtensionInjectorSmoke {
         String guard = "if(String(window.location.href)!==" + ExtensionInjector.jsonString(PAGE) + ")return;";
         contains(scripts.get(0), guard, "CSS submission checks current page");
         contains(scripts.get(1), guard, "JS submission checks current page");
-        before(scripts.get(0), guard, "window.__daymarkBoot", "CSS guard runs before bootstrap");
-        before(scripts.get(0), guard, "window.__daymarkLastCss", "CSS guard runs before style payload");
+        String bootstrapGuard = "if(String(window.location.href)!==expected)return;";
+        contains(scripts.get(0), bootstrapGuard, "CSS bootstrap checks the expected page before setup");
+        before(scripts.get(0), "var expected=" + ExtensionInjector.jsonString(PAGE) + ";",
+                bootstrapGuard, "CSS bootstrap guard uses the captured page URL");
+        before(scripts.get(0), bootstrapGuard, "window.__daymarkBoot",
+                "CSS bootstrap guard runs before bootstrap state is created");
+        before(scripts.get(0), guard, "window.__daymarkLastCss", "CSS payload guard runs before style payload");
         before(scripts.get(1), guard, "window.__scopeTest", "JS guard runs before pack code");
         contains(scripts.get(0), "window.__daymarkExpectedUrl", "bootstrap records expected page");
         contains(scripts.get(0), "window.GM_addStyle", "userscript style helper remains available");
