@@ -266,21 +266,27 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "fresh Focus Timer panel starts in Stopwatch mode");
 
-            String countdownTap = dispatchTap(countdown);
+            String countdownTap = dispatchTap(mainActivity, "Countdown");
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a real tap selects Countdown (" + countdownTap + ")");
-            String stopwatchTap = dispatchTap(stopwatch);
+            String stopwatchTap = dispatchTap(mainActivity, "Stopwatch");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a real tap selects Stopwatch (" + stopwatchTap + ")");
 
+            modeSelector = findFocusModeSelector(mainActivity);
+            parentScroll = findParentScrollView(modeSelector);
             String leftSwipe = dispatchSwipe(modeSelector, true);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a leftward horizontal swipe selects Countdown (" + leftSwipe + ")");
+            modeSelector = findFocusModeSelector(mainActivity);
+            parentScroll = findParentScrollView(modeSelector);
             String rightSwipe = dispatchSwipe(modeSelector, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
             // The selector may have moved during horizontal gestures; re-center it
             // before injecting the parent-scroll gesture.
+            modeSelector = findFocusModeSelector(mainActivity);
+            parentScroll = findParentScrollView(modeSelector);
             scrollDescendantIntoScrollView(parentScroll, modeSelector);
             boolean[] canScroll = new boolean[2];
             int[] scrollY = new int[2];
@@ -337,6 +343,37 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             android.view.ViewGroup group = (android.view.ViewGroup) root;
             for (int index = 0; index < group.getChildCount(); index++) {
                 android.view.View match = findViewByContentDescription(group.getChildAt(index), expected);
+                if (match != null) return match;
+            }
+        }
+        return null;
+    }
+
+    private android.view.View findFocusModeSelector(Activity activity) throws Exception {
+        android.view.View[] selector = new android.view.View[1];
+        runOnMainSync(() -> {
+            android.view.View root = activity.getWindow().getDecorView();
+            android.view.View currentStopwatch = findVisibleTextView(root, "Stopwatch");
+            android.view.View row = currentStopwatch == null
+                    || !(currentStopwatch.getParent() instanceof android.view.View)
+                    ? null : (android.view.View) currentStopwatch.getParent();
+            selector[0] = row == null ? null : findAncestorWithSimpleName(row, "ModeSelector");
+        });
+        check(selector[0] != null, "current visible Focus controls resolve to the real ModeSelector");
+        return selector[0];
+    }
+
+    private android.view.View findVisibleTextView(android.view.View root, String expected) {
+        if (root == null) return null;
+        if (root instanceof android.widget.TextView) {
+            CharSequence text = ((android.widget.TextView) root).getText();
+            if (text != null && expected.contentEquals(text)
+                    && root.isShown() && root.isAttachedToWindow()) return root;
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = group.getChildCount() - 1; index >= 0; index--) {
+                android.view.View match = findVisibleTextView(group.getChildAt(index), expected);
                 if (match != null) return match;
             }
         }
@@ -447,9 +484,11 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         String[] startDescription = new String[1];
         String[] startText = new String[1];
         runOnMainSync(() -> {
-            selected[0] = stopwatch.isSelected();
-            selected[1] = countdown.isSelected();
             android.view.View root = activity.getWindow().getDecorView();
+            android.view.View currentStopwatch = findVisibleTextView(root, "Stopwatch");
+            android.view.View currentCountdown = findVisibleTextView(root, "Countdown");
+            selected[0] = currentStopwatch != null && currentStopwatch.isSelected();
+            selected[1] = currentCountdown != null && currentCountdown.isSelected();
             android.view.View start = findViewByContentDescription(root, "Start focus timer");
             String expectedStatus = countdownExpected ? "TARGET DURATION" : "READY WHEN YOU ARE";
             android.view.View status = findViewByText(root, expectedStatus);
@@ -465,6 +504,16 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(selected[0] == !countdownExpected && selected[1] == countdownExpected,
                 message + ": exactly the expected mode is selected (" + observed + ")");
         check(idleState[0], message + ": Start remains available and the timer stays idle (" + observed + ")");
+    }
+
+    private String dispatchTap(Activity activity, String label) throws Exception {
+        android.view.View[] target = new android.view.View[1];
+        runOnMainSync(() -> target[0] = findVisibleTextView(
+                activity.getWindow().getDecorView(), label));
+        check(target[0] != null && target[0].isAttachedToWindow()
+                        && target[0].isEnabled() && target[0].isClickable(),
+                "current visible " + label + " mode button is attached, enabled and clickable");
+        return dispatchTap(target[0]);
     }
 
     private String dispatchTap(android.view.View view) throws Exception {
@@ -696,13 +745,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private String describeTouchTarget(android.view.View view, android.graphics.Rect bounds) throws Exception {
         int[] location = new int[2];
-        boolean[] state = new boolean[3];
+        boolean[] state = new boolean[5];
         String[] label = new String[1];
         runOnMainSync(() -> {
             view.getLocationOnScreen(location);
             state[0] = view.isShown();
             state[1] = view.isEnabled();
             state[2] = view.isClickable();
+            state[3] = view.isAttachedToWindow();
+            state[4] = view.hasOnClickListeners();
             if (view instanceof android.widget.TextView) {
                 CharSequence text = ((android.widget.TextView) view).getText();
                 label[0] = text == null ? "" : text.toString();
@@ -710,7 +761,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         });
         return "target=" + label[0] + " bounds=" + bounds.toShortString()
                 + " locationOnScreen=(" + location[0] + "," + location[1] + ")"
-                + " shown=" + state[0] + " enabled=" + state[1] + " clickable=" + state[2];
+                + " shown=" + state[0] + " enabled=" + state[1] + " clickable=" + state[2]
+                + " attached=" + state[3] + " hasClickListener=" + state[4];
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
