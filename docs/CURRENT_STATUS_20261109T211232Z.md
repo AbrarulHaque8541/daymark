@@ -10,7 +10,7 @@
 - Workflow inventory: android-device-acceptance, android-device-test-release, android-private-main-test-apk, android-production-release, android-release-assets, android, browser-cookie-import-safety, desktop-browser-ci, focus-live-update, focus-timer-emulator, focus-timer-ui, generator-generic-ossf-slsa3-publish, nightly-main-audit, platform-contract.
 - Main branch protection endpoint returned HTTP 403; repository rulesets endpoint returned an empty list. Effective required-review/check enforcement is therefore not established.
 - Releases: v1.5 published 2026-10-23T09:42:55Z; v1.4 remains draft. No release/tag action was taken.
-- Gradle identity: `com.abrar.daymark`, versionName `1.6`, versionCode `13`, minSdk 26, targetSdk 36. Issue #679 tracks the conflicting stale `com.cue.daymark` instruction; no identity change was made.
+- Gradle identity: `com.abrar.daymark`, versionName `1.6`, versionCode `13`, minSdk 26, targetSdk 36. Issue #679 tracks a conflicting stale application-identity directive; no identity change was made.
 
 ## Open PR inventory and exact-head evidence
 
