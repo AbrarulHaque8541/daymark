@@ -100,7 +100,7 @@ test('every repository Node test file registers at least one executable test cas
     'a todo-only file must not make a suite look executable');
   assert.equal(hasRegisteredTestCase("test.only('focused fixture', () => {});"), false,
     'committed focused-only test files must be rejected');
-  assert.equal(hasRegisteredTestCase('const example = "test(\\'fake\\')";'), false,
+  assert.equal(hasRegisteredTestCase("const example = \"test('fake')\";"), false,
     'a test-like string literal must not count as a test registration');
 
   for (const file of testFiles) {
