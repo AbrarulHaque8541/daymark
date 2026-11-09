@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- A focused second runner avoids editing PR #648's shared platform instrumentation. -->
+    <instrumentation
+        android:name="com.abrar.daymark.DaymarkServiceWorkerInstrumentation"
+        android:targetPackage="com.abrar.daymark"
+        android:label="Daymark Service Worker runtime acceptance" />
+</manifest>
