@@ -344,7 +344,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private android.graphics.Rect visibleBounds(android.view.View view) throws Exception {
         android.graphics.Rect[] bounds = {new android.graphics.Rect()};
-        runOnMainSync(() -> view.getGlobalVisibleRect(bounds[0]));
+        int[] rootLocation = new int[2];
+        runOnMainSync(() -> {
+            // getGlobalVisibleRect is root-relative; sendPointerSync injects in
+            // screen coordinates. Translate before using bounds for taps/swipes.
+            view.getGlobalVisibleRect(bounds[0]);
+            android.view.View rootView = view.getRootView();
+            if (rootView != null) rootView.getLocationOnScreen(rootLocation);
+        });
+        bounds[0].offset(rootLocation[0], rootLocation[1]);
         return bounds[0];
     }
 
