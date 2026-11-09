@@ -564,6 +564,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 ? bounds.centerY() - distance / 2f
                 : bounds.centerY() + distance / 2f;
         StringBuilder selectorTrace = new StringBuilder();
+        // A delivered parent MOVE is rendered as parent-scroll:ACTION_MOVE by appendTouchTrace().
+        // Keeping this label explicit lets the source guard catch regressions in ScrollView tracing.
         StringBuilder ancestorTrace = new StringBuilder();
         java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
         java.util.ArrayList<android.view.View> tracedAncestors = new java.util.ArrayList<>();
