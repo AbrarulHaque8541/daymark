@@ -1557,7 +1557,7 @@
       } else {
         const backupState = readFocusRecoveryBackupState();
         if (!backupState.readable) reportUnknownFocusRecoveryBackup();
-        else if (backupState.hasPayload) reportFocusRecovery(true);
+        else if (backupState.hasBackup) reportFocusRecovery(true);
       }
 
       const completedSession = restoreResult.completedSession;
@@ -1627,7 +1627,9 @@
       // Recovery backups are intentionally retained. Clearing one implicitly
       // here would destroy rejected history before a user recovery/export flow
       // exists. Only an explicit recovery action may remove it in the future.
-      if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
+      const backupState = readFocusRecoveryBackupState();
+      if (!backupState.readable) reportUnknownFocusRecoveryBackup();
+      else if (backupState.hasBackup) reportFocusRecovery(true);
       return true;
     } catch (error) {
       console.warn('Could not save Daymark focus state:', error);
