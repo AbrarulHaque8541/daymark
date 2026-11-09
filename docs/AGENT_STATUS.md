@@ -94,9 +94,13 @@
 
 # Agent status index
 
+- [2026-11-09T11:21:40Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T112140Z.md)
+
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [2026-11-09T11:21:40Z — current main 1d29085](./CURRENT_STATUS_20261109T112140Z.md)
+- Previous reviewed snapshot: [2026-11-09T07:51:24Z](./CURRENT_STATUS_20261109T075124Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (verified current main, merged #645, current PR heads, exact-head checks and this run's fixes)](./CURRENT_STATUS_20261109T070843Z.md)
 - Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z](./CURRENT_STATUS_20261109T064041Z.md)
 - Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z](./CURRENT_STATUS_20261109T063944Z.md)
