@@ -54,8 +54,9 @@ final class ExtensionInjector {
         }
 
         String expectedUrl = jsonString(pageUrl);
-        if (css.length() > 0) {
-            // Bootstrap and CSS share one guarded WebView submission.
+        if (css.length() > 0 || js.length() > 0) {
+            // JS-only userscripts still need the page-bound GM_addStyle bootstrap.
+            // Bootstrap and any CSS payload share one guarded WebView submission.
             webView.evaluateJavascript(cssScript(expectedUrl, css.toString()), null);
         }
         if (js.length() > 0) {
