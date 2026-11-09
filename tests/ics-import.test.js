@@ -238,19 +238,19 @@ test('index.html offers the calendar format in the import file picker', () => {
     'the accept list must offer .ics alongside JSON, CSV and Markdown');
 });
 
-test('CATEGORIES splits on unescaped commas and semicolons; escaped delimiters stay inside values', () => {
+test('CATEGORIES splits only on unescaped commas; semicolons remain inside values', () => {
   const ics = [
     'BEGIN:VCALENDAR',
     'BEGIN:VTODO',
     'UID:cats@example.com',
     'SUMMARY:Tagged',
-    'CATEGORIES:work,personal\\,private;urgent',
+    'CATEGORIES:work,personal\\,private;urgent,finance',
     'END:VTODO',
     'END:VCALENDAR'
   ].join('\n');
   const result = importer.fromIcs(ics, freshCtx());
   assert.equal(result.tasks.length, 1);
-  assert.deepEqual(result.tasks[0].tags, ['work', 'urgent'], "escaped comma stays inside a value that fails the tag contract and is safely omitted");
+  assert.deepEqual(result.tasks[0].tags, ['work', 'finance'], 'the escaped comma and semicolon stay inside one unsupported value');
 });
 
 test('skipped recurring components do not inflate the recurrence or timezone counts', () => {
