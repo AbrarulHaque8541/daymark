@@ -121,6 +121,27 @@
     return { ok: true, reason: null, conflicts: [], addedIds, tasks: merged };
   }
 
+  async function withTaskMutationLock(lockManager, callback, lockName) {
+    if (!lockManager || typeof lockManager.request !== 'function') {
+      return { ok: false, reason: 'coordination-unavailable' };
+    }
+    if (typeof callback !== 'function') {
+      return { ok: false, reason: 'mutation-callback-unavailable' };
+    }
+    const name = typeof lockName === 'string' && lockName ? lockName : TASK_MUTATION_LOCK;
+    try {
+      return await lockManager.request(name, { mode: 'exclusive' }, async () => {
+        try {
+          return { ok: true, value: await callback() };
+        } catch (error) {
+          return { ok: false, reason: 'mutation-failed' };
+        }
+      });
+    } catch (error) {
+      return { ok: false, reason: 'lock-failed' };
+    }
+  }
+
   async function commitTaskSnapshot(options) {
     const opts = options && typeof options === 'object' ? options : {};
     const locks = opts.lockManager;
@@ -223,6 +244,7 @@
     cloneTaskList,
     areTaskListsEqual,
     mergeTaskSnapshots,
+    withTaskMutationLock,
     commitTaskSnapshot
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
