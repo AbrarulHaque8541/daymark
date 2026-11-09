@@ -152,13 +152,17 @@ test('a csv file is intercepted, merged and saved with a status line', async () 
 test('CSV rows with duplicate subtask JSON keys are skipped without changing stored tasks', async () => {
   const cell = (value) => {
     const text = String(value);
-    return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    const cr = String.fromCharCode(13);
+    const lf = String.fromCharCode(10);
+    return text.includes('"') || text.includes(',') || text.includes(cr) || text.includes(lf)
+      ? '"' + text.replace(/"/g, '""') + '"' : text;
   };
   const row = [
     'duplicate-subtask', 'Do not drop ambiguous steps', '', '', 'medium', 'false',
     '', '', '', '[{"id":"s1","title":"Original","title":"Overwritten","done":false}]', NOW, NOW
   ].map(cell).join(',');
-  const csv = importer.CSV_HEADER + '\\r\\n' + row + '\\r\\n';
+  const crlf = String.fromCharCode(13, 10);
+  const csv = importer.CSV_HEADER + crlf + row + crlf;
   const original = JSON.stringify(sampleTasks);
   const { env, elements, storageData, writes, created } = fakeEnv({
     stored: original,
@@ -169,7 +173,7 @@ test('CSV rows with duplicate subtask JSON keys are skipped without changing sto
   assert.equal(storageData[ui.STORAGE_KEY], original, 'existing tasks remain byte-for-byte unchanged');
   assert.equal(writes.length, 0, 'an ambiguous row never triggers a storage write');
   const status = created.find((el) => el.id === 'import-status');
-  assert.match(status.textContent, /1 malformed row skipped\\./);
+  assert.ok(status.textContent.includes('1 malformed row skipped.'));
 });
 
 test('a markdown file imports with generated ids', async () => {
