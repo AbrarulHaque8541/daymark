@@ -248,6 +248,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(parentScroll != null,
                     "Focus mode selector remains inside the parent Tasks ScrollView");
             scrollViewIntoFocus(modeRow);
+            // The initial mode taps must also land inside the ScrollView's real hit rectangle.
+            scrollDescendantIntoScrollView(parentScroll, modeSelector);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "fresh Focus Timer panel starts in Stopwatch mode");
 
