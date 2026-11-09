@@ -438,6 +438,7 @@
   <dialog id="edit-dialog" class="edit-dialog" aria-labelledby="edit-heading">
     <form id="edit-form" method="dialog">
       <h2 id="edit-heading">Edit task</h2>
+      <input id="edit-id" name="id" type="hidden">
       <label class="sr-only" for="edit-title">Title</label>
       <input id="edit-title" name="title" type="text" maxlength="160" required>
       <label class="sr-only" for="edit-due-date">Due date</label>
@@ -467,12 +468,29 @@
         <option value="high">High priority</option>
         <option value="low">Low priority</option>
       </select>
+      <label class="sr-only" for="edit-tags">Tags (comma separated)</label>
+      <input id="edit-tags" name="tags" type="text" maxlength="200" placeholder="tags, separated, by, commas">
+      <label class="sr-only" for="edit-notes">Notes</label>
+      <textarea id="edit-notes" name="notes" maxlength="4000" rows="4" placeholder="Optional notes"></textarea>
       <p id="edit-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
+      <div class="subtask-editor">
+        <div id="subtask-list" class="subtask-list" aria-live="polite"></div>
+        <div class="subtask-add-row">
+          <label class="sr-only" for="new-subtask">Add a step</label>
+          <input id="new-subtask" type="text" maxlength="120" placeholder="Add a step">
+          <button class="button button-quiet" id="add-subtask" type="button">Add step</button>
+        </div>
+      </div>
+      <p class="form-error" id="edit-error" role="alert" hidden>Please enter a task title.</p>
       <menu>
         <button class="button button-quiet" value="cancel" formnovalidate>Cancel</button>
         <button class="button button-primary" value="save">Save</button>
       </menu>
     </form>
   </dialog>
+  <div class="toast-stack" id="toast-stack" role="status" aria-live="polite" aria-atomic="true">
+    <div class="toast" id="toast"></div>
+    <button class="toast-action" id="toast-action" type="button" hidden></button>
+  </div>
 </body>
 </html>
