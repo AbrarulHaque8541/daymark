@@ -5,16 +5,16 @@ const { test } = require('node:test');
 
 const PINNED_NODE24_ACTIONS = {
   'actions/checkout': {
-    sha: '08c6903cd8c0fde910a37f88322edcfb5dd907a8',
-    version: 'v5.0.0'
+    sha: '9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0',
+    version: 'v7.0.0'
   },
   'actions/setup-java': {
-    sha: 'dded0888837ed1f317902acf8a20df0ad188d165',
-    version: 'v5.0.0'
+    sha: 'dd06d9cba3e5552c54d9f8ea23572deb30010f7c',
+    version: 'v6.0.0'
   },
   'android-actions/setup-android': {
-    sha: '651bceb6f9ca583f16b8d75b62c36ded2ae6fc9c',
-    version: 'v4.0.0'
+    sha: 'be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd',
+    version: 'v4.0.4'
   },
   'actions/upload-artifact': {
     sha: 'b7c566a772e6b6bfb58ed0dc250532a479d7789f',
