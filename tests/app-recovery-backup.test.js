@@ -12,6 +12,38 @@ const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FEED_KEY = 'daymark.feed.v1';
 const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
 
+function streamedFeedResponse() {
+  const bytes = new TextEncoder().encode(FEED_XML);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true };
+      const end = Math.min(offset + 16, bytes.length);
+      const value = bytes.slice(offset, end);
+      offset = end;
+      return { done: false, value };
+    },
+    cancel() {
+      offset = bytes.length;
+      return Promise.resolve();
+    },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get(name) {
+        return name.toLowerCase() === 'content-length' ? String(bytes.length) : null;
+      }
+    },
+    body: { getReader: () => reader },
+    text() {
+      throw new Error('Briefing fixture must use the bounded streaming feed reader');
+    }
+  };
+}
+
 function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
   const elements = new Map();
 
@@ -117,7 +149,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     window,
     Blob: supportBlob ? MockBlob : undefined,
     URL: supportBlob ? mockURL : { revokeObjectURL(url) { revokedObjectUrls.push(url); } },
-    fetch: async () => ({ ok: true, status: 200, text: async () => FEED_XML }),
+    fetch: async () => streamedFeedResponse(),
     clearTimeout(id) { timers.delete(id); },
     setTimeout(callback, delay = 0) {
       const id = nextTimerId++;

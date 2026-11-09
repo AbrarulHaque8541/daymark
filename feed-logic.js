@@ -10,6 +10,11 @@
   const MAX_XML_BYTES = MAX_XML_CHARS * 4;
   // Public RSS/Atom documents should be shallow; bound recursion before hostile XML exhausts the JS stack.
   const MAX_XML_DEPTH = 64;
+  // A shallow, element-dense document can amplify a small response into a
+  // large object graph. Bound nodes and attributes independently of byte/depth.
+  const MAX_XML_NODES = 5000;
+  const MAX_XML_ATTRIBUTES = 10000;
+  const MAX_XML_ATTRIBUTES_PER_ELEMENT = 32;
 
   function decodeEntities(text) {
     return String(text).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, entity) => {
@@ -40,6 +45,8 @@
     let i = 0;
     const len = xml.length;
     const fail = (message) => { throw new Error(`Malformed XML: ${message}`); };
+    let nodesCreated = 0;
+    let attributesCreated = 0;
 
     function skipMisc() {
       for (;;) {
@@ -77,12 +84,15 @@
     function parseElement(depth) {
       const level = Number.isInteger(depth) ? depth : 1;
       if (level > MAX_XML_DEPTH) fail('XML nesting limit exceeded');
+      nodesCreated += 1;
+      if (nodesCreated > MAX_XML_NODES) fail('XML node limit exceeded');
       i += 1; // consume '<'
       const nameMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/.exec(xml.slice(i));
       if (!nameMatch) fail('expected an element name');
       const name = nameMatch[0];
       i += name.length;
-      const attributes = {};
+      const attributes = Object.create(null);
+      let elementAttributeCount = 0;
       for (;;) {
         while (i < len && /\s/.test(xml[i])) i += 1;
         if (xml.startsWith('/>', i)) {
@@ -95,6 +105,12 @@
         }
         const attrMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/.exec(xml.slice(i));
         if (!attrMatch) fail('expected an attribute name');
+        if (elementAttributeCount >= MAX_XML_ATTRIBUTES_PER_ELEMENT
+          || attributesCreated >= MAX_XML_ATTRIBUTES) {
+          fail('XML attribute limit exceeded');
+        }
+        elementAttributeCount += 1;
+        attributesCreated += 1;
         const attrName = attrMatch[0];
         i += attrName.length;
         while (i < len && /\s/.test(xml[i])) i += 1;
@@ -220,19 +236,31 @@
 
     const body = response && response.body;
     if (!body || typeof body.getReader !== 'function' || typeof root.TextDecoder !== 'function') {
-      // Compatibility fallback for older/test Response implementations. Prefer
-      // streaming whenever the browser exposes a readable response body.
-      const xml = await response.text();
-      if (xml.length > MAX_XML_CHARS) throw new Error('The feed response was too large to parse safely.');
-      return xml;
+      if (controller) controller.abort();
+      // A post-read text() length check cannot bound peak allocation. RSS/Atom
+      // network responses must be streamed so the byte cap is enforced before
+      // the complete document is materialized.
+      throw new Error('A streaming response reader is required to enforce the feed size limit safely.');
     }
 
-    const reader = body.getReader();
-    setActiveReader(reader);
-    const decoder = new root.TextDecoder('utf-8');
-    let xml = '';
-    let bytesRead = 0;
+    let reader = null;
+    let readerCancelled = false;
+    const cancelReader = async () => {
+      if (readerCancelled || !reader) return;
+      readerCancelled = true;
+      if (typeof reader.cancel !== 'function') return;
+      try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+    };
     try {
+      // Reader acquisition and decoder construction can both throw (for
+      // example, a locked stream or a constrained WebView). Keep them inside
+      // the protected region so the request is aborted and any acquired lock
+      // is cancelled/released on every failure path.
+      reader = body.getReader();
+      setActiveReader(reader);
+      const decoder = new root.TextDecoder('utf-8', { fatal: true });
+      let xml = '';
+      let bytesRead = 0;
       for (;;) {
         const part = await reader.read();
         if (part.done) break;
@@ -241,13 +269,13 @@
         bytesRead += chunkBytes;
         if (bytesRead > MAX_XML_BYTES) {
           if (controller) controller.abort();
-          try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+          await cancelReader();
           throw new Error('The feed response was too large to parse safely.');
         }
         xml += decoder.decode(chunk, { stream: true });
         if (xml.length > MAX_XML_CHARS) {
           if (controller) controller.abort();
-          try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+          await cancelReader();
           throw new Error('The feed response was too large to parse safely.');
         }
       }
@@ -255,9 +283,15 @@
       if (xml.length > MAX_XML_CHARS) throw new Error('The feed response was too large to parse safely.');
       if (isTimedOut()) throw new Error('Feed request timed out.');
       return xml;
+    } catch (error) {
+      if (controller) controller.abort();
+      await cancelReader();
+      throw error;
     } finally {
       setActiveReader(null);
-      try { reader.releaseLock(); } catch (error) { /* minimal test readers may omit releaseLock */ }
+      if (reader) {
+        try { reader.releaseLock(); } catch (error) { /* minimal test readers may omit releaseLock */ }
+      }
     }
   }
 
@@ -287,9 +321,20 @@
       const response = await fetchImpl(url, {
         signal: controller ? controller.signal : undefined,
         cache: 'no-store',
-        redirect: 'follow'
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        redirect: 'error'
       });
-      if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
+      if (!response || !response.ok) {
+        const body = response && response.body;
+        if (body && typeof body.cancel === 'function') {
+          try {
+            const cancellation = body.cancel();
+            if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+          } catch (error) { /* releasing an unread error body is best-effort */ }
+        }
+        throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
+      }
       const xml = await readResponseText(
         response,
         controller,
@@ -417,7 +462,10 @@
     MAX_SUMMARY_CHARS,
     MAX_XML_CHARS,
     MAX_XML_BYTES,
-    MAX_XML_DEPTH
+    MAX_XML_DEPTH,
+    MAX_XML_NODES,
+    MAX_XML_ATTRIBUTES,
+    MAX_XML_ATTRIBUTES_PER_ELEMENT
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkFeed = api;
