@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const currencyApi = require('../currency-logic.js');
 const ui = require('../currency-ui.js');
 
@@ -63,10 +65,11 @@ function fakeEnv(options) {
   elements['currency-form'].navigationCount = 0;
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
-  const storage = {
+  const defaultStorage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); }
   };
+  const storage = opts.storage || defaultStorage;
   const env = {
     document: {
       readyState: 'complete',
@@ -78,7 +81,30 @@ function fakeEnv(options) {
     fetch: opts.fetch,
     now: () => '2026-11-03T12:00:00.000Z'
   };
+  if (opts.omitLocalStorage) delete env.localStorage;
   return { env, elements, storageData };
+}
+
+function streamResponse(body) {
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; }, cancel() { return reader.cancel(); } },
+    text() { throw new Error('bounded response reader must not call response.text()'); }
+  };
 }
 
 function okFetch(routes) {
@@ -88,9 +114,7 @@ function okFetch(routes) {
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
-    if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
-    }
+    if (typeof body === 'string') return Promise.resolve(streamResponse(body));
     return Promise.resolve(body);
   };
   impl.seen = seen;
@@ -181,7 +205,8 @@ test('a corrupt cache is ignored instead of crashing', () => {
   const { env, elements } = fakeEnv({ stored: '{not json' });
   ui.attachCurrencyUi(env);
   assert.equal(elements['currency-now'].textContent, '');
-  assert.equal(elements['currency-status'].textContent, 'Pick two currencies and tap Refresh.');
+  assert.equal(elements['currency-status'].textContent,
+    'Pick two currencies and tap Refresh. · saved currency data is unreadable and was preserved');
 });
 
 test('refresh fetches, renders, and persists the result', async () => {
@@ -342,4 +367,114 @@ test('copy button copies the main conversion line and updates status', async () 
   assert.equal(copied, '1 USD = 94.91 INR');
   assert.ok(elements['currency-status'].textContent.includes('Copied'));
   assert.equal(click.prevented, true);
+});
+
+
+test('auto-boot does not eagerly read a blocked localStorage getter', () => {
+  const source = fs.readFileSync(require.resolve('../currency-ui.js'), 'utf8');
+  const elements = {
+    'currency-amount': fakeElement('input'),
+    'currency-from': fakeElement('select'),
+    'currency-to': fakeElement('select'),
+    'currency-refresh': fakeElement('button'),
+    'currency-swap': fakeElement('button'),
+    'currency-form': fakeElement('form'),
+    'currency-status': fakeElement('p'),
+    'currency-now': fakeElement('div'),
+    'currency-copy': fakeElement('button')
+  };
+  const doc = { readyState: 'complete', getElementById(id) { return elements[id] || null; } };
+  const win = {};
+  Object.defineProperty(win, 'localStorage', { get() { throw new Error('storage is blocked'); } });
+  const context = { window: win, document: doc };
+  context.globalThis = context;
+  assert.doesNotThrow(() => vm.runInNewContext(source, context));
+  assert.match(elements['currency-status'].textContent, /browser storage is unavailable/);
+});
+
+test('storage read failure preserves unknown cache and preferences while refresh still renders', async () => {
+  let writes = 0;
+  const storage = {
+    getItem() { throw new Error('storage read denied'); },
+    setItem() { writes += 1; }
+  };
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl, storage });
+  const handle = ui.attachCurrencyUi(env);
+  await handle.onRefresh();
+  assert.equal(fetchImpl.seen.length, 1);
+  assert.match(elements['currency-now'].textContent, /^10 USD = 949.1 INR/);
+  assert.match(elements['currency-status'].textContent, /^Updated · .*browser storage could not be read/);
+  assert.equal(writes, 0, 'unknown cache and preference values must not be overwritten');
+});
+
+test('a corrupt currency cache is preserved after a successful refresh', async () => {
+  const corrupt = '{broken currency cache';
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements, storageData } = fakeEnv({ amount: '10', stored: corrupt, fetch: fetchImpl });
+  const handle = ui.attachCurrencyUi(env);
+  await handle.onRefresh();
+  assert.equal(storageData[ui.STORAGE_KEY], corrupt);
+  assert.match(elements['currency-now'].textContent, /^10 USD = 949.1 INR/);
+  assert.match(elements['currency-status'].textContent, /saved currency data is unreadable and was preserved/);
+});
+
+test('storage quota failure does not misreport a successful rate refresh', async () => {
+  const storage = {
+    getItem() { return null; },
+    setItem() { throw new Error('quota exceeded'); }
+  };
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl, storage });
+  const handle = ui.attachCurrencyUi(env);
+  await handle.onRefresh();
+  assert.match(elements['currency-now'].textContent, /^10 USD = 949.1 INR/);
+  assert.match(elements['currency-status'].textContent, /^Updated · .*changes could not be saved/);
+  assert.equal(elements['currency-refresh'].disabled, false);
+});
+
+test('preference write failure is contained and does not break currency swapping', () => {
+  const storage = {
+    getItem() { return null; },
+    setItem() { throw new Error('quota exceeded'); }
+  };
+  const { env, elements } = fakeEnv({ storage });
+  ui.attachCurrencyUi(env);
+  const amountInput = elements['currency-amount'];
+  amountInput.value = '42';
+  const input = amountInput.listeners.find((listener) => listener.type === 'input');
+  assert.ok(input);
+  assert.doesNotThrow(() => input.handler());
+  assert.match(elements['currency-status'].textContent, /Currency preferences could not be saved/);
+  const swap = elements['currency-swap'];
+  const click = { preventDefault() {} };
+  assert.doesNotThrow(() => swap.listeners.find((listener) => listener.type === 'click').handler(click));
+  assert.equal(elements['currency-from'].value, 'INR');
+  assert.equal(elements['currency-to'].value, 'USD');
+  assert.match(elements['currency-status'].textContent, /changes could not be saved/);
+});
+
+test('refresh does not overwrite a cache changed in another tab', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements, storageData } = fakeEnv({ amount: '10', stored: STORED, fetch: fetchImpl });
+  const handle = ui.attachCurrencyUi(env);
+  const otherTabValue = JSON.stringify({ otherTab: true });
+  storageData[ui.STORAGE_KEY] = otherTabValue;
+  await handle.onRefresh();
+  assert.equal(storageData[ui.STORAGE_KEY], otherTabValue);
+  assert.match(elements['currency-now'].textContent, /^10 USD = 949.1 INR/);
+  assert.match(elements['currency-status'].textContent, /changed elsewhere and was preserved/);
+});
+
+test('corrupt saved preferences are preserved when the user changes the amount', () => {
+  const corrupt = '{broken currency preferences';
+  const { env, elements, storageData } = fakeEnv({});
+  storageData[ui.PREFS_KEY] = corrupt;
+  ui.attachCurrencyUi(env);
+  elements['currency-amount'].value = '25';
+  const input = elements['currency-amount'].listeners.find((listener) => listener.type === 'input');
+  assert.ok(input);
+  input.handler();
+  assert.equal(storageData[ui.PREFS_KEY], corrupt);
+  assert.match(elements['currency-status'].textContent, /saved currency preferences are unreadable and were preserved/);
 });

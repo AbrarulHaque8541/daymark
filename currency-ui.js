@@ -23,7 +23,21 @@
     if (!env || !env.document) throw new Error('attachCurrencyUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    const storageRequested = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+      || !!env.window || typeof window !== 'undefined';
+    let storage = null;
+    let storageAccessFailed = false;
+    let storageReadFailed = false;
+    let storageWriteFailed = false;
+    let storageConflict = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+      if (storageRequested && !storage) storageAccessFailed = true;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const currencyApi = env.currencyApi || root.DaymarkCurrency || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
@@ -42,6 +56,8 @@
 
     let busy = false;
     let cached = null;
+    let cacheRecord = null;
+    let prefsRecord = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -101,42 +117,112 @@
       updateCopyVisibility();
     }
 
-    function readCache() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+    function readRecord(key, validate) {
+      if (!storageRequested) return { key, state: 'unavailable', raw: null, value: null };
+      if (!storage || storageAccessFailed || typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        return { key, state: 'unreadable', raw: null, value: null };
+      }
+      let raw;
       try {
-        const parsed = JSON.parse(raw);
-        if (currencyApi && typeof currencyApi.validateCurrencyCache === 'function'
-          && currencyApi.validateCurrencyCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
-      return null;
+        raw = storage.getItem(key);
+      } catch (error) {
+        storageReadFailed = true;
+        return { key, state: 'unreadable', raw: null, value: null };
+      }
+      if (raw === null) return { key, state: 'absent', raw: null, value: null };
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (error) {
+        return { key, state: 'corrupt', raw, value: null };
+      }
+      if (!validate(parsed)) return { key, state: 'corrupt', raw, value: null };
+      return { key, state: 'valid', raw, value: parsed };
+    }
+
+    function storageNotice() {
+      if (!storageRequested) return '';
+      if (storageAccessFailed) return ' · browser storage is unavailable';
+      if (storageReadFailed) return ' · browser storage could not be read; existing currency data was preserved';
+      if (storageConflict) return ' · saved currency data changed elsewhere and was preserved';
+      const problems = [];
+      if (cacheRecord && cacheRecord.state === 'corrupt') {
+        problems.push('saved currency data is unreadable and was preserved');
+      }
+      if (prefsRecord && prefsRecord.state === 'corrupt') {
+        problems.push('saved currency preferences are unreadable and were preserved');
+      }
+      if (storageWriteFailed) problems.push('changes could not be saved in this browser');
+      return problems.length ? ' · ' + problems.join('; ') : '';
+    }
+
+    function persistRecord(record, value) {
+      if (!storageRequested) return true;
+      if (!record || (record.state !== 'absent' && record.state !== 'valid')) return false;
+      if (!storage || storageAccessFailed) {
+        storageAccessFailed = true;
+        return false;
+      }
+      if (typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        record.state = 'unreadable';
+        return false;
+      }
+      let current;
+      try {
+        current = storage.getItem(record.key);
+      } catch (error) {
+        storageReadFailed = true;
+        record.state = 'unreadable';
+        return false;
+      }
+      if (current !== record.raw) {
+        storageConflict = true;
+        record.state = 'conflict';
+        return false;
+      }
+      if (typeof storage.setItem !== 'function') {
+        storageWriteFailed = true;
+        return false;
+      }
+      const raw = JSON.stringify(value);
+      try {
+        storage.setItem(record.key, raw);
+        record.state = 'valid';
+        record.raw = raw;
+        record.value = value;
+        return true;
+      } catch (error) {
+        storageWriteFailed = true;
+        return false;
+      }
+    }
+
+    function readCache() {
+      cacheRecord = readRecord(STORAGE_KEY, (parsed) => !!(
+        currencyApi && typeof currencyApi.validateCurrencyCache === 'function'
+        && currencyApi.validateCurrencyCache(parsed)
+      ));
+      return cacheRecord.value;
     }
 
     function persistCache(cache) {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      return persistRecord(cacheRecord, cache);
     }
 
     function readPrefs() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(PREFS_KEY);
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.amount === 'string' && typeof parsed.from === 'string' && typeof parsed.to === 'string') {
-          return parsed;
-        }
-      } catch (error) { /* ignore corrupt prefs */ }
-      return null;
+      prefsRecord = readRecord(PREFS_KEY, (parsed) => !!(
+        parsed && typeof parsed.amount === 'string'
+        && typeof parsed.from === 'string' && typeof parsed.to === 'string'
+      ));
+      return prefsRecord.value;
     }
 
     function persistPrefs() {
-      if (!storage || typeof storage.setItem !== 'function') return;
       const { amountText, from, to } = readInputs();
-      if (!from || !to) return;
-      const prefs = { amount: amountText, from, to };
-      storage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      if (!from || !to) return true;
+      return persistRecord(prefsRecord, { amount: amountText, from, to });
     }
 
     function restorePrefs() {
@@ -178,7 +264,7 @@
         persistCache(cached);
         persistPrefs();
         render(cached, amount);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached && cached.from === from && cached.to === to) {
@@ -204,6 +290,7 @@
       status('Pick two currencies and tap Refresh.');
       updateCopyVisibility();
     }
+    if (storageNotice()) status((statusEl && statusEl.textContent || 'Currency conversion is ready.') + storageNotice());
 
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
@@ -222,8 +309,11 @@
     [amountEl, fromEl, toEl].forEach((el) => {
       if (el && typeof el.addEventListener === 'function') {
         el.addEventListener('keydown', enterRefresh);
-        el.addEventListener('change', persistPrefs);
-        el.addEventListener('input', persistPrefs);
+        const savePrefs = () => {
+          if (!persistPrefs()) status('Currency preferences could not be saved.' + storageNotice());
+        };
+        el.addEventListener('change', savePrefs);
+        el.addEventListener('input', savePrefs);
       }
     });
 
@@ -251,7 +341,7 @@
         const tmp = fromEl.value;
         fromEl.value = toEl.value;
         toEl.value = tmp;
-        persistPrefs();
+        const prefsSaved = persistPrefs();
         if (cached && currencyApi) {
           const amount = currencyApi.normalizeAmount(
             amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
@@ -286,6 +376,7 @@
         } else {
           status('Currencies swapped. Tap Refresh for the rate.');
         }
+        if (!prefsSaved) status((statusEl && statusEl.textContent || 'Currencies swapped.') + storageNotice());
       });
     }
 
@@ -342,7 +433,7 @@
   root.DaymarkCurrencyUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachCurrencyUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachCurrencyUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

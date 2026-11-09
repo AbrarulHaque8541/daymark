@@ -19,7 +19,21 @@
     if (!env || !env.document) throw new Error('attachWeatherUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    const storageRequested = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+      || !!env.window || typeof window !== 'undefined';
+    let storage = null;
+    let storageAccessFailed = false;
+    let storageReadFailed = false;
+    let storageWriteFailed = false;
+    let storageConflict = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+      if (storageRequested && !storage) storageAccessFailed = true;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const weatherApi = env.weatherApi || root.DaymarkWeather || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
@@ -35,6 +49,8 @@
 
     let busy = false;
     let cached = null;
+    let cacheRecord = null;
+    let prefsRecord = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -65,37 +81,110 @@
         + ` · Humidity ${Math.round(weather.humidityPercent)}%`;
     }
 
-    function readCache() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+    function readRecord(key, validate) {
+      if (!storageRequested) return { key, state: 'unavailable', raw: null, value: null };
+      if (!storage || storageAccessFailed || typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        return { key, state: 'unreadable', raw: null, value: null };
+      }
+      let raw;
       try {
-        const parsed = JSON.parse(raw);
-        if (weatherApi && typeof weatherApi.validateWeatherCache === 'function'
-          && weatherApi.validateWeatherCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
-      return null;
+        raw = storage.getItem(key);
+      } catch (error) {
+        storageReadFailed = true;
+        return { key, state: 'unreadable', raw: null, value: null };
+      }
+      if (raw === null) return { key, state: 'absent', raw: null, value: null };
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (error) {
+        return { key, state: 'corrupt', raw, value: null };
+      }
+      if (!validate(parsed)) return { key, state: 'corrupt', raw, value: null };
+      return { key, state: 'valid', raw, value: parsed };
+    }
+
+    function storageNotice() {
+      if (!storageRequested) return '';
+      if (storageAccessFailed) return ' · browser storage is unavailable';
+      if (storageReadFailed) return ' · saved weather data could not be read';
+      if (storageConflict) return ' · saved data changed elsewhere and was preserved';
+      const problems = [];
+      if (cacheRecord && cacheRecord.state === 'corrupt') {
+        problems.push('saved weather data is unreadable and was preserved');
+      }
+      if (prefsRecord && prefsRecord.state === 'corrupt') {
+        problems.push('saved place preferences are unreadable and were preserved');
+      }
+      if (storageWriteFailed) problems.push('changes could not be saved in this browser');
+      return problems.length ? ' · ' + problems.join('; ') : '';
+    }
+
+    function persistRecord(record, value) {
+      if (!storageRequested) return true;
+      if (!record || record.state !== 'absent' && record.state !== 'valid') return false;
+      if (!storage || storageAccessFailed) {
+        storageAccessFailed = true;
+        return false;
+      }
+      if (typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        record.state = 'unreadable';
+        return false;
+      }
+      let current;
+      try {
+        current = storage.getItem(record.key);
+      } catch (error) {
+        storageReadFailed = true;
+        record.state = 'unreadable';
+        return false;
+      }
+      if (current !== record.raw) {
+        storageConflict = true;
+        record.state = 'conflict';
+        return false;
+      }
+      if (typeof storage.setItem !== 'function') {
+        storageWriteFailed = true;
+        return false;
+      }
+      const raw = JSON.stringify(value);
+      try {
+        storage.setItem(record.key, raw);
+        record.state = 'valid';
+        record.raw = raw;
+        record.value = value;
+        return true;
+      } catch (error) {
+        storageWriteFailed = true;
+        return false;
+      }
+    }
+
+    function readCache() {
+      cacheRecord = readRecord(STORAGE_KEY, (parsed) => !!(
+        weatherApi && typeof weatherApi.validateWeatherCache === 'function'
+        && weatherApi.validateWeatherCache(parsed)
+      ));
+      return cacheRecord.value;
     }
 
     function persistCache(cache) {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+      return persistRecord(cacheRecord, cache);
     }
 
     function readPrefs() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(PREFS_KEY);
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.place === 'string' && parsed.place.trim()) return parsed;
-      } catch (error) { /* ignore corrupt prefs */ }
-      return null;
+      prefsRecord = readRecord(PREFS_KEY, (parsed) => !!(
+        parsed && typeof parsed.place === 'string' && parsed.place.trim()
+      ));
+      return prefsRecord.value;
     }
 
     function persistPrefs(place) {
-      if (!storage || typeof storage.setItem !== 'function' || !place || !place.trim()) return;
-      storage.setItem(PREFS_KEY, JSON.stringify({ place: place.trim() }));
+      if (!place || !place.trim()) return true;
+      return persistRecord(prefsRecord, { place: place.trim() });
     }
 
     async function onRefresh() {
@@ -122,7 +211,7 @@
         persistCache(cached);
         persistPrefs(query);
         render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC`);
+        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
@@ -136,15 +225,75 @@
       }
     }
 
-    function onClear() {
-      // Explicit, scoped removal: only this card's cache and place preference.
-      if (storage && typeof storage.removeItem === 'function') {
-        storage.removeItem(STORAGE_KEY);
-        storage.removeItem(PREFS_KEY);
-      }
+    function clearView() {
       cached = null;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (nowEl) nowEl.textContent = '';
+    }
+
+    function onClear() {
+      // Clearing is explicit, but never report success unless both owned keys
+      // were verified and removed. A partial failure attempts to restore both.
+      if (!storageRequested) {
+        clearView();
+        status('Weather cleared from this view; browser storage is unavailable.');
+        return;
+      }
+      if (!storage || storageAccessFailed || !cacheRecord || !prefsRecord
+        || cacheRecord.state === 'unreadable' || prefsRecord.state === 'unreadable') {
+        status('Could not verify saved weather; nothing was cleared.' + storageNotice());
+        return;
+      }
+      if (typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        status('Could not verify saved weather; nothing was cleared.' + storageNotice());
+        return;
+      }
+      const records = [cacheRecord, prefsRecord];
+      const current = [];
+      try {
+        for (const record of records) current.push(storage.getItem(record.key));
+      } catch (error) {
+        storageReadFailed = true;
+        status('Could not verify saved weather; nothing was cleared.' + storageNotice());
+        return;
+      }
+      if (records.some((record, index) => current[index] !== record.raw)) {
+        storageConflict = true;
+        status('Could not clear saved weather because it changed elsewhere; current data was kept.' + storageNotice());
+        return;
+      }
+      try {
+        for (const record of records) {
+          if (record.raw !== null) {
+            if (typeof storage.removeItem !== 'function') throw new Error('removeItem is unavailable');
+            storage.removeItem(record.key);
+          }
+        }
+      } catch (error) {
+        storageWriteFailed = true;
+        let rollbackFailed = false;
+        for (const record of records) {
+          try {
+            if (record.raw === null) {
+              if (typeof storage.removeItem === 'function') storage.removeItem(record.key);
+            } else {
+              if (typeof storage.setItem !== 'function') throw new Error('setItem is unavailable');
+              storage.setItem(record.key, record.raw);
+            }
+          } catch (rollbackError) {
+            rollbackFailed = true;
+          }
+        }
+        status((rollbackFailed
+          ? 'Could not clear saved weather; storage may be partially changed.'
+          : 'Could not clear saved weather; previous saved data was restored where possible.')
+          + storageNotice());
+        return;
+      }
+      cacheRecord = { key: STORAGE_KEY, state: 'absent', raw: null, value: null };
+      prefsRecord = { key: PREFS_KEY, state: 'absent', raw: null, value: null };
+      clearView();
       status('Weather cleared on this device. Type a place name and tap Refresh.');
     }
 
@@ -161,6 +310,7 @@
     } else {
       status('Type a place name and tap Refresh.');
     }
+    if (storageNotice()) status((statusEl && statusEl.textContent || 'Weather is ready.') + storageNotice());
 
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
@@ -186,7 +336,9 @@
         }
       });
       inputEl.addEventListener('input', () => {
-        if (typeof inputEl.value === 'string') persistPrefs(inputEl.value);
+        if (typeof inputEl.value === 'string' && !persistPrefs(inputEl.value)) {
+          status('Place preference was not saved.' + storageNotice());
+        }
       });
     }
 
@@ -207,7 +359,7 @@
   root.DaymarkWeatherUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachWeatherUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachWeatherUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

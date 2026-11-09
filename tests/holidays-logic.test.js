@@ -13,7 +13,25 @@ const HOLIDAYS_BODY = JSON.stringify([
 ]);
 
 function jsonResponse(body) {
-  return { ok: true, status: 200, text: () => Promise.resolve(body) };
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; }, cancel() { return reader.cancel(); } },
+    text() { throw new Error('bounded response reader must not call response.text()'); }
+  };
 }
 
 function routeFetch(routes) {
@@ -140,16 +158,30 @@ test('fetchHolidays reports friendly errors', async () => {
   );
 });
 
-test('oversized responses are rejected before parsing', async () => {
-  const huge = 'x'.repeat(holidays.MAX_JSON_CHARS + 1);
+test('oversized responses are rejected by Content-Length before acquiring the stream', async () => {
+  let readerOpened = false;
+  let bodyCancelled = false;
+  let textCalled = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get(name) { return name.toLowerCase() === 'content-length' ? String(holidays.MAX_JSON_BYTES + 1) : null; } },
+    body: {
+      getReader() { readerOpened = true; throw new Error('oversized body must be rejected before reader acquisition'); },
+      cancel() { bodyCancelled = true; return Promise.resolve(); }
+    },
+    text() { textCalled = true; throw new Error('unbounded text fallback must not be called'); }
+  };
   await assertStrict.rejects(
     holidays.fetchHolidays('IN', routeFetch([
-      { prefix: holidays.ENDPOINT, body: () => ({ ok: true, status: 200, text: () => Promise.resolve(huge) }) }
-    ]), { now: () => '2026-11-06T12:00:00.000Z' }),
+      { prefix: holidays.ENDPOINT, body: () => response }
+    ])),
     /too large/
   );
+  assertStrict.equal(readerOpened, false);
+  assertStrict.equal(bodyCancelled, true);
+  assertStrict.equal(textCalled, false);
 });
-
 test('a hanging request times out', async () => {
   const hanging = () => new Promise(() => {});
   await assertStrict.rejects(

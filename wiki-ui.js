@@ -19,7 +19,18 @@
     if (!env || !env.document) throw new Error('attachWikiUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    // Storage is optional for this card. Do not let a privacy-restricted
+    // window.localStorage getter prevent the search UI from attaching.
+    let storage = null;
+    try {
+      if (Object.prototype.hasOwnProperty.call(env, 'localStorage')) {
+        storage = env.localStorage || null;
+      } else {
+        storage = win ? (win.localStorage || null) : null;
+      }
+    } catch (error) {
+      storage = null;
+    }
     const wikiApi = env.wikiApi || root.DaymarkWiki || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
@@ -34,6 +45,8 @@
 
     let busy = false;
     let cached = null;
+    let cacheRecord = null;
+    let prefsRecord = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -92,49 +105,151 @@
       });
     }
 
-    function readCache() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+    function readStoredRecord(key, validate) {
+      if (!storage || typeof storage.getItem !== 'function') return { state: 'unavailable', raw: null, value: null };
+      let raw;
+      try { raw = storage.getItem(key); }
+      catch (error) { return { state: 'unreadable', raw: null, value: null }; }
+      if (raw === null) return { state: 'absent', raw: null, value: null };
+      if (typeof raw !== 'string' || raw.length === 0) return { state: 'corrupt', raw, value: null };
       try {
         const parsed = JSON.parse(raw);
-        if (wikiApi && typeof wikiApi.validateWikiCache === 'function'
-          && wikiApi.validateWikiCache(parsed)) return parsed;
-      } catch (error) { /* a corrupt cache is treated as no cache */ }
-      return null;
+        if (validate(parsed)) return { state: 'valid', raw, value: parsed };
+      } catch (error) {
+        // Preserve corrupt raw values instead of silently treating them as absent.
+      }
+      return { state: 'corrupt', raw, value: null };
     }
 
-    function persistCache(cache) {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      storage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    function readCache() {
+      cacheRecord = readStoredRecord(STORAGE_KEY, (value) => !!(
+        wikiApi && typeof wikiApi.validateWikiCache === 'function'
+        && wikiApi.validateWikiCache(value)
+      ));
+      return cacheRecord.value;
     }
 
     function readPrefs() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(PREFS_KEY);
-      if (!raw) return null;
+      prefsRecord = readStoredRecord(PREFS_KEY, (value) => !!(
+        value && typeof value.query === 'string' && value.query.trim()
+      ));
+      return prefsRecord.value;
+    }
+
+    function persistRecord(key, value, record) {
+      if (!storage || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') {
+        return { ok: false, reason: 'unavailable' };
+      }
+      if (!record || (record.state !== 'absent' && record.state !== 'valid')) {
+        return { ok: false, reason: record ? record.state : 'unknown' };
+      }
+      let current;
+      try { current = storage.getItem(key); }
+      catch (error) { return { ok: false, reason: 'unreadable' }; }
+      if (current !== record.raw) return { ok: false, reason: 'changed' };
+      let raw;
       try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.query === 'string' && parsed.query.trim()) return parsed;
-      } catch (error) { /* ignore corrupt prefs */ }
-      return null;
+        raw = JSON.stringify(value);
+        storage.setItem(key, raw);
+      } catch (error) {
+        return { ok: false, reason: 'write' };
+      }
+      return { ok: true, record: { state: 'valid', raw, value } };
+    }
+
+    function persistCache(cache) {
+      const result = persistRecord(STORAGE_KEY, cache, cacheRecord);
+      if (result.ok) cacheRecord = result.record;
+      return result;
     }
 
     function persistPrefs(query) {
-      if (!storage || typeof storage.setItem !== 'function' || !query || !query.trim()) return;
-      storage.setItem(PREFS_KEY, JSON.stringify({ query: query.trim() }));
+      if (!query || !query.trim()) return { ok: true, skipped: true };
+      const result = persistRecord(PREFS_KEY, { query: query.trim() }, prefsRecord);
+      if (result.ok) prefsRecord = result.record;
+      return result;
+    }
+
+    function persistenceMessage(label, result) {
+      if (!result || result.ok) return '';
+      if (result.reason === 'unavailable') return label + ' could not be saved because local storage is unavailable';
+      if (result.reason === 'unreadable') return label + ' could not be verified and was left untouched';
+      if (result.reason === 'corrupt') return label + ' is invalid and was left untouched';
+      if (result.reason === 'changed') return label + ' changed elsewhere and was not overwritten';
+      return label + ' could not be saved';
+    }
+
+    function readWarning(record, label) {
+      if (!record) return '';
+      if (record.state === 'unavailable') return 'Local storage is unavailable; saved ' + label + ' cannot be restored or changed.';
+      if (record.state === 'unreadable') return 'Saved ' + label + ' could not be read and was left untouched.';
+      if (record.state === 'corrupt') return 'Saved ' + label + ' is invalid and was left untouched.';
+      return '';
+    }
+
+    function restoreRecord(key, record) {
+      if (record.raw === null) storage.removeItem(key);
+      else {
+        if (typeof storage.setItem !== 'function') throw new Error('Storage cannot restore the previous value.');
+        storage.setItem(key, record.raw);
+      }
     }
 
     function clearStorage() {
-      if (!storage) return;
-      if (typeof storage.removeItem === 'function') {
+      if (!storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+        return { ok: false, reason: 'unavailable' };
+      }
+      if (!cacheRecord || !prefsRecord
+        || cacheRecord.state === 'unavailable' || cacheRecord.state === 'unreadable'
+        || prefsRecord.state === 'unavailable' || prefsRecord.state === 'unreadable') {
+        return { ok: false, reason: 'unknown' };
+      }
+      if ((cacheRecord.raw !== null || prefsRecord.raw !== null)
+        && typeof storage.setItem !== 'function') {
+        return { ok: false, reason: 'unavailable' };
+      }
+      const before = [
+        { key: STORAGE_KEY, record: cacheRecord },
+        { key: PREFS_KEY, record: prefsRecord }
+      ];
+      try {
+        for (const entry of before) {
+          if (storage.getItem(entry.key) !== entry.record.raw) return { ok: false, reason: 'changed' };
+        }
+      } catch (error) {
+        return { ok: false, reason: 'unknown' };
+      }
+      try {
         storage.removeItem(STORAGE_KEY);
         storage.removeItem(PREFS_KEY);
+      } catch (error) {
+        let restored = true;
+        for (const entry of before) {
+          try { restoreRecord(entry.key, entry.record); }
+          catch (restoreError) { restored = false; }
+        }
+        return { ok: false, reason: restored ? 'remove' : 'partial' };
       }
+      cacheRecord = { state: 'absent', raw: null, value: null };
+      prefsRecord = { state: 'absent', raw: null, value: null };
+      return { ok: true };
     }
 
     function onClear() {
       if (busy) return;
+      const cleared = clearStorage();
+      if (!cleared.ok) {
+        if (cleared.reason === 'unknown') {
+          status('Could not clear: saved Wikipedia data could not be read or verified; it was left untouched.');
+        } else if (cleared.reason === 'changed') {
+          status('Could not clear: saved Wikipedia data changed elsewhere; current results were kept.');
+        } else if (cleared.reason === 'partial') {
+          status('Could not fully clear saved data; current results were kept on this page.');
+        } else {
+          status('Could not clear saved Wikipedia data; current results were kept.');
+        }
+        return false;
+      }
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (listEl) {
         if (typeof listEl.removeChild === 'function') {
@@ -143,9 +258,9 @@
           listEl.textContent = '';
         }
       }
-      clearStorage();
       cached = null;
       status('Cleared. Type a topic and tap Search.');
+      return true;
     }
 
     async function onSearch() {
@@ -169,10 +284,15 @@
       try {
         const result = await wikiApi.searchWikipedia(query, fetchImpl, { now });
         cached = result;
-        persistCache(cached);
-        persistPrefs(query);
         render(cached);
-        status('Updated · ' + cached.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC');
+        const cacheSave = persistCache(cached);
+        const prefsSave = persistPrefs(query);
+        const warnings = [
+          persistenceMessage('Saved Wikipedia cache', cacheSave),
+          persistenceMessage('Search preference', prefsSave)
+        ].filter(Boolean);
+        status('Updated · ' + cached.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC'
+          + (warnings.length ? ' · ' + warnings.join('; ') : ''));
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
@@ -191,13 +311,19 @@
     if (prefs && inputEl && typeof inputEl.value === 'string') {
       inputEl.value = prefs.query;
     }
+    const initialWarnings = [
+      readWarning(cacheRecord, 'Wikipedia cache'),
+      readWarning(prefsRecord, 'search preference')
+    ].filter(Boolean);
+    const initialWarning = initialWarnings.length ? initialWarnings.join(' ') + ' ' : '';
     if (cached) {
       render(cached);
-      status('Cached · updated ' + cached.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC');
+      status('Cached · updated ' + cached.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC'
+        + (initialWarnings.length ? ' · ' + initialWarnings.join(' ') : ''));
     } else if (prefs) {
-      status('Last search restored. Tap Search to look it up again.');
+      status(initialWarning + 'Last search restored. Tap Search to look it up again.');
     } else {
-      status('Type a topic and tap Search.');
+      status(initialWarning + 'Type a topic and tap Search.');
     }
 
     if (buttonEl && typeof buttonEl.addEventListener === 'function') {
@@ -219,7 +345,9 @@
         return undefined;
       });
       inputEl.addEventListener('input', () => {
-        if (typeof inputEl.value === 'string') persistPrefs(inputEl.value);
+        if (typeof inputEl.value !== 'string' || !inputEl.value.trim()) return;
+        const saved = persistPrefs(inputEl.value);
+        if (!saved.ok) status(persistenceMessage('Search preference', saved) + '.');
       });
     }
 
@@ -240,7 +368,7 @@
   root.DaymarkWikiUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachWikiUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachWikiUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

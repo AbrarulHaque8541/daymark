@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const weatherApi = require('../weather-logic.js');
 const ui = require('../weather-ui.js');
 
@@ -45,11 +47,12 @@ function fakeEnv(options) {
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
-  const storage = {
+  const defaultStorage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
+  const storage = opts.storage || defaultStorage;
   const env = {
     document: {
       readyState: 'complete',
@@ -61,7 +64,30 @@ function fakeEnv(options) {
     fetch: opts.fetch,
     now: () => '2026-11-03T12:00:00.000Z'
   };
+  if (opts.omitLocalStorage) delete env.localStorage;
   return { env, elements, storageData };
+}
+
+function streamResponse(body) {
+  const bytes = new TextEncoder().encode(body);
+  let offset = 0;
+  const reader = {
+    async read() {
+      if (offset >= bytes.length) return { done: true, value: undefined };
+      const chunk = bytes.slice(offset, offset + 1024);
+      offset += chunk.length;
+      return { done: false, value: chunk };
+    },
+    cancel() { return Promise.resolve(); },
+    releaseLock() {}
+  };
+  return {
+    ok: true,
+    status: 200,
+    headers: { get() { return null; } },
+    body: { getReader() { return reader; }, cancel() { return reader.cancel(); } },
+    text() { throw new Error('bounded response reader must not call response.text()'); }
+  };
 }
 
 function okFetch(routes) {
@@ -71,9 +97,7 @@ function okFetch(routes) {
     const route = routes.find((r) => url.startsWith(r.prefix));
     if (!route) return Promise.reject(new Error('unexpected url'));
     const body = typeof route.body === 'function' ? route.body(url) : route.body;
-    if (typeof body === 'string') {
-      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(body) });
-    }
+    if (typeof body === 'string') return Promise.resolve(streamResponse(body));
     return Promise.resolve(body);
   };
   impl.seen = seen;
@@ -109,7 +133,8 @@ test('a corrupt cache is ignored instead of crashing', () => {
   const { env, elements } = fakeEnv({ stored: '{not json' });
   ui.attachWeatherUi(env);
   assert.equal(elements['weather-now'].textContent, '');
-  assert.equal(elements['weather-status'].textContent, 'Type a place name and tap Refresh.');
+  assert.equal(elements['weather-status'].textContent,
+    'Type a place name and tap Refresh. · saved weather data is unreadable and was preserved');
 });
 
 test('refresh fetches, renders, and persists the result', async () => {
@@ -280,4 +305,152 @@ test('clicking the Clear button clears the card', () => {
   assert.equal(storageData[ui.STORAGE_KEY], undefined);
   assert.equal(elements['weather-now'].textContent, '');
   assert.equal(elements['weather-status'].textContent, 'Weather cleared on this device. Type a place name and tap Refresh.');
+});
+
+
+test('auto-boot does not eagerly read a blocked localStorage getter', () => {
+  const source = fs.readFileSync(require.resolve('../weather-ui.js'), 'utf8');
+  const elements = {
+    'weather-place': fakeElement('input'),
+    'weather-refresh': fakeElement('button'),
+    'weather-form': fakeElement('form'),
+    'weather-status': fakeElement('p'),
+    'weather-now': fakeElement('div'),
+    'weather-clear': fakeElement('button')
+  };
+  const doc = {
+    readyState: 'complete',
+    getElementById(id) { return elements[id] || null; }
+  };
+  const win = {};
+  Object.defineProperty(win, 'localStorage', {
+    get() { throw new Error('storage is blocked'); }
+  });
+  const context = { window: win, document: doc };
+  context.globalThis = context;
+  assert.doesNotThrow(() => vm.runInNewContext(source, context));
+  assert.match(elements['weather-status'].textContent, /browser storage is unavailable/);
+});
+
+test('storage read failure does not overwrite unknown weather data or hide a successful refresh', async () => {
+  let writes = 0;
+  const storage = {
+    getItem() { throw new Error('storage read denied'); },
+    setItem() { writes += 1; },
+    removeItem() { throw new Error('storage read denied'); }
+  };
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: fetchImpl, storage });
+  const handle = ui.attachWeatherUi(env);
+  await handle.onRefresh();
+  assert.equal(fetchImpl.seen.length, 2);
+  assert.match(elements['weather-now'].textContent, /Kolkata, India/);
+  assert.match(elements['weather-status'].textContent, /^Updated · .*saved weather data could not be read/);
+  assert.equal(writes, 0, 'unreadable cache and preferences must not be overwritten');
+});
+
+test('a corrupt weather cache is preserved after a successful network refresh', async () => {
+  const corrupt = '{broken weather cache';
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements, storageData } = fakeEnv({ place: 'Kolkata', stored: corrupt, fetch: fetchImpl });
+  const handle = ui.attachWeatherUi(env);
+  await handle.onRefresh();
+  assert.equal(storageData[ui.STORAGE_KEY], corrupt);
+  assert.match(elements['weather-now'].textContent, /Kolkata, India/);
+  assert.match(elements['weather-status'].textContent, /saved weather data is unreadable and was preserved/);
+});
+
+test('storage quota failure does not turn a successful refresh into a network error', async () => {
+  const storage = {
+    getItem() { return null; },
+    setItem() { throw new Error('quota exceeded'); },
+    removeItem() {}
+  };
+  const fetchImpl = okFetch([
+    { prefix: weatherApi.GEOCODING_ENDPOINT, body: GEOCODING_BODY },
+    { prefix: weatherApi.FORECAST_ENDPOINT, body: FORECAST_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ place: 'Kolkata', fetch: fetchImpl, storage });
+  const handle = ui.attachWeatherUi(env);
+  await handle.onRefresh();
+  assert.match(elements['weather-now'].textContent, /Kolkata, India/);
+  assert.match(elements['weather-status'].textContent, /^Updated · .*changes could not be saved/);
+  assert.equal(elements['weather-refresh'].disabled, false);
+});
+
+test('place preference write failure is contained inside the input event', () => {
+  const storage = {
+    getItem() { return null; },
+    setItem() { throw new Error('quota exceeded'); },
+    removeItem() {}
+  };
+  const { env, elements } = fakeEnv({ storage });
+  ui.attachWeatherUi(env);
+  const input = elements['weather-place'];
+  input.value = 'Berlin';
+  const inputListener = input.listeners.find((listener) => listener.type === 'input');
+  assert.ok(inputListener);
+  assert.doesNotThrow(() => inputListener.handler());
+  assert.match(elements['weather-status'].textContent, /Place preference was not saved/);
+  assert.match(elements['weather-status'].textContent, /changes could not be saved/);
+});
+
+test('partial Clear failure restores saved cache and preference and keeps the visible forecast', () => {
+  const cache = JSON.stringify({
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 10, feelsLikeC: 9, windKph: 5, humidityPercent: 70,
+      isDay: false, weatherCode: 0, label: 'Clear night'
+    },
+    fetchedAt: '2026-11-02T09:30:00.000Z'
+  });
+  const prefs = JSON.stringify({ place: 'Kolkata' });
+  const storageData = {
+    [ui.STORAGE_KEY]: cache,
+    [ui.PREFS_KEY]: prefs
+  };
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    setItem(key, value) { storageData[key] = String(value); },
+    removeItem(key) {
+      if (key === ui.PREFS_KEY) throw new Error('preference removal denied');
+      delete storageData[key];
+    }
+  };
+  const { env, elements } = fakeEnv({ storage });
+  const handle = ui.attachWeatherUi(env);
+  const before = elements['weather-now'].textContent;
+  handle.onClear();
+  assert.equal(storageData[ui.STORAGE_KEY], cache, 'cache is restored after partial removal');
+  assert.equal(storageData[ui.PREFS_KEY], prefs, 'preference remains unchanged');
+  assert.equal(elements['weather-now'].textContent, before, 'visible weather is retained');
+  assert.match(elements['weather-status'].textContent, /Could not clear saved weather/);
+  assert.doesNotMatch(elements['weather-status'].textContent, /^Weather cleared/);
+});
+
+test('Clear refuses to erase a value changed in another tab', () => {
+  const stored = JSON.stringify({
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 10, feelsLikeC: 9, windKph: 5, humidityPercent: 70,
+      isDay: false, weatherCode: 0, label: 'Clear night'
+    },
+    fetchedAt: '2026-11-02T09:30:00.000Z'
+  });
+  const { env, elements, storageData } = fakeEnv({ stored });
+  const handle = ui.attachWeatherUi(env);
+  const visible = elements['weather-now'].textContent;
+  storageData[ui.STORAGE_KEY] = JSON.stringify({ otherTab: true });
+  handle.onClear();
+  assert.notEqual(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(elements['weather-now'].textContent, visible);
+  assert.match(elements['weather-status'].textContent, /changed elsewhere/);
 });
