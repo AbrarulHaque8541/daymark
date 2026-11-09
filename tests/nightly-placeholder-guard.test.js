@@ -95,7 +95,19 @@ function hasRegisteredTestCase(source) {
 test('every repository Node test file registers at least one executable test case', () => {
   const repositoryRoot = path.resolve(__dirname, '..');
   const testFiles = collectNodeTestFiles(repositoryRoot);
+  const actualInventory = testFiles
+    .map((file) => path.relative(repositoryRoot, file).split(path.sep).join('/'))
+    .sort();
+  const expectedInventory = fs.readFileSync(path.join(__dirname, 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8')
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .sort();
 
+  assert.equal(new Set(expectedInventory).size, expectedInventory.length,
+    'the required Node test inventory must not contain duplicate paths');
+  assert.deepEqual(actualInventory, expectedInventory,
+    'Node test files were added, removed or renamed; review and update REQUIRED_NODE_TEST_FILES.txt explicitly');
   assert.ok(testFiles.length > 0, 'the repository must retain its Node regression suite');
   assert.equal(hasRegisteredTestCase('placeholder'), false, 'literal placeholder files must not count as tests');
   assert.equal(hasRegisteredTestCase('// placeholder\n/* no executable test */'), false,
