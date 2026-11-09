@@ -110,7 +110,9 @@ public final class ExtensionInjectorSmoke {
         WebView jsOnly = new WebView(PAGE);
         ExtensionInjector.apply(jsOnly, PAGE, Collections.singletonList(
                 pack("js-only", true, "https://example.com/*", "", "window.__jsOnly=1;")));
-        equal(1, jsOnly.getEvaluatedScripts().size(), "JS-only pack uses one submission");
+        equal(2, jsOnly.getEvaluatedScripts().size(), "JS-only pack receives bootstrap and one script submission");
+        contains(jsOnly.getEvaluatedScripts().get(0), "window.GM_addStyle", "JS-only pack receives GM_addStyle bootstrap");
+        contains(jsOnly.getEvaluatedScripts().get(1), "window.__jsOnly=1;", "JS-only pack code follows the bootstrap");
 
         List<BrowserExtension> many = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
@@ -118,8 +120,9 @@ public final class ExtensionInjectorSmoke {
         }
         WebView bounded = new WebView(PAGE);
         ExtensionInjector.apply(bounded, PAGE, many);
-        equal(1, bounded.getEvaluatedScripts().size(), "JS packs share one bounded submission");
-        String payload = bounded.getEvaluatedScripts().get(0);
+        equal(2, bounded.getEvaluatedScripts().size(), "JS packs share one bounded script submission after the bootstrap");
+        contains(bounded.getEvaluatedScripts().get(0), "window.GM_addStyle", "bounded JS packs receive one bootstrap");
+        String payload = bounded.getEvaluatedScripts().get(1);
         for (int i = 0; i < BrowserExtension.MAX_ENABLED_PER_PAGE; i++) {
             contains(payload, "window.__pack" + i + "=1;", "enabled pack " + i + " is retained");
         }
