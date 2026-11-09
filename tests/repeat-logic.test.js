@@ -79,6 +79,16 @@ test('completing early keeps the rhythm anchored to the due date', () => {
   assert.equal(repeat.nextDueDate('2026-11-13', 'weekly', '2026-10-30'), '2026-11-20');
 });
 
+test('repeat rules fail closed beyond the supported four-digit date range', () => {
+  assert.equal(repeat.nextDueDate('9999-12-31', 'daily', '9999-12-31'), null);
+  assert.equal(repeat.nextDueDate('9999-12-31', 'weekly', '9999-12-31'), null);
+  assert.equal(repeat.nextDueDate('9999-12-31', 'weekdays', '9999-12-31'), null);
+  assert.equal(repeat.nextDueDate('9999-12-31', 'monthly', '9999-12-31', 31), null);
+  assert.equal(repeat.nextDueDate('9999-02-28', 'yearly', '9999-02-28', 29), null);
+  // The first weekday after the due date is in year 10000 even though today is still in 9999.
+  assert.equal(repeat.nextDueDate('9999-12-31', 'weekdays', '9999-12-30'), null);
+});
+
 test('invalid input returns null instead of a made-up date', () => {
   assert.equal(repeat.nextDueDate('2026-02-30', 'daily', '2026-10-30'), null);
   assert.equal(repeat.nextDueDate('not-a-date', 'daily', '2026-10-30'), null);

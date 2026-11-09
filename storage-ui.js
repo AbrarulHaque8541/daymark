@@ -15,15 +15,7 @@
     if (!env || !env.document) throw new Error('attachStorageUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    let storage = null;
-    let storageAccessFailed = false;
-    try {
-      storage = env.localStorage !== undefined
-        ? env.localStorage
-        : ((win && win.localStorage) || null);
-    } catch (error) {
-      storageAccessFailed = true;
-    }
+    const storage = env.localStorage || (win && win.localStorage) || null;
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
@@ -39,8 +31,7 @@
     }
 
     function storageAvailable() {
-      if (storageAccessFailed
-        || !storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+      if (!storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
         return false;
       }
       try {
@@ -57,12 +48,6 @@
         return;
       }
       if (!listEl || typeof listEl.appendChild !== 'function') return;
-      if (storageAccessFailed) {
-        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
-        if (clearAllEl) clearAllEl.disabled = true;
-        status('Browser storage could not be accessed. Local data status is unknown; nothing was changed.');
-        return;
-      }
       let scan = null;
       try {
         scan = storageApi.scanStorage(storage);
@@ -78,20 +63,11 @@
         const row = make('div');
         if (!row) break;
         if (typeof row.setAttribute === 'function') row.setAttribute('class', 'feed-item');
-        const unreadableCount = Array.isArray(category.unreadableKeys)
-          ? category.unreadableKeys.length : 0;
         const title = make('span');
         if (title) {
           if (typeof title.setAttribute === 'function') title.setAttribute('class', 'feed-item-title');
-          let state = ' — not present';
-          if (unreadableCount > 0) {
-            state = category.present
-              ? ' — partially readable (about ' + storageApi.formatBytes(category.bytes) + ')'
-              : ' — status unknown (could not read)';
-          } else if (category.present) {
-            state = ' — about ' + storageApi.formatBytes(category.bytes);
-          }
-          title.textContent = category.label + state;
+          title.textContent = category.label
+            + (category.present ? ' — about ' + storageApi.formatBytes(category.bytes) : ' — not present');
           row.appendChild(title);
         }
         const summary = make('p');
@@ -109,9 +85,7 @@
             button.setAttribute('aria-label', 'Clear ' + category.label + ' from this browser');
           }
           button.textContent = 'Clear';
-          // Allow an explicit retry for unknown data; clearCategory itself still
-          // fails closed when it cannot read the key before attempting removal.
-          button.disabled = !category.present && unreadableCount === 0;
+          button.disabled = !category.present;
           if (typeof button.addEventListener === 'function') {
             button.addEventListener('click', () => { onClearCategory(category.id); });
           }
@@ -119,22 +93,12 @@
         }
         listEl.appendChild(row);
       }
-      const unreadableCount = Number.isInteger(scan.unreadableCount) ? scan.unreadableCount : 0;
-      if (unreadableCount > 0) {
-        const known = scan.presentCount === 0
-          ? 'No readable local data was found'
-          : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
-            + storageApi.formatBytes(scan.totalBytes) + ' total)';
-        status(known + '; ' + unreadableCount
-          + ' categories could not be checked. Reported sizes exclude unreadable entries.');
-      } else if (scan.presentCount === 0) {
-        status('No local data is stored yet. Add a task or use a card to see it here.');
-      } else {
-        status(scan.presentCount + ' of ' + scan.categories.length
+      status(scan.presentCount === 0
+        ? 'No local data is stored yet. Add a task or use a card to see it here.'
+        : scan.presentCount + ' of ' + scan.categories.length
           + ' categories hold data on this device (about '
           + storageApi.formatBytes(scan.totalBytes) + ' total).');
-      }
-      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0 && unreadableCount === 0;
+      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0;
     }
 
     // Returns 'accepted', 'declined', or 'failed'. A failed confirmation prompt
@@ -288,7 +252,7 @@
   root.DaymarkStorageUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachStorageUi({ document, window });
+    const boot = () => attachStorageUi({ document, window, localStorage: window.localStorage });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

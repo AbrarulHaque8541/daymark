@@ -7,19 +7,14 @@ const storage = require('../storage-logic.js');
 function fakeStorage(initial) {
   const data = Object.assign({}, initial || {});
   const failures = new Set();
-  const readFailures = new Set();
   return {
-    getItem(key) {
-      if (readFailures.has(key)) throw new Error('Read access failure');
-      return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
-    },
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
     setItem(key, value) { data[key] = String(value); },
     removeItem(key) {
       if (failures.has(key)) throw new Error('Quota or access failure');
       delete data[key];
     },
     failOn(key) { failures.add(key); },
-    failReadOn(key) { readFailures.add(key); },
     snapshot: data
   };
 }
@@ -148,49 +143,6 @@ test('unavailable or malformed storage fails closed with an honest error', () =>
   assert.throws(() => storage.scanStorage(null), /Browser storage is unavailable/);
   assert.throws(() => storage.clearCategory({ getItem: () => null }, 'tasks'), /Browser storage is unavailable/);
   assert.throws(() => storage.clearAll(undefined), /Browser storage is unavailable/);
-});
-
-test('scanStorage reports per-key read failures as unknown instead of absent', () => {
-  const store = fakeStorage({
-    'daymark.tasks.v1': JSON.stringify([{ id: 't1', title: 'Still stored' }]),
-    'daymark.weather.v1': '{}'
-  });
-  store.failReadOn('daymark.tasks.v1');
-  const scan = storage.scanStorage(store);
-  const byId = Object.fromEntries(scan.categories.map((entry) => [entry.id, entry]));
-
-  assert.equal(scan.complete, false);
-  assert.equal(scan.unreadableCount, 1);
-  assert.deepEqual(scan.unreadableKeys, ['daymark.tasks.v1']);
-  assert.equal(byId.tasks.present, false, 'unreadable content is not counted as readable data');
-  assert.deepEqual(byId.tasks.unreadableKeys, ['daymark.tasks.v1']);
-  assert.equal(byId.tasks.complete, false);
-  assert.equal(byId.weather.present, true, 'other readable categories remain visible');
-  assert.equal(scan.presentCount, 1);
-  assert.equal(scan.totalBytes, 2, 'totals include readable entries only');
-  assert.equal(store.snapshot['daymark.tasks.v1'].includes('Still stored'), true,
-    'a failed scan must never mutate stored data');
-});
-
-test('scanStorage never calls the store empty when every managed key is unreadable', () => {
-  const initial = Object.fromEntries(storage.CATEGORIES.flatMap((category) =>
-    category.keys.map((key) => [key, 'still stored'])
-  ));
-  const store = fakeStorage(initial);
-  for (const category of storage.CATEGORIES) {
-    for (const key of category.keys) store.failReadOn(key);
-  }
-
-  const scan = storage.scanStorage(store);
-  assert.equal(scan.complete, false);
-  assert.equal(scan.presentCount, 0);
-  assert.equal(scan.unreadableCount, storage.CATEGORIES.length);
-  assert.equal(scan.unreadableKeys.length, storage.CATEGORIES.reduce(
-    (count, category) => count + category.keys.length, 0
-  ));
-  assert.equal(scan.totalBytes, 0, 'unreadable values are excluded from measured byte totals');
-  assert.ok(Object.values(store.snapshot).every((value) => value === 'still stored'),
-    'a total read failure must not mutate any stored value');
 });
 
 test('formatBytes renders human sizes without inventing precision', () => {

@@ -1,7 +1,11 @@
-- [CURRENT — Daymark whole-project engineering status — 2026-11-08T11:50:17.463Z (main b1993efffc81, PRs #611/#612 merged; #601/#604/#607/#610 integration and CI)](./CURRENT_STATUS_20261108T115017Z.md)
-- Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T09:51:08Z (storage health work)](./CURRENT_STATUS_20261108T095108Z.md)
-- Earlier snapshot: [Daymark whole-project engineering status — 2026-11-08T09:20:00Z](./CURRENT_STATUS_20261108T092000Z.md)
-- Use the CURRENT snapshot above for live repository/PR/CI/backlog state; older entries below are historical.
+- [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z (main 7e540c9b5d3a; feed stream cleanup, webhook/recovery integration, Focus and CI blockers)](./CURRENT_STATUS_20261109T063944Z.md)
+- Previous snapshot: [Daymark engineering status — 2026-11-09T04:20:34.434Z (iCalendar open-format import)](./CURRENT_STATUS_20261109T042000Z.md)
+- Historical storage-health snapshot: [2026-11-08T11:50:17.463Z](./CURRENT_STATUS_20261108T115017Z.md)
+- Earlier storage-health snapshot: [2026-11-08T09:51:08Z](./CURRENT_STATUS_20261108T095108Z.md)
+- [CURRENT — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
+- Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
+- Use the CURRENT snapshot above for live branch/CI/backlog state; older entries below are historical.
+
 
 - [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
 
@@ -89,7 +93,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-08T11:50:17.463Z (main b1993efffc81; PR #611/#612 merged)](./CURRENT_STATUS_20261108T115017Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z (verified current-main and exact-head repository audit)](./CURRENT_STATUS_20261109T063944Z.md)
+- Previous reviewed snapshot: - [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
 
 
 - [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
