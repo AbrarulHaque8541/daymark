@@ -1,6 +1,17 @@
 #!/usr/bin/env sh
 # Repeat a complete Android instrumentation command without retrying failures.
 # The emulator is disposable: clear only the app package between independent runs.
+# Parse the instrumentation component from pm output without depending on
+# an unescaped sed BRE group or the order of unrelated package-manager lines.
+parse_platform_instrumentation_component() {
+  awk '/^instrumentation:/ && /DaymarkPlatformInstrumentation/ {
+    sub(/^instrumentation:/, "")
+    sub(/ .*/, "")
+    print
+    exit
+  }'
+}
+
 run_instrumentation_repeated() {
   if [ "$#" -eq 0 ]; then
     echo "instrumentation command is required" >&2
