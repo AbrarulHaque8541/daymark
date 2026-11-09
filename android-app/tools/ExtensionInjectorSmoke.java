@@ -39,7 +39,7 @@ public final class ExtensionInjectorSmoke {
                 bootstrapGuard, "CSS bootstrap guard uses the captured page URL");
         before(scripts.get(0), bootstrapGuard, "window.__daymarkBoot",
                 "CSS bootstrap guard runs before bootstrap state is created");
-        before(scripts.get(0), guard, "window.__daymarkLastCss", "CSS payload guard runs before style payload");
+        before(scripts.get(0), guard, "window.__daymarkLastCss=", "CSS payload guard runs before style assignment");
         before(scripts.get(1), guard, "window.__scopeTest", "JS guard runs before pack code");
         contains(scripts.get(0), "window.__daymarkExpectedUrl", "bootstrap records expected page");
         contains(scripts.get(0), "window.GM_addStyle", "userscript style helper remains available");
