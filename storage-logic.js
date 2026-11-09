@@ -123,12 +123,15 @@
     const categories = CATEGORIES.map((category) => {
       let bytes = 0;
       let present = false;
+      const unreadableKeys = [];
       for (const key of category.keys) {
         let raw = null;
         try {
           raw = storage.getItem(key);
         } catch (error) {
-          raw = null;
+          // A failed read is unknown, not evidence that the key is absent.
+          unreadableKeys.push(key);
+          continue;
         }
         if (raw !== null && raw !== undefined) {
           present = true;
@@ -141,13 +144,22 @@
         description: category.description,
         keys: category.keys.slice(),
         bytes,
-        present
+        present,
+        unreadableKeys,
+        complete: unreadableKeys.length === 0
       };
     });
     const presentCount = categories.filter((category) => category.present).length;
+    const unreadableCategories = categories.filter((category) => category.unreadableKeys.length > 0);
+    const unreadableKeys = unreadableCategories.reduce(
+      (all, category) => all.concat(category.unreadableKeys), []
+    );
     return {
       categories,
       presentCount,
+      unreadableCount: unreadableCategories.length,
+      unreadableKeys,
+      complete: unreadableCategories.length === 0,
       totalBytes: categories.reduce((sum, category) => sum + category.bytes, 0)
     };
   }
@@ -158,13 +170,23 @@
   function clearCategory(storage, categoryId) {
     requireUsableStorage(storage);
     const keys = planClear(categoryId);
-    const removed = [];
+    const existing = [];
     const failed = [];
+    // Read every key before deleting any key. A read failure is unknown state,
+    // not permission to partially clear a category.
     for (const key of keys) {
       try {
-        const existed = storage.getItem(key) !== null;
+        if (storage.getItem(key) !== null) existing.push(key);
+      } catch (error) {
+        failed.push(key);
+      }
+    }
+    if (failed.length > 0) return { id: categoryId, removed: [], failed };
+    const removed = [];
+    for (const key of existing) {
+      try {
         storage.removeItem(key);
-        if (existed) removed.push(key);
+        removed.push(key);
       } catch (error) {
         failed.push(key);
       }
@@ -174,7 +196,42 @@
 
   function clearAll(storage) {
     requireUsableStorage(storage);
-    const results = CATEGORIES.map((category) => clearCategory(storage, category.id));
+    const existing = new Set();
+    const unreadable = new Set();
+    // Preflight every managed key before removing anything. An unknown key
+    // blocks the entire clear-all operation, avoiding partial deletion.
+    for (const category of CATEGORIES) {
+      for (const key of category.keys) {
+        try {
+          if (storage.getItem(key) !== null) existing.add(key);
+        } catch (error) {
+          unreadable.add(key);
+        }
+      }
+    }
+    if (unreadable.size > 0) {
+      const failedKeys = Array.from(unreadable);
+      const results = CATEGORIES.map((category) => ({
+        id: category.id,
+        removed: [],
+        failed: category.keys.filter((key) => unreadable.has(key))
+      }));
+      return { results, removedKeys: [], failedKeys };
+    }
+    const results = CATEGORIES.map((category) => {
+      const removed = [];
+      const failed = [];
+      for (const key of category.keys) {
+        if (!existing.has(key)) continue;
+        try {
+          storage.removeItem(key);
+          removed.push(key);
+        } catch (error) {
+          failed.push(key);
+        }
+      }
+      return { id: category.id, removed, failed };
+    });
     return {
       results,
       removedKeys: results.reduce((all, result) => all.concat(result.removed), []),
