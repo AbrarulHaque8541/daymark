@@ -67,7 +67,7 @@
     {
       id: 'webhook',
       label: 'Webhook settings',
-      description: 'The https:// endpoint you saved for task-completion events.',
+      description: 'A legacy endpoint setting from older versions. New webhook endpoints stay in the active tab only and are never saved here.',
       keys: ['daymark.webhook.v1']
     },
     {

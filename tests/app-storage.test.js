@@ -12,7 +12,7 @@ const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null, webhookUi = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -104,6 +104,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     })
     : logic;
   const window = {
+    DaymarkWebhookUi: webhookUi,
     DaymarkLogic: appLogic,
     DaymarkFocus: focus,
     DaymarkRepeat: repeat,
@@ -431,14 +432,6 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('healthy task-array backup is cleared as stale when primary is healthy', () => {
-  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
-  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
-  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
-
-  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
-});
-
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
   const corruptData = '{not valid JSON';
   const { elements, storedValues } = bootApp({ savedValue: corruptData });
@@ -676,4 +669,254 @@ test('initial loading indicators clear only when the real app render and storage
   const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.equal(indexSource.includes('}, 120);'), false,
     'index must not hide loading indicators after an arbitrary timeout');
+});
+
+
+test('completion webhook runs once and only after the completed task is persisted', () => {
+  const task = makeImportTask('webhook-order-success', 'Persist before notifying');
+  const notifications = [];
+  let app;
+  const webhookUi = {
+    notifyTaskCompleted(candidate) {
+      const persisted = JSON.parse(app.storedValues.get(STORAGE_KEY))
+        .find((item) => item.id === candidate.id);
+      notifications.push({ taskId: candidate.id, persistedCompleted: persisted?.completed });
+      return Promise.resolve();
+    }
+  };
+  app = bootApp({ savedValue: JSON.stringify([task]), webhookUi });
+
+  triggerTaskCompletion(app, task.id);
+  assert.deepEqual(notifications, [{ taskId: task.id, persistedCompleted: true }],
+    'the webhook callback must observe the successfully persisted completed task');
+
+  triggerTaskCompletion(app, task.id);
+  assert.equal(notifications.length, 1, 'reopening a task must not emit another completion event');
+});
+
+test('failed task persistence never emits a completion webhook', () => {
+  const task = makeImportTask('webhook-order-failure', 'Do not notify an unsaved completion');
+  const savedValue = JSON.stringify([task]);
+  let notifications = 0;
+  const app = bootApp({
+    savedValue,
+    failPrimarySave: true,
+    webhookUi: {
+      notifyTaskCompleted() {
+        notifications += 1;
+        return Promise.resolve();
+      }
+    }
+  });
+
+  triggerTaskCompletion(app, task.id);
+
+  assert.equal(notifications, 0, 'a failed local save must not emit an external completion event');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].completed, false,
+    'the stored task remains incomplete when persistence fails');
+});
+
+
+test('re-backing up identical opaque bytes does not duplicate the recovery payload', () => {
+  const opaque = '{legacy recovery bytes that are not parseable JSON';
+  const app = bootApp({ savedValue: opaque, savedBackupValue: opaque });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), opaque,
+    'the exact same opaque payload does not need a second nested copy');
+});
+
+test('backing up a corrupt primary preserves a different valid existing backup', () => {
+  const existingBackup = JSON.stringify([makeImportTask('backup-only-task', 'Older backup task')]);
+  const corruptPrimary = '{not valid JSON';
+  const app = bootApp({ savedValue: corruptPrimary, savedBackupValue: existingBackup });
+
+  const bundle = JSON.parse(app.storedValues.get(BACKUP_KEY));
+  assert.equal(bundle.format, 'daymark-recovery-bundle-v1');
+  assert.deepEqual(bundle.payloads, [existingBackup, corruptPrimary],
+    'a new corrupt primary must not overwrite a distinct valid recovery copy');
+});
+
+test('different healthy task-array backups are preserved across later task saves', () => {
+  const primaryTask = makeImportTask('primary-task', 'Primary task');
+  const backupTask = makeImportTask('backup-only-task', 'Backup-only task');
+  const primary = JSON.stringify([primaryTask]);
+  const backup = JSON.stringify([backupTask]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'a valid backup with different records is not proven stale');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+
+  triggerTaskCompletion(app, primaryTask.id);
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'a later successful task save must not discard backup-only records');
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].completed, true);
+});
+
+test('byte-identical healthy task-array backup is cleared as redundant', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: primary });
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'the backup can be cleared when the exact same payload is already primary');
+});
+
+test('opaque malformed backup is preserved when primary tasks are healthy', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const backup = '{legacy recovery bytes that are not parseable JSON';
+  const app = bootApp({ savedValue: primary, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'unparseable backup bytes may contain the only copy of older tasks');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+});
+
+test('unknown JSON recovery formats are preserved when primary tasks are healthy', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const backup = JSON.stringify({ format: 'legacy-daymark-backup-v0', tasks: [] });
+  const app = bootApp({ savedValue: primary, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'an unrecognized backup format is not assumed to be disposable');
+});
+
+test('recovery bundles with distinct valid task arrays are preserved', () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const backupPayload = JSON.stringify([makeImportTask('backup-only-task', 'Backup-only task')]);
+  const bundle = JSON.stringify({
+    format: 'daymark-recovery-bundle-v1',
+    payloads: [backupPayload]
+  });
+  const app = bootApp({ savedValue: primary, savedBackupValue: bundle });
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), bundle,
+    'a bundle containing a different valid task array may contain unique user data');
+});
+
+test('a missing primary task key remains a normal empty state without a recovery backup', () => {
+  const app = bootApp({ savedValue: null });
+
+  assert.equal(app.elements.get('#storage-status span').textContent, 'Local storage ready');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'an absent key is not treated as corrupt data and does not create a backup');
+});
+
+test('a missing primary task key surfaces an existing recovery backup for manual review', () => {
+  const backup = JSON.stringify([makeImportTask('backup-only', 'Recoverable older task')]);
+  const app = bootApp({ savedValue: null, savedBackupValue: backup });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), null,
+    'the missing primary is not silently recreated or overwritten');
+  assert.equal(app.storedValues.get(BACKUP_KEY), backup,
+    'the existing backup remains byte-for-byte intact');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained for manual review/);
+  assert.equal(app.toastWriteCount > 0, true,
+    'the user receives an export affordance for the recoverable backup');
+});
+
+test('an empty primary task payload is preserved before a later task save', () => {
+  const app = bootApp({ savedValue: '' });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'the original empty primary payload remains unchanged during recovery');
+  assert.equal(app.storedValues.get(BACKUP_KEY), '',
+    'the present empty-string payload is copied verbatim to the recovery backup');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Saved data could not be read/,
+    'an empty stored value is reported as unreadable rather than absent');
+
+  app.elements.get('#new-title').value = 'Safe task after recovery';
+  triggerFormSubmit(app, '#add-form');
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), '',
+    'a later save must retain the opaque empty recovery source');
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].title, 'Safe task after recovery');
+});
+
+test('an empty primary task payload is not overwritten when its recovery backup cannot be created', () => {
+  const app = bootApp({ savedValue: '', failBackup: true });
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'the original empty primary payload remains byte-for-byte unchanged');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'failed backup creation must not claim that recovery data was saved');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup could not be created/);
+
+  app.elements.get('#new-title').value = 'Must not overwrite the only source';
+  triggerFormSubmit(app, '#add-form');
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), '',
+    'later task saves remain blocked while the only original payload cannot be backed up');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false);
+});
+
+test('partial recovery export imports readable tasks and skips an unknown Focus source', () => {
+  const existingTask = makeImportTask('partial-existing-task', 'Existing task');
+  const recoveredTask = makeImportTask('partial-readable-task', 'Readable task backup');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: JSON.stringify([recoveredTask]),
+    taskBackupStatus: 'available',
+    focusBackup: null,
+    focusBackupStatus: 'unknown'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 1, 'the readable task source receives the normal import preview');
+  assert.match(app.confirmMessages[0], /1 recovery source was marked unknown/);
+  const savedTasks = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.ok(savedTasks.some((task) => task.id === recoveredTask.id), 'the readable task backup is imported');
+  assert.equal(app.storedValues.get(FOCUS_KEY), existingFocus, 'the unknown Focus source does not overwrite existing Focus data');
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+});
+
+test('partial recovery export imports readable Focus data but never imports bytes marked unknown', () => {
+  const existingTask = makeImportTask('partial-task-stays', 'Existing task stays');
+  const forbiddenTask = makeImportTask('partial-unknown-task', 'Must not import unknown bytes');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const focusEntry = makeFocusLogEntry('partial-readable-focus-log');
+  const readableFocus = JSON.stringify({ session: null, log: [focusEntry] });
+  const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: JSON.stringify([forbiddenTask]),
+    taskBackupStatus: 'unknown',
+    focusBackup: readableFocus,
+    focusBackupStatus: 'available'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 1);
+  assert.match(app.confirmMessages[0], /1 recovery source was marked unknown/);
+  assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), [existingTask],
+    'raw task bytes are ignored when the envelope marks that source unknown');
+  const savedFocus = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.ok(savedFocus.log.some((entry) => entry.id === focusEntry.id), 'the readable Focus backup is imported');
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+});
+
+test('empty available partial-recovery payload is reported and does not mutate either store', () => {
+  const existingTask = makeImportTask('partial-empty-existing', 'Existing task');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const savedTasks = JSON.stringify([existingTask]);
+  const app = bootApp({ savedValue: savedTasks, savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: '',
+    taskBackupStatus: 'available',
+    focusBackup: null,
+    focusBackupStatus: 'unknown'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 0, 'no preview is offered when no valid recovery record exists');
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
+  assert.equal(app.storedValues.get(FOCUS_KEY), existingFocus);
+  assert.match(app.elements.get('#toast').textContent, /No valid recovery data could be restored/);
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
 });
