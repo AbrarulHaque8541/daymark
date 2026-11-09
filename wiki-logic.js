@@ -1,6 +1,9 @@
 ((root) => {
   'use strict';
 
+  const responseBodyApi = root.DaymarkResponseBody
+    || (typeof require === 'function' ? require('./response-body-logic.js') : null);
+
   // Keyless Wikipedia knowledge glance for the Daymark web prototype, powered by
   // the free public Wikipedia search API (no API key, no account, no maintainer
   // backend). Mirrors the weather-logic.js module style: pure functions, no
@@ -10,7 +13,8 @@
   const MAX_QUERY_CHARS = 120;
   const MAX_RESULTS = 5;
   const MAX_SNIPPET_CHARS = 400;
-  const MAX_JSON_CHARS = 256 * 1024;
+  const MAX_JSON_BYTES = 256 * 1024;
+  const MAX_JSON_CHARS = MAX_JSON_BYTES;
   const DEFAULT_TIMEOUT_MS = 10000;
 
   const SEARCH_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
@@ -96,26 +100,52 @@
 
   async function fetchJson(url, fetchImpl, timeoutMs) {
     if (typeof fetchImpl !== 'function') throw new Error('fetch is not available.');
-    const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
+    const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
+    let timedOut = false;
+    let activeReader = null;
+    const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     let timer = null;
-    let init;
-    if (typeof AbortController === 'function') {
-      const controller = new AbortController();
-      init = { signal: controller.signal };
-      timer = setTimeout(() => controller.abort(), timeout);
-    }
-    try {
-      const response = await fetchImpl(url, init);
+    const timeout = new Promise((resolve, reject) => {
+      timer = root.setTimeout(() => {
+        timedOut = true;
+        if (controller) controller.abort();
+        if (activeReader && typeof activeReader.cancel === 'function') {
+          try {
+            const cancellation = activeReader.cancel();
+            if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+          } catch (error) { /* cancellation is best-effort */ }
+        }
+        reject(new Error('Wikipedia request timed out.'));
+      }, duration);
+    });
+    const request = (async () => {
+      const response = await fetchImpl(url, {
+        signal: controller ? controller.signal : undefined
+      });
       if (!response || !response.ok) {
         throw new Error('Wikipedia request failed (' + (response ? response.status : 'no response') + ').');
       }
-      const body = await response.text();
-      if (typeof body !== 'string' || body.length > MAX_JSON_CHARS) {
-        throw new Error('Wikipedia response too large.');
+      if (!responseBodyApi || typeof responseBodyApi.readBoundedText !== 'function') {
+        throw new Error('The bounded response reader is unavailable.');
       }
+      const body = await responseBodyApi.readBoundedText(response, {
+        maxBytes: MAX_JSON_BYTES,
+        maxChars: MAX_JSON_CHARS,
+        tooLargeMessage: 'Wikipedia response too large.',
+        malformedMessage: 'Wikipedia response was malformed.',
+        streamRequiredMessage: 'This browser cannot read Wikipedia responses with the required size limit.',
+        timeoutMessage: 'Wikipedia request timed out.',
+        controller,
+        isTimedOut: () => timedOut,
+        onReader: (reader) => { activeReader = reader; }
+      });
+      if (timedOut) throw new Error('Wikipedia request timed out.');
       return JSON.parse(body);
+    })();
+    try {
+      return await Promise.race([request, timeout]);
     } finally {
-      if (timer !== null) clearTimeout(timer);
+      if (timer !== null) root.clearTimeout(timer);
     }
   }
 
@@ -144,6 +174,7 @@
     MAX_RESULTS,
     MAX_SNIPPET_CHARS,
     MAX_JSON_CHARS,
+    MAX_JSON_BYTES,
     DEFAULT_TIMEOUT_MS,
     SEARCH_ENDPOINT
   };
