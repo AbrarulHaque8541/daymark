@@ -7,7 +7,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/** Host regression tests for page-bound extension injection and bounded WebView submissions. */
+/** Host regressions for page-bound injection and same-document SPA CSS scope reevaluation. */
 public final class ExtensionInjectorSmoke {
     private static final String PAGE = "https://example.com/account?tab=one";
     private static int assertions;
@@ -16,7 +16,7 @@ public final class ExtensionInjectorSmoke {
         bindsEverySubmissionToTheFinishedPage();
         jsOnlyUserscriptsReceiveTheStyleHelper();
         skipsStaleOnPageFinishedCallbacks();
-        skipsDisabledAndNonmatchingPacks();
+        serializesFutureScopesButRunsOnlyCurrentScripts();
         skipsInvalidAndEmptyInputs();
         boundsSubmissionsAndEnabledPacks();
         escapesExpectedUrlAsJavaScriptString();
@@ -25,27 +25,32 @@ public final class ExtensionInjectorSmoke {
 
     private static void bindsEverySubmissionToTheFinishedPage() {
         WebView webView = new WebView(PAGE);
-        BrowserExtension pack = pack("scope", true, "https://example.com/*",
+        BrowserExtension pack = pack("scope", true, "https://example.com/account*",
                 "body{color:red}", "window.__scopeTest=1;");
         ExtensionInjector.apply(webView, PAGE, Collections.singletonList(pack));
 
         List<String> scripts = webView.getEvaluatedScripts();
-        equal(2, scripts.size(), "CSS bootstrap/style and JS use two submissions");
+        equal(2, scripts.size(), "SPA bootstrap/style configuration and JS use two submissions");
         String guard = "if(String(window.location.href)!==" + ExtensionInjector.jsonString(PAGE) + ")return;";
-        contains(scripts.get(0), guard, "CSS submission checks current page");
-        contains(scripts.get(1), guard, "JS submission checks current page");
-        String bootstrapGuard = "if(String(window.location.href)!==expected)return;";
-        contains(scripts.get(0), bootstrapGuard, "CSS bootstrap checks the expected page before setup");
-        before(scripts.get(0), "var expected=" + ExtensionInjector.jsonString(PAGE) + ";",
-                bootstrapGuard, "CSS bootstrap guard uses the captured page URL");
-        before(scripts.get(0), bootstrapGuard, "window.__daymarkBoot",
-                "CSS bootstrap guard runs before bootstrap state is created");
-        before(scripts.get(0), guard, "window.__daymarkLastCss=", "CSS payload guard runs before style assignment");
-        before(scripts.get(1), guard, "window.__scopeTest", "JS guard runs before pack code");
-        contains(scripts.get(0), "window.__daymarkExpectedUrl", "bootstrap records expected page");
-        contains(scripts.get(0), "window.GM_addStyle", "userscript style helper remains available");
-        contains(scripts.get(0), "history.pushState", "SPA CSS reapply remains available");
-        contains(scripts.get(1), "window.__daymarkRan", "per-pack duplicate-run guard remains available");
+        contains(scripts.get(0), "window.__daymarkSpaConfig=", "SPA configuration is submitted before the bootstrap");
+        contains(scripts.get(0), "\"expectedUrl\":" + ExtensionInjector.jsonString(PAGE),
+                "SPA configuration carries the exact finished-page URL");
+        contains(scripts.get(0), "String(window.location.href) !== String(config.expectedUrl)",
+                "SPA bootstrap checks the current page before creating state");
+        before(scripts.get(0), "var config = window.__daymarkSpaConfig;",
+                "window.__daymarkSpaState", "page guard/bootstrap configuration precedes state creation");
+        contains(scripts.get(0), "\"matches\":[\"https://example.com/account*\"]",
+                "all match rules are serialized for future SPA routes");
+        contains(scripts.get(0), "\"css\":\"body{color:red}\"",
+                "CSS is stored per pack rather than concatenated into one global style");
+        contains(scripts.get(0), "history.pushState", "pushState is observed");
+        contains(scripts.get(0), "history.replaceState", "replaceState is observed");
+        contains(scripts.get(0), "hashchange", "hash changes trigger a scope reevaluation");
+        contains(scripts.get(0), "data-daymark-pack-id", "managed styles are attributed to their owning pack");
+        contains(scripts.get(0), "window.__daymarkAddStyle", "userscript-created styles use the same ownership tracking");
+        contains(scripts.get(1), guard, "pack scripts retain the finished-page guard");
+        contains(scripts.get(1), "var GM_addStyle=__dmAddStyle", "userscript GM_addStyle is scoped to its pack");
+        before(scripts.get(1), guard, "window.__scopeTest=1;", "pack code runs only after the page guard");
     }
 
     private static void jsOnlyUserscriptsReceiveTheStyleHelper() {
@@ -55,15 +60,10 @@ public final class ExtensionInjectorSmoke {
         ExtensionInjector.apply(webView, PAGE, Collections.singletonList(pack));
 
         List<String> scripts = webView.getEvaluatedScripts();
-        equal(2, scripts.size(), "JS-only userscripts receive bootstrap and script in two submissions");
-        contains(scripts.get(0), "window.GM_addStyle", "JS-only bootstrap installs the userscript style helper");
+        equal(2, scripts.size(), "JS-only userscripts receive bootstrap and script submissions");
+        contains(scripts.get(0), "window.__daymarkAddStyle", "JS-only bootstrap installs the managed style helper");
         contains(scripts.get(1), "GM_addStyle('body{color:red}')", "JS-only script can call GM_addStyle");
-        String bootstrapGuard = "if(String(window.location.href)!==expected)return;";
-        before(scripts.get(0), bootstrapGuard, "window.GM_addStyle",
-                "JS-only bootstrap is page-bound before exposing the style helper");
-        String guard = "if(String(window.location.href)!==" + ExtensionInjector.jsonString(PAGE) + ")return;";
-        before(scripts.get(1), guard, "GM_addStyle('body{color:red}')",
-                "JS-only pack code runs only after the page URL guard");
+        contains(scripts.get(1), "var GM_addStyle=__dmAddStyle", "JS-only pack receives an owned style closure");
     }
 
     private static void skipsStaleOnPageFinishedCallbacks() {
@@ -74,14 +74,30 @@ public final class ExtensionInjectorSmoke {
                 "stale onPageFinished URL is rejected before evaluateJavascript");
     }
 
-    private static void skipsDisabledAndNonmatchingPacks() {
+    private static void serializesFutureScopesButRunsOnlyCurrentScripts() {
         WebView webView = new WebView(PAGE);
-        List<BrowserExtension> packs = Arrays.asList(
-                pack("disabled", false, "https://example.com/*", "body{}", "window.__disabled=1;"),
-                pack("wrong-host", true, "https://other.example/*", "body{}", "window.__wrongHost=1;"));
-        ExtensionInjector.apply(webView, PAGE, packs);
-        equal(0, webView.getEvaluatedScripts().size(),
-                "disabled and nonmatching packs are rechecked at injection boundary");
+        BrowserExtension current = pack("current", true,
+                Collections.singletonList("https://example.com/account*"),
+                Collections.singletonList("https://example.com/account/private/*"),
+                Collections.singletonList("paused.example"),
+                "body{color:red}", "window.__current=1;");
+        BrowserExtension future = pack("future", true, "https://example.com/public/*",
+                "body{background:black}", "window.__future=1;");
+        BrowserExtension disabled = pack("disabled", false, "https://example.com/*",
+                "body{display:none}", "window.__disabled=1;");
+
+        ExtensionInjector.apply(webView, PAGE, Arrays.asList(current, future, disabled));
+        List<String> scripts = webView.getEvaluatedScripts();
+        equal(2, scripts.size(), "current scripts are injected after one SPA configuration");
+        contains(scripts.get(0), "\"id\":\"current\"", "current pack is tracked");
+        contains(scripts.get(0), "\"id\":\"future\"", "nonmatching future-route pack is tracked");
+        notContains(scripts.get(0), "\"id\":\"disabled\"", "disabled packs are not tracked");
+        contains(scripts.get(0), "\"excludes\":[\"https://example.com/account/private/*\"]",
+                "exclude rules are serialized");
+        contains(scripts.get(0), "\"disabledSites\":[\"paused.example\"]",
+                "per-site pause rules are serialized");
+        contains(scripts.get(1), "window.__current=1;", "current matching userscript runs");
+        notContains(scripts.get(1), "window.__future=1;", "future-route userscript waits for a matching document load");
     }
 
     private static void skipsInvalidAndEmptyInputs() {
@@ -93,25 +109,27 @@ public final class ExtensionInjectorSmoke {
         WebView empty = new WebView(PAGE);
         ExtensionInjector.apply(empty, PAGE, Collections.singletonList(
                 pack("empty", true, "https://example.com/*", "", "")));
-        equal(0, empty.getEvaluatedScripts().size(), "empty pack does not submit bootstrap work");
+        equal(1, empty.getEvaluatedScripts().size(), "empty configuration still clears stale page-owned styles");
+        contains(empty.getEvaluatedScripts().get(0), "\"packs\":[]", "empty packs are represented explicitly");
 
         ExtensionInjector.apply(null, PAGE, Collections.singletonList(
                 pack("null-view", true, "https://example.com/*", "", "window.__nullView=1;")));
-        ExtensionInjector.apply(new WebView(PAGE), PAGE, Collections.<BrowserExtension>emptyList());
-        assertions += 2;
+        WebView noPacks = new WebView(PAGE);
+        ExtensionInjector.apply(noPacks, PAGE, Collections.<BrowserExtension>emptyList());
+        equal(1, noPacks.getEvaluatedScripts().size(), "empty store still updates the page-local state");
     }
 
     private static void boundsSubmissionsAndEnabledPacks() {
         WebView cssOnly = new WebView(PAGE);
         ExtensionInjector.apply(cssOnly, PAGE, Collections.singletonList(
                 pack("css-only", true, "https://example.com/*", "body{}", "")));
-        equal(1, cssOnly.getEvaluatedScripts().size(), "CSS-only pack uses one submission");
+        equal(1, cssOnly.getEvaluatedScripts().size(), "CSS-only pack uses one SPA bootstrap submission");
 
         WebView jsOnly = new WebView(PAGE);
         ExtensionInjector.apply(jsOnly, PAGE, Collections.singletonList(
                 pack("js-only", true, "https://example.com/*", "", "window.__jsOnly=1;")));
         equal(2, jsOnly.getEvaluatedScripts().size(), "JS-only pack receives bootstrap and one script submission");
-        contains(jsOnly.getEvaluatedScripts().get(0), "window.GM_addStyle", "JS-only pack receives GM_addStyle bootstrap");
+        contains(jsOnly.getEvaluatedScripts().get(0), "window.__daymarkAddStyle", "JS-only pack receives style bootstrap");
         contains(jsOnly.getEvaluatedScripts().get(1), "window.__jsOnly=1;", "JS-only pack code follows the bootstrap");
 
         List<BrowserExtension> many = new ArrayList<>();
@@ -121,7 +139,6 @@ public final class ExtensionInjectorSmoke {
         WebView bounded = new WebView(PAGE);
         ExtensionInjector.apply(bounded, PAGE, many);
         equal(2, bounded.getEvaluatedScripts().size(), "JS packs share one bounded script submission after the bootstrap");
-        contains(bounded.getEvaluatedScripts().get(0), "window.GM_addStyle", "bounded JS packs receive one bootstrap");
         String payload = bounded.getEvaluatedScripts().get(1);
         for (int i = 0; i < BrowserExtension.MAX_ENABLED_PER_PAGE; i++) {
             contains(payload, "window.__pack" + i + "=1;", "enabled pack " + i + " is retained");
@@ -139,8 +156,15 @@ public final class ExtensionInjectorSmoke {
     }
 
     private static BrowserExtension pack(String id, boolean enabled, String pattern, String css, String js) {
+        return pack(id, enabled, Collections.singletonList(pattern),
+                Collections.<String>emptyList(), Collections.<String>emptyList(), css, js);
+    }
+
+    private static BrowserExtension pack(String id, boolean enabled, List<String> matches,
+                                         List<String> excludes, List<String> disabledSites,
+                                         String css, String js) {
         return new BrowserExtension(id, "Test", "1", "", enabled, false,
-                Collections.singletonList(pattern), css, js, "document_end");
+                matches, excludes, css, js, "document_end", "", disabledSites);
     }
 
     private static void before(String source, String first, String second, String label) {

@@ -3,6 +3,7 @@ package com.abrar.daymark;
 import android.content.Context;
 import android.webkit.WebView;
 
+import java.util.Collections;
 import java.util.List;
 
 /** Applies enabled local extension packs to a WebView page. */
@@ -23,9 +24,11 @@ final class ExtensionRuntime {
 
     void onPageFinished(WebView webView, String url) {
         if (webView == null || url == null) return;
-        if (!store.isGloballyEnabled()) return;
-        List<BrowserExtension> matching = store.enabledMatching(url);
-        if (matching.isEmpty()) return;
-        ExtensionInjector.apply(webView, url, matching);
+        // Pass every pack so the page-local bootstrap can activate CSS when an SPA route
+        // changes from a non-matching path to a matching path. The injector filters disabled
+        // packs and rechecks the current URL before executing any userscript.
+        List<BrowserExtension> packs = store.isGloballyEnabled()
+                ? store.listAll() : Collections.<BrowserExtension>emptyList();
+        ExtensionInjector.apply(webView, url, packs);
     }
 }

@@ -1,5 +1,7 @@
 package android.webkit;
 
+import android.content.Context;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.List;
 /** Host-only WebView stub for ExtensionInjectorSmoke. */
 public final class WebView {
     private String url;
+    private final Context context = new Context();
     private final List<String> evaluatedScripts = new ArrayList<>();
 
     public WebView(String url) {
@@ -15,6 +18,10 @@ public final class WebView {
 
     public String getUrl() {
         return url;
+    }
+
+    public Context getContext() {
+        return context;
     }
 
     public void setUrl(String url) {
