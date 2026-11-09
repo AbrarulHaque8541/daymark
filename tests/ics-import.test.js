@@ -157,7 +157,17 @@ test('only valid VTODO completion metadata marks imported tasks done', () => {
     'END:VTODO',
     'BEGIN:VTODO',
     'SUMMARY:Done by completion date',
+    'STATUS:COMPLETED',
     'COMPLETED;VALUE=DATE-TIME:20261108T100000Z',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Completion date without completed status',
+    'COMPLETED:20261108T100000Z',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Completion date while in progress',
+    'STATUS:IN-PROCESS',
+    'COMPLETED:20261108T100000Z',
     'END:VTODO',
     'BEGIN:VTODO',
     'SUMMARY:Malformed completion',
@@ -187,10 +197,10 @@ test('only valid VTODO completion metadata marks imported tasks done', () => {
     ''
   ].join('\n');
   const result = importer.fromIcs(ics, freshCtx());
-  assert.equal(result.tasks.length, 8);
+  assert.equal(result.tasks.length, 10);
   assert.deepEqual(result.tasks.map((task) => task.completed),
-    [true, true, false, false, false, false, false, false]);
-  assert.equal(result.invalidCompletion, 6,
+    [true, true, false, false, false, false, false, false, false, false]);
+  assert.equal(result.invalidCompletion, 8,
     'malformed VTODO metadata and VEVENT completion misuse are disclosed, not trusted');
 });
 
