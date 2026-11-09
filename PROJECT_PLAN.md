@@ -4,6 +4,37 @@ Daymark should remain a fast, simple, privacy-first task app that works offline,
 
 **Status snapshot.** This document contains a staged roadmap, not proof that a feature is implemented. Verify live `main`, open PRs/issues, `android-app/app/build.gradle.kts`, and the [Releases page](https://github.com/AbrarulHaque8541/daymark/releases) before making implementation or publication claims. CI/build success does not establish physical-device behavior; device acceptance is tracked separately in issue #160.
 
+## Current execution queue refresh — 2026-11-09
+
+This priority order supersedes the historical **Execution queue (checked 2026-10-13)** below. Older entries remain as audit history; they are not current implementation or workflow claims. Recheck the live status index and exact PR heads before each action.
+
+### P0 — User-data and real-device acceptance
+
+1. **Complete the physical Android acceptance matrix — issue #160.** No physical device was tested in this refresh. Record model, Android API, WebView provider/version, build SHA, APK SHA, scenario and result. Cover browser navigation/renderer recovery, Reader Mode, extensions, downloads/SAF, encrypted task recovery, same-signer upgrade, TalkBack, and notifications. CI/APK verification is not device acceptance.
+2. **Finish Focus Timer API 29/36 lifecycle qualification — issue #613 / PR #648.** The current-main integration combines the API 30+ Task Editor IME-insets fix with the mode-selector parent-interception fix and a ten-run API 36 gate. At this snapshot, Android CI, Ubuntu/Windows contracts, Focus UI/Sound and Live Update checks pass; API 29/API 36 emulator runs and non-publishing APK workflows are still running on head `723aa6c763e9420f54261737971f4f572568fe04`. Do not call the gesture fix accepted until both emulator jobs finish; physical-device acceptance remains separate.
+3. **Keep browser downloads fail-closed until a redirect-validating transport exists — issue #348 / PR #648.** New WebView download requests are deliberately rejected; existing download history/open/cancel behavior is retained. Do not re-enable DownloadManager or claim download completion without an app-owned HTTPS/redirect/credential-safe transport and SAF device tests.
+
+### P1 — Integrate and independently review security/data work
+
+4. **Bounded API streaming plus resilient data cards — PR #649.** Current-main head `674afcb8ebebde2f2976183816d2c4dfff5d45be` is 1 ahead / 0 behind. Android CI, Ubuntu/Windows contracts, device-test APK/manifest verification and Node **567/567** pass; release publication was skipped. Weather, Currency, Holidays and Wikipedia all use the shared bounded reader. Four UI stream fixtures reject `.text()`. Independent security/data review is still required before merge.
+5. **Webhook privacy and recovery integrity — issue #636/#639/#640, PR #643.** Current head `e51f1d461aacc6864b5e8d97cc2b9f843c62a212` is 50 ahead / 0 behind. Android CI, Ubuntu/Windows contracts, device-test APK verification and Node **556/556** pass. Endpoint URLs are session-only; task/Focus backups are read independently; task completion persists before webhook notification; queue overflow refuses new events without eviction. Independent security/data-integrity review is pending. PR #643 shares `storage-logic.js`, `tests/storage-logic.test.js` and `index.html` with storage-health PR #604; reconcile one combined owner-reviewed tree before merging either.
+6. **Storage health and durable status index — issue #603 / PR #604.** Preserve unreadable keys as UNKNOWN, never treat read errors as absent, and keep partial clear/rollback outcomes truthful. PR #604 is 13 commits behind current main; its old-head green checks are not current-main integration evidence. It owns `docs/AGENT_STATUS.md`; refresh that index and add a new dated snapshot without deleting historical links. PR #637 also touches that index and must coordinate rather than overwrite it.
+7. **Remove Node 20 action warnings — issue #84 / PR #645.** The non-publishing workflow upgrades are in review; its current recorded head has the Focus emulator failure that PR #648 is addressing. Rebase and rerun exact-head checks after #648 is integrated. Release/provenance workflows still use older action pins and require independent review; do not change them as part of an unreviewed CI cleanup.
+8. **Complete recurrence/reminder acceptance — issue #476.** The long-gap arithmetic catch-up and four-digit date boundaries are source-tested. Real AlarmManager delivery, Doze, reboot, timezone changes, OEM battery policy and physical notifications remain NOT TESTED.
+9. **Review browser/extension/feed/desktop security — PRs #626, #627 and #631; issue #348.** Their reported exact-head CI is green, but independent review and physical browser/desktop qualification remain pending. System WebView is not a full Chrome/Firefox extension engine; do not overstate support.
+
+### P2 — Measured platform expansion
+
+10. **Cross-platform architecture — issue #325.** Keep Android as the current shipped target. Desktop browser policy CI is not proof of a packaged desktop task app or GUI/device behavior. Windows/Linux task shell and secure-storage acceptance remain experimental; HarmonyOS/OpenHarmony remains unqualified until an actual ArkTS/native adapter and device evidence exist.
+
+### Current repository baseline (verified 2026-11-09)
+
+- Main: `fbcf1253b18669d36d060b679e1821cf17a6f3a9`; 14 open PRs and 11 open issues at this snapshot.
+- Source identity: `com.abrar.daymark`, versionName `1.6`, versionCode `13`, minSdk `26`, targetSdk `36`. The automation request's `com.cue.daymark` instruction conflicts with root AGENTS.md and live Gradle; no identity change is authorized or made.
+- Latest published release: v1.5; v1.4 remains draft. No release/tag was created in this refresh.
+- Main reports `protected: false`; rulesets API returned an empty list and the protection-detail endpoint returned HTTP 403. See issue #646; no repository settings were changed.
+- Physical-device acceptance: **NOT TESTED**.
+
 
 ## Execution queue (checked 2026-10-13)
 
@@ -262,3 +293,18 @@ Work by: Cue
 Model: not disclosed by runtime
 Tooling: GitHub connector CLI, git, local source/workflow/documentation review
 Timestamp (UTC): 2026-10-13T14:42:14Z
+
+
+## Current-source refresh — 2026-11-09 (updates to the 2026-10-10 suggestion table)
+
+The suggestion table above is historical as of 2026-10-10; these two entries are no longer “verified absent” or “not verified”:
+
+- **S1 Inbound share target:** implemented and merged via PR #635. Shared text/URLs enter the task capture flow; line-ending normalization is covered by source/host tests. Physical share-sheet acceptance across third-party apps remains pending issue #160.
+- **S6 Focus timer on a task:** the Focus Timer exists in current source. Its gesture/IME/instrumentation integration is under PR #648; API 29/API 36 emulator completion and physical acceptance are still pending. Do not describe the timer as device-verified.
+
+Other suggestions remain proposals unless their acceptance criteria are added to the live execution queue. This refresh does not silently accept or implement S2/S3/S4/S5/S7.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
+Timestamp (UTC): 2026-11-09T02:25:00Z
