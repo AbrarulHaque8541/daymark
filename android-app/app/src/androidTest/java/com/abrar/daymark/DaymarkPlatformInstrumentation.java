@@ -415,7 +415,16 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private android.graphics.Rect visibleBounds(android.view.View view) throws Exception {
         android.graphics.Rect[] bounds = {new android.graphics.Rect()};
-        runOnMainSync(() -> view.getGlobalVisibleRect(bounds[0]));
+        int[] rootLocation = new int[2];
+        runOnMainSync(() -> {
+            // getGlobalVisibleRect is relative to the root view, but UiAutomation
+            // injects MotionEvents in screen coordinates. Translate before using
+            // these bounds to select tap/drag coordinates.
+            view.getGlobalVisibleRect(bounds[0]);
+            android.view.View rootView = view.getRootView();
+            if (rootView != null) rootView.getLocationOnScreen(rootLocation);
+        });
+        bounds[0].offset(rootLocation[0], rootLocation[1]);
         return bounds[0];
     }
 
@@ -617,6 +626,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             android.graphics.Rect parentScrollBounds = new android.graphics.Rect();
             int[] parentScrollLocation = new int[2];
             parentScroll.getGlobalVisibleRect(parentScrollBounds);
+            android.view.View rootView = parentScroll.getRootView();
+            int[] rootLocation = new int[2];
+            if (rootView != null) rootView.getLocationOnScreen(rootLocation);
+            parentScrollBounds.offset(rootLocation[0], rootLocation[1]);
             parentScroll.getLocationOnScreen(parentScrollLocation);
             parentScrollState[0] = "parentScrollState={enabled=" + parentScroll.isEnabled()
                     + ", shown=" + parentScroll.isShown()
