@@ -326,7 +326,7 @@
         return false;
       }
       const result = locked.value;
-      if (result.removed.length > 0) notifyTaskStorageChange(null);
+      if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
           + result.failedKeys.length + ' item(s) could not be removed by the browser.';
