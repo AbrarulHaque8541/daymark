@@ -66,7 +66,7 @@ adb shell run-as com.abrar.daymark sh -c 'rm -f files/daymark-instrumentation-in
     adb shell am instrument -w -r "$instrumentation" >"$instrumentation_output" 2>&1
     command_status=$?
   fi
-  printf '%s\\n' "$command_status" >"$status_file"
+  printf '%s\n' "$command_status" >"$status_file"
 ) &
 instrumentation_pid=$!
 bridge_status=0
@@ -96,20 +96,20 @@ if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
   if [ -z "$phase_log" ]; then
     phase_log="INSTRUMENTATION_PHASE_LOG: unavailable (missing file or bounded adb read timed out)."
   fi
-  printf '%s\\n' "$phase_log" >"$phase_log_path"
+  printf '%s\n' "$phase_log" >"$phase_log_path"
   output="${output}
 INSTRUMENTATION_ERROR: host command exceeded its 300-second timeout (exit $instrument_status)."
-  printf '%s\\n' "$output"
+  printf '%s\n' "$output"
   echo "::group::instrumentation-phases.log captured after instrumentation timed out at 300 seconds"
   cat "$phase_log_path"
   echo "::endgroup::"
   report_failure "$output" "$phase_log"
   return 1
 fi
-printf '%s\\n' "$output"
-if [ "$instrument_status" -ne 0 ] \\
-   || ! printf '%s\\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: result=passed' \\
-   || ! printf '%s\\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: main_activity_tabs_transition=passed'; then
+printf '%s\n' "$output"
+if [ "$instrument_status" -ne 0 ] \
+   || ! printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: result=passed' \
+   || ! printf '%s\n' "$output" | grep -Fq 'INSTRUMENTATION_RESULT: main_activity_tabs_transition=passed'; then
   report_failure "$output"
   return 1
 fi
