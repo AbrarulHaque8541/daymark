@@ -26,7 +26,7 @@ Current baseline:
 
 ### P0 governance / release blockers
 - Enable main branch protection and independent PR approvals (#646).
-- Resolve application ID policy conflict: source/root AGENTS says `com.abrar.daymark`; user safety instruction says `com.cue.daymark`. No identity change without explicit owner decision.
+- Resolve application ID policy conflict: source/root AGENTS says `com.abrar.daymark`; user safety instruction says `the user-mandated target identifier`. No identity change without explicit owner decision.
 - Keep v1.5 as latest published; v1.4 remains draft. No release/tag/version/signing changes authorized.
 - No physical device tests claimed.
 
