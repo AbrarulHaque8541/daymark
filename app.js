@@ -1437,12 +1437,31 @@
     }
   }
 
-  function hasFocusRecoveryBackup() {
+  function readFocusRecoveryBackupState() {
     try {
-      return focusRecoveryPayloads(localStorage.getItem(FOCUS_BACKUP_KEY)).length > 0;
+      const raw = localStorage.getItem(FOCUS_BACKUP_KEY);
+      return {
+        readable: true,
+        hasPayload: focusRecoveryPayloads(raw).length > 0
+      };
     } catch (error) {
-      return false;
+      // Unknown is not absence: callers must surface the uncertainty and must
+      // never clear or replace a key whose contents could not be inspected.
+      return { readable: false, hasPayload: false };
     }
+  }
+
+  function reportUnknownFocusRecoveryBackup() {
+    setStorageStatus(
+      'Focus recovery backup status unknown because browser storage could not be read; existing data was not changed',
+      true
+    );
+    // The combined exporter reads task and Focus backups independently. It
+    // can still offer a readable task backup without pretending the Focus key
+    // was absent or exporting a fabricated empty value.
+    offerRecoveryExport(
+      'Focus recovery backup could not be checked. Any other readable recovery data is available for export.'
+    );
   }
 
   function reportFocusRecovery(backupSaved) {
@@ -1507,7 +1526,12 @@
       return empty;
     }
     if (saved === null) {
-      if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
+      const backupState = readFocusRecoveryBackupState();
+      if (!backupState.readable) {
+        reportUnknownFocusRecoveryBackup();
+      } else if (backupState.hasPayload) {
+        reportFocusRecovery(true);
+      }
       return empty;
     }
     try {
@@ -1528,8 +1552,10 @@
         const backupSaved = backUpRawFocusPayload(saved);
         if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
         reportFocusRecovery(backupSaved);
-      } else if (hasFocusRecoveryBackup()) {
-        reportFocusRecovery(true);
+      } else {
+        const backupState = readFocusRecoveryBackupState();
+        if (!backupState.readable) reportUnknownFocusRecoveryBackup();
+        else if (backupState.hasPayload) reportFocusRecovery(true);
       }
 
       const completedSession = restoreResult.completedSession;
@@ -1555,7 +1581,9 @@
         // completion log. On quota failure the original primary value remains.
         try {
           localStorage.setItem(FOCUS_KEY, JSON.stringify({ session: null, log: entries }));
-          if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
+          const backupState = readFocusRecoveryBackupState();
+          if (!backupState.readable) reportUnknownFocusRecoveryBackup();
+          else if (backupState.hasPayload) reportFocusRecovery(true);
         } catch (saveError) {
           const backupSaved = backUpRawFocusPayload(saved);
           if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
