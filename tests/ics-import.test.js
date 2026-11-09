@@ -346,7 +346,7 @@ test('a malformed calendar envelope cannot write or partially import existing ta
   assert.equal(storageData[ui.STORAGE_KEY], original, 'existing task bytes remain unchanged');
   const status = created.find((el) => el.id === 'import-status');
   assert.ok(status);
-  assert.match(status.textContent, /Import failed: Calendar component appears outside the VCALENDAR block\\. Nothing was changed\\./);
+  assert.match(status.textContent, /Import failed: Calendar component appears outside the VCALENDAR block\. Nothing was changed\./);
 });
 
 test('index.html offers the calendar format in the import file picker', () => {
