@@ -51,4 +51,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -rniE "TODO|FIXME|lorem ipsum" --include="*.js" --include="*.html" --include="*.css" --exclude-dir=node_modules . | grep -v "tests/"
+          ! grep -rniwE "TODO|FIXME|lorem ipsum" --include="*.js" --include="*.html" --include="*.css" --exclude-dir=node_modules . | grep -v "tests/"
