@@ -444,6 +444,67 @@ test('malformed UTF-8 split across chunks aborts, cancels and releases the reade
   assert.equal(textCalled, false, 'stream path never materializes response.text()');
 });
 
+test('feed reader acquisition failure aborts without an unbounded text fallback', async () => {
+  let capturedSignal = null;
+  let textCalled = false;
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: { getReader() { throw new Error('stream is already locked'); } },
+    async text() { textCalled = true; return RSS; }
+  };
+  await assert.rejects(
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 1000),
+    /stream is already locked/
+  );
+  assert.ok(capturedSignal);
+  assert.equal(capturedSignal.aborted, true, 'reader acquisition failure aborts the request');
+  assert.equal(textCalled, false, 'reader acquisition failure never falls back to response.text()');
+});
+
+test('decoder initialization failure cancels and releases an acquired reader', async () => {
+  const originalTextDecoder = globalThis.TextDecoder;
+  let capturedSignal = null;
+  let cancelled = false;
+  let released = false;
+  let textCalled = false;
+  const reader = {
+    async read() { throw new Error('read must not start when decoder construction fails'); },
+    async cancel() { cancelled = true; },
+    releaseLock() { released = true; }
+  };
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: { getReader: () => reader },
+    async text() { textCalled = true; return RSS; }
+  };
+  try {
+    globalThis.TextDecoder = class {
+      constructor() { throw new Error('decoder initialization failed'); }
+    };
+    await assert.rejects(
+      feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+        capturedSignal = options.signal;
+        return response;
+      }, 1000),
+      /decoder initialization failed/
+    );
+  } finally {
+    globalThis.TextDecoder = originalTextDecoder;
+  }
+  assert.ok(capturedSignal);
+  assert.equal(capturedSignal.aborted, true, 'decoder initialization failure aborts the request');
+  assert.equal(cancelled, true, 'the acquired reader is cancelled');
+  assert.equal(released, true, 'the acquired reader lock is released');
+  assert.equal(textCalled, false, 'decoder failure never falls back to response.text()');
+});
+
 test('feed fetch parses a streamed response and cancels non-success response bodies', async () => {
   const streamed = streamedResponse(RSS);
   const parsed = await feed.fetchFeed('https://example.com/feed.xml', async () => streamed.response, 1000);

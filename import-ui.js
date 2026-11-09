@@ -2,13 +2,15 @@
  * Daymark open-format import UI wiring for the web prototype.
  *
  * Extends the existing #import-tasks flow: JSON backups keep flowing to the
- * built-in app.js handler untouched; a selected .csv or .md file is
+ * built-in app.js handler untouched; a selected .csv, .md or .ics file is
  * intercepted first (capture-phase change listener on the document fires
  * before app.js's at-target listener) and parsed by import-logic.js. Parsed
  * tasks are merged into daymark.tasks.v1: existing ids win, invalid rows are
- * skipped, and every skip is reported honestly in a status line. After a
- * successful save a synthesized storage event asks app.js to reload tasks so
- * imported rows appear immediately. Fully offline: no network, no timers.
+ * skipped, and every skip is reported honestly in a status line. Calendar
+ * files disclose what was simplified: recurring items import once and time
+ * zones are kept as written. After a successful save a synthesized storage
+ * event asks app.js to reload tasks so imported rows appear immediately.
+ * Fully offline: no network, no timers.
  */
 ((root) => {
   'use strict';
@@ -100,9 +102,14 @@
           throw new Error('the file is larger than the 8 MB import limit');
         }
         const text = await readText(file);
+        if (format === 'ics' && typeof importApi.fromIcs !== 'function') {
+          throw new Error('calendar import is unavailable in this build');
+        }
         const parsed = format === 'csv'
           ? importApi.fromCsv(text, { now: now(), makeId })
-          : importApi.fromMarkdown(text, { now: now(), makeId });
+          : format === 'markdown'
+            ? importApi.fromMarkdown(text, { now: now(), makeId })
+            : importApi.fromIcs(text, { now: now(), makeId });
         if (!logic || typeof logic.validateStoredTasks !== 'function') {
           throw new Error('task logic is unavailable');
         }
@@ -127,6 +134,13 @@
         if (merge.duplicates > 0) parts.push(plural(merge.duplicates, 'duplicate') + ' skipped.');
         if (merge.invalid > 0) parts.push(plural(merge.invalid, 'invalid task') + ' skipped.');
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
+        if (parsed.recurring > 0) {
+          parts.push(plural(parsed.recurring, 'recurring item') + ' imported once as a one-time task.');
+        }
+        if (parsed.timezoneDropped > 0) {
+          parts.push('Times were kept as written; time zones were not applied.');
+        }
+        if (parsed.cancelled > 0) parts.push(plural(parsed.cancelled, 'cancelled item') + ' skipped.');
         status(parts.join(' '));
       } catch (error) {
         status('Import failed: ' + (error && error.message ? error.message : 'unknown error') + ' Nothing was changed.');

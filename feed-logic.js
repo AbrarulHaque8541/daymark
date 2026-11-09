@@ -243,19 +243,24 @@
       throw new Error('A streaming response reader is required to enforce the feed size limit safely.');
     }
 
-    const reader = body.getReader();
-    setActiveReader(reader);
-    const decoder = new root.TextDecoder('utf-8', { fatal: true });
-    let xml = '';
-    let bytesRead = 0;
+    let reader = null;
     let readerCancelled = false;
     const cancelReader = async () => {
-      if (readerCancelled) return;
+      if (readerCancelled || !reader) return;
       readerCancelled = true;
       if (typeof reader.cancel !== 'function') return;
       try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
     };
     try {
+      // Reader acquisition and decoder construction can both throw (for
+      // example, a locked stream or a constrained WebView). Keep them inside
+      // the protected region so the request is aborted and any acquired lock
+      // is cancelled/released on every failure path.
+      reader = body.getReader();
+      setActiveReader(reader);
+      const decoder = new root.TextDecoder('utf-8', { fatal: true });
+      let xml = '';
+      let bytesRead = 0;
       for (;;) {
         const part = await reader.read();
         if (part.done) break;
@@ -284,7 +289,9 @@
       throw error;
     } finally {
       setActiveReader(null);
-      try { reader.releaseLock(); } catch (error) { /* minimal test readers may omit releaseLock */ }
+      if (reader) {
+        try { reader.releaseLock(); } catch (error) { /* minimal test readers may omit releaseLock */ }
+      }
     }
   }
 
