@@ -452,7 +452,7 @@ test('every repository Node test file registers at least one executable test cas
     'regular-expression literals must not count as executable registrations');
   assert.equal(hasRegisteredTestCase("// test('fake')\\n/* it('fake') */"), false,
     'line and block comments must not count as executable registrations');
-  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => {});"), true,
+  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => assert.ok(true));"), true,
     'focused-test text inside a template literal must not reject a real test');
   assert.equal(hasRegisteredTestCase("const note = \"not test('fake')\";"), false,
     'prose before a test-like phrase inside a quoted string must not count as a registration');
