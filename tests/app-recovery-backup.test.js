@@ -9,6 +9,7 @@ const feedLogic = require('../feed-logic.js');
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
+const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
 const FEED_KEY = 'daymark.feed.v1';
 const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
 
@@ -44,7 +45,7 @@ function streamedFeedResponse() {
   };
 }
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set()) {
   const elements = new Map();
 
   function element(selector) {
@@ -116,7 +117,10 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   };
 
   const localStorage = {
-    getItem: (key) => storedValues.has(key) ? storedValues.get(key) : null,
+    getItem(key) {
+      if (failReads.has(key)) throw new Error('SecurityError: storage read blocked');
+      return storedValues.has(key) ? storedValues.get(key) : null;
+    },
     setItem: (key, value) => {
       if (failWrites.has(key)) throw new Error('QuotaExceededError');
       storedValues.set(key, String(value));
@@ -518,4 +522,34 @@ test('Briefing confirms when its cache was persisted for offline reading', async
   assert.match(app.elements.get('#feed-status').textContent,
     /Saved for offline reading/,
     'the status only promises offline availability after persistence succeeds');
+});
+
+
+test('task recovery backup remains exportable when the Focus backup key is unreadable', () => {
+  const taskBackup = JSON.stringify([validTask('task-backup', 'Task backup remains readable')]);
+  const focusBackup = JSON.stringify({ session: null, log: [] });
+  const storedValues = new Map([[BACKUP_KEY, taskBackup], [FOCUS_BACKUP_KEY, focusBackup]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([STORAGE_KEY, FOCUS_BACKUP_KEY]));
+
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'a readable task backup must still expose the export action');
+  assert.equal(action.textContent, 'Export recovery');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], taskBackup, 'the export contains the readable task backup bytes');
+  assert.equal(storedValues.get(BACKUP_KEY), taskBackup, 'the original task backup remains untouched');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup, 'the unreadable Focus key is not overwritten');
+});
+
+test('Focus recovery backup remains exportable when the task backup key is unreadable', () => {
+  const focusBackup = JSON.stringify({ session: null, log: [{ id: 'focus-backup', kind: 'focus', finalElapsedMs: 1000 }] });
+  const storedValues = new Map([[STORAGE_KEY, '[]'], [FOCUS_BACKUP_KEY, focusBackup]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([BACKUP_KEY]));
+
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'a readable Focus backup must still expose the export action');
+  assert.equal(action.textContent, 'Export recovery');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], focusBackup, 'the export contains the readable Focus backup bytes');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup, 'the original Focus backup remains untouched');
+  assert.equal(storedValues.has(BACKUP_KEY), false, 'the unreadable task backup is not recreated as an empty value');
 });

@@ -552,16 +552,26 @@
   }
 
   function readRecoveryExportPayload() {
+    // Task and Focus backups are independent recovery sources. A read failure
+    // for one key must not hide a readable backup under the other key.
     let taskBackup = null;
     let focusBackup = null;
+    let taskReadable = false;
+    let focusReadable = false;
     try {
       taskBackup = localStorage.getItem(BACKUP_KEY);
-      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
+      taskReadable = true;
     } catch (error) {
-      return null;
+      // Preserve the independently readable Focus backup, if any.
     }
-    const hasTaskBackup = typeof taskBackup === 'string' && taskBackup.length > 0;
-    const hasFocusBackup = typeof focusBackup === 'string' && focusBackup.length > 0;
+    try {
+      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
+      focusReadable = true;
+    } catch (error) {
+      // Preserve the independently readable task backup, if any.
+    }
+    const hasTaskBackup = taskReadable && typeof taskBackup === 'string' && taskBackup.length > 0;
+    const hasFocusBackup = focusReadable && typeof focusBackup === 'string' && focusBackup.length > 0;
     if (hasTaskBackup && hasFocusBackup) {
       return JSON.stringify({
         format: 'daymark-combined-recovery-v1',
