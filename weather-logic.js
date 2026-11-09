@@ -1,6 +1,9 @@
 ((root) => {
   'use strict';
 
+  const responseBodyApi = root.DaymarkResponseBody
+    || (typeof require === 'function' ? require('./response-body-logic.js') : null);
+
   // Keyless weather glance for the Daymark web prototype, powered by the free
   // Open-Meteo public APIs (no API key, no account, no maintainer backend).
   // Mirrors the feed-logic.js module style: pure functions, no DOM, no storage,
@@ -182,92 +185,23 @@
       && typeof value.fetchedAt === 'string' && !Number.isNaN(Date.parse(value.fetchedAt)));
   }
 
-  async function readBoundedResponseText(response) {
-    // Reject a declared oversized body before reading it. Content-Length may
-    // describe compressed bytes, so the streaming byte counter remains the
-    // authoritative bound on the decoded response body.
-    let declaredLength = null;
-    try {
-      const headers = response && response.headers;
-      if (headers && typeof headers.get === 'function') {
-        const header = headers.get('content-length');
-        const value = header === null || header === undefined ? '' : String(header).trim();
-        if (value.length > 0 && Array.from(value).every((character) => character >= '0' && character <= '9')) {
-          const parsed = Number(value);
-          if (Number.isSafeInteger(parsed)) declaredLength = parsed;
-        }
-      }
-    } catch (error) {
-      // A non-readable optional header does not prevent bounded stream reading.
-    }
-    if (declaredLength !== null && declaredLength > MAX_JSON_BYTES) {
-      throw new Error('The weather response was too large to parse safely.');
-    }
-
-    const body = response && response.body;
-    const Decoder = typeof root.TextDecoder === 'function' ? root.TextDecoder : null;
-    if (body && typeof body.getReader === 'function' && Decoder) {
-      const reader = body.getReader();
-      const decoder = new Decoder('utf-8');
-      let bytesRead = 0;
-      let text = '';
-      try {
-        while (true) {
-          const part = await reader.read();
-          if (!part || typeof part !== 'object') {
-            throw new Error('The weather response stream was malformed.');
-          }
-          if (part.done) break;
-          const chunk = part.value;
-          if (!chunk || !Number.isFinite(chunk.byteLength)) {
-            throw new Error('The weather response stream was malformed.');
-          }
-          bytesRead += chunk.byteLength;
-          if (bytesRead > MAX_JSON_BYTES) {
-            try {
-              const cancellation = reader.cancel();
-              if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
-            } catch (error) {
-              // The request is already rejected; cancellation is best-effort.
-            }
-            throw new Error('The weather response was too large to parse safely.');
-          }
-          text += decoder.decode(chunk, { stream: true });
-        }
-        text += decoder.decode();
-        return text;
-      } finally {
-        try {
-          reader.releaseLock();
-        } catch (error) {
-          // Some lightweight stream implementations do not expose a releasable lock.
-        }
-      }
-    }
-
-    if (!response || typeof response.text !== 'function') {
-      throw new Error('The weather response body is unavailable.');
-    }
-    const text = await response.text();
-    if (typeof text !== 'string') throw new Error('The weather response was malformed.');
-    const Encoder = typeof root.TextEncoder === 'function' ? root.TextEncoder : null;
-    const byteLength = Encoder ? new Encoder().encode(text).byteLength : text.length;
-    if (byteLength > MAX_JSON_BYTES) {
-      throw new Error('The weather response was too large to parse safely.');
-    }
-    return text;
-  }
-
   async function fetchJson(url, fetchImpl, timeoutMs) {
     if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
     const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
     let timedOut = false;
+    let activeReader = null;
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     let timer = null;
     const timeout = new Promise((resolve, reject) => {
       timer = root.setTimeout(() => {
         timedOut = true;
         if (controller) controller.abort();
+        if (activeReader && typeof activeReader.cancel === 'function') {
+          try {
+            const cancellation = activeReader.cancel();
+            if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+          } catch (error) { /* cancellation is best-effort */ }
+        }
         reject(new Error('Weather request timed out.'));
       }, duration);
     });
@@ -275,10 +209,26 @@
       const response = await fetchImpl(url, {
         signal: controller ? controller.signal : undefined,
         cache: 'no-store',
-        redirect: 'follow'
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        redirect: 'error'
       });
       if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
-      const text = await readBoundedResponseText(response);
+      if (!responseBodyApi || typeof responseBodyApi.readBoundedText !== 'function') {
+        throw new Error('The bounded response reader is unavailable.');
+      }
+      const text = await responseBodyApi.readBoundedText(response, {
+        maxBytes: MAX_JSON_BYTES,
+        maxChars: MAX_JSON_CHARS,
+        tooLargeMessage: 'The weather response was too large to parse safely.',
+        malformedMessage: 'The weather response was malformed.',
+        streamRequiredMessage: 'This browser cannot read weather responses with the required size limit.',
+        timeoutMessage: 'Weather request timed out.',
+        controller,
+        isTimedOut: () => timedOut,
+        onReader: (reader) => { activeReader = reader; }
+      });
       if (timedOut) throw new Error('Weather request timed out.');
       try {
         return JSON.parse(text);

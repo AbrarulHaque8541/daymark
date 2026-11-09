@@ -1,6 +1,9 @@
 ((root) => {
   'use strict';
 
+  const responseBodyApi = root.DaymarkResponseBody
+    || (typeof require === 'function' ? require('./response-body-logic.js') : null);
+
   // Keyless public-holidays lookup for the Daymark web prototype, powered by the
   // free Nager.Date public API (no API key, no account, no maintainer backend).
   // Mirrors the weather-logic.js module style: pure functions, no DOM, no
@@ -10,7 +13,8 @@
 
   const MAX_NAME_CHARS = 120;
   const MAX_LOCAL_NAME_CHARS = 120;
-  const MAX_JSON_CHARS = 256 * 1024;
+  const MAX_JSON_BYTES = 256 * 1024;
+  const MAX_JSON_CHARS = MAX_JSON_BYTES;
   const MAX_HOLIDAYS = 60;
   const DEFAULT_TIMEOUT_MS = 10000;
   const MIN_YEAR = 2000;
@@ -109,12 +113,19 @@
     if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
     const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
     let timedOut = false;
+    let activeReader = null;
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     let timer = null;
     const timeout = new Promise((resolve, reject) => {
       timer = root.setTimeout(() => {
         timedOut = true;
         if (controller) controller.abort();
+        if (activeReader && typeof activeReader.cancel === 'function') {
+          try {
+            const cancellation = activeReader.cancel();
+            if (cancellation && typeof cancellation.catch === 'function') cancellation.catch(() => {});
+          } catch (error) { /* cancellation is best-effort */ }
+        }
         reject(new Error('Holidays request timed out.'));
       }, duration);
     });
@@ -122,11 +133,26 @@
       const response = await fetchImpl(url, {
         signal: controller ? controller.signal : undefined,
         cache: 'no-store',
-        redirect: 'follow'
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        redirect: 'error'
       });
       if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : 'unknown'}`);
-      const text = await response.text();
-      if (text.length > MAX_JSON_CHARS) throw new Error('The holidays response was too large to parse safely.');
+      if (!responseBodyApi || typeof responseBodyApi.readBoundedText !== 'function') {
+        throw new Error('The bounded response reader is unavailable.');
+      }
+      const text = await responseBodyApi.readBoundedText(response, {
+        maxBytes: MAX_JSON_BYTES,
+        maxChars: MAX_JSON_CHARS,
+        tooLargeMessage: 'The holidays response was too large to parse safely.',
+        malformedMessage: 'The holidays response was malformed.',
+        streamRequiredMessage: 'This browser cannot read holiday responses with the required size limit.',
+        timeoutMessage: 'Holidays request timed out.',
+        controller,
+        isTimedOut: () => timedOut,
+        onReader: (reader) => { activeReader = reader; }
+      });
       if (timedOut) throw new Error('Holidays request timed out.');
       try {
         return JSON.parse(text);
@@ -177,6 +203,7 @@
     MAX_NAME_CHARS,
     MAX_LOCAL_NAME_CHARS,
     MAX_JSON_CHARS,
+    MAX_JSON_BYTES,
     MAX_HOLIDAYS,
     DEFAULT_TIMEOUT_MS,
     MIN_YEAR,
