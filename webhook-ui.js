@@ -402,8 +402,12 @@
                 return { ok: true, missing: true };
               }
 
-              if (result.failure) {
-                if (result.queue.length) latest[index] = result.queue[0];
+              if (result.failure && result.queue.length) {
+                // A retryable failure keeps the updated attempt count. When
+                // flushQueue returns no event after the final failed attempt,
+                // it has deliberately exhausted the retry budget and must be
+                // removed durably just like a successful delivery.
+                latest[index] = result.queue[0];
               } else {
                 latest.splice(index, 1);
               }
@@ -429,8 +433,16 @@
             }
             if (!updated.value || !updated.value.ok) break;
             if (result.failure) {
-              status('Could not deliver webhook events. Check the endpoint and retry. '
-                + (queue.length ? queueNote() : '') + storageWarning());
+              const droppedNotice = result.droppedCount
+                ? result.droppedCount + (result.droppedCount === 1
+                  ? ' event was dropped after too many attempts. '
+                  : ' events were dropped after too many attempts. ')
+                : '';
+              const remainingNotice = queue.length
+                ? 'Could not deliver remaining webhook events. Check the endpoint and retry. '
+                  + queueNote()
+                : (result.droppedCount ? 'No events remain queued.' : 'Could not deliver webhook events. Check the endpoint and retry.');
+              status(droppedNotice + remainingNotice + storageWarning());
               break;
             }
             // A successful or max-attempt-dropped event is now durably removed.
