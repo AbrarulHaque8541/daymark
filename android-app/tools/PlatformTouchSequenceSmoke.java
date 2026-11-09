@@ -23,6 +23,14 @@ public final class PlatformTouchSequenceSmoke {
         equal(2360L, swipe.get(9).eventTime, "swipe duration");
         equal(810f, swipe.get(9).x, "swipe final x");
         equal(620f, swipe.get(9).y, "swipe final y");
+        List<PlatformTouchSequence.Sample> shortestSwipe =
+                PlatformTouchSequence.swipe(0, 0, 9, 9, 3000L, 9);
+        for (int index = 1; index < shortestSwipe.size(); index++) {
+            assertions++;
+            if (shortestSwipe.get(index).eventTime <= shortestSwipe.get(index - 1).eventTime) {
+                throw new AssertionError("minimum-duration swipe timestamps must increase strictly");
+            }
+        }
         for (int index = 1; index < swipe.size(); index++) {
             assertions++;
             if (swipe.get(index).eventTime <= swipe.get(index - 1).eventTime) {
