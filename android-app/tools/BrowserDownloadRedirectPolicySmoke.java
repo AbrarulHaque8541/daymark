@@ -110,6 +110,14 @@ public final class BrowserDownloadRedirectPolicySmoke {
         rejects(BrowserDownloadRedirectPolicy.Rejection.RESERVED_HOST, () -> start("https://hidden.onion/file", resolver));
         rejects(BrowserDownloadRedirectPolicy.Rejection.RESERVED_HOST, () -> start("https://intranet/file", resolver));
         rejects(BrowserDownloadRedirectPolicy.Rejection.RESERVED_HOST, () -> start("https://router.home.arpa/file", resolver));
+        final int[] altResolverCalls = {0};
+        BrowserDownloadRedirectPolicy.HostResolver altResolver = host -> {
+            altResolverCalls[0]++;
+            return new InetAddress[]{ip("8.8.8.8")};
+        };
+        rejects(BrowserDownloadRedirectPolicy.Rejection.RESERVED_HOST,
+                () -> start("https://service.alt/file", altResolver));
+        check(altResolverCalls[0] == 0, ".alt special-use names are rejected before DNS lookup");
         rejects(BrowserDownloadRedirectPolicy.Rejection.UNSAFE_ADDRESS, () -> start("https://private.example.net/file", resolver));
         rejects(BrowserDownloadRedirectPolicy.Rejection.UNSAFE_ADDRESS, () -> start("https://loopback.example.net/file", resolver));
         rejects(BrowserDownloadRedirectPolicy.Rejection.UNSAFE_ADDRESS, () -> start("https://linklocal.example.net/file", resolver));

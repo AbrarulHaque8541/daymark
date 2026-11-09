@@ -344,6 +344,8 @@ final class BrowserDownloadRedirectPolicy {
                 || host.endsWith(".example")
                 || host.endsWith(".invalid")
                 || host.endsWith(".onion")
+                || "alt".equals(host)
+                || host.endsWith(".alt") // RFC 9476 special-use namespace; do not send to DNS.
                 || "home.arpa".equals(host)
                 || host.endsWith(".home.arpa");
     }
