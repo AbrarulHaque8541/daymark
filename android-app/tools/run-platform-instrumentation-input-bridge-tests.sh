@@ -57,7 +57,7 @@ run_case() {
   printf '%s\n' "$request" > "$FAKE_DEVICE_DIR/instrumentation-input-request.txt"
   FAKE_STOP_AFTER_READS=0
   export FAKE_STOP_AFTER_READS
-  drive_instrumentation_input_bridge com.abrar.daymark "$FAKE_STOP_FILE"
+  drive_instrumentation_input_bridge com.abrar.daymark.test "$FAKE_STOP_FILE"
   if [ -n "$expected_input" ]; then
     grep -Fqx "$expected_input" "$FAKE_INPUT_LOG" || fail "expected host input '$expected_input'"
   else
@@ -75,7 +75,7 @@ printf '%s\n' "4|swipe|1|2|3|4|360" > "$FAKE_DEVICE_DIR/instrumentation-input-re
 FAKE_INPUT_STATUS=7
 FAKE_STOP_AFTER_READS=0
 export FAKE_INPUT_STATUS FAKE_STOP_AFTER_READS
-drive_instrumentation_input_bridge com.abrar.daymark "$FAKE_STOP_FILE"
+drive_instrumentation_input_bridge com.abrar.daymark.test "$FAKE_STOP_FILE"
 grep -Fqx "4|7" "$FAKE_DEVICE_DIR/instrumentation-input-result.txt" \
   || fail "host input failure status must reach instrumentation"
 : > "$FAKE_INPUT_LOG"
@@ -84,7 +84,7 @@ printf '%s\n' "5|tap|12|34|12|34|100" > "$FAKE_DEVICE_DIR/instrumentation-input-
 unset FAKE_INPUT_STATUS
 FAKE_STOP_AFTER_READS=2
 export FAKE_STOP_AFTER_READS
-drive_instrumentation_input_bridge com.abrar.daymark "$FAKE_STOP_FILE"
+drive_instrumentation_input_bridge com.abrar.daymark.test "$FAKE_STOP_FILE"
 [ "$(wc -l < "$FAKE_INPUT_LOG" | tr -d '[:space:]')" = "1" ] \
   || fail "a repeated request sequence must be dispatched only once"
 
@@ -95,7 +95,7 @@ FAKE_STOP_AFTER_READS=0
 FAKE_PUBLISH_STATUS=9
 export FAKE_STOP_AFTER_READS FAKE_PUBLISH_STATUS
 set +e
-publish_error="$(drive_instrumentation_input_bridge com.abrar.daymark "$FAKE_STOP_FILE" 2>&1)"
+publish_error="$(drive_instrumentation_input_bridge com.abrar.daymark.test "$FAKE_STOP_FILE" 2>&1)"
 publish_status=$?
 set -e
 [ "$publish_status" -ne 0 ] || fail "a failed result publication must stop the bridge"
