@@ -6,6 +6,7 @@ const importer = require('../import-logic.js');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
+const mutation = require('../task-mutation-logic.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -25,6 +26,35 @@ function fakeElement(tag) {
     attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; }
   };
+}
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      assert.equal(options.mode, 'exclusive');
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
+    }
+  };
+}
+
+function readValidTasks(raw) {
+  if (raw === null) return { ok: true, tasks: [] };
+  if (typeof raw !== 'string' || raw.length === 0 || logic.hasDuplicateJsonKeys(raw)) {
+    return { ok: false, reason: 'invalid-current' };
+  }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (error) {
+    return { ok: false, reason: 'invalid-current' };
+  }
+  if (!Array.isArray(parsed)) return { ok: false, reason: 'invalid-current' };
+  const validated = logic.validateStoredTasks(parsed);
+  if (validated.rejectedCount > 0) return { ok: false, reason: 'invalid-current' };
+  return { ok: true, tasks: validated.tasks };
 }
 
 function fakeEnv(options) {
@@ -49,8 +79,9 @@ function fakeEnv(options) {
       if (index !== -1) listeners.splice(index, 1);
     }
   };
-  const storageData = {};
+  const storageData = opts.storageData || {};
   const writes = [];
+  const locks = opts.locks === false ? null : (opts.lockManager || makeLockManager());
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
@@ -62,6 +93,7 @@ function fakeEnv(options) {
     constructor(type, init) { this.type = type; this.key = init && init.key; }
   }
   const win = {
+    navigator: locks ? { locks } : {},
     StorageEvent: MockStorageEvent,
     dispatchEvent(event) { dispatched.push(event); return true; }
   };
@@ -72,12 +104,16 @@ function fakeEnv(options) {
       localStorage: storage,
       importApi: importer,
       logic,
+      taskMutation: mutation,
+      lockManager: locks,
       now: () => NOW
     },
     elements,
     created,
     listeners,
     storageData,
+    storage,
+    locks,
     writes,
     dispatched
   };
@@ -323,7 +359,107 @@ test('a task-store write failure preserves the original data and sends no refres
   assert.equal(writes.length, 0, 'a failed setItem is not recorded as a successful write');
   assert.equal(dispatched.length, 0, 'no refresh event is sent after a failed save');
   assert.match(created.find((el) => el.id === 'import-status').textContent,
-    /Import failed: quota exceeded.*Nothing was changed/);
+    /Import failed: browser storage rejected the task write.*Nothing was changed/);
+});
+
+test('open-format import merges a normal task write completed while the file is being read', async () => {
+  const csv = exporter.toCsv([
+    { id: 'ignored', title: 'From concurrent import', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let releaseFile;
+  const pendingFileText = new Promise((resolve) => { releaseFile = resolve; });
+  const file = { name: 'racing.csv', size: csv.length, text: () => pendingFileText };
+  const { env, elements, storageData, storage, locks, dispatched } = fakeEnv({
+    stored: JSON.stringify(sampleTasks),
+    files: [file]
+  });
+  const handle = ui.attachImportUi(env);
+  const importPromise = handle.onChange(changeEvent(elements['import-file']));
+
+  const normalTask = {
+    id: 'normal-tab-task',
+    title: 'Normal tab task',
+    dueDate: null,
+    priority: 'medium',
+    completed: false,
+    createdAt: NOW,
+    updatedAt: NOW
+  };
+  const normalSave = await mutation.commitTaskSnapshot({
+    lockManager: locks,
+    storage,
+    key: ui.STORAGE_KEY,
+    baseTasks: sampleTasks,
+    desiredTasks: sampleTasks.concat(normalTask),
+    readCurrent: readValidTasks
+  });
+  assert.equal(normalSave.ok, true);
+  releaseFile(csv);
+  await importPromise;
+
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.ok(saved.some((task) => task.title === 'Normal tab task'));
+  assert.ok(saved.some((task) => task.title === 'From concurrent import'));
+  assert.equal(dispatched.length, 1, 'the successful import signals the same-tab refresh');
+});
+
+test('two open-format imports with a same-id different-value race fail closed', async () => {
+  const makeCsv = (title) => exporter.toCsv([
+    { id: 'ignored', title, dueDate: null, priority: 'medium', completed: false,
+      createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const sharedStorage = { [ui.STORAGE_KEY]: JSON.stringify(sampleTasks) };
+  const sharedLocks = makeLockManager();
+  const first = fakeEnv({
+    stored: JSON.stringify(sampleTasks),
+    storageData: sharedStorage,
+    lockManager: sharedLocks,
+    files: [csvFile(makeCsv('First imported value'))]
+  });
+  const second = fakeEnv({
+    stored: JSON.stringify(sampleTasks),
+    storageData: sharedStorage,
+    lockManager: sharedLocks,
+    files: [csvFile(makeCsv('Conflicting imported value'))]
+  });
+  const firstHandle = ui.attachImportUi(first.env);
+  const secondHandle = ui.attachImportUi(second.env);
+
+  await Promise.all([
+    firstHandle.onChange(changeEvent(first.elements['import-file'])),
+    secondHandle.onChange(changeEvent(second.elements['import-file']))
+  ]);
+
+  const saved = JSON.parse(sharedStorage[ui.STORAGE_KEY]);
+  assert.equal(saved.filter((task) => task.id === 'import-' + Date.parse(NOW) + '-1').length, 1);
+  const titles = saved.filter((task) => task.id === 'import-' + Date.parse(NOW) + '-1').map((task) => task.title);
+  assert.ok(titles[0] === 'First imported value' || titles[0] === 'Conflicting imported value');
+  const statuses = [
+    first.created.find((el) => el.id === 'import-status').textContent,
+    second.created.find((el) => el.id === 'import-status').textContent
+  ];
+  assert.equal(statuses.filter((value) => /Imported 1 task/.test(value)).length, 1);
+  assert.equal(statuses.filter((value) => /conflicts with a newer task/.test(value)).length, 1);
+});
+
+test('open-format imports fail closed when Web Locks are unavailable', async () => {
+  const csv = exporter.toCsv([
+    { id: 'ignored', title: 'Must not save without a lock', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const original = JSON.stringify(sampleTasks);
+  const { env, elements, storageData, writes, dispatched, created } = fakeEnv({
+    stored: original,
+    files: [csvFile(csv)],
+    locks: false
+  });
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  assert.equal(storageData[ui.STORAGE_KEY], original);
+  assert.equal(writes.length, 0);
+  assert.equal(dispatched.length, 0);
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /safe cross-tab task coordination is unavailable/);
 });
 
 test('import auto-boot does not eagerly evaluate window.localStorage', () => {
