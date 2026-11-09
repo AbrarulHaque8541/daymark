@@ -82,14 +82,182 @@ function collectNodeTestFiles(directory) {
   }).sort();
 }
 
+function maskJavaScriptNonCode(source) {
+  const textValue = String(source);
+  const output = textValue.split("");
+  const templateQuote = String.fromCharCode(96);
+  const blank = (start, end) => {
+    for (let index = start; index < end; index += 1) {
+      if (output[index] !== "\n" && output[index] !== "\r") output[index] = " ";
+    }
+  };
+  const regexPrefixKeywords = new Set([
+    "await", "case", "delete", "do", "else", "in", "instanceof",
+    "new", "of", "return", "throw", "typeof", "void", "yield",
+    "as", "extends"
+  ]);
+
+  function skipQuoted(start, quote) {
+    let index = start + 1;
+    while (index < textValue.length) {
+      const character = textValue[index];
+      if (character === "\\") {
+        index += 2;
+        continue;
+      }
+      if (character === quote) return index + 1;
+      if ((character === "\n" || character === "\r") && quote !== templateQuote) return index;
+      index += 1;
+    }
+    return index;
+  }
+
+  function skipRegularExpression(start) {
+    let index = start + 1;
+    let inCharacterClass = false;
+    while (index < textValue.length) {
+      const character = textValue[index];
+      if (character === "\\") {
+        index += 2;
+        continue;
+      }
+      if (character === "\n" || character === "\r") return start + 1;
+      if (character === "[" && !inCharacterClass) inCharacterClass = true;
+      else if (character === "]" && inCharacterClass) inCharacterClass = false;
+      else if (character === "/" && !inCharacterClass) {
+        index += 1;
+        while (index < textValue.length && /[A-Za-z]/.test(textValue[index])) index += 1;
+        return index;
+      }
+      index += 1;
+    }
+    return start + 1;
+  }
+
+  function scanTemplate(start) {
+    blank(start, start + 1);
+    let index = start + 1;
+    let rawStart = index;
+    while (index < textValue.length) {
+      const character = textValue[index];
+      if (character === "\\") {
+        index += 2;
+        continue;
+      }
+      if (character === templateQuote) {
+        blank(rawStart, index + 1);
+        return index + 1;
+      }
+      if (character === "$" && textValue[index + 1] === "{") {
+        blank(rawStart, index + 2);
+        index = scanCode(index + 2, true);
+        rawStart = index;
+        continue;
+      }
+      index += 1;
+    }
+    blank(rawStart, textValue.length);
+    return textValue.length;
+  }
+
+  function scanCode(start, stopAtTemplateBrace) {
+    let index = start;
+    let braceDepth = 0;
+    let canStartRegex = true;
+    while (index < textValue.length) {
+      const character = textValue[index];
+      const next = textValue[index + 1];
+      if (/\s/.test(character)) {
+        index += 1;
+        continue;
+      }
+      if (stopAtTemplateBrace && character === "}" && braceDepth === 0) {
+        blank(index, index + 1);
+        return index + 1;
+      }
+      if (character === "/" && next === "/") {
+        let end = index + 2;
+        while (end < textValue.length && textValue[end] !== "\n" && textValue[end] !== "\r") end += 1;
+        blank(index, end);
+        index = end;
+        continue;
+      }
+      if (character === "/" && next === "*") {
+        const close = textValue.indexOf("*/", index + 2);
+        const end = close < 0 ? textValue.length : close + 2;
+        blank(index, end);
+        index = end;
+        continue;
+      }
+      if (character === "'" || character === '"') {
+        const end = skipQuoted(index, character);
+        blank(index, end);
+        index = end;
+        canStartRegex = false;
+        continue;
+      }
+      if (character === templateQuote) {
+        index = scanTemplate(index);
+        canStartRegex = false;
+        continue;
+      }
+      if (character === "/" && canStartRegex) {
+        const end = skipRegularExpression(index);
+        if (end > index + 1) {
+          blank(index, end);
+          index = end;
+          canStartRegex = false;
+          continue;
+        }
+      }
+      if (/[A-Za-z_$]/.test(character)) {
+        let end = index + 1;
+        while (end < textValue.length && /[A-Za-z0-9_$]/.test(textValue[end])) end += 1;
+        canStartRegex = regexPrefixKeywords.has(textValue.slice(index, end));
+        index = end;
+        continue;
+      }
+      if (/[0-9]/.test(character)) {
+        let end = index + 1;
+        while (end < textValue.length && /[A-Za-z0-9_.]/.test(textValue[end])) end += 1;
+        index = end;
+        canStartRegex = false;
+        continue;
+      }
+      if (stopAtTemplateBrace && character === "{") {
+        braceDepth += 1;
+        index += 1;
+        canStartRegex = true;
+        continue;
+      }
+      if (stopAtTemplateBrace && character === "}" && braceDepth > 0) {
+        braceDepth -= 1;
+        index += 1;
+        canStartRegex = false;
+        continue;
+      }
+      const three = textValue.slice(index, index + 3);
+      const two = textValue.slice(index, index + 2);
+      const token = ["===", "!=="].includes(three)
+        ? three
+        : (["=>", "++", "--", "?.", "&&", "||", "??", "==", "!=", "<=", ">=",
+            "+=", "-=", "*=", "/=", "%=", "**", "<<", ">>"].includes(two) ? two : character);
+      index += token.length;
+      canStartRegex = ![")", "]", "}", ".", "?.", "++", "--"].includes(token);
+      if (token === ";") canStartRegex = true;
+    }
+    return index;
+  }
+
+  scanCode(0, false);
+  return output.join("");
+}
+
 function hasRegisteredTestCase(source) {
-  const withoutComments = source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
-    .trim();
-  const activeTest = /(?<![A-Za-z0-9_$.'"\x60])\b(?:test|it)\s*\(/.test(withoutComments);
-  const focusedTest = /(?<![A-Za-z0-9_$.'"\x60])\b(?:test|it|describe)\.only\s*\(/.test(withoutComments);
-  return withoutComments.length > 0 && activeTest && !focusedTest;
+  const code = maskJavaScriptNonCode(source).trim();
+  const activeTest = /(^|[^A-Za-z0-9_$.])(?:test|it)\s*\(/m.test(code);
+  const focusedTest = /(^|[^A-Za-z0-9_$.])(?:test|it|describe)\s*\.\s*only\s*\(/m.test(code);
+  return code.length > 0 && activeTest && !focusedTest;
 }
 
 test('every repository Node test file registers at least one executable test case', () => {
@@ -124,6 +292,18 @@ test('every repository Node test file registers at least one executable test cas
     'focused-only describe suites must be rejected');
   assert.equal(hasRegisteredTestCase("const example = \"test('fake')\";"), false,
     'a test-like string literal must not count as a test registration');
+  assert.equal(hasRegisteredTestCase("const example = 'test(placeholder)';"), false,
+    'single-quoted fake registrations must be ignored');
+  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "example test('fake')" + String.fromCharCode(96) + ";"), false,
+    'template raw text must not count as an executable registration');
+  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "${test('real', () => {})}" + String.fromCharCode(96) + ";"), true,
+    'an actual registration inside a template interpolation remains executable');
+  assert.equal(hasRegisteredTestCase("const example = /test(foo)/;"), false,
+    'regular-expression literals must not count as executable registrations');
+  assert.equal(hasRegisteredTestCase("// test('fake')\\n/* it('fake') */"), false,
+    'line and block comments must not count as executable registrations');
+  assert.equal(hasRegisteredTestCase("const example = " + String.fromCharCode(96) + "test.only('fake')" + String.fromCharCode(96) + "; test('real', () => {});"), true,
+    'focused-test text inside a template literal must not reject a real test');
 
   for (const file of testFiles) {
     const relative = path.relative(repositoryRoot, file);
