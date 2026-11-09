@@ -348,8 +348,8 @@
           <h2 id="browser-error-heading">Browser errors, in plain language</h2>
           <p class="briefing-description">Offline explanations for common load failures. No network.</p>
           <form id="browser-error-form" class="feed-form" novalidate>
-            <label class="sr-only" for="browser-error-pick">Error to explain</label>
-            <select id="browser-error-pick" name="error" class="sort-select" aria-label="Error">
+            <label class="sr-only" for="browser-error-scenario">Error to explain</label>
+            <select id="browser-error-scenario" name="error" class="sort-select" aria-label="Error">
               <option value="net::ERR_NAME_NOT_RESOLVED" selected>Name not resolved</option>
               <option value="net::ERR_INTERNET_DISCONNECTED">Internet disconnected</option>
               <option value="net::ERR_CONNECTION_REFUSED">Connection refused</option>
@@ -365,7 +365,7 @@
             <button class="button button-quiet" id="browser-error-clear" type="button">Clear</button>
           </form>
           <p class="feed-status" id="browser-error-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="browser-error-list" aria-live="polite"></div>
+          <div class="feed-list" id="browser-error-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
