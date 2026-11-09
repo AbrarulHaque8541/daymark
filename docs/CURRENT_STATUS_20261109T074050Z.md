@@ -24,7 +24,7 @@
 
 ## Open pull requests — 21
 
-All base/head SHAs below were fetched live from GitHub. The four current-main-based engineering branches are #604, #656, #657, #658 and #659 (five branches, including the documentation owner). Other PRs are based on older snapshots and require conflict-aware synchronization before their historical green checks can be treated as current integration evidence.
+All base/head SHAs below were fetched live from GitHub. Five current-main-based branches are #604, #656, #657, #658 and #659 (including the documentation owner). Other PRs are based on older snapshots and require conflict-aware synchronization before their historical green checks can be treated as current integration evidence.
 
 | PR | Base SHA | Head SHA | Current assessment |
 |---|---|---|---|
