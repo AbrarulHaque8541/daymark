@@ -42,7 +42,11 @@ for path in (
 assert ". tools/platform-instrumentation-repeat.sh" in runner
 assert "run_instrumentation_repeated run_instrumentation_once" in runner
 assert "adb shell am instrument -w -r" in runner
-assert "awk '/^instrumentation:/ && /DaymarkPlatformInstrumentation/" in runner
+assert "parse_platform_instrumentation_component" in runner
+assert 'while [ "$attempt" -le 20 ]' in runner
+assert "parse_platform_instrumentation_component()" in helper
+assert "DaymarkPlatformInstrumentation" in helper
+assert "parse_platform_instrumentation_component" in test_runner
 assert "adb logcat -d -t 500 -s DaymarkInstr:I" in runner
 assert "drive_instrumentation_input_bridge" not in runner
 assert "input_package=" not in runner
