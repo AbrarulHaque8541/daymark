@@ -520,34 +520,22 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
-        // Explicitly invoke a shell so stderr redirection and the exit marker are interpreted by
-        // Android's shell, rather than being passed as extra arguments to the input utility.
-        // The command contains only numeric coordinates and a fixed duration.
-        String script = "input swipe "
-                + Math.round(startX) + " "
-                + Math.round(startY) + " "
-                + Math.round(endX) + " "
-                + Math.round(endY)
-                + " 320 2>&1; status=$?; printf \"__DAYMARK_INPUT_EXIT:%s\\n\" \"$status\"";
-        String command = "sh -c '" + script + "'";
-        String output = executeShellCommand(command);
-        check(output.contains("__DAYMARK_INPUT_EXIT:0"),
-                "touchscreen swipe command failed: " + output);
-        waitForIdleSync();
-    }
-
-    private String executeShellCommand(String command) throws IOException {
-        ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(command);
-        StringBuilder output = new StringBuilder();
-        try (ParcelFileDescriptor.AutoCloseInputStream stream =
-                     new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
-            byte[] buffer = new byte[256];
-            int count;
-            while ((count = stream.read(buffer)) != -1) {
-                output.append(new String(buffer, 0, count, StandardCharsets.UTF_8));
-            }
+        // Use the same instrumented-window pointer path that successfully delivers taps.
+        // Shell input swipe was accepted by the emulator but frequently produced empty
+        // MotionEvent traces on the Focus mode selector under CI load.
+        long downTime = android.os.SystemClock.uptimeMillis();
+        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, startX, startY);
+        final int moveSteps = 8;
+        for (int step = 1; step <= moveSteps; step++) {
+            float progress = step / (float) moveSteps;
+            float x = startX + (endX - startX) * progress;
+            float y = startY + (endY - startY) * progress;
+            injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime,
+                    downTime + step * 40L, x, y);
         }
-        return output.toString();
+        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime,
+                downTime + (moveSteps + 1) * 40L, endX, endY);
+        waitForIdleSync();
     }
 
     private void injectPointerEvent(int action, long downTime, long eventTime, float x, float y)
