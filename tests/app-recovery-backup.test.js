@@ -1048,3 +1048,88 @@ test('Focus backup remains exportable when task recovery backup creation fails',
     'failed backup creation does not write a placeholder task backup');
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup);
 });
+
+
+test('primary task JSON with duplicate keys is preserved byte-for-byte for manual recovery', () => {
+  const ambiguous = '[{"id":"primary-duplicate","title":"Original title","title":"Overwritten title","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z"}]';
+  const storedValues = new Map([[STORAGE_KEY, ambiguous]]);
+  const app = bootApp(storedValues);
+
+  assert.equal(storedValues.get(STORAGE_KEY), ambiguous,
+    'duplicate task keys must not be accepted and rewritten through JSON.parse');
+  assert.equal(storedValues.get(BACKUP_KEY), ambiguous,
+    'the exact ambiguous primary bytes must be preserved in the recovery backup');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Saved data could not be read/);
+  assert.equal(app.elements.get('#toast-action').hidden, false,
+    'the user receives a manual recovery export action');
+});
+
+test('recovery imports reject duplicate keys inside task, Focus, and legacy payload strings', () => {
+  const duplicateTask = '[{"id":"incoming-task","title":"Original title","title":"Overwritten title","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z"}]';
+  const duplicateSubtask = '[{"id":"incoming-subtask","title":"Task","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z","subtasks":[{"id":"step-1","title":"Original step","title":"Overwritten step","done":false}]}]';
+  const duplicateFocusSession = '{"session":{"id":"session-1","title":"Original session","title":"Overwritten session","state":"running","durationMinutes":25,"startedAt":"2026-11-09T05:00:00.000Z","endsAt":"2026-11-09T05:25:00.000Z"},"log":[]}';
+  const duplicateFocusLog = '{"session":null,"log":[{"id":"log-1","title":"Original log","title":"Overwritten log","durationMinutes":25,"completedAt":"2026-11-09T05:25:00.000Z"}]}';
+  const cases = [
+    {
+      label: 'partial task backup payload',
+      raw: JSON.stringify({
+        format: 'daymark-partial-recovery-v1',
+        taskBackup: duplicateTask,
+        taskBackupStatus: 'available',
+        focusBackup: null,
+        focusBackupStatus: 'absent'
+      })
+    },
+    {
+      label: 'nested task subtask payload',
+      raw: JSON.stringify({
+        format: 'daymark-combined-recovery-v1',
+        taskBackup: duplicateSubtask,
+        focusBackup: null
+      })
+    },
+    {
+      label: 'legacy task recovery-bundle payload',
+      raw: JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [duplicateTask] })
+    },
+    {
+      label: 'partial Focus session payload',
+      raw: JSON.stringify({
+        format: 'daymark-partial-recovery-v1',
+        taskBackup: null,
+        taskBackupStatus: 'absent',
+        focusBackup: duplicateFocusSession,
+        focusBackupStatus: 'available'
+      })
+    },
+    {
+      label: 'nested Focus log payload',
+      raw: JSON.stringify({
+        format: 'daymark-combined-recovery-v1',
+        taskBackup: null,
+        focusBackup: duplicateFocusLog
+      })
+    },
+    {
+      label: 'legacy Focus recovery-bundle payload',
+      raw: JSON.stringify({ format: 'daymark-focus-recovery-bundle-v1', payloads: [duplicateFocusSession] })
+    }
+  ];
+
+  for (const [index, entry] of cases.entries()) {
+    const existing = JSON.stringify([validTask('existing-' + index, 'Existing task')]);
+    const storedValues = new Map([[STORAGE_KEY, existing]]);
+    const app = bootApp(storedValues);
+    const input = app.elements.get('#import-file');
+    input.files = [{ size: entry.raw.length, text: entry.raw }];
+    input.dispatch('change');
+
+    assert.equal(app.getConfirmCalls(), 0, entry.label + ' must be rejected before import confirmation');
+    assert.equal(storedValues.get(STORAGE_KEY), existing, entry.label + ' must not mutate existing tasks');
+    assert.equal(storedValues.has(FOCUS_KEY), false, entry.label + ' must not write Focus state');
+    assert.equal(storedValues.has(BACKUP_KEY), false, entry.label + ' must not create a replacement backup');
+    assert.match(app.elements.get('#toast').textContent,
+      /No valid recovery data could be restored/, entry.label + ' must be disclosed as malformed');
+  }
+});
