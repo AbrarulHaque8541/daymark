@@ -468,7 +468,7 @@ test('import auto-boot does not eagerly evaluate window.localStorage', () => {
     'boot must pass window and let attachImportUi guard the storage getter');
 });
 
-test('import aborts if another tab changes task storage while the selected file is read', async () => {
+test('import merges a non-conflicting task added by another tab while the file is read', async () => {
   const original = JSON.stringify(sampleTasks);
   const changedByOtherTab = JSON.stringify(sampleTasks.concat([{
     id: 'other-tab-1', title: 'Saved in another tab', dueDate: null, priority: 'medium',
@@ -494,13 +494,16 @@ test('import aborts if another tab changes task storage while the selected file 
 
   await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
 
-  assert.equal(fileRead, true, 'the selected file was read before the conflict was detected');
-  assert.equal(storageData[ui.STORAGE_KEY], changedByOtherTab,
-    'the newer value written by another tab is preserved byte-for-byte');
-  assert.equal(writes.length, 0, 'the stale import merge is not written');
-  assert.equal(dispatched.length, 0, 'a failed import does not announce a successful save');
+  assert.equal(fileRead, true, 'the selected file is read before the locked merge');
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.ok(saved.some((task) => task.id === 'other-tab-1'),
+    'the newer task written by another tab is preserved');
+  assert.ok(saved.some((task) => task.id === 'import-after-read'),
+    'the imported task is added without replacing the newer task');
+  assert.equal(writes.length, 1, 'the merged snapshot is written once under the shared lock');
+  assert.equal(dispatched.length, 1, 'the successful merge announces a same-tab refresh');
   assert.match(created.find((el) => el.id === 'import-status').textContent,
-    /saved tasks changed while import was being prepared/);
+    /Imported 1 task from tasks\.csv/);
 });
 
 test('duplicate-key task storage blocks import before reading the selected file', async () => {
