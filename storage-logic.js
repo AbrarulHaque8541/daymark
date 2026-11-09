@@ -65,6 +65,12 @@
       keys: ['daymark.zones.v1']
     },
     {
+      id: 'browser-proxy',
+      label: 'Saved browser proxy profile',
+      description: 'The last proxy address entered in the offline planner. Saving this plan does not route browser traffic.',
+      keys: ['daymark.browser-proxy.last-profile']
+    },
+    {
       id: 'webhook',
       label: 'Webhook settings',
       description: 'A legacy endpoint setting from older versions. New webhook endpoints stay in the active tab only and are never saved here.',
