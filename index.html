@@ -34,6 +34,8 @@
   <script src="browser-download-ui.js" defer></script>
   <script src="browser-proxy-logic.js" defer></script>
   <script src="browser-proxy-ui.js" defer></script>
+  <script src="browser-data-logic.js" defer></script>
+  <script src="browser-data-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="storage-logic.js" defer></script>
@@ -403,6 +405,26 @@
           </form>
           <p class="feed-status" id="browser-proxy-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="browser-proxy-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-data-card" aria-labelledby="browser-data-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-data-heading">What each Clear button really does</h2>
+          <p class="briefing-description">Offline, plain-words scope of every clear action. No network, nothing runs.</p>
+          <form id="browser-data-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-data-action">Clear action to explain</label>
+            <select id="browser-data-action" name="action" class="sort-select" aria-label="Clear action">
+              <option value="clear-completed" selected>Clear completed tasks</option>
+              <option value="clear-search">Clear task search</option>
+              <option value="webhook-clear-queue">Clear webhook queue</option>
+              <option value="storage-clear-status">Clear storage status</option>
+              <option value="import-merge">Import a backup</option>
+              <option value="export-backup">Export a backup</option>
+            </select>
+            <button class="button button-primary" id="browser-data-explain" type="submit">Explain</button>
+            <button class="button button-quiet" id="browser-data-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-data-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-data-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
