@@ -79,4 +79,20 @@ export FAKE_STOP_AFTER_READS
 drive_instrumentation_input_bridge com.abrar.daymark "$FAKE_STOP_FILE"
 [ "$(wc -l < "$FAKE_INPUT_LOG" | tr -d '[:space:]')" = "1" ] \
   || fail "a repeated request sequence must be dispatched only once"
+
+: > "$FAKE_INPUT_LOG"
+rm -f "$FAKE_STOP_FILE" "$FAKE_READ_COUNT" "$FAKE_DEVICE_DIR/instrumentation-input-result.txt"
+printf '%s\\n' "6|tap|12|34|12|34|100" > "$FAKE_DEVICE_DIR/instrumentation-input-request.txt"
+FAKE_STOP_AFTER_READS=0
+FAKE_PUBLISH_STATUS=9
+export FAKE_STOP_AFTER_READS FAKE_PUBLISH_STATUS
+set +e
+publish_error="$(drive_instrumentation_input_bridge com.abrar.daymark "$FAKE_STOP_FILE" 2>&1)"
+publish_status=$?
+set -e
+[ "$publish_status" -ne 0 ] || fail "a failed result publication must stop the bridge"
+printf '%s\\n' "$publish_error" | grep -Fq "fake result publish denied" \\
+  || fail "the bridge must surface the adb result-publication error"
+unset FAKE_PUBLISH_STATUS
+
 echo "PASS host input bridge protocol: tap/swipe routing, invalid-action rejection, failure propagation, duplicate suppression"
