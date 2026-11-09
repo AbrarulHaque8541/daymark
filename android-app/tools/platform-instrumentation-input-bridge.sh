@@ -54,8 +54,8 @@ EOF
           esac
         fi
         publish_output="$(DAYMARK_HOST_INPUT_BRIDGE_SEQ="$seq" DAYMARK_HOST_INPUT_BRIDGE_STATUS="$input_status" \
-          adb shell "run-as $package sh -c 'printf \\"%s|%s\\\\n\\" \\"$seq\\" \\"$input_status\\" > files/daymark-instrumentation-input-result.tmp && mv files/daymark-instrumentation-input-result.tmp files/daymark-instrumentation-input-result.txt'" 2>&1)" || {
-          publish_output="$(printf '%s' "$publish_output" | tr -d '\\r')"
+          adb shell "run-as $package sh -c 'printf \"%s|%s\\n\" \"$seq\" \"$input_status\" > files/daymark-instrumentation-input-result.tmp && mv files/daymark-instrumentation-input-result.tmp files/daymark-instrumentation-input-result.txt'" 2>&1)" || {
+          publish_output="$(printf '%s' "$publish_output" | tr -d '\r')"
           if [ -n "$publish_output" ]; then
             echo "Could not publish host input result for sequence $seq: $publish_output" >&2
           else
