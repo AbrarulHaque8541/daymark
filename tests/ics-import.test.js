@@ -30,7 +30,7 @@ const googleLikeIcs = [
   'BEGIN:VEVENT',
   'UID:event-1@example.com',
   'SUMMARY:Team sync',
-  'DTSTART;TZID=Asia/Kolkata:20261110T093000',
+  'DTSTART;TZID=Asia/Kolkata:20261110T093045',
   'RRULE:FREQ=WEEKLY;COUNT=10',
   'END:VEVENT',
   'BEGIN:VEVENT',
@@ -102,6 +102,8 @@ test('fromIcs maps a realistic calendar export onto stored tasks with honest cou
   assert.equal(result.cancelled, 1);
   assert.equal(result.recurring, 1);
   assert.equal(result.timezoneDropped, 2, 'TZID event and Z-suffix event both count');
+  assert.equal(result.secondsDropped, 1, 'non-zero seconds are truncated and counted');
+  assert.equal(result.invalidCompletion, 0);
   assert.equal(result.skippedRows, 0);
 
   const todo = result.tasks[0];
@@ -146,7 +148,7 @@ test('a component without a usable SUMMARY is counted as a skipped row', () => {
   assert.equal(result.skippedRows, 2);
 });
 
-test('STATUS COMPLETED and the COMPLETED property both mark tasks done', () => {
+test('only valid VTODO completion metadata marks imported tasks done', () => {
   const ics = [
     'BEGIN:VCALENDAR',
     'BEGIN:VTODO',
@@ -155,15 +157,41 @@ test('STATUS COMPLETED and the COMPLETED property both mark tasks done', () => {
     'END:VTODO',
     'BEGIN:VTODO',
     'SUMMARY:Done by completion date',
-    'COMPLETED:20261108T100000Z',
+    'COMPLETED;VALUE=DATE-TIME:20261108T100000Z',
     'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Malformed completion',
+    'COMPLETED:garbage',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Empty completion',
+    'COMPLETED:',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Invalid clock completion',
+    'COMPLETED:20261108T256000Z',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Local completion without UTC',
+    'COMPLETED:20261108T100000',
+    'END:VTODO',
+    'BEGIN:VEVENT',
+    'SUMMARY:Event status is not completion',
+    'STATUS:COMPLETED',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'SUMMARY:Event completion property is invalid',
+    'COMPLETED:20261108T100000Z',
+    'END:VEVENT',
     'END:VCALENDAR',
     ''
   ].join('\n');
   const result = importer.fromIcs(ics, freshCtx());
-  assert.equal(result.tasks.length, 2);
-  assert.equal(result.tasks[0].completed, true);
-  assert.equal(result.tasks[1].completed, true);
+  assert.equal(result.tasks.length, 8);
+  assert.deepEqual(result.tasks.map((task) => task.completed),
+    [true, true, false, false, false, false, false, false]);
+  assert.equal(result.invalidCompletion, 6,
+    'malformed VTODO metadata and VEVENT completion misuse are disclosed, not trusted');
 });
 
 test('calendar input without a VCALENDAR block fails closed', () => {
@@ -228,7 +256,8 @@ test('the import UI intercepts .ics files, saves them, and discloses the simplif
   assert.ok(status, 'a status element exists');
   assert.match(status.textContent, /Imported 4 tasks from calendar\.ics\./);
   assert.match(status.textContent, /1 recurring item imported once as a one-time task\./);
-  assert.match(status.textContent, /Times were kept as written; time zones were not applied\./);
+  assert.match(status.textContent, /Time zones were not converted; the written hour and minute values were kept\./);
+  assert.match(status.textContent, /1 imported time had non-zero seconds; seconds were truncated to minute precision\./);
   assert.match(status.textContent, /1 cancelled item skipped\./);
 });
 
@@ -251,6 +280,51 @@ test('CATEGORIES splits only on unescaped commas; semicolons remain inside value
   const result = importer.fromIcs(ics, freshCtx());
   assert.equal(result.tasks.length, 1);
   assert.deepEqual(result.tasks[0].tags, ['work', 'finance'], 'the escaped comma and semicolon stay inside one unsupported value');
+});
+
+test('repeated CATEGORIES properties are accumulated in order and deduplicated', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'UID:repeated-categories@example.com',
+    'SUMMARY:Repeated categories',
+    'CATEGORIES:WORK,FINANCE',
+    'CATEGORIES:TRAVEL,WORK',
+    'CATEGORIES;LANGUAGE=en:PERSONAL,FINANCE',
+    'END:VTODO',
+    'END:VCALENDAR'
+  ].join('\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.equal(result.tasks.length, 1);
+  assert.deepEqual(result.tasks[0].tags, ['work', 'finance', 'travel', 'personal']);
+});
+
+test('calendar time seconds are validated and non-zero precision loss is counted', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'SUMMARY:Whole minute',
+    'DUE:20261109T091500',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:UTC seconds',
+    'DUE:20261109T101530Z',
+    'END:VTODO',
+    'BEGIN:VEVENT',
+    'SUMMARY:Local seconds',
+    'DTSTART;TZID=Asia/Kolkata:20261109T111545',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'SUMMARY:Invalid seconds',
+    'DTSTART;TZID=UTC:20261109T121599',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.equal(result.tasks.length, 4);
+  assert.deepEqual(result.tasks.map((task) => task.dueTime), ['09:15', '10:15', '11:15', null]);
+  assert.equal(result.secondsDropped, 2);
+  assert.equal(result.timezoneDropped, 2);
 });
 
 test('skipped recurring components do not inflate the recurrence or timezone counts', () => {
