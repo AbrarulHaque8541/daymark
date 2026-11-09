@@ -1,19 +1,22 @@
-## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
+## Current execution queue — 2026-11-09T12:58:13Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
 
-1. **P0 — Focus Timer / browser download safety (#648, #613, #671):** synchronize the 120-ahead/7-behind Focus branch with current main, fix source-guard and host-input drift, then prove actual Countdown/Stopwatch taps, horizontal swipes and parent ScrollView vertical scrolling on API 29 and API 36. Keep API 36 ten-consecutive-run gate. New downloads remain fail-closed until a manual redirect-validating, bounded transport is integrated; do not restore DownloadManager opaque redirects.
-2. **P1 — Recovery data integrity (#664, #640):** apply duplicate-key rejection to primary Focus storage, task/Focus outer recovery envelopes, every nested JSON string and user-selected imports. Preserve exact raw bytes and refuse ambiguous overwrite/import. Current head 5a1962c5 still has one guard call site (primary task loader); recovery/import regressions are missing.
-3. **P1 — Storage health (#666, #603):** latest head 1579ce1d is 28 ahead/0 behind current main; Android CI and device APK checks are running, contracts pass. Complete independent fail-closed review; unreadable data must never be treated as absent or deleted.
-4. **P1 — Release signing isolation (#665, #84):** latest head 7e4cd3e7 is 9 ahead/0 behind; exact-head Android/contracts/device workflows are running. Verify PR builds cannot access signing secrets and finish Node24/transitive action inventory.
-5. **P1 — Webhook queue (#662, #639, #636):** final-attempt drop and Web Locks/session-only secret behavior pass exact-head Android/contracts/device checks on 2c8aa239; synchronize five commits behind main and obtain independent review.
-6. **P1 — Import/export (#656):** exact-head Android/contracts/device checks pass on 199e9fa6; synchronize five commits behind main and obtain independent RFC 5545/data-loss review.
-7. **P1 — Extension trust (#659):** exact-head Android/contracts/device checks pass on 6c7d50ab; synchronize five commits behind main and obtain independent security review.
-8. **P0 — Physical acceptance (#160):** test current-main APK on real devices, recording model/API/WebView provider/version and APK SHA. Emulator/artifact builds are not physical-device acceptance.
-9. **P1 — Governance (#646):** owner-approved required checks and independent-review protection for main; no settings changed in this cycle.
-10. **P2 — Browser UX / cross-platform architecture (#348, #325):** resume after Focus/download safety and storage/data-integrity gates.
+1. **P0 — Focus Timer vertical-scroll handoff (#648, #613):** latest head `762f551d467ef43a6ea4fd6822fbf0979928c24b`, current main base `8d76584bc07ed06388e46de8dd11bd39d7250d3a`, 131 ahead / 0 behind. Previous API29/API36 run passed taps and horizontal selection but parent ScrollView stayed at scrollY 0. Latest head adds ACTION_DOWN parent release, parent/selector event traces and scroll-position assertion. Host touch-sequence smoke 35 assertions PASS; no latest-head CI/emulator result returned. Preserve API36 ten-run gate.
+2. **P0 — Signing-secret isolation (#665, #84):** head `87fd649516d1d2a16d34063661506b014697255c`, 10 ahead / 0 behind; Android/contracts/device APK PASS. Main still exposes signing-secret environment to PR-controlled Gradle debug steps until the fix is independently reviewed and integrated. No exfiltration evidence.
+3. **P0 — Webhook privacy/queue (#662, #636, #639):** head `506246c60b7ed061e0c4375df5cf8f5fd064f292`, 13 ahead / 0 behind; Android/contracts/device acceptance/APK PASS. Integrate #655's UI only; do not reintroduce localStorage endpoint secrets, non-atomic locks, remove-before-POST queue or silent overflow. Delivery is at-least-once.
+4. **P0 — Corrective default-branch cleanup (#674, #646):** head `e022591340e1dc4ed95df5f0ab15231f59591ded`, 6 ahead / 0 behind; Android/contracts/device APK/device-acceptance artifacts PASS. Removes three Focus helper/test files accidentally committed directly to main by this automation. This is a governance correction, not runtime work; independent review still required.
+5. **P1 — Extension trust/storage (#659):** head `3ae856f76d2af17457bf943ef23e68405e7d17a0`, 18 ahead / 0 behind; Android/contracts/device acceptance/APK PASS. Preserve unreadable existing files and reject oversized imports; obtain independent security review.
+6. **P1 — Recovery backup integrity (#664, #640, #603):** head `cb30fe49f8a6c325d4ccd9630f90d0c5e4cc76c8`, 12 ahead / 0 behind; Android/contracts/device acceptance/APK PASS. Keep task and Focus backup reads independent; manual export/recovery acceptance remains pending.
+7. **P1 — Storage health (#666):** head `a9c633f8d0ae9c0af01ce9eedc1344d0400a04f8`, 29 ahead / 0 behind; Android/contracts/device APK PASS. Unknown/unreadable state must remain fail-closed.
+8. **P1 — iCalendar import/export (#656):** head `ae38db6e8ea8e13a4c65983e0aec40056e38ee54`, 31 ahead / 0 behind; Android/contracts/device APK PASS. RFC 5545 category/completion/precision fixes need independent data-integrity review and provider acceptance.
+9. **P1 — Status index/project plan (#669):** head `e2352780752bca2f87d3f2fc66b784c9aa22933b`, 16 ahead / 0 behind; Android/contracts/device APK PASS before this refresh. Preserve the complete historical status index.
+10. **P0 — Physical acceptance (#160):** test current-main APK on real devices, recording model/API/WebView provider/version and APK SHA. Emulator/artifact builds are not physical acceptance. Reminder Doze/reboot/timezone acceptance remains #476.
+11. **P1 — Governance (#646):** main is unprotected and rulesets are empty; owner-side independent approvals and required Android/Ubuntu/Windows checks remain necessary. Resolve the source `com.abrar.daymark` vs safety-mandated `com.cue.daymark` identity conflict before any package-sensitive release work.
 
-Recent integration: PR #673 merged at 8d76584bc07ed06388e46de8dd11bd39d7250d3a. Post-merge Android CI is in progress and Ubuntu/Windows contracts pass. No production release/tag was published.
+Recent merges: #673, #672, #657 and #670. Current main post-merge Android CI #42617732358 and Ubuntu/Windows contracts #42617732347 both PASS. Inventory: **9 open PRs / 12 open issues**; all active branches compare 0 behind current main.
+
+Latest whole-project snapshot: [CURRENT_STATUS_20261109T125813Z.md](docs/CURRENT_STATUS_20261109T125813Z.md). Main includes three accidental helper/test files pending removal via #674; no runtime code was changed by those direct commits. No release/tag/version/signing-key change or destructive migration.
 
 ---
 
@@ -452,21 +455,3 @@ Model: GPT-6
 Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
 Timestamp (UTC): 2026-11-09T02:36:57.068Z
 
-
-## Latest repository-wide execution — 2026-11-09T12:58:13Z
-
-Baseline: `main 8d76584bc07ed06388e46de8dd11bd39d7250d3a`; root `AGENTS.md` `492ed21e2219a8d1b80c7d6e63575525c98a5a91`. Current inventory: 9 open PRs / 12 open issues; every active branch compares 0 behind current main.
-
-- #657/#670/#672/#673 merged by concurrent automation; main Android CI and Ubuntu/Windows contracts pass on current SHA.
-- #656/#659/#662/#664/#665/#666/#669 synchronized to current main with normal two-parent commits; their exact-head Android/contracts/device checks pass.
-- #648 Focus remains draft. Latest completed API29/API36 run passed taps/horizontal mode selection but failed vertical parent ScrollView movement (`scrollY 0→0`). Current head adds UiAutomation shell-identity input, ModeSelector release on ACTION_DOWN, parent/selector event traces and a scroll-position assertion. Host touch-sequence smoke: 35 assertions PASS; no current-head Actions run returned yet.
-- #665 signing-secret isolation remains a P0 security fix; main still has the PR-build secret-environment exposure until reviewed/integrated.
-- #662 is the safe webhook implementation; merged #655 UI must not reintroduce localStorage endpoint secrets, non-atomic locks or remove-before-POST queue behavior.
-- #664/#666 recovery/storage and #659 extension import preserve unreadable/oversized user data; independent review and device acceptance remain pending.
-- #674 is a corrective PR removing three Focus helper/test files accidentally created directly on main by this automation. This was a governance error; no runtime code changed. #674 exact-head Android/contracts/device checks pass; it remains unmerged pending independent review.
-- Browser downloads remain fail-closed under #648; issue #671 tracks a safe redirect-validating transport.
-- Main branch protection is disabled; issue #646 tracks required independent reviews and checks. Application identity conflict (`com.abrar.daymark` in source/AGENTS vs `com.cue.daymark` safety mandate) remains unresolved; no package change.
-
-Next priorities: #648 vertical-scroll handoff/current-head CI; #665 signing-secret review; #662 webhook integration; #674 cleanup review; #659/#664/#666 security/data integrity; physical Android acceptance #160; reminders Doze/reboot/timezone #476. No release/tag/version/signing-key change or destructive migration.
-
-See [docs/CURRENT_STATUS_20261109T125813Z.md](docs/CURRENT_STATUS_20261109T125813Z.md) for exact heads, workflow evidence, blockers and the full issue inventory.
