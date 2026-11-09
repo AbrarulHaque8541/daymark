@@ -878,3 +878,24 @@ test('empty Focus primary payload is backed up as opaque data before any Focus s
   assert.equal(app.elements.get('#toast-action').hidden, false,
     'the present empty backup remains available for manual export');
 });
+
+
+
+test('task recovery notice remains visible when a Focus backup is also present', () => {
+  const corruptTask = '{not valid task JSON';
+  const focusBackup = JSON.stringify({ session: null, log: [{ id: 'focus-backup', durationMinutes: 25 }] });
+  const storedValues = new Map([[STORAGE_KEY, corruptTask], [FOCUS_BACKUP_KEY, focusBackup]]);
+  const app = bootApp(storedValues);
+
+  assert.match(app.elements.get('#toast').textContent, /original data was kept in a browser backup/i,
+    'the Focus loader must not replace the more urgent task-recovery notice');
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false);
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-combined-recovery-v1');
+  assert.equal(exported.taskBackup, storedValues.get(BACKUP_KEY));
+  assert.equal(exported.focusBackup, focusBackup);
+  assert.equal(storedValues.get(STORAGE_KEY), corruptTask);
+});
