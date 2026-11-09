@@ -760,3 +760,58 @@ test('tab-local events wait behind a full durable queue and are delivered withou
   assert.equal(handle.readQueue().length, 0);
   assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
 });
+
+
+test('older tab-local webhook events stay ahead of later completions after storage recovers', async () => {
+  const storageData = {};
+  let failQueueWrites = true;
+  const storage = {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
+    setItem(key, value) {
+      if (key === webhookApi.QUEUE_KEY && failQueueWrites) throw new Error('quota');
+      storageData[key] = String(value);
+    },
+    removeItem(key) { delete storageData[key]; }
+  };
+  const deliveredTitles = [];
+  const { env } = fakeEnv({
+    storage,
+    url: 'https://hooks.example.com/x',
+    fetch: async (url, init) => {
+      deliveredTitles.push(JSON.parse(init.body).task.title);
+      return { ok: true, status: 200 };
+    }
+  });
+  const handle = ui.attachWebhookUi(env);
+  handle.onSave({ preventDefault() {} });
+
+  const olderTask = Object.assign({}, TASK, {
+    id: 'older-memory-only',
+    title: 'older memory-only event'
+  });
+  const newerTask = Object.assign({}, TASK, {
+    id: 'newer-after-recovery',
+    title: 'newer completion after storage recovery'
+  });
+
+  const older = await handle.notifyTaskCompleted(olderTask);
+  assert.deepEqual(older, { queued: true, reason: 'memory-only' });
+  assert.equal(handle.readQueue().length, 1);
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined,
+    'the older event remains tab-local while durable writes fail');
+
+  failQueueWrites = false;
+  const newer = await handle.notifyTaskCompleted(newerTask);
+  assert.deepEqual(newer, { queued: true, reason: 'memory-only' },
+    'a newer completion joins the pending FIFO suffix instead of jumping ahead in durable storage');
+  await settle();
+
+  assert.deepEqual(deliveredTitles, [
+    'older memory-only event',
+    'newer completion after storage recovery'
+  ], 'delivery preserves completion order across a storage failure and recovery');
+  assert.equal(handle.readQueue().length, 0);
+  assert.deepEqual(JSON.parse(storageData[webhookApi.QUEUE_KEY]), []);
+});
