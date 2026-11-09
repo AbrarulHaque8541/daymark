@@ -892,6 +892,31 @@ test('a valid primary Focus state still exposes a readable opaque recovery backu
     'loading and exporting must not alter the original backup');
 });
 
+
+
+test('an expired Focus session can be finalized without hiding an existing recovery backup', () => {
+  const now = Date.now();
+  const expired = focusLogic.createSession({ kind: 'focus', durationMinutes: 1 }, now - 2 * 60 * 1000);
+  const primary = JSON.stringify({ session: focusLogic.serialize(expired), log: [] });
+  const backup = '{older opaque Focus recovery bytes';
+  const storedValues = new Map([
+    [STORAGE_KEY, '[]'],
+    ['daymark.focus.v1', primary],
+    [FOCUS_BACKUP_KEY, backup]
+  ]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
+
+  assert.equal(saved.session, null, 'an expired running session is finalized on reload');
+  assert.equal(saved.log.length, 1, 'the completed session is added to the Focus log');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), backup,
+    'finalizing a session must retain the older recovery bytes');
+  assert.equal(app.elements.get('#toast-action').hidden, false,
+    'the retained backup remains available for manual export');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus data recovery backup retained/);
+});
+
 test('a normal Focus save succeeds when no recovery backup exists', () => {
   const primary = JSON.stringify({ session: null, log: [] });
   const storedValues = new Map([[ 'daymark.focus.v1', primary ]]);
