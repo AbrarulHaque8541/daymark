@@ -1,1 +1,559 @@
-PLACEHOLDER
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2f5f7">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1216">
+  <meta name="description" content="A calm, local-first personal task manager prototype.">
+  <title>Daymark — personal tasks</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2316705f'/%3E%3Crect x='5' y='9' width='3' height='10' rx='1' fill='%23f7f8f5'/%3E%3Crect x='10.5' y='5' width='3' height='14' rx='1' fill='%23f7f8f5'/%3E%3Crect x='16' y='11' width='3' height='8' rx='1' fill='%23f7f8f5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-motion-efficiency.css">
+  <link rel="stylesheet" href="motion-accessibility.css">
+  <script src="task-logic.js" defer></script>
+  <script src="repeat-logic.js" defer></script>
+  <script src="focus-logic.js" defer></script>
+  <script src="feed-logic.js" defer></script>
+  <script src="response-body-logic.js" defer></script>
+  <script src="weather-logic.js" defer></script>
+  <script src="weather-ui.js" defer></script>
+  <script src="holidays-logic.js" defer></script>
+  <script src="holidays-ui.js" defer></script>
+  <script src="currency-logic.js" defer></script>
+  <script src="currency-ui.js" defer></script>
+  <script src="zones-logic.js" defer></script>
+  <script src="zones-ui.js" defer></script>
+  <script src="wiki-logic.js" defer></script>
+  <script src="wiki-ui.js" defer></script>
+  <script src="browser-address-logic.js" defer></script>
+  <script src="browser-address-ui.js" defer></script>
+  <script src="browser-error-logic.js" defer></script>
+  <script src="browser-error-ui.js" defer></script>
+  <script src="browser-download-logic.js" defer></script>
+  <script src="browser-download-ui.js" defer></script>
+  <script src="browser-proxy-logic.js" defer></script>
+  <script src="browser-proxy-ui.js" defer></script>
+  <script src="browser-data-logic.js" defer></script>
+  <script src="browser-data-ui.js" defer></script>
+  <script src="webhook-logic.js" defer></script>
+  <script src="webhook-ui.js" defer></script>
+  <script src="storage-logic.js" defer></script>
+  <script src="storage-ui.js" defer></script>
+  <script src="motion-policy.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="export-ui.js" defer></script>
+  <script src="import-logic.js" defer></script>
+  <script src="import-ui.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Application identity">
+      <a class="brand" href="#main" aria-label="Daymark home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-name">daymark</span>
+      </a>
+      <div class="rail-bottom">
+        <span class="rail-avatar" aria-label="Personal workspace">A</span>
+      </div>
+    </aside>
+
+    <main id="main" class="main-content">
+      <header class="topbar">
+        <div class="workspace-label"><span class="status-dot" aria-hidden="true"></span> Personal workspace</div>
+        <div class="topbar-right">
+          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
+        </div>
+      </header>
+
+      <section class="page-heading" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow" id="today-label">TODAY</p>
+          <h1 id="page-title">Your day, <em>at a glance.</em></h1>
+        </div>
+        <div class="heading-stat" aria-live="polite">
+          <span class="stat-number" id="open-count">0</span>
+          <span class="stat-label">open tasks</span>
+        </div>
+      </section>
+
+      <section class="composer card" aria-labelledby="add-heading">
+        <div class="composer-intro">
+          <span class="plus-mark" aria-hidden="true">+</span>
+          <div><h2 id="add-heading">Add a task</h2></div>
+        </div>
+        <form id="add-form" class="add-form" novalidate>
+          <label class="sr-only" for="new-title">Task title</label>
+          <input id="new-title" name="title" type="text" maxlength="160" placeholder="What needs your attention?" autocomplete="off" aria-describedby="add-error" required>
+          <label class="sr-only" for="new-due-date">Due date (optional)</label>
+          <input id="new-due-date" name="dueDate" type="date" aria-label="Due date (optional)">
+          <label class="sr-only" for="new-due-time">Due time (optional)</label>
+          <input id="new-due-time" name="dueTime" type="time" aria-label="Due time (optional)" disabled>
+          <label class="sr-only" for="new-reminder">Reminder (optional)</label>
+          <select id="new-reminder" name="reminder" aria-label="Reminder (optional)" disabled>
+            <option value="">No reminder</option>
+            <option value="0">Remind at due time</option>
+            <option value="30">30 min before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+          </select>
+          <label class="sr-only" for="new-repeat">Repeat (optional)</label>
+          <select id="new-repeat" name="repeat" aria-label="Repeat (optional)" disabled>
+            <option value="">No repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="weekdays">Weekdays</option>
+            <option value="yearly">Yearly</option>
+          </select>
+          <label class="sr-only" for="new-priority">Priority</label>
+          <select id="new-priority" name="priority" aria-label="Priority">
+            <option value="medium">Medium priority</option>
+            <option value="high">High priority</option>
+            <option value="low">Low priority</option>
+          </select>
+          <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
+        </form>
+        <p id="new-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
+        <div class="date-chips" aria-label="Quick due dates">
+          <button class="date-chip" id="chip-today" type="button">Today</button>
+          <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
+        </div>
+        <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
+        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search. Add <kbd>#tags</kbd> to the title to tag a task.</p>
+      </section>
+
+      <div class="content-grid">
+        <section class="tasks-panel" aria-labelledby="tasks-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">YOUR LIST</p><h2 id="tasks-heading">Tasks</h2></div>
+            <div class="section-heading-tools">
+              <span class="task-total" id="visible-count">0 tasks</span>
+              <button class="clear-completed" id="clear-completed" type="button" hidden>Clear completed</button>
+              <button class="clear-completed" id="explain-clear-completed" type="button" hidden aria-label="Explain what Clear completed does" title="Explain what Clear completed does">?</button>
+            </div>
+          </div>
+          <nav class="filters" aria-label="Filter tasks">
+            <button type="button" class="filter-button is-active" data-filter="all" aria-pressed="true">All <span id="count-all">0</span></button>
+            <button type="button" class="filter-button" data-filter="today" aria-pressed="false">Today <span id="count-today">0</span></button>
+            <button type="button" class="filter-button" data-filter="upcoming" aria-pressed="false">Upcoming <span id="count-upcoming">0</span></button>
+            <button type="button" class="filter-button" data-filter="overdue" aria-pressed="false">Overdue <span id="count-overdue">0</span></button>
+            <button type="button" class="filter-button" data-filter="completed" aria-pressed="false">Completed <span id="count-completed">0</span></button>
+          </nav>
+          <div class="stats-strip" id="stats-strip" hidden aria-label="Your progress">
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-done-today">0</span><span class="stat-cell-label">done today</span></div>
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-done-week">0</span><span class="stat-cell-label">done this week</span></div>
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-streak">0</span><span class="stat-cell-label">day streak</span></div>
+          </div>
+          <div class="task-tools">
+            <label class="sr-only" for="task-search">Search tasks by title</label>
+            <input id="task-search" type="search" placeholder="Search your tasks…" autocomplete="off" aria-describedby="visible-count">
+            <p class="sr-only" id="search-result-status" role="status" aria-live="polite"></p>
+            <button class="tool-button clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
+            <button class="tool-button" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart</button>
+            <label class="sr-only" for="export-format">Export format</label>
+            <select id="export-format" class="sort-select" aria-label="Choose export format">
+              <option value="json" selected>Backup (JSON)</option>
+              <option value="markdown">Markdown (.md)</option>
+              <option value="csv">CSV (.csv)</option>
+              <option value="ics">Calendar (.ics)</option>
+            </select>
+            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
+            <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
+            <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          </div>
+          <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
+            <div class="task-list-skeleton" aria-hidden="true">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+          <div class="empty-state" id="empty-state" hidden>
+            <div class="empty-illustration" aria-hidden="true"><span class="empty-sun"></span><span class="empty-line line-one"></span><span class="empty-line line-two"></span><span class="empty-check">✓</span></div>
+            <h3 id="empty-title">A clear start</h3>
+            <p id="empty-copy">Add your first task above. Small steps count.</p>
+            <button class="button button-quiet empty-clear-search" id="empty-clear-search" type="button" hidden>Clear search</button>
+          </div>
+        </section>
+
+        <div class="side-column">
+        <aside class="suggestion-card" aria-labelledby="suggestion-title">
+          <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span></div>
+          <h2 id="suggestion-title">A good place to begin</h2>
+          <p class="suggestion-description">Local rules pick your next tasks — no AI service.</p>
+          <div class="suggestion-list" id="suggestion-list" aria-live="polite"></div>
+        </aside>
+
+        <aside class="focus-card" id="focus-card" aria-labelledby="focus-heading">
+          <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span></div>
+          <h2 id="focus-heading">One thing at a time</h2>
+          <p class="focus-description">No network, no account.</p>
+          <div class="focus-time-wrap">
+            <span class="focus-time" id="focus-time" role="timer">25:00</span>
+            <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite" aria-atomic="true">Ready</span>
+          </div>
+          <div class="focus-progress" id="focus-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Focus session progress"><div class="focus-progress-fill" id="focus-progress-fill"></div></div>
+          <div class="focus-presets" role="group" aria-label="Timer length">
+            <button class="date-chip focus-preset is-active" type="button" data-focus-preset="focus">Focus · 25 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
+          </div>
+          <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
+          <select id="focus-task"><option value="">No task</option></select>
+          <div class="focus-actions">
+            <button class="button button-primary" id="focus-start" type="button">Start</button>
+            <button class="button button-quiet" id="focus-pause" type="button" hidden>Pause</button>
+            <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
+          </div>
+          <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
+        </aside>
+
+        <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="briefing-heading">RSS / Atom briefing</h2>
+          <p class="briefing-description">Fetched on Refresh, cached offline. Some feeds block browser requests.</p>
+          <form id="feed-form" class="feed-form" novalidate>
+            <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
+            <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>
+            <button class="button button-primary feed-refresh" id="feed-refresh" type="submit">Refresh</button>
+            <button class="button button-quiet feed-clear" id="feed-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="feed-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="feed-list" aria-live="polite"></div>
+        </aside>
+        <aside class="weather-card" id="weather-card" aria-labelledby="weather-heading">
+          <div class="weather-topline"><span class="weather-dot" aria-hidden="true"></span></div>
+          <h2 id="weather-heading">Weather for today</h2>
+          <p class="weather-description">Open-Meteo — no account, no API key. Cached offline.</p>
+          <form id="weather-form" class="feed-form" novalidate>
+            <label class="sr-only" for="weather-place">Place name</label>
+            <input id="weather-place" name="place" type="text" maxlength="80" placeholder="City, e.g. Kolkata" autocomplete="off">
+            <button class="button button-primary weather-refresh" id="weather-refresh" type="button">Refresh</button>
+            <button class="button button-quiet weather-clear" id="weather-clear" type="button">Clear</button>
+          </form>
+          <p class="weather-status" id="weather-status" role="status" aria-live="polite"></p>
+          <div class="weather-now" id="weather-now" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="holiday-card" aria-labelledby="holiday-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="holiday-heading">Public holidays ahead</h2>
+          <p class="briefing-description">Nager.Date open data — no account, no API key. Cached offline.</p>
+          <form id="holiday-form" class="feed-form" novalidate>
+            <label class="sr-only" for="holiday-country">Country for public holidays</label>
+            <select id="holiday-country" name="country" class="sort-select" aria-label="Country">
+              <option value="IN" selected>IN — India</option>
+              <option value="US">US — United States</option>
+              <option value="GB">GB — United Kingdom</option>
+              <option value="AU">AU — Australia</option>
+              <option value="CA">CA — Canada</option>
+              <option value="DE">DE — Germany</option>
+              <option value="FR">FR — France</option>
+              <option value="ES">ES — Spain</option>
+              <option value="IT">IT — Italy</option>
+              <option value="NL">NL — Netherlands</option>
+              <option value="JP">JP — Japan</option>
+              <option value="SG">SG — Singapore</option>
+              <option value="NZ">NZ — New Zealand</option>
+              <option value="IE">IE — Ireland</option>
+              <option value="SE">SE — Sweden</option>
+              <option value="NO">NO — Norway</option>
+              <option value="DK">DK — Denmark</option>
+              <option value="FI">FI — Finland</option>
+              <option value="BE">BE — Belgium</option>
+              <option value="CH">CH — Switzerland</option>
+              <option value="AT">AT — Austria</option>
+              <option value="PT">PT — Portugal</option>
+              <option value="PL">PL — Poland</option>
+              <option value="CZ">CZ — Czechia</option>
+              <option value="HU">HU — Hungary</option>
+              <option value="RO">RO — Romania</option>
+              <option value="GR">GR — Greece</option>
+              <option value="TR">TR — Turkey</option>
+              <option value="ZA">ZA — South Africa</option>
+              <option value="MX">MX — Mexico</option>
+              <option value="BR">BR — Brazil</option>
+              <option value="AR">AR — Argentina</option>
+              <option value="CL">CL — Chile</option>
+              <option value="CO">CO — Colombia</option>
+              <option value="PE">PE — Peru</option>
+              <option value="KR">KR — South Korea</option>
+              <option value="CN">CN — China</option>
+              <option value="TW">TW — Taiwan</option>
+              <option value="HK">HK — Hong Kong</option>
+              <option value="TH">TH — Thailand</option>
+              <option value="MY">MY — Malaysia</option>
+              <option value="ID">ID — Indonesia</option>
+              <option value="PH">PH — Philippines</option>
+              <option value="VN">VN — Vietnam</option>
+              <option value="AE">AE — United Arab Emirates</option>
+              <option value="SA">SA — Saudi Arabia</option>
+              <option value="IL">IL — Israel</option>
+              <option value="EG">EG — Egypt</option>
+              <option value="NG">NG — Nigeria</option>
+              <option value="KE">KE — Kenya</option>
+              <option value="GH">GH — Ghana</option>
+              <option value="MA">MA — Morocco</option>
+              <option value="TN">TN — Tunisia</option>
+              <option value="UA">UA — Ukraine</option>
+              <option value="RU">RU — Russia</option>
+              <option value="KZ">KZ — Kazakhstan</option>
+              <option value="PK">PK — Pakistan</option>
+              <option value="BD">BD — Bangladesh</option>
+              <option value="LK">LK — Sri Lanka</option>
+              <option value="NP">NP — Nepal</option>
+              <option value="MM">MM — Myanmar</option>
+              <option value="KH">KH — Cambodia</option>
+              <option value="LA">LA — Laos</option>
+              <option value="MN">MN — Mongolia</option>
+              <option value="UZ">UZ — Uzbekistan</option>
+              <option value="AZ">AZ — Azerbaijan</option>
+              <option value="GE">GE — Georgia</option>
+              <option value="AM">AM — Armenia</option>
+              <option value="BY">BY — Belarus</option>
+              <option value="MD">MD — Moldova</option>
+              <option value="LV">LV — Latvia</option>
+              <option value="LT">LT — Lithuania</option>
+              <option value="EE">EE — Estonia</option>
+              <option value="IS">IS — Iceland</option>
+              <option value="LU">LU — Luxembourg</option>
+              <option value="MT">MT — Malta</option>
+              <option value="CY">CY — Cyprus</option>
+              <option value="AL">AL — Albania</option>
+              <option value="BA">BA — Bosnia and Herzegovina</option>
+              <option value="RS">RS — Serbia</option>
+              <option value="ME">ME — Montenegro</option>
+              <option value="MK">MK — North Macedonia</option>
+              <option value="SI">SI — Slovenia</option>
+              <option value="HR">HR — Croatia</option>
+              <option value="BG">BG — Bulgaria</option>
+              <option value="SK">SK — Slovakia</option>
+              <option value="LI">LI — Liechtenstein</option>
+              <option value="MC">MC — Monaco</option>
+              <option value="AD">AD — Andorra</option>
+              <option value="SM">SM — San Marino</option>
+              <option value="VA">VA — Vatican City</option>
+            </select>
+            <button class="button button-primary holiday-refresh" id="holiday-refresh" type="button">Refresh</button>
+            <button class="button button-quiet holiday-clear" id="holiday-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="holiday-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="holiday-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="currency-card" aria-labelledby="currency-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="currency-heading">Currency rates</h2>
+          <p class="briefing-description">Frankfurter open data — no account, no API key. Cached offline.</p>
+          <form id="currency-form" class="feed-form" novalidate>
+            <label class="sr-only" for="currency-base">Base currency</label>
+            <select id="currency-base" name="base" class="sort-select" aria-label="Base currency">
+              <option value="USD" selected>USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="INR">INR</option>
+              <option value="JPY">JPY</option>
+              <option value="AUD">AUD</option>
+              <option value="CAD">CAD</option>
+              <option value="CHF">CHF</option>
+              <option value="CNY">CNY</option>
+              <option value="SGD">SGD</option>
+            </select>
+            <label class="sr-only" for="currency-quote">Quote currency</label>
+            <select id="currency-quote" name="quote" class="sort-select" aria-label="Quote currency">
+              <option value="INR" selected>INR</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="JPY">JPY</option>
+              <option value="AUD">AUD</option>
+              <option value="CAD">CAD</option>
+              <option value="CHF">CHF</option>
+              <option value="CNY">CNY</option>
+              <option value="SGD">SGD</option>
+            </select>
+            <button class="button button-primary currency-refresh" id="currency-refresh" type="button">Refresh</button>
+            <button class="button button-quiet currency-clear" id="currency-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="currency-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="currency-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="zones-card" aria-labelledby="zones-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="zones-heading">World clocks</h2>
+          <p class="briefing-description">Local clocks for places you care about. No network.</p>
+          <form id="zones-form" class="feed-form" novalidate>
+            <label class="sr-only" for="zones-place">Place</label>
+            <input id="zones-place" name="place" type="text" maxlength="80" placeholder="City or zone" autocomplete="off">
+            <button class="button button-primary zones-add" id="zones-add" type="submit">Add</button>
+            <button class="button button-quiet zones-clear" id="zones-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="zones-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="zones-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="wiki-card" aria-labelledby="wiki-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="wiki-heading">Wikipedia summary</h2>
+          <p class="briefing-description">Open summaries. Cached offline. Some articles may be blocked by the browser.</p>
+          <form id="wiki-form" class="feed-form" novalidate>
+            <label class="sr-only" for="wiki-query">Search</label>
+            <input id="wiki-query" name="query" type="text" maxlength="120" placeholder="Search Wikipedia" autocomplete="off">
+            <button class="button button-primary wiki-search" id="wiki-search" type="submit">Search</button>
+            <button class="button button-quiet wiki-clear" id="wiki-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="wiki-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="wiki-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-address-card" aria-labelledby="browser-address-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-address-heading">Browser address plan</h2>
+          <p class="briefing-description">Plan a navigation. Nothing is loaded until you confirm.</p>
+          <form id="browser-address-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-address-input">Address or search</label>
+            <input id="browser-address-input" name="address" type="text" maxlength="2048" placeholder="https://example.com or search" autocomplete="off">
+            <button class="button button-primary" id="browser-address-plan" type="submit">Plan</button>
+            <button class="button button-quiet" id="browser-address-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-address-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-address-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-error-card" aria-labelledby="browser-error-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-error-heading">Browser errors, in plain language</h2>
+          <p class="briefing-description">Offline explanations for common browser and storage problems. Nothing is fetched.</p>
+          <form id="browser-error-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-error-scenario">Scenario</label>
+            <select id="browser-error-scenario" name="scenario" class="sort-select" aria-label="Error scenario">
+              <option value="storage-quota" selected>Storage quota exceeded</option>
+              <option value="storage-unavailable">Storage unavailable</option>
+              <option value="network-offline">Network offline</option>
+              <option value="feed-blocked">Feed blocked by browser</option>
+              <option value="invalid-url">Invalid URL</option>
+            </select>
+            <button class="button button-primary" id="browser-error-explain" type="submit">Explain</button>
+            <button class="button button-quiet" id="browser-error-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-error-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-error-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-download-heading">Browser download plan</h2>
+          <p class="briefing-description">Plan a download. Nothing is fetched until you confirm.</p>
+          <form id="browser-download-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-download-url">URL</label>
+            <input id="browser-download-url" name="url" type="url" maxlength="2048" placeholder="https://example.com/file.pdf" autocomplete="off">
+            <button class="button button-primary" id="browser-download-plan" type="submit">Plan</button>
+            <button class="button button-quiet" id="browser-download-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-download-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-download-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-proxy-card" aria-labelledby="browser-proxy-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-proxy-heading">Browser proxy plan</h2>
+          <p class="briefing-description">Plan a proxy. Nothing is applied until you confirm.</p>
+          <form id="browser-proxy-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-proxy-address">Proxy address</label>
+            <input id="browser-proxy-address" name="address" type="text" maxlength="512" placeholder="proxy.example.org:8080" autocomplete="off">
+            <button class="button button-primary" id="browser-proxy-plan" type="submit">Plan</button>
+            <button class="button button-quiet" id="browser-proxy-clear" type="button">Clear</button>
+            <button class="button button-quiet" id="browser-proxy-copy" type="button" aria-label="Copy the proxy plan to the clipboard">Copy plan</button>
+          </form>
+          <p class="feed-status" id="browser-proxy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="browser-proxy-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="browser-data-card" aria-labelledby="browser-data-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-data-heading">What each Clear button really does</h2>
+          <p class="briefing-description">Offline, plain-words scope for every clear or storage-touching action in this prototype. Nothing is fetched and no action is run.</p>
+          <form id="browser-data-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-data-action">Action</label>
+            <select id="browser-data-action" name="action" class="sort-select" aria-label="Clear or storage action">
+              <option value="clear-completed" selected>Clear completed tasks</option>
+              <option value="clear-search">Clear task search</option>
+              <option value="webhook-clear-queue">Clear webhook queue</option>
+              <option value="storage-clear-status">Clear storage status</option>
+              <option value="import-merge">Import a backup</option>
+              <option value="export-backup">Export a backup</option>
+            </select>
+            <button class="button button-primary" id="browser-data-explain" type="submit">Explain</button>
+            <button class="button button-quiet" id="browser-data-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-data-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="browser-data-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="webhook-heading">Task completion webhook</h2>
+          <p class="briefing-description">Announce completed tasks to a user-chosen HTTPS endpoint. Offline-first; events queue on this device until they can be delivered.</p>
+          <form id="webhook-form" class="feed-form" novalidate>
+            <label class="sr-only" for="webhook-url">Webhook URL</label>
+            <input id="webhook-url" name="url" type="url" inputmode="url" placeholder="https://hooks.example.com/daymark" autocomplete="off" spellcheck="false" aria-describedby="webhook-status">
+            <button class="button button-primary" id="webhook-save" type="submit">Save</button>
+            <button class="button button-quiet" id="webhook-test" type="button">Test</button>
+            <button class="button button-quiet" id="webhook-flush" type="button">Retry queue</button>
+            <button class="button button-quiet" id="webhook-clear-queue" type="button">Clear queue</button>
+          </form>
+          <p class="feed-status" id="webhook-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        </aside>
+        <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="storage-heading">Browser storage health</h2>
+          <p class="briefing-description">Local-only check of this origin’s storage. No network.</p>
+          <form id="storage-form" class="feed-form" novalidate>
+            <button class="button button-primary" id="storage-check" type="button">Check</button>
+            <button class="button button-quiet" id="storage-clear" type="button">Clear status</button>
+          </form>
+          <p class="feed-status" id="storage-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="storage-result" aria-live="polite"></div>
+        </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+  <dialog id="edit-dialog" class="edit-dialog" aria-labelledby="edit-heading">
+    <form id="edit-form" method="dialog" novalidate>
+      <h2 id="edit-heading">Edit task</h2>
+      <label class="sr-only" for="edit-title">Title</label>
+      <input id="edit-title" name="title" type="text" maxlength="160" required>
+      <label class="sr-only" for="edit-due-date">Due date</label>
+      <input id="edit-due-date" name="dueDate" type="date">
+      <label class="sr-only" for="edit-due-time">Due time</label>
+      <input id="edit-due-time" name="dueTime" type="time" disabled>
+      <label class="sr-only" for="edit-reminder">Reminder</label>
+      <select id="edit-reminder" name="reminder" disabled>
+        <option value="">No reminder</option>
+        <option value="0">Remind at due time</option>
+        <option value="30">30 min before</option>
+        <option value="60">1 hour before</option>
+        <option value="1440">1 day before</option>
+      </select>
+      <label class="sr-only" for="edit-repeat">Repeat</label>
+      <select id="edit-repeat" name="repeat" disabled>
+        <option value="">No repeat</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="weekdays">Weekdays</option>
+        <option value="yearly">Yearly</option>
+      </select>
+      <label class="sr-only" for="edit-priority">Priority</label>
+      <select id="edit-priority" name="priority">
+        <option value="medium">Medium priority</option>
+        <option value="high">High priority</option>
+        <option value="low">Low priority</option>
+      </select>
+      <label class="sr-only" for="edit-notes">Notes</label>
+      <textarea id="edit-notes" name="notes" maxlength="2000" rows="4" placeholder="Notes (optional)"></textarea>
+      <div class="edit-actions">
+        <button class="button button-quiet" id="edit-cancel" type="button" value="cancel">Cancel</button>
+        <button class="button button-primary" id="edit-save" type="submit" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
