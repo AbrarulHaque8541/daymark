@@ -125,6 +125,62 @@ test('fromIcs maps a realistic calendar export onto stored tasks with honest cou
   assert.equal(utcEvent.dueTime, '14:30');
 });
 
+
+test('CATEGORIES splits only unescaped commas and never invents tags from escaped delimiters', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VTODO',
+    'UID:categories@example.com',
+    'SUMMARY:Category escaping',
+    'CATEGORIES:work\\,personal,finance,ops\\;urgent',
+    'END:VTODO',
+    'END:VCALENDAR',
+    ''
+  ].join('\r\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.deepEqual(result.tasks[0].tags, ['finance'],
+    'escaped comma/semicolon stay inside their original category and invalid tag text is not split into invented tags');
+});
+
+test('recurrence and timezone simplifications count only imported rows and include RDATE/RECURRENCE-ID', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VEVENT',
+    'UID:skipped-recurring@example.com',
+    'DTSTART;TZID=Asia/Kolkata:20261110T090000',
+    'RRULE:FREQ=DAILY',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:invalid-time@example.com',
+    'SUMMARY:Keep date but reject invalid time',
+    'DTSTART;TZID=Asia/Kolkata:20261110T250000',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:rdate@example.com',
+    'SUMMARY:RDATE recurrence',
+    'DTSTART:20261110T090000',
+    'RDATE:20261111T090000',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:recurrence-instance@example.com',
+    'SUMMARY:Detached recurrence instance',
+    'RECURRENCE-ID:20261112T090000',
+    'DTSTART:20261112T090000',
+    'END:VEVENT',
+    'END:VCALENDAR',
+    ''
+  ].join('\r\n');
+  const result = importer.fromIcs(ics, freshCtx());
+  assert.equal(result.tasks.length, 3);
+  assert.equal(result.skippedRows, 1);
+  assert.equal(result.recurring, 2,
+    'only imported RDATE and RECURRENCE-ID items are disclosed; the skipped RRULE row is not counted');
+  assert.equal(result.timezoneDropped, 0,
+    'timezone simplification is not counted for a skipped row or an invalid clock time');
+  assert.equal(result.tasks[0].dueDate, '2026-11-10');
+  assert.equal(result.tasks[0].dueTime, null);
+});
+
 test('imported calendar tasks pass the same validation as stored tasks', () => {
   const result = importer.fromIcs(googleLikeIcs, freshCtx());
   for (const task of result.tasks) {
