@@ -1,8 +1,7 @@
-// Quick Translate: floating button next to a text selection that calls
-// the free MyMemory API; falls back to a Google Translate tab on error.
+// Quick Translate: send a small, user-selected snippet to the background worker.
+// The worker requests only the MyMemory host permission and bounds the HTTPS response.
 
 const BTN_ID = "uccl-translate-btn";
-const MYMEMORY = "https://api.mymemory.translated.net/get";
 
 async function targetLanguage() {
   const stored = await chrome.storage.sync.get("settings");
@@ -28,27 +27,35 @@ function onEnable() {
   document.addEventListener("selectionchange", () => {
     const text = selectedText();
     if (!text || text.length > 500) { btn.style.display = "none"; return; }
-    const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    const selection = window.getSelection();
+    const rect = selection && selection.rangeCount > 0
+      ? selection.getRangeAt(0).getBoundingClientRect() : null;
+    if (!rect) { btn.style.display = "none"; return; }
     btn.style.left = Math.max(4, rect.right + 4) + "px";
     btn.style.top = Math.max(4, rect.top - 32) + "px";
     btn.style.display = "block";
   });
-  btn.onclick = async () => {
+  btn.onclick = async (event) => {
+    if (!event || event.isTrusted !== true) return;
     const text = selectedText();
-    if (!text) return;
-    const lang = await targetLanguage();
-    const url = MYMEMORY + "?q=" + encodeURIComponent(text) + "&langpair=en|" + lang;
+    if (!text || text.length > 500) return;
+    let lang = "hi";
+    try { lang = await targetLanguage(); } catch (error) { /* use the safe default */ }
     try {
-      const response = await fetch(url);
-      const data = await response.json();
-      const translated =
-        data && data.responseData && data.responseData.translatedText;
-      if (translated) {
-        alert(text + "\n→ " + translated);
+      const response = await chrome.runtime.sendMessage({
+        type: "translateRequest",
+        text,
+        language: lang,
+      });
+      if (response && response.text) {
+        alert(text + "\n→ " + response.text);
         return;
       }
-    } catch (e) { /* fall through to Google Translate */ }
-    window.open("https://translate.google.com/?sl=auto&tl=" + lang + "&text=" + encodeURIComponent(text) + "&op=translate", "_blank");
+    } catch (error) {
+      // Fall back to the explicit browser translation page below.
+    }
+    window.open("https://translate.google.com/?sl=auto&tl=" + encodeURIComponent(lang)
+      + "&text=" + encodeURIComponent(text) + "&op=translate", "_blank");
   };
   document.documentElement.appendChild(btn);
 }

@@ -1,7 +1,9 @@
 // Popup: auto-builds the toggle list from the feature registry.
-// Adding a new feature module requires zero changes here.
+// Adding a feature module requires zero changes here.
 
 import { REGISTRY, ORDER, getSettings } from "../features/registry.js";
+
+const TRANSLATE_ORIGIN = "https://api.mymemory.translated.net";
 
 const list = document.getElementById("features");
 const settings = await getSettings();
@@ -13,7 +15,6 @@ for (const id of ORDER) {
   const feature = REGISTRY[id];
   const row = document.createElement("div");
   row.className = "feature";
-
   const meta = document.createElement("div");
   meta.className = "meta";
   const name = document.createElement("div");
@@ -38,10 +39,26 @@ for (const id of ORDER) {
   label.appendChild(slider);
 
   toggle.onchange = async () => {
-    settings.features[id] = toggle.checked;
+    const enabled = toggle.checked;
+    if (id === "translate" && enabled) {
+      let granted = false;
+      try {
+        // This request is made in the popup's direct user-gesture handler.
+        granted = await chrome.permissions.request({ origins: [TRANSLATE_ORIGIN + "/*"] });
+      } catch (error) {
+        granted = false;
+      }
+      if (!granted) {
+        toggle.checked = false;
+        settings.features[id] = false;
+        await chrome.storage.sync.set({ settings });
+        await chrome.runtime.sendMessage({ type: "setFeature", id, enabled: false });
+        return;
+      }
+    }
+    settings.features[id] = enabled;
     await chrome.storage.sync.set({ settings });
-    // Background worker applies adblock/permission side effects.
-    chrome.runtime.sendMessage({ type: "setFeature", id, enabled: toggle.checked });
+    await chrome.runtime.sendMessage({ type: "setFeature", id, enabled });
   };
 
   row.appendChild(meta);
