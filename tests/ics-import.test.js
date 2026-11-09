@@ -7,12 +7,26 @@ const path = require('node:path');
 const importer = require('../import-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
+const mutation = require('../task-mutation-logic.js');
 
 const NOW = '2026-11-09T05:00:00.000Z';
 
 function freshCtx() {
   let n = 0;
   return { now: NOW, makeId: () => 'gen-' + String(++n) };
+}
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
+    }
+  };
 }
 
 const googleLikeIcs = [
@@ -263,10 +277,11 @@ test('the import UI intercepts .ics files, saves them, and discloses the simplif
     addEventListener() {},
     removeEventListener() {}
   };
-  const win = { StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } }, dispatchEvent() { return true; } };
+  const locks = makeLockManager();
+  const win = { navigator: { locks }, StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } }, dispatchEvent() { return true; } };
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
-    importApi: importer, logic, now: () => NOW
+    importApi: importer, logic, taskMutation: mutation, lockManager: locks, now: () => NOW
   });
   const event = {
     target: element,
@@ -328,13 +343,15 @@ test('a malformed calendar envelope cannot write or partially import existing ta
     addEventListener() {},
     removeEventListener() {}
   };
+  const locks = makeLockManager();
   const win = {
+    navigator: { locks },
     StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } },
     dispatchEvent() { return true; }
   };
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
-    importApi: importer, logic, now: () => NOW
+    importApi: importer, logic, taskMutation: mutation, lockManager: locks, now: () => NOW
   });
   const event = {
     target: element,
@@ -499,6 +516,8 @@ test('import UI discloses invalid completion, invalid date values and ambiguous 
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
     importApi: importer,
+    taskMutation: mutation,
+    lockManager: locks,
     logic: { validateStoredTasks: () => ({ tasks: [], rejectedCount: 0 }), isValidTask: () => true, hasDuplicateJsonKeys: () => false },
     now: () => NOW
   });
