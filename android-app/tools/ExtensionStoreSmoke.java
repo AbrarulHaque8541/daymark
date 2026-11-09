@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.List;
 
 /** Real filesystem/persistence checks for ExtensionStore using isolated host-only Android stubs. */
 public final class ExtensionStoreSmoke {
@@ -55,9 +56,17 @@ public final class ExtensionStoreSmoke {
                     "a readable but malformed existing extension pack is rejected without replacing its exact bytes");
             check(!new File(corruptFile.getAbsolutePath() + ".tmp").exists(),
                     "a failed malformed-pack import does not leave a partial temporary file");
-            store.uninstallUserPack(corruptId);
+            ExtensionStore.MalformedUserPack corruptRecord = findMalformed(store,
+                    corruptFile.getName());
+            check(ExtensionStore.MalformedUserPack.STATE_MALFORMED.equals(corruptRecord.state)
+                            && corruptRecord.canExport && corruptRecord.canRemove,
+                    "readable malformed pack appears as a disabled recovery record with explicit safe actions");
+            check(Arrays.equals(corruptBytes, store.readMalformedUserPackBytes(
+                            corruptRecord.fileName, corruptRecord.sha256)),
+                    "raw malformed-pack export is byte-identical to the original bytes");
+            store.removeMalformedUserPack(corruptRecord.fileName, corruptRecord.sha256);
             check(!corruptFile.exists(),
-                    "the explicit store uninstall path can remove the preserved malformed pack by id");
+                    "fingerprint-confirmed removal deletes only the selected malformed pack");
 
             String emptyId = "user.empty-corrupt-smoke";
             File emptyFile = new File(new File(root, "browser_extensions"), emptyId + ".daymark-ext.json");
@@ -67,8 +76,12 @@ public final class ExtensionStoreSmoke {
             expectMalformedFailure(store, emptyImport);
             check(emptyFile.exists() && emptyFile.length() == 0L,
                     "a readable zero-byte existing pack remains present and byte-for-byte unchanged");
-            store.uninstallUserPack(emptyId);
-            check(!emptyFile.exists(), "explicit uninstall can remove the zero-byte malformed pack");
+            ExtensionStore.MalformedUserPack emptyRecord = findMalformed(store, emptyFile.getName());
+            check(emptyRecord.canExport && emptyRecord.canRemove
+                            && store.readMalformedUserPackBytes(emptyRecord.fileName, emptyRecord.sha256).length == 0,
+                    "zero-byte malformed pack is surfaced and exported as exactly zero bytes");
+            store.removeMalformedUserPack(emptyRecord.fileName, emptyRecord.sha256);
+            check(!emptyFile.exists(), "fingerprint-confirmed removal can remove a zero-byte malformed pack");
 
             String oversizedId = "user.oversized-smoke";
             File oversizedFile = new File(new File(root, "browser_extensions"), oversizedId + ".daymark-ext.json");
@@ -80,6 +93,14 @@ public final class ExtensionStoreSmoke {
             expectReadFailure(store, oversizedImport);
             check(Arrays.equals(oversizedBytes, Files.readAllBytes(oversizedFile.toPath())),
                     "an oversized existing extension file is rejected without truncation or replacement");
+            ExtensionStore.MalformedUserPack oversizedRecord = findMalformed(store, oversizedFile.getName());
+            check(ExtensionStore.MalformedUserPack.STATE_OVERSIZED.equals(oversizedRecord.state)
+                            && !oversizedRecord.canExport && !oversizedRecord.canRemove,
+                    "oversized pack is visible as non-actionable recovery metadata");
+            expectRecoveryReadFailure(store, oversizedRecord.fileName, oversizedRecord.sha256);
+            expectRecoveryRemoveFailure(store, oversizedRecord.fileName, oversizedRecord.sha256);
+            check(Arrays.equals(oversizedBytes, Files.readAllBytes(oversizedFile.toPath())),
+                    "rejected oversized recovery actions preserve the exact original bytes");
 
             String unreadableId = "user.unreadable-smoke";
             File unreadablePath = new File(new File(root, "browser_extensions"), unreadableId + ".daymark-ext.json");
@@ -93,11 +114,85 @@ public final class ExtensionStoreSmoke {
             check(unreadablePath.isDirectory() && marker.exists()
                             && Arrays.equals(markerBytes, Files.readAllBytes(marker.toPath())),
                     "an unreadable existing extension path and its contents are preserved");
+            ExtensionStore.MalformedUserPack nonRegularRecord = findMalformed(store, unreadablePath.getName());
+            check(ExtensionStore.MalformedUserPack.STATE_NON_REGULAR.equals(nonRegularRecord.state)
+                            && !nonRegularRecord.canExport && !nonRegularRecord.canRemove,
+                    "non-regular extension paths are visible but never exported or removed");
+            expectRecoveryReadFailure(store, nonRegularRecord.fileName, nonRegularRecord.sha256);
+            expectRecoveryRemoveFailure(store, nonRegularRecord.fileName, nonRegularRecord.sha256);
 
-            System.out.println("PASS: ExtensionStoreSmoke: new imports disabled; identical re-import state preserved; conflicts rejected; malformed/unreadable/oversized existing packs preserved ("
+            String binaryId = "user.binary-smoke";
+            File binaryFile = new File(new File(root, "browser_extensions"), binaryId + ".daymark-ext.json");
+            byte[] binaryBytes = new byte[] {(byte) 0xff, 0x00, 0x7b, 0x00};
+            Files.write(binaryFile.toPath(), binaryBytes);
+            ExtensionStore.MalformedUserPack binaryRecord = findMalformed(store, binaryFile.getName());
+            check(binaryRecord.canExport && Arrays.equals(binaryBytes,
+                            store.readMalformedUserPackBytes(binaryRecord.fileName, binaryRecord.sha256)),
+                    "invalid UTF-8 malformed packs can be exported byte-for-byte without text normalization");
+            store.removeMalformedUserPack(binaryRecord.fileName, binaryRecord.sha256);
+            check(!binaryFile.exists(), "confirmed recovery removal removes the selected invalid-UTF-8 pack");
+
+            String changedId = "user.changed-smoke";
+            File changedFile = new File(new File(root, "browser_extensions"), changedId + ".daymark-ext.json");
+            byte[] listedBytes = "{bad-one".getBytes(StandardCharsets.UTF_8);
+            byte[] replacementBytes = "{bad-two".getBytes(StandardCharsets.UTF_8);
+            Files.write(changedFile.toPath(), listedBytes);
+            ExtensionStore.MalformedUserPack changedRecord = findMalformed(store, changedFile.getName());
+            Files.write(changedFile.toPath(), replacementBytes);
+            expectRecoveryReadFailure(store, changedRecord.fileName, changedRecord.sha256);
+            expectRecoveryRemoveFailure(store, changedRecord.fileName, changedRecord.sha256);
+            check(Arrays.equals(replacementBytes, Files.readAllBytes(changedFile.toPath())),
+                    "a pack changed after listing is neither exported under a stale fingerprint nor deleted");
+
+            String targetId = "user.symlink-target";
+            File targetFile = new File(root, targetId + ".txt");
+            byte[] targetBytes = "do-not-follow-symlink".getBytes(StandardCharsets.UTF_8);
+            Files.write(targetFile.toPath(), targetBytes);
+            String symlinkId = "user.symlink-smoke";
+            File symlinkFile = new File(new File(root, "browser_extensions"), symlinkId + ".daymark-ext.json");
+            Files.createSymbolicLink(symlinkFile.toPath(), targetFile.toPath());
+            ExtensionStore.MalformedUserPack symlinkRecord = findMalformed(store, symlinkFile.getName());
+            check(ExtensionStore.MalformedUserPack.STATE_NON_REGULAR.equals(symlinkRecord.state)
+                            && !symlinkRecord.canExport && !symlinkRecord.canRemove,
+                    "symbolic links are listed as non-regular and are never followed");
+            expectRecoveryReadFailure(store, symlinkRecord.fileName, symlinkRecord.sha256);
+            expectRecoveryRemoveFailure(store, symlinkRecord.fileName, symlinkRecord.sha256);
+            check(Files.isSymbolicLink(symlinkFile.toPath())
+                            && Arrays.equals(targetBytes, Files.readAllBytes(targetFile.toPath())),
+                    "rejected symlink recovery actions preserve both link and target");
+
+            System.out.println("PASS: ExtensionStoreSmoke: disabled imports, conflict preservation, malformed-pack listing, exact-byte export, fingerprint-checked removal and fail-closed unsafe paths ("
                     + assertions + " assertions)");
         } finally {
             deleteTree(root);
+        }
+    }
+
+    private static ExtensionStore.MalformedUserPack findMalformed(ExtensionStore store, String fileName) throws Exception {
+        List<ExtensionStore.MalformedUserPack> records = store.listMalformedUserPacks();
+        for (ExtensionStore.MalformedUserPack record : records) {
+            if (fileName.equals(record.fileName)) return record;
+        }
+        throw new AssertionError("malformed recovery record is missing: " + fileName);
+    }
+
+    private static void expectRecoveryReadFailure(ExtensionStore store, String fileName, String fingerprint) throws Exception {
+        assertions++;
+        try {
+            store.readMalformedUserPackBytes(fileName, fingerprint);
+            throw new AssertionError("expected unsafe or changed recovery export to fail closed: " + fileName);
+        } catch (IOException expected) {
+            // Unsafe, oversized, non-regular or stale records are not exportable.
+        }
+    }
+
+    private static void expectRecoveryRemoveFailure(ExtensionStore store, String fileName, String fingerprint) throws Exception {
+        assertions++;
+        try {
+            store.removeMalformedUserPack(fileName, fingerprint);
+            throw new AssertionError("expected unsafe or changed recovery removal to fail closed: " + fileName);
+        } catch (IOException expected) {
+            // Unsafe, oversized, non-regular or stale records are not removable.
         }
     }
 
