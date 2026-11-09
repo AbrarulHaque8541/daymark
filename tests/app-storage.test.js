@@ -339,7 +339,7 @@ test('task completion webhook is durably queued inside the task mutation lock af
   await triggerTaskCompletion(app, task.id);
   assert.equal(observed.held, true, 'the webhook append callback runs before the task lock is released');
   assert.equal(observed.committed.completed, true, 'the task write is durable before notification');
-  assert.deepEqual(observed.options, { deferDelivery: true }, 'network delivery is deferred outside the task lock callback');
+  assert.equal(observed.options.deferDelivery, true, 'network delivery is deferred outside the task lock callback');
 });
 
 test('task writes fail closed when Web Locks are unavailable', async () => {

@@ -850,21 +850,22 @@ test('status never echoes a webhook endpoint from a network error', async () => 
   assert.equal(elements['webhook-status'].textContent.includes(secret),false);
 });
 
-test('the app persists a newly completed task before queueing its webhook', () => {
+test('the app persists a newly completed task before queueing its webhook under the task lock', () => {
   const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-  assert.ok(app.includes("const result = webhookUi.notifyTaskCompleted(task);"));
-  assert.ok(app.includes("result.catch((error) =>"));
+  assert.ok(app.includes('afterCommit: typeof afterCommit === \'function\' ? afterCommit : undefined'));
+  assert.ok(app.includes('return await webhookUi.notifyTaskCompleted(task, options);'));
 
   const toggleStart = app.indexOf("if (button.dataset.action === 'toggle')");
   const toggleEnd = app.indexOf("} else if", toggleStart);
   assert.ok(toggleStart >= 0 && toggleEnd > toggleStart, 'the task toggle branch must remain identifiable');
   const toggle = app.slice(toggleStart, toggleEnd);
-  const persistAt = toggle.indexOf('const saved = await persistTasks();');
-  const notifyAt = toggle.indexOf('notifyWebhookTaskCompleted(task)');
-  assert.ok(persistAt >= 0 && notifyAt > persistAt,
-    'the external webhook must never be queued before the local task write succeeds');
-  assert.ok(toggle.includes('if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);'),
-    'only a successfully persisted transition from open to completed may emit an event');
+  const afterCommitAt = toggle.indexOf('const afterCommit = task.completed && !wasCompleted');
+  const persistAt = toggle.indexOf('const saved = await persistTasks(afterCommit);');
+  assert.ok(afterCommitAt >= 0 && persistAt > afterCommitAt,
+    'the completion notification callback must be attached to the task transaction');
+  assert.ok(toggle.includes('await notifyWebhookTaskCompleted(committed, { deferDelivery: true })'));
+  assert.ok(toggle.includes('commit.changedIds.includes(task.id)'),
+    'only a newly committed open-to-completed transition may emit an event');
 });
 
 test('index markup exposes task-completion webhook controls and session-only disclosure', () => {
