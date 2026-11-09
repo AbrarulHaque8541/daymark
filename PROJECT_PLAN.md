@@ -1,3 +1,27 @@
+## Current execution queue — 2026-11-09T21:12:32.998Z (main 1532838c; #683 branch safety review; #688 test-source guard in CI)
+
+Full live inventory and exact-head evidence: [CURRENT_STATUS_20261109T211232Z.md](docs/CURRENT_STATUS_20261109T211232Z.md).
+
+1. **P0 #683:** reject the non-atomic localStorage lease branch; implement origin-wide Web Locks across normal writes/import/recovery/clear/undo, with fail-closed fallback and true two-context tests.
+2. **P0 #613/#677/#648:** integrate the tested #648 Focus/IME implementation sequentially into #677 and rerun API 29/36; exact #677 API36 currently fails Cancel with IME visible.
+3. **P0 #646/#160:** owner-side branch protection and physical Android/WebView acceptance.
+4. **P1 #675/#640/#636/#639:** independent recovery/webhook data-integrity review; do not conflate queue locking with task locking.
+5. **P1 #687/#659:** accessible malformed-extension recovery/export/removal UI; store-layer parent-symlink protections are already present on #659.
+6. **P1 #685/#686:** decide Service Worker Online compatibility while retaining Offline fail-closed behavior.
+7. **P1 #671/#678:** complete DNS-pinned/TLS-verified bounded browser download transport; keep downloads fail-closed.
+8. **P1 #684/#476:** align Android/web recurrence semantics and validate alarms, Doze, reboot, timezone and OEM delivery.
+9. **P1 #665/#84:** independent signing/provenance review and direct/transitive Actions runtime modernization.
+10. **P1 #656/#676/#682:** independent import/export, extension and browser-data review; integrate imports with the shared task mutation contract.
+11. **P1 #688:** finish exact-head CI and independent review for the Node test-source integrity guard.
+12. **P2 #325/#348:** measured cross-platform, browser UX, accessibility and performance work.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T21:12:32.998Z
+
+---
+
 ## Current execution queue — 2026-11-09T20:35:56.690Z (main 1532838c; exact-head follow-up for #675/#686/#659)
 
 Full inventory and evidence: [CURRENT_STATUS_20261109T203556Z.md](docs/CURRENT_STATUS_20261109T203556Z.md).
