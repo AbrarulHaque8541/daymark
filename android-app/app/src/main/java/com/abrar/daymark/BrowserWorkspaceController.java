@@ -43,6 +43,11 @@ final class BrowserWorkspaceController {
     }
 
     static void enforceOffline(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
+        if (policy != null && !policy.allowsRemoteLoads()) {
+            // Service Workers use a process-wide controller, not the retained WebView list.
+            // Reassert their global fail-closed boundary even when there are no live tabs.
+            BrowserServiceWorkerEnforcement.enforceBlocked();
+        }
         BrowserOfflineEnforcement.enforceOffline(policy, tabs);
     }
 }

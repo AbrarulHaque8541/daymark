@@ -9,7 +9,6 @@ policy = (main / "BrowserServiceWorkerPolicy.java").read_text(encoding="utf-8")
 enforcement = (main / "BrowserServiceWorkerEnforcement.java").read_text(encoding="utf-8")
 webview = (main / "DaymarkWebView.java").read_text(encoding="utf-8")
 workspace = (main / "BrowserWorkspaceController.java").read_text(encoding="utf-8")
-offline = (main / "BrowserOfflineEnforcement.java").read_text(encoding="utf-8")
 docs = (root / "ANDROID_SOURCES.md").read_text(encoding="utf-8")
 
 def require(condition, message):
@@ -44,8 +43,9 @@ require("new WebResourceResponse(" in enforcement and "403" in enforcement,
         "return a synthetic blocked response instead of allowing network pass-through")
 require(".setBlockNetworkLoads(false)" not in enforcement,
         "never unblock the process-wide Service Worker network setting")
-require("BrowserServiceWorkerEnforcement.enforceBlocked();" in offline,
-        "reassert the process-wide block on Offline transition even without retained tabs")
+require("BrowserServiceWorkerEnforcement.enforceBlocked();" in workspace
+        and "if (policy != null && !policy.allowsRemoteLoads())" in workspace,
+        "reassert the process-wide block in the Android workspace controller on Offline transition")
 require("DaymarkWebView.isServiceWorkerNetworkPolicyReady()" in workspace,
         "do not unblock page loads if global Service Worker enforcement could not be installed")
 require(re.search(

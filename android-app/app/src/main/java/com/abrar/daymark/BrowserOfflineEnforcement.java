@@ -18,11 +18,7 @@ final class BrowserOfflineEnforcement {
     private BrowserOfflineEnforcement() { }
 
     static void enforceOffline(BrowserNetworkPolicy policy, List<? extends Tab> tabs) {
-        if (policy == null || policy.allowsRemoteLoads()) return;
-        // Service Workers use a process-wide controller, not the retained WebView list.
-        // Reassert their global fail-closed boundary even when there are no live tabs.
-        BrowserServiceWorkerEnforcement.enforceBlocked();
-        if (tabs == null) return;
+        if (policy == null || policy.allowsRemoteLoads() || tabs == null) return;
         for (Tab tab : tabs) {
             if (tab == null) continue;
             try {
