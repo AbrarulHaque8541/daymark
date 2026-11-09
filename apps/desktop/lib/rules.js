@@ -47,7 +47,8 @@ function isHttps(url) {
 
 function isAllowedInsecure(hostname) {
   if (!hostname) return false;
-  return INSECURE_ALLOWED_HOSTNAMES.has(hostname.toLowerCase());
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return INSECURE_ALLOWED_HOSTNAMES.has(normalized);
 }
 
 function isAllowedUrl(url) {

@@ -62,3 +62,10 @@ test('tracker suffix does not match lookalike sibling domains', () => {
   // evildoubleclick.net must not be caught by a naive contains() check
   assert.equal(rules.isTrackerUrl('https://evildoubleclick.net'), false);
 });
+
+test('IPv6 loopback is preserved as a local HTTP exception', () => {
+  assert.equal(rules.isAllowedUrl('http://[::1]:3000/'), true);
+  assert.equal(rules.isAllowedInsecure('[::1]'), true);
+  assert.equal(rules.isAllowedUrl('http://[::2]:3000/'), false);
+  assert.equal(rules.httpsUpgradeUrl('http://[::1]:3000/dev'), 'http://[::1]:3000/dev');
+});
