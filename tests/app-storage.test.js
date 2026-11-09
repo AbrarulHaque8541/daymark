@@ -855,3 +855,68 @@ test('an empty primary task payload is not overwritten when its recovery backup 
     'later task saves remain blocked while the only original payload cannot be backed up');
   assert.equal(app.storedValues.has(BACKUP_KEY), false);
 });
+
+test('partial recovery export imports readable tasks and skips an unknown Focus source', () => {
+  const existingTask = makeImportTask('partial-existing-task', 'Existing task');
+  const recoveredTask = makeImportTask('partial-readable-task', 'Readable task backup');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: JSON.stringify([recoveredTask]),
+    taskBackupStatus: 'available',
+    focusBackup: null,
+    focusBackupStatus: 'unknown'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 1, 'the readable task source receives the normal import preview');
+  assert.match(app.confirmMessages[0], /1 recovery source was marked unknown/);
+  const savedTasks = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.ok(savedTasks.some((task) => task.id === recoveredTask.id), 'the readable task backup is imported');
+  assert.equal(app.storedValues.get(FOCUS_KEY), existingFocus, 'the unknown Focus source does not overwrite existing Focus data');
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+});
+
+test('partial recovery export imports readable Focus data but never imports bytes marked unknown', () => {
+  const existingTask = makeImportTask('partial-task-stays', 'Existing task stays');
+  const forbiddenTask = makeImportTask('partial-unknown-task', 'Must not import unknown bytes');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const focusEntry = makeFocusLogEntry('partial-readable-focus-log');
+  const readableFocus = JSON.stringify({ session: null, log: [focusEntry] });
+  const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: JSON.stringify([forbiddenTask]),
+    taskBackupStatus: 'unknown',
+    focusBackup: readableFocus,
+    focusBackupStatus: 'available'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 1);
+  assert.match(app.confirmMessages[0], /1 recovery source was marked unknown/);
+  assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), [existingTask],
+    'raw task bytes are ignored when the envelope marks that source unknown');
+  const savedFocus = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.ok(savedFocus.log.some((entry) => entry.id === focusEntry.id), 'the readable Focus backup is imported');
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+});
+
+test('empty available partial-recovery payload is reported and does not mutate either store', () => {
+  const existingTask = makeImportTask('partial-empty-existing', 'Existing task');
+  const existingFocus = JSON.stringify({ session: null, log: [] });
+  const savedTasks = JSON.stringify([existingTask]);
+  const app = bootApp({ savedValue: savedTasks, savedFocusValue: existingFocus });
+  const partial = JSON.stringify({
+    format: 'daymark-partial-recovery-v1',
+    taskBackup: '',
+    taskBackupStatus: 'available',
+    focusBackup: null,
+    focusBackupStatus: 'unknown'
+  });
+  triggerTaskImport(app, { size: Buffer.byteLength(partial), content: partial });
+  assert.equal(app.confirmMessages.length, 0, 'no preview is offered when no valid recovery record exists');
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
+  assert.equal(app.storedValues.get(FOCUS_KEY), existingFocus);
+  assert.match(app.elements.get('#toast').textContent, /No valid recovery data could be restored/);
+  assert.match(app.elements.get('#toast').textContent, /1 recovery source was marked unknown and skipped/);
+});
