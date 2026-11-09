@@ -862,3 +862,31 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Cycle B 2026-11-10: consistent focus-visible and press feedback for chips/filters (accent #16705f).
+   Reduced-motion safe; no new network. */
+.filter-button:focus-visible,
+.date-chip:focus-visible,
+.tag-pill:focus-visible,
+.tool-button:focus-visible {
+  outline: 3px solid rgba(22, 112, 95, .45);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.date-chip:active,
+.tag-pill:active,
+.filter-button:active {
+  transform: translateY(1px) scale(.97);
+  background: var(--accent-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter-button:focus-visible,
+  .date-chip:focus-visible,
+  .tag-pill:focus-visible,
+  .tool-button:focus-visible,
+  .date-chip:active,
+  .tag-pill:active,
+  .filter-button:active {
+    transform: none;
+  }
+}
