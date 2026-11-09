@@ -46,12 +46,18 @@ public final class ExtensionStoreSmoke {
 
             String corruptId = "user.corrupt-smoke";
             File corruptFile = new File(new File(root, "browser_extensions"), corruptId + ".daymark-ext.json");
-            Files.write(corruptFile.toPath(), "{not valid JSON".getBytes(StandardCharsets.UTF_8));
+            byte[] corruptBytes = "{not valid JSON".getBytes(StandardCharsets.UTF_8);
+            Files.write(corruptFile.toPath(), corruptBytes);
             BrowserExtension recovered = ExtensionPackageParser.parseDaymarkJson(
                     pack(corruptId, "window.recovered = true;", true), false);
-            store.installUserPack(recovered);
-            check(!stored(store, corruptId).enabled,
-                    "replacing a readable but corrupt stored import also persists the pack disabled");
+            expectMalformedFailure(store, recovered);
+            check(Arrays.equals(corruptBytes, Files.readAllBytes(corruptFile.toPath())),
+                    "a readable but malformed existing extension pack is rejected without replacing its exact bytes");
+            check(!new File(corruptFile.getAbsolutePath() + ".tmp").exists(),
+                    "a failed malformed-pack import does not leave a partial temporary file");
+            store.uninstallUserPack(corruptId);
+            check(!corruptFile.exists(),
+                    "the explicit store uninstall path can remove the preserved malformed pack by id");
 
             String oversizedId = "user.oversized-smoke";
             File oversizedFile = new File(new File(root, "browser_extensions"), oversizedId + ".daymark-ext.json");
@@ -77,7 +83,7 @@ public final class ExtensionStoreSmoke {
                             && Arrays.equals(markerBytes, Files.readAllBytes(marker.toPath())),
                     "an unreadable existing extension path and its contents are preserved");
 
-            System.out.println("PASS: ExtensionStoreSmoke: new/corrupt imports disabled; identical re-import state preserved; conflicts rejected; unreadable/oversized existing packs preserved ("
+            System.out.println("PASS: ExtensionStoreSmoke: new imports disabled; identical re-import state preserved; conflicts rejected; malformed/unreadable/oversized existing packs preserved ("
                     + assertions + " assertions)");
         } finally {
             deleteTree(root);
@@ -105,6 +111,18 @@ public final class ExtensionStoreSmoke {
             throw new AssertionError("expected a different script under the same id to be rejected");
         } catch (IllegalArgumentException expected) {
             // Conflict correctly rejected.
+        }
+    }
+
+    private static void expectMalformedFailure(ExtensionStore store, BrowserExtension ext) throws Exception {
+        assertions++;
+        try {
+            store.installUserPack(ext);
+            throw new AssertionError("expected a readable malformed existing extension pack to be preserved");
+        } catch (IOException expected) {
+            if (!expected.getMessage().contains("malformed; refusing to replace it")) {
+                throw new AssertionError("malformed pack must be reported as a preservation refusal", expected);
+            }
         }
     }
 
