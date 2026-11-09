@@ -1148,7 +1148,11 @@
 
   function readTaskRecoveryPayloads(raw) {
     const result = { arrays: [], malformedCount: 0 };
-    if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (typeof raw !== 'string') return result;
+    if (raw.length === 0) {
+      result.malformedCount = 1;
+      return result;
+    }
     let parsed;
     try {
       parsed = JSON.parse(raw);
@@ -1182,7 +1186,11 @@
 
   function readFocusRecoveryStates(raw) {
     const result = { states: [], malformedCount: 0 };
-    if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (typeof raw !== 'string') return result;
+    if (raw.length === 0) {
+      result.malformedCount = 1;
+      return result;
+    }
     if (!focus) {
       result.malformedCount = 1;
       return result;
@@ -1221,9 +1229,36 @@
   function applyImportedRecovery(recovery, rawText) {
     let taskRaw = null;
     let focusRaw = null;
+    let unknownRecoverySources = 0;
+    let malformedEnvelopeCount = 0;
+    const readPartialSource = (raw, status) => {
+      if (status === 'available') {
+        if (typeof raw === 'string') return raw;
+        malformedEnvelopeCount += 1;
+        return null;
+      }
+      if (status === 'unknown') {
+        unknownRecoverySources += 1;
+        if (raw !== null) malformedEnvelopeCount += 1;
+        return null;
+      }
+      if (status === 'absent') {
+        if (raw !== null) malformedEnvelopeCount += 1;
+        return null;
+      }
+      unknownRecoverySources += 1;
+      malformedEnvelopeCount += 1;
+      return null;
+    };
+
     if (recovery.format === 'daymark-combined-recovery-v1') {
       taskRaw = typeof recovery.taskBackup === 'string' ? recovery.taskBackup : null;
       focusRaw = typeof recovery.focusBackup === 'string' ? recovery.focusBackup : null;
+    } else if (recovery.format === 'daymark-partial-recovery-v1') {
+      // Partial exports contain exact bytes only for sources that were readable
+      // at export time. Never import a value whose status is unknown or absent.
+      taskRaw = readPartialSource(recovery.taskBackup, recovery.taskBackupStatus);
+      focusRaw = readPartialSource(recovery.focusBackup, recovery.focusBackupStatus);
     } else if (recovery.format === 'daymark-recovery-bundle-v1') {
       taskRaw = rawText;
     } else if (recovery.format === 'daymark-focus-recovery-bundle-v1'
@@ -1292,10 +1327,15 @@
       if (!incomingSession) skippedFocusSessions += 1;
     });
 
-    const malformedRecovery = taskPayloads.malformedCount + focusPayloads.malformedCount;
+    const malformedRecovery = taskPayloads.malformedCount + focusPayloads.malformedCount + malformedEnvelopeCount;
     if (!incomingTasks.length && !incomingFocusLog.length && !incomingSession) {
-      showToast(malformedRecovery
-        ? 'No valid recovery data could be restored. Existing data was kept.'
+      const reasons = [];
+      if (malformedRecovery) reasons.push('No valid recovery data could be restored.');
+      if (unknownRecoverySources) {
+        reasons.push(unknownRecoverySources + ' recovery source' + (unknownRecoverySources === 1 ? ' was' : 's were') + ' marked unknown and skipped.');
+      }
+      showToast(reasons.length
+        ? reasons.join(' ') + ' Existing data was kept.'
         : 'All recovery records already exist or no new data was found. Nothing was changed.');
       return;
     }
@@ -1309,7 +1349,8 @@
       skippedFocusSessions ? `${skippedFocusSessions} Focus session${skippedFocusSessions === 1 ? '' : 's'} will be skipped to preserve your current session or because it has expired.` : '',
       duplicateFocusEntries ? `${duplicateFocusEntries} duplicate Focus log entr${duplicateFocusEntries === 1 ? 'y' : 'ies'} will be skipped.` : '',
       invalidFocusRecords ? `${invalidFocusRecords} invalid Focus record${invalidFocusRecords === 1 ? '' : 's'} will be skipped.` : '',
-      malformedRecovery ? `${malformedRecovery} unreadable recovery payload${malformedRecovery === 1 ? '' : 's'} will be ignored.` : '',
+      malformedRecovery ? malformedRecovery + ' malformed recovery payload or envelope value' + (malformedRecovery === 1 ? '' : 's') + ' will be ignored.' : '',
+      unknownRecoverySources ? unknownRecoverySources + ' recovery source' + (unknownRecoverySources === 1 ? ' was' : 's were') + ' marked unknown when this export was created and will be skipped.' : '',
       'Existing tasks, Focus history, and a current Focus session will not be replaced. Continue?'
     ].filter(Boolean).join('\n');
 
@@ -1381,6 +1422,9 @@
         failureCount += 1;
       }
     }
+    if (unknownRecoverySources) {
+      outcomes.push(unknownRecoverySources + ' recovery source' + (unknownRecoverySources === 1 ? ' was' : 's were') + ' marked unknown and skipped');
+    }
     const message = outcomes.join('; ');
     showToast(failureCount && successCount
       ? `Recovery import partially completed — ${message}.`
@@ -1399,6 +1443,7 @@
     if (!Array.isArray(parsed)) {
       const isRecovery = parsed && typeof parsed === 'object' && (
         parsed.format === 'daymark-combined-recovery-v1'
+        || parsed.format === 'daymark-partial-recovery-v1'
         || parsed.format === 'daymark-recovery-bundle-v1'
         || parsed.format === 'daymark-focus-recovery-bundle-v1'
         || Object.prototype.hasOwnProperty.call(parsed, 'session')
