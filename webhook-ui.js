@@ -439,7 +439,7 @@
                   : ' events were dropped after too many attempts. ')
                 : '';
               const remainingNotice = queue.length
-                ? 'Could not deliver remaining webhook events. Check the endpoint and retry. '
+                ? 'Could not deliver webhook events that remain queued. Check the endpoint and retry. '
                   + queueNote()
                 : (result.droppedCount ? 'No events remain queued.' : 'Could not deliver webhook events. Check the endpoint and retry.');
               status(droppedNotice + remainingNotice + storageWarning());
