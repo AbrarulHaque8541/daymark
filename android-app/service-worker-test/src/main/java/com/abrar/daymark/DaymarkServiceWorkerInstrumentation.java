@@ -64,27 +64,44 @@ public final class DaymarkServiceWorkerInstrumentation {
             throw new AssertionError("A unique runToken instrumentation argument is required.");
         }
         ControlledServer server = null;
+        ControlledServer secondServer = null;
         WebView seed = null;
+        WebView secondSeed = null;
         WebView active = null;
+        WebView secondActive = null;
+        WebView secondTab = null;
         WebView recreated = null;
         try {
             marker("starting controlled Service Worker request trace on API "
                     + android.os.Build.VERSION.SDK_INT);
             server = new ControlledServer();
+            secondServer = new ControlledServer();
 
-            // Seed a worker in the app's WebView profile before the Daymark policy is loaded.
+            // Seed workers on two distinct loopback origins before Daymark installs its
+            // process-wide policy. Different ports are different origins and therefore have
+            // independent Service Worker registrations and caches.
             seed = createWebView();
             load(seed, server.url("/register"));
             awaitBoolean(seed, "document.title === 'controlled'", WAIT_MS,
-                    "the local page must register and activate its Service Worker");
+                    "the first origin must register and activate its Service Worker");
             int initialWorkerScripts = server.count("/sw.js");
             check(initialWorkerScripts > 0,
-                    "the controlled server must observe the initial worker script registration");
+                    "the first controlled server must observe its worker script registration");
 
-            // Close the seed tab so the worker is persisted without a live page. Initialize
-            // Daymark's process-wide client/settings before creating the next WebView.
+            secondSeed = createWebView();
+            load(secondSeed, secondServer.url("/register"));
+            awaitBoolean(secondSeed, "document.title === 'controlled'", WAIT_MS,
+                    "the second origin must register and activate its Service Worker");
+            int secondInitialWorkerScripts = secondServer.count("/sw.js");
+            check(secondInitialWorkerScripts > 0,
+                    "the second controlled server must observe its worker script registration");
+
+            // Close both seed tabs so the workers persist without live pages. Initialize
+            // Daymark's process-wide client/settings before creating the next WebViews.
             destroy(seed);
             seed = null;
+            destroy(secondSeed);
+            secondSeed = null;
 
             ClassLoader targetLoader = instrumentation.getTargetContext().getClassLoader();
             Class<?> daymarkWebView = Class.forName(WEB_VIEW_CLASS, true, targetLoader);
@@ -101,32 +118,62 @@ public final class DaymarkServiceWorkerInstrumentation {
             active = createWebView();
             load(active, server.url("/controlled"));
             awaitBoolean(active, "navigator.serviceWorker.controller !== null", WAIT_MS,
-                    "the persisted worker must control the newly created WebView");
+                    "the first persisted worker must control the newly created WebView");
+
+            secondActive = createWebView();
+            load(secondActive, secondServer.url("/controlled"));
+            awaitBoolean(secondActive, "navigator.serviceWorker.controller !== null", WAIT_MS,
+                    "the second persisted worker must control a WebView from its own origin");
+
+            // A second tab on the first origin verifies that the global boundary is not tied
+            // to the first WebView instance or its lifecycle.
+            secondTab = createWebView();
+            load(secondTab, server.url("/controlled"));
+            awaitBoolean(secondTab, "navigator.serviceWorker.controller !== null", WAIT_MS,
+                    "a second tab on the first origin must use the persisted worker");
 
             // Online page navigation remains usable when the user explicitly unblocks this
             // WebView. Only worker-originated network activity is globally denied.
             setPageNetworkBlocked(active, false);
+            setPageNetworkBlocked(secondActive, false);
+            setPageNetworkBlocked(secondTab, false);
             execute(active, "document.title='page-pending';"
                     + "fetch('/page-egress').then(r=>r.text()).then(t=>document.title=t)"
                     + ".catch(()=>document.title='page-error');");
             awaitBoolean(active, "document.title === 'page-ok'", WAIT_MS,
                     "ordinary page networking must remain available in explicit Online mode");
+            execute(secondActive, "document.title='page-pending';"
+                    + "fetch('/page-egress').then(r=>r.text()).then(t=>document.title=t)"
+                    + ".catch(()=>document.title='page-error');");
+            awaitBoolean(secondActive, "document.title === 'page-ok'", WAIT_MS,
+                    "ordinary page networking must remain available on the second explicit origin");
             check(server.count("/page-egress") == 1,
-                    "the controlled server must receive the explicitly enabled page request");
+                    "the first controlled server must receive the explicitly enabled page request");
+            check(secondServer.count("/page-egress") == 1,
+                    "the second controlled server must receive its explicitly enabled page request");
 
             // Cached/local Service Worker responses remain usable even though worker network
             // fetches are denied.
             requestCachedResponse(active);
+            requestCachedResponse(secondActive);
             check(server.count("/cached") == 0,
-                    "a cached Service Worker response must not require a network request");
+                    "the first origin's cached Service Worker response must not require a network request");
+            check(secondServer.count("/cached") == 0,
+                    "the second origin's cached Service Worker response must not require a network request");
 
             requestWorkerEgress(active);
+            requestWorkerEgress(secondActive);
+            requestWorkerEgress(secondTab);
             check(server.count("/trigger") == 0,
-                    "the page trigger must be fulfilled by the active Service Worker");
+                    "the first-origin page trigger must be fulfilled by its active Service Worker");
             check(server.count("/worker-egress") == 0,
-                    "a Service Worker fetch must never reach the controlled network server");
+                    "the first-origin Service Worker fetch must never reach its controlled server");
+            check(secondServer.count("/worker-egress") == 0,
+                    "the second-origin Service Worker fetch must never reach its controlled server");
             check(server.count("/sw.js") == initialWorkerScripts,
-                    "a controlled tab must not fetch the worker script around the global block");
+                    "the first origin must not fetch its worker script around the global block");
+            check(secondServer.count("/sw.js") == secondInitialWorkerScripts,
+                    "the second origin must not fetch its worker script around the global block");
 
             // Exercise the page-level Offline transition independently of the global worker
             // policy. A page request must fail while the same worker remains network-blocked.
@@ -161,24 +208,34 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "Offline reassertion must restore the process-wide Service Worker block");
 
             setPageNetworkBlocked(active, false);
+            setPageNetworkBlocked(secondActive, false);
+            setPageNetworkBlocked(secondTab, false);
             requestWorkerEgress(active);
+            requestWorkerEgress(secondActive);
+            requestWorkerEgress(secondTab);
             check(server.count("/worker-egress") == 0,
-                    "worker egress must remain blocked after Online page access and Offline reassertion");
+                    "first-origin worker egress must remain blocked after Online page access and Offline reassertion");
+            check(secondServer.count("/worker-egress") == 0,
+                    "second-origin worker egress must remain blocked after Online page access and Offline reassertion");
 
             // Service Workers outlive individual WebView instances. Destroy this tab and create
             // another WebView in the same app profile; the persisted worker must remain blocked.
             destroy(active);
             active = null;
+            destroy(secondActive);
+            secondActive = null;
+            destroy(secondTab);
+            secondTab = null;
             recreated = createWebView();
-            load(recreated, server.url("/controlled"));
+            load(recreated, secondServer.url("/controlled"));
             awaitBoolean(recreated, "navigator.serviceWorker.controller !== null", WAIT_MS,
-                    "the persisted worker must control a recreated WebView");
+                    "the second-origin persisted worker must control a recreated WebView");
             requestCachedResponse(recreated);
             requestWorkerEgress(recreated);
-            check(server.count("/worker-egress") == 0,
-                    "a recreated tab must not regain Service Worker network access");
-            check(server.count("/trigger") == 0,
-                    "the recreated tab's worker must continue to intercept its trigger request");
+            check(secondServer.count("/worker-egress") == 0,
+                    "a recreated tab must not regain second-origin Service Worker network access");
+            check(secondServer.count("/trigger") == 0,
+                    "the recreated tab's worker must continue to intercept its second-origin trigger");
 
             execute(recreated, "(async()=>{"
                     + "const registration=await navigator.serviceWorker.getRegistration();"
@@ -197,8 +254,15 @@ public final class DaymarkServiceWorkerInstrumentation {
                     + assertions + " assertions", failure);
         } finally {
             if (recreated != null) destroyQuietly(recreated);
+            if (secondTab != null) destroyQuietly(secondTab);
+            if (secondActive != null) destroyQuietly(secondActive);
             if (active != null) destroyQuietly(active);
+            if (secondSeed != null) destroyQuietly(secondSeed);
             if (seed != null) destroyQuietly(seed);
+            if (secondServer != null) {
+                try { secondServer.close(); }
+                catch (IOException error) { Log.w(TAG, "could not close second controlled server", error); }
+            }
             if (server != null) {
                 try { server.close(); }
                 catch (IOException error) { Log.w(TAG, "could not close controlled server", error); }
