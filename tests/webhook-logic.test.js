@@ -29,8 +29,6 @@ const failingFetch = async () => {
 };
 
 const DEFAULT_ENDPOINT_URL = 'https://hooks.example.com/x';
-const TEST_ENDPOINT_FINGERPRINT = 'a'.repeat(64);
-
 function fingerprintFor(url) {
   const normalized = new URL(url);
   normalized.hash = '';
@@ -38,7 +36,7 @@ function fingerprintFor(url) {
 }
 
 function makeEvent(payload, now, url) {
-  return webhook.makeQueueEvent(payload, now, url ? fingerprintFor(url) : TEST_ENDPOINT_FINGERPRINT);
+  return webhook.makeQueueEvent(payload, now, fingerprintFor(url || DEFAULT_ENDPOINT_URL));
 }
 
 function flushForTest(queue, url, fetchImpl, options) {
@@ -92,6 +90,14 @@ test('flush refuses endpoint-mismatched and unassigned events before network acc
       return { ok: true, status: 200 };
     }, { endpointFingerprint: fingerprintFor('https://hooks.example.com/other') }),
     /does not match/
+  );
+  const foreign = makeEvent(payload, '2026-11-04T10:05:00.000Z', 'https://hooks.example.com/other');
+  await assert.rejects(
+    webhook.flushQueue([foreign], DEFAULT_ENDPOINT_URL, async () => {
+      fetchCalled = true;
+      return { ok: true, status: 200 };
+    }, { endpointFingerprint: fingerprintFor(DEFAULT_ENDPOINT_URL) }),
+    /different or unassigned endpoint/
   );
   const legacy = Object.assign({}, event);
   delete legacy.endpointFingerprint;
