@@ -16,6 +16,8 @@ public final class PlatformShellInputCommandSmoke {
         equal(7, PlatformShellInputCommand.parseStatus("input failed\\r\\n__DAYMARK_INPUT_STATUS__=7\\r\\n"),
                 "non-zero exit status");
         rejects(() -> PlatformShellInputCommand.tap(-1, 0), "negative tap coordinate");
+        rejects(() -> PlatformShellInputCommand.withStatus("input tap 1 2; echo unsafe"), "shell metacharacters");
+        rejects(() -> PlatformShellInputCommand.withStatus("input tap 10001 2"), "out-of-range direct command");
         rejects(() -> PlatformShellInputCommand.swipe(0, 0, 1, 1, 5001), "oversized swipe duration");
         rejects(() -> PlatformShellInputCommand.parseStatus("no status marker"), "missing status marker");
         rejects(() -> PlatformShellInputCommand.parseStatus("__DAYMARK_INPUT_STATUS__=999"), "invalid status value");
