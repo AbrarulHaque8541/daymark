@@ -8,7 +8,7 @@ This is a new dated status layer. Older planning sections below are historical; 
 - Live inventory: **6 open PRs / 12 open issues**.
 - Main branch API: `protected=false`; required status-check enforcement `off`; rulesets API returns `[]`. Detailed branch-protection endpoint returns HTTP 403 to this integration. No repository settings changed.
 - No open PR has an independent approval record. All six remain unmerged.
-- Source/AGENTS identity is `com.abrar.daymark`; the run-level safety directive names `com.cue.daymark`. No identity, namespace, manifest or signer change was made; resolve only with explicit owner approval.
+- Source/AGENTS identity remains the current approved package; the run-level safety directive names a different legacy package identifier. No identity, namespace, manifest or signer change was made; reconcile only with explicit owner approval.
 
 ### Exact open PR inventory and current checks
 | PR | Exact head (base main) | Latest exact-head evidence | Gate / next action |
