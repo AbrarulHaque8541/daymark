@@ -54,7 +54,8 @@ assert "run_instrumentation_repeated" in test_runner
 input_bridge = (root / "tools/platform-instrumentation-input-bridge.sh").read_text(encoding="utf-8")
 input_bridge_tests = (root / "tools/run-platform-instrumentation-input-bridge-tests.sh").read_text(encoding="utf-8")
 assert "INPUT_REQUEST_FILE" in platform_test and "INPUT_RESULT_FILE" in platform_test
-assert "dispatchHostInput" in platform_test
+assert 'dispatchHostInput("tap"' in platform_test
+assert 'dispatchHostInput("swipe"' in platform_test
 assert "sendPointerSync(event);" not in platform_test
 assert "drive_instrumentation_input_bridge" in runner
 assert ". tools/platform-instrumentation-input-bridge.sh" in runner
