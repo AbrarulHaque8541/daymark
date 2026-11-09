@@ -90,7 +90,6 @@ assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0])" i
 assert '"parent-scroll"' in platform_test
 assert "MotionEvent.actionToString(event.getActionMasked())" in platform_test
 assert "ancestor == parentScroll ? \"parent-scroll\"" in platform_test
-assert "ancestor == parentScroll ? \\"parent-scroll\\"" in platform_test
 assert "ancestor.setOnTouchListener" in platform_test
 assert "appendTouchTrace(ancestorTrace, label, targetView, event)" in platform_test
 assert "selectorTrace" in platform_test
