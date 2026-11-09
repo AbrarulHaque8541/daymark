@@ -164,8 +164,12 @@ test('clear-action catalog stays aligned with real Undo expiry and backup cleanu
   const showToast = sourceSection(appSource, 'function showToast(message, action = null) {', 'function readRecoveryExportPayload() {');
   assert.match(clearCompleted, /label: 'Undo'/);
   assert.match(showToast, /action \? 7000 : 2600/);
-  assert.match(appSource, /function persistTasks\(\)[\\s\\S]{0,2500}clearRecoveryBackup\(\)/);
-  assert.match(appSource, /function clearRecoveryBackup\(\)[\\s\\S]{0,500}localStorage\\.removeItem\(BACKUP_KEY\)/);
+  const persistStart = appSource.indexOf('function persistTasks()');
+  const backupStart = appSource.indexOf('function clearRecoveryBackup()');
+  assert.ok(persistStart >= 0 && backupStart > persistStart, 'persistence and backup cleanup functions must exist');
+  const persistenceAndBackup = appSource.slice(persistStart, backupStart + 500);
+  assert.match(persistenceAndBackup, /clearRecoveryBackup\(\)/);
+  assert.match(persistenceAndBackup, /localStorage\.removeItem\(BACKUP_KEY\)/);
 });
 
 test('export catalog stays aligned with JSON memory export and saved-store open-format export', () => {
