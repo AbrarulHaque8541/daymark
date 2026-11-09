@@ -761,15 +761,19 @@
     }
   }
 
-  function runToastAction() {
+  async function runToastAction() {
     const action = state.toastAction;
-    if (!action) return;
+    if (!action || typeof action.run !== 'function') return;
     clearTimeout(state.toastTimer);
     state.toastTimer = null;
     state.toastAction = null;
     $('#toast-stack').classList.remove('is-visible');
     $('#toast-action').hidden = true;
-    action.run();
+    try {
+      await action.run();
+    } catch (error) {
+      showToast('That action could not be completed. Please retry.');
+    }
   }
 
   function scheduleNextDayRefresh() {
