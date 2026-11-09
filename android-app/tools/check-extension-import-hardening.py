@@ -216,6 +216,8 @@ if __name__ == "__main__":
     store_smoke = (root / "tools/ExtensionStoreSmoke.java").read_text(encoding="utf-8")
     for marker in (
         "a readable but malformed existing extension pack is rejected without replacing its exact bytes",
+        "a readable zero-byte existing pack remains present and byte-for-byte unchanged",
+        "explicit uninstall can remove the zero-byte malformed pack",
         "a failed malformed-pack import does not leave a partial temporary file",
         "the explicit store uninstall path can remove the preserved malformed pack by id",
         "an oversized existing extension file is rejected without truncation or replacement",
