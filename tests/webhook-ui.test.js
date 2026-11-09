@@ -500,7 +500,9 @@ test('a final failed delivery durably drops only the exhausted event', async () 
   const handle = ui.attachWebhookUi(env);
   handle.onSave({ preventDefault() {} });
 
-  await handle.flush();
+  // Saving a configured endpoint automatically starts the pending flush.
+  // Wait for that operation rather than calling flush again while it is busy.
+  await settle();
 
   const persisted = JSON.parse(storageData[webhookApi.QUEUE_KEY]);
   assert.equal(fetchCalls, 1, 'the exhausted event receives exactly its final permitted attempt');
@@ -512,7 +514,7 @@ test('a final failed delivery durably drops only the exhausted event', async () 
     /1 event was dropped after too many attempts/i,
     'the user is told why the event disappeared');
   assert.match(elements['webhook-status'].textContent,
-    /remaining webhook events.*retry/i,
+    /webhook events that remain queued.*retry/i,
     'remaining events remain actionable');
 });
 
