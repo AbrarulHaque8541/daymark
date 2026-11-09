@@ -15,7 +15,7 @@ run_variant() {
 
   instrumentation="$(adb shell pm list instrumentation)"
   printf '%s\n' "$instrumentation"
-  if ! printf '%s\n' "$instrumentation" | grep -Fq "android.test.InstrumentationTestRunner"; then
+  if ! printf '%s\n' "$instrumentation" | grep -Fq "androidx.test.runner.AndroidJUnitRunner"; then
     echo "The JUnit instrumentation runner is not registered in the installed test APK." >&2
     exit 1
   fi

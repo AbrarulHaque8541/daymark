@@ -23,7 +23,7 @@ android {
     defaultConfig {
         minSdk = 26
         targetSdk = 36
-        testInstrumentationRunner = "android.test.InstrumentationTestRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     targetProjectPath = ":app"
@@ -32,4 +32,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+
+dependencies {
+    implementation("androidx.test:runner:1.6.2")
+    implementation("androidx.test.ext:junit:1.2.1")
 }

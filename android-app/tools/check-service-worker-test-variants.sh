@@ -13,7 +13,14 @@ do
 done
 
 runner="$(cat tools/run-service-worker-instrumentation-on-emulator.sh)"
-for required in "pm list instrumentation" "android.test.InstrumentationTestRunner" "DaymarkServiceWorkerInstrumentation" "DaymarkSWRuntime:I" "runToken" "all Service Worker runtime phases passed" "FAIL after"
+for required in \
+  'pm list instrumentation' \
+  'androidx.test.runner.AndroidJUnitRunner' \
+  'DaymarkServiceWorkerInstrumentation' \
+  'DaymarkSWRuntime:I' \
+  'runToken' \
+  'all Service Worker runtime phases passed' \
+  'FAIL after'
 do
   if ! printf '%s\n' "$runner" | grep -Fq "$required"; then
     echo "Service Worker runner is missing runtime-result verification: $required" >&2
@@ -22,29 +29,40 @@ do
 done
 
 module_build="$(cat service-worker-test/build.gradle.kts)"
+for required in \
+  'testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"' \
+  'androidx.test:runner:1.6.2' \
+  'androidx.test.ext:junit:1.2.1'
+do
+  if ! printf '%s\n' "$module_build" | grep -Fq "$required"; then
+    echo "Service Worker test module is missing required AndroidX instrumentation dependency: $required" >&2
+    exit 1
+  fi
+done
+
 test_source="$(find service-worker-test/src/main/java -name DaymarkServiceWorkerInstrumentation.java -print -quit)"
 if [ -z "$test_source" ]; then
-  echo "Service Worker JUnit instrumentation test source is missing." >&2
+  echo "Service Worker runtime test source is missing." >&2
   exit 1
 fi
 test_source_content="$(cat "$test_source")"
-if ! printf '%s\n' "$module_build" | grep -Fq 'testInstrumentationRunner = "android.test.InstrumentationTestRunner"'; then
-  echo "Service Worker test module must use the platform JUnit instrumentation runner." >&2
-  exit 1
-fi
-if ! printf '%s\n' "$test_source_content" | grep -Fq "extends InstrumentationTestCase" \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq "public void testServiceWorkerNetworkPolicy()" \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getString("runToken")' \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getInstrumentation().getTargetContext()' \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq 'getInstrumentation().runOnMainSync' \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq 'BrowserWorkspaceController' \
-  || ! printf '%s\n' "$test_source_content" | grep -Fq 'enforceOffline.invoke(null, offlinePolicy, Collections.emptyList())'; then
-  echo "Service Worker runtime class must expose a discoverable, run-token-bound JUnit3 test." >&2
-  exit 1
-fi
-if printf '%s\n' "$runner" | grep -Fq "adb logcat -c"; then
+for required in \
+  '@RunWith(AndroidJUnit4.class)' \
+  '@Test' \
+  'InstrumentationRegistry.getInstrumentation()' \
+  'instrumentation.getArguments()' \
+  'BrowserWorkspaceController' \
+  'enforceOffline.invoke(null, offlinePolicy, Collections.emptyList())'
+do
+  if ! printf '%s\n' "$test_source_content" | grep -Fq "$required"; then
+    echo "Service Worker runtime test is missing a required JUnit/production acceptance contract: $required" >&2
+    exit 1
+  fi
+done
+
+if printf '%s\n' "$runner" | grep -Fq 'adb logcat -c'; then
   echo "Service Worker runner must not depend on clearing logcat buffers." >&2
   exit 1
 fi
 
-echo "Both Service Worker target-app flavor tasks and the run-token-bound JUnit runtime test are wired."
+echo "Both Service Worker target-app flavors and the AndroidX JUnit runtime acceptance are guarded."

@@ -1,7 +1,11 @@
 package com.abrar.daymark.serviceworkertest;
 
 import android.os.Bundle;
-import android.test.InstrumentationTestCase;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import android.app.Instrumentation;
 import android.os.SystemClock;
 import android.webkit.ServiceWorkerController;
 import android.webkit.WebSettings;
@@ -42,16 +46,19 @@ import java.util.concurrent.atomic.AtomicReference;
  * This runner is separate from DaymarkPlatformInstrumentation so it does not race PR #648's
  * active Focus lifecycle changes to that shared runner.
  */
-public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTestCase {
+@RunWith(AndroidJUnit4.class)
+public final class DaymarkServiceWorkerInstrumentation {
     private static final String TAG = "DaymarkSWRuntime";
     private static final long WAIT_MS = 15000L;
     private static final String WEB_VIEW_CLASS = "com.abrar.daymark.DaymarkWebView";
 
+    private final Instrumentation instrumentation = InstrumentationRegistry.instrumentation;
     private int assertions;
     private String runToken;
 
+    @Test
     public void testServiceWorkerNetworkPolicy() throws Exception {
-        Bundle arguments = getInstrumentation().getArguments();
+        Bundle arguments = instrumentation.getArguments();
         runToken = arguments == null ? null : arguments.getString("runToken");
         if (runToken == null || !runToken.matches("[A-Za-z0-9._-]{1,120}")) {
             throw new AssertionError("A unique runToken instrumentation argument is required.");
@@ -79,7 +86,7 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
             destroy(seed);
             seed = null;
 
-            ClassLoader targetLoader = getInstrumentation().getTargetContext().getClassLoader();
+            ClassLoader targetLoader = instrumentation.getTargetContext().getClassLoader();
             Class<?> daymarkWebView = Class.forName(WEB_VIEW_CLASS, true, targetLoader);
             Method readyMethod = daymarkWebView.getDeclaredMethod(
                     "isServiceWorkerNetworkPolicyReady");
@@ -201,8 +208,8 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
 
     private WebView createWebView() throws Exception {
         WebView[] result = new WebView[1];
-        getInstrumentation().runOnMainSync(() -> {
-            WebView view = new WebView(getInstrumentation().getTargetContext());
+        instrumentation.runOnMainSync(() -> {
+            WebView view = new WebView(instrumentation.getTargetContext());
             WebSettings settings = view.getSettings();
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
@@ -215,18 +222,18 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     }
 
     private void load(WebView view, String url) throws Exception {
-        getInstrumentation().runOnMainSync(() -> view.loadUrl(url));
+        instrumentation.runOnMainSync(() -> view.loadUrl(url));
         awaitBoolean(view, "document.readyState === 'complete'", WAIT_MS,
                 "the controlled page must finish loading");
     }
 
     private void setPageNetworkBlocked(WebView view, boolean blocked) throws Exception {
-        getInstrumentation().runOnMainSync(() -> view.getSettings().setBlockNetworkLoads(blocked));
+        instrumentation.runOnMainSync(() -> view.getSettings().setBlockNetworkLoads(blocked));
     }
 
     private void execute(WebView view, String script) throws Exception {
         CountDownLatch completed = new CountDownLatch(1);
-        getInstrumentation().runOnMainSync(() -> view.evaluateJavascript(script, ignored -> completed.countDown()));
+        instrumentation.runOnMainSync(() -> view.evaluateJavascript(script, ignored -> completed.countDown()));
         if (!completed.await(5, TimeUnit.SECONDS)) {
             throw new AssertionError("WebView did not execute the acceptance script");
         }
@@ -235,7 +242,7 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     private boolean evaluateBoolean(WebView view, String expression) throws Exception {
         AtomicReference<String> value = new AtomicReference<>();
         CountDownLatch completed = new CountDownLatch(1);
-        getInstrumentation().runOnMainSync(() -> view.evaluateJavascript(expression, result -> {
+        instrumentation.runOnMainSync(() -> view.evaluateJavascript(expression, result -> {
             value.set(result);
             completed.countDown();
         }));
@@ -272,7 +279,7 @@ public final class DaymarkServiceWorkerInstrumentation extends InstrumentationTe
     }
 
     private void destroy(WebView view) throws Exception {
-        getInstrumentation().runOnMainSync(() -> {
+        instrumentation.runOnMainSync(() -> {
             view.stopLoading();
             view.destroy();
         });
