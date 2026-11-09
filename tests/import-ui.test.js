@@ -149,6 +149,29 @@ test('a csv file is intercepted, merged and saved with a status line', async () 
   assert.match(status.textContent, /1 duplicate skipped\./);
 });
 
+test('CSV rows with duplicate subtask JSON keys are skipped without changing stored tasks', async () => {
+  const cell = (value) => {
+    const text = String(value);
+    return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  };
+  const row = [
+    'duplicate-subtask', 'Do not drop ambiguous steps', '', '', 'medium', 'false',
+    '', '', '', '[{"id":"s1","title":"Original","title":"Overwritten","done":false}]', NOW, NOW
+  ].map(cell).join(',');
+  const csv = importer.CSV_HEADER + '\\r\\n' + row + '\\r\\n';
+  const original = JSON.stringify(sampleTasks);
+  const { env, elements, storageData, writes, created } = fakeEnv({
+    stored: original,
+    files: [csvFile(csv)]
+  });
+  const handle = ui.attachImportUi(env);
+  await handle.onChange(changeEvent(elements['import-file']));
+  assert.equal(storageData[ui.STORAGE_KEY], original, 'existing tasks remain byte-for-byte unchanged');
+  assert.equal(writes.length, 0, 'an ambiguous row never triggers a storage write');
+  const status = created.find((el) => el.id === 'import-status');
+  assert.match(status.textContent, /1 malformed row skipped\\./);
+});
+
 test('a markdown file imports with generated ids', async () => {
   const md = exporter.toMarkdown([
     { id: 'ignored', title: 'From markdown', dueDate: null, priority: 'medium', completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
