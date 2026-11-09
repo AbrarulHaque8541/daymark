@@ -1,18 +1,18 @@
-## Current execution queue — 2026-11-09T18:46:54.363Z (main 1532838c; #675 merge commit fce085fc; #686 Service Worker policy green)
+## Current execution queue — 2026-11-09T18:52:06.803Z (main 1532838c; #675 exact-head CI green; #686 Service Worker policy green)
 
-This section supersedes older queue summaries. Full exact-head inventory, test evidence and the prioritized backlog are in [CURRENT_STATUS_20261109T184654Z.md](docs/CURRENT_STATUS_20261109T184654Z.md).
+Full exact-head evidence and the live open-PR inventory are in [CURRENT_STATUS_20261109T185206Z.md](docs/CURRENT_STATUS_20261109T185206Z.md).
 
-1. **P0 — #675 recovery/webhook:** mainline conflict resolved with a normal two-parent merge commit; 48 ahead/0 behind, mergeable=true. Run exact-head CI and complete independent data-integrity/security review before integration.
-2. **P0 — #685 Service Worker boundary:** #686 exact-head policy, Android, contracts and device APK workflows all PASS. Add API 26/29/36 controlled-server request-trace instrumentation; keep fail-closed and issue open until runtime/physical proof.
-3. **P0 — #646/#160 governance and physical acceptance:** main protection remains disabled, rulesets empty; owner-side settings and independent reviews required. Physical Android/WebView/OEM acceptance remains NOT TESTED.
-4. **P1 — #671 browser downloads:** finish Daymark-owned redirect validation, same-origin credentials, bounded streaming, cancellation and cleanup; keep fail-closed until integrated.
-5. **P1 — #656/#659/#665/#676/#682:** complete independent RFC 5545, extension-security, signing/provenance and browser-data reviews; do not merge without approvals.
-6. **P1 — #677/#613:** integrate #648's tested Focus instrumentation/correction, then rerun #677's own API36 ten-run gate. Physical reminder/AlarmManager tests remain pending.
-7. **P1 — #683/#684:** resolve cross-tab writes and repeat-completion contract only after coordinating #675/#648 file ownership and product semantics.
-8. **P1 — #476/#679:** current-main recurrence/DST source fixes are present; physical alarm behavior and application identity conflict remain open.
+1. **P0 — #675 recovery/webhook:** 51 ahead/0 behind, mergeable=true; Android CI, Ubuntu/Windows contracts and device-test APK PASS. Obtain independent data-integrity/security review and manual recovery-export acceptance.
+2. **P0 — #685 Service Worker boundary:** #686 policy, Android, contracts and APK workflows PASS. Add API 26/29/36 controlled-server request tracing; keep fail-closed and issue open until runtime/physical proof.
+3. **P0 — #646/#160 governance and device acceptance:** main protection remains disabled and rulesets empty; owner-side settings, independent reviews and physical Android/WebView/OEM acceptance required.
+4. **P1 — #671 downloads:** complete Daymark-owned redirect validation, same-origin credentials, bounded streaming, cancellation and cleanup; keep downloads fail-closed until integrated.
+5. **P1 — #656/#659/#665/#676/#682:** finish independent RFC 5545, extension-security, signing/provenance and browser-data reviews before merge.
+6. **P1 — #677/#613:** synchronize #677 with #648's tested Focus harness and rerun its own API36 ten-run gate; physical reminder/AlarmManager tests remain pending.
+7. **P1 — #683/#684:** resolve cross-tab write serialization and repeat-completion semantics after coordinating #675/#648 file ownership.
+8. **P1 — #476/#679:** source recurrence/DST fixes are in main; physical alarm acceptance and application identity reconciliation remain open.
 9. **P2 — #325/#348:** resume measured browser UX/accessibility/performance and cross-platform architecture after P0 data/security gates.
 
-No pull request was merged; no release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred in this cycle. The normal mainline merge commit into PR #675 is recorded in the latest status snapshot.
+No PR was merged into main; no release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred. The normal mainline merge commit into PR #675 is recorded in the latest status snapshot.
 
 ---
 
