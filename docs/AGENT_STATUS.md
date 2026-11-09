@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-09T11:10:00Z (main 1d29085; #663 merged; current Focus/storage/security integration)](./CURRENT_STATUS_20261109T111000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:51:24.139Z (main 8238d576ffde; #651/#652 superseded, #656/#657 green, #658/#659 security branches, current webhook/Focus blockers)](./CURRENT_STATUS_20261109T075124Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:40:50.709Z (main 8238d576ffde; #656 category-loss disclosure, #657 terminal recurrence coverage, #658/#659 security review, #604 current-main snapshot)](./CURRENT_STATUS_20261109T074050Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (main 8238d576ffde; PR #645 merged; current #643/#656 exact-head audit)](./CURRENT_STATUS_20261109T070843Z.md)
@@ -97,7 +98,10 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (verified current main, merged #645, current PR heads, exact-head checks and this run's fixes)](./CURRENT_STATUS_20261109T070843Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T11:10:00Z (main 1d29085; #663 merged; current Focus/storage/security integration)](./CURRENT_STATUS_20261109T111000Z.md)
+- Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T07:51:24.139Z (main 8238d576ffde; #651/#652 superseded, #656/#657 green, #658/#659 security branches, current webhook/Focus blockers)](./CURRENT_STATUS_20261109T075124Z.md)
+- Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T07:40:50.709Z](./CURRENT_STATUS_20261109T074050Z.md)
+- Earlier reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z](./CURRENT_STATUS_20261109T070843Z.md)
 - Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z](./CURRENT_STATUS_20261109T064041Z.md)
 - Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z](./CURRENT_STATUS_20261109T063944Z.md)
 - Earlier reviewed snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
