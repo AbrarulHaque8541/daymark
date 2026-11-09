@@ -10,7 +10,7 @@
 - Live inventory: **10 open PRs / 18 open issues**.
 - All ten open PRs target main at `1532838c78ab350b18f95e96a2c547ba384f0831`. No independent APPROVED review was returned; recorded review submissions are comments by the repository owner/connected identity, not independent approvals.
 - Main branch metadata reports `protected=false`; repository rulesets are empty; detailed protection inspection returns HTTP 403 to this integration. No protection setting was changed.
-- Root `AGENTS.md` and source Gradle identity specify `com.abrar.daymark`; the run-level instruction says `com.cue.daymark`. This conflict remains in #679. No namespace/applicationId/manifest identity change was made.
+- Root `AGENTS.md` and source Gradle identity specify `com.abrar.daymark`; a conflicting run-level package-identity instruction remains recorded in #679. No namespace/applicationId/manifest identity change was made.
 - No production release/tag, version/signing-key change, destructive migration, force push, protection bypass or physical-device test was performed.
 
 ## Work delivered this execution
