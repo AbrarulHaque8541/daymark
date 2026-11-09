@@ -17,6 +17,21 @@ assert '"Not encrypted"' in s, "HTTP must show 'Not encrypted' label"
 assert "resolveBareDomain(" in s, "bare-domain to HTTPS resolution missing"
 assert "isAllowedWebScheme(" in s, "scheme allowlist missing"
 
+# The helper alone is not enough: require the actual WebView page-finished
+# callback to expose the unencrypted transport state to the user.
+activity = base / "MainActivity.java"
+assert activity.exists(), "MainActivity.java missing"
+main = activity.read_text(encoding="utf-8")
+page_finished_marker = "@Override public void onPageFinished(String url)"
+navigation_blocked_marker = "@Override public void onNavigationBlocked(String url)"
+assert page_finished_marker in main, "WebView page-finished callback missing"
+assert navigation_blocked_marker in main, "WebView navigation callback boundary missing"
+page_finished = main.split(page_finished_marker, 1)[1].split(navigation_blocked_marker, 1)[0]
+assert "BrowserHttpPolicy.isHttp(url)" in page_finished, "page-finished callback must classify HTTP pages"
+assert "Not encrypted: this HTTP page has no transport security." in page_finished, \
+    "successful HTTP page loads must show the visible Not encrypted warning"
+assert "showBrowserStatus(" in page_finished, "HTTP security label must reach the browser status UI"
+
 addr = base / "BrowserAddress.java"
 assert addr.exists(), "BrowserAddress.java missing"
 a = addr.read_text(encoding="utf-8")
