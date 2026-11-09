@@ -102,7 +102,7 @@ if [ "$bridge_status" -ne 0 ]; then
   output="${output}
 INPUT_BRIDGE_ERROR: host input bridge exited with status $bridge_status."
 fi
-adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
+adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp >/dev/null 2>&1 || true
 if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
   phase_log=""
   for pkg in com.abrar.daymark com.abrar.daymark.debug; do
