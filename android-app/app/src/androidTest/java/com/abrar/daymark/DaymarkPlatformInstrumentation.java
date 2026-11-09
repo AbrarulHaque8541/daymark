@@ -421,8 +421,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         String target = describeTouchTarget(view, bounds);
         float x = bounds.centerX();
         float y = bounds.centerY();
-        dispatchHostInput("tap", x, y, x, y, 100);
-        return target + " tapCenter=(" + x + "," + y + ") source=host-adb-touchscreen/finger";
+        long downTime = android.os.SystemClock.uptimeMillis();
+        injectTouchSequence(PlatformTouchSequence.tap(x, y, downTime), downTime);
+        return target + " tapCenter=(" + x + "," + y + ") source=UiAutomation/finger";
     }
 
     private String dispatchSwipe(android.view.View view, boolean left) throws Exception {
@@ -592,42 +593,45 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
-        // The host-side adb input command targets the active app window under shell UID.
-        // This avoids Android 15+ targeted instrumentation pointer injection cross-UID restrictions.
-        dispatchHostInput("swipe", startX, startY, endX, endY, 360);
+        long downTime = android.os.SystemClock.uptimeMillis();
+        injectTouchSequence(PlatformTouchSequence.swipe(startX, startY, endX, endY,
+                downTime, PlatformTouchSequence.DEFAULT_SWIPE_DURATION_MS), downTime);
     }
 
-    private void dispatchHostInput(String action, float startX, float startY,
-                                   float endX, float endY, int durationMs) throws Exception {
-        String inputCommand;
-        if ("tap".equals(action)) {
-            inputCommand = PlatformShellInputCommand.tap(Math.round(startX), Math.round(startY));
-        } else if ("swipe".equals(action)) {
-            inputCommand = PlatformShellInputCommand.swipe(Math.round(startX), Math.round(startY),
-                    Math.round(endX), Math.round(endY), durationMs);
-        } else {
-            throw new IllegalArgumentException("unsupported shell input action: " + action);
+    private void injectTouchSequence(java.util.List<PlatformTouchSequence.Sample> samples,
+                                     long downTime) throws Exception {
+        android.app.UiAutomation automation = getUiAutomation();
+        boolean adoptedShellIdentity = false;
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            automation.adoptShellPermissionIdentity("android.permission.INJECT_EVENTS");
+            adoptedShellIdentity = true;
+            marker("touch injection adopted shell INJECT_EVENTS identity");
         }
-
-        marker("shell input start: " + inputCommand);
-        ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(inputCommand);
-        if (descriptor == null) {
-            throw new IOException("UiAutomation returned no shell input descriptor");
-        }
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        try (ParcelFileDescriptor.AutoCloseInputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
-            byte[] buffer = new byte[256];
-            int count;
-            while ((count = input.read(buffer)) != -1) {
-                if (output.size() + count > 4096) {
-                    throw new IOException("shell input output exceeded its size limit");
+        try {
+            for (PlatformTouchSequence.Sample sample : samples) {
+                android.view.MotionEvent event = android.view.MotionEvent.obtain(
+                        downTime, sample.eventTime, sample.action, sample.x, sample.y, 0);
+                event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
+                if (android.os.Build.VERSION.SDK_INT >= 29) {
+                    event.setDisplayId(android.view.Display.DEFAULT_DISPLAY);
                 }
-                output.write(buffer, 0, count);
+                try {
+                    boolean injected;
+                    if (android.os.Build.VERSION.SDK_INT >= 29) {
+                        injected = automation.injectInputEvent(event, true);
+                    } else {
+                        sendPointerSync(event);
+                        injected = true;
+                    }
+                    check(injected, "touch event was accepted by UiAutomation (action=" + sample.action
+                            + ", x=" + sample.x + ", y=" + sample.y + ")");
+                } finally {
+                    event.recycle();
+                }
             }
+        } finally {
+            if (adoptedShellIdentity) automation.dropShellPermissionIdentity();
         }
-        String response = new String(output.toByteArray(), StandardCharsets.UTF_8);
-        if (!response.trim().isEmpty()) marker("shell input output: " + response.trim());
-        marker("shell input complete: " + inputCommand);
         waitForIdleSync();
     }
 
