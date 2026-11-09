@@ -51,10 +51,15 @@ fi
 
 echo "Running Android instrumentation component: $instrumentation"
 input_package="com.abrar.daymark"
-if ! adb shell run-as "$input_package" sh -c 'test -d files && test -w files' >/dev/null 2>&1; then
-  echo "Target app package $input_package is not accessible through run-as; host input bridge cannot operate." >&2
+run_as_output="$(adb shell run-as "$input_package" sh -c 'mkdir -p files && test -d files && test -w files' 2>&1)" || {
+  run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
+  if [ -n "$run_as_output" ]; then
+    echo "Target app package $input_package is not accessible through run-as: $run_as_output" >&2
+  else
+    echo "Target app package $input_package is not accessible through run-as (adb returned a non-zero status without diagnostics)." >&2
+  fi
   exit 1
-fi
+}
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
 phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 run_instrumentation_once() {
