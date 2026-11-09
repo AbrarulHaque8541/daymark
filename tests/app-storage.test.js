@@ -436,12 +436,12 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('healthy task-array backup is cleared as stale when primary is healthy', () => {
+test('byte-identical healthy task-array backup is cleared as redundant', () => {
   const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
-  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
-  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
+  const app = bootApp({ savedValue: primary, savedBackupValue: primary });
 
-  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'only a byte-identical fully valid backup is redundant with the healthy primary');
 });
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
