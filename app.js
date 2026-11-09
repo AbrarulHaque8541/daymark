@@ -60,7 +60,7 @@
     }
     if (saved === null) {
       const recovery = readRecoveryExportPayload();
-      if (recovery.hasUnknownBackup || recovery.taskBackupStatus === 'available' || recovery.focusBackupStatus === 'available') state.taskRecoveryNoticeActive = true;
+      if (recovery.hasUnknownBackup || recovery.taskBackupStatus === 'available') state.taskRecoveryNoticeActive = true;
       if (recovery.hasUnknownBackup) {
         setStorageStatus('No current task list; recovery status unknown', true);
         showToast('No current task list is present. At least one recovery backup could not be read. No data was changed.');
@@ -1574,8 +1574,28 @@
     }
     if (primaryUnreadable) {
       state.focusPrimaryUnreadable = true;
-      if (!suppressRecoveryNotice) {
-        const recovery = readRecoveryExportPayload();
+      const recovery = readRecoveryExportPayload();
+      if (suppressRecoveryNotice) {
+        // Keep the task-recovery toast, but make the shared status label truthful
+        // about the Focus primary as well.
+        if (state.taskPrimaryUnreadable) {
+          if (recovery.hasUnknownBackup) {
+            setStorageStatus('Task and Focus primary data unreadable; recovery status unknown', true);
+          } else if (recovery.taskBackupStatus === 'available' || recovery.focusBackupStatus === 'available') {
+            setStorageStatus('Task and Focus primary data unreadable; recovery backup available', true);
+          } else {
+            setStorageStatus('Task and Focus primary data unreadable; no recovery backup found', true);
+          }
+        } else if (recovery.hasUnknownBackup) {
+          setStorageStatus('Focus data unreadable; recovery status unknown', true);
+        } else if (recovery.focusBackupStatus === 'available') {
+          setStorageStatus('Focus data unreadable; recovery backup available', true);
+        } else if (recovery.taskBackupStatus === 'available') {
+          setStorageStatus('Focus data unreadable; task recovery backup available', true);
+        } else {
+          setStorageStatus('Focus data unreadable; no recovery backup found', true);
+        }
+      } else {
         if (recovery.hasUnknownBackup) {
           setStorageStatus('Focus data unreadable; recovery status unknown', true);
           showToast('Focus data could not be read. At least one recovery backup could not be read. No data was changed.');
