@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-09T20:10:13.760Z (main 1532838c; #648 Focus API29/API36 exact-head PASS; #686 AndroidX Service Worker runtime harness correction pending CI; 10 open PRs / 18 issues)](./CURRENT_STATUS_20261109T201013Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T18:52:06.803Z (main 1532838c; #675 51 ahead/0 behind with exact-head CI green; #686 five workflows green; 10 open PRs / 17 issues)](./CURRENT_STATUS_20261109T185206Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T18:46:54.363Z (main 1532838c; #675 mainline conflict resolved; #686 Service Worker boundary five workflows green; 10 open PRs / 17 issues)](./CURRENT_STATUS_20261109T184654Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T16:46:11.546Z (main 1532838c; 8 open PRs, 14 issues; #675 absent-primary recovery fix pushed, exact-head CI pending)](./CURRENT_STATUS_20261109T164611Z.md)
