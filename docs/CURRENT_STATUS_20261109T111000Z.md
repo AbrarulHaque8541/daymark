@@ -22,7 +22,7 @@
 
 ## Open pull requests — 10
 
-All heads below were compared against current main 1d29085. The nine pre-existing PR branches are one commit behind main because #663 merged after they were created. Historical green checks do not cover that new combined base until branches are synchronized and checks rerun.
+All heads below were compared against current main 1d29085. The nine pre-existing PR branches are one commit behind main because #663 merged after they were created. PR #667 is based directly on current main. Historical green checks do not cover the new combined base until branches are synchronized and checks rerun.
 
 | PR | Base SHA | Head SHA | Ahead/behind vs current main | Exact-head assessment |
 |---|---|---|---:|---|
@@ -35,6 +35,7 @@ All heads below were compared against current main 1d29085. The nine pre-existin
 | #637 | 60713561597aa594661b7e497bb14d06a1028c68 | 5f1a94d9d5d6b6de1ab43debd1486befc201e2bc | 12 / 22 | GitHub reports mergeable=false; no current-head workflows. Its useful press-feedback CSS/test is being ported to #667. The HTTP page-finished label guard is already present in current main. Obsolete/future-dated status snapshots from this branch will not be copied. |
 | #657 | 8238d576ffdeb31a74c3bd66cd3c96e9cd42b61c | 9d67369901b93a79fb4ebb4dc2c79d9f2b0eb19f | 4 / 1 | Android [42589386457](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589386457), Ubuntu/Windows [42589386436](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589386436), non-publishing acceptance [42589386580](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589386580), device APK [42589386442](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589386442): PASS. Draft, GitHub reports mergeable=false, no independent review. Terminal recurring reminder persistence. |
 | #659 | 8238d576ffdeb31a74c3bd66cd3c96e9cd42b61c | 127c02c85e1946a6183e08d6197a7d9d3c69028c | 13 / 1 | Android [42589488009](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589488009), Ubuntu/Windows [42589488039](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589488039), non-publishing acceptance [42589488034](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589488034), device APK [42589487909](https://github.com/AbrarulHaque8541/daymark/actions/runs/42589487909): PASS. Draft, GitHub reports mergeable=false, no independent security review. Extension import opt-in and existing-pack preservation. |
+| #667 | 1d29085b9c4f9ff3489711fd7e18cc88ab368767 | b16f84cc09f2e747525439d1f1838e3000e2a5cc (pre-snapshot head) | 5 / 0 before this snapshot commit | Draft; Android [42606916911](https://github.com/AbrarulHaque8541/daymark/actions/runs/42606916911), Ubuntu/Windows [42606916929](https://github.com/AbrarulHaque8541/daymark/actions/runs/42606916929), device APK [42606916897](https://github.com/AbrarulHaque8541/daymark/actions/runs/42606916897) pending at snapshot time. Contains CSS/test plus this snapshot, index and plan updates; this snapshot correction itself advances the final head and requires fresh checks. |
 
 ## Open issues — 11
 
@@ -65,7 +66,7 @@ All heads below were compared against current main 1d29085. The nine pre-existin
 
 ### PR #667 — press feedback and current status refresh
 - Current-main branch created from 1d29085. Ported only the unique CSS press-feedback rules and regression test from stale #637; the HTTP runtime-label guard was already present in main.
-- Initial code head before status-doc commits: 2c0a9e52c111e2a4a06440201bd3636ece753470. Status snapshot/index/plan updates on this same branch will advance the final head and require fresh exact-head CI.
+- Added the dated snapshot, updated docs/AGENT_STATUS.md pointer while preserving historical links, and refreshed the top PROJECT_PLAN queue. Branch head before this snapshot correction: b16f84cc09f2e747525439d1f1838e3000e2a5cc; this snapshot commit advances the final head, so its exact-head CI must be rechecked.
 - CSS uses active rules after hover and disables transforms under prefers-reduced-motion. Physical visual/TalkBack acceptance NOT TESTED.
 
 ## Governance, reviews and release safety
