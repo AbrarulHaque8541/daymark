@@ -198,6 +198,7 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
       'daymark.tasks.v1': '[]',
       'daymark.focus.v1': '{}',
       'daymark.webhook.queue.v1': '[]',
+      'daymark.webhook.lock.v1': '12345|stale-owner',
       'unrelated.other.key': 'keep me'
     }
   });
@@ -208,6 +209,7 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
   assert.equal(storageData['daymark.tasks.v1'], undefined);
   assert.equal(storageData['daymark.focus.v1'], undefined);
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
+  assert.equal(storageData['daymark.webhook.lock.v1'], undefined, 'legacy webhook lock is managed and cleared');
   assert.equal(storageData['unrelated.other.key'], 'keep me');
   assert.match(elements['storage-status-line'].textContent, /Cleared all 3 stored item\(s\)/);
   assert.match(elements['storage-status-line'].textContent, /Nothing outside this browser was affected/);
