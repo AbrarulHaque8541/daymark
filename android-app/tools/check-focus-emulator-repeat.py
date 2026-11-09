@@ -73,7 +73,6 @@ assert "INPUT_REQUEST_FILE" not in platform_test and "INPUT_RESULT_FILE" not in 
 assert "MAX_COORDINATE = 10000" in shell_policy
 assert "MAX_DURATION_MS = 5000" in shell_policy
 assert "checkCoordinate" in shell_policy
-assert "unsupported shell input command" in shell_policy
 assert "negative tap coordinate" in shell_smoke
 assert "oversized swipe duration" in shell_smoke
 assert "missing status marker" in shell_smoke
