@@ -338,6 +338,20 @@ test('empty prior recovery sources survive when a new partial task payload is ba
   }
 });
 
+test('primary task JSON with duplicate keys is preserved byte-for-byte for manual recovery', () => {
+  const ambiguous = '[{"id":"primary-duplicate","title":"Original title","title":"Overwritten title","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z","subtasks":[{"id":"step-1","title":"Original step","title":"Overwritten step","done":false}]}]';
+  const storedValues = new Map([[STORAGE_KEY, ambiguous]]);
+  const app = bootApp(storedValues);
+
+  assert.equal(storedValues.get(STORAGE_KEY), ambiguous,
+    'JSON.parse must not silently choose one duplicate field and rewrite the primary');
+  assert.equal(storedValues.get(BACKUP_KEY), ambiguous,
+    'the exact ambiguous task/subtask bytes must be preserved in recovery storage');
+  assert.match(app.elements.get('#storage-status span').textContent, /Saved data could not be read/);
+  assert.equal(app.elements.get('#toast-action').hidden, false,
+    'the preserved ambiguous payload remains available for manual export');
+});
+
 test('failed recovery backup creation never overwrites the only original task payload', () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
