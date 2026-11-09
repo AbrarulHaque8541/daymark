@@ -109,7 +109,7 @@ test('same-task concurrent edits fail closed instead of silently choosing a last
   ]);
   assert.equal(results.filter((result) => result.ok).length, 1);
   assert.equal(results.filter((result) => result.reason === 'conflict').length, 1);
-  assert.match(['Edit from A', 'Edit from B'].includes(JSON.parse(storage.raw)[0].title) ? 'valid' : 'invalid', /valid/);
+  assert.ok(['Edit from A', 'Edit from B'].includes(JSON.parse(storage.raw)[0].title));
 });
 
 test('delete racing with an edit is a conflict and preserves the winning snapshot', async () => {
