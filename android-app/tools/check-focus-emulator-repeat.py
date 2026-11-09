@@ -38,11 +38,12 @@ assert 'python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT"' in canonic
 assert "run_instrumentation_repeated" in test_runner
 assert "event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN)" in platform_test
 assert "sendPointerSync(event);" in platform_test  # taps
-assert "executeShellCommand(command);" in platform_test  # real touchscreen swipe; no shell marker parsing
-assert "__DAYMARK_INPUT_EXIT:0" not in platform_test  # silent input commands are verified by View events
+assert "executeShellCommand(command)" in platform_test  # real touchscreen swipe
+assert "sh -c " in platform_test  # shell control operators are interpreted explicitly
+assert "2>&1; status=$?" in platform_test  # preserve stderr and capture the actual input exit status
+assert "__DAYMARK_INPUT_EXIT:0" in platform_test
 assert "vertical drag delivers touchscreen events to target" in platform_test
 assert "input swipe " in platform_test
-assert "__DAYMARK_INPUT_EXIT:0" in platform_test
 assert "getUiAutomation().injectInputEvent" not in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "stableVisibleBounds" in platform_test

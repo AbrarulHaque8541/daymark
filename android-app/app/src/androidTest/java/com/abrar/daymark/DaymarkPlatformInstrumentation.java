@@ -520,18 +520,19 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
-        // The Android input command is intentionally invoked without shell control operators.
-        // UiAutomation's command pipe may return empty stdout for a successful silent input
-        // command; the caller verifies delivery through actual View MotionEvents and mode state.
-        // Keep the command to one executable plus numeric arguments so it also works when the
-        // platform launches it without an intermediate shell parser.
-        String command = "input swipe "
+        // Explicitly invoke a shell so stderr redirection and the exit marker are interpreted by
+        // Android's shell, rather than being passed as extra arguments to the input utility.
+        // The command contains only numeric coordinates and a fixed duration.
+        String script = "input swipe "
                 + Math.round(startX) + " "
                 + Math.round(startY) + " "
                 + Math.round(endX) + " "
                 + Math.round(endY)
-                + " 320";
-        executeShellCommand(command);
+                + " 320 2>&1; status=$?; printf \"__DAYMARK_INPUT_EXIT:%s\\n\" \"$status\"";
+        String command = "sh -c '" + script + "'";
+        String output = executeShellCommand(command);
+        check(output.contains("__DAYMARK_INPUT_EXIT:0"),
+                "touchscreen swipe command failed: " + output);
         waitForIdleSync();
     }
 
