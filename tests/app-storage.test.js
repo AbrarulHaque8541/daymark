@@ -288,6 +288,43 @@ test('task writes fail closed when Web Locks are unavailable', async () => {
   assert.match(app.elements.get('#toast').textContent, /Could not save/i);
 });
 
+test('a stale tab does not recreate a task list removed by another context', async () => {
+  const existing = makeImportTask('existing-before-removal', 'Existing before removal');
+  const sharedStorage = new Map([[STORAGE_KEY, JSON.stringify([existing])], [FOCUS_KEY, null]]);
+  const app = bootApp({ storageData: sharedStorage });
+  sharedStorage.delete(STORAGE_KEY);
+
+  app.elements.get('#new-title').value = 'Do not overwrite removal';
+  await triggerFormSubmit(app, '#add-form');
+
+  assert.equal(sharedStorage.has(STORAGE_KEY), false);
+  assert.match(app.elements.get('#storage-status').textContent, /removed by another context/i);
+});
+
+test('an unreadable replacement is backed up and never replaces a known task baseline', async () => {
+  const existing = makeImportTask('existing-before-corruption', 'Existing before corruption');
+  const sharedStorage = new Map([[STORAGE_KEY, JSON.stringify([existing])], [FOCUS_KEY, null]]);
+  const app = bootApp({ storageData: sharedStorage });
+  sharedStorage.set(STORAGE_KEY, '{broken replacement');
+
+  app.elements.get('#new-title').value = 'Do not erase known tasks';
+  await triggerFormSubmit(app, '#add-form');
+
+  assert.equal(sharedStorage.get(STORAGE_KEY), '{broken replacement');
+  assert.equal(sharedStorage.get(BACKUP_KEY), '{broken replacement');
+  assert.match(app.elements.get('#storage-status').textContent, /unreadable value/i);
+});
+
+test('a corrupt startup payload is preserved before a new task list is saved', async () => {
+  const corrupt = '{broken startup payload';
+  const app = bootApp({ savedValue: corrupt });
+  app.elements.get('#new-title').value = 'New task after backup';
+  await triggerFormSubmit(app, '#add-form');
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), corrupt);
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].title, 'New task after backup');
+});
+
 test('monthly task completed on a clamped date retains its original day anchor', async () => {
   const recurring = makeImportTask('monthly-31', 'Month-end task');
   recurring.dueDate = '2026-02-28';
