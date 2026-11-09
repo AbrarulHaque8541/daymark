@@ -17,6 +17,13 @@ assert "disallowParentIntercept(false);" in selector
 assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in selector
 assert "requestDisallowInterceptTouchEvent(true)" not in selector
 assert "requestDisallowInterceptTouchEvent(false)" not in selector
+vertical_branch = selector.split(
+    "if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)", 1
+)[1].split(
+    "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1
+)[0]
+assert "disallowParentIntercept(false);" in vertical_branch
+assert "return false;" in vertical_branch, "vertical drags must be handed back to the parent ScrollView"
 
 canonical = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
 
@@ -45,5 +52,8 @@ assert "vertical drag delivers touchscreen events to target" in platform_test
 assert "getUiAutomation().injectInputEvent" not in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "stableVisibleBounds" in platform_test
+assert "findParentScrollView" in platform_test
+assert "parentScroll.canScrollVertically(1)" in platform_test
+assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in platform_test
 assert "locationOnScreen=(" in platform_test
 print("PASS focus emulator repeat wiring: API 36 ten-run gate, bounded disposable reset, fail-fast test integration")

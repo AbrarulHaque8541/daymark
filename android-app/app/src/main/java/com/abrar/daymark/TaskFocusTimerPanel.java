@@ -431,13 +431,20 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                         disallowParentIntercept(false);
                         return false;
                     }
-                    if (verticalGesture) return true;
+                    if (verticalGesture) {
+                        // A vertical drag belongs to the parent Tasks ScrollView, not this
+                        // horizontal mode selector. Release the parent so it can consume the
+                        // next MOVE and scroll the workspace.
+                        disallowParentIntercept(false);
+                        return false;
+                    }
                     TaskFocusTimerModeGesturePolicy.Result result =
                             TaskFocusTimerModeGesturePolicy.classify(
                                     event.getX() - downX, event.getY() - downY, gestureThresholdPx);
                     if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL) {
                         verticalGesture = true;
-                        return true;
+                        disallowParentIntercept(false);
+                        return false;
                     }
                     if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH
                             || result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {

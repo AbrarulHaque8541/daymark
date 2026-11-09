@@ -110,6 +110,7 @@ expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDis
 expect_fail_after_removal check-focus-emulator-repeat.py "sendPointerSync(event);" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "injectPointerEvent(android.view.MotionEvent.ACTION_MOVE" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" "$PLATFORM_TEST" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"

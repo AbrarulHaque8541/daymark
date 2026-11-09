@@ -267,6 +267,33 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             String rightSwipe = dispatchSwipe(modeRow, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
+            android.widget.ScrollView parentScroll = findParentScrollView(modeRow);
+            check(parentScroll != null,
+                    "Focus mode selector remains inside the parent Tasks ScrollView");
+            runOnMainSync(() -> {
+                android.view.ViewGroup frame = (android.view.ViewGroup) parentScroll.getChildAt(0);
+                android.view.ViewGroup content = (android.view.ViewGroup) frame.getChildAt(0);
+                android.view.View spacer = new android.view.View(mainActivity);
+                content.addView(spacer, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1200));
+                parentScroll.scrollTo(0, 0);
+            });
+            waitForIdleSync();
+            boolean[] canScroll = new boolean[2];
+            int[] scrollY = new int[2];
+            runOnMainSync(() -> {
+                canScroll[0] = parentScroll.canScrollVertically(1);
+                canScroll[1] = parentScroll.canScrollVertically(-1);
+                scrollY[0] = parentScroll.getScrollY();
+            });
+            check(canScroll[0] || canScroll[1],
+                    "Tasks workspace has scrollable content for the vertical-gesture regression");
+            dispatchVerticalScrollSwipe(modeRow, canScroll[0]);
+            runOnMainSync(() -> scrollY[1] = parentScroll.getScrollY());
+            check(canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0],
+                    "parent Tasks ScrollView scrolls after a vertical Focus-mode drag");
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "a vertical workspace scroll does not change the selected Focus mode");
             dispatchVerticalSwipe(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag inside Countdown cancels the child click");
@@ -478,6 +505,32 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
                 "vertical drag delivers touchscreen events to target ("
                         + view.getClass().getSimpleName() + ")");
+    }
+
+    private android.widget.ScrollView findParentScrollView(android.view.View view) {
+        android.view.ViewParent parent = view.getParent();
+        while (parent != null) {
+            if (parent instanceof android.widget.ScrollView) {
+                return (android.widget.ScrollView) parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+
+    private void dispatchVerticalScrollSwipe(android.view.View view, boolean fingerMovesUp)
+            throws Exception {
+        android.graphics.Rect bounds = stableVisibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0,
+                "vertical-scroll target has stable visible screen bounds");
+        float distance = Math.min(bounds.height() * 0.70f, 48f);
+        float startY = fingerMovesUp
+                ? bounds.centerY() + distance / 2f
+                : bounds.centerY() - distance / 2f;
+        float endY = fingerMovesUp
+                ? bounds.centerY() - distance / 2f
+                : bounds.centerY() + distance / 2f;
+        injectDrag(bounds.centerX(), startY, bounds.centerX(), endY);
     }
 
     private android.graphics.Rect stableVisibleBounds(android.view.View view) throws Exception {
