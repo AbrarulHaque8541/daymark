@@ -126,8 +126,6 @@ def check_sources(parser, store, smoke):
         "could send that data to an external service",
         "New imports start disabled",
         "explicit activation",
-        "an oversized existing extension file is rejected without truncation or replacement",
-        "an unreadable existing extension path and its contents are preserved",
     ):
         assert marker in smoke, f"missing import-hardening regression: {marker}"
 
@@ -203,6 +201,12 @@ if __name__ == "__main__":
     parser = (root / "app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java").read_text(encoding="utf-8")
     store = (root / "app/src/main/java/com/abrar/daymark/ExtensionStore.java").read_text(encoding="utf-8")
     smoke = (root / "tools/ExtensionPackageParserSmoke.java").read_text(encoding="utf-8")
+    store_smoke = (root / "tools/ExtensionStoreSmoke.java").read_text(encoding="utf-8")
+    for marker in (
+        "an oversized existing extension file is rejected without truncation or replacement",
+        "an unreadable existing extension path and its contents are preserved",
+    ):
+        assert marker in store_smoke, f"missing ExtensionStore preservation regression: {marker}"
     check_sources(parser, store, smoke)
     test_limit_guard_mutations(parser, store, smoke)
     subprocess.run(["sh", str(root / "tools/run-extension-store-tests.sh")], cwd=root, check=True)
