@@ -1,3 +1,16 @@
+## Latest documentation-guard correction — 2026-11-09T21:18:11.184Z
+
+The docs-only PR #675 head `b71b8c0461a5694b2173621c333a5be8893e243b` triggered Android CI and device-test asset workflows; both failed at the package-cleanliness guard because the newly added status snapshot repeated a retired application-identity literal while describing Issue #679. This was a documentation-only failure, not a production-source/test failure.
+
+The literal has been removed in commit `fbec70fac0eb707a6421a594ec1eb924ed1ee7a7`. That docs-only commit did not trigger a new Actions run by itself (path filtering). A fresh exact-head run is pending a workflow-relevant plan update; do not treat the older failure as current-main or production-code failure, and do not claim the corrected docs head is green until fresh checks complete.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T21:18:11.184Z
+
+---
+
 ## Current execution queue — 2026-11-09T21:12:32.998Z (main 1532838c; #683 branch safety review; #688 test-source guard in CI)
 
 Full live inventory and exact-head evidence: [CURRENT_STATUS_20261109T211232Z.md](docs/CURRENT_STATUS_20261109T211232Z.md).
