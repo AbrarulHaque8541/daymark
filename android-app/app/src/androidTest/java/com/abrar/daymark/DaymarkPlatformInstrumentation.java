@@ -247,8 +247,21 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             android.widget.ScrollView parentScroll = findParentScrollView(modeSelector);
             check(parentScroll != null,
                     "Focus mode selector remains inside the parent Tasks ScrollView");
+            // Add scrollable content before any mode tap so the actual controls can be
+            // positioned inside the ScrollView viewport, not merely drawn beyond it.
+            runOnMainSync(() -> {
+                android.view.ViewGroup frame = (android.view.ViewGroup) parentScroll.getChildAt(0);
+                android.view.ViewGroup content = (android.view.ViewGroup) frame.getChildAt(0);
+                android.view.View spacer = new android.view.View(mainActivity);
+                content.addView(spacer, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1200));
+                content.requestLayout();
+                parentScroll.requestLayout();
+            });
+            waitForIdleSync();
             scrollViewIntoFocus(modeRow);
-            // The initial mode taps must also land inside the ScrollView's real hit rectangle.
+            scrollDescendantIntoScrollView(parentScroll, countdown);
+            scrollDescendantIntoScrollView(parentScroll, stopwatch);
             scrollDescendantIntoScrollView(parentScroll, modeSelector);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "fresh Focus Timer panel starts in Stopwatch mode");
@@ -266,19 +279,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             String rightSwipe = dispatchSwipe(modeSelector, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
-            runOnMainSync(() -> {
-                android.view.ViewGroup frame = (android.view.ViewGroup) parentScroll.getChildAt(0);
-                android.view.ViewGroup content = (android.view.ViewGroup) frame.getChildAt(0);
-                android.view.View spacer = new android.view.View(mainActivity);
-                content.addView(spacer, new android.widget.LinearLayout.LayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1200));
-                content.requestLayout();
-                parentScroll.requestLayout();
-            });
-            waitForIdleSync();
-            // Keep the injected gesture inside the ScrollView's actual hit rectangle.
-            // A child may draw beyond an unclipped ancestor, but the ScrollView cannot
-            // receive a touch whose screen coordinates fall outside its viewport.
+            // The selector may have moved during horizontal gestures; re-center it
+            // before injecting the parent-scroll gesture.
             scrollDescendantIntoScrollView(parentScroll, modeSelector);
             boolean[] canScroll = new boolean[2];
             int[] scrollY = new int[2];
@@ -303,15 +305,19 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                             + ", verticalScrollTrace=" + verticalScrollTrace + ")");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical workspace scroll does not change the selected Focus mode");
+            scrollDescendantIntoScrollView(parentScroll, countdown);
             dispatchVerticalSwipe(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag inside Countdown cancels the child click");
+            scrollDescendantIntoScrollView(parentScroll, countdown);
             String countdownAfterVerticalDrag = dispatchTap(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a tap still works after a rejected vertical drag (" + countdownAfterVerticalDrag + ")");
+            scrollDescendantIntoScrollView(parentScroll, stopwatch);
             dispatchVerticalSwipe(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a vertical drag inside Stopwatch cancels the child click");
+            scrollDescendantIntoScrollView(parentScroll, stopwatch);
             String stopwatchAfterVerticalDrag = dispatchTap(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag does not disable subsequent taps (" + stopwatchAfterVerticalDrag + ")");
@@ -375,7 +381,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(targetBounds.height() >= targetHeight[0]
                         && targetBounds.top >= parentBounds.top
                         && targetBounds.bottom <= parentBounds.bottom,
-                "Focus selector is fully inside the parent Tasks ScrollView before vertical drag"
+                "Focus control is fully inside the parent Tasks ScrollView before touch injection"
                         + " (target=" + targetBounds.toShortString()
                         + ", parent=" + parentBounds.toShortString()
                         + ", scrollY=" + actualScroll[0] + ")");
