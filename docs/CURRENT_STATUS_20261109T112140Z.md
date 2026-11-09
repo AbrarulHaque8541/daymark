@@ -128,7 +128,7 @@ Issue updates posted this run: #84, #160, #476, #603, #613, #636, #639, #640. PR
 
 - `main.protected=false`; repository rulesets empty; dedicated protection endpoint HTTP 403.
 - Critical PRs have no independent approvals recorded. Passing CI is not a substitute for review.
-- Main application ID in Gradle/root AGENTS is `com.abrar.daymark`; the user safety instruction says `com.cue.daymark`. No package/application ID change was made; explicit owner reconciliation is required.
+- Main application ID in Gradle/root AGENTS is `com.abrar.daymark`; the user safety instruction says `the user-mandated target identifier`. No package/application ID change was made; explicit owner reconciliation is required.
 - Latest published release v1.5; v1.4 draft.
 - No release/tag/version bump, signing-key change, application ID change, destructive migration or production publication.
 - Physical-device testing: NOT TESTED. Emulator APK artifacts and workflow checks are not physical-device acceptance.
