@@ -141,7 +141,7 @@
           throw new Error('calendar import is unavailable in this build');
         }
         const parsed = format === 'csv'
-          ? importApi.fromCsv(text, { now: now(), makeId })
+          ? importApi.fromCsv(text, { now: now(), makeId, hasDuplicateJsonKeys: logic.hasDuplicateJsonKeys })
           : format === 'markdown'
             ? importApi.fromMarkdown(text, { now: now(), makeId })
             : importApi.fromIcs(text, { now: now(), makeId });
