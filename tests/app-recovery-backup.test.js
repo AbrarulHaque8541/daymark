@@ -432,7 +432,7 @@ test('unreadable task primary remains read-only after a user attempts to add a t
 
 test('unreadable Focus primary remains read-only after a user starts a session', () => {
   const backup = JSON.stringify({ session: null, log: [] });
-  const storedValues = new Map([[FOCUS_BACKUP_KEY, backup]]);
+  const storedValues = new Map([[STORAGE_KEY, JSON.stringify([])], [FOCUS_BACKUP_KEY, backup]]);
   const failReads = new Set([FOCUS_KEY]);
   const app = bootApp(storedValues, new Set(), false, true, failReads);
 
@@ -473,7 +473,8 @@ test('unreadable task and Focus primaries with no backups do not create replacem
   const app = bootApp(storedValues, new Set(), false, true, failReads);
 
   assert.match(app.elements.get('#storage-status span').textContent,
-    /Focus data unreadable; no recovery backup found/);
+    /Primary task data unreadable; no recovery backup found/,
+  'the task-primary warning is shown first when both primaries are unreadable');
   app.elements.get('#new-title').value = 'Session-only task';
   app.elements.get('#add-form').dispatch('submit');
   assert.equal(storedValues.has(STORAGE_KEY), false);
@@ -482,6 +483,8 @@ test('unreadable task and Focus primaries with no backups do not create replacem
   app.elements.get('#focus-start').dispatch('click');
   assert.equal(storedValues.has(FOCUS_KEY), false);
   assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save Focus data safely: primary Focus data is unreadable/);
 });
 
 test('app.js parses before browser runtime boot', () => {
