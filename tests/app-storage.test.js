@@ -579,7 +579,7 @@ test('add form shows date-only reminder guidance only for a date with no time an
   assert.equal(hint.hidden, true, 'the helper hides after the add form resets');
 });
 
-test('edit form shows date-only reminder guidance and saves a null time with its selected lead', () => {
+test('edit form shows date-only reminder guidance and saves a null time with its selected lead', async () => {
   const task = makeImportTask('date-only-edit', 'Edit reminder');
   task.dueDate = '2026-11-21';
   task.dueTime = '14:30';
