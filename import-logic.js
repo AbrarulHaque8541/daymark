@@ -427,8 +427,9 @@
     };
   }
 
-  // COMPLETED is a VTODO DATE-TIME property and must be UTC. Merely having
-  // the property is not evidence that a task is complete.
+  // COMPLETED is a VTODO DATE-TIME property, must be UTC, and is valid only
+  // alongside STATUS:COMPLETED. The status property remains the completion
+  // state; a timestamp alone must never mark an item complete.
   function isValidIcsCompletion(prop) {
     if (!prop || typeof prop.value !== 'string') return false;
     const valueType = (prop.params.VALUE || '').toUpperCase();
@@ -510,7 +511,9 @@
       const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
       const due = icsDateTaskField(dueProp);
       const completionProp = byName.COMPLETED || null;
-      const validCompletion = component.type === 'VTODO' && isValidIcsCompletion(completionProp);
+      const validCompletion = component.type === 'VTODO'
+        && status === 'COMPLETED'
+        && isValidIcsCompletion(completionProp);
       const invalidCompletion = (completionProp !== null && !validCompletion) ||
         (component.type !== 'VTODO' && status === 'COMPLETED');
       const priorityValue = byName.PRIORITY ? byName.PRIORITY.value.trim() : '';
@@ -524,7 +527,7 @@
         dueDate: due.dueDate,
         dueTime: due.dueTime,
         priority,
-        completed: component.type === 'VTODO' && (status === 'COMPLETED' || validCompletion),
+        completed: component.type === 'VTODO' && status === 'COMPLETED',
         repeat: null,
         tags: categoryProps.reduce((all, prop) => all.concat(icsSplitList(prop.value)), []),
         notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
