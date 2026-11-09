@@ -526,3 +526,12 @@ test('duplicate-key task storage blocks import before reading the selected file'
   const status = created.find((el) => el.id === 'import-status');
   assert.match(status.textContent, /duplicate JSON keys/);
 });
+
+test('production HTML loads the shared task coordinator before app and import UI', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const coordinatorAt = html.indexOf('task-mutation-logic.js');
+  assert.ok(coordinatorAt >= 0, 'the shared task coordinator is present');
+  assert.ok(coordinatorAt < html.indexOf('app.js'), 'the coordinator loads before app.js');
+  assert.ok(coordinatorAt < html.indexOf('import-ui.js'), 'the coordinator loads before import-ui.js');
+});
+
