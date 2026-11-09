@@ -82,7 +82,7 @@ PR #666 was closed without merging after all five of its changed files (index.ht
 
 - Main remains unprotected; rulesets empty; protection detail endpoint HTTP 403. No branch settings changed.
 - No independent approval is recorded for the five open PRs.
-- Root AGENTS.md/Gradle specify applicationId com.abrar.daymark, while the run-level owner safety instruction says it must remain com.cue.daymark. No applicationId, namespace, manifest package or signer change was made; the discrepancy needs explicit reconciliation.
+- The repository's current Gradle/manifest package identity conflicts with the run-level owner safety directive. No applicationId, namespace, manifest package or signer change was made; the discrepancy needs explicit reconciliation.
 - v1.5 published; v1.4 draft. No release/tag/version bump/signing-key change.
 - No destructive migration, automatic restore or production-data mutation.
 - Physical-device testing: NOT TESTED. Emulator/CI APK artifacts are not physical acceptance.
