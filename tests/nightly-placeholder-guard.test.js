@@ -65,23 +65,39 @@ test('the exact GNU grep guard excludes test/dependency directories without hidi
 });
 
 
-test('every Node test file registers at least one executable test case', () => {
+
+function collectNodeTestFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collectNodeTestFiles(fullPath);
+    return entry.isFile() && /\.test\.(?:js|mjs|cjs)$/.test(entry.name) ? [fullPath] : [];
+  }).sort();
+}
+
+function hasRegisteredTestCase(source) {
+  const withoutComments = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .trim();
+  return withoutComments.length > 0
+    && /\b(?:test|it)(?:\.(?:skip|todo|only))?\s*\(\s*['"\x60]/.test(withoutComments);
+}
+
+test('every repository Node test file registers at least one executable test case', () => {
   const testDirectory = path.join(__dirname);
-  const testFiles = fs.readdirSync(testDirectory)
-    .filter((name) => name.endsWith('.test.js'))
-    .sort();
-  const registration = /\b(?:test|it)(?:\.(?:skip|todo|only))?\s*\(\s*['"\x60]/;
+  const testFiles = collectNodeTestFiles(testDirectory);
 
   assert.ok(testFiles.length > 0, 'the repository must retain its Node regression suite');
+  assert.equal(hasRegisteredTestCase('placeholder'), false, 'literal placeholder files must not count as tests');
+  assert.equal(hasRegisteredTestCase('// placeholder\n/* no executable test */'), false,
+    'comment-only test files must not count as tests');
+  assert.equal(hasRegisteredTestCase("test('valid fixture', () => {});"), true,
+    'a named Node test registration must be accepted');
 
-  for (const name of testFiles) {
-    const source = fs.readFileSync(path.join(testDirectory, name), 'utf8');
-    const withoutComments = source
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '')
-      .trim();
-    assert.ok(withoutComments.length > 0, name + ' must not be empty or comment-only');
-    assert.match(withoutComments, registration,
-      name + ' must register at least one named Node test; a placeholder/helper-only file is not a regression suite');
+  for (const file of testFiles) {
+    const relative = path.relative(testDirectory, file);
+    const source = fs.readFileSync(file, 'utf8');
+    assert.ok(hasRegisteredTestCase(source),
+      relative + ' must register at least one named test(); a placeholder/helper-only file is not a regression suite');
   }
 });
