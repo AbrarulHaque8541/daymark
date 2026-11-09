@@ -119,7 +119,7 @@ All base/head SHAs below were fetched live from GitHub. Five current-main-based 
 - Review inventory for #604, #656, #657, #658, #659, #643 and #648 found no independent approval. Recorded reviews are repository-owner COMMENTED or absent; no requested independent reviewers on the current-main drafts.
 - main.protected=false; repository rulesets endpoint returns an empty list; branch-protection detail endpoint returns HTTP 403 to the connected integration. No protection settings were changed and no merge/protection bypass was attempted.
 - No release/tag/version bump, signing-key change, destructive migration, production publication or application ID change.
-- The current run-level package identity instruction conflicts with Gradle/AGENTS source identity; do not change either without owner-approved reconciliation.
+- The run-level package identity instruction conflicts with the Gradle/AGENTS source identity; do not change either without owner-approved reconciliation.
 
 ## Prioritized backlog
 
