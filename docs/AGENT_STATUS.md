@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-09T14:53:34.079Z (main 59e6961c0645; six open PRs, twelve issues; Focus/security backlog re-audited)](./CURRENT_STATUS_20261109T145334Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T13:13:07.642Z (main 59e6961c0645; #675 webhook/storage/recovery, #656 import/export, #659 extension, #665 signing/Node24; Focus #648 blocked)](./CURRENT_STATUS_20261109T131307Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:00:49Z (main 1d29085, Focus #648 direct shell-input and CSS #670)](./CURRENT_STATUS_20261109T120049Z.md)
@@ -108,6 +109,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [Daymark whole-project engineering status — 2026-11-09T14:53:34.079Z (main 59e6961c0645; six open PRs, twelve issues)](./CURRENT_STATUS_20261109T145334Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T13:13:07.642Z (main 59e6961c0645; #675 webhook/storage/recovery, #656 import/export, #659 extension, #665 signing/Node24; Focus #648 blocked)](./CURRENT_STATUS_20261109T131307Z.md)
 - Previous reviewed snapshot: [2026-11-09T12:34:39.477Z — main 8d76584bc07e](./CURRENT_STATUS_20261109T123439Z.md)
 - Previous reviewed snapshot: [2026-11-09T12:00:49Z — current main 1d29085](./CURRENT_STATUS_20261109T120049Z.md)
