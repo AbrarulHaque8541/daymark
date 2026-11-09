@@ -245,9 +245,16 @@
 
     const reader = body.getReader();
     setActiveReader(reader);
-    const decoder = new root.TextDecoder('utf-8');
+    const decoder = new root.TextDecoder('utf-8', { fatal: true });
     let xml = '';
     let bytesRead = 0;
+    let readerCancelled = false;
+    const cancelReader = async () => {
+      if (readerCancelled) return;
+      readerCancelled = true;
+      if (typeof reader.cancel !== 'function') return;
+      try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+    };
     try {
       for (;;) {
         const part = await reader.read();
@@ -257,13 +264,13 @@
         bytesRead += chunkBytes;
         if (bytesRead > MAX_XML_BYTES) {
           if (controller) controller.abort();
-          try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+          await cancelReader();
           throw new Error('The feed response was too large to parse safely.');
         }
         xml += decoder.decode(chunk, { stream: true });
         if (xml.length > MAX_XML_CHARS) {
           if (controller) controller.abort();
-          try { await reader.cancel(); } catch (error) { /* cancellation is best-effort */ }
+          await cancelReader();
           throw new Error('The feed response was too large to parse safely.');
         }
       }
@@ -271,6 +278,10 @@
       if (xml.length > MAX_XML_CHARS) throw new Error('The feed response was too large to parse safely.');
       if (isTimedOut()) throw new Error('Feed request timed out.');
       return xml;
+    } catch (error) {
+      if (controller) controller.abort();
+      await cancelReader();
+      throw error;
     } finally {
       setActiveReader(null);
       try { reader.releaseLock(); } catch (error) { /* minimal test readers may omit releaseLock */ }
@@ -303,7 +314,9 @@
       const response = await fetchImpl(url, {
         signal: controller ? controller.signal : undefined,
         cache: 'no-store',
-        redirect: 'follow'
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        redirect: 'error'
       });
       if (!response || !response.ok) {
         const body = response && response.body;

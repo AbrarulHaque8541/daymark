@@ -390,6 +390,60 @@ test('feed timeout cancels an active streaming reader after headers', async () =
   assert.equal(released, true, 'reader lock is released after cancellation');
 });
 
+test('feed requests reject redirects and omit ambient credentials and referrer', async () => {
+  let capturedOptions = null;
+  const streamed = streamedResponse(RSS);
+  const parsed = await feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+    capturedOptions = options;
+    return streamed.response;
+  }, 1000);
+  assert.equal(parsed.title, 'Example News');
+  assert.equal(capturedOptions.redirect, 'error');
+  assert.equal(capturedOptions.credentials, 'omit');
+  assert.equal(capturedOptions.referrerPolicy, 'no-referrer');
+});
+
+test('malformed UTF-8 split across chunks aborts, cancels and releases the reader', async () => {
+  const bytes = Buffer.concat([Buffer.from(RSS, 'utf8'), Buffer.from([0xc3, 0x28])]);
+  const chunks = [
+    bytes.subarray(0, bytes.length - 2),
+    bytes.subarray(bytes.length - 2, bytes.length - 1),
+    bytes.subarray(bytes.length - 1)
+  ];
+  let index = 0;
+  let cancelled = false;
+  let released = false;
+  let textCalled = false;
+  let capturedSignal = null;
+  const reader = {
+    async read() {
+      if (index >= chunks.length) return { done: true };
+      return { done: false, value: chunks[index++] };
+    },
+    async cancel() { cancelled = true; },
+    releaseLock() { released = true; }
+  };
+  const response = {
+    ok: true,
+    status: 200,
+    headers: { get: () => String(bytes.length) },
+    body: { getReader: () => reader },
+    async text() { textCalled = true; return RSS; }
+  };
+  await assert.rejects(
+    feed.fetchFeed('https://example.com/feed.xml', async (_url, options) => {
+      capturedSignal = options.signal;
+      return response;
+    }, 1000),
+    /encoded data|UTF-8|utf-8/i
+  );
+  assert.ok(capturedSignal, 'AbortController signal is passed to fetch');
+  assert.equal(capturedSignal.aborted, true, 'decoder failure aborts the network request');
+  assert.equal(cancelled, true, 'decoder failure cancels the active reader');
+  assert.equal(released, true, 'decoder failure releases the reader lock');
+  assert.equal(textCalled, false, 'stream path never materializes response.text()');
+});
+
 test('feed fetch parses a streamed response and cancels non-success response bodies', async () => {
   const streamed = streamedResponse(RSS);
   const parsed = await feed.fetchFeed('https://example.com/feed.xml', async () => streamed.response, 1000);
