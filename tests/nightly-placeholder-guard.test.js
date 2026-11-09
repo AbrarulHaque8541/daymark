@@ -70,7 +70,7 @@ test('every Node test file registers at least one executable test case', () => {
   const testFiles = fs.readdirSync(testDirectory)
     .filter((name) => name.endsWith('.test.js'))
     .sort();
-  const registration = /\b(?:test|it|describe)(?:\.(?:skip|todo|only))?\s*\(\s*['"\x60]/;
+  const registration = /\b(?:test|it)(?:\.(?:skip|todo|only))?\s*\(\s*['"\x60]/;
 
   assert.ok(testFiles.length > 0, 'the repository must retain its Node regression suite');
 
