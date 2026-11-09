@@ -87,7 +87,9 @@ assert 'findAncestorWithSimpleName(modeRow, "ModeSelector")' in platform_test
 assert "dispatchSwipe(modeSelector, true)" in platform_test
 assert "dispatchSwipe(modeSelector, false)" in platform_test
 assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0])" in platform_test
-assert 'parent-scroll:ACTION_MOVE' in platform_test
+assert '"parent-scroll"' in platform_test
+assert "MotionEvent.actionToString(event.getActionMasked())" in platform_test
+assert "ancestor == parentScroll ? \"parent-scroll\"" in platform_test
 assert "parentScroll.setOnTouchListener" in platform_test
 assert "selectorTrace" in platform_test
 assert "parentTrace" in platform_test

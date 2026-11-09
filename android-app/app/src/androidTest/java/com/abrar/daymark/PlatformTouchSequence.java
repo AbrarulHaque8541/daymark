@@ -48,6 +48,13 @@ final class PlatformTouchSequence {
         return Collections.unmodifiableList(samples);
     }
 
+    static long delayUntil(long eventTime, long now) {
+        if (eventTime < 0L || now < 0L) {
+            throw new IllegalArgumentException("touch event and current times must be non-negative");
+        }
+        return Math.max(0L, eventTime - now);
+    }
+
     private static void checkPoint(float x, float y) {
         if (!Float.isFinite(x) || !Float.isFinite(y)
                 || x < 0 || y < 0 || x > MAX_COORDINATE || y > MAX_COORDINATE) {

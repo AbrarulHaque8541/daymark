@@ -575,8 +575,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             int ancestorIndex = 0;
             while (parent instanceof android.view.View) {
                 android.view.View ancestor = (android.view.View) parent;
-                final String label = "ancestor-" + ancestorIndex + "-"
-                        + ancestor.getClass().getSimpleName();
+                final String label = ancestor == parentScroll ? "parent-scroll"
+                        : "ancestor-" + ancestorIndex + "-" + ancestor.getClass().getSimpleName();
                 ancestor.setOnTouchListener((targetView, event) -> {
                     appendTouchTrace(ancestorTrace, label, targetView, event);
                     return false;
@@ -659,6 +659,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         }
         try {
             for (PlatformTouchSequence.Sample sample : samples) {
+                long delayMs = PlatformTouchSequence.delayUntil(
+                        sample.eventTime, android.os.SystemClock.uptimeMillis());
+                if (delayMs > 0L) android.os.SystemClock.sleep(delayMs);
                 android.view.MotionEvent event = android.view.MotionEvent.obtain(
                         downTime, sample.eventTime, sample.action, sample.x, sample.y, 0);
                 event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);

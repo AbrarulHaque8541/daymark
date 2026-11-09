@@ -7,6 +7,12 @@ public final class PlatformTouchSequenceSmoke {
     private static int assertions;
 
     public static void main(String[] args) {
+        equal(25L, PlatformTouchSequence.delayUntil(1025L, 1000L),
+                "future touch sample waits until its scheduled event time");
+        equal(0L, PlatformTouchSequence.delayUntil(999L, 1000L),
+                "late touch sample is injected without negative delay");
+        rejects(() -> PlatformTouchSequence.delayUntil(-1L, 0L), "negative touch event time");
+
         List<PlatformTouchSequence.Sample> tap = PlatformTouchSequence.tap(12, 34, 1000L);
         equal(2, tap.size(), "tap sample count");
         equal(PlatformTouchSequence.ACTION_DOWN, tap.get(0).action, "tap starts with DOWN");
