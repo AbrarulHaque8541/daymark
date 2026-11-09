@@ -191,3 +191,15 @@ test('shared task date contract matches the Java host implementation fixture', (
   }
   assert.equal(cases, 9, 'shared date contract must include all nine cases');
 });
+
+test('duplicate JSON object keys are detected recursively without scanning string contents', () => {
+  assert.equal(logic.hasDuplicateJsonKeys('{"title":"first","title":"last"}'), true);
+  assert.equal(logic.hasDuplicateJsonKeys('[{"nested":{"id":1,"id":2}}]'), true);
+  assert.equal(logic.hasDuplicateJsonKeys('{"a":1,"\\u0061":2}'), true);
+  assert.equal(logic.hasDuplicateJsonKeys('{"one":{"id":1},"two":{"id":2}}'), false);
+  assert.equal(logic.hasDuplicateJsonKeys('{"text":"{\\"id\\":1,\\"id\\":2}"}'), false);
+  assert.equal(logic.hasDuplicateJsonKeys('{"a":1,"b":[true,null,2]}'), false);
+  assert.equal(logic.hasDuplicateJsonKeys('{invalid'), false);
+  const deeplyNested = '['.repeat(130) + '0' + ']'.repeat(130);
+  assert.equal(logic.hasDuplicateJsonKeys(deeplyNested), true);
+});

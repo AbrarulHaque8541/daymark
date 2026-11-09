@@ -233,3 +233,17 @@ test('export auto-boot does not eagerly evaluate window.localStorage', () => {
   assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
     'boot must pass window and let attachExportUi guard the storage getter');
 });
+
+test('duplicate-key task storage fails closed for open-format export', () => {
+  const ambiguous = '[{"id":"t1","title":"Original","title":"Overwritten","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-01-01T00:00:00.000Z","updatedAt":"2026-01-01T00:00:00.000Z"}]';
+  const { env, elements, created } = fakeEnv({ format: 'markdown', stored: ambiguous });
+  const handle = ui.attachExportUi(env);
+  const event = clickEvent(elements['export-tasks']);
+  handle.onClick(event);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(event.propagationStopped, true);
+  assert.equal(created.some((el) => el.tagName === 'a'), false,
+    'no download is produced from ambiguous task bytes');
+  const status = created.find((el) => el.id === 'export-status');
+  assert.match(status.textContent, /duplicate JSON keys/);
+});

@@ -112,12 +112,16 @@
         if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
           throw new Error('browser storage is unavailable; nothing was changed');
         }
-        if (!logic || typeof logic.validateStoredTasks !== 'function') {
+        if (!logic || typeof logic.validateStoredTasks !== 'function'
+          || typeof logic.hasDuplicateJsonKeys !== 'function') {
           throw new Error('task logic is unavailable');
         }
         const raw = storage.getItem(STORAGE_KEY);
         let stored = [];
         if (raw !== null) {
+          if (logic.hasDuplicateJsonKeys(raw)) {
+            throw new Error('saved tasks contain duplicate JSON keys; nothing was changed');
+          }
           stored = JSON.parse(raw);
           if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
         }

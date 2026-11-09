@@ -75,13 +75,17 @@
       if (typeof event.preventDefault === 'function') event.preventDefault();
       if (typeof event.stopPropagation === 'function') event.stopPropagation();
       try {
-        if (!logic || typeof logic.validateStoredTasks !== 'function') {
+        if (!logic || typeof logic.validateStoredTasks !== 'function'
+          || typeof logic.hasDuplicateJsonKeys !== 'function') {
           throw new Error('task logic is unavailable');
         }
         if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
           throw new Error('browser storage is unavailable; no data was exported');
         }
         const raw = storage.getItem(STORAGE_KEY);
+        if (raw !== null && logic.hasDuplicateJsonKeys(raw)) {
+          throw new Error('saved tasks contain duplicate JSON keys; no data was exported');
+        }
         const parsed = raw === null ? [] : JSON.parse(raw);
         if (!Array.isArray(parsed)) {
           throw new Error('saved tasks are unreadable; no data was exported');

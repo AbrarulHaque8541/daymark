@@ -162,6 +162,120 @@
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
   }
 
+
+  // Detect duplicate JSON object member names before JSON.parse can silently
+  // keep the last value. Invalid JSON remains the caller's parse error; excessive
+  // nesting is rejected here so hostile inputs cannot exhaust the call stack.
+  function hasDuplicateJsonKeys(raw) {
+    if (typeof raw !== 'string') return false;
+    let index = 0;
+    let duplicate = false;
+    let tooDeep = false;
+    const literalPattern = /(?:true|false|null)/y;
+    const numberPattern = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+    const whitespace = () => {
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character !== ' ' && character !== '\t' && character !== '\r' && character !== '\n') break;
+        index += 1;
+      }
+    };
+    const readString = () => {
+      const start = index;
+      index += 1;
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character === '\\') {
+          if (index + 1 >= raw.length) throw new Error('incomplete JSON escape');
+          index += 2;
+          continue;
+        }
+        if (character === '"') {
+          index += 1;
+          return JSON.parse(raw.slice(start, index));
+        }
+        if (character.charCodeAt(0) < 0x20) throw new Error('invalid JSON string');
+        index += 1;
+      }
+      throw new Error('unterminated JSON string');
+    };
+    const readValue = (depth) => {
+      if (depth > 128) {
+        tooDeep = true;
+        throw new Error('JSON nesting limit exceeded');
+      }
+      whitespace();
+      const character = raw[index];
+      if (character === '"') {
+        readString();
+        return;
+      }
+      if (character === '{') {
+        index += 1;
+        whitespace();
+        if (raw[index] === '}') {
+          index += 1;
+          return;
+        }
+        const keys = new Set();
+        for (;;) {
+          whitespace();
+          if (raw[index] !== '"') throw new Error('invalid JSON object key');
+          const key = readString();
+          if (keys.has(key)) duplicate = true;
+          keys.add(key);
+          whitespace();
+          if (raw[index] !== ':') throw new Error('missing JSON object colon');
+          index += 1;
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === '}') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON object separator');
+          index += 1;
+        }
+      }
+      if (character === '[') {
+        index += 1;
+        whitespace();
+        if (raw[index] === ']') {
+          index += 1;
+          return;
+        }
+        for (;;) {
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === ']') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON array separator');
+          index += 1;
+        }
+      }
+      literalPattern.lastIndex = index;
+      if (literalPattern.exec(raw)) {
+        index = literalPattern.lastIndex;
+        return;
+      }
+      numberPattern.lastIndex = index;
+      if (numberPattern.exec(raw)) {
+        index = numberPattern.lastIndex;
+        return;
+      }
+      throw new Error('invalid JSON value');
+    };
+    try {
+      readValue(0);
+      whitespace();
+      return index === raw.length && (duplicate || tooDeep);
+    } catch (error) {
+      return tooDeep;
+    }
+  }
+
   const api = {
     localDateString,
     isDateOnly,
@@ -173,6 +287,7 @@
     isTag,
     isValidTask,
     validateStoredTasks,
+    hasDuplicateJsonKeys,
     getFilteredTasks,
     getSuggestions,
     MAX_NOTES_CHARS,

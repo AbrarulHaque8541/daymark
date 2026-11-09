@@ -339,3 +339,24 @@ test('import aborts if another tab changes task storage while the selected file 
   assert.match(created.find((el) => el.id === 'import-status').textContent,
     /saved tasks changed while import was being prepared/);
 });
+
+test('duplicate-key task storage blocks import before reading the selected file', async () => {
+  const ambiguous = '[{"id":"t1","title":"Original","title":"Overwritten","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-01-01T00:00:00.000Z","updatedAt":"2026-01-01T00:00:00.000Z"}]';
+  let fileRead = false;
+  const file = { name: 'tasks.csv', size: 1, text: async () => { fileRead = true; return 'title\\nNew task'; } };
+  const { env, elements, storageData, writes, dispatched, created } = fakeEnv({
+    stored: ambiguous,
+    files: [file]
+  });
+  const handle = ui.attachImportUi(env);
+  const event = changeEvent(elements['import-file']);
+  await handle.onChange(event);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(storageData[ui.STORAGE_KEY], ambiguous,
+    'ambiguous existing task bytes are not normalized or overwritten');
+  assert.equal(writes.length, 0);
+  assert.equal(dispatched.length, 0);
+  assert.equal(fileRead, false, 'the selected file is not read when existing storage is ambiguous');
+  const status = created.find((el) => el.id === 'import-status');
+  assert.match(status.textContent, /duplicate JSON keys/);
+});
