@@ -23,7 +23,7 @@ android {
     defaultConfig {
         minSdk = 26
         targetSdk = 36
-        testInstrumentationRunner = "com.abrar.daymark.DaymarkServiceWorkerInstrumentation"
+        testInstrumentationRunner = "android.test.InstrumentationTestRunner"
     }
 
     targetProjectPath = ":app"
