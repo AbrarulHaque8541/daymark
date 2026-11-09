@@ -175,6 +175,22 @@ test('an already-applied identical mutation is idempotent', async () => {
   assert.deepEqual(JSON.parse(storage.raw), desired);
 });
 
+test('a second tab importing an identical task is idempotent and reports no new addition', async () => {
+  const base = [makeTask('existing', 'Existing')];
+  const desired = base.concat(makeTask('same-import', 'Imported once'));
+  const storage = makeStorage(base);
+  const locks = makeLockManager();
+
+  const first = await commit(locks, storage, base, desired);
+  const second = await commit(locks, storage, base, desired);
+
+  assert.equal(first.ok, true);
+  assert.deepEqual(first.addedIds, ['same-import']);
+  assert.equal(second.ok, true);
+  assert.deepEqual(second.addedIds, []);
+  assert.equal(JSON.parse(storage.raw).filter((task) => task.id === 'same-import').length, 1);
+});
+
 test('task equality is independent of object property insertion order', () => {
   const left = [{ id: 'a', title: 'A', completed: false }];
   const right = [{ completed: false, title: 'A', id: 'a' }];
