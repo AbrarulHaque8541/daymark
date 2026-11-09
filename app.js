@@ -138,7 +138,6 @@
   }
 
   function isPartialRecoveryPayload(raw) {
-    if (hasDuplicateJsonKeys(raw)) return true;
     try {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount > 0;
