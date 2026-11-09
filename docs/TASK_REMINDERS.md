@@ -18,6 +18,7 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 - Alarms use `AlarmManager.setAndAllowWhileIdle` (RTC_WAKEUP) — **no foreground service, no polling**.
 - Alarms are (re)scheduled when the app opens, after every successful task save, after device boot, and after system clock/timezone changes. The non-exported receiver listens only for `BOOT_COMPLETED`, `QUICKBOOT_POWERON`, `TIME_SET`, and `TIMEZONE_CHANGED`; the time-change broadcasts cause Daymark to re-resolve local due times using the new system zone and re-arm the absolute RTC alarms.
 - If a notification is missed (device off, Doze), the in-app dialog on the next app open still covers it.
+- In the browser, `checkReminders()` runs once during app setup and every 30 seconds while the tab is open. It rebuilds the local due instant from the current `Date`/timezone on each check, so clock/timezone changes are reflected on the next check; browser reminders remain in-page only and do not run after the tab closes.
 - If boot or system-time rescheduling fails, a flag is stored and the next app open retries.
 
 ## Permissions (honest scope)
@@ -30,7 +31,8 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 ## Honest limitations
 
 - Alarms are **inexact**: `setAndAllowWhileIdle` still allows Doze / battery-saver batching, so a notification can arrive late.
-- Reminders reschedule **on app open, on save, after boot, and after system clock/timezone changes** — no background polling between those points.
+- **Android:** reminders re-arm on app open, successful task save, boot, `TIME_SET`, and `TIMEZONE_CHANGED`; there is no background poller. Alarms remain inexact and may be delayed by Doze/battery saver.
+- **Browser:** reminders are evaluated on app setup and every 30 seconds while the tab is open. They use the current local timezone on each check, but are in-page only; there is no OS notification or background delivery after the tab closes.
 - **Portable backup compatibility**: new exports use DMM3 and preserve tags, the repeat rule, and the original monthly/yearly day-of-month anchor. Legacy DMM3 yearly records with a zero anchor default to the task's current due-date day. DMM1/DMM2 archives remain importable with their historical defaults; DMM2 cannot restore tags or repeat state it never stored.
 - On some Android versions, per-channel overrides made in system Settings may outlive an in-app sound change; the channel is recreated to apply the new sound.
 
