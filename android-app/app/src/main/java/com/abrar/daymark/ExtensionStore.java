@@ -163,7 +163,9 @@ final class ExtensionStore {
             try {
                 existing = ExtensionPackageParser.parseDaymarkJson(existingJson, false);
             } catch (Exception malformed) {
-                // A readable but malformed stored pack may be replaced by this confirmed import.
+                // Malformed bytes are still user data. Never replace them as a side effect
+                // of importing another pack with the same id; require explicit recovery/removal.
+                throw new IOException("Existing extension pack is malformed; refusing to replace it.", malformed);
             }
         }
         if (existing != null && !isSamePack(existing, ext)) {
@@ -171,7 +173,7 @@ final class ExtensionStore {
                     + ext.id + ". Uninstall it before importing a different pack.");
         }
         if (existing == null) {
-            // Treat a new or corrupt-on-disk import as untrusted until the user enables it in the manager.
+            // Treat a new import as untrusted until the user enables it in the manager.
             ext = ExtensionPackageParser.prepareNewUserPackInstall(ext);
         } else {
             // Re-importing identical content must not silently re-enable a pack or clear
