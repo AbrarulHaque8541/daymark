@@ -292,7 +292,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0],
                     "parent Tasks ScrollView scrolls after a vertical Focus-mode drag"
                             + " (startY=" + scrollY[0] + ", endY=" + scrollY[1]
-                            + ", canScrollDown=" + canScroll[0] + ", canScrollUp=" + canScroll[1] + ")");
+                            + ", canScrollDown=" + canScroll[0] + ", canScrollUp=" + canScroll[1]
+                            + ", verticalScrollTrace=" + verticalScrollTrace + ")");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical workspace scroll does not change the selected Focus mode");
             dispatchVerticalSwipe(countdown);
@@ -475,11 +476,22 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         String label = targetView instanceof android.widget.TextView
                 ? String.valueOf(((android.widget.TextView) targetView).getText())
                 : targetView.getClass().getSimpleName();
+        int pointerIndex = event.getPointerCount() == 0 ? 0
+                : Math.min(event.getActionIndex(), event.getPointerCount() - 1);
         trace.append(target).append(':').append(android.view.MotionEvent.actionToString(event.getActionMasked()))
                 .append(" label=").append(label)
-                .append(" local=(").append(event.getX()).append(',').append(event.getY()).append(')')
+                .append(" pointerCount=").append(event.getPointerCount());
+        if (event.getPointerCount() > 0) {
+            trace.append(" pointerId=").append(event.getPointerId(pointerIndex))
+                    .append(" toolType=").append(event.getToolType(pointerIndex));
+        }
+        trace.append(" local=(").append(event.getX()).append(',').append(event.getY()).append(')')
                 .append(" raw=(").append(event.getRawX()).append(',').append(event.getRawY()).append(')')
-                .append(" source=").append(event.getSource());
+                .append(" source=").append(event.getSource())
+                .append(" eventTime=").append(event.getEventTime());
+        if (targetView instanceof android.widget.ScrollView) {
+            trace.append(" scrollY=").append(((android.widget.ScrollView) targetView).getScrollY());
+        }
     }
 
     private void dispatchVerticalSwipe(android.view.View view) throws Exception {
@@ -552,27 +564,43 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 ? bounds.centerY() - distance / 2f
                 : bounds.centerY() + distance / 2f;
         StringBuilder selectorTrace = new StringBuilder();
-        StringBuilder parentTrace = new StringBuilder();
+        StringBuilder ancestorTrace = new StringBuilder();
         java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        java.util.ArrayList<android.view.View> tracedAncestors = new java.util.ArrayList<>();
+        int[] parentScrollY = new int[2];
         runOnMainSync(() -> {
+            parentScrollY[0] = parentScroll.getScrollY();
             attachTouchTraceListeners(view, "vertical-selector", selectorTrace, tracedViews);
-            parentScroll.setOnTouchListener((targetView, event) -> {
-                appendTouchTrace(parentTrace, "parent-scroll", targetView, event);
-                return false;
-            });
+            android.view.ViewParent parent = view.getParent();
+            int ancestorIndex = 0;
+            while (parent instanceof android.view.View) {
+                android.view.View ancestor = (android.view.View) parent;
+                final String label = "ancestor-" + ancestorIndex + "-"
+                        + ancestor.getClass().getSimpleName();
+                ancestor.setOnTouchListener((targetView, event) -> {
+                    appendTouchTrace(ancestorTrace, label, targetView, event);
+                    return false;
+                });
+                tracedAncestors.add(ancestor);
+                parent = ancestor.getParent();
+                ancestorIndex += 1;
+            }
         });
         try {
             injectDrag(bounds.centerX(), startY, bounds.centerX(), endY);
         } finally {
             runOnMainSync(() -> {
                 for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
-                parentScroll.setOnTouchListener(null);
+                for (android.view.View tracedAncestor : tracedAncestors) tracedAncestor.setOnTouchListener(null);
+                parentScrollY[1] = parentScroll.getScrollY();
             });
         }
         String[] traces = new String[1];
-        runOnMainSync(() -> traces[0] = "selector=[" + selectorTrace + "] parent=[" + parentTrace + "]");
+        runOnMainSync(() -> traces[0] = "selector=[" + selectorTrace + "] ancestors=[" + ancestorTrace + "]");
         return traces[0] + " start=(" + bounds.centerX() + "," + startY + ")"
-                + " end=(" + bounds.centerX() + "," + endY + ")";
+                + " end=(" + bounds.centerX() + "," + endY + ")"
+                + " parentScrollYBefore=" + parentScrollY[0]
+                + " parentScrollYAfter=" + parentScrollY[1];
     }
 
     private android.graphics.Rect stableVisibleBounds(android.view.View view) throws Exception {

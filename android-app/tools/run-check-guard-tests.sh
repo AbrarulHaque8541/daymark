@@ -9,7 +9,6 @@ SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
 RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
 FOCUS_PANEL="$ROOT/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
 PLATFORM_TEST="$ROOT/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
-FOCUS_PANEL="$ROOT/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
 REPEAT_HELPER="$ROOT/tools/platform-instrumentation-repeat.sh"
 TOUCH_SEQUENCE="$ROOT/app/src/androidTest/java/com/abrar/daymark/PlatformTouchSequence.java"
 BACKUP=$(mktemp)

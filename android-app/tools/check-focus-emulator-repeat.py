@@ -16,10 +16,10 @@ selector_start = focus_panel.index("private final class ModeSelector")
 selector_end = focus_panel.index("private void chooseDisplayUnit", selector_start)
 selector = focus_panel[selector_start:selector_end]
 
+down_branch = selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split("case MotionEvent.ACTION_MOVE:", 1)[0]
 assert "disallowParentIntercept(true);" in selector
 assert "disallowParentIntercept(false);" in down_branch, "parent ScrollView must remain eligible from ACTION_DOWN"
 assert "disallowParentIntercept(false);" in selector
-down_branch = selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split("case MotionEvent.ACTION_MOVE:", 1)[0]
 assert "disallowParentIntercept(true);" not in down_branch, "vertical Tasks scrolling must remain available until direction is known"
 assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in selector
 assert "requestDisallowInterceptTouchEvent(true)" not in selector
@@ -27,6 +27,9 @@ assert "requestDisallowInterceptTouchEvent(false)" not in selector
 vertical_branch = selector.split("if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)", 1)[1].split("if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1)[0]
 assert "disallowParentIntercept(false);" in vertical_branch
 assert "return false;" in vertical_branch, "vertical drags must be handed back to the parent ScrollView"
+assert "verticalScrollTrace=" in platform_test, "failed vertical scroll assertions must emit the captured dispatch trace"
+assert "ancestorTrace" in platform_test, "vertical diagnostics must trace the parent and intermediate ViewGroups"
+assert "pointerId=" in platform_test and "toolType=" in platform_test, "touch diagnostics must record pointer identity and tool type"
 
 canonical = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
 assert "timeout-minutes: 90" in workflow
