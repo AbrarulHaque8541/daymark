@@ -8,7 +8,7 @@
 - Main exact-head checks: Android build PASS; Ubuntu and Windows shared contracts PASS. Main branch reports `protected: false`; no repository rulesets were returned.
 - Open inventory: **10 PRs / 18 issues**.
 - Recent mainline integration: #681 merged at `1532838c78ab350b18f95e96a2c547ba384f0831`.
-- Source Gradle identity/version: `com.abrar.daymark`, versionName `1.6`, versionCode `13`, minSdk 26, targetSdk 36. The run-level directive says `com.cue.daymark`; this conflicts with root AGENTS and live Gradle. No identity change was made.
+- Source Gradle identity/version: `com.abrar.daymark`, versionName `1.6`, versionCode `13`, minSdk 26, targetSdk 36. A run-level package-identity directive conflicts with root AGENTS and live Gradle. No identity change was made.
 - Latest published release observed: v1.5; v1.4 remains draft. No release/tag/version/signing change was made.
 - Physical Android/WebView acceptance: **NOT TESTED**.
 
