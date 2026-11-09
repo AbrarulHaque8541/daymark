@@ -50,6 +50,7 @@
     const statusEl = element('webhook-status');
 
     let config = null;
+    let endpointFingerprintPromise = null;
     let queue = [];
     let busy = false;
     let queueReadFailed = storageAccessFailed;
@@ -79,6 +80,18 @@
 
     function isOnline() {
       return !navigator || typeof navigator.onLine !== 'boolean' || navigator.onLine;
+    }
+
+    function currentEndpointFingerprint() {
+      if (!config || !webhookApi) return Promise.reject(new Error('Webhook endpoint is not configured.'));
+      if (!endpointFingerprintPromise) {
+        endpointFingerprintPromise = webhookApi.fingerprintWebhookUrl(
+          config.url,
+          env.crypto || (win && win.crypto) || root.crypto,
+          env.TextEncoder || (win && win.TextEncoder) || root.TextEncoder
+        );
+      }
+      return endpointFingerprintPromise;
     }
 
     function queueCoordinatorAvailable() {
@@ -199,6 +212,66 @@
       }
     }
 
+    async function assignLegacyQueueToEndpoint(endpointFingerprint) {
+      const snapshot = await withQueueLock(() => {
+        const state = readQueue();
+        if (!state.ok) {
+          queueReadFailed = true;
+          return { ok: false };
+        }
+        queueReadFailed = false;
+        queue = state.value;
+        return { ok: true, queue: state.value.slice() };
+      });
+      if (!snapshot.ok || !snapshot.value || !snapshot.value.ok) return { ok: false };
+      const unassignedCount = snapshot.value.queue.filter((event) => !event.endpointFingerprint).length;
+      if (!unassignedCount) return { ok: true, assigned: 0 };
+
+      const confirmFn = typeof env.confirm === 'function'
+        ? env.confirm
+        : (win && typeof win.confirm === 'function' ? win.confirm.bind(win) : null);
+      if (!confirmFn) return { ok: true, assigned: 0, cancelled: true, count: unassignedCount };
+      let confirmed = false;
+      try {
+        confirmed = confirmFn(
+          'Assign ' + unassignedCount + ' older queued webhook event(s) to the HTTPS endpoint entered in this tab? '
+          + 'These events will be sent to that destination. Daymark stores only a SHA-256 destination fingerprint, not the endpoint URL.'
+        ) === true;
+      } catch (error) {
+        confirmed = false;
+      }
+      if (!confirmed) return { ok: true, assigned: 0, cancelled: true, count: unassignedCount };
+
+      const updated = await withQueueLock(() => {
+        const state = readQueue();
+        if (!state.ok) {
+          queueReadFailed = true;
+          return { ok: false };
+        }
+        queueReadFailed = false;
+        const current = state.value;
+        const next = current.map((event) => event.endpointFingerprint
+          ? event
+          : Object.assign({}, event, { endpointFingerprint }));
+        const assigned = next.filter((event, index) =>
+          !current[index].endpointFingerprint && event.endpointFingerprint === endpointFingerprint).length;
+        if (!assigned) {
+          queue = current;
+          return { ok: true, assigned: 0, queue: current.slice() };
+        }
+        if (!persistQueue(next)) {
+          queue = current;
+          queueWriteFailed = true;
+          return { ok: false };
+        }
+        queue = next;
+        queueWriteFailed = memoryOnlyEvents.length > 0;
+        return { ok: true, assigned, queue: next.slice() };
+      });
+      if (!updated.ok || !updated.value || !updated.value.ok) return { ok: false };
+      return { ok: true, assigned: updated.value.assigned, queue: updated.value.queue };
+    }
+
     function storageWarning() {
       const problems = [];
       if (legacyConfigCleanupFailed) {
@@ -262,6 +335,25 @@
 
       setBusy(true);
       try {
+        let endpointFingerprint;
+        try {
+          endpointFingerprint = await currentEndpointFingerprint();
+        } catch (error) {
+          status('Webhook delivery is paused because this browser cannot safely isolate endpoint destinations. No event was sent.' + storageWarning());
+          renderQueue();
+          return;
+        }
+        const legacyAssignment = await assignLegacyQueueToEndpoint(endpointFingerprint);
+        if (!legacyAssignment.ok) {
+          status('Webhook delivery is paused because older queued events could not be safely assigned or preserved.' + storageWarning());
+          renderQueue();
+          return;
+        }
+        if (legacyAssignment.cancelled) {
+          status(legacyAssignment.count + ' older queued event(s) have no destination binding and were preserved. Confirm assignment to this endpoint or clear the queue.' + storageWarning());
+          renderQueue();
+          return;
+        }
         const delivery = await withDeliveryLock(async () => {
           let deliveredCount = 0;
           let droppedCount = 0;
@@ -374,8 +466,20 @@
               break;
             }
 
-            const event = queue[0];
-            const result = await webhookApi.flushQueue([event], config.url, fetchImpl);
+            const event = queue.find((item) => item.endpointFingerprint === endpointFingerprint);
+            if (!event) {
+              const otherEndpointCount = queue.filter((item) =>
+                item.endpointFingerprint && item.endpointFingerprint !== endpointFingerprint).length;
+              if (otherEndpointCount) {
+                status(otherEndpointCount + ' queued event(s) belong to a different endpoint. Re-enter that endpoint in this tab to deliver them.' + storageWarning());
+              }
+              break;
+            }
+            const result = await webhookApi.flushQueue([event], config.url, fetchImpl, {
+              endpointFingerprint,
+              crypto: env.crypto || (win && win.crypto) || root.crypto,
+              TextEncoder: env.TextEncoder || (win && win.TextEncoder) || root.TextEncoder
+            });
             deliveredCount += result.deliveredCount;
             droppedCount += result.droppedCount;
             if (result.failure) lastFailure = result.failure;
@@ -514,7 +618,7 @@
           return { cleared: false, reason };
         }
 
-        status("Saved webhook events and this tab's pending events were cleared. Unsaved events in other tabs remain there." + storageWarning());
+        status("All saved webhook events on this device and this tab's pending events were cleared. Unsaved events in other tabs remain there." + storageWarning());
         renderQueue();
         return { cleared: true };
       } finally {
@@ -528,6 +632,7 @@
       if (!raw) {
         if (config) {
           config = null;
+          endpointFingerprintPromise = null;
           status('Webhook disabled for this tab. Queued events remain on this device.' + storageWarning());
           return { saved: false, cleared: true, sessionOnly: true };
         }
@@ -548,7 +653,8 @@
       // The endpoint intentionally exists only in this page's memory. The
       // durable queue contains event payloads, never the destination URL.
       config = { version: 1, url: raw };
-      status('Webhook enabled for this tab only. Re-enter the endpoint after reload.' + storageWarning());
+      endpointFingerprintPromise = null;
+      status('Webhook enabled for this tab only. Re-enter the endpoint after reload. Queued events are isolated by a SHA-256 destination fingerprint; events for other endpoints stay queued until that endpoint is re-entered.' + storageWarning());
       if (queue.length || memoryOnlyEvents.length || queueWriteFailed) void attemptFlush();
       return { saved: true, cleared: false, sessionOnly: true };
     }
@@ -600,16 +706,23 @@
         return { queued: false, reason: 'coordination-unavailable' };
       }
 
-      let event;
+      let payload;
       try {
-        const payload = webhookApi.buildTaskCompletedPayload(task, now());
-        event = webhookApi.makeQueueEvent(payload, now());
+        payload = webhookApi.buildTaskCompletedPayload(task, now());
       } catch (error) {
         status('Could not prepare the webhook event.');
         return { queued: false, reason: 'invalid' };
       }
 
-      return withQueueLock(() => {
+      return currentEndpointFingerprint().then((endpointFingerprint) => {
+        let event;
+        try {
+          event = webhookApi.makeQueueEvent(payload, now(), endpointFingerprint);
+        } catch (error) {
+          status('Could not prepare an endpoint-isolated webhook event.');
+          return { queued: false, reason: 'fingerprint-unavailable' };
+        }
+        return withQueueLock(() => {
         coordinationFailed = false;
         const state = readQueue();
         if (!state.ok) {
@@ -698,6 +811,10 @@
           else await attemptFlush();
         }
         return result;
+        });
+      }, () => {
+        status('Task completion was not queued because this browser could not safely isolate webhook destinations. No event was sent.' + storageWarning());
+        return { queued: false, reason: 'fingerprint-unavailable' };
       });
     }
 
