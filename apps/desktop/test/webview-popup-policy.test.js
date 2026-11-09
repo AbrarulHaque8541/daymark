@@ -116,3 +116,38 @@ test('each new browser window installs security before loading its local UI', ()
   assert.match(source, /isAllowedRequest\(details, appUiFiles, appUiEntry\)/);
   assert.match(source, /pathToFileURL\(/);
 });
+
+
+test('credential-bearing initial, navigation, redirect and popup URLs are rejected', () => {
+  const host = new EventEmitter();
+  const requested = [];
+  const guest = new EventEmitter();
+  guest.setWindowOpenHandler = function(handler) { this.handler = handler; };
+  installWebviewPopupPolicy(host, (url) => requested.push(url), isAllowedUrl);
+
+  let attachPrevented = false;
+  host.emit('will-attach-webview', { preventDefault() { attachPrevented = true; } }, {}, {
+    src: 'https://alice:secret@example.com/path',
+  });
+  assert.equal(attachPrevented, true, 'credential-bearing initial guest URL is rejected');
+
+  host.emit('did-attach-webview', {}, guest);
+  const credentialUrls = [
+    'https://alice:secret@example.com/path',
+    'https://alice@example.com/path',
+    'https://:secret@example.com/path',
+    'https://alice%3Asecret@example.com/path',
+  ];
+  for (const url of credentialUrls) {
+    let navigationPrevented = false;
+    guest.emit('will-navigate', { preventDefault() { navigationPrevented = true; } }, url);
+    assert.equal(navigationPrevented, true, 'will-navigate rejects ' + url);
+
+    let redirectPrevented = false;
+    guest.emit('will-redirect', { preventDefault() { redirectPrevented = true; } }, url);
+    assert.equal(redirectPrevented, true, 'will-redirect rejects ' + url);
+
+    assert.deepEqual(guest.handler({ url }), { action: 'deny' }, 'popup rejects ' + url);
+  }
+  assert.deepEqual(requested, [], 'credential-bearing URLs never reach tab routing');
+});

@@ -29,7 +29,7 @@ Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS 
 
 - Host renderer: sandbox, contextIsolation aur webSecurity enabled; nodeIntegration disabled.
 - Guest webviews: preload aur custom session/partition overrides remove hote hain; Node integration, plugins aur nested webview disabled; sandbox/security preferences force hoti hain.
-- Initial URL, in-page navigation, redirects aur popup targets HTTPS/localhost policy se validate hote hain.
+- Initial URL, in-page navigation, redirects aur popup targets HTTPS/localhost policy se validate hote hain; credential-bearing URLs are rejected before address/navigation/request admission.
 - file: access exact packaged renderer files tak limited hai. data:/blob: sirf subresources ke liye, aur about:blank/about:srcdoc sirf child frames ke liye allowed hain. Top-level file:, data:, chrome:, devtools:, javascript: aur unknown schemes blocked hain.
 - HTTPS/WSS allowed; remote HTTP/WS blocked; localhost HTTP/WS development exception hai.
 - Tracker list starter list hai, comprehensive network-level ad/tracker blocker nahi.
