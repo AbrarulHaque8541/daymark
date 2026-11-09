@@ -5,11 +5,11 @@ public final class PlatformShellInputCommandSmoke {
     private static int assertions;
 
     public static void main(String[] args) {
-        equal("input tap 12 34", PlatformShellInputCommand.tap(12, 34), "tap command");
-        equal("input swipe 1 2 300 400 360",
+        equal("/system/bin/input tap 12 34 2>&1", PlatformShellInputCommand.tap(12, 34), "tap command");
+        equal("/system/bin/input swipe 1 2 300 400 360 2>&1",
                 PlatformShellInputCommand.swipe(1, 2, 300, 400, 360), "swipe command");
-        equal("input tap 0 0", PlatformShellInputCommand.tap(0, 0), "minimum coordinates");
-        equal("input tap 10000 10000", PlatformShellInputCommand.tap(10000, 10000), "maximum coordinates");
+        equal("/system/bin/input tap 0 0 2>&1", PlatformShellInputCommand.tap(0, 0), "minimum coordinates");
+        equal("/system/bin/input tap 10000 10000 2>&1", PlatformShellInputCommand.tap(10000, 10000), "maximum coordinates");
         rejects(() -> PlatformShellInputCommand.tap(-1, 0), "negative tap coordinate");
         rejects(() -> PlatformShellInputCommand.tap(10001, 0), "oversized tap coordinate");
         rejects(() -> PlatformShellInputCommand.swipe(0, 0, 1, 1, 0), "zero swipe duration");
