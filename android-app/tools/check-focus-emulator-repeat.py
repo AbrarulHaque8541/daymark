@@ -8,6 +8,16 @@ runner = (root / "tools/run-platform-instrumentation-on-emulator.sh").read_text(
 helper = (root / "tools/platform-instrumentation-repeat.sh").read_text(encoding="utf-8")
 test_runner = (root / "tools/run-platform-instrumentation-repeat-tests.sh").read_text(encoding="utf-8")
 platform_test = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java").read_text(encoding="utf-8")
+focus_panel = (root / "app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java").read_text(encoding="utf-8")
+selector_start = focus_panel.index("private final class ModeSelector")
+selector_end = focus_panel.index("private void chooseDisplayUnit", selector_start)
+selector = focus_panel[selector_start:selector_end]
+assert "disallowParentIntercept(true);" in selector
+assert "disallowParentIntercept(false);" in selector
+assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in selector
+assert "requestDisallowInterceptTouchEvent(true)" not in selector
+assert "requestDisallowInterceptTouchEvent(false)" not in selector
+
 canonical = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
 
 assert "timeout-minutes: 90" in workflow
