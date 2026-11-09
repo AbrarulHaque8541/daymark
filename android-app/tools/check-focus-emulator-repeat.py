@@ -14,6 +14,14 @@ selector_end = focus_panel.index("private void chooseDisplayUnit", selector_star
 selector = focus_panel[selector_start:selector_end]
 assert "disallowParentIntercept(true);" in selector
 assert "disallowParentIntercept(false);" in selector
+down_branch = selector.split(
+    "case MotionEvent.ACTION_DOWN:", 1
+)[1].split(
+    "case MotionEvent.ACTION_MOVE:", 1
+)[0]
+assert "disallowParentIntercept(true);" not in down_branch, (
+    "the vertical Tasks ScrollView must not be locked out before gesture direction is known"
+)
 assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in selector
 assert "requestDisallowInterceptTouchEvent(true)" not in selector
 assert "requestDisallowInterceptTouchEvent(false)" not in selector
