@@ -31,6 +31,24 @@
     const formEl = element('browser-data-form');
     const clearEl = element('browser-data-clear');
 
+    const explainClearEl = element('explain-clear-completed');
+    if (explainClearEl && actionEl && formEl) {
+      explainClearEl.addEventListener('click', () => {
+        actionEl.value = 'clear-completed';
+        if (typeof formEl.requestSubmit === 'function') {
+          formEl.requestSubmit();
+        } else {
+          formEl.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }
+        const card = element('browser-data-card');
+        if (card && typeof card.scrollIntoView === 'function') {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (typeof actionEl.focus === 'function') actionEl.focus();
+        status('Showing what Clear completed does.');
+      });
+    }
+
     function status(message) {
       if (statusEl) statusEl.textContent = message;
     }
@@ -57,76 +75,61 @@
       head.appendChild(summary);
       resultEl.appendChild(head);
       const lines = [];
-      for (let i = 0; i < result.removes.length; i += 1) {
-        lines.push('Removes \u00b7 ' + result.removes[i]);
-      }
-      for (let i = 0; i < result.keeps.length; i += 1) {
-        lines.push('Keeps \u00b7 ' + result.keeps[i]);
-      }
-      lines.push((result.recoverable ? 'Comes back \u00b7 ' : 'No undo \u00b7 ') + result.recovery);
-      lines.push('Scope \u00b7 ' + result.scope);
-      lines.push('Network \u00b7 ' + result.network);
-      for (let i = 0; i < lines.length; i += 1) {
-        resultEl.appendChild(makeItem('feed-item', lines[i]));
-      }
+      for (const removed of result.removes || []) lines.push(makeItem('feed-item', 'Removes · ' + removed));
+      for (const kept of result.keeps || []) lines.push(makeItem('feed-item', 'Keeps · ' + kept));
+      lines.push(makeItem('feed-item', (result.recoverable ? 'Can come back · ' : 'No undo · ') + (result.recovery || '')));
+      lines.push(makeItem('feed-item', 'Scope · ' + (result.scope || '')));
+      lines.push(makeItem('feed-item', 'Network · ' + (result.network || '')));
+      for (const line of lines) resultEl.appendChild(line);
     }
 
     function explain() {
       if (!dataApi || typeof dataApi.explainClearAction !== 'function') {
-        status('Clear-action explanations are unavailable.');
+        status('Clear-action catalog is unavailable.');
         return;
       }
-      const action = actionEl && typeof actionEl.value === 'string' ? actionEl.value : '';
-      // The engine fails closed to the honest unknown entry for any value
-      // the prototype does not know.
-      const result = dataApi.explainClearAction(action);
-      status('Explained \u00b7 ' + result.label
-        + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
+      const id = actionEl ? actionEl.value : '';
+      const result = dataApi.explainClearAction(id);
       renderExplanation(result);
+      const deletes = result.deletesData ? 'deletes data' : 'does not delete data';
+      status('Explained · ' + result.title + ' · ' + deletes);
     }
 
-    function onClear() {
-      if (resultEl) {
-        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
-      }
-      status('Cleared. Pick an action to see exactly what it touches.');
-    }
-
-    if (formEl && typeof formEl.addEventListener === 'function') {
+    if (formEl) {
       formEl.addEventListener('submit', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
         explain();
       });
     }
-    if (actionEl && typeof actionEl.addEventListener === 'function') {
-      actionEl.addEventListener('change', () => { explain(); });
+    if (clearEl) {
+      clearEl.addEventListener('click', () => {
+        if (resultEl) while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+        status('');
+      });
     }
-    if (clearEl && typeof clearEl.addEventListener === 'function') {
-      clearEl.addEventListener('click', () => { onClear(); });
+    if (actionEl) {
+      actionEl.addEventListener('change', explain);
     }
-
+    // Boot with the current selection.
     explain();
 
-    return {
-      explain,
-      onClear,
-      detach() {
-        // No document-level listener is registered; the returned handle
-        // simply stops being used once it goes out of scope.
-        status('');
-      }
-    };
+    return { explain };
+  }
+
+  function boot() {
+    if (typeof document === 'undefined') return;
+    attachBrowserDataUi({ document });
+  }
+
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot);
+    } else {
+      boot();
+    }
   }
 
   const api = { attachBrowserDataUi };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.DaymarkBrowserDataUi = api;
-
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    // This UI is stateless. Do not touch window.localStorage during boot:
-    // storage may be disabled or its getter may throw before the card can render.
-    const boot = () => attachBrowserDataUi({ document });
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
-  }
+  else root.DaymarkBrowserDataUi = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
