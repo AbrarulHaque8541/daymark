@@ -1,3 +1,28 @@
+## Current execution queue — 2026-11-09T20:35:56.690Z (main 1532838c; exact-head follow-up for #675/#686/#659)
+
+Full inventory and evidence: [CURRENT_STATUS_20261109T203556Z.md](docs/CURRENT_STATUS_20261109T203556Z.md).
+
+1. **P0 #683:** cross-tab task mutation contract across normal saves, import, recovery, clear and undo; coordinate #675/#656.
+2. **P0 #613/#677/#648:** integrate Focus/IME correction and rerun strict API 29/36 reminder lifecycle.
+3. **P0 #646/#160:** owner-side branch protection/independent review and physical Android/WebView acceptance.
+4. **P1 #675/#640/#636/#639:** independent recovery/webhook review and manual exact-byte recovery acceptance.
+5. **P1 #687/#659:** accessible malformed-extension recovery/export/removal UI, coordinated with MainActivity ownership.
+6. **P1 #685/#686:** finish multi-origin/Activity/renderer Service Worker acceptance and resolve global-block compatibility.
+7. **P1 #671/#678:** complete secure app-owned download transport; keep actual downloads fail-closed.
+8. **P1 #684/#476:** align Android/web recurrence semantics and validate alarms, Doze, reboot, timezone and OEM delivery.
+9. **P1 #665/#84:** independent signing/provenance and Actions runtime review.
+10. **P1 #656/#676/#682:** independent import/export, extension and browser-data review.
+11. **P2 #325/#348:** measured cross-platform, browser UX, accessibility and performance work.
+
+No release/tag/version/signer/application identity change, destructive migration, force push or protection bypass is authorized.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T20:35:56.690Z
+
+---
+
 ## Current execution queue — 2026-11-09T20:35:23.409Z (main 1532838c; #686 multi-origin runtime coverage; #659 host-smoke compile fix)
 
 Full exact-head inventory and delivery ledger: [CURRENT_STATUS_20261109T203523Z.md](docs/CURRENT_STATUS_20261109T203523Z.md).
