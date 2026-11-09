@@ -215,10 +215,14 @@
     return { id, title, dueDate, dueTime, priority, completed, createdAt, updatedAt, notes, repeat, tags, subtasks };
   }
 
-  function parseSubtasksJson(value) {
+  function parseSubtasksJson(value, ctx) {
+    // CSV subtasks are nested JSON inside a CSV cell. Require the shared
+    // duplicate-key guard before JSON.parse can silently keep the last member.
+    if (!ctx || typeof ctx.hasDuplicateJsonKeys !== 'function'
+        || ctx.hasDuplicateJsonKeys(value)) return null;
     let parsed;
     try { parsed = JSON.parse(value); } catch (error) { return null; }
-    return parsed;
+    return Array.isArray(parsed) ? parsed : null;
   }
 
   function fromCsv(text, ctx) {
@@ -233,10 +237,12 @@
     for (let i = 1; i < rows.length; i += 1) {
       const row = rows[i];
       if (row.length !== width) { skippedRows += 1; continue; }
+      const subtasks = row[9] ? parseSubtasksJson(row[9], ctx) : [];
+      if (!Array.isArray(subtasks)) { skippedRows += 1; continue; }
       const task = buildTask({
         id: row[0], title: row[1], dueDate: row[2], dueTime: row[3], priority: row[4],
         completed: row[5], repeat: row[6], tags: row[7] ? row[7].split(' ') : [], notes: row[8],
-        subtasks: row[9] ? parseSubtasksJson(row[9]) : [], createdAt: row[10], updatedAt: row[11]
+        subtasks, createdAt: row[10], updatedAt: row[11]
       }, ctx);
       if (task === null) { skippedRows += 1; continue; }
       tasks.push(task);
