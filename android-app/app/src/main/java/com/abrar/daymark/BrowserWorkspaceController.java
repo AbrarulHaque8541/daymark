@@ -16,6 +16,10 @@ final class BrowserWorkspaceController {
         if (policy == null || target == null || !policy.allowsRemoteLoads()) {
             throw new IllegalStateException("Explicit Online consent is required before navigation.");
         }
+        if (!DaymarkWebView.isServiceWorkerNetworkPolicyReady()) {
+            throw new SecurityException(
+                    "Daymark could not enforce its service-worker network policy; navigation remains blocked.");
+        }
         target.getSettings().setBlockNetworkLoads(false);
     }
 
@@ -26,7 +30,8 @@ final class BrowserWorkspaceController {
      * every load with no WebView callback (#221).
      */
     static void prepareTabsForExplicitNavigation(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
-        if (policy == null || !policy.allowsRemoteLoads() || tabs == null) return;
+        if (policy == null || !policy.allowsRemoteLoads() || tabs == null
+                || !DaymarkWebView.isServiceWorkerNetworkPolicyReady()) return;
         for (DaymarkWebView tab : tabs) {
             if (tab == null) continue;
             try {

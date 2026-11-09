@@ -208,3 +208,28 @@ Work by: Cue
 Model: not disclosed by runtime
 Tooling: Git, GitHub CLI, official Android/llama.cpp sources
 Timestamp (UTC): 2026-10-26T03:57:57Z
+
+
+## Service Worker network boundary
+
+Daymark installs its process-wide Android ServiceWorkerController policy during
+DaymarkWebView class initialization, before the first WebView instance is created.
+The controller's ServiceWorkerWebSettings.setBlockNetworkLoads(true) setting and
+a ServiceWorkerClient fail-closed response block remote Service Worker requests.
+This is intentionally stricter than the page-level Online/Offline switch: **Service
+Worker network requests remain blocked even while ordinary page navigation is Online**.
+Explicitly opening a site does not grant a Service Worker network access, and switching
+Offline reasserts the global block. Local data:, blob: and about: responses may
+still be handled locally; cached Service Worker responses may continue to work.
+
+Compatibility trade-off: sites that rely on Service Worker network fetches, script
+updates, push-related fetches, or background synchronization may be degraded. This is
+a temporary fail-closed boundary until a separately reviewed origin-scoped grant model
+and real-device request-trace acceptance exist. It is **not** a claim that all
+platform-managed WebView/Safe Browsing egress is blocked.
+
+Official platform references:
+- https://developer.android.com/reference/android/webkit/ServiceWorkerController
+- https://developer.android.com/reference/android/webkit/ServiceWorkerWebSettings
+- https://developer.android.com/reference/android/webkit/ServiceWorkerClient
+
