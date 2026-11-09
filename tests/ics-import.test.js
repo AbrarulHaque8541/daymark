@@ -333,10 +333,10 @@ test('escaped RFC TEXT semicolons remain inside one CATEGORIES value', () => {
     'BEGIN:VTODO',
     'UID:escaped-semicolon@example.com',
     'SUMMARY:Escaped semicolon',
-    'CATEGORIES:work\\\\;urgent,finance',
+    'CATEGORIES:work\\;urgent,finance',
     'END:VTODO',
     'END:VCALENDAR'
-  ].join('\\n');
+  ].join('\n');
   const result = importer.fromIcs(ics, freshCtx());
   assert.equal(result.tasks.length, 1);
   assert.deepEqual(result.tasks[0].tags, ['finance'],
@@ -359,7 +359,7 @@ test('import UI discloses invalid completion metadata without marking the task d
     'COMPLETED:garbage',
     'END:VTODO',
     'END:VCALENDAR'
-  ].join('\\n');
+  ].join('\n');
   const element = {
     id: 'import-file', value: '', files: [{ name: 'invalid-completion.ics', size: ics.length, text: async () => ics }],
     textContent: ''
@@ -396,7 +396,7 @@ test('import UI discloses invalid completion metadata without marking the task d
   assert.equal(saved[0].completed, false);
   const status = created.find((el) => el.id === 'import-status');
   assert.ok(status);
-  assert.match(status.textContent, /1 item had invalid completion metadata ignored; left open\\./);
+  assert.match(status.textContent, /1 item had invalid completion metadata ignored; left open\./);
 });
 
 test('skipped recurring components do not inflate the recurrence or timezone counts', () => {
