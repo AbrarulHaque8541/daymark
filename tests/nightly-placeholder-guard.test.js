@@ -10,10 +10,9 @@ test('nightly placeholder guard ignores RFC 5545 VTODO identifiers but detects s
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const command = workflow.match(/grep -rniwE "([^"]+)" --include=/);
   assert.ok(command, 'nightly audit must use grep whole-word matching for placeholder markers');
+  assert.equal(command[1], 'TODO|FIXME|lorem ipsum', 'the guard must keep its complete placeholder vocabulary');
 
-  const terms = command[1].split('|').map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const marker = new RegExp('\\\\b(?:' + terms.join('|') + ')\\\\b', 'i');
-
+  const marker = /\b(?:TODO|FIXME|lorem ipsum)\b/i;
   for (const source of ['VTODO', 'BEGIN:VTODO', 'The VTODO component contains a task']) {
     assert.equal(marker.test(source), false, source + ' is an RFC 5545 identifier, not a placeholder');
   }
