@@ -27,7 +27,11 @@ test('every catalog entry is well formed and honest', () => {
     assert.ok(Array.isArray(entry.keeps) && entry.keeps.length > 0, id + ' must keep at least one thing');
     for (const line of entry.keeps) assert.ok(typeof line === 'string' && line.length > 0, id + ' keeps must be non-empty strings');
     assert.equal(typeof entry.recoverable, 'boolean', id + ' recoverable must be a boolean');
+    assert.equal(Number.isSafeInteger(entry.undoWindowSeconds) && entry.undoWindowSeconds >= 0, true,
+      id + ' undoWindowSeconds must be a non-negative integer');
+    assert.equal(typeof entry.available, 'boolean', id + ' available must be a boolean');
     assert.equal(typeof entry.deletesData, 'boolean', id + ' deletesData must be a boolean');
+    assert.equal(typeof entry.exportable, 'boolean', id + ' exportable must be a boolean');
   }
 });
 
@@ -37,6 +41,7 @@ test('an unknown action id fails closed to the honest unknown entry', () => {
   assert.match(result.summary, /no honest description/);
   assert.ok(result.keeps.includes('Everything, out of caution'));
   assert.equal(result.deletesData, false);
+  assert.equal(result.exportable, false);
 });
 
 test('explainClearAction returns defensive copies', () => {
@@ -61,23 +66,48 @@ test('listClearActions exposes honest delete flags', () => {
   const clearCompleted = actions.find((action) => action.id === 'clear-completed');
   assert.ok(clearCompleted, 'clear-completed must be listed');
   assert.equal(clearCompleted.deletesData, true);
+  assert.equal(clearCompleted.available, true);
+  assert.equal(clearCompleted.undoWindowSeconds, 7);
+  assert.equal(clearCompleted.exportable, true);
+  assert.equal(actions.find((action) => action.id === 'webhook-clear-queue').exportable, false);
+  assert.equal(actions.find((action) => action.id === 'storage-clear-status').available, false);
   assert.equal(actions.find((action) => action.id === 'clear-search').deletesData, false);
 });
 
-test('planClearSequence approves export before delete with no warnings', () => {
+test('planClearSequence warns that a preceding Export is not a verified complete backup', () => {
   const plan = engine.planClearSequence(['export-backup', 'clear-completed']);
   assert.equal(plan.ok, true);
   assert.deepEqual(plan.ids, ['export-backup', 'clear-completed']);
   assert.equal(plan.steps.length, 2);
-  assert.equal(plan.warnings.length, 0);
-  assert.equal(plan.note, 'Daymark runs nothing automatically; this plan only explains.');
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /planned Export step is not proof that a complete backup was created/);
+  assert.match(plan.warnings[0], /verify the file is present and contains the intended data/);
+  assert.match(plan.warnings[0], /If recovery is pending, use Export recovery/);
+  assert.match(plan.warnings[0], /Undo lasts only 7 seconds/);
+  assert.match(plan.note, /does not inspect storage\/recovery state or verify an export/);
 });
 
 test('planClearSequence warns when data is deleted with no export first', () => {
   const plan = engine.planClearSequence(['clear-completed']);
   assert.equal(plan.ok, true);
   assert.equal(plan.warnings.length, 1);
-  assert.match(plan.warnings[0], /no Export step before it/);
+  assert.match(plan.warnings[0], /No Export step is planned before this deletion/);
+  assert.match(plan.warnings[0], /Undo lasts only 7 seconds/);
+});
+
+test('planClearSequence does not count an Export step that occurs after deletion', () => {
+  const plan = engine.planClearSequence(['clear-completed', 'export-backup']);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /No Export step is planned before this deletion/);
+});
+
+test('task export cannot be treated as a recovery path for webhook queue deletion', () => {
+  const plan = engine.planClearSequence(['export-backup', 'webhook-clear-queue']);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /not included in task exports or Export recovery/);
+  assert.doesNotMatch(plan.warnings[0], /verify the file is present/);
 });
 
 test('planClearSequence does not demand an export for delete-free actions', () => {
@@ -110,4 +140,76 @@ test('planClearSequence fails closed on an empty list', () => {
   const plan = engine.planClearSequence([]);
   assert.equal(plan.ok, false);
   assert.match(plan.error, /at least one known action/);
+});
+
+
+test('clear-completed explanation matches the real temporary Undo and save behavior', () => {
+  const entry = engine.explainClearAction('clear-completed');
+  assert.equal(entry.recoverable, true);
+  assert.equal(entry.undoWindowSeconds, 7);
+  assert.match(entry.recovery, /Undo is available.*7 seconds/);
+  assert.match(entry.recovery, /After it expires, there is no built-in undo/);
+  assert.ok(entry.removes.some((line) => /fully valid stale task recovery backup may also be cleared/.test(line)));
+  assert.match(entry.summary, /If saving fails, the removal is only for this session/);
+});
+
+test('storage status is not advertised as an available action until its controls are wired', () => {
+  const entry = engine.explainClearAction('storage-clear-status');
+  assert.equal(entry.available, false);
+  assert.match(entry.summary, /controls are not connected/);
+  assert.match(entry.summary, /neither operation currently runs/);
+  assert.equal(engine.planClearSequence(['storage-clear-status']).ok, false);
+});
+
+test('export explanation distinguishes in-memory JSON, saved-store open formats and plaintext privacy', () => {
+  const entry = engine.explainClearAction('export-backup');
+  assert.match(entry.summary, /in-memory task list/);
+  assert.match(entry.summary, /CSV, Markdown and iCalendar exports read the saved task store and validate parsed tasks/);
+  assert.match(entry.recovery, /plaintext export/);
+  assert.match(entry.recovery, /not a raw recovery export or encrypted backup/);
+  assert.match(entry.recovery, /use Export recovery instead/);
+});
+
+const fs = require('node:fs');
+const path = require('node:path');
+const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const exportUiSource = fs.readFileSync(path.join(__dirname, '..', 'export-ui.js'), 'utf8');
+
+function sourceSection(source, start, end) {
+  const first = source.indexOf(start);
+  const last = source.indexOf(end, first + start.length);
+  assert.ok(first >= 0 && last > first, 'source section must exist: ' + start);
+  return source.slice(first, last);
+}
+
+test('clear-action catalog stays aligned with real Undo expiry and backup cleanup', () => {
+  const clearCompleted = sourceSection(appSource, 'function clearCompleted() {', 'function exportTasks() {');
+  const showToast = sourceSection(appSource, 'function showToast(message, action = null) {', 'function readRecoveryExportPayload() {');
+  assert.match(clearCompleted, /label: 'Undo'/);
+  assert.match(showToast, /action \? 7000 : 2600/);
+  const persistStart = appSource.indexOf('function persistTasks()');
+  const backupStart = appSource.indexOf('function clearRecoveryBackup()');
+  assert.ok(persistStart >= 0 && backupStart > persistStart, 'persistence and backup cleanup functions must exist');
+  const persistenceAndBackup = appSource.slice(persistStart, backupStart + 500);
+  assert.match(persistenceAndBackup, /clearRecoveryBackup\(\)/);
+  assert.match(persistenceAndBackup, /localStorage\.removeItem\(BACKUP_KEY\)/);
+});
+
+test('export catalog stays aligned with JSON memory export and saved-store open-format export', () => {
+  const jsonExport = sourceSection(appSource, 'function exportTasks() {', 'function readTaskRecoveryPayloads(raw) {');
+  assert.match(jsonExport, /JSON\.stringify\(state\.tasks/);
+  assert.doesNotMatch(jsonExport, /localStorage\.getItem/);
+  assert.match(exportUiSource, /storage\.getItem\(STORAGE_KEY\)/);
+});
+
+test('export catalog discloses when the current exporter treats empty storage as absent', () => {
+  const entry = engine.explainClearAction('export-backup');
+  const treatsEmptyAsMissing = /const parsed = raw \? JSON\.parse\(raw\) : \[\]/.test(exportUiSource);
+  if (treatsEmptyAsMissing) {
+    assert.match(entry.summary, /present empty-string value is treated like a missing key and can yield an empty export/);
+    assert.match(entry.summary, /successful empty export does not prove storage is healthy/);
+  } else {
+    assert.doesNotMatch(entry.summary, /present empty-string value is treated like a missing key/);
+    assert.match(entry.summary, /read the saved task store and validate parsed tasks/);
+  }
 });
