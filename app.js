@@ -78,7 +78,7 @@
         // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
         offerRecoveryExport('Saved on this device; ignored originals remain in a recovery backup');
-      } else if (hasRecoveryBackupNeedingPreservation()) {
+      } else if (hasRecoveryBackupNeedingPreservation(saved)) {
         // Opaque originals are retained only once grouped into an explicit recovery bundle.
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
@@ -116,50 +116,53 @@
     }
   }
 
+  function isKnownRecoveryBundle(parsed, raw) {
+    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1'
+        || !Array.isArray(parsed.payloads)
+        || !parsed.payloads.every((payload) => typeof payload === 'string')) return false;
+    const keys = Object.keys(parsed).sort();
+    return keys.length === 2 && keys[0] === 'format' && keys[1] === 'payloads'
+      && JSON.stringify(parsed) === raw;
+  }
+
   function recoveryBackupPayloads(raw) {
-    if (typeof raw !== 'string' || !raw) return [];
+    if (typeof raw !== 'string') return [];
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return isPartialRecoveryPayload(raw) ? [raw] : [];
-      }
-      if (parsed && parsed.format === 'daymark-recovery-bundle-v1'
-          && Array.isArray(parsed.payloads)) {
-        return parsed.payloads.filter((payload) => typeof payload === 'string');
-      }
+      if (Array.isArray(parsed)) return [raw];
+      if (isKnownRecoveryBundle(parsed, raw)) return parsed.payloads;
     } catch (error) {
-      // An opaque/malformed backup may itself be the only surviving copy of
-      // older data. Preserve its exact bytes when a new damaged payload arrives.
+      // Opaque bytes, including an empty string, may be the only surviving copy.
     }
     return [raw];
   }
 
-  function isHealthyTaskPayload(raw) {
-    if (typeof raw !== 'string' || !raw) return false;
+  function recoveryBackupIsRedundant(raw, primaryRaw) {
+    if (typeof raw !== 'string') return true;
+    if (typeof primaryRaw !== 'string' || primaryRaw.length === 0) return false;
+    let parsed;
     try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && logic.validateStoredTasks(parsed).rejectedCount === 0;
+      parsed = JSON.parse(raw);
     } catch (error) {
+      // Malformed/opaque bytes are not evidence that a backup is stale.
       return false;
     }
+    if (Array.isArray(parsed)) return raw === primaryRaw;
+    if (isKnownRecoveryBundle(parsed, raw)) {
+      return parsed.payloads.every((payload) => payload === primaryRaw);
+    }
+    // Unknown JSON shapes or metadata are opaque recovery data.
+    return false;
   }
 
   function backUpRawPayload(raw) {
     try {
       const existing = localStorage.getItem(BACKUP_KEY);
       const existingPayloads = recoveryBackupPayloads(existing);
-      const existingParsed = (() => {
-        try { return JSON.parse(existing); } catch (error) { return null; }
-      })();
-      const existingIsBundle = Boolean(existingParsed
-        && existingParsed.format === 'daymark-recovery-bundle-v1'
-        && Array.isArray(existingParsed.payloads));
       const preserveExisting = existingPayloads.length > 0
-        && (existingIsBundle || !isHealthyTaskPayload(existing));
+        && existing !== raw
+        && !recoveryBackupIsRedundant(existing, raw);
       if (preserveExisting) {
-        // A recovery bundle, partial payload, or opaque prior backup may hold
-        // unique user data. Merge it with the newly rejected original rather
-        // than replacing it. Healthy task-array backups remain stale.
         const payloads = Array.from(new Set([...existingPayloads, raw]));
         localStorage.setItem(BACKUP_KEY, JSON.stringify({
           format: 'daymark-recovery-bundle-v1',
@@ -184,26 +187,15 @@
     }
   }
 
-  function hasRecoveryBackupNeedingPreservation() {
+  function hasRecoveryBackupNeedingPreservation(primaryRaw) {
     let raw;
     try {
       raw = localStorage.getItem(BACKUP_KEY);
     } catch (error) {
       return true;
     }
-    if (typeof raw !== 'string' || raw.length === 0) return false;
-    if (recoveryBackupPayloads(raw).some(isPartialRecoveryPayload)) return true;
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (error) {
-      // Raw malformed backup is stale once the primary store is healthy.
-      // Opaque sources are retained only after being grouped in a recovery bundle.
-      return false;
-    }
-    if (!parsed || parsed.format !== 'daymark-recovery-bundle-v1' || !Array.isArray(parsed.payloads)) return false;
-    return parsed.payloads.some((payload) => typeof payload !== 'string'
-      || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
+    if (typeof raw !== 'string') return false;
+    return !recoveryBackupIsRedundant(raw, primaryRaw);
   }
 
   function persistTasks() {
@@ -219,10 +211,11 @@
         }
         state.recoveryBackupPendingPayload = null;
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
+      const primaryPayload = JSON.stringify(state.tasks);
+      localStorage.setItem(STORAGE_KEY, primaryPayload);
       if (hasPartialRecoveryBackup()) {
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
-      } else if (hasRecoveryBackupNeedingPreservation()) {
+      } else if (hasRecoveryBackupNeedingPreservation(primaryPayload)) {
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
       } else {
         setStorageStatus('Saved on this device');

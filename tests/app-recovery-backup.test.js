@@ -276,13 +276,37 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'ordinary saves must not drop the rejected task source');
 });
 
-test('a stale malformed backup is still cleared when the primary task store is healthy', () => {
+test('an opaque backup is retained when the primary task store is healthy', () => {
+  const opaque = '{previously unreadable recovery bytes';
   const storedValues = new Map([
     [STORAGE_KEY, JSON.stringify([validTask('valid-1', 'Healthy task')])],
-    [BACKUP_KEY, '{previously unreadable}']
+    [BACKUP_KEY, opaque]
   ]);
+  const app = bootApp(storedValues);
+  assert.equal(storedValues.get(BACKUP_KEY), opaque,
+    'healthy primary data does not prove opaque backup bytes are redundant');
+  assert.match(app.elements.get('#storage-status span').textContent, /recovery backup retained for manual review/);
+});
+
+test('a different valid task backup is retained when the primary task store is healthy', () => {
+  const older = JSON.stringify([validTask('older-task', 'Older recoverable task')]);
+  const primary = JSON.stringify([validTask('current-task', 'Current task')]);
+  const storedValues = new Map([[STORAGE_KEY, primary], [BACKUP_KEY, older]]);
+  const app = bootApp(storedValues);
+  assert.equal(storedValues.get(BACKUP_KEY), older,
+    'a different valid backup may contain tasks absent from the primary payload');
+  app.elements.get('#new-title').value = 'Follow-up edit';
+  app.elements.get('#add-form').dispatch('submit');
+  assert.equal(storedValues.get(BACKUP_KEY), older,
+    'a later save must not erase the distinct older recovery copy');
+});
+
+test('an exact byte-identical valid backup is the only healthy backup cleared automatically', () => {
+  const primary = JSON.stringify([validTask('same-task', 'Same task')]);
+  const storedValues = new Map([[STORAGE_KEY, primary], [BACKUP_KEY, primary]]);
   bootApp(storedValues);
-  assert.equal(storedValues.has(BACKUP_KEY), false);
+  assert.equal(storedValues.has(BACKUP_KEY), false,
+    'the backup is redundant only when its exact bytes match the healthy primary');
 });
 
 
