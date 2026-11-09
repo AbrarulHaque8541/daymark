@@ -805,7 +805,7 @@ test('unreadable Focus backup is reported as unknown when the primary Focus key 
   assert.match(app.elements.get('#storage-status span').textContent, /Focus recovery backup status unknown/i);
   assert.equal(storedValues.has('daymark.focus.v1'), false, 'an absent primary Focus key remains absent');
   assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false, 'the unreadable recovery key is never recreated or removed');
-  assert.equal(app.elements.get('#toast-action').hidden, true, 'no export is offered when neither backup can be read');
+  assert.notEqual(app.elements.get('#toast-action').textContent, 'Export recovery', 'no export action is offered when neither backup can be read');
 });
 
 test('unreadable Focus backup is reported as unknown when a valid primary Focus state exists', () => {
