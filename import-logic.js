@@ -323,9 +323,9 @@
   // RFC 5545 3.1: a line beginning with a space or tab continues the previous
   // logical line; that leading whitespace is removed when unfolding.
 
-  // Splits an RFC 5545 list (CATEGORIES etc.) on unescaped commas or
-  // semicolons, then unescapes each item. Escaped delimiters stay inside
-  // their original value.
+  // CATEGORIES is a comma-separated TEXT list. Semicolons are ordinary
+  // category text, not separators. Split before unescaping so escaped commas
+  // stay inside their original value; cleanTags later rejects unsupported punctuation.
   function icsSplitList(text) {
     if (typeof text !== 'string' || text.length === 0) return [];
     const parts = [];
@@ -337,7 +337,7 @@
         i += 1;
         continue;
       }
-      if (ch === ',' || ch === ';') {
+      if (ch === ',') {
         parts.push(current);
         current = '';
         continue;
