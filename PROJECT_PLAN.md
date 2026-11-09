@@ -1,3 +1,47 @@
+## Current execution queue refresh — 2026-11-09T11:21:40Z (main 1d29085)
+
+Latest whole-project snapshot: [CURRENT_STATUS_20261109T112140Z.md](docs/CURRENT_STATUS_20261109T112140Z.md).
+
+Current baseline:
+- Main: `1d29085b9c4f9ff3489711fd7e18cc88ab368767`.
+- Root AGENTS: `492ed21e2219a8d1b80c7d6e63575525c98a5a91`.
+- 9 open PRs; 11 open issues.
+- Main protection disabled; no rulesets; independent approvals absent on critical open PRs.
+- Main SHA direct workflow lookup returned no post-merge runs for #663; current-main-based PR branches #656/#657/#659/#662/#664/#665/#666 have fresh exact-head green Android/contracts/device-test checks.
+
+### P0 — immediate security and runtime acceptance
+1. #665 signing-secret isolation: current-main PR debug-build job logs expose masked signing-secret environment variables to PR-controlled Gradle execution. #665 removes them from debug steps and gates secrets to tag release only. Exact head `530ba59607f944358f18f8bcd1f2881d9e0e8aaa`, Node 659/659 and Android/contracts/device-test PASS. Independent security review required.
+2. #648/#613 Focus Timer: align instrumentation checkpoints and host runner with `com.abrar.daymark.test`; exact head `d3fcf751ae4fbd3dd42a7dcb4116c562274ad27b`; Android CI in progress, contracts/device-test pending, API 29/36 emulator lifecycle queued. Do not claim pass until logs verify.
+3. #662 webhook: current main contains #655's localStorage endpoint/lock implementation. #662 replaces it with session-only endpoint state and Web Locks. Exact head `4c3252ee5b303184d2e7cac07deb6a3f18d9f865`, Node 684/684 and Android/contracts/device-test PASS; independent review required.
+4. #664 recovery: independent Task/Focus backup reads, UNKNOWN state and byte preservation. Exact head `fc104fd590d3a61deb02efc1808439cbda1c6d41`; Android/contracts/device-test PASS; physical recovery acceptance pending.
+5. #160 physical Android/WebView/OEM acceptance; APK artifacts are not device tests.
+
+### P1 — integration and data integrity
+- #656 import/export + RFC 5545: exact head `60ed05002237f172a9f9931390b024f5d30756ad`, Node 679/679 and Android/contracts/device-test PASS; independent review pending.
+- #659 extension import trust: exact head `3e95f41c5cad12474345875b8078d75249154dc9`; Android/contracts/device acceptance/device-test PASS; independent review pending.
+- #666 storage health: exact head `4ebb8256926ae9a3d3fb7ba774da4cc517add7ec`, Node 671/671 and Android/contracts/device-test PASS; review pending.
+- #657 recurrence terminal-fire persistence: exact head `0bf58040c9186de574c3e760e61f1bf0cedd04ad`; CI and non-publishing acceptance PASS; real Doze/reboot/timezone notification acceptance pending.
+- #637 CSS/status index: 12 ahead / 22 behind, mergeable=false; rebase or replace without losing historical status links.
+- Synchronize only branches with non-conflicting paths; #662 already has a manual merge of #663's index/test markup.
+
+### P0 governance / release blockers
+- Enable main branch protection and independent PR approvals (#646).
+- Resolve application ID policy conflict: source/root AGENTS says `com.abrar.daymark`; user safety instruction says `com.cue.daymark`. No identity change without explicit owner decision.
+- Keep v1.5 as latest published; v1.4 remains draft. No release/tag/version/signing changes authorized.
+- No physical device tests claimed.
+
+### This run's delivery and integration log
+- #656: imported #618's six code-file storage-safety changes into the current-main iCalendar branch; added quota/write-failure regression and updated ICS UI validation fixture. Exact head `60ed05002237f172a9f9931390b024f5d30756ad`; Node 679/679; Android/contracts/device-test PASS; not merged.
+- #662: merged current main #663 task-editor/toast markup and its contract test into the webhook branch; exact head `4c3252ee5b303184d2e7cac07deb6a3f18d9f865`; Node 684/684; Android/contracts/device-test PASS; not merged.
+- #665/#666/#657/#659/#664/#656: merged current main #663 commit into each non-conflicting branch using ordinary merge commits; all now 0 behind current main and fresh exact-head CI green.
+- #648: corrected source-guard mutation markers for the host input bridge, aligned Java checkpoint/phase-log storage with instrumentation test context, runner preflight/poll and fake-adb tests to `com.abrar.daymark.test`. Exact head `d3fcf751ae4fbd3dd42a7dcb4116c562274ad27b`; workflows pending/in progress; not merged.
+- #618 closed without merge after its code was transplanted into #656; stale status snapshots were not copied.
+- #668 opened as a duplicate Focus branch and closed without merge to avoid overlapping instrumentation PRs; #648 remains canonical.
+- #604 merged earlier; a mistaken closure statement was corrected on the PR.
+- #663 merged by concurrent automation at 11:03Z; exact-head CI passed before merge; post-merge main run not returned.
+- Issues updated: #84, #160, #476, #603, #613, #636, #639, #640.
+- No PR merged by this run; no production release, tag, version bump, signing-key change, application ID change or destructive migration.
+
 # Daymark Project Plan
 
 Daymark should remain a fast, simple, privacy-first task app that works offline, while letting interested users reveal more capability through task-specific workspaces. Engineering is technology-agnostic: use any language or tool that demonstrably gives the best result for a component, as defined in the [technology-agnostic engineering policy](docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md). Language examples are not a whitelist or requirement. The ordinary task flow must not require users to learn about AI, models, plugins, terminals, or Android internals. Advanced tools should be optional, visible, modular where the distribution channel permits, and bounded by user-approved scopes.
