@@ -489,7 +489,7 @@ test('import UI discloses invalid completion and date metadata without corruptin
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
     importApi: importer,
-    logic: { validateStoredTasks: () => ({ tasks: [] }), isValidTask: () => true },
+    logic: { validateStoredTasks: () => ({ tasks: [], rejectedCount: 0 }), isValidTask: () => true },
     now: () => NOW
   });
   await handle.onChange({
