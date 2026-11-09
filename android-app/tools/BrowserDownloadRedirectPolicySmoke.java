@@ -51,22 +51,25 @@ public final class BrowserDownloadRedirectPolicySmoke {
                 "https://cdn.example.net/file.bin", resolver);
         check(crossOrigin.url.equals("https://cdn.example.net/file.bin"),
                 "cross-origin HTTPS redirect is allowed when the destination is public");
-        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies(relative.url, crossOrigin.url),
+        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies(relative, crossOrigin),
                 "cookies are not forwarded across origins");
-        check(BrowserDownloadRedirectPolicy.shouldForwardCookies("https://EXAMPLE.com:443/a",
-                        "https://example.com/b"),
+        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies(null, crossOrigin),
+                "cookies are not forwarded without validated source and target hops");
+        check(BrowserDownloadRedirectPolicy.shouldForwardCookies(initial, relative),
                 "same-origin comparison normalizes host case and default HTTPS ports");
-        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies("https://example.com/a",
-                        "http://example.com/a"), "scheme change is a different origin");
-        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies("https://example.com:8443/a",
-                        "https://example.com/a"), "non-default ports are part of the origin");
+        BrowserDownloadRedirectPolicy.Hop httpHop = start("http://example.com/a", resolver);
+        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies(httpHop, initial),
+                "scheme change is a different origin");
+        BrowserDownloadRedirectPolicy.Hop nonDefaultPort = start("https://example.com:8443/a", resolver);
+        check(!BrowserDownloadRedirectPolicy.shouldForwardCookies(nonDefaultPort, initial),
+                "non-default ports are part of the origin");
 
         Map<String, String> sameOriginHeaders = BrowserDownloadRedirectPolicy.redirectRequestHeaders(
-                "https://example.com/a", "https://example.com/b", "Daymark/1", "application/pdf", "sid=one");
+                initial, relative, "Daymark/1", "application/pdf", "sid=one");
         check("sid=one".equals(sameOriginHeaders.get("Cookie")),
                 "same-origin redirect may use target-origin cookies");
         Map<String, String> crossOriginHeaders = BrowserDownloadRedirectPolicy.redirectRequestHeaders(
-                "https://example.com/a", "https://cdn.example.net/b", "Daymark/1", "application/pdf", "sid=one");
+                relative, crossOrigin, "Daymark/1", "application/pdf", "sid=one");
         check(!crossOriginHeaders.containsKey("Cookie"), "cross-origin redirect strips cookies");
         check("identity".equals(crossOriginHeaders.get("Accept-Encoding")),
                 "transport requests identity encoding so byte caps apply to the received representation");
@@ -75,11 +78,11 @@ public final class BrowserDownloadRedirectPolicySmoke {
                         && !crossOriginHeaders.containsKey("Origin"),
                 "ambient credentials, referrer and origin are never copied");
         Map<String, String> initialHeaders = BrowserDownloadRedirectPolicy.initialRequestHeaders(
-                "Daymark/1", "application/octet-stream", "sid=initial");
+                initial, "Daymark/1", "application/octet-stream", "sid=initial");
         check("sid=initial".equals(initialHeaders.get("Cookie")),
                 "first-hop cookies are explicitly scoped to the requested download URL");
         Map<String, String> hostileHeaders = BrowserDownloadRedirectPolicy.initialRequestHeaders(
-                "Daymark/1\r\nAuthorization: evil", "application/pdf", "sid=ok\r\nX-Evil: yes");
+                initial, "Daymark/1\r\nAuthorization: evil", "application/pdf", "sid=ok\r\nX-Evil: yes");
         check(!hostileHeaders.containsKey("User-Agent") && !hostileHeaders.containsKey("Cookie"),
                 "header values with control characters are dropped");
 
