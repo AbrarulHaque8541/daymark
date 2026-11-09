@@ -1,3 +1,7 @@
+- [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T12:00:49Z (main 1d29085, Focus #648 direct shell-input and CSS #670)](./CURRENT_STATUS_20261109T120049Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T11:39:14Z (main 1d29085, Focus bridge correction and repo-wide queue)](./CURRENT_STATUS_20261109T113914Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T11:21:40Z (main 1d29085, webhook/recovery and repo-wide queue)](./CURRENT_STATUS_20261109T112140Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:51:24.139Z (main 8238d576ffde; #651/#652 superseded, #656/#657 green, #658/#659 security branches, current webhook/Focus blockers)](./CURRENT_STATUS_20261109T075124Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:40:50.709Z (main 8238d576ffde; #656 category-loss disclosure, #657 terminal recurrence coverage, #658/#659 security review, #604 current-main snapshot)](./CURRENT_STATUS_20261109T074050Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (main 8238d576ffde; PR #645 merged; current #643/#656 exact-head audit)](./CURRENT_STATUS_20261109T070843Z.md)
@@ -94,16 +98,18 @@
 
 # Agent status index
 
+- [2026-11-09T12:00:49Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T120049Z.md)
+
+- [2026-11-09T11:39:14Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T113914Z.md)
+
+- [2026-11-09T11:21:40Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T112140Z.md)
+
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (verified current main, merged #645, current PR heads, exact-head checks and this run's fixes)](./CURRENT_STATUS_20261109T070843Z.md)
-- Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z](./CURRENT_STATUS_20261109T064041Z.md)
-- Previous reviewed snapshot: [Daymark whole-project engineering status — 2026-11-09T06:39:44.085Z](./CURRENT_STATUS_20261109T063944Z.md)
-- Earlier reviewed snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
-
-
-- [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
+- Previous reviewed snapshot: [2026-11-09T12:00:49Z — current main 1d29085](./CURRENT_STATUS_20261109T120049Z.md)
+- Previous reviewed snapshot: [2026-11-09T11:39:14Z](./CURRENT_STATUS_20261109T113914Z.md)
 
 ## Before acting
 
