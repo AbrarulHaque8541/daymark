@@ -284,7 +284,7 @@ test('task writes fail closed when Web Locks are unavailable', async () => {
   await triggerFormSubmit(app, '#add-form');
 
   assert.deepEqual(JSON.parse(app.storedValues.get(STORAGE_KEY)), []);
-  assert.match(app.elements.get('#storage-status').textContent, /coordination is unavailable/i);
+  assert.match(app.elements.get('#storage-status span').textContent, /coordination is unavailable/i);
   assert.match(app.elements.get('#toast').textContent, /Could not save/i);
 });
 
@@ -298,7 +298,7 @@ test('a stale tab does not recreate a task list removed by another context', asy
   await triggerFormSubmit(app, '#add-form');
 
   assert.equal(sharedStorage.has(STORAGE_KEY), false);
-  assert.match(app.elements.get('#storage-status').textContent, /removed by another context/i);
+  assert.match(app.elements.get('#storage-status span').textContent, /removed by another context/i);
 });
 
 test('an unreadable replacement is backed up and never replaces a known task baseline', async () => {
@@ -312,7 +312,7 @@ test('an unreadable replacement is backed up and never replaces a known task bas
 
   assert.equal(sharedStorage.get(STORAGE_KEY), '{broken replacement');
   assert.equal(sharedStorage.get(BACKUP_KEY), '{broken replacement');
-  assert.match(app.elements.get('#storage-status').textContent, /unreadable value/i);
+  assert.match(app.elements.get('#storage-status span').textContent, /unreadable value/i);
 });
 
 test('a corrupt startup payload is preserved before a new task list is saved', async () => {
