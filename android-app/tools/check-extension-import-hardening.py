@@ -25,6 +25,10 @@ def check_sources(parser, store, smoke):
     assert "read > MAX_USER_PACK_BYTES - total" in reader, "streaming read must enforce the byte limit"
     assert "total != initialLength" in reader, "concurrent file changes must not be accepted as complete reads"
     assert "Math.min(file.length()" not in reader, "stored extension reads must not silently truncate"
+    assert "Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)" in reader, \
+        "runtime extension reads must never follow symlinked pack files"
+    assert "Files.exists(out.toPath(), LinkOption.NOFOLLOW_LINKS)" in install, \
+        "imports must detect even broken symlinks and refuse to replace them"
     assert "existingJson = readFile(out);" in install, "existing content must be read before parse handling"
     assert "catch (IOException unreadable)" in install, "I/O failures must be surfaced before any replacement"
     assert "refusing to replace it" in install, "unreadable existing packs must be preserved"
@@ -81,6 +85,8 @@ def check_sources(parser, store, smoke):
     uninstall = store.split("void uninstallUserPack", 1)[1].split("private boolean isBuiltinDisabled", 1)[0]
     assert "synchronized (ExtensionStore.class)" in uninstall, \
         "explicit uninstall must serialize with fingerprint-checked recovery removal"
+    assert "Files.isRegularFile(out.toPath(), LinkOption.NOFOLLOW_LINKS)" in uninstall, \
+        "legacy uninstall must not follow or delete non-regular pack paths"
     assert "ExtensionPackageParser.prepareNewUserPackInstall(ext)" in install, \
         "new user imports must be prepared disabled until explicit activation"
     assert "existing.enabled" in install, "identical re-import must retain the user's activation choice"
@@ -255,6 +261,8 @@ if __name__ == "__main__":
         "invalid UTF-8 malformed packs can be exported byte-for-byte without text normalization",
         "a pack changed after listing is neither exported under a stale fingerprint nor deleted",
         "symbolic links are listed as non-regular and are never followed",
+        "symlinked extension packs are never loaded into the executable extension list",
+        "legacy install/uninstall paths also preserve symlink and target bytes",
     ):
         assert marker in store_smoke, f"missing ExtensionStore preservation regression: {marker}"
     check_sources(parser, store, smoke)
