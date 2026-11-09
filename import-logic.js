@@ -467,9 +467,9 @@
     };
   }
 
-  // COMPLETED is a VTODO DATE-TIME property, must be UTC, and is valid only
-  // alongside STATUS:COMPLETED. The status property remains the completion
-  // state; a timestamp alone must never mark an item complete.
+  // RFC 5545 defines COMPLETED as a UTC DATE-TIME property on VTODO.
+  // A valid timestamp is completion evidence independently of STATUS; invalid
+  // values and use on VEVENT are ignored and disclosed rather than trusted.
   function isValidIcsCompletion(prop) {
     if (!prop || typeof prop.value !== 'string') return false;
     const valueType = (prop.params.VALUE || '').toUpperCase();
