@@ -20,7 +20,17 @@
     if (!env || !env.document) throw new Error('attachBrowserAddressUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    let storageReadFailed = false;
+    let storageWriteFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : ((win && win.localStorage) || null);
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     // An env may explicitly pass addressApi: null to model a page where the
     // engine failed to load; only fall back to the global when it is absent.
     const addressApi = Object.prototype.hasOwnProperty.call(env, 'addressApi')
@@ -53,23 +63,52 @@
     }
 
     function readPrefs() {
-      if (!storage || typeof storage.getItem !== 'function') return null;
-      const raw = storage.getItem(PREFS_KEY);
-      if (!raw) return null;
+      if (!storage || typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        return null;
+      }
+      let raw = null;
+      try {
+        raw = storage.getItem(PREFS_KEY);
+      } catch (error) {
+        // Unknown saved preference must not be overwritten by a later change.
+        storageReadFailed = true;
+        return null;
+      }
+      if (raw === null) return null;
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.provider === 'string'
           && addressApi && addressApi.isKnownProvider(parsed.provider)) {
           return parsed;
         }
-      } catch (error) { /* a corrupt preference is treated as no preference */ }
+      } catch (error) {
+        // A non-empty but unreadable value is unknown saved state, not an absent preference.
+        storageReadFailed = true;
+        return null;
+      }
+      // Preserve syntactically valid but unsupported values rather than overwriting them.
+      storageReadFailed = true;
       return null;
     }
 
     function persistPrefs(provider) {
-      if (!storage || typeof storage.setItem !== 'function') return;
-      if (!addressApi || !addressApi.isKnownProvider(provider)) return;
-      storage.setItem(PREFS_KEY, JSON.stringify({ provider }));
+      if (!storage || storageAccessFailed || storageReadFailed
+        || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') return false;
+      if (!addressApi || !addressApi.isKnownProvider(provider)) return false;
+      try {
+        storage.setItem(PREFS_KEY, JSON.stringify({ provider }));
+        return true;
+      } catch (error) {
+        storageWriteFailed = true;
+        return false;
+      }
+    }
+
+    function storageNotice() {
+      return storageAccessFailed || storageReadFailed || storageWriteFailed
+        || !storage || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function'
+        ? ' · provider preference not saved in this browser' : '';
     }
 
     function securityLabel(security) {
@@ -80,31 +119,31 @@
 
     function classify() {
       if (!addressApi || typeof addressApi.parseAddressInput !== 'function') {
-        status('Address preview is unavailable.');
+        status('Address preview is unavailable.' + storageNotice());
         return;
       }
       const typed = inputEl && typeof inputEl.value === 'string' ? inputEl.value : '';
       if (!typed.trim()) {
-        status('Nothing typed yet.');
+        status('Nothing typed yet.' + storageNotice());
         detail('Type a URL or search text to see how the browser will read it.');
         return;
       }
       const result = addressApi.parseAddressInput(typed, { provider: currentProvider() });
       if (result.kind === 'navigate') {
-        status('Opens a page · ' + securityLabel(result.security));
+        status('Opens a page · ' + securityLabel(result.security) + storageNotice());
         const idn = result.idn ? ' (Unicode domain, punycode host ' + result.host + ')' : '';
         detail('Navigate to ' + result.url + idn);
       } else if (result.kind === 'search') {
-        status('Runs a search with ' + result.providerName + '.');
+        status('Runs a search with ' + result.providerName + '.' + storageNotice());
         detail('Search for "' + result.searchQuery + '" · ' + result.url);
       } else if (result.kind === 'external') {
-        status('External handoff.');
+        status('External handoff.' + storageNotice());
         detail(result.url + ' — Daymark passes this to another app only on your explicit action.');
       } else if (result.kind === 'blocked') {
-        status('Blocked.');
+        status('Blocked.' + storageNotice());
         detail(result.reason);
       } else {
-        status('Nothing to preview.');
+        status('Nothing to preview.' + storageNotice());
         detail('');
       }
     }
@@ -157,7 +196,7 @@
   root.DaymarkBrowserAddressUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachBrowserAddressUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachBrowserAddressUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

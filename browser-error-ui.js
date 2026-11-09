@@ -111,7 +111,9 @@
   root.DaymarkBrowserErrorUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachBrowserErrorUi({ document, window, localStorage: window.localStorage });
+    // This UI is stateless. Do not touch window.localStorage during boot:
+    // storage may be disabled or its getter may throw before the card can render.
+    const boot = () => attachBrowserErrorUi({ document });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
