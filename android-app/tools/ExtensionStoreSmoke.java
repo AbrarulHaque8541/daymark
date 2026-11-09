@@ -170,10 +170,68 @@ public final class ExtensionStoreSmoke {
                             && Arrays.equals(targetBytes, Files.readAllBytes(targetFile.toPath())),
                     "legacy install/uninstall paths also preserve symlink and target bytes");
 
-            System.out.println("PASS: ExtensionStoreSmoke: disabled imports, conflict preservation, malformed-pack listing, exact-byte export, fingerprint-checked removal and fail-closed unsafe paths ("
+            // A symlinked parent directory must not expose a valid pack stored outside userDir.
+            File userDirectory = new File(root, "browser_extensions");
+            File externalDirectory = new File(root, "external_browser_extensions");
+            if (!userDirectory.exists() && !Files.isSymbolicLink(userDirectory.toPath())) {
+                throw new AssertionError("expected the original user extension directory to exist");
+            }
+            deleteTree(userDirectory);
+            check(!Files.exists(userDirectory.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS),
+                    "the original private extension directory was removed before parent-symlink test");
+            Files.createDirectory(externalDirectory.toPath());
+            String parentSymlinkId = "user.parent-symlink";
+            File externalPack = new File(externalDirectory, parentSymlinkId + ".daymark-ext.json");
+            byte[] externalPackBytes = pack(parentSymlinkId, "window.parentSymlink = true;", true)
+                    .getBytes(StandardCharsets.UTF_8);
+            Files.write(externalPack.toPath(), externalPackBytes);
+            Files.createSymbolicLink(userDirectory.toPath(), externalDirectory.toPath());
+            ExtensionStore reloadedStore = new ExtensionStore(context);
+            check(Files.isSymbolicLink(userDirectory.toPath()),
+                    "store construction never follows or replaces a symlinked private extension directory");
+            check(reloadedStore.listAll().stream().noneMatch(extension -> parentSymlinkId.equals(extension.id)),
+                    "a valid pack behind a symlinked parent directory is never loaded for execution");
+            check(reloadedStore.userPackJson(parentSymlinkId) == null,
+                    "user-pack lookup fails closed when the private directory is a symlink");
+            BrowserExtension parentSymlinkImport = ExtensionPackageParser.parseDaymarkJson(
+                    pack(parentSymlinkId, "window.replacement = true;", true), false);
+            expectUnsafeDirectoryInstall(reloadedStore, parentSymlinkImport);
+            reloadedStore.uninstallUserPack(parentSymlinkId);
+            expectDirectoryRecoveryFailure(reloadedStore);
+            expectRecoveryReadFailure(reloadedStore, parentSymlinkId + ".daymark-ext.json", "0".repeat(64));
+            expectRecoveryRemoveFailure(reloadedStore, parentSymlinkId + ".daymark-ext.json", "0".repeat(64));
+            check(Files.isSymbolicLink(userDirectory.toPath())
+                            && Arrays.equals(externalPackBytes, Files.readAllBytes(externalPack.toPath())),
+                    "all parent-symlink recovery, install and uninstall attempts preserve the external pack bytes");
+
+            System.out.println("PASS: ExtensionStoreSmoke: disabled imports, conflict preservation, malformed-pack listing, exact-byte export, fingerprint-checked removal and fail-closed file/parent symlink paths ("
                     + assertions + " assertions)");
         } finally {
             deleteTree(root);
+        }
+    }
+
+    private static void expectUnsafeDirectoryInstall(ExtensionStore store, BrowserExtension ext) throws Exception {
+        assertions++;
+        try {
+            store.installUserPack(ext);
+            throw new AssertionError("expected install into a symlinked private directory to fail closed");
+        } catch (IOException expected) {
+            if (!expected.getMessage().contains("Private extension pack directory")) {
+                throw new AssertionError("unsafe directory must be reported before import", expected);
+            }
+        }
+    }
+
+    private static void expectDirectoryRecoveryFailure(ExtensionStore store) throws Exception {
+        assertions++;
+        try {
+            store.listMalformedUserPacks();
+            throw new AssertionError("expected recovery enumeration of a symlinked private directory to fail closed");
+        } catch (IOException expected) {
+            if (!expected.getMessage().contains("Private extension pack directory")) {
+                throw new AssertionError("unsafe directory must be reported as unavailable", expected);
+            }
         }
     }
 
