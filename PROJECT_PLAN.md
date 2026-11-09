@@ -1,4 +1,32 @@
-## Current whole-project execution queue — 2026-11-09T15:20:06Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+## Current whole-project execution queue — 2026-11-09T15:24:39Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed exact-head inventory, CI evidence, issue list and safety limitations are in [the 15:24 status snapshot](docs/CURRENT_STATUS_20261109T152439Z.md). The #675 head recorded there is the fully green plan-refresh head before this new snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Seven open PRs, twelve open issues; all seven PR bases equal current main. No independent approvals/requested reviewers.
+- Main protection disabled, rulesets empty; detailed protection endpoint HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: all Android/contracts/Focus UI/Live Update/device artifact checks PASS; API29 367 assertions PASS; API36 **10/10 runs PASS**, 370 assertions each. Physical acceptance pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545 review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device PASS; Node 541/541, ExtensionStore smoke 12, 16 guard mutations; independent review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device PASS; draft; PR/debug signing secrets isolated, tag-only signed build. SLSA v1.4.0 upstream Node20 dependency remains.
+- **#675** `8fe4a143cfcae3ae546cc2bd337dcc9042296379`: Android CI #42643754741, contracts #42643754413, device APK #42643754424 **PASS**; code/test head `9bda5bf` Node 728/728 and all build/artifact checks PASS; latest docs/plan head also fully green. Draft; independent security/data-integrity review pending.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device PASS; ExtensionInjectorSmoke 41 assertions; independent review and physical browser acceptance pending.
+- **#677** `925930b88649c25017c2cd8f00af72dbf090e6fa`: Android CI/host reminder guards/Node/Gradle PASS; contracts PASS; Focus Live Update PASS; device acceptance and device APK PASS (release skipped). API29 Focus PASS; API36 Focus FAIL at known horizontal-swipe assertion because this main-based branch lacks #648's screen-coordinate correction. Do not weaken/retry away; synchronize after #648 is independently reviewed/merged and rerun.
+
+### Prioritized backlog
+1. **P0 — Independent review/integration:** #648 Focus coordinate fix; #675 webhook/storage/recovery; #665 signing-secret boundary; #656 import semantics; #659/#676 extension security; #677 reminder time-change re-arming. No merge without independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** real devices with model/API/WebView provider/version, APK SHA and evidence for browser, extensions, SAF, updates, reminders and downloads. CI/emulator artifacts are not physical acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport validates downgrade/private addresses/host, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp cleanup and cancellation/error behavior.
+4. **P1 — Reminder delivery (#476/#677):** synchronize #677 with #648, rerun API36, then test actual clock/timezone transitions and reboot/Doze/OEM behavior on physical devices. Browser checks remain nominal 30s and subject to hidden-tab throttling.
+5. **P0 — Governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations, no force-push/deletion.
+6. **P1 — Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or separately review provenance migration.
+7. **P2 — Cross-platform/browser (#325/#348):** measured compatibility and performance.
+
+## Historical whole-project execution queue — 2026-11-09T15:20:06Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
 
 The detailed seven-PR inventory, exact heads/checks, issue list, work log and limitations are in [the 15:20 status snapshot](docs/CURRENT_STATUS_20261109T152006Z.md). The #675 head captured there is the plan-refresh head before this snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
 
