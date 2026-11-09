@@ -65,11 +65,32 @@ function fakeEnv(options) {
   };
   const storageData = {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
+  const storageCalls = { reads: 0, writes: 0, removes: 0 };
   const storage = {
-    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); },
-    removeItem(key) { delete storageData[key]; }
+    getItem(key) {
+      storageCalls.reads += 1;
+      if (opts.readFailure) throw new Error('Read access failure');
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
+    setItem(key, value) {
+      storageCalls.writes += 1;
+      if (opts.writeFailure) throw new Error('Write access failure');
+      storageData[key] = String(value);
+    },
+    removeItem(key) {
+      storageCalls.removes += 1;
+      if (opts.removeFailure) throw new Error('Remove access failure');
+      delete storageData[key];
+    }
   };
+  if (opts.omitGetItem) delete storage.getItem;
+  const window = {};
+  if (opts.storageGetterThrows) {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw new Error('Storage access denied'); }
+    });
+  }
   const env = {
     document: {
       readyState: 'complete',
@@ -77,12 +98,12 @@ function fakeEnv(options) {
       createElement(tag) { return fakeElement(tag); },
       body: fakeElement('body')
     },
-    window: {},
-    localStorage: storage,
+    window,
     zonesApi: opts.zonesApi,
     now: () => FROZEN_NOW
   };
-  return { env, elements, storageData };
+  if (!opts.omitLocalStorage) env.localStorage = storage;
+  return { env, elements, storageData, storageCalls, storage };
 }
 
 function rowTexts(listEl) {
@@ -114,14 +135,131 @@ test('attach restores a saved zone list with a cached note', () => {
   assert.ok(elements['zones-status'].textContent.startsWith('Cached · updated 2026-11-08 08:30 UTC'));
 });
 
-test('a corrupt cache is ignored instead of crashing', () => {
-  const { env, elements } = fakeEnv({ stored: '{not json' });
-  ui.attachZonesUi(env);
-  const rows = rowTexts(elements['zones-list']);
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0][1], 'India · Kolkata — 17:30');
-  assert.equal(elements['zones-status'].textContent,
-    'Pick time zones to compare. Everything is computed offline.');
+test('empty, malformed, and non-cache zone values are preserved instead of treated as absent', async () => {
+  for (const stored of ['', '{not json', 'null', '{"zones":[]}']) {
+    const { env, elements, storageData, storageCalls } = fakeEnv({
+      stored,
+      pick: 'Europe/London'
+    });
+    const handle = ui.attachZonesUi(env);
+    const rows = rowTexts(elements['zones-list']);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0][1], 'India · Kolkata — 17:30');
+    assert.match(elements['zones-status'].textContent, /invalid and were left untouched/i);
+    await handle.onAdd();
+    assert.equal(storageCalls.writes, 0, 'unknown saved data blocks an add write');
+    assert.equal(storageData[ui.STORAGE_KEY], stored, 'the original corrupt value remains untouched');
+    assert.equal(rowTexts(elements['zones-list']).length, 2, 'the visible list remains unchanged');
+    await handle.onRefresh();
+    assert.equal(storageCalls.writes, 0, 'refresh cannot overwrite an unreadable cache');
+    assert.equal(storageData[ui.STORAGE_KEY], stored);
+  }
+});
+
+test('an explicit Clear action can remove a corrupt zone cache', async () => {
+  const { env, elements, storageData } = fakeEnv({ stored: '' });
+  const handle = ui.attachZonesUi(env);
+  await handle.onClear();
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(rowTexts(elements['zones-list'])[0][1], 'India · Kolkata — 17:30');
+  assert.equal(elements['zones-status'].textContent, 'World clock cleared on this device.');
+});
+
+test('a throwing localStorage getter does not crash and keeps writes fail-closed', async () => {
+  const { env, elements, storageCalls } = fakeEnv({
+    omitLocalStorage: true,
+    storageGetterThrows: true,
+    pick: 'Europe/London'
+  });
+  let handle = null;
+  assert.doesNotThrow(() => { handle = ui.attachZonesUi(env); });
+  assert.ok(handle);
+  assert.equal(rowTexts(elements['zones-list'])[0][1], 'India · Kolkata — 17:30');
+  assert.match(elements['zones-status'].textContent, /Browser storage is unavailable/);
+  await handle.onAdd();
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(rowTexts(elements['zones-list']).length, 2);
+  assert.match(elements['zones-status'].textContent, /saved list was not changed/i);
+});
+
+test('a storage adapter without getItem cannot overwrite unreadable saved zones', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements, storageData, storageCalls } = fakeEnv({
+    stored,
+    omitGetItem: true,
+    pick: 'Asia/Tokyo'
+  });
+  const handle = ui.attachZonesUi(env);
+  assert.match(elements['zones-status'].textContent, /Browser storage is unavailable/);
+  assert.equal(rowTexts(elements['zones-list']).length, 2);
+  await handle.onAdd();
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  assert.equal(rowTexts(elements['zones-list'])[0][1], 'India · Kolkata — 17:30');
+  await handle.onClear();
+  assert.equal(storageCalls.removes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  await handle.onRefresh();
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  assert.match(elements['zones-status'].textContent, /refresh time was not saved/i);
+});
+
+test('a failed saved-zone read never overwrites or clears unknown stored data', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements, storageData, storageCalls } = fakeEnv({
+    stored,
+    readFailure: true,
+    pick: 'Asia/Tokyo'
+  });
+  const handle = ui.attachZonesUi(env);
+  assert.match(elements['zones-status'].textContent, /Saved time zones could not be read/);
+  assert.equal(rowTexts(elements['zones-list']).length, 2);
+  await handle.onAdd();
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  await handle.onClear();
+  assert.equal(storageCalls.removes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  assert.match(elements['zones-status'].textContent, /were not cleared/i);
+});
+
+test('a failed save does not change the displayed zone list', async () => {
+  const { env, elements, storageData, storageCalls } = fakeEnv({
+    writeFailure: true,
+    pick: 'Europe/London'
+  });
+  const handle = ui.attachZonesUi(env);
+  await handle.onAdd();
+  assert.equal(storageCalls.writes, 1);
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(rowTexts(elements['zones-list']).length, 2);
+  assert.equal(rowTexts(elements['zones-list'])[0][1], 'India · Kolkata — 17:30');
+  assert.match(elements['zones-status'].textContent, /could not be updated/i);
+  assert.match(elements['zones-status'].textContent, /saved list was not changed/i);
+});
+
+test('a failed clear preserves the saved zone list and reports failure', async () => {
+  const stored = JSON.stringify(makeCache(['Asia/Kolkata', 'Europe/London']));
+  const { env, elements, storageData, storageCalls } = fakeEnv({
+    stored,
+    removeFailure: true
+  });
+  const handle = ui.attachZonesUi(env);
+  await handle.onClear();
+  assert.equal(storageCalls.removes, 1);
+  assert.equal(storageData[ui.STORAGE_KEY], stored);
+  assert.equal(rowTexts(elements['zones-list']).length, 3);
+  assert.equal(rowTexts(elements['zones-list'])[1][1], 'UK · London — 12:00');
+  assert.match(elements['zones-status'].textContent, /Could not clear saved time zones/);
+});
+
+test('a failed refresh does not claim the refresh time was saved', async () => {
+  const { env, elements, storageCalls } = fakeEnv({ writeFailure: true });
+  const handle = ui.attachZonesUi(env);
+  await handle.onRefresh();
+  assert.equal(storageCalls.writes, 1);
+  assert.match(elements['zones-status'].textContent, /refresh time was not saved/i);
 });
 
 test('add appends the picked zone, renders it, and persists the list', async () => {
