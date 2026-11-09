@@ -601,16 +601,14 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             throw new IOException("UiAutomation returned no shell input descriptor");
         }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        try {
-            try (ParcelFileDescriptor.AutoCloseInputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
-                byte[] buffer = new byte[256];
-                int count;
-                while ((count = input.read(buffer)) != -1) {
-                    if (output.size() + count > 4096) {
-                        throw new IOException("shell input output exceeded its size limit");
-                    }
-                    output.write(buffer, 0, count);
+        try (ParcelFileDescriptor.AutoCloseInputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+            byte[] buffer = new byte[256];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                if (output.size() + count > 4096) {
+                    throw new IOException("shell input output exceeded its size limit");
                 }
+                output.write(buffer, 0, count);
             }
         }
         String response = new String(output.toByteArray(), StandardCharsets.UTF_8);
