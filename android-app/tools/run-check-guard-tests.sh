@@ -107,8 +107,8 @@ expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP
 python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
 echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
 expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py "sendPointerSync(event);" "$PLATFORM_TEST" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py "injectPointerEvent(android.view.MotionEvent.ACTION_MOVE" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py 'dispatchHostInput("swipe"' "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "INPUT_RESULT_FILE" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" "$PLATFORM_TEST" "$ROOT"
