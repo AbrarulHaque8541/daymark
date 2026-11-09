@@ -502,7 +502,7 @@
           return { cleared: false, reason };
         }
 
-        status('Saved webhook events and this tab's pending events were cleared. Unsaved events in other tabs remain there.' + storageWarning());
+        status("Saved webhook events and this tab's pending events were cleared. Unsaved events in other tabs remain there." + storageWarning());
         renderQueue();
         return { cleared: true };
       } finally {
