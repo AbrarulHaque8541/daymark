@@ -108,11 +108,14 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   };
   const animationFrames = [];
   let confirmCalls = 0;
+  const fetchImpl = async () => ({ ok: true, status: 200, text: async () => FEED_XML });
   const window = {
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
     DaymarkFocus: focus,
     DaymarkWebhookUi: webhookUi,
+    localStorage,
+    fetch: fetchImpl,
     confirm() { confirmCalls += 1; return true; },
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
@@ -135,7 +138,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     Blob: supportBlob ? MockBlob : undefined,
     URL: supportBlob ? mockURL : { revokeObjectURL(url) { revokedObjectUrls.push(url); } },
     FileReader: MockFileReader,
-    fetch: async () => ({ ok: true, status: 200, text: async () => FEED_XML }),
+    fetch: fetchImpl,
     clearTimeout(id) { timers.delete(id); },
     setTimeout(callback, delay = 0) {
       const id = nextTimerId++;

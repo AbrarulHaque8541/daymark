@@ -149,14 +149,14 @@
     let duplicate = false;
     let tooDeep = false;
     const whitespace = () => {
-      while (index < raw.length && /\\s/.test(raw[index])) index += 1;
+      while (index < raw.length && /\s/.test(raw[index])) index += 1;
     };
     const readString = () => {
       const start = index;
       index += 1;
       while (index < raw.length) {
         const character = raw[index];
-        if (character === '\\\\') {
+        if (character === '\\') {
           index += 2;
           continue;
         }
@@ -231,7 +231,7 @@
         index += literal[0].length;
         return;
       }
-      const number = rest.match(/^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?/);
+      const number = rest.match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
       if (number) {
         index += number[0].length;
         return;
