@@ -320,6 +320,30 @@
     return out;
   }
 
+
+  // RFC 5545 CATEGORIES is a comma-separated TEXT list. Split before unescaping
+  // so an escaped comma remains inside one category instead of inventing tags.
+  function splitIcsTextList(text) {
+    const values = [];
+    let current = '';
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text.charAt(i);
+      if (ch === '\\' && i + 1 < text.length) {
+        current += ch + text.charAt(i + 1);
+        i += 1;
+        continue;
+      }
+      if (ch === ',') {
+        values.push(icsUnescape(current));
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    values.push(icsUnescape(current));
+    return values;
+  }
+
   // RFC 5545 3.1: a line beginning with a space or tab continues the previous
   // logical line; that leading whitespace is removed when unfolding.
   function unfoldIcsLines(text) {
@@ -367,20 +391,29 @@
   // Maps a DUE/DTSTART property onto stored dueDate/dueTime. The clock time
   // is kept exactly as written: a Z suffix or a TZID parameter is counted as
   // a dropped time zone, never silently re-interpreted.
-  function icsDateTaskField(prop, stats) {
-    if (!prop) return { dueDate: null, dueTime: null };
+  function icsDateTaskField(prop) {
+    if (!prop) return { dueDate: null, dueTime: null, timezoneDropped: false };
     const declaredDate = (prop.params.VALUE || '').toUpperCase() === 'DATE';
     const asDate = prop.value.match(ICS_DATE);
     if (declaredDate || asDate) {
-      if (!asDate) return { dueDate: null, dueTime: null };
-      return { dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3], dueTime: null };
+      if (!asDate) return { dueDate: null, dueTime: null, timezoneDropped: false };
+      const dueDate = asDate[1] + '-' + asDate[2] + '-' + asDate[3];
+      return {
+        dueDate: isDateOnly(dueDate) ? dueDate : null,
+        dueTime: null,
+        timezoneDropped: false
+      };
     }
     const asDateTime = prop.value.match(ICS_DATETIME);
-    if (!asDateTime) return { dueDate: null, dueTime: null };
-    if (asDateTime[7] === 'Z' || prop.params.TZID) stats.timezoneDropped += 1;
+    if (!asDateTime) return { dueDate: null, dueTime: null, timezoneDropped: false };
+    const dueDate = asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3];
+    const dueTime = asDateTime[4] + ':' + asDateTime[5];
+    const validDate = isDateOnly(dueDate);
+    const validTime = isTimeOnly(dueTime);
     return {
-      dueDate: asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3],
-      dueTime: asDateTime[4] + ':' + asDateTime[5]
+      dueDate: validDate ? dueDate : null,
+      dueTime: validDate && validTime ? dueTime : null,
+      timezoneDropped: validDate && validTime && (asDateTime[7] === 'Z' || Boolean(prop.params.TZID))
     };
   }
 
@@ -427,8 +460,8 @@
   // map to tasks: SUMMARY -> title, DUE (todos) or DTSTART (events) -> due
   // date/time, DESCRIPTION -> notes, CATEGORIES -> tags, PRIORITY 1-4 high /
   // 5 medium / 6-9 low, STATUS:COMPLETED -> done, STATUS:CANCELLED skipped.
-  // Recurrence rules are NOT expanded: a recurring item imports once as a
-  // plain task and the recurring count says so honestly. Time zones are
+  // Recurrence sets (RRULE/RDATE and detached recurrence instances) are NOT
+  // expanded: each item imports once as a plain task and is disclosed honestly. Time zones are
   // never re-interpreted: the written clock time is kept, the drop counted.
   function fromIcs(text, ctx) {
     const parsed = parseIcs(text);
@@ -444,7 +477,7 @@
       const status = byName.STATUS ? byName.STATUS.value.trim().toUpperCase() : '';
       if (status === 'CANCELLED') { stats.cancelled += 1; continue; }
       const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
-      const due = icsDateTaskField(dueProp, stats);
+      const due = icsDateTaskField(dueProp);
       const priorityValue = byName.PRIORITY ? byName.PRIORITY.value.trim() : '';
       const priorityNumber = /^\d+$/.test(priorityValue) ? Number(priorityValue) : 0;
       const priority = priorityNumber >= 1 && priorityNumber <= 4 ? 'high'
@@ -458,16 +491,18 @@
         priority,
         completed: status === 'COMPLETED' || Boolean(byName.COMPLETED),
         repeat: null,
-        tags: byName.CATEGORIES ? icsUnescape(byName.CATEGORIES.value).split(/[,;]/) : [],
+        tags: byName.CATEGORIES ? splitIcsTextList(byName.CATEGORIES.value) : [],
         notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
         subtasks: [],
         createdAt: ctx && ctx.now,
         updatedAt: ctx && ctx.now
       };
-      if (byName.RRULE) stats.recurring += 1;
+      const hasRecurrence = ['RRULE', 'RDATE', 'RECURRENCE-ID'].some((name) => Boolean(byName[name]));
       const task = buildTask(raw, ctx);
       if (task === null) { skippedRows += 1; continue; }
       tasks.push(task);
+      if (hasRecurrence) stats.recurring += 1;
+      if (due.timezoneDropped && task.dueDate !== null && task.dueTime !== null) stats.timezoneDropped += 1;
     }
     return {
       tasks,
