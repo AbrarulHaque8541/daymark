@@ -422,8 +422,9 @@
     });
 
     if (!locked.ok) {
-      if (!needsBackup) {
+      if (state.recoveryBackupPendingPayload === null) {
         // Failure to remove an optional redundant copy is harmless; retain it.
+        // A new pending payload may have arrived while the lock request waited.
         state.recoveryBackupCleanupPending = false;
         return true;
       }
@@ -432,7 +433,7 @@
         ? 'Recovery backup maintenance is waiting for safe cross-tab coordination. Primary task data was not changed.'
         : 'Recovery backup maintenance could not acquire the shared task lock. Primary task data was not changed.';
       setStorageStatus(message, true);
-      showToast('Recovery backup maintenance could not run safely. Original task data remains in place; retry after coordination is available.');
+      showToast('Recovery backup could not be prepared because cross-tab coordination is unavailable. Original task data remains in place.');
       return false;
     }
 

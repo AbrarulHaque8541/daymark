@@ -183,6 +183,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
 
   return {
     elements,
+    settle() { return new Promise((resolve) => setImmediate(resolve)); },
     getLastBlob: () => lastBlob,
     getRevokedObjectUrls: () => revokedObjectUrls.slice(),
     getPendingTimeouts: () => Array.from(timers.entries()).map(([id, timer]) => ({ id, delay: timer.delay })),
@@ -215,6 +216,7 @@ test('partially rejected saved tasks survive a subsequent edit and page reload',
   ]);
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const first = bootApp(storedValues);
+  await first.settle();
 
   assert.equal(storedValues.get(BACKUP_KEY), original,
     'the full original payload is backed up when validation rejects a record');
@@ -251,6 +253,7 @@ test('a new partial recovery backup preserves earlier rejected task records', as
   ]);
 
   const first = bootApp(storedValues);
+  await first.settle();
   const bundle = JSON.parse(storedValues.get(BACKUP_KEY));
   assert.equal(bundle.format, 'daymark-recovery-bundle-v1');
   assert.deepEqual(bundle.payloads, [earlier, current],
@@ -277,6 +280,7 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     [BACKUP_KEY, priorOpaqueBackup]
   ]);
   const app = bootApp(storedValues);
+  await app.settle();
 
   const backup = JSON.parse(storedValues.get(BACKUP_KEY));
   assert.equal(backup.format, 'daymark-recovery-bundle-v1');
@@ -319,10 +323,11 @@ test('a different valid task backup is retained when the primary task store is h
     'a later save must not erase the distinct older recovery copy');
 });
 
-test('an exact byte-identical valid backup is the only healthy backup cleared automatically', () => {
+test('an exact byte-identical valid backup is the only healthy backup cleared automatically', async () => {
   const primary = JSON.stringify([validTask('same-task', 'Same task')]);
   const storedValues = new Map([[STORAGE_KEY, primary], [BACKUP_KEY, primary]]);
-  bootApp(storedValues);
+  const app = bootApp(storedValues);
+  await app.settle();
   assert.equal(storedValues.has(BACKUP_KEY), false,
     'the backup is redundant only when its exact bytes match the healthy primary');
 });
@@ -340,7 +345,7 @@ test('empty backup bytes and empty recovery bundles remain opaque recovery data'
   }
 });
 
-test('empty prior recovery sources survive when a new partial task payload is backed up', () => {
+test('empty prior recovery sources survive when a new partial task payload is backed up', async () => {
   const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
   const current = JSON.stringify([
     validTask('current-valid', 'Current task'),
@@ -348,7 +353,8 @@ test('empty prior recovery sources survive when a new partial task payload is ba
   ]);
   for (const priorBackup of ['', emptyBundle]) {
     const storedValues = new Map([[STORAGE_KEY, current], [BACKUP_KEY, priorBackup]]);
-    bootApp(storedValues);
+    const app = bootApp(storedValues);
+    await app.settle();
     const merged = JSON.parse(storedValues.get(BACKUP_KEY));
     assert.equal(merged.format, 'daymark-recovery-bundle-v1');
     assert.deepEqual(merged.payloads, [priorBackup, current],
@@ -356,10 +362,11 @@ test('empty prior recovery sources survive when a new partial task payload is ba
   }
 });
 
-test('primary task JSON with duplicate keys is preserved byte-for-byte for manual recovery', () => {
+test('primary task JSON with duplicate keys is preserved byte-for-byte for manual recovery', async () => {
   const ambiguous = '[{"id":"primary-duplicate","title":"Original title","title":"Overwritten title","dueDate":null,"priority":"medium","completed":false,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z","subtasks":[{"id":"step-1","title":"Original step","title":"Overwritten step","done":false}]}]';
   const storedValues = new Map([[STORAGE_KEY, ambiguous]]);
   const app = bootApp(storedValues);
+  await app.settle();
 
   assert.equal(storedValues.get(STORAGE_KEY), ambiguous,
     'JSON.parse must not silently choose one duplicate field and rewrite the primary');
@@ -378,6 +385,7 @@ test('failed recovery backup creation never overwrites the only original task pa
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const failWrites = new Set([BACKUP_KEY]);
   const app = bootApp(storedValues, failWrites);
+  await app.settle();
 
   assert.equal(storedValues.get(STORAGE_KEY), original,
     'the primary remains byte-for-byte intact when backup creation fails');
@@ -401,7 +409,7 @@ test('failed recovery backup creation never overwrites the only original task pa
   assert.ok(saved.some((task) => task.title === 'Retry after freeing storage'));
 });
 
-test('recovery backup export preserves a second user gesture for browser download', () => {
+test('recovery backup export preserves a second user gesture for browser download', async () => {
   const opaque = '{older opaque recovery bytes';
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -412,6 +420,7 @@ test('recovery backup export preserves a second user gesture for browser downloa
     [BACKUP_KEY, opaque]
   ]);
   const app = bootApp(storedValues);
+  await app.settle();
 
   const backupRaw = storedValues.get(BACKUP_KEY);
   const action = app.elements.get('#toast-action');
@@ -444,13 +453,14 @@ test('recovery backup export preserves a second user gesture for browser downloa
 });
 
 
-test('recovery export releases its prepared object URL when the action expires', () => {
+test('recovery export releases its prepared object URL when the action expires', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
   ]);
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const app = bootApp(storedValues);
+  await app.settle();
   const action = app.elements.get('#toast-action');
 
   action.dispatch('click');
@@ -467,13 +477,14 @@ test('recovery export releases its prepared object URL when the action expires',
 });
 
 
-test('recovery export reports Blob preparation failure without offering a broken download', () => {
+test('recovery export reports Blob preparation failure without offering a broken download', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
   ]);
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const app = bootApp(storedValues, new Set(), true);
+  await app.settle();
   const action = app.elements.get('#toast-action');
 
   action.dispatch('click');
@@ -487,7 +498,7 @@ test('recovery export reports Blob preparation failure without offering a broken
 
 
 
-test('recovery export uses encoded data URL when Blob URL APIs are unavailable', () => {
+test('recovery export uses encoded data URL when Blob URL APIs are unavailable', async () => {
   const priorOpaque = '{older opaque + recovery bytes\\nनमस्ते';
   const primary = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -498,6 +509,7 @@ test('recovery export uses encoded data URL when Blob URL APIs are unavailable',
     [BACKUP_KEY, priorOpaque]
   ]);
   const app = bootApp(storedValues, new Set(), false, false);
+  await app.settle();
   const raw = storedValues.get(BACKUP_KEY);
   const action = app.elements.get('#toast-action');
 
@@ -587,9 +599,10 @@ test('an empty task backup remains exportable when the primary task read throws'
     'the zero-byte recovery source must remain unchanged');
 });
 
-test('an empty primary task value is preserved as opaque recovery data', () => {
+test('an empty primary task value is preserved as opaque recovery data', async () => {
   const storedValues = new Map([[STORAGE_KEY, '']]);
   const app = bootApp(storedValues);
+  await app.settle();
   const action = app.elements.get('#toast-action');
 
   assert.equal(storedValues.get(STORAGE_KEY), '',
@@ -734,7 +747,7 @@ test('an empty task backup is included when the independent Focus backup is expo
   }), 'the combined export preserves both independent recovery sources exactly');
 });
 
-test('recovery export includes task and focus backup sources together without modifying either', () => {
+test('recovery export includes task and focus backup sources together without modifying either', async () => {
   const taskPrimary = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -745,6 +758,7 @@ test('recovery export includes task and focus backup sources together without mo
     ['daymark.focus.v1.backup', focusBackup]
   ]);
   const app = bootApp(storedValues);
+  await app.settle();
   const taskBackup = storedValues.get(BACKUP_KEY);
   const expected = JSON.stringify({
     format: 'daymark-combined-recovery-v1',
