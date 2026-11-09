@@ -636,8 +636,10 @@ assert task_editor_ime, "task editor dialog must have a dedicated IME-insets han
 assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
 assert "Api30Window.applyInsets(view, insets, 0)" in task_editor_ime.group(1)
 assert "configureDialogImeInsets(shownDialogWindow)" in activity
-assert "SOFT_INPUT_ADJUST_NOTHING" in activity and "SOFT_INPUT_ADJUST_RESIZE" in activity, \\
-    "API 30+ dialogs must use explicit IME insets while API 26-29 retain resize behavior"
+assert (
+    "SOFT_INPUT_ADJUST_NOTHING" in activity
+    and "SOFT_INPUT_ADJUST_RESIZE" in activity
+), "API 30+ dialogs must use explicit IME insets while API 26-29 retain resize behavior"
 
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
