@@ -8,9 +8,21 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -204,6 +216,223 @@ final class ExtensionStore {
             writeFile(file, ExtensionPackageParser.toDaymarkJson(updated));
         } catch (Exception ignored) {
             // Corrupt packs remain hidden from the runtime until re-imported.
+        }
+    }
+
+    /**
+     * A non-executable recovery record for a user pack that cannot be parsed safely.
+     * The descriptor contains metadata and a content fingerprint, never the raw pack bytes.
+     */
+    static final class MalformedUserPack {
+        static final String STATE_MALFORMED = "malformed";
+        static final String STATE_OVERSIZED = "oversized";
+        static final String STATE_UNREADABLE = "unreadable";
+        static final String STATE_NON_REGULAR = "non_regular";
+
+        final String fileName;
+        final String displayId;
+        final long byteSize;
+        final String state;
+        final String reason;
+        final String sha256;
+        final boolean canExport;
+        final boolean canRemove;
+
+        MalformedUserPack(String fileName, long byteSize, String state, String reason,
+                          String sha256, boolean canExport, boolean canRemove) {
+            this.fileName = fileName;
+            this.displayId = fileName.substring(0, fileName.length() - ".daymark-ext.json".length());
+            this.byteSize = byteSize;
+            this.state = state;
+            this.reason = reason;
+            this.sha256 = sha256;
+            this.canExport = canExport;
+            this.canRemove = canRemove;
+        }
+    }
+
+    /**
+     * Enumerates malformed or unsafe user-pack files without loading or executing them.
+     * Valid packs are omitted. Unsafe files remain visible as disabled recovery metadata.
+     */
+    List<MalformedUserPack> listMalformedUserPacks() throws IOException {
+        synchronized (ExtensionStore.class) {
+            Path directory = userDir.toPath();
+            if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) return new ArrayList<>();
+            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Extension pack directory is not a regular directory.");
+            }
+            List<MalformedUserPack> result = new ArrayList<>();
+            try (DirectoryStream<Path> files = Files.newDirectoryStream(directory)) {
+                for (Path path : files) {
+                    String name = path.getFileName().toString();
+                    if (!isSafeUserPackFileName(name)) continue;
+                    MalformedUserPack record = inspectMalformedUserPack(path, name);
+                    if (record != null) result.add(record);
+                }
+            }
+            result.sort(Comparator.comparing(record -> record.fileName));
+            return result;
+        }
+    }
+
+    /**
+     * Reads the exact original bytes of a malformed pack after verifying the listing fingerprint.
+     * Oversized, unreadable, non-regular, changed, or now-valid files fail closed.
+     */
+    byte[] readMalformedUserPackBytes(String fileName, String expectedSha256) throws IOException {
+        synchronized (ExtensionStore.class) {
+            Path path = resolveSafeUserPackPath(fileName);
+            byte[] bytes = readStableBytes(path);
+            verifyMalformedFingerprint(bytes, expectedSha256);
+            return bytes.clone();
+        }
+    }
+
+    /**
+     * Removes only the selected malformed regular file after its exact fingerprint is rechecked.
+     * The caller must obtain explicit user confirmation before invoking this method.
+     */
+    void removeMalformedUserPack(String fileName, String expectedSha256) throws IOException {
+        synchronized (ExtensionStore.class) {
+            Path path = resolveSafeUserPackPath(fileName);
+            byte[] first = readStableBytes(path);
+            verifyMalformedFingerprint(first, expectedSha256);
+            byte[] second = readStableBytes(path);
+            if (!Arrays.equals(first, second)) {
+                throw new IOException("Extension pack changed during removal; refusing to delete it.");
+            }
+            Files.delete(path);
+        }
+    }
+
+    private MalformedUserPack inspectMalformedUserPack(Path path, String fileName) {
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(
+                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!attributes.isRegularFile()) {
+                return new MalformedUserPack(fileName, attributes.size(),
+                        MalformedUserPack.STATE_NON_REGULAR,
+                        "Not a regular file; export and removal are disabled.",
+                        null, false, false);
+            }
+            if (attributes.size() > MAX_USER_PACK_BYTES) {
+                return new MalformedUserPack(fileName, attributes.size(),
+                        MalformedUserPack.STATE_OVERSIZED,
+                        "File exceeds the safe recovery read limit.",
+                        null, false, false);
+            }
+            byte[] bytes = readStableBytes(path);
+            if (!isMalformedPackBytes(bytes)) return null;
+            return new MalformedUserPack(fileName, bytes.length,
+                    MalformedUserPack.STATE_MALFORMED,
+                    "Stored extension data is malformed or has an unsupported encoding.",
+                    sha256Hex(bytes), true, true);
+        } catch (IOException failure) {
+            if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return null;
+            return new MalformedUserPack(fileName, -1L,
+                    MalformedUserPack.STATE_UNREADABLE,
+                    "File could not be read safely; export and removal are disabled.",
+                    null, false, false);
+        }
+    }
+
+    private static boolean isSafeUserPackFileName(String fileName) {
+        return fileName != null
+                && fileName.matches("[A-Za-z0-9._-]{1,80}\\.daymark-ext\\.json");
+    }
+
+    private Path resolveSafeUserPackPath(String fileName) throws IOException {
+        if (!isSafeUserPackFileName(fileName)) {
+            throw new IOException("Invalid extension recovery filename.");
+        }
+        Path directory = userDir.toPath().toAbsolutePath().normalize();
+        Path path = directory.resolve(fileName).normalize();
+        if (!directory.equals(path.getParent())) {
+            throw new IOException("Extension recovery path escapes the private pack directory.");
+        }
+        return path;
+    }
+
+    private static byte[] readStableBytes(Path path) throws IOException {
+        byte[] first = readBoundedBytes(path);
+        byte[] second = readBoundedBytes(path);
+        if (!Arrays.equals(first, second)) {
+            throw new IOException("Extension pack changed while being inspected.");
+        }
+        return second;
+    }
+
+    private static byte[] readBoundedBytes(Path path) throws IOException {
+        BasicFileAttributes before = Files.readAttributes(
+                path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        if (!before.isRegularFile()) {
+            throw new IOException("Extension recovery target is not a regular file.");
+        }
+        long expectedLength = before.size();
+        if (expectedLength > MAX_USER_PACK_BYTES) {
+            throw new IOException("Extension recovery file exceeds the safe byte limit.");
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream((int) expectedLength);
+        try (InputStream in = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            int total = 0;
+            while ((read = in.read(buffer)) != -1) {
+                if (read > MAX_USER_PACK_BYTES - total) {
+                    throw new IOException("Extension recovery file exceeded the safe byte limit.");
+                }
+                out.write(buffer, 0, read);
+                total += read;
+            }
+            if (total != expectedLength) {
+                throw new IOException("Extension recovery file changed while being read.");
+            }
+        }
+        BasicFileAttributes after = Files.readAttributes(
+                path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        if (!after.isRegularFile()
+                || after.size() != expectedLength
+                || !before.lastModifiedTime().equals(after.lastModifiedTime())
+                || (before.fileKey() != null && !before.fileKey().equals(after.fileKey()))) {
+            throw new IOException("Extension recovery file changed while being read.");
+        }
+        return out.toByteArray();
+    }
+
+    private static boolean isMalformedPackBytes(byte[] bytes) {
+        try {
+            String text = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes)).toString();
+            ExtensionPackageParser.parseDaymarkJson(text, false);
+            return false;
+        } catch (Exception malformed) {
+            return true;
+        }
+    }
+
+    private static String sha256Hex(byte[] bytes) throws IOException {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder result = new StringBuilder(digest.length * 2);
+            for (byte value : digest) result.append(String.format("%02x", value & 0xff));
+            return result.toString();
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IOException("SHA-256 is unavailable for extension recovery.", impossible);
+        }
+    }
+
+    private static void verifyMalformedFingerprint(byte[] bytes, String expectedSha256) throws IOException {
+        if (expectedSha256 == null || !expectedSha256.matches("[a-f0-9]{64}")) {
+            throw new IOException("A valid recovery fingerprint is required.");
+        }
+        if (!expectedSha256.equals(sha256Hex(bytes))) {
+            throw new IOException("Extension pack changed since it was listed; refusing the operation.");
+        }
+        if (!isMalformedPackBytes(bytes)) {
+            throw new IOException("Extension pack is no longer malformed; refusing recovery deletion/export.");
         }
     }
 
