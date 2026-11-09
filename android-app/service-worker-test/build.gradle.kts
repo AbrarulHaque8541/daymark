@@ -6,11 +6,21 @@ android {
     namespace = "com.abrar.daymark.serviceworkertest"
     compileSdk = 36
 
+    flavorDimensions += "distribution"
+
+    // Mirror both target-app flavors. The test-only plugin's missing-dimension
+    // fallback did not add the consumer flavor attribute required to resolve
+    // :app's githubSideloadDebug and playDebug tested APKs.
+    productFlavors {
+        create("githubSideload") {
+            dimension = "distribution"
+        }
+        create("play") {
+            dimension = "distribution"
+        }
+    }
+
     defaultConfig {
-        // The target app has both githubSideload and play flavors. Resolve the
-        // test module's missing distribution dimension explicitly so Gradle
-        // never guesses between two equally compatible debug APKs.
-        missingDimensionStrategy("distribution", "githubSideload")
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "com.abrar.daymark.DaymarkServiceWorkerInstrumentation"

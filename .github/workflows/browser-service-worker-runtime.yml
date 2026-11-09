@@ -8,6 +8,7 @@ on:
       - "android-app/settings.gradle.kts"
       - "android-app/service-worker-test/**"
       - "android-app/tools/run-service-worker-instrumentation-on-emulator.sh"
+      - "android-app/tools/check-service-worker-test-variants.sh"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerEnforcement.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerPolicy.java"
       - "android-app/app/src/main/java/com/abrar/daymark/DaymarkWebView.java"
@@ -43,6 +44,10 @@ jobs:
           java-version: "17"
           cache: gradle
           cache-dependency-path: android-app/**/*.gradle*
+
+      - name: Verify Service Worker instrumentation variant wiring
+        working-directory: android-app
+        run: sh tools/check-service-worker-test-variants.sh
 
       - name: Enable KVM group permissions
         run: |
