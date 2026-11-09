@@ -93,7 +93,13 @@
   }
 
   function validateQueue(value) {
-    return Array.isArray(value) && value.length <= MAX_QUEUE_EVENTS && value.every(isValidQueueEvent);
+    if (!Array.isArray(value) || value.length > MAX_QUEUE_EVENTS) return false;
+    const ids = new Set();
+    for (const event of value) {
+      if (!isValidQueueEvent(event) || ids.has(event.id)) return false;
+      ids.add(event.id);
+    }
+    return true;
   }
 
   function validateWebhookConfig(value) {
@@ -104,7 +110,15 @@
 
   function enqueueEvent(queue, event) {
     if (!isValidQueueEvent(event)) throw new Error('Only well-formed webhook events can be queued.');
-    const list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    const list = Array.isArray(queue) ? queue.slice() : [];
+    if (!validateQueue(list)) {
+      throw new Error('The existing webhook queue is invalid; no events were changed.');
+    }
+    if (list.some((item) => item.id === event.id)) {
+      const error = new Error('Webhook event IDs must be unique.');
+      error.code = 'duplicate-event-id';
+      throw error;
+    }
     if (list.length >= MAX_QUEUE_EVENTS) {
       const error = new Error('The webhook queue is full; existing events were preserved.');
       error.code = 'queue-full';
@@ -184,7 +198,10 @@
   async function flushQueue(queue, url, fetchImpl, options) {
     const opts = options && typeof options === 'object' ? options : {};
     const maxAttempts = Number.isInteger(opts.maxAttempts) && opts.maxAttempts > 0 ? opts.maxAttempts : MAX_ATTEMPTS;
-    let list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    if (!Array.isArray(queue) || !validateQueue(queue)) {
+      throw new Error('The webhook queue is invalid; no events were changed.');
+    }
+    let list = queue.slice();
     let deliveredCount = 0;
     let droppedCount = 0;
     let failure = null;
