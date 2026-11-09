@@ -130,7 +130,7 @@
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return [raw];
-      if (isKnownRecoveryBundle(parsed, raw)) return parsed.payloads;
+      if (isKnownRecoveryBundle(parsed, raw)) return parsed.payloads.length > 0 ? parsed.payloads : [raw];
     } catch (error) {
       // Opaque bytes, including an empty string, may be the only surviving copy.
     }
@@ -149,7 +149,7 @@
     }
     if (Array.isArray(parsed)) return raw === primaryRaw;
     if (isKnownRecoveryBundle(parsed, raw)) {
-      return parsed.payloads.every((payload) => payload === primaryRaw);
+      return parsed.payloads.length > 0 && parsed.payloads.every((payload) => payload === primaryRaw);
     }
     // Unknown JSON shapes or metadata are opaque recovery data.
     return false;

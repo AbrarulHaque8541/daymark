@@ -310,6 +310,34 @@ test('an exact byte-identical valid backup is the only healthy backup cleared au
 });
 
 
+test('empty backup bytes and empty recovery bundles remain opaque recovery data', () => {
+  const healthyPrimary = JSON.stringify([validTask('healthy-1', 'Healthy primary task')]);
+  const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
+  for (const priorBackup of ['', emptyBundle]) {
+    const storedValues = new Map([[STORAGE_KEY, healthyPrimary], [BACKUP_KEY, priorBackup]]);
+    const app = bootApp(storedValues);
+    assert.equal(storedValues.get(BACKUP_KEY), priorBackup,
+      'present empty/unknown recovery bytes must not be cleared');
+    assert.match(app.elements.get('#storage-status span').textContent, /recovery backup retained for manual review/);
+  }
+});
+
+test('empty prior recovery sources survive when a new partial task payload is backed up', () => {
+  const emptyBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [] });
+  const current = JSON.stringify([
+    validTask('current-valid', 'Current task'),
+    validTask('current-invalid', 'x'.repeat(170))
+  ]);
+  for (const priorBackup of ['', emptyBundle]) {
+    const storedValues = new Map([[STORAGE_KEY, current], [BACKUP_KEY, priorBackup]]);
+    bootApp(storedValues);
+    const merged = JSON.parse(storedValues.get(BACKUP_KEY));
+    assert.equal(merged.format, 'daymark-recovery-bundle-v1');
+    assert.deepEqual(merged.payloads, [priorBackup, current],
+      'new recovery bundles must retain exact prior empty/unknown bytes');
+  }
+});
+
 test('failed recovery backup creation never overwrites the only original task payload', () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
