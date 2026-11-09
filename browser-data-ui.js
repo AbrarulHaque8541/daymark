@@ -11,6 +11,9 @@
  * Mirrors the browser-error-ui.js module style: attachBrowserDataUi(env)
  * is fully injectable for unit tests and the card is stateless, so boot
  * never touches window.localStorage.
+ *
+ * Also supports planning a sequence of actions with export-before-delete
+ * warnings using planClearSequence().
  */
 ((root) => {
   'use strict';
@@ -18,8 +21,6 @@
   function attachBrowserDataUi(env) {
     if (!env || !env.document) throw new Error('attachBrowserDataUi requires a document.');
     const doc = env.document;
-    // An env may explicitly pass dataApi: null to model a page where the
-    // engine failed to load; only fall back to the global when absent.
     const dataApi = Object.prototype.hasOwnProperty.call(env, 'dataApi')
       ? env.dataApi
       : (root.DaymarkBrowserData || null);
@@ -30,6 +31,9 @@
     const resultEl = element('browser-data-result');
     const formEl = element('browser-data-form');
     const clearEl = element('browser-data-clear');
+    const planEl = element('browser-data-plan');
+    const planResultEl = element('browser-data-plan-result');
+    const checksEl = element('browser-data-checks');
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -58,14 +62,14 @@
       resultEl.appendChild(head);
       const lines = [];
       for (let i = 0; i < result.removes.length; i += 1) {
-        lines.push('Removes \u00b7 ' + result.removes[i]);
+        lines.push('Removes · ' + result.removes[i]);
       }
       for (let i = 0; i < result.keeps.length; i += 1) {
-        lines.push('Keeps \u00b7 ' + result.keeps[i]);
+        lines.push('Keeps · ' + result.keeps[i]);
       }
-      lines.push((result.recoverable ? 'Comes back \u00b7 ' : 'No undo \u00b7 ') + result.recovery);
-      lines.push('Scope \u00b7 ' + result.scope);
-      lines.push('Network \u00b7 ' + result.network);
+      lines.push((result.recoverable ? 'Comes back · ' : 'No undo · ') + result.recovery);
+      lines.push('Scope · ' + result.scope);
+      lines.push('Network · ' + result.network);
       for (let i = 0; i < lines.length; i += 1) {
         resultEl.appendChild(makeItem('feed-item', lines[i]));
       }
@@ -77,11 +81,9 @@
         return;
       }
       const action = actionEl && typeof actionEl.value === 'string' ? actionEl.value : '';
-      // The engine fails closed to the honest unknown entry for any value
-      // the prototype does not know.
       const result = dataApi.explainClearAction(action);
-      status('Explained \u00b7 ' + result.label
-        + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
+      status('Explained · ' + result.label
+        + (result.deletesData ? ' · deletes data' : ' · deletes nothing'));
       renderExplanation(result);
     }
 
@@ -89,7 +91,53 @@
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
+      if (planResultEl) {
+        while (planResultEl.firstChild) planResultEl.removeChild(planResultEl.firstChild);
+      }
       status('Cleared. Pick an action to see exactly what it touches.');
+    }
+
+    function collectSelectedIds() {
+      if (!checksEl) return [];
+      const boxes = checksEl.querySelectorAll('input[type="checkbox"]:checked');
+      const ids = [];
+      for (let i = 0; i < boxes.length; i += 1) {
+        const id = boxes[i].value;
+        if (id) ids.push(id);
+      }
+      return ids;
+    }
+
+    function renderPlan(plan) {
+      if (!planResultEl) return;
+      while (planResultEl.firstChild) planResultEl.removeChild(planResultEl.firstChild);
+      if (!plan.ok) {
+        planResultEl.appendChild(makeItem('feed-item', 'Plan refused: ' + plan.error));
+        return;
+      }
+      planResultEl.appendChild(makeItem('feed-item', 'Planned sequence (nothing runs):'));
+      for (let i = 0; i < plan.steps.length; i += 1) {
+        planResultEl.appendChild(makeItem('feed-item', (i + 1) + '. ' + plan.steps[i]));
+      }
+      if (plan.warnings && plan.warnings.length) {
+        for (let i = 0; i < plan.warnings.length; i += 1) {
+          planResultEl.appendChild(makeItem('feed-item feed-item-warning', 'Warning: ' + plan.warnings[i]));
+        }
+      }
+      if (plan.note) {
+        planResultEl.appendChild(makeItem('feed-item', plan.note));
+      }
+    }
+
+    function onPlan() {
+      if (!dataApi || typeof dataApi.planClearSequence !== 'function') {
+        status('Sequence planning is unavailable.');
+        return;
+      }
+      const ids = collectSelectedIds();
+      const plan = dataApi.planClearSequence(ids);
+      status(plan.ok ? 'Sequence planned · ' + plan.ids.length + ' actions' : 'Sequence plan refused');
+      renderPlan(plan);
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -104,15 +152,17 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (planEl && typeof planEl.addEventListener === 'function') {
+      planEl.addEventListener('click', () => { onPlan(); });
+    }
 
     explain();
 
     return {
       explain,
       onClear,
+      onPlan,
       detach() {
-        // No document-level listener is registered; the returned handle
-        // simply stops being used once it goes out of scope.
         status('');
       }
     };
@@ -123,8 +173,6 @@
   root.DaymarkBrowserDataUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    // This UI is stateless. Do not touch window.localStorage during boot:
-    // storage may be disabled or its getter may throw before the card can render.
     const boot = () => attachBrowserDataUi({ document });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
