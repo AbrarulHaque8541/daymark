@@ -430,6 +430,7 @@ test('clear-all confirmation discloses the remembered browser proxy profile', ()
 
   assert.equal(confirmations.length, 1);
   assert.match(confirmations[0], /saved browser proxy profile/i);
+  assert.match(confirmations[0], /Focus Timer preset/i);
   assert.equal(storageData['daymark.browser-proxy.last-profile'], 'proxy.example:8080',
     'declining the confirmation must preserve the remembered profile');
   assert.equal(confirmState.result, false);
