@@ -25,7 +25,7 @@ def check_sources(parser, store, smoke):
     assert "read > MAX_USER_PACK_BYTES - total" in reader, "streaming read must enforce the byte limit"
     assert "total != initialLength" in reader, "concurrent file changes must not be accepted as complete reads"
     assert "Math.min(file.length()" not in reader, "stored extension reads must not silently truncate"
-    assert "String existingJson = readFile(out);" in install, "existing content must be read before parse handling"
+    assert "existingJson = readFile(out);" in install, "existing content must be read before parse handling"
     assert "catch (IOException unreadable)" in install, "I/O failures must be surfaced before any replacement"
     assert "refusing to replace it" in install, "unreadable existing packs must be preserved"
     assert "catch (Exception unreadable)" not in install, "read errors must not be swallowed as parse errors"
