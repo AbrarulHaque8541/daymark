@@ -117,12 +117,12 @@ jobs:
           {
             echo "### Non-production device-test APK"
             echo
-            echo "- Source SHA: `$GITHUB_SHA`"
-            echo "- PR head SHA: `${PR_HEAD_SHA:-not-applicable}`"
-            echo "- Package: `$package_name`"
-            echo "- Version: `$version_name` (code `$version_code`)"
-            echo "- Min/target SDK: `$min_sdk` / `$target_sdk`"
-            echo "- APK SHA-256: `$sha256`"
+            echo "- Source SHA: \`$GITHUB_SHA\`"
+            echo "- PR head SHA: \`${PR_HEAD_SHA:-not-applicable}\`"
+            echo "- Package: \`$package_name\`"
+            echo "- Version: \`$version_name\` (code \`$version_code\`)"
+            echo "- Min/target SDK: \`$min_sdk\` / \`$target_sdk\`"
+            echo "- APK SHA-256: \`$sha256\`"
             echo
             echo "**Safety:** this debug-signed APK is for manual QA. It cannot update an installed production-signed build in place. Do not uninstall Daymark or use it to test task-data migration."
           } >> "$GITHUB_STEP_SUMMARY"
