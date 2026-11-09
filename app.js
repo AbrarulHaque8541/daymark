@@ -252,10 +252,19 @@
         return { ok: true };
       },
       readCurrent: (raw) => {
-        const preserveOpaque = (payload) => backUpRawPayload(payload)
-          ? { ok: true, tasks: [] }
-          : { ok: false, reason: 'recovery-backup-failed' };
-        if (raw === null) return { ok: true, tasks: [] };
+        const preserveOpaque = (payload) => {
+          if (!backUpRawPayload(payload)) return { ok: false, reason: 'recovery-backup-failed' };
+          // If this tab already knew about tasks, an unreadable replacement
+          // must not be treated as an empty list and erase that known baseline.
+          return baseTasks.length
+            ? { ok: false, reason: 'current-preserved-unreadable' }
+            : { ok: true, tasks: [] };
+        };
+        if (raw === null) {
+          return baseTasks.length
+            ? { ok: false, reason: 'current-removed' }
+            : { ok: true, tasks: [] };
+        }
         if (typeof raw !== 'string') return { ok: false, reason: 'invalid-current' };
         if (logic.hasDuplicateJsonKeys(raw)) return preserveOpaque(raw);
 
@@ -294,7 +303,9 @@
         'storage-unavailable': 'Task changes not saved: browser storage is unavailable.',
         'storage-read-failed': 'Task changes not saved: the current task list could not be read.',
         'storage-write-failed': 'Task changes not saved: browser storage rejected the write.',
-        'recovery-backup-failed': 'Cannot save safely: recovery data could not be preserved. Free browser storage and retry.'
+        'recovery-backup-failed': 'Cannot save safely: recovery data could not be preserved. Free browser storage and retry.',
+        'current-preserved-unreadable': 'Stored task data changed to an unreadable value. A recovery copy was preserved; reload and review it before retrying.',
+        'current-removed': 'The saved task list was removed by another context. Reload before retrying so existing tasks are not lost.'
       };
       setStorageStatus(messages[result.reason] || 'Task changes not saved. Reload and retry.', true);
       return false;
