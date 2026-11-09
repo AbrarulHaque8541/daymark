@@ -46,6 +46,7 @@
       undoWindowSeconds: 7,
       recovery: 'Undo is available in the toast for 7 seconds. After it expires, there is no built-in undo. Export a backup first for durable recovery. If saving fails, the removal is session-only and the previously saved task list remains.',
       deletesData: true,
+      exportable: true,
       scope: 'This device only',
       network: 'None — this never contacts the network'
     },
@@ -59,6 +60,7 @@
       recoverable: true,
       recovery: 'Nothing is lost, so nothing needs recovering \u2014 type the search again if you want it back.',
       deletesData: false,
+      exportable: false,
       scope: 'The current view only',
       network: 'None'
     },
@@ -71,6 +73,7 @@
       recoverable: false,
       recovery: 'Cleared queue entries cannot be re-sent. Complete a task again if you need a new announcement.',
       deletesData: true,
+      exportable: false,
       scope: 'This device only',
       network: 'None \u2014 clearing happens locally, without contacting the server'
     },
@@ -84,6 +87,7 @@
       recoverable: true,
       recovery: 'Unavailable until the storage card wiring is repaired. This explanation does not inspect or clear storage.',
       deletesData: false,
+      exportable: false,
       scope: 'Not available in this build',
       network: 'None'
     },
@@ -97,6 +101,7 @@
       recoverable: true,
       recovery: 'Import only adds; the imported file stays intact, so you can inspect or retry it any time.',
       deletesData: false,
+      exportable: false,
       scope: 'This device only',
       network: 'None \u2014 files are read locally'
     },
@@ -109,6 +114,7 @@
       recoverable: true,
       recovery: 'This is a normal plaintext export, not a raw recovery export or encrypted backup. Exported files may contain private task details; keep them private. If storage is unreadable or recovery is pending, use Export recovery instead.',
       deletesData: false,
+      exportable: false,
       scope: 'A new local file',
       network: 'None — the file never leaves this device unless you share it yourself'
     }
@@ -126,6 +132,7 @@
     recoverable: true,
     recovery: 'Nothing ran, so nothing needs recovering.',
     deletesData: false,
+    exportable: false,
     scope: 'Nothing ran',
     network: 'None'
   };
@@ -152,6 +159,7 @@
       available: entry.available !== false,
       recovery: entry.recovery,
       deletesData: entry.deletesData,
+      exportable: entry.exportable === true,
       scope: entry.scope,
       network: entry.network
     };
@@ -164,7 +172,8 @@
       label: CATALOG[id].label,
       available: CATALOG[id].available !== false,
       undoWindowSeconds: Number.isSafeInteger(CATALOG[id].undoWindowSeconds) ? CATALOG[id].undoWindowSeconds : 0,
-      deletesData: CATALOG[id].deletesData
+      deletesData: CATALOG[id].deletesData,
+      exportable: CATALOG[id].exportable === true
     }));
   }
 
@@ -212,9 +221,11 @@
         : 'changes no stored data'));
       if (ids[i] === 'export-backup') exportPlanned = true;
       if (entry.deletesData) {
-        const backupWarning = exportPlanned
-          ? 'A planned Export step is not proof that a complete backup was created; verify the file is present and contains the intended data. If recovery is pending, use Export recovery. '
-          : 'No Export step is planned before this deletion. If recovery is pending, use Export recovery. ';
+        const backupWarning = !entry.exportable
+          ? 'This data is not included in task exports or Export recovery, so a task backup cannot restore it. '
+          : exportPlanned
+            ? 'A planned Export step is not proof that a complete backup was created; verify the file is present and contains the intended data. If recovery is pending, use Export recovery. '
+            : 'No Export step is planned before this deletion. If recovery is pending, use Export recovery. ';
         const undoWarning = entry.undoWindowSeconds > 0
           ? 'The temporary Undo lasts only ' + entry.undoWindowSeconds + ' seconds and is not a durable backup.'
           : 'This action has no built-in undo.';
