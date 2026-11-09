@@ -405,10 +405,68 @@ function getNodeTestBindings(source, code) {
   return bindings;
 }
 
+function maskNodeTestImportDeclarations(source, code) {
+  const output = code.split('');
+  const blank = (start, end) => {
+    for (let index = start; index < end; index += 1) {
+      if (output[index] !== '\n' && output[index] !== '\r') output[index] = ' ';
+    }
+  };
+
+  const commonJsBinding = /(^|[^A-Za-z0-9_$.])(?:const|let|var)\s+(test|it|\{\s*(?:test|it)(?:\s*,\s*(?:test|it))*\s*\})\s*=\s*require\s*\(/gm;
+  let match;
+  while ((match = commonJsBinding.exec(code))) {
+    const requireIndex = code.indexOf('require', match.index + match[1].length);
+    const openIndex = code.indexOf('(', requireIndex + 'require'.length);
+    const closeIndex = findClosingDelimiter(code, openIndex, '(', ')');
+    if (closeIndex < 0) continue;
+    if (!/^(['"])node:test\1$/.test(source.slice(openIndex + 1, closeIndex).trim())) continue;
+    blank(match.index + match[1].length, closeIndex + 1);
+  }
+
+  const esmBinding = /(^|[^A-Za-z0-9_$.])import\s+(test|it|\{\s*(?:test|it)(?:\s*,\s*(?:test|it))*\s*\})\s+from\s+/gm;
+  while ((match = esmBinding.exec(code))) {
+    const fromOffset = match[0].lastIndexOf('from') + 4;
+    let specifierStart = match.index + fromOffset;
+    while (/\s/.test(source[specifierStart] || '')) specifierStart += 1;
+    const quote = source[specifierStart];
+    if (quote !== "'" && quote !== '"') continue;
+    const specifierEnd = source.indexOf(quote, specifierStart + 1);
+    if (specifierEnd < 0 || source.slice(specifierStart + 1, specifierEnd) !== 'node:test') continue;
+    blank(match.index + match[1].length, specifierEnd + 1);
+  }
+  return output.join('');
+}
+
+function hasShadowedNodeTestBinding(code, name) {
+  // Fail closed when an imported test/it identifier is also declared,
+  // shadowed by a parameter/method, or reassigned elsewhere in the file.
+  // This deliberately conservative rule prevents a nested no-op helper from
+  // impersonating node:test without adding a parser dependency to the guard.
+  const escaped = name;
+  const patterns = [
+    new RegExp('\\b(?:const|let|var)\\s+' + escaped + '\\b'),
+    new RegExp('\\b(?:const|let|var)\\s*\\{[^}]*\\b' + escaped + '\\b[^}]*\\}\\s*='),
+    new RegExp('\\bfunction\\s+' + escaped + '\\s*\\('),
+    new RegExp('\\bclass\\s+' + escaped + '\\b'),
+    new RegExp('\\bfunction\\s*(?:[A-Za-z_$][\\w$]*)?\\s*\\([^)]*\\b' + escaped + '\\b[^)]*\\)'),
+    new RegExp('\\bcatch\\s*\\(\\s*' + escaped + '\\s*\\)'),
+    new RegExp('(?:\\(\\s*' + escaped + '(?:\\s*,[^)]*)?\\)|\\b' + escaped + ')\\s*=>'),
+    new RegExp('\\(\\s*\\{[^}]*\\b' + escaped + '\\b[^}]*\\}\\s*\\)\\s*=>'),
+    new RegExp('(?:^|[;{}\\n])\\s*(?:async\\s+)?(?!if\\b|for\\b|while\\b|switch\\b|catch\\b|with\\b)[A-Za-z_$][\\w$]*\\s*\\([^)]*\\b' + escaped + '\\b[^)]*\\)\\s*\\{'),
+    new RegExp('\\b' + escaped + '\\s*=(?!=|>)')
+  ];
+  return patterns.some((pattern) => pattern.test(code));
+}
+
 function hasRegisteredTestCase(source) {
   const code = maskJavaScriptNonCode(source);
   const nodeTestBindings = getNodeTestBindings(source, code);
   if (nodeTestBindings.size === 0) return false;
+  const importMaskedCode = maskNodeTestImportDeclarations(source, code);
+  const shadowedBindings = new Set([...nodeTestBindings].filter((name) =>
+    hasShadowedNodeTestBinding(importMaskedCode, name)
+  ));
   const focusedTest = /(^|[^A-Za-z0-9_$.])(?:test|it|describe)\s*\.\s*only\s*\(/m.test(code);
   if (focusedTest) return false;
 
@@ -416,7 +474,7 @@ function hasRegisteredTestCase(source) {
   let match;
   while ((match = registration.exec(code))) {
     const identifierStart = match.index + match[1].length;
-    if (!nodeTestBindings.has(match[2])) continue;
+    if (!nodeTestBindings.has(match[2]) || shadowedBindings.has(match[2])) continue;
     const openIndex = code.indexOf("(", identifierStart + match[2].length);
     const closeIndex = findClosingDelimiter(code, openIndex, "(", ")");
     if (closeIndex < 0) continue;
@@ -519,6 +577,14 @@ test('every repository Node test file registers at least one executable test cas
     'a locally defined it() helper must not impersonate node:test');
   assert.equal(hasRegisteredTestCase("const test = require('node:test'); const it = () => {}; it('fake', () => assert.ok(true));"), false,
     'an imported test binding must not authorize a locally defined it() helper');
+  assert.equal(hasRegisteredTestCase("const { test } = require('node:test'); function helper(test) { test('fake', () => assert.ok(true)); }"), false,
+    'a shadowed function parameter must not impersonate the imported node:test binding');
+  assert.equal(hasRegisteredTestCase("const { test } = require('node:test'); function helper() { const test = () => {}; test('fake', () => assert.ok(true)); }"), false,
+    'a shadowed local declaration must not impersonate the imported node:test binding');
+  assert.equal(hasRegisteredTestCase("let { test } = require('node:test'); test = () => {}; test('fake', () => assert.ok(true));"), false,
+    'reassigning an imported test binding must not count as a node:test registration');
+  assert.equal(hasRegisteredTestCase("import { test } from 'node:test'; function helper(test) { test('fake', () => assert.ok(true)); }"), false,
+    'ES module test imports must also reject shadowed registrations');
   assert.equal(hasRegisteredTestCase("const { it } = require('node:test'); it('valid', () => assert.ok(true));"), true,
     'a genuine CommonJS it binding must be accepted');
   assert.equal(hasRegisteredTestCase("const test = require('./fake-test'); test('fake', () => assert.ok(true));"), false,
