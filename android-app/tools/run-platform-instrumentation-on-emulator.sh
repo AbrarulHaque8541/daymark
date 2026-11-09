@@ -27,6 +27,7 @@ report_failure() {
 
 run_instrumentation_once() {
   : > "$instrumentation_output"
+  adb logcat -c >/dev/null 2>&1 || true
   set +e
   if command -v timeout >/dev/null 2>&1; then
     timeout --signal=TERM --kill-after=10s 300s adb shell am instrument -w -r "$instrumentation" >"$instrumentation_output" 2>&1
