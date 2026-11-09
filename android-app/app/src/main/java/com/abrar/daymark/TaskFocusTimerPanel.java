@@ -417,15 +417,20 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         public boolean onInterceptTouchEvent(MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Clear any ancestor scroll-interception request left by a prior gesture.
-                    requestDisallowInterceptTouchEvent(false);
+                    // Keep the workspace/scroll ancestors from stealing the first MOVE before
+                    // this selector can classify a horizontal mode gesture. Terminal paths below
+                    // always release the request; active-timer interactions release it immediately.
+                    requestDisallowInterceptTouchEvent(true);
                     downX = event.getX();
                     downY = event.getY();
                     horizontalGesture = false;
                     verticalGesture = false;
                     return false;
                 case MotionEvent.ACTION_MOVE:
-                    if (closed || actionPending || timer != null && !timer.isFinished()) return false;
+                    if (closed || actionPending || timer != null && !timer.isFinished()) {
+                        requestDisallowInterceptTouchEvent(false);
+                        return false;
+                    }
                     if (verticalGesture) return true;
                     TaskFocusTimerModeGesturePolicy.Result result =
                             TaskFocusTimerModeGesturePolicy.classify(
