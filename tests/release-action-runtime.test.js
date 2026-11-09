@@ -43,6 +43,9 @@ const WORKFLOWS = {
   '.github/workflows/generator-generic-ossf-slsa3-publish.yml': [
     'actions/checkout',
     'actions/setup-java'
+  ],
+  '.github/workflows/android-private-main-test-apk.yml': [
+    'actions/upload-artifact'
   ]
 };
 
