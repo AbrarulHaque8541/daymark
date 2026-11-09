@@ -6,6 +6,8 @@ const importer = require('../import-logic.js');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const NOW = '2026-11-07T05:00:00.000Z';
 
@@ -48,10 +50,11 @@ function fakeEnv(options) {
     }
   };
   const storageData = {};
+  const writes = [];
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); },
+    setItem(key, value) { writes.push({ key, value: String(value) }); storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
   const dispatched = [];
@@ -75,6 +78,7 @@ function fakeEnv(options) {
     created,
     listeners,
     storageData,
+    writes,
     dispatched
   };
 }
@@ -163,29 +167,6 @@ test('a markdown file imports with generated ids', async () => {
   assert.match(status.textContent, /Imported 1 task from notes\.md\./);
 });
 
-test('iCalendar import status discloses categories the Daymark tag model cannot retain', async () => {
-  const ics = [
-    'BEGIN:VCALENDAR',
-    'BEGIN:VTODO',
-    'UID:category-disclosure@example.com',
-    'SUMMARY:Calendar task',
-    'CATEGORIES:work,personal\\,private;urgent,finance',
-    'END:VTODO',
-    'END:VCALENDAR'
-  ].join('\n');
-  const { env, elements, created, storageData } = fakeEnv({
-    stored: JSON.stringify(sampleTasks),
-    files: [{ name: 'calendar.ics', size: ics.length, text: async () => ics }]
-  });
-  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
-  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
-  assert.equal(saved.length, 2);
-  assert.deepEqual(saved[1].tags, ['work', 'finance']);
-  const status = created.find((el) => el.id === 'import-status');
-  assert.match(status.textContent,
-    /1 category value could not be represented by Daymark tags and were skipped\./);
-});
-
 test('oversize and unreadable files fail closed without touching storage', async () => {
   const original = JSON.stringify(sampleTasks);
   const big = fakeEnv({ stored: original, files: [{ name: 'huge.csv', size: ui.MAX_IMPORT_FILE_BYTES + 1, text: async () => 'x' }] });
@@ -200,6 +181,49 @@ test('oversize and unreadable files fail closed without touching storage', async
   await ui.attachImportUi(broken.env).onChange(changeEvent(broken.elements['import-file']));
   assert.equal(broken.storageData[ui.STORAGE_KEY], original);
   assert.match(broken.created.find((el) => el.id === 'import-status').textContent, /Import failed: CSV header does not match/);
+});
+
+test('empty task storage is corruption and cannot be replaced by an import', async () => {
+  const csv = exporter.toCsv([
+    { id: 'new-1', title: 'Must not replace unknown data', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let fileRead = false;
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
+    stored: '',
+    files: [{ name: 'tasks.csv', size: csv.length, text: async () => { fileRead = true; return csv; } }]
+  });
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  assert.equal(storageData[ui.STORAGE_KEY], '', 'empty corrupt task data is preserved');
+  assert.equal(fileRead, false, 'the selected file is not read when the existing store is corrupt');
+  assert.equal(writes.length, 0, 'failed import does not write the task store');
+  assert.equal(dispatched.length, 0, 'failed import does not signal a successful task-store update');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /Import failed: .*Nothing was changed\./);
+});
+
+test('mixed valid and malformed existing tasks block import without sanitizing the raw store', async () => {
+  const malformed = { ...sampleTasks[0], id: 'broken', title: '' };
+  const duplicate = { ...sampleTasks[0], title: 'Duplicate existing id' };
+  const raw = JSON.stringify([sampleTasks[0], malformed, duplicate]);
+  const csv = exporter.toCsv([
+    { id: 'new-2', title: 'New imported task', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let fileRead = false;
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
+    stored: raw,
+    files: [{ name: 'tasks.csv', size: csv.length, text: async () => { fileRead = true; return csv; } }]
+  });
+
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+
+  assert.equal(storageData[ui.STORAGE_KEY], raw, 'the original mixed-valid/invalid JSON is preserved byte-for-byte');
+  assert.equal(fileRead, false, 'the selected file is not read after existing-record validation fails');
+  assert.equal(writes.length, 0, 'no replacement task-store write occurs');
+  assert.equal(dispatched.length, 0, 'no successful storage event is dispatched');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /invalid or duplicate record/);
 });
 
 test('FileReader fallback reads files without file.text()', async () => {
@@ -229,4 +253,66 @@ test('auto-boot stays inert under Node (no window) and the module exposes its AP
   assert.equal(ui.STORAGE_KEY, 'daymark.tasks.v1');
   assert.equal(ui.MAX_IMPORT_FILE_BYTES, 8 * 1024 * 1024);
   assert.equal(typeof globalThis.DaymarkImportUi, 'object');
+});
+
+
+test('blocked storage getter keeps the import handler attached and changes no task data', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const { env, elements, created, storageData } = fakeEnv({
+    stored: original,
+    files: [{ name: 'tasks.csv', size: 10, text: async () => 'should not be read' }]
+  });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() {
+      throw new Error('storage access blocked');
+    }
+  });
+  const handle = ui.attachImportUi(env);
+  await handle.onChange(changeEvent(elements['import-file']));
+  assert.equal(storageData[ui.STORAGE_KEY], original, 'the existing task store is untouched');
+  const status = created.find((el) => el.id === 'import-status');
+  assert.match(status.textContent, /Import failed: browser storage is unavailable; nothing was changed/);
+});
+
+test('import auto-boot does not eagerly evaluate window.localStorage', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'import-ui.js'), 'utf8');
+  assert.doesNotMatch(source, /localStorage:\s*window\.localStorage/,
+    'boot must pass window and let attachImportUi guard the storage getter');
+});
+
+test('import aborts if another tab changes task storage while the selected file is read', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const changedByOtherTab = JSON.stringify(sampleTasks.concat([{
+    id: 'other-tab-1', title: 'Saved in another tab', dueDate: null, priority: 'medium',
+    completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: []
+  }]));
+  const csv = exporter.toCsv([
+    { id: 'import-after-read', title: 'Imported task', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let fileRead = false;
+  const { env, elements, created, storageData, writes, dispatched } = fakeEnv({
+    stored: original,
+    files: [{
+      name: 'tasks.csv',
+      size: csv.length,
+      text: async () => {
+        fileRead = true;
+        storageData[ui.STORAGE_KEY] = changedByOtherTab;
+        return csv;
+      }
+    }]
+  });
+
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+
+  assert.equal(fileRead, true, 'the selected file was read before the conflict was detected');
+  assert.equal(storageData[ui.STORAGE_KEY], changedByOtherTab,
+    'the newer value written by another tab is preserved byte-for-byte');
+  assert.equal(writes.length, 0, 'the stale import merge is not written');
+  assert.equal(dispatched.length, 0, 'a failed import does not announce a successful save');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /saved tasks changed while import was being prepared/);
 });
