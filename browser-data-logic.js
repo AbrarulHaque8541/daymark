@@ -103,7 +103,7 @@
     'export-backup': {
       label: 'Export a backup',
       title: 'Export a backup',
-      summary: 'Creates a local task export without changing stored data. The JSON backup uses the current in-memory task list; CSV, Markdown and iCalendar exports read and validate the saved task store. If storage is unreadable or recovery is pending, a normal export may be incomplete.',
+      summary: 'Creates a local task export without changing stored data. The JSON backup uses the current in-memory task list; CSV, Markdown and iCalendar exports read the saved task store and validate parsed tasks. On this build, a present empty-string value is treated like a missing key and can yield an empty export, so a successful empty export does not prove storage is healthy. If storage access throws, export fails; if recovery is pending, a normal export may be incomplete.',
       removes: [],
       keeps: ['Saved task data and existing recovery backups are not changed', 'The current task list remains in Daymark'],
       recoverable: true,
@@ -169,8 +169,8 @@
   }
 
   // Plans a sequence of clear actions as an explanation only: known ids in
-  // the given order, deduplicated, with an honest warning whenever data is
-  // deleted with no Export step before it. Fail-closed: any unknown id
+  // the given order, deduplicated. Every destructive step warns because a
+  // planned Export is not proof of a successful, complete backup. Fail-closed: any unknown id
   // rejects the whole plan rather than silently skipping it.
   function planClearSequence(rawIds) {
     const fail = (error) => ({
@@ -201,7 +201,7 @@
     }
     const steps = [];
     const warnings = [];
-    let exported = false;
+    let exportPlanned = false;
     for (let i = 0; i < ids.length; i += 1) {
       const entry = explainClearAction(ids[i]);
       if (!entry.available) {
@@ -210,12 +210,15 @@
       steps.push(entry.label + ' \u2014 ' + (entry.deletesData
         ? 'deletes data on this device'
         : 'changes no stored data'));
-      if (ids[i] === 'export-backup') exported = true;
-      if (entry.deletesData && !exported) {
-        warnings.push(entry.label + ' deletes data without a durable Export step before it; '
-          + (entry.undoWindowSeconds > 0
-            ? 'the temporary Undo lasts only ' + entry.undoWindowSeconds + ' seconds and is not a durable backup.'
-            : 'this action has no built-in undo.'));
+      if (ids[i] === 'export-backup') exportPlanned = true;
+      if (entry.deletesData) {
+        const backupWarning = exportPlanned
+          ? 'A planned Export step is not proof that a complete backup was created; verify the file is present and contains the intended data. If recovery is pending, use Export recovery. '
+          : 'No Export step is planned before this deletion. If recovery is pending, use Export recovery. ';
+        const undoWarning = entry.undoWindowSeconds > 0
+          ? 'The temporary Undo lasts only ' + entry.undoWindowSeconds + ' seconds and is not a durable backup.'
+          : 'This action has no built-in undo.';
+        warnings.push(entry.label + ' deletes data. ' + backupWarning + undoWarning);
       }
     }
     return {
@@ -223,7 +226,7 @@
       ids: ids.slice(),
       steps,
       warnings,
-      note: 'Daymark runs nothing automatically; this plan only explains.'
+      note: 'Daymark runs nothing automatically; this plan only explains and does not inspect storage/recovery state or verify an export.'
     };
   }
 
