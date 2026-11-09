@@ -56,8 +56,29 @@
       }
       return [];
     }
-    if (!saved) {
-      setStorageStatus('Local storage ready');
+    if (saved === null) {
+      // A missing primary task key does not prove that no recovery data exists.
+      // Inspect the independent backup key before presenting an empty state.
+      let backupRaw = null;
+      let backupReadable = false;
+      try {
+        backupRaw = localStorage.getItem(BACKUP_KEY);
+        backupReadable = true;
+      } catch (error) {
+        // Unknown is not the same as absent. Preserve the existing key and
+        // offer any independently readable Focus backup through the exporter.
+      }
+      if (!backupReadable) {
+        setStorageStatus('No primary task data; recovery backup status unknown', true);
+        offerRecoveryExport('Task recovery backup could not be checked. Any other readable recovery data is available for export.');
+      } else if (backupRaw !== null) {
+        // Empty strings and malformed bytes are still present recovery sources.
+        // Export them exactly; never parse or auto-restore an opaque backup.
+        setStorageStatus('No primary task data; recovery backup available for manual export', true);
+        offerRecoveryExport('No primary task list was found. A recovery backup is available for manual export.');
+      } else {
+        setStorageStatus('Local storage ready');
+      }
       return [];
     }
     try {
