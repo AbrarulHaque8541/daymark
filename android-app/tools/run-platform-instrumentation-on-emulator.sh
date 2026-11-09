@@ -22,7 +22,7 @@ report_failure() {
   body="$1"
   phase_log="${2:-}"
   if [ -z "$phase_log" ]; then
-    for pkg in com.abrar.daymark com.abrar.daymark.debug; do
+    for pkg in "$input_package" com.abrar.daymark com.abrar.daymark.debug; do
       phase_log="$(read_phase_log "$pkg")"
       [ -n "$phase_log" ] && break
     done
@@ -60,7 +60,7 @@ phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 run_instrumentation_once() {
 status_file="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-status.$$"
 rm -f "$status_file"
-adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
+adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp files/instrumentation-phases.log' >/dev/null 2>&1 || true
 (
   set +e
   if command -v timeout >/dev/null 2>&1; then
@@ -91,7 +91,7 @@ if [ "$bridge_status" -ne 0 ]; then
   output="${output}
 INPUT_BRIDGE_ERROR: host input bridge exited with status $bridge_status."
 fi
-adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
+adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp files/instrumentation-phases.log' >/dev/null 2>&1 || true
 if [ "$instrument_status" -eq 124 ] || [ "$instrument_status" -eq 137 ]; then
   phase_log=""
   for pkg in com.abrar.daymark com.abrar.daymark.debug; do
