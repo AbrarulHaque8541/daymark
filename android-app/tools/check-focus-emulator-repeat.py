@@ -88,6 +88,7 @@ assert "dispatchSwipe(modeSelector, true)" in platform_test
 assert "dispatchSwipe(modeSelector, false)" in platform_test
 assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0])" in platform_test
 assert '"parent-scroll"' in platform_test
+assert "parent-scroll:ACTION_MOVE" in platform_test, "vertical dispatch diagnostics must retain the parent ScrollView MOVE trace marker"
 assert "MotionEvent.actionToString(event.getActionMasked())" in platform_test
 assert "ancestor == parentScroll ? \"parent-scroll\"" in platform_test
 assert "ancestor.setOnTouchListener" in platform_test
