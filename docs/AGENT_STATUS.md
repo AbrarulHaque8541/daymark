@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-09T07:51:24.139Z (main 8238d576ffde; #651/#652 superseded, #656/#657 green, #658/#659 security branches, current webhook/Focus blockers)](./CURRENT_STATUS_20261109T075124Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:40:50.709Z (main 8238d576ffde; #656 category-loss disclosure, #657 terminal recurrence coverage, #658/#659 security review, #604 current-main snapshot)](./CURRENT_STATUS_20261109T074050Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T07:08:43.149Z (main 8238d576ffde; PR #645 merged; current #643/#656 exact-head audit)](./CURRENT_STATUS_20261109T070843Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T06:41:12.544Z (main 7e540c9b5d3a; PR #604 docs-only status index, feed, webhook and Focus status)](./CURRENT_STATUS_20261109T064041Z.md)
