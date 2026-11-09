@@ -103,8 +103,16 @@ assert "scrollDeadline" in platform_test
 assert "horizontal swipe delivers touchscreen events to the ModeSelector or descendants" in platform_test
 assert "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
-assert "scrollDescendantIntoScrollView(parentScroll, modeSelector);" in platform_test, "vertical gestures must be injected inside the parent ScrollView viewport"
-assert platform_test.index("scrollDescendantIntoScrollView(parentScroll, modeSelector);") < platform_test.index("String countdownTap = dispatchTap(countdown);"), "initial mode taps must also be inside the ScrollView viewport"
+assert "scrollDescendantIntoScrollView(parentScroll, countdown);" in platform_test, "actual mode controls must be positioned inside the parent ScrollView viewport"
+assert platform_test.index("scrollDescendantIntoScrollView(parentScroll, countdown);") < platform_test.index("String countdownTap = dispatchTap(countdown);"), "initial Countdown tap must be inside the ScrollView viewport"
+countdown_swipe = platform_test.index("dispatchVerticalSwipe(countdown);")
+countdown_retap = platform_test.index("String countdownAfterVerticalDrag = dispatchTap(countdown);")
+assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, countdown);", 0, countdown_swipe) >= 0, "Countdown drag must start inside the ScrollView viewport"
+assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, countdown);", countdown_swipe, countdown_retap) >= countdown_swipe, "Countdown must be re-centered before the follow-up tap"
+stopwatch_swipe = platform_test.index("dispatchVerticalSwipe(stopwatch);")
+stopwatch_retap = platform_test.index("String stopwatchAfterVerticalDrag = dispatchTap(stopwatch);")
+assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, stopwatch);", 0, stopwatch_swipe) >= 0, "Stopwatch drag must start inside the ScrollView viewport"
+assert platform_test.rfind("scrollDescendantIntoScrollView(parentScroll, stopwatch);", stopwatch_swipe, stopwatch_retap) >= stopwatch_swipe, "Stopwatch must be re-centered before the follow-up tap"
 assert "offsetDescendantRectToMyCoords(descendant, target)" in platform_test
 assert "targetBounds.height() >= targetHeight[0]" in platform_test
 assert "targetBounds.top >= parentBounds.top" in platform_test
