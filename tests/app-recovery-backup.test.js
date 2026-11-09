@@ -526,6 +526,47 @@ test('app.js integrity guard rejects placeholder or truncated application source
 });
 
 
+test('an empty opaque task backup remains available as a zero-byte export', () => {
+  const storedValues = new Map([
+    [STORAGE_KEY, JSON.stringify([validTask('primary', 'Healthy primary task')])],
+    [BACKUP_KEY, '']
+  ]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false,
+    'a readable empty-string backup is still a present opaque recovery source');
+  assert.equal(action.textContent, 'Export recovery');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], '',
+    'the export preserves the exact zero-byte backup payload');
+  assert.match(app.elements.get('#toast').textContent, /Recovery backup prepared/);
+  action.dispatch('click');
+  assert.equal(app.elements.get('#download-link').clicked, true,
+    'the user can download the zero-byte recovery file');
+  assert.equal(storedValues.get(BACKUP_KEY), '',
+    'export never mutates the original empty backup');
+});
+
+test('an empty task backup is included when the independent Focus backup is exported', () => {
+  const focusBackup = '{opaque focus recovery bytes';
+  const storedValues = new Map([
+    [STORAGE_KEY, JSON.stringify([validTask('primary', 'Healthy primary task')])],
+    [BACKUP_KEY, ''],
+    [FOCUS_BACKUP_KEY, focusBackup]
+  ]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false);
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], JSON.stringify({
+    format: 'daymark-combined-recovery-v1',
+    taskBackup: '',
+    focusBackup
+  }), 'the combined export preserves both independent recovery sources exactly');
+});
+
 test('recovery export includes task and focus backup sources together without modifying either', () => {
   const taskPrimary = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
