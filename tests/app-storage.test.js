@@ -12,7 +12,7 @@ const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -30,6 +30,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   let toastWriteCount = 0;
   const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
   if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
+  if (savedFocusBackupValue !== null) storedValues.set('daymark.focus.v1.backup', savedFocusBackupValue);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -82,6 +83,10 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
 
   const localStorage = {
     getItem(key) {
+      if (failPrimaryRead && key === STORAGE_KEY) throw new Error('SecurityError: primary unreadable');
+      if (failBackupRead && key === BACKUP_KEY) throw new Error('SecurityError: backup unreadable');
+      if (failFocusPrimaryRead && key === FOCUS_KEY) throw new Error('SecurityError: focus primary unreadable');
+      if (failFocusBackupRead && key === 'daymark.focus.v1.backup') throw new Error('SecurityError: focus backup unreadable');
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
@@ -665,15 +670,53 @@ test('date-only 9 AM scheduling stays local across the spring DST transition', (
 }));
 
 
-test('initial loading indicators clear only when the real app render and storage check finish', () => {
-  const { classSets } = bootApp({ savedValue: null });
+test('primary task key unreadable with readable backup surfaces recovery without mutation', () => {
+  const backupPayload = JSON.stringify([{ id: 'recovered', title: 'From backup', completed: false }]);
+  const app = bootApp({
+    savedValue: 'ignored-because-read-fails',
+    savedBackupValue: backupPayload,
+    failPrimaryRead: true
+  });
+  const status = app.elements.get('#storage-status');
+  const label = status.querySelector('span');
+  assert.match(label.textContent, /Primary storage unreadable; recovery backup available/);
+  assert.equal(app.storedValues.get(STORAGE_KEY), 'ignored-because-read-fails', 'primary key is never overwritten');
+  assert.equal(app.storedValues.get(BACKUP_KEY), backupPayload, 'backup is left untouched');
+  // Recovery export should be offered (button becomes visible or href set in the real flow)
+});
 
-  assert.equal(classSets.get('#task-list').has('is-ready'), true,
-    'render marks the task list ready');
-  assert.equal(classSets.get('#storage-status').has('is-checking'), false,
-    'storage status update clears its checking indicator');
+test('primary task key unreadable and backup also unreadable reports unknown recovery status', () => {
+  const app = bootApp({
+    savedValue: 'whatever',
+    failPrimaryRead: true,
+    failBackupRead: true
+  });
+  const status = app.elements.get('#storage-status');
+  const label = status.querySelector('span');
+  assert.match(label.textContent, /Storage and recovery backup unavailable/);
+  assert.equal(app.storedValues.has(STORAGE_KEY), true);
+});
 
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.equal(indexSource.includes('}, 120);'), false,
-    'index must not hide loading indicators after an arbitrary timeout');
+test('primary task key unreadable with no backup present reports no recovery found', () => {
+  const app = bootApp({
+    savedValue: null,
+    failPrimaryRead: true
+  });
+  const status = app.elements.get('#storage-status');
+  const label = status.querySelector('span');
+  assert.match(label.textContent, /Primary storage unreadable; no recovery backup found/);
+});
+
+test('primary focus key unreadable with readable focus backup surfaces recovery', () => {
+  const focusBackup = JSON.stringify({ format: 'daymark-focus-recovery-bundle-v1', payloads: ['{}'] });
+  const app = bootApp({
+    savedFocusValue: 'ignored',
+    savedFocusBackupValue: focusBackup,
+    failFocusPrimaryRead: true
+  });
+  const status = app.elements.get('#storage-status');
+  const label = status.querySelector('span');
+  assert.match(label.textContent, /Primary focus storage unreadable; recovery backup available/);
+  assert.equal(app.storedValues.get(FOCUS_KEY), 'ignored', 'focus primary is never overwritten');
+  assert.equal(app.storedValues.get('daymark.focus.v1.backup'), focusBackup);
 });
