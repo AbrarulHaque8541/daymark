@@ -68,4 +68,8 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           working-directory: android-app
-          script: sh tools/run-platform-instrumentation-on-emulator.sh
+          script: |
+            adb shell wm size
+            adb shell wm density
+            adb shell settings get system font_scale
+            sh tools/run-platform-instrumentation-on-emulator.sh
