@@ -282,7 +282,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             });
             check(canScroll[0] || canScroll[1],
                     "Tasks workspace has scrollable content for the vertical-gesture regression");
-            dispatchVerticalScrollSwipe(modeSelector, canScroll[0]);
+            String verticalScrollTrace = dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0]);
             long scrollDeadline = android.os.SystemClock.uptimeMillis() + 2000L;
             do {
                 runOnMainSync(() -> scrollY[1] = parentScroll.getScrollY());
@@ -538,8 +538,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         return distance;
     }
 
-    private void dispatchVerticalScrollSwipe(android.view.View view, boolean fingerMovesUp)
-            throws Exception {
+    private String dispatchVerticalScrollSwipe(android.view.View view,
+                                                android.widget.ScrollView parentScroll,
+                                                boolean fingerMovesUp) throws Exception {
         android.graphics.Rect bounds = stableVisibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0,
                 "vertical-scroll target has stable visible screen bounds");
@@ -550,7 +551,28 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         float endY = fingerMovesUp
                 ? bounds.centerY() - distance / 2f
                 : bounds.centerY() + distance / 2f;
-        injectDrag(bounds.centerX(), startY, bounds.centerX(), endY);
+        StringBuilder selectorTrace = new StringBuilder();
+        StringBuilder parentTrace = new StringBuilder();
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        runOnMainSync(() -> {
+            attachTouchTraceListeners(view, "vertical-selector", selectorTrace, tracedViews);
+            parentScroll.setOnTouchListener((targetView, event) -> {
+                appendTouchTrace(parentTrace, "parent-scroll", targetView, event);
+                return false;
+            });
+        });
+        try {
+            injectDrag(bounds.centerX(), startY, bounds.centerX(), endY);
+        } finally {
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+                parentScroll.setOnTouchListener(null);
+            });
+        }
+        String[] traces = new String[1];
+        runOnMainSync(() -> traces[0] = "selector=[" + selectorTrace + "] parent=[" + parentTrace + "]");
+        return traces[0] + " start=(" + bounds.centerX() + "," + startY + ")"
+                + " end=(" + bounds.centerX() + "," + endY + ")";
     }
 
     private android.graphics.Rect stableVisibleBounds(android.view.View view) throws Exception {
