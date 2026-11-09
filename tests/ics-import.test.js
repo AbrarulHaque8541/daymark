@@ -509,7 +509,9 @@ test('import UI discloses invalid completion, invalid date values and ambiguous 
     addEventListener() {},
     removeEventListener() {}
   };
+  const locks = makeLockManager();
   const win = {
+    navigator: { locks },
     StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } },
     dispatchEvent() { return true; }
   };
