@@ -88,7 +88,7 @@ function hasRegisteredTestCase(source) {
     .replace(/^\s*\/\/.*$/gm, '')
     .trim();
   const activeTest = /(?<![A-Za-z0-9_$.'"\x60])\b(?:test|it)\s*\(/.test(withoutComments);
-  const focusedTest = /(?<![A-Za-z0-9_$.'"\x60])\b(?:test|it)\.only\s*\(/.test(withoutComments);
+  const focusedTest = /(?<![A-Za-z0-9_$.'"\x60])\b(?:test|it|describe)\.only\s*\(/.test(withoutComments);
   return withoutComments.length > 0 && activeTest && !focusedTest;
 }
 
@@ -120,6 +120,8 @@ test('every repository Node test file registers at least one executable test cas
     'a todo-only file must not make a suite look executable');
   assert.equal(hasRegisteredTestCase("test.only('focused fixture', () => {});"), false,
     'committed focused-only test files must be rejected');
+  assert.equal(hasRegisteredTestCase("describe.only('focused suite', () => { test('active', () => {}); });"), false,
+    'focused-only describe suites must be rejected');
   assert.equal(hasRegisteredTestCase("const example = \"test('fake')\";"), false,
     'a test-like string literal must not count as a test registration');
 
