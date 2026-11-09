@@ -64,6 +64,7 @@ assert 'adb shell run-as "$input_package" mkdir -p files' in runner
 assert 'adb shell run-as "$input_package" mkdir "$probe_dir"' in runner
 assert 'adb shell run-as "$input_package" rmdir "$probe_dir"' in runner
 assert 'adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt' in runner
+assert "sh -c" not in runner, "runner file operations must use direct run-as commands, not unquoted compound shell strings"
 assert 'adb shell "run-as $package sh -c' in (root / "tools/platform-instrumentation-input-bridge.sh").read_text(encoding="utf-8"), \
     "compound remote result writes must be sent as one quoted adb shell command"
 assert ". tools/platform-instrumentation-input-bridge.sh" in runner
