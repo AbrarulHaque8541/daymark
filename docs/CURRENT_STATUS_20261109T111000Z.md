@@ -16,7 +16,7 @@
 ## Product and release state
 
 - Gradle source: namespace/applicationId `com.abrar.daymark`, versionName 1.6, versionCode 13, minSdk 26, targetSdk 36.
-- The run-level safety instruction requires `com.cue.daymark`, which conflicts with the owner-approved repository identity in AGENTS.md and Gradle. Neither identity was changed; owner-approved reconciliation is required before identity-sensitive release work.
+- The run-level safety instruction names a different package identifier, which conflicts with the owner-approved repository identity in AGENTS.md and Gradle. No identity migration was attempted; owner reconciliation is required before identity-sensitive release work.
 - Live releases: v1.5 is published (2026-10-23); v1.4 is draft. No release, tag, version bump, signer change or production publication occurred.
 - Physical Android/browser/extension/desktop acceptance: NOT TESTED.
 
