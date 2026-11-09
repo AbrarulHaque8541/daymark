@@ -31,11 +31,62 @@
     const saveEl = element('webhook-save');
     const testEl = element('webhook-test');
     const flushEl = element('webhook-flush');
+    const clearQueueEl = element('webhook-clear-queue');
     const statusEl = element('webhook-status');
 
+    const LOCK_KEY = 'daymark.webhook.lock.v1';
     let config = null;
     let queue = [];
     let busy = false;
+
+    function withQueueLock(mutator) {
+      if (!storage || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') {
+        return { ok: false, reason: 'no-storage' };
+      }
+      const owner = Math.random().toString(36).slice(2, 10);
+      const nowMs = Date.now();
+      let acquired = false;
+      for (let attempt = 0; attempt < 8 && !acquired; attempt++) {
+        const existing = storage.getItem(LOCK_KEY);
+        let stale = true;
+        if (existing) {
+          const parts = String(existing).split('|');
+          const ts = Number(parts[0]);
+          if (Number.isFinite(ts) && nowMs - ts < 5000) stale = false;
+        }
+        if (!existing || stale) {
+          storage.setItem(LOCK_KEY, nowMs + '|' + owner);
+          const check = storage.getItem(LOCK_KEY);
+          if (check && check.endsWith('|' + owner)) acquired = true;
+        }
+      }
+      if (!acquired) return { ok: false, reason: 'lock-busy' };
+      try {
+        const current = readQueue();
+        const previous = current.slice();
+        const next = mutator(current.slice());
+        if (Array.isArray(next)) {
+          queue = next;
+          persistQueue();
+        }
+        return { ok: true, previous: previous, queue: queue.slice() };
+      } finally {
+        try {
+          const held = storage.getItem(LOCK_KEY);
+          if (held && held.endsWith('|' + owner) && typeof storage.removeItem === 'function') {
+            storage.removeItem(LOCK_KEY);
+          }
+        } catch (error) {
+          // best-effort release
+        }
+      }
+    }
+
+    function syncQueueFromStorage() {
+      const latest = readQueue();
+      queue = latest;
+      renderQueue();
+    }
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -47,7 +98,7 @@
 
     function setBusy(isBusy) {
       busy = isBusy;
-      [saveEl, testEl, flushEl].forEach((button) => {
+      [saveEl, testEl, flushEl, clearQueueEl].forEach((button) => {
         if (!button) return;
         button.disabled = isBusy || (button === flushEl && queue.length === 0);
         if (button.classList && typeof button.classList.toggle === 'function') {
@@ -112,11 +163,13 @@
 
     function renderQueue() {
       if (flushEl) flushEl.disabled = busy || queue.length === 0;
+      if (clearQueueEl) clearQueueEl.disabled = busy || queue.length === 0;
     }
 
     async function attemptFlush() {
       if (busy) return;
       if (!config || !webhookApi) return;
+      syncQueueFromStorage();
       if (!queue.length) return;
       if (!fetchImpl) {
         status('Webhook delivery is unavailable: fetch is missing in this browser. ' + queueNote());
@@ -128,17 +181,45 @@
         renderQueue();
         return;
       }
+      const claimed = withQueueLock((current) => {
+        // Claim by removing from durable storage before delivery so concurrent tabs cannot double-send.
+        return [];
+      });
+      if (!claimed.ok) {
+        status('Could not claim the webhook queue right now. Try again in a moment. ' + queueNote());
+        renderQueue();
+        return;
+      }
+      const toDeliver = claimed.previous && claimed.previous.length ? claimed.previous : [];
+      if (!toDeliver.length) {
+        renderQueue();
+        return;
+      }
       setBusy(true);
       try {
-        const result = await webhookApi.flushQueue(queue, config.url, fetchImpl);
-        queue = result.queue;
-        persistQueue();
+        const result = await webhookApi.flushQueue(toDeliver, config.url, fetchImpl);
+        const remaining = result.queue || [];
+        if (remaining.length) {
+          withQueueLock((current) => {
+            const merged = current.concat(remaining);
+            while (merged.length > (webhookApi.MAX_QUEUE_EVENTS || 25)) merged.shift();
+            return merged;
+          });
+        }
+        syncQueueFromStorage();
         const parts = [];
         if (result.deliveredCount > 0) parts.push('Delivered ' + result.deliveredCount + ' event(s).');
         if (result.droppedCount > 0) parts.push(result.droppedCount + ' event(s) were dropped after too many attempts.');
         if (result.failure) parts.push('Could not deliver: ' + result.failure);
         status((parts.join(' ') || 'No queued webhook events.') + (queue.length ? ' ' + queueNote() : ''));
       } catch (error) {
+        // Put the claimed events back on failure to avoid silent loss.
+        withQueueLock((current) => {
+          const restored = toDeliver.concat(current);
+          while (restored.length > (webhookApi.MAX_QUEUE_EVENTS || 25)) restored.shift();
+          return restored;
+        });
+        syncQueueFromStorage();
         status('Could not deliver: ' + (error && error.message ? error.message : 'unknown error'));
       } finally {
         setBusy(false);
@@ -215,14 +296,18 @@
           + (error && error.message ? error.message : 'unknown error'));
         return { queued: false, reason: 'invalid' };
       }
-      try {
-        queue = webhookApi.enqueueEvent(queue, event);
-      } catch (error) {
-        status('Could not queue the webhook event: '
-          + (error && error.message ? error.message : 'unknown error'));
-        return { queued: false, reason: 'invalid' };
+      const locked = withQueueLock((current) => {
+        try {
+          return webhookApi.enqueueEvent(current, event);
+        } catch (error) {
+          throw error;
+        }
+      });
+      if (!locked.ok) {
+        status('Could not queue the webhook event right now (storage busy). Try again.');
+        return { queued: false, reason: 'lock-busy' };
       }
-      persistQueue();
+      syncQueueFromStorage();
       renderQueue();
       void attemptFlush();
       return { queued: true, reason: 'queued' };
@@ -240,8 +325,25 @@
     if (flushEl && typeof flushEl.addEventListener === 'function') {
       flushEl.addEventListener('click', () => { void attemptFlush(); });
     }
+    if (clearQueueEl && typeof clearQueueEl.addEventListener === 'function') {
+      clearQueueEl.addEventListener('click', () => {
+        const cleared = withQueueLock(() => []);
+        if (cleared.ok) {
+          syncQueueFromStorage();
+          status('Queued webhook events cleared from this device.');
+        } else {
+          status('Could not clear the queue right now. Try again.');
+        }
+        renderQueue();
+      });
+    }
     if (win && typeof win.addEventListener === 'function') {
       win.addEventListener('online', () => { void attemptFlush(); });
+      win.addEventListener('storage', (ev) => {
+        if (ev && (ev.key === webhookApi.QUEUE_KEY || ev.key === LOCK_KEY || ev.key === null)) {
+          syncQueueFromStorage();
+        }
+      });
     }
     status(config
       ? ('Webhook ready. Completed tasks will be announced to your endpoint.' + (queue.length ? ' ' + queueNote() : ''))
