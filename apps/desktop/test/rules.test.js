@@ -62,3 +62,47 @@ test('tracker suffix does not match lookalike sibling domains', () => {
   // evildoubleclick.net must not be caught by a naive contains() check
   assert.equal(rules.isTrackerUrl('https://evildoubleclick.net'), false);
 });
+
+test('IPv6 loopback is preserved as a local HTTP exception', () => {
+  assert.equal(rules.isAllowedUrl('http://[::1]:3000/'), true);
+  assert.equal(rules.isAllowedInsecure('[::1]'), true);
+  assert.equal(rules.isAllowedUrl('http://[::2]:3000/'), false);
+  assert.equal(rules.httpsUpgradeUrl('http://[::1]:3000/dev'), 'http://[::1]:3000/dev');
+});
+
+
+test('credential-bearing URLs are rejected before navigation admission', () => {
+  const urls = [
+    'https://alice:secret@example.com/path',
+    'https://alice@example.com/path',
+    'https://:secret@example.com/path',
+    'https://alice%3Asecret@example.com/path',
+    'https://trusted.example@attacker.example/path',
+    'http://alice:secret@localhost:3000/dev',
+  ];
+  for (const url of urls) assert.equal(rules.isAllowedUrl(url), false, url);
+});
+
+test('top-level navigation admits only HTTPS and the localhost HTTP exception', () => {
+  for (const url of [
+    'ftp://localhost/file',
+    'ws://localhost/socket',
+    'wss://localhost/socket',
+    'file://localhost/etc/passwd',
+  ]) assert.equal(rules.isAllowedUrl(url), false, url);
+  assert.equal(rules.isAllowedUrl('http://localhost:3000/dev'), true);
+  assert.equal(rules.isAllowedUrl('https://example.com/path'), true);
+});
+
+test('address entry rejects credentials and unsupported schemes', () => {
+  for (const url of [
+    'https://alice:secret@example.com/path',
+    'https://alice@example.com/path',
+    'https://:secret@example.com/path',
+    'https://alice%3Asecret@example.com/path',
+    'http://alice:secret@localhost:3000/dev',
+    'ftp://localhost/file',
+    'ws://localhost/socket',
+    'file:///etc/passwd',
+  ]) assert.throws(() => rules.httpsUpgradeUrl(url), /invalid-address/, url);
+});

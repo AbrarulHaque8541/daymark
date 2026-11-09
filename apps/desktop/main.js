@@ -2,10 +2,17 @@
 
 const { app, session, BrowserWindow } = require('electron');
 const path = require('path');
-const { isAllowedInsecure, isTrackerUrl } = require('./lib/rules');
+const { pathToFileURL } = require('url');
+const { isAllowedUrl } = require('./lib/rules');
+const { isAllowedRequest, isTrackerRequest } = require('./lib/request-policy');
 const { installWebviewPopupPolicy } = require('./lib/webview-popup-policy');
 
 let mainWindow = null;
+const rendererDir = path.join(__dirname, 'renderer');
+const appUiFiles = new Set(['index.html', 'app.js', 'style.css'].map((name) =>
+  pathToFileURL(path.join(rendererDir, name)).href,
+));
+const appUiEntry = pathToFileURL(path.join(rendererDir, 'index.html')).href;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -17,12 +24,21 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   });
+  const guardShellNavigation = (event, url) => {
+    if (url !== appUiEntry) event.preventDefault();
+  };
+  mainWindow.webContents.on('will-navigate', guardShellNavigation);
+  mainWindow.webContents.on('will-redirect', guardShellNavigation);
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   installWebviewPopupPolicy(mainWindow.webContents, (url) => {
     if (mainWindow) mainWindow.webContents.send('open-tab-request', url);
-  });
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  }, isAllowedUrl);
+  mainWindow.loadFile(path.join(rendererDir, 'index.html'));
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -31,22 +47,11 @@ function createMainWindow() {
 app.whenReady().then(() => {
   const ses = session.defaultSession;
 
-  // HTTPS-only browsing: cancel plain-HTTP requests except localhost.
-  // Internal schemes (file/, data/, chrome:) stay usable for the UI itself.
+  // The local shell may load only its packaged renderer entry and assets.
+  // Remote pages get HTTPS/WSS plus the explicit localhost development
+  // exception; data/blob/about:blank are child-resource-only.
   ses.webRequest.onBeforeRequest((details, callback) => {
-    let url;
-    try {
-      url = new URL(details.url);
-    } catch {
-      return callback({ cancel: true });
-    }
-    const protocol = url.protocol.replace(':', '');
-    const internal = ['file', 'data', 'chrome', 'devtools', 'blob'].includes(protocol);
-    const localHttpOk = protocol === 'http' && isAllowedInsecure(url.hostname);
-    if (!(protocol === 'https' || internal || localHttpOk)) {
-      return callback({ cancel: true });
-    }
-    if (details.resourceType !== 'mainFrame' && isTrackerUrl(details.url)) {
+    if (!isAllowedRequest(details, appUiFiles, appUiEntry) || isTrackerRequest(details)) {
       return callback({ cancel: true });
     }
     callback({ cancel: false });
