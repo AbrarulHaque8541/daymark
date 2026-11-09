@@ -107,6 +107,14 @@ function fakeEnv(options) {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
 
+test('the shared task lock contract loads before webhook UI attaches in the browser', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const mutationIndex = indexSource.indexOf('task-mutation-logic.js');
+  const webhookUiIndex = indexSource.indexOf('webhook-ui.js');
+  assert.ok(mutationIndex >= 0 && webhookUiIndex >= 0);
+  assert.ok(mutationIndex < webhookUiIndex, 'the lock contract must exist before webhook-ui auto-boot');
+});
+
 test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof ui.attachWebhookUi, 'function');
   assert.equal(typeof globalThis.DaymarkWebhookUi, 'object');

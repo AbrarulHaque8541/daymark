@@ -893,8 +893,8 @@
 
   const api = {
     attachWebhookUi,
-    notifyTaskCompleted(task) {
-      if (activeHandle) return activeHandle.notifyTaskCompleted(task);
+    notifyTaskCompleted(task, options) {
+      if (activeHandle) return activeHandle.notifyTaskCompleted(task, options);
       return { queued: false, reason: 'not-attached' };
     }
   };
