@@ -17,6 +17,18 @@ def check_sources(parser, store, smoke):
     patterns = parser.split("private static List<String> readValidatedPatterns", 1)[1].split(
         "static boolean isSupportedMatchPattern", 1)[0]
     install = store.split("void installUserPack", 1)[1].split("private File findUserPack", 1)[0]
+    reader = store.split("private static String readFile", 1)[1].split("private static void writeFile", 1)[0]
+
+    # Existing extension files are bounded and never silently truncated or replaced after I/O failure.
+    assert "MAX_USER_PACK_BYTES = 200_000;" in store, "stored extension reads must keep the 200 KB limit"
+    assert "if (initialLength > MAX_USER_PACK_BYTES)" in reader, "oversized stored packs must be rejected before reading"
+    assert "read > MAX_USER_PACK_BYTES - total" in reader, "streaming read must enforce the byte limit"
+    assert "total != initialLength" in reader, "concurrent file changes must not be accepted as complete reads"
+    assert "Math.min(file.length()" not in reader, "stored extension reads must not silently truncate"
+    assert "String existingJson = readFile(out);" in install, "existing content must be read before parse handling"
+    assert "catch (IOException unreadable)" in install, "I/O failures must be surfaced before any replacement"
+    assert "refusing to replace it" in install, "unreadable existing packs must be preserved"
+    assert "catch (Exception unreadable)" not in install, "read errors must not be swallowed as parse errors"
 
     # issue #190: decompressed budgets across every entry, including skipped file types
     assert "MAX_ARCHIVE_DECOMPRESSED_BYTES" in archive and "MAX_ENTRY_DECOMPRESSED_BYTES" in archive, \
@@ -114,6 +126,8 @@ def check_sources(parser, store, smoke):
         "could send that data to an external service",
         "New imports start disabled",
         "explicit activation",
+        "an oversized existing extension file is rejected without truncation or replacement",
+        "an unreadable existing extension path and its contents are preserved",
     ):
         assert marker in smoke, f"missing import-hardening regression: {marker}"
 
@@ -161,6 +175,25 @@ def test_limit_guard_mutations(parser, store, smoke):
             f"new-import activation regression failed for an unrelated reason: {rejected}"
     else:
         raise AssertionError("source guard accepted removal of the disabled-new-import policy")
+
+    size_guard = "if (initialLength > MAX_USER_PACK_BYTES)"
+    assert store.count(size_guard) == 1, "stored pack size guard must be unique"
+    try:
+        check_sources(parser, store.replace(size_guard, "if (false)", 1), smoke)
+    except AssertionError as rejected:
+        assert "oversized stored packs must be rejected" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the stored-pack size limit")
+
+    stream_guard = "if (read > MAX_USER_PACK_BYTES - total)"
+    assert store.count(stream_guard) == 1, "streaming read limit must be unique"
+    try:
+        check_sources(parser, store.replace(stream_guard, "if (false)", 1), smoke)
+    except AssertionError as rejected:
+        assert "streaming read must enforce the byte limit" in str(rejected)
+    else:
+        raise AssertionError("source guard accepted removal of the streaming read limit")
+
     check_sources(parser, store, smoke)
     print(f"PASS: extension import source-guard mutation tests — {len(mutations) + 2} rejected mutations; unchanged source accepted")
 
@@ -173,4 +206,4 @@ if __name__ == "__main__":
     check_sources(parser, store, smoke)
     test_limit_guard_mutations(parser, store, smoke)
     subprocess.run(["sh", str(root / "tools/run-extension-store-tests.sh")], cwd=root, check=True)
-    print("PASS: extension import hardening — bounded archive/rule budgets, SHA-256 ids, fail-closed match scopes, honest effective timing")
+    print("PASS: extension import hardening — bounded archive/rule budgets, fail-closed scopes, default-disabled imports, and preservation of unreadable/oversized stored packs")
