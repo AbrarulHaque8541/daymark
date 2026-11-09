@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import sys
+import re
 
 root = Path(sys.argv[1]).resolve()
 main = root / "app/src/main/java/com/abrar/daymark"
@@ -29,7 +30,9 @@ require("BrowserServiceWorkerPolicy.shouldShowCompatibilityNotice()" in webview
         "the Online-mode Service Worker compatibility trade-off must be disclosed in-app")
 require("ServiceWorkerController.getInstance()" in enforcement,
         "use the process-wide ServiceWorkerController")
-require("setBlockNetworkLoads(BrowserServiceWorkerPolicy.blocksNetworkLoads())" in enforcement,
+require(re.search(
+            r"getServiceWorkerWebSettings\(\)\s*\.setBlockNetworkLoads\(\s*BrowserServiceWorkerPolicy\.blocksNetworkLoads\(\)",
+            enforcement) is not None,
         "set the platform ServiceWorkerWebSettings network block")
 require("controller.setServiceWorkerClient(new ServiceWorkerClient()" in enforcement
         and "shouldInterceptRequest(WebResourceRequest request)" in enforcement,
@@ -45,8 +48,9 @@ require("BrowserServiceWorkerEnforcement.enforceBlocked();" in offline,
         "reassert the process-wide block on Offline transition even without retained tabs")
 require("DaymarkWebView.isServiceWorkerNetworkPolicyReady()" in workspace,
         "do not unblock page loads if global Service Worker enforcement could not be installed")
-require("Service Worker network requests remain blocked even while ordinary page navigation is Online"
-        in docs,
+require(re.search(
+            r"Service\s+Worker network requests remain blocked even while ordinary page navigation is Online",
+            docs) is not None,
         "document the fail-closed behavior and compatibility trade-off")
 require("static Decision decide(boolean onlineEnabled, boolean explicitNavigation, String scheme)" in policy,
         "keep Online toggle and explicit navigation distinct from Service Worker network grants")
