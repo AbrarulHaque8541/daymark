@@ -700,6 +700,41 @@ public final class TaskLogicSmoke {
         check(TaskLogic.advanceRepeat(finalYearTask, zone, Instant.parse("9999-12-31T10:00:00Z"))
                         == finalYearTask,
                 "automatic catch-up keeps the valid task unchanged when no four-digit next date exists");
+
+        Task finalYearReminder = TaskLogic.create("Final supported reminder", "9999-12-31", "medium", "",
+                "09:00", Integer.valueOf(0), Collections.<Subtask>emptyList(), TaskLogic.REPEAT_DAILY);
+        Instant finalYearReminderFire = Instant.parse("9999-12-31T09:00:00Z");
+        Instant finalYearReminderShownAt = Instant.parse("9999-12-31T10:00:00Z");
+        check(TaskLogic.advanceRepeat(finalYearReminder, zone,
+                        finalYearReminderFire.minusSeconds(1)) == finalYearReminder,
+                "final-date reminder remains pending before its trigger");
+        Task terminalReminder = TaskLogic.advanceRepeat(finalYearReminder, zone, finalYearReminderShownAt);
+        check(terminalReminder != finalYearReminder,
+                "terminal recurring reminder persists a shown marker instead of returning unchanged");
+        check("9999-12-31".equals(terminalReminder.dueDate),
+                "terminal recurring reminder keeps the final supported due date");
+        check(finalYearReminderFire.toString().equals(terminalReminder.reminderShownFire),
+                "terminal recurring reminder stores the exact fire instant as shown");
+        check(finalYearReminderShownAt.toString().equals(terminalReminder.updatedAt),
+                "terminal recurring reminder records the actual shown timestamp");
+        check(TaskLogic.isValid(terminalReminder),
+                "terminal recurring reminder remains a valid persisted task");
+        check(ReminderSchedulePolicy.scheduledFire(terminalReminder, zone, null) == null,
+                "terminal recurring reminder is not scheduled or shown again");
+
+        Task finalYearDayLeadReminder = TaskLogic.create("Final supported one-day reminder", "9999-12-31",
+                "medium", "", "09:00", Integer.valueOf(1440), Collections.<Subtask>emptyList(),
+                TaskLogic.REPEAT_DAILY);
+        Instant finalYearDayLeadFire = Instant.parse("9999-12-30T09:00:00Z");
+        Instant finalYearDayLeadShownAt = Instant.parse("9999-12-30T10:00:00Z");
+        Task terminalDayLeadReminder = TaskLogic.advanceRepeat(finalYearDayLeadReminder, zone,
+                finalYearDayLeadShownAt);
+        check("9999-12-31".equals(terminalDayLeadReminder.dueDate),
+                "terminal one-day-lead repeat keeps the final supported due date");
+        check(finalYearDayLeadFire.toString().equals(terminalDayLeadReminder.reminderShownFire),
+                "terminal one-day-lead repeat stores the previous-day fire instant");
+        check(ReminderSchedulePolicy.scheduledFire(terminalDayLeadReminder, zone, null) == null,
+                "terminal one-day-lead reminder is not scheduled again");
     }
 
     private static Task task(String id, String title, String dueDate, String priority, boolean completed, int second) {
