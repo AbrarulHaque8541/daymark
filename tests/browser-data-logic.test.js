@@ -31,6 +31,7 @@ test('every catalog entry is well formed and honest', () => {
       id + ' undoWindowSeconds must be a non-negative integer');
     assert.equal(typeof entry.available, 'boolean', id + ' available must be a boolean');
     assert.equal(typeof entry.deletesData, 'boolean', id + ' deletesData must be a boolean');
+    assert.equal(typeof entry.exportable, 'boolean', id + ' exportable must be a boolean');
   }
 });
 
@@ -40,6 +41,7 @@ test('an unknown action id fails closed to the honest unknown entry', () => {
   assert.match(result.summary, /no honest description/);
   assert.ok(result.keeps.includes('Everything, out of caution'));
   assert.equal(result.deletesData, false);
+  assert.equal(result.exportable, false);
 });
 
 test('explainClearAction returns defensive copies', () => {
@@ -66,6 +68,8 @@ test('listClearActions exposes honest delete flags', () => {
   assert.equal(clearCompleted.deletesData, true);
   assert.equal(clearCompleted.available, true);
   assert.equal(clearCompleted.undoWindowSeconds, 7);
+  assert.equal(clearCompleted.exportable, true);
+  assert.equal(actions.find((action) => action.id === 'webhook-clear-queue').exportable, false);
   assert.equal(actions.find((action) => action.id === 'storage-clear-status').available, false);
   assert.equal(actions.find((action) => action.id === 'clear-search').deletesData, false);
 });
@@ -96,6 +100,14 @@ test('planClearSequence does not count an Export step that occurs after deletion
   assert.equal(plan.ok, true);
   assert.equal(plan.warnings.length, 1);
   assert.match(plan.warnings[0], /No Export step is planned before this deletion/);
+});
+
+test('task export cannot be treated as a recovery path for webhook queue deletion', () => {
+  const plan = engine.planClearSequence(['export-backup', 'webhook-clear-queue']);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /not included in task exports or Export recovery/);
+  assert.doesNotMatch(plan.warnings[0], /verify the file is present/);
 });
 
 test('planClearSequence does not demand an export for delete-free actions', () => {
