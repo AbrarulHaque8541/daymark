@@ -8,7 +8,14 @@ import java.util.Locale;
 
 /**
  * Applies page-local CSS/JS for enabled packs. No native bridge.
- * Injects a small SPA/MutationObserver bootstrap so pushState pages still get CSS re-applied.
+ *
+ * <p>WebView.evaluateJavascript is asynchronous and targets the currently displayed document.
+ * Bind every submitted payload to the exact URL that produced onPageFinished, both before queueing
+ * and inside the JavaScript that will execute later. CSS bootstrap/style work is one submission;
+ * pack scripts are a second, independently guarded submission.
+ *
+ * <p>Scripts still run in the page's main world. A trusted script can persist through same-document
+ * SPA navigation; the URL guard prevents a stale callback from crossing into a different document.
  */
 final class ExtensionInjector {
     private ExtensionInjector() { }
@@ -17,17 +24,23 @@ final class ExtensionInjector {
         if (webView == null || enabledMatching == null || enabledMatching.isEmpty()) return;
         if (!BrowserAddress.isAllowedWebUrl(pageUrl)) return;
 
+        // onPageFinished can be stale if a newer navigation has already started.
+        if (!pageUrl.equals(webView.getUrl())) return;
+
         List<BrowserExtension> limited = new ArrayList<>();
         for (BrowserExtension ext : enabledMatching) {
             if (limited.size() >= BrowserExtension.MAX_ENABLED_PER_PAGE) break;
+            if (ext == null || !ext.enabled || !ext.matchesUrl(pageUrl)) continue;
             limited.add(ext);
         }
+        if (limited.isEmpty()) return;
 
         StringBuilder css = new StringBuilder();
         StringBuilder js = new StringBuilder();
         for (BrowserExtension ext : limited) {
             if (ext.css != null && !ext.css.isEmpty()) {
-                css.append("\n/* ").append(safeComment(ext.id)).append(" */\n").append(ext.css).append('\n');
+                css.append("\n/* ").append(safeComment(ext.id)).append(" */\n")
+                        .append(ext.css).append('\n');
             }
             if (ext.js != null && !ext.js.isEmpty()) {
                 // Per-pack IIFE + duplicate-run guard (pack id).
@@ -40,43 +53,59 @@ final class ExtensionInjector {
             }
         }
 
-        // Bootstrap: CSS apply helper + history/MutationObserver re-apply (consensus Must).
-        String bootstrap = "(function(){try{"
-                + "if(window.__daymarkBoot)return;window.__daymarkBoot=1;"
+        String expectedUrl = jsonString(pageUrl);
+        if (css.length() > 0) {
+            // Bootstrap and CSS share one guarded WebView submission.
+            webView.evaluateJavascript(cssScript(expectedUrl, css.toString()), null);
+        }
+        if (js.length() > 0) {
+            // A navigation between the CSS and JS submissions must not retarget page scripts.
+            webView.evaluateJavascript(jsScript(expectedUrl, js.toString()), null);
+        }
+    }
+
+    private static String cssScript(String expectedUrl, String cssText) {
+        return cssBootstrap(expectedUrl)
+                + "(function(){try{if(String(window.location.href)!==" + expectedUrl + ")return;"
+                + "window.__daymarkLastCss=" + jsonString(cssText) + ";"
+                + "if(window.__daymarkApplyCss)window.__daymarkApplyCss(window.__daymarkLastCss);"
+                + "else{var id='daymark-ext-css';var el=document.getElementById(id);"
+                + "if(!el){el=document.createElement('style');el.id=id;"
+                + "(document.head||document.documentElement).appendChild(el);}"
+                + "el.textContent=window.__daymarkLastCss;}"
+                + "}catch(e){}})();";
+    }
+
+    private static String cssBootstrap(String expectedUrl) {
+        return "(function(){try{"
+                + "var expected=" + expectedUrl + ";"
+                + "if(String(window.location.href)!==expected)return;"
+                + "if(window.__daymarkBoot){window.__daymarkExpectedUrl=expected;return;}"
+                + "window.__daymarkBoot=1;window.__daymarkExpectedUrl=expected;"
                 + "window.__daymarkApplyCss=function(css){try{"
                 + "var id='daymark-ext-css';var el=document.getElementById(id);"
                 + "if(!el){el=document.createElement('style');el.id=id;"
                 + "(document.head||document.documentElement).appendChild(el);}"
                 + "el.textContent=css||'';}catch(e){}};"
                 + "window.GM_addStyle=function(css){try{"
+                + "if(String(window.location.href)!==window.__daymarkExpectedUrl)return;"
                 + "var s=document.createElement('style');s.textContent=String(css||'');"
                 + "(document.head||document.documentElement).appendChild(s);}catch(e){}};"
                 + "var _ps=history.pushState,_rs=history.replaceState;"
-                + "function _dmNav(){try{if(window.__daymarkLastCss)window.__daymarkApplyCss(window.__daymarkLastCss);}catch(e){}}"
+                + "function _dmNav(){try{if(window.__daymarkLastCss)"
+                + "window.__daymarkApplyCss(window.__daymarkLastCss);}catch(e){}}"
                 + "history.pushState=function(){_ps.apply(this,arguments);_dmNav();};"
                 + "history.replaceState=function(){_rs.apply(this,arguments);_dmNav();};"
                 + "window.addEventListener('popstate',_dmNav);"
                 + "try{var mo=new MutationObserver(function(){_dmNav();});"
                 + "mo.observe(document.documentElement,{childList:true,subtree:true});}catch(e){}"
-                + "}catch(e){}})();"
-                ;
-        webView.evaluateJavascript(bootstrap, null);
+                + "}catch(e){}})();";
+    }
 
-        if (css.length() > 0) {
-            String cssText = css.toString();
-            String injectCss = "(function(){try{"
-                    + "window.__daymarkLastCss=" + jsonString(cssText) + ";"
-                    + "if(window.__daymarkApplyCss)window.__daymarkApplyCss(window.__daymarkLastCss);"
-                    + "else{var id='daymark-ext-css';var el=document.getElementById(id);"
-                    + "if(!el){el=document.createElement('style');el.id=id;"
-                    + "(document.head||document.documentElement).appendChild(el);}el.textContent=window.__daymarkLastCss;}"
-                    + "}catch(e){}})();"
-                    ;
-            webView.evaluateJavascript(injectCss, null);
-        }
-        if (js.length() > 0) {
-            webView.evaluateJavascript("(function(){try{" + js + "}catch(e){}})();", null);
-        }
+    private static String jsScript(String expectedUrl, String jsText) {
+        return "(function(){try{if(String(window.location.href)!==" + expectedUrl + ")return;"
+                + jsText
+                + "}catch(e){}})();";
     }
 
     private static String safeComment(String id) {
