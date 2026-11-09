@@ -798,6 +798,41 @@ test('task recovery backup remains exportable when the Focus backup key is unrea
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), focusBackup, 'the unreadable Focus key is not overwritten');
 });
 
+test('unreadable Focus backup is reported as unknown when the primary Focus key is absent', () => {
+  const storedValues = new Map([[STORAGE_KEY, '[]']]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([FOCUS_BACKUP_KEY]), focusLogic);
+
+  assert.match(app.elements.get('#storage-status span').textContent, /Focus recovery backup status unknown/i);
+  assert.equal(storedValues.has('daymark.focus.v1'), false, 'an absent primary Focus key remains absent');
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false, 'the unreadable recovery key is never recreated or removed');
+  assert.equal(app.elements.get('#toast-action').hidden, true, 'no export is offered when neither backup can be read');
+});
+
+test('unreadable Focus backup is reported as unknown when a valid primary Focus state exists', () => {
+  const primaryFocus = JSON.stringify({ session: null, log: [] });
+  const storedValues = new Map([[STORAGE_KEY, '[]'], ['daymark.focus.v1', primaryFocus]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([FOCUS_BACKUP_KEY]), focusLogic);
+
+  assert.match(app.elements.get('#storage-status span').textContent, /Focus recovery backup status unknown/i);
+  assert.equal(storedValues.get('daymark.focus.v1'), primaryFocus, 'the readable primary Focus bytes remain unchanged');
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false, 'the unreadable backup is not replaced with an empty value');
+});
+
+test('a readable task backup remains exportable when the Focus backup is unreadable and its primary is absent', () => {
+  const taskBackup = JSON.stringify([validTask('independent-task-backup', 'Keep independent task backup')]);
+  const storedValues = new Map([[STORAGE_KEY, '[]'], [BACKUP_KEY, taskBackup]]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set([FOCUS_BACKUP_KEY]), focusLogic);
+
+  assert.match(app.elements.get('#storage-status span').textContent, /Focus recovery backup status unknown/i);
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false, 'the independently readable task backup still exposes export');
+  assert.equal(action.textContent, 'Export recovery');
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], taskBackup, 'the export contains only the readable task backup bytes');
+  assert.equal(storedValues.get(BACKUP_KEY), taskBackup, 'the original task backup remains untouched');
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false, 'the unreadable Focus backup is not recreated or overwritten');
+});
+
 test('Focus recovery backup remains exportable when the task backup key is unreadable', () => {
   const focusBackup = JSON.stringify({ session: null, log: [{ id: 'focus-backup', kind: 'focus', finalElapsedMs: 1000 }] });
   const storedValues = new Map([[STORAGE_KEY, '[]'], [FOCUS_BACKUP_KEY, focusBackup]]);
