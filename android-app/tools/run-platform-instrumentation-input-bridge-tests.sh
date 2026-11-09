@@ -26,12 +26,12 @@ fi
 if [ "$1" = shell ] && [ "$#" -eq 2 ]; then
   case "$2" in
     "run-as "*)
-      if [ "${FAKE_PUBLISH_STATUS:-0}" -ne 0 ]; then
+      if [ "\${FAKE_PUBLISH_STATUS:-0}" -ne 0 ]; then
         echo "fake result publish denied" >&2
         exit "$FAKE_PUBLISH_STATUS"
       fi
       printf '%s|%s\n' "$DAYMARK_HOST_INPUT_BRIDGE_SEQ" "$DAYMARK_HOST_INPUT_BRIDGE_STATUS" > "$FAKE_DEVICE_DIR/instrumentation-input-result.txt"
-      if [ "${FAKE_STOP_AFTER_READS:-0}" -eq 0 ]; then
+      if [ "\${FAKE_STOP_AFTER_READS:-0}" -eq 0 ]; then
         touch "$FAKE_STOP_FILE"
       fi
       exit 0
