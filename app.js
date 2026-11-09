@@ -561,30 +561,72 @@
   }
 
   function readRecoveryExportPayload() {
-    let taskBackup = null;
-    let focusBackup = null;
-    try {
-      taskBackup = localStorage.getItem(BACKUP_KEY);
-      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
-    } catch (error) {
-      return null;
+    const readBackup = (key) => {
+      try {
+        const value = localStorage.getItem(key);
+        return {
+          status: typeof value === 'string' && value.length > 0 ? 'available' : 'absent',
+          value: typeof value === 'string' && value.length > 0 ? value : null
+        };
+      } catch (error) {
+        console.warn('Could not read a Daymark recovery backup:', error);
+        return { status: 'unknown', value: null };
+      }
+    };
+    // Task and Focus backups are independent recovery sources. A failure to
+    // read one must never hide the exact bytes available from the other.
+    const task = readBackup(BACKUP_KEY);
+    const focus = readBackup(FOCUS_BACKUP_KEY);
+    const hasTaskBackup = task.status === 'available';
+    const hasFocusBackup = focus.status === 'available';
+    const hasUnknownBackup = task.status === 'unknown' || focus.status === 'unknown';
+
+    if (!hasTaskBackup && !hasFocusBackup) {
+      return { payload: null, hasUnknownBackup };
     }
-    const hasTaskBackup = typeof taskBackup === 'string' && taskBackup.length > 0;
-    const hasFocusBackup = typeof focusBackup === 'string' && focusBackup.length > 0;
     if (hasTaskBackup && hasFocusBackup) {
-      return JSON.stringify({
-        format: 'daymark-combined-recovery-v1',
-        taskBackup,
-        focusBackup
-      });
+      return {
+        payload: JSON.stringify({
+          format: 'daymark-combined-recovery-v1',
+          taskBackup: task.value,
+          focusBackup: focus.value
+        }),
+        hasUnknownBackup: false
+      };
     }
-    return hasTaskBackup ? taskBackup : (hasFocusBackup ? focusBackup : null);
+    if (hasUnknownBackup) {
+      // Preserve readable bytes and explicitly distinguish an unreadable
+      // sibling from an absent backup. This is an export envelope only; it
+      // never writes or restores either storage key.
+      return {
+        payload: JSON.stringify({
+          format: 'daymark-partial-recovery-v1',
+          taskBackup: task.value,
+          taskBackupStatus: task.status,
+          focusBackup: focus.value,
+          focusBackupStatus: focus.status
+        }),
+        hasUnknownBackup: true
+      };
+    }
+    return {
+      payload: hasTaskBackup ? task.value : focus.value,
+      hasUnknownBackup: false
+    };
   }
 
   function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
-    const raw = readRecoveryExportPayload();
-    if (typeof raw !== 'string' || raw.length === 0) return;
-    showToast(message, {
+    const recovery = readRecoveryExportPayload();
+    if (typeof recovery.payload !== 'string' || recovery.payload.length === 0) {
+      if (recovery.hasUnknownBackup) {
+        showToast('Recovery backup status is unknown; no readable backup could be exported. No data was changed.');
+      }
+      return;
+    }
+    const notice = recovery.hasUnknownBackup
+      ? `${message} Another recovery key could not be read; the export will mark it as unknown.`
+      : message;
+    showToast(notice, {
       label: 'Export recovery',
       run: exportRecoveryBackup
     });
@@ -593,9 +635,12 @@
   function exportRecoveryBackup() {
     if (state.recoveryExportInProgress) return;
 
-    const raw = readRecoveryExportPayload();
+    const recovery = readRecoveryExportPayload();
+    const raw = recovery.payload;
     if (typeof raw !== 'string' || raw.length === 0) {
-      showToast('No recovery backup is available to export.');
+      showToast(recovery.hasUnknownBackup
+        ? 'No readable recovery backup is available; another backup key could not be read.'
+        : 'No recovery backup is available to export.');
       return;
     }
 
