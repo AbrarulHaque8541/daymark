@@ -6,6 +6,8 @@ ACTIVITY="$ROOT/app/src/main/java/com/abrar/daymark/MainActivity.java"
 PROVIDER="$ROOT/app/src/main/java/com/abrar/daymark/AttachmentContentProvider.java"
 RECEIVER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java"
 SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
+POLICY="$ROOT/app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java"
+MANIFEST="$ROOT/app/src/main/AndroidManifest.xml"
 RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
@@ -93,6 +95,11 @@ expect_fail_after_removal check-web-clip.py 'saveTasksAsync("Saving offline clip
 # Reminder notification must retain the per-duration action labels and only re-arm its alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + minutes + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "ACTION_TIME_CHANGED" "$POLICY" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "ACTION_TIMEZONE_CHANGED" "$POLICY" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIME_SET" "$MANIFEST" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIMEZONE_CHANGED" "$MANIFEST" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "ReminderSchedulePolicy.shouldRescheduleForSystemChange(action)" "$RECEIVER" "$ROOT"
 # Site history search and single-site removal must fail closed.
 python3 "$ROOT/tools/check-browser-history.py" "$ROOT" >/dev/null
 echo "PASS meta: check-browser-history.py passes on current source"
