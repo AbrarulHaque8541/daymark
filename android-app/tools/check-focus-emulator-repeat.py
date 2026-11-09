@@ -60,7 +60,7 @@ assert "drive_instrumentation_input_bridge" in runner
 assert ". tools/platform-instrumentation-input-bridge.sh" in runner
 assert "adb shell input tap" in input_bridge and "adb shell input swipe" in input_bridge
 assert "run-platform-instrumentation-input-bridge-tests.sh" in test_runner
-assert "duplicate request sequence" in input_bridge_tests
+assert "repeated request sequence" in input_bridge_tests
 assert "vertical drag delivers touchscreen events to target" in platform_test
 assert "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" in platform_test
 assert "stableVisibleBounds" in platform_test
