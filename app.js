@@ -13,7 +13,7 @@
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, taskPrimaryUnreadable: false, focusPrimaryUnreadable: false, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -29,12 +29,36 @@
 
   function loadTasks() {
     let saved = null;
+    let primaryUnreadable = false;
     try {
       saved = localStorage.getItem(STORAGE_KEY);
     } catch (error) {
-      console.warn('Could not read Daymark storage:', error);
-      setStorageStatus('Storage unavailable', true);
-      showToast('Browser storage is unavailable. You can still use this page for now.');
+      console.warn('Could not read Daymark primary task storage:', error);
+      primaryUnreadable = true;
+    }
+    if (primaryUnreadable) {
+      state.taskPrimaryUnreadable = true;
+      // Primary key is unreadable. Independently inspect the recovery backup
+      // without treating the primary as absent or mutating either key.
+      let backupRaw = null;
+      let backupUnreadable = false;
+      try {
+        backupRaw = localStorage.getItem(BACKUP_KEY);
+      } catch (backupError) {
+        console.warn('Could not read Daymark task recovery backup:', backupError);
+        backupUnreadable = true;
+      }
+      if (backupUnreadable) {
+        setStorageStatus('Primary task data unreadable; recovery status unknown', true);
+        showToast('Task data could not be read. Recovery backup status is unknown. No data was changed.');
+      } else if (typeof backupRaw === 'string' && backupRaw.length > 0) {
+        setStorageStatus('Primary task data unreadable; recovery backup available', true);
+        showToast('Task data could not be read. A recovery backup is available for export. No data was changed.');
+        offerRecoveryExport('Primary task data is unreadable. Export the recovery backup for manual review.');
+      } else {
+        setStorageStatus('Primary task data unreadable; no recovery backup found', true);
+        showToast('Task data could not be read. No recovery backup was found. No data was changed.');
+      }
       return [];
     }
     if (!saved) {
@@ -188,6 +212,10 @@
   }
 
   function persistTasks() {
+    if (state.taskPrimaryUnreadable) {
+      setStorageStatus('Cannot save tasks safely: primary task data is unreadable. Export the recovery backup before editing.', true);
+      return false;
+    }
     try {
       if (state.recoveryBackupPendingPayload !== null) {
         // Do not overwrite the only remaining copy of rejected/unreadable
@@ -533,30 +561,72 @@
   }
 
   function readRecoveryExportPayload() {
-    let taskBackup = null;
-    let focusBackup = null;
-    try {
-      taskBackup = localStorage.getItem(BACKUP_KEY);
-      focusBackup = localStorage.getItem(FOCUS_BACKUP_KEY);
-    } catch (error) {
-      return null;
+    const readBackup = (key) => {
+      try {
+        const value = localStorage.getItem(key);
+        return {
+          status: typeof value === 'string' && value.length > 0 ? 'available' : 'absent',
+          value: typeof value === 'string' && value.length > 0 ? value : null
+        };
+      } catch (error) {
+        console.warn('Could not read a Daymark recovery backup:', error);
+        return { status: 'unknown', value: null };
+      }
+    };
+    // Task and Focus backups are independent recovery sources. A failure to
+    // read one must never hide the exact bytes available from the other.
+    const task = readBackup(BACKUP_KEY);
+    const focus = readBackup(FOCUS_BACKUP_KEY);
+    const hasTaskBackup = task.status === 'available';
+    const hasFocusBackup = focus.status === 'available';
+    const hasUnknownBackup = task.status === 'unknown' || focus.status === 'unknown';
+
+    if (!hasTaskBackup && !hasFocusBackup) {
+      return { payload: null, hasUnknownBackup };
     }
-    const hasTaskBackup = typeof taskBackup === 'string' && taskBackup.length > 0;
-    const hasFocusBackup = typeof focusBackup === 'string' && focusBackup.length > 0;
     if (hasTaskBackup && hasFocusBackup) {
-      return JSON.stringify({
-        format: 'daymark-combined-recovery-v1',
-        taskBackup,
-        focusBackup
-      });
+      return {
+        payload: JSON.stringify({
+          format: 'daymark-combined-recovery-v1',
+          taskBackup: task.value,
+          focusBackup: focus.value
+        }),
+        hasUnknownBackup: false
+      };
     }
-    return hasTaskBackup ? taskBackup : (hasFocusBackup ? focusBackup : null);
+    if (hasUnknownBackup) {
+      // Preserve readable bytes and explicitly distinguish an unreadable
+      // sibling from an absent backup. This is an export envelope only; it
+      // never writes or restores either storage key.
+      return {
+        payload: JSON.stringify({
+          format: 'daymark-partial-recovery-v1',
+          taskBackup: task.value,
+          taskBackupStatus: task.status,
+          focusBackup: focus.value,
+          focusBackupStatus: focus.status
+        }),
+        hasUnknownBackup: true
+      };
+    }
+    return {
+      payload: hasTaskBackup ? task.value : focus.value,
+      hasUnknownBackup: false
+    };
   }
 
   function offerRecoveryExport(message = 'Recovery data is preserved on this device. Export it for manual review.') {
-    const raw = readRecoveryExportPayload();
-    if (typeof raw !== 'string' || raw.length === 0) return;
-    showToast(message, {
+    const recovery = readRecoveryExportPayload();
+    if (typeof recovery.payload !== 'string' || recovery.payload.length === 0) {
+      if (recovery.hasUnknownBackup) {
+        showToast('Recovery backup status is unknown; no readable backup could be exported. No data was changed.');
+      }
+      return;
+    }
+    const notice = recovery.hasUnknownBackup
+      ? `${message} Another recovery key could not be read; the export will mark it as unknown.`
+      : message;
+    showToast(notice, {
       label: 'Export recovery',
       run: exportRecoveryBackup
     });
@@ -565,9 +635,12 @@
   function exportRecoveryBackup() {
     if (state.recoveryExportInProgress) return;
 
-    const raw = readRecoveryExportPayload();
+    const recovery = readRecoveryExportPayload();
+    const raw = recovery.payload;
     if (typeof raw !== 'string' || raw.length === 0) {
-      showToast('No recovery backup is available to export.');
+      showToast(recovery.hasUnknownBackup
+        ? 'No readable recovery backup is available; another backup key could not be read.'
+        : 'No recovery backup is available to export.');
       return;
     }
 
@@ -919,11 +992,12 @@
     const task = state.tasks.find((item) => item.id === row?.dataset.taskId);
     if (!task) return;
     if (button.dataset.action === 'toggle') {
+      const wasCompleted = task.completed;
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
+      if (saved && task.completed && !wasCompleted) notifyWebhookTaskCompleted(task);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
@@ -1421,11 +1495,36 @@
     const empty = { session: null, log: [] };
     if (!focus) return empty;
     let saved = null;
+    let primaryUnreadable = false;
     try {
       saved = localStorage.getItem(FOCUS_KEY);
     } catch (error) {
-      console.warn('Could not read Daymark focus storage:', error);
-      setStorageStatus('Focus storage unavailable', true);
+      console.warn('Could not read Daymark focus primary storage:', error);
+      primaryUnreadable = true;
+    }
+    if (primaryUnreadable) {
+      state.focusPrimaryUnreadable = true;
+      // Primary Focus key is unreadable. Independently inspect the Focus
+      // recovery backup without mutation.
+      let backupRaw = null;
+      let backupUnreadable = false;
+      try {
+        backupRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
+      } catch (backupError) {
+        console.warn('Could not read Daymark focus recovery backup:', backupError);
+        backupUnreadable = true;
+      }
+      if (backupUnreadable) {
+        setStorageStatus('Focus data unreadable; recovery status unknown', true);
+        showToast('Focus data could not be read. Recovery backup status is unknown. No data was changed.');
+      } else if (typeof backupRaw === 'string' && backupRaw.length > 0) {
+        setStorageStatus('Focus data unreadable; recovery backup available', true);
+        showToast('Focus data could not be read. A recovery backup is available for export. No data was changed.');
+        offerRecoveryExport('Focus data is unreadable. Export the recovery backup for manual review.');
+      } else {
+        setStorageStatus('Focus data unreadable; no recovery backup found', true);
+        showToast('Focus data could not be read. No recovery backup was found. No data was changed.');
+      }
       return empty;
     }
     if (!saved) {
@@ -1501,6 +1600,10 @@
 
   function persistFocusState() {
     if (!focus) return false;
+    if (state.focusPrimaryUnreadable) {
+      setStorageStatus('Cannot save Focus data safely: primary Focus data is unreadable. Export the recovery backup before continuing.', true);
+      return false;
+    }
     if (state.focusRecoveryBackupPendingPayload !== null) {
       const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
       if (!backupSaved) {

@@ -5,14 +5,17 @@ const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const feedLogic = require('../feed-logic.js');
+const focus = require('../focus-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FEED_KEY = 'daymark.feed.v1';
+const FOCUS_KEY = 'daymark.focus.v1';
+const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
 const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set(), webhookUi = null, onStorageWrite = null) {
   const elements = new Map();
 
   function element(selector) {
@@ -84,10 +87,14 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   };
 
   const localStorage = {
-    getItem: (key) => storedValues.has(key) ? storedValues.get(key) : null,
+    getItem: (key) => {
+      if (failReads.has(key)) throw new Error('SecurityError');
+      return storedValues.has(key) ? storedValues.get(key) : null;
+    },
     setItem: (key, value) => {
       if (failWrites.has(key)) throw new Error('QuotaExceededError');
       storedValues.set(key, String(value));
+      if (typeof onStorageWrite === 'function') onStorageWrite(key, String(value));
     },
     removeItem: (key) => storedValues.delete(key)
   };
@@ -103,6 +110,8 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   const window = {
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
+    DaymarkFocus: focus,
+    DaymarkWebhookUi: webhookUi,
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
@@ -152,6 +161,19 @@ function validTask(id, title) {
     id, title, dueDate: null, priority: 'medium', completed: false,
     createdAt: timestamp, updatedAt: timestamp
   };
+}
+
+
+function dispatchTaskToggle(app, taskId) {
+  const row = { dataset: { taskId } };
+  const button = {
+    dataset: { action: 'toggle' },
+    closest(selector) { return selector === '[data-task-id]' ? row : null; }
+  };
+  const target = {
+    closest(selector) { return selector === 'button[data-action]' ? button : null; }
+  };
+  app.elements.get('#task-list').dispatch('click', { target });
 }
 
 test('partially rejected saved tasks survive a subsequent edit and page reload', () => {
@@ -400,6 +422,77 @@ test('recovery export uses encoded data URL when Blob URL APIs are unavailable',
     'data URLs do not need object-URL revocation');
 });
 
+test('unreadable task primary remains read-only after a user attempts to add a task', () => {
+  const backup = JSON.stringify([validTask('recovered-task', 'Recovered task')]);
+  const storedValues = new Map([[BACKUP_KEY, backup]]);
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  app.elements.get('#new-title').value = 'Session-only task';
+  app.elements.get('#add-form').dispatch('submit');
+
+  assert.equal(storedValues.has(STORAGE_KEY), false,
+    'a later setItem must not replace a primary key whose read failed');
+  assert.equal(storedValues.get(BACKUP_KEY), backup,
+    'the readable recovery backup remains byte-for-byte unchanged');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save tasks safely: primary task data is unreadable/);
+});
+
+test('unreadable Focus primary remains read-only after a user starts a session', () => {
+  const backup = JSON.stringify({ session: null, log: [] });
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, backup]]);
+  const failReads = new Set([FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus data unreadable; recovery backup available/);
+  app.elements.get('#focus-start').dispatch('click');
+
+  assert.equal(storedValues.has(FOCUS_KEY), false,
+    'starting a timer must not overwrite an unreadable Focus primary');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), backup,
+    'the readable Focus backup remains byte-for-byte unchanged');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save Focus data safely: primary Focus data is unreadable/);
+});
+
+test('unreadable task and Focus primaries with unreadable backups remain unchanged after attempted writes', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY, BACKUP_KEY, FOCUS_KEY, FOCUS_BACKUP_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  app.elements.get('#new-title').value = 'Must not overwrite task primary';
+  app.elements.get('#add-form').dispatch('submit');
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+  assert.equal(storedValues.has(BACKUP_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save tasks safely: primary task data is unreadable/);
+
+  app.elements.get('#focus-start').dispatch('click');
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Cannot save Focus data safely: primary Focus data is unreadable/);
+});
+
+test('unreadable task and Focus primaries with no backups do not create replacement primaries', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY, FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Focus data unreadable; no recovery backup found/);
+  app.elements.get('#new-title').value = 'Session-only task';
+  app.elements.get('#add-form').dispatch('submit');
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+  assert.equal(storedValues.has(BACKUP_KEY), false);
+
+  app.elements.get('#focus-start').dispatch('click');
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+  assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
+});
+
 test('app.js parses before browser runtime boot', () => {
   try {
     new vm.Script(APP_SOURCE, { filename: 'app.js' });
@@ -486,4 +579,134 @@ test('Briefing confirms when its cache was persisted for offline reading', async
   assert.match(app.elements.get('#feed-status').textContent,
     /Saved for offline reading/,
     'the status only promises offline availability after persistence succeeds');
+});
+
+
+test('unreadable primary task key surfaces readable recovery backup without mutation', () => {
+  const backup = JSON.stringify([validTask('recovered-1', 'Recovered task')]);
+  const storedValues = new Map([
+    [BACKUP_KEY, backup]
+  ]);
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Primary task data unreadable; recovery backup available/);
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false);
+  assert.equal(storedValues.get(BACKUP_KEY), backup, 'backup must remain untouched');
+  assert.equal(storedValues.has(STORAGE_KEY), false, 'primary must not be written');
+});
+
+test('unreadable primary and unreadable backup reports unknown recovery status', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY, BACKUP_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Primary task data unreadable; recovery status unknown/);
+  assert.equal(app.elements.get('#toast-action').hidden, true);
+});
+
+test('unreadable primary with no backup reports no recovery backup found', () => {
+  const storedValues = new Map();
+  const failReads = new Set([STORAGE_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /Primary task data unreadable; no recovery backup found/);
+});
+
+
+
+
+test('recovery export preserves readable task backup when Focus backup read is unknown', () => {
+  const backup = JSON.stringify([validTask('task-backup', 'Keep readable task backup')]);
+  const storedValues = new Map([[BACKUP_KEY, backup]]);
+  const failReads = new Set([STORAGE_KEY, FOCUS_BACKUP_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false, 'a readable task backup remains exportable');
+  assert.match(app.elements.get('#toast').textContent, /Another recovery key could not be read/);
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-partial-recovery-v1');
+  assert.equal(exported.taskBackup, backup, 'the task backup bytes are preserved exactly');
+  assert.equal(exported.taskBackupStatus, 'available');
+  assert.equal(exported.focusBackup, null);
+  assert.equal(exported.focusBackupStatus, 'unknown',
+    'an unreadable Focus backup is not misreported as absent');
+  assert.equal(storedValues.get(BACKUP_KEY), backup);
+  assert.equal(storedValues.has(STORAGE_KEY), false);
+});
+
+test('recovery export preserves readable Focus backup when task backup read is unknown', () => {
+  const backup = JSON.stringify({ session: null, log: [{ id: 'focus-log', duration: 25 }] });
+  const storedValues = new Map([[FOCUS_BACKUP_KEY, backup]]);
+  const failReads = new Set([BACKUP_KEY, FOCUS_KEY]);
+  const app = bootApp(storedValues, new Set(), false, true, failReads);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(action.hidden, false, 'a readable Focus backup remains exportable');
+  assert.match(app.elements.get('#toast').textContent, /Another recovery key could not be read/);
+  action.dispatch('click');
+
+  const exported = JSON.parse(app.getLastBlob().parts[0]);
+  assert.equal(exported.format, 'daymark-partial-recovery-v1');
+  assert.equal(exported.taskBackup, null);
+  assert.equal(exported.taskBackupStatus, 'unknown',
+    'an unreadable task backup is not misreported as absent');
+  assert.equal(exported.focusBackup, backup, 'the Focus backup bytes are preserved exactly');
+  assert.equal(exported.focusBackupStatus, 'available');
+  assert.equal(storedValues.get(FOCUS_BACKUP_KEY), backup);
+  assert.equal(storedValues.has(FOCUS_KEY), false);
+});
+
+
+
+test('task-completion webhook is not queued when task persistence fails', () => {
+  const original = JSON.stringify([validTask('webhook-task', 'Persist before webhook')]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const notifications = [];
+  const webhookUi = {
+    notifyTaskCompleted(task) {
+      notifications.push(task.id);
+      return Promise.resolve({ queued: true });
+    }
+  };
+  const app = bootApp(storedValues, new Set([STORAGE_KEY]), false, true, new Set(), webhookUi);
+
+  dispatchTaskToggle(app, 'webhook-task');
+
+  assert.deepEqual(notifications, [],
+    'an external completion event must not be queued when the local primary write fails');
+  assert.equal(storedValues.get(STORAGE_KEY), original,
+    'failed persistence leaves the original task bytes unchanged');
+});
+
+test('task-completion webhook is queued only after a successful new completion write', () => {
+  const original = JSON.stringify([validTask('webhook-task', 'Persist before webhook')]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const order = [];
+  const webhookUi = {
+    notifyTaskCompleted(task) {
+      order.push({ type: 'webhook', completed: task.completed });
+      return Promise.resolve({ queued: true });
+    }
+  };
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), webhookUi,
+    (key) => { if (key === STORAGE_KEY) order.push({ type: 'persist' }); });
+
+  dispatchTaskToggle(app, 'webhook-task');
+  assert.deepEqual(order, [
+    { type: 'persist' },
+    { type: 'webhook', completed: true }
+  ], 'the task write must complete before the webhook notification');
+
+  dispatchTaskToggle(app, 'webhook-task');
+  assert.equal(order.filter((entry) => entry.type === 'webhook').length, 1,
+    'reopening a task must not emit a completion webhook');
+  assert.equal(JSON.parse(storedValues.get(STORAGE_KEY))[0].completed, false);
 });
