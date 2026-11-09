@@ -109,6 +109,7 @@ python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
 echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
 expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "getUiAutomation().executeShellCommand(command)" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "DaymarkPlatformInstrumentation" "$ROOT/tools/run-platform-instrumentation-on-emulator.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py 'STATUS_MARKER = "__DAYMARK_INPUT_STATUS__="' "$SHELL_POLICY" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "TAP_PATTERN" "$SHELL_POLICY" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "run-platform-instrumentation-shell-input-tests.sh" "$ROOT/tools/run-platform-instrumentation-repeat-tests.sh" "$ROOT"
