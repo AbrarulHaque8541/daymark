@@ -571,6 +571,21 @@ test('an empty task backup remains exportable when the primary task read throws'
     'the zero-byte recovery source must remain unchanged');
 });
 
+test('an empty primary task value is preserved as opaque recovery data', () => {
+  const storedValues = new Map([[STORAGE_KEY, '']]);
+  const app = bootApp(storedValues);
+  const action = app.elements.get('#toast-action');
+
+  assert.equal(storedValues.get(STORAGE_KEY), '',
+    'the empty primary task bytes must not be rewritten');
+  assert.equal(storedValues.get(BACKUP_KEY), '',
+    'the exact empty primary task bytes must be retained as a recovery backup');
+  assert.equal(action.hidden, false);
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], '',
+    'the recovery export must preserve the exact empty task bytes');
+});
+
 test('an empty Focus backup remains exportable when the primary Focus read throws', () => {
   const storedValues = new Map([[FOCUS_BACKUP_KEY, '']]);
   const app = bootApp(storedValues, new Set(), false, true, new Set(['daymark.focus.v1']), focusLogic);
@@ -598,6 +613,27 @@ test('an empty primary Focus value is preserved as opaque recovery data', () => 
   action.dispatch('click');
   assert.equal(app.getLastBlob().parts[0], '',
     'the recovery export must preserve the exact primary bytes');
+});
+
+test('an empty primary Focus value does not overwrite an older opaque recovery source', () => {
+  const prior = '{older Focus recovery bytes';
+  const storedValues = new Map([
+    ['daymark.focus.v1', ''],
+    [FOCUS_BACKUP_KEY, prior]
+  ]);
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  const backup = JSON.parse(storedValues.get(FOCUS_BACKUP_KEY));
+
+  assert.equal(storedValues.get('daymark.focus.v1'), '',
+    'the empty primary Focus bytes must remain unchanged');
+  assert.equal(backup.format, 'daymark-focus-recovery-bundle-v1');
+  assert.deepEqual(backup.payloads, [prior, ''],
+    'the older opaque backup and the empty primary bytes must both remain recoverable');
+  const action = app.elements.get('#toast-action');
+  assert.equal(action.hidden, false);
+  action.dispatch('click');
+  assert.equal(app.getLastBlob().parts[0], storedValues.get(FOCUS_BACKUP_KEY),
+    'manual export must preserve the complete combined Focus recovery source');
 });
 
 test('empty strings are malformed recovery payloads, not absent recovery sources', () => {
