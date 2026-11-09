@@ -9,6 +9,7 @@ enforcement = (main / "BrowserServiceWorkerEnforcement.java").read_text(encoding
 webview = (main / "DaymarkWebView.java").read_text(encoding="utf-8")
 workspace = (main / "BrowserWorkspaceController.java").read_text(encoding="utf-8")
 docs = (root / "ANDROID_SOURCES.md").read_text(encoding="utf-8")
+docs_flat = " ".join(docs.split())
 test_module = (root / "service-worker-test/build.gradle.kts").read_text(encoding="utf-8")
 
 def require(condition, message):
@@ -48,7 +49,7 @@ require("BrowserServiceWorkerEnforcement.enforceBlocked();" in workspace
         "reassert the process-wide block in the Android workspace controller on Offline transition")
 require("DaymarkWebView.isServiceWorkerNetworkPolicyReady()" in workspace,
         "do not unblock page loads if global Service Worker enforcement could not be installed")
-require("Service Worker network requests remain blocked even while ordinary page navigation is Online" in docs,
+require("Service Worker network requests remain blocked even while ordinary page navigation is Online" in docs_flat,
         "document the fail-closed behavior and compatibility trade-off")
 require("static Decision decide(boolean onlineEnabled, boolean explicitNavigation, String scheme)" in policy,
         "keep Online toggle and explicit navigation distinct from Service Worker network grants")
