@@ -36,7 +36,8 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.currency.v1',
     'daymark.zones.v1',
     'daymark.webhook.v1',
-    'daymark.webhook.queue.v1'
+    'daymark.webhook.queue.v1',
+    'daymark.webhook.lock.v1'
   ];
   assert.deepEqual(storage.categoryIds().length, storage.CATEGORIES.length);
   const seen = new Set();
@@ -57,6 +58,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
 test('planClear returns the exact keys and rejects unknown categories', () => {
   assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
+  assert.deepEqual(storage.planClear('webhook-lock'), ['daymark.webhook.lock.v1']);
   assert.throws(() => storage.planClear('nope'), /Unknown data category/);
   assert.throws(() => storage.planClear(null), /Unknown data category/);
   // The plan is a copy: mutating it must not change future plans.
