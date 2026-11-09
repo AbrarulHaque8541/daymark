@@ -54,13 +54,29 @@ public final class ExtensionPackageParserSmoke {
         check(original.version.equals(parsed.version), "pack version survives a JSON round trip");
         check(original.description.equals(parsed.description), "pack description survives a JSON round trip");
         check(parsed.enabled, "enabled pack survives a JSON round trip");
+        BrowserExtension firstInstall = ExtensionPackageParser.prepareNewUserPackInstall(parsed);
+        check(!firstInstall.enabled, "a new user-pack install is disabled until explicit activation");
+        check(parsed.enabled, "preparing a new install does not mutate the parsed pack");
         check(!parsed.builtIn, "imported packs are never marked built-in");
         check(parsed.matches.contains("https://example.com/*"), "match rules survive a JSON round trip");
         check(parsed.excludes.contains("https://example.com/private"), "exclude rules survive a JSON round trip");
         check(original.css.equals(parsed.css), "css survives a JSON round trip");
         check(original.js.equals(parsed.js), "js survives a JSON round trip");
         check("document_end".equals(parsed.runAt), "the effective runAt survives a JSON round trip");
-        check(original.warnings.equals(parsed.warnings), "warnings survive a JSON round trip");
+        check(parsed.warnings.startsWith(original.warnings), "original warnings survive alongside the import disclosure");
+        check(parsed.warnings.contains("not an isolated extension sandbox"),
+                "Daymark JSON imports disclose that page scripts are not isolated");
+        check(parsed.warnings.contains("JavaScript runs in that page's context"),
+                "the trust disclosure describes JavaScript conditionally alongside CSS-only content");
+        check(parsed.warnings.contains("could send that data to an external service"),
+                "Daymark JSON imports disclose possible external transmission of page-visible data");
+        BrowserExtension reParsed = ExtensionPackageParser.parseDaymarkJson(
+                ExtensionPackageParser.toDaymarkJson(parsed), false);
+        check(parsed.warnings.equals(reParsed.warnings), "the trust disclosure remains idempotent across storage reads");
+        BrowserExtension builtIn = ExtensionPackageParser.parseDaymarkJson(
+                ExtensionPackageParser.toDaymarkJson(original), true);
+        check(!builtIn.warnings.contains("not an isolated extension sandbox"),
+                "built-in packs do not receive an imported-pack trust warning");
         check(parsed.disabledSites.contains("example.com"), "disabled sites survive a JSON round trip");
     }
 
@@ -103,6 +119,8 @@ public final class ExtensionPackageParserSmoke {
         check(ext.warnings.contains("document_start run timing is not supported"),
                 "the timing limitation is disclosed as an import warning");
         check("console.log('body');".equals(ext.js), "userscript body excludes the header block");
+        check(ext.warnings.contains("not an isolated extension sandbox"),
+                "userscript imports disclose the page-context execution boundary");
         check(ext.warnings.contains("@require/@resource not fetched"), "remote @require is refused with a warning");
         check(!ext.warnings.contains("unsupported @grant"), "GM_addStyle is allowed without an unsupported-grant warning");
 
@@ -144,6 +162,9 @@ public final class ExtensionPackageParserSmoke {
                 "toolbar popups are refused with a warning");
         check(ext.warnings.contains("Requested permissions were not granted"),
                 "manifest permissions are refused with a warning");
+        check(ext.warnings.contains("not an isolated extension sandbox")
+                        && ext.warnings.contains("New imports start disabled"),
+                "WebExtension imports disclose page-context execution and default-disabled activation");
         check(ext.warnings.contains("CSS file style.css was not found in the archive"),
                 "manifest-only imports warn that referenced files were not supplied");
         check(ext.warnings.contains("JS file script.js was not found in the archive"),
