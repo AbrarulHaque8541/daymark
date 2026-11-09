@@ -4,6 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/tools/platform-instrumentation-repeat.sh"
 TMP=$(mktemp -d "daymark-instrumentation-repeat.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
+sh "$ROOT/tools/run-platform-instrumentation-input-bridge-tests.sh"
 RUN_LOG="$TMP/runs.log"
 ADB_LOG="$TMP/adb.log"
 export RUN_LOG ADB_LOG
