@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const storageApi = require('../storage-logic.js');
 const ui = require('../storage-ui.js');
 
@@ -42,14 +44,19 @@ function fakeElement(tag) {
 function fakeEnv(options) {
   const opts = options || {};
   const elements = {
-    'data-list': Object.assign(fakeElement('div'), { id: 'data-list' }),
-    'data-status': Object.assign(fakeElement('p'), { id: 'data-status' }),
-    'data-refresh': Object.assign(fakeElement('button'), { id: 'data-refresh' }),
-    'data-clear-all': Object.assign(fakeElement('button'), { id: 'data-clear-all' })
+    'storage-list': Object.assign(fakeElement('div'), { id: 'storage-list' }),
+    'storage-status-line': Object.assign(fakeElement('p'), { id: 'storage-status-line' }),
+    'storage-check': Object.assign(fakeElement('button'), { id: 'storage-check' }),
+    'storage-clear': Object.assign(fakeElement('button'), { id: 'storage-clear' }),
+    'storage-clear-all': Object.assign(fakeElement('button'), { id: 'storage-clear-all' })
   };
   const storageData = Object.assign({}, opts.data || {});
+  const readFailures = new Set(opts.readFailures || []);
   const storage = {
-    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    getItem(key) {
+      if (readFailures.has(key)) throw new Error('Read access failure');
+      return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
+    },
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
@@ -82,15 +89,46 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkStorageUi, 'object');
 });
 
+test('the production HTML storage controls match the UI wiring', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const id of ['storage-check', 'storage-clear', 'storage-clear-all', 'storage-status-line', 'storage-list']) {
+    const matches = html.match(new RegExp('id="' + id + '"', 'g')) || [];
+    assert.equal(matches.length, 1, id + ' appears exactly once in production HTML');
+  }
+  const { env, elements } = fakeEnv({});
+  ui.attachStorageUi(env);
+  for (const id of ['storage-check', 'storage-clear', 'storage-clear-all']) {
+    assert.ok(elements[id].listeners.some((entry) => entry.type === 'click'), id + ' has a click handler');
+  }
+});
+
+test('Clear status only clears the message and never clears stored data', () => {
+  const { env, elements, storageData } = fakeEnv({ data: { 'daymark.tasks.v1': '[]' } });
+  let clearAllCalls = 0;
+  const originalClearAll = env.storageApi.clearAll;
+  env.storageApi.clearAll = function(...args) {
+    clearAllCalls += 1;
+    return originalClearAll.apply(this, args);
+  };
+  ui.attachStorageUi(env);
+  elements['storage-status-line'].textContent = 'previous status';
+  const clear = elements['storage-clear'].listeners.find((entry) => entry.type === 'click');
+  assert.ok(clear, 'Clear status is wired');
+  clear.handler();
+  assert.equal(elements['storage-status-line'].textContent, '');
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(clearAllCalls, 0, 'Clear status never calls clearAll');
+});
+
 test('attach without any stored data lists every category with honest sizes', () => {
   const { env, elements } = fakeEnv({});
   ui.attachStorageUi(env);
-  const rows = elements['data-list'].children;
+  const rows = elements['storage-list'].children;
   assert.equal(rows.length, storageApi.CATEGORIES.length, 'every category is explained even when empty');
   const clearButtons = rows.map((row) => row.children.find((child) => child.tagName === 'button'));
   assert.ok(clearButtons.every((button) => button.disabled === true), 'nothing can be cleared when nothing is stored');
-  assert.match(elements['data-status'].textContent, /No local data is stored yet/);
-  assert.equal(elements['data-clear-all'].disabled, true, 'clear-all is disabled with an empty store');
+  assert.match(elements['storage-status-line'].textContent, /No local data is stored yet/);
+  assert.equal(elements['storage-clear-all'].disabled, true, 'clear-all is disabled with an empty store');
 });
 
 test('attach with data reports category counts, sizes, and enables clearing', () => {
@@ -101,8 +139,8 @@ test('attach with data reports category counts, sizes, and enables clearing', ()
     }
   });
   ui.attachStorageUi(env);
-  assert.match(elements['data-status'].textContent, /2 of \d+ categories hold data/);
-  const rows = elements['data-list'].children;
+  assert.match(elements['storage-status-line'].textContent, /2 of \d+ categories hold data/);
+  const rows = elements['storage-list'].children;
   assert.ok(rows.some((row) => row.children.some((child) =>
     typeof child.textContent === 'string' && child.textContent.startsWith('Tasks — about '))));
   assert.ok(rows.some((row) => row.children.some((child) =>
@@ -113,7 +151,7 @@ test('attach with data reports category counts, sizes, and enables clearing', ()
   assert.equal(taskButton.disabled, false);
   assert.equal(focusButton.disabled, true, 'a category with no data cannot be cleared');
   assert.equal(taskButton['aria-label'], 'Clear Tasks from this browser');
-  assert.equal(elements['data-clear-all'].disabled, false);
+  assert.equal(elements['storage-clear-all'].disabled, false);
 });
 
 test('clearing one category asks for confirmation and removes only its keys', () => {
@@ -132,8 +170,8 @@ test('clearing one category asks for confirmation and removes only its keys', ()
   assert.equal(storageData['daymark.tasks.v1'], undefined, 'the task data is removed');
   assert.equal(storageData['daymark.tasks.v1.backup'], '[]', 'the recovery backup keeps its own category');
   assert.equal(storageData['daymark.webhook.v1'] !== undefined, true, 'webhook settings are untouched');
-  assert.match(elements['data-status'].textContent, /Cleared Tasks \(1 item\(s\) removed\)/);
-  assert.match(elements['data-status'].textContent, /Nothing else was touched/);
+  assert.match(elements['storage-status-line'].textContent, /Cleared Tasks \(1 item\(s\) removed\)/);
+  assert.match(elements['storage-status-line'].textContent, /Nothing else was touched/);
 });
 
 test('declining the confirmation changes nothing and says so', () => {
@@ -142,7 +180,7 @@ test('declining the confirmation changes nothing and says so', () => {
   confirmState.result = false;
   handle.onClearCategory('currency');
   assert.equal(storageData['daymark.currency.v1'], '{}');
-  assert.match(elements['data-status'].textContent, /Cancelled\. Nothing was cleared/);
+  assert.match(elements['storage-status-line'].textContent, /Cancelled\. Nothing was cleared/);
 });
 
 test('a throwing confirmation fails closed without touching data', () => {
@@ -151,7 +189,7 @@ test('a throwing confirmation fails closed without touching data', () => {
   confirmState.throws = true;
   handle.onClearCategory('briefing');
   assert.equal(storageData['daymark.feed.v1'], '{}');
-  assert.match(elements['data-status'].textContent, /Could not ask for confirmation\. Nothing was cleared/);
+  assert.match(elements['storage-status-line'].textContent, /Could not ask for confirmation\. Nothing was cleared/);
 });
 
 test('clear-all confirms once, removes everything, and leaves foreign keys alone', () => {
@@ -171,9 +209,9 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
   assert.equal(storageData['daymark.focus.v1'], undefined);
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
   assert.equal(storageData['unrelated.other.key'], 'keep me');
-  assert.match(elements['data-status'].textContent, /Cleared all 3 stored item\(s\)/);
-  assert.match(elements['data-status'].textContent, /Nothing outside this browser was affected/);
-  assert.equal(elements['data-clear-all'].disabled, true, 'clear-all disables after the store is empty');
+  assert.match(elements['storage-status-line'].textContent, /Cleared all 3 stored item\(s\)/);
+  assert.match(elements['storage-status-line'].textContent, /Nothing outside this browser was affected/);
+  assert.equal(elements['storage-clear-all'].disabled, true, 'clear-all disables after the store is empty');
 });
 
 test('a failed removal during clear-all is reported honestly', () => {
@@ -181,24 +219,118 @@ test('a failed removal during clear-all is reported honestly', () => {
   const handle = ui.attachStorageUi(env);
   env.localStorage.removeItem = () => { throw new Error('blocked'); };
   handle.onClearAll();
-  assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
+  assert.match(elements['storage-status-line'].textContent, /could not be removed by the browser/);
+});
+
+test('unreadable data is shown as unknown and clear-all fails closed', () => {
+  const { env, elements, storageData, confirmations } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' },
+    readFailures: ['daymark.tasks.v1']
+  });
+  const handle = ui.attachStorageUi(env);
+  const taskRow = elements['storage-list'].children.find((row) =>
+    row.children.some((child) => child.textContent.startsWith('Tasks —')));
+  const taskTitle = taskRow.children.find((child) => child.tagName === 'span');
+  const taskButton = taskRow.children.find((child) => child.tagName === 'button');
+
+  assert.match(taskTitle.textContent, /status unknown/);
+  assert.equal(taskButton.disabled, false, 'an unreadable category allows an explicit retry');
+  assert.equal(elements['storage-clear-all'].disabled, true, 'clear-all is blocked while any category is unreadable');
+  assert.match(elements['storage-status-line'].textContent, /categories could not be checked/);
+  assert.doesNotMatch(elements['storage-status-line'].textContent, /No local data is stored yet/);
+
+  handle.onClearCategory('tasks');
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'failed reads must not delete the stored value');
+  assert.match(elements['storage-status-line'].textContent, /could not be checked or removed\. Nothing was cleared/);
+  handle.onClearAll();
+  assert.equal(confirmations.length, 1, 'only the category retry was confirmed; clear-all was blocked');
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'unknown data blocks clear-all deletion');
+});
+
+test('category clear reports a preflight read failure without claiming that anything was cleared', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' },
+    readFailures: ['daymark.tasks.v1']
+  });
+  const handle = ui.attachStorageUi(env);
+
+  handle.onClearCategory('tasks');
+
+  assert.equal(storageData['daymark.tasks.v1'], '[]',
+    'the preflight read failure must preserve the original task data');
+  assert.match(elements['storage-status-line'].textContent,
+    /Could not clear Tasks: 1 item\(s\) could not be checked or removed\. Nothing was cleared\./);
+  assert.doesNotMatch(elements['storage-status-line'].textContent, /Cleared Tasks/);
+});
+
+test('category clear reports a storage race with no remaining key as no change', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' }
+  });
+  const handle = ui.attachStorageUi(env);
+  delete storageData['daymark.tasks.v1'];
+
+  handle.onClearCategory('tasks');
+
+  assert.match(elements['storage-status-line'].textContent,
+    /No stored data was found for Tasks\. Nothing was changed\./);
+  assert.doesNotMatch(elements['storage-status-line'].textContent, /Cleared Tasks/);
+});
+
+test('all unreadable categories never produce an empty-store claim', () => {
+  const allKeys = storageApi.CATEGORIES.flatMap((category) => category.keys);
+  const data = Object.fromEntries(allKeys.map((key) => [key, 'still stored']));
+  const { env, elements, storageData } = fakeEnv({ data, readFailures: allKeys });
+  ui.attachStorageUi(env);
+
+  assert.match(elements['storage-status-line'].textContent, /No readable local data was found/);
+  assert.match(elements['storage-status-line'].textContent, /categories could not be checked/);
+  assert.doesNotMatch(elements['storage-status-line'].textContent, /No local data is stored yet/);
+  assert.equal(elements['storage-clear-all'].disabled, true,
+    'clear-all is blocked while every category is unreadable');
+  assert.ok(Object.values(storageData).every((value) => value === 'still stored'),
+    'rendering an incomplete scan must not mutate data');
 });
 
 test('unavailable storage keeps the card honest and never clears anything', () => {
   const { env, elements } = fakeEnv({});
   env.localStorage = null;
   ui.attachStorageUi(env);
-  assert.match(elements['data-status'].textContent, /Could not read local data: Browser storage is unavailable/);
+  assert.match(elements['storage-status-line'].textContent, /Could not read local data: Browser storage is unavailable/);
+});
+
+test('a throwing localStorage getter leaves every category unknown and fails closed', () => {
+  const { env, elements, storageData, confirmations } = fakeEnv({
+    data: { 'daymark.tasks.v1': 'keep this task data' }
+  });
+  delete env.localStorage;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() { throw new Error('storage access denied'); }
+  });
+
+  const handle = ui.attachStorageUi(env);
+  assert.match(elements['storage-status-line'].textContent,
+    /Browser storage could not be accessed\. Local data status is unknown/);
+  assert.equal(elements['storage-clear-all'].disabled, true,
+    'clear-all is disabled when the storage object itself cannot be acquired');
+
+  handle.onClearAll();
+  handle.onClearCategory('tasks');
+  assert.equal(confirmations.length, 0, 'no destructive confirmation is offered without storage access');
+  assert.equal(storageData['daymark.tasks.v1'], 'keep this task data',
+    'a throwing storage getter must never cause data to be cleared');
+  assert.match(elements['storage-status-line'].textContent, /Browser storage is unavailable/);
 });
 
 test('the refresh button rescans without confirmation and without changing data', () => {
   const { env, elements, storageData, confirmations } = fakeEnv({ data: { 'daymark.feed.v1': '{}' } });
   ui.attachStorageUi(env);
   env.localStorage.setItem('daymark.weather.v1', '{}');
-  const refresh = elements['data-refresh'].listeners.find((entry) => entry.type === 'click');
+  const refresh = elements['storage-check'].listeners.find((entry) => entry.type === 'click');
   assert.ok(refresh, 'the refresh button is wired');
   refresh.handler();
-  assert.match(elements['data-status'].textContent, /2 of \d+ categories hold data/);
+  assert.match(elements['storage-status-line'].textContent, /2 of \d+ categories hold data/);
   assert.equal(confirmations.length, 0, 'a read-only scan never asks for confirmation');
   assert.equal(storageData['daymark.feed.v1'], '{}');
   assert.equal(storageData['daymark.weather.v1'], '{}');
@@ -213,8 +345,8 @@ test('clear actions set busy state (disabled + aria-busy + is-busy) while operat
   let sawBusy = false;
   env.storageApi.clearCategory = function(...args) {
     // During the call, buttons should be busy
-    const clearAll = elements['data-clear-all'];
-    const list = elements['data-list'];
+    const clearAll = elements['storage-clear-all'];
+    const list = elements['storage-list'];
     if (clearAll.disabled && clearAll.classList.contains('is-busy') && list['aria-busy'] === 'true') {
       sawBusy = true;
     }
@@ -224,5 +356,5 @@ test('clear actions set busy state (disabled + aria-busy + is-busy) while operat
   handle.onClearCategory('tasks');
   assert.equal(sawBusy, true, 'busy state is active during clear');
   // After, busy should be cleared
-  assert.equal(elements['data-list']['aria-busy'], 'false');
+  assert.equal(elements['storage-list']['aria-busy'], 'false');
 });
