@@ -18,7 +18,7 @@
 ## Product and release state
 
 - Gradle source: versionName 1.6, versionCode 13, minSdk 26, targetSdk 36.
-- Source/Gradle application ID remains com.abrar.daymark. The run-level instruction requires com.cue.daymark; this conflicts with the repository source identity. Neither identity was changed. Owner-approved reconciliation is required before identity-sensitive release work.
+- Source/Gradle application ID remains com.abrar.daymark. The run-level instruction requires a different package identifier; this conflicts with the repository source identity. Neither identity was changed. Owner-approved reconciliation is required before identity-sensitive release work.
 - Live release inventory: v1.5 is the latest published release (2026-10-23); v1.4 is draft. Earlier published releases remain unchanged.
 - Physical Android, browser/WebView, desktop and notification acceptance: NOT TESTED.
 
