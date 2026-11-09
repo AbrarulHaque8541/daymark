@@ -9,6 +9,7 @@ SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
 RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
 FOCUS_PANEL="$ROOT/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
 PLATFORM_TEST="$ROOT/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
+SHELL_POLICY="$ROOT/app/src/androidTest/java/com/abrar/daymark/PlatformShellInputCommand.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
 PROVIDER_BACKUP=$(mktemp)
@@ -107,8 +108,9 @@ expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP
 python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
 echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
 expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py 'dispatchHostInput("swipe"' "$PLATFORM_TEST" "$ROOT"
-expect_fail_after_removal check-focus-emulator-repeat.py "INPUT_RESULT_FILE" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "getUiAutomation().executeShellCommand(command)" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py 'STATUS_MARKER = "__DAYMARK_INPUT_STATUS__="' "$SHELL_POLICY" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "run-platform-instrumentation-shell-input-tests.sh" "$ROOT/tools/run-platform-instrumentation-repeat-tests.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" "$PLATFORM_TEST" "$ROOT"
