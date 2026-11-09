@@ -111,6 +111,7 @@ expect_fail_after_removal check-focus-emulator-repeat.py "automation.injectInput
 expect_fail_after_removal check-focus-emulator-repeat.py 'while [ "$attempt" -le 20 ]' "$ROOT/tools/run-platform-instrumentation-on-emulator.sh" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "parse_platform_instrumentation_component()" "$REPEAT_HELPER" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "MAX_COORDINATE = 10000" "$TOUCH_SEQUENCE" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "MIN_SWIPE_DURATION_MS = SWIPE_MOVE_STEPS + 1" "$TOUCH_SEQUENCE" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py 'findAncestorWithSimpleName(modeRow, "ModeSelector")' "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py "scrollDeadline" "$PLATFORM_TEST" "$ROOT"
 expect_fail_after_removal check-focus-emulator-repeat.py 'adoptShellPermissionIdentity("android.permission.INJECT_EVENTS")' "$PLATFORM_TEST" "$ROOT"
