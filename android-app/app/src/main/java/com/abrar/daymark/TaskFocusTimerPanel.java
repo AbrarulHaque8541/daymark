@@ -428,9 +428,9 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         public boolean onInterceptTouchEvent(MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Let the parent Tasks ScrollView observe the stream from the start.
-                    // It only intercepts vertical-dominant movement; horizontal drags stay
-                    // with this selector and are intercepted after the direction is known.
+                    // Clear any stale disallow request and let the parent Tasks ScrollView
+                    // observe the stream from the start.
+                    disallowParentIntercept(false);
                     downX = event.getX();
                     downY = event.getY();
                     horizontalGesture = false;
@@ -477,17 +477,25 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
 
         @Override
         public boolean onTouchEvent(MotionEvent event) {
-            if (!horizontalGesture && !verticalGesture) return super.onTouchEvent(event);
+            if (verticalGesture) {
+                // Do not keep the vertical stream as the selector's touch target. The parent
+                // Tasks ScrollView must be able to take over and perform the workspace scroll.
+                disallowParentIntercept(false);
+                if (event.getActionMasked() == MotionEvent.ACTION_UP
+                        || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    resetGesture();
+                }
+                return false;
+            }
+            if (!horizontalGesture) return super.onTouchEvent(event);
             if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-                if (horizontalGesture) {
-                    TaskFocusTimerModeGesturePolicy.Result result =
-                            TaskFocusTimerModeGesturePolicy.classify(
-                                    event.getX() - downX, event.getY() - downY, gestureThresholdPx);
-                    if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH) {
-                        chooseMode(TaskFocusTimer.Mode.STOPWATCH);
-                    } else if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
-                        chooseMode(TaskFocusTimer.Mode.COUNTDOWN);
-                    }
+                TaskFocusTimerModeGesturePolicy.Result result =
+                        TaskFocusTimerModeGesturePolicy.classify(
+                                event.getX() - downX, event.getY() - downY, gestureThresholdPx);
+                if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH) {
+                    chooseMode(TaskFocusTimer.Mode.STOPWATCH);
+                } else if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
+                    chooseMode(TaskFocusTimer.Mode.COUNTDOWN);
                 }
                 resetGesture();
                 return true;
