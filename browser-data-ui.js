@@ -63,11 +63,22 @@
       for (let i = 0; i < result.keeps.length; i += 1) {
         lines.push('Keeps \u00b7 ' + result.keeps[i]);
       }
+      if (result.undoWindowSeconds > 0) {
+        lines.push('Undo window \u00b7 ' + result.undoWindowSeconds + ' seconds');
+      }
       lines.push((result.recoverable ? 'Comes back \u00b7 ' : 'No undo \u00b7 ') + result.recovery);
       lines.push('Scope \u00b7 ' + result.scope);
       lines.push('Network \u00b7 ' + result.network);
       for (let i = 0; i < lines.length; i += 1) {
         resultEl.appendChild(makeItem('feed-item', lines[i]));
+      }
+      if (resultEl.classList && typeof resultEl.classList.add === 'function') {
+        resultEl.classList.add('is-updating');
+        setTimeout(() => {
+          if (resultEl.classList && typeof resultEl.classList.remove === 'function') {
+            resultEl.classList.remove('is-updating');
+          }
+        }, 180);
       }
     }
 
@@ -80,8 +91,10 @@
       // The engine fails closed to the honest unknown entry for any value
       // the prototype does not know.
       const result = dataApi.explainClearAction(action);
-      status('Explained \u00b7 ' + result.label
-        + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
+      status(!result.available
+        ? 'Unavailable \u00b7 ' + result.label + ' \u00b7 no action was run'
+        : 'Explained \u00b7 ' + result.label
+          + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
       renderExplanation(result);
     }
 
@@ -89,7 +102,7 @@
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
-      status('Cleared. Pick an action to see exactly what it touches.');
+      status('Explanation cleared; no task or storage data was changed.');
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -101,8 +114,23 @@
     if (actionEl && typeof actionEl.addEventListener === 'function') {
       actionEl.addEventListener('change', () => { explain(); });
     }
-    if (clearEl && typeof clearEl.addEventListener === 'function') {
-      clearEl.addEventListener('click', () => { onClear(); });
+    if (clearEl) {
+      clearEl.textContent = 'Clear explanation';
+      if (typeof clearEl.setAttribute === 'function') {
+        clearEl.setAttribute('aria-label', 'Clear explanation only; no task or storage data is changed');
+      }
+      if (typeof clearEl.addEventListener === 'function') {
+        clearEl.addEventListener('pointerdown', () => {
+          if (clearEl.classList && typeof clearEl.classList.add === 'function') clearEl.classList.add('is-pressed');
+        });
+        clearEl.addEventListener('pointerup', () => {
+          if (clearEl.classList && typeof clearEl.classList.remove === 'function') clearEl.classList.remove('is-pressed');
+        });
+        clearEl.addEventListener('pointercancel', () => {
+          if (clearEl.classList && typeof clearEl.classList.remove === 'function') clearEl.classList.remove('is-pressed');
+        });
+        clearEl.addEventListener('click', () => { onClear(); });
+      }
     }
 
     explain();
