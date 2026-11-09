@@ -394,16 +394,16 @@ test('clear actions set busy state (disabled + aria-busy + is-busy) while operat
 
 
 test('storage UI selectors stay connected to the production HTML contract', () => {
-  const root = pathModule.join(__dirname, '..');
-  const html = fs.readFileSync(pathModule.join(root, 'index.html'), 'utf8');
-  const source = fs.readFileSync(pathModule.join(root, 'storage-ui.js'), 'utf8');
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'storage-ui.js'), 'utf8');
   const counts = new Map();
-  for (const match of html.matchAll(/\\bid="([^"]+)"/g)) {
+  for (const match of html.matchAll(/\bid="([^"]+)"/g)) {
     counts.set(match[1], (counts.get(match[1]) || 0) + 1);
   }
 
   const referenced = [...new Set(
-    [...source.matchAll(/\\belement\\('([^']+)'\\)/g)].map((match) => match[1])
+    [...source.matchAll(/\belement\('([^']+)'\)/g)].map((match) => match[1])
   )];
   const optional = new Set(['storage-clear-all']);
   const missing = referenced.filter((id) => !optional.has(id) && counts.get(id) !== 1);
@@ -414,7 +414,7 @@ test('storage UI selectors stay connected to the production HTML contract', () =
     assert.equal(counts.get(id), 1, id + ' must remain present exactly once');
   }
 
-  const clearStatus = html.match(/<button\\b(?=[^>]*\\bid="storage-clear")(?=[^>]*\\btype="button")[^>]*>([\\s\\S]*?)<\\/button>/i);
+  const clearStatus = html.match(/<button\b(?=[^>]*\bid="storage-clear")(?=[^>]*\btype="button")[^>]*>([\s\S]*?)<\/button>/i);
   assert.ok(clearStatus, 'Clear status must remain a non-submitting button');
   assert.match(clearStatus[1], /Clear status/i);
 });
