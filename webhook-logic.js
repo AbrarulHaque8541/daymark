@@ -35,6 +35,30 @@
     return Boolean(host) && (host.includes('.') || host === 'localhost');
   }
 
+  const ENDPOINT_FINGERPRINT_RE = /^[a-f0-9]{64}$/;
+
+  function isValidEndpointFingerprint(value) {
+    return typeof value === 'string' && ENDPOINT_FINGERPRINT_RE.test(value);
+  }
+
+  async function fingerprintWebhookUrl(value, cryptoImpl, textEncoderImpl) {
+    if (!isValidWebhookUrl(value)) {
+      throw new Error('A valid https:// webhook URL is required to isolate its queue.');
+    }
+    const cryptoApi = cryptoImpl || root.crypto;
+    const Encoder = textEncoderImpl || root.TextEncoder;
+    if (!cryptoApi || !cryptoApi.subtle || typeof cryptoApi.subtle.digest !== 'function'
+        || typeof Encoder !== 'function') {
+      throw new Error('Web Crypto SHA-256 is unavailable; endpoint-isolated webhook queueing is disabled.');
+    }
+    const normalized = new URL(value.trim());
+    // Fragments are not sent in HTTP requests and must not split one endpoint's queue.
+    normalized.hash = '';
+    const digest = await cryptoApi.subtle.digest('SHA-256', new Encoder().encode(normalized.href));
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
   function clipText(value, max) {
     return String(value === null || value === undefined ? '' : value).trim().slice(0, max);
   }
@@ -74,22 +98,28 @@
     return payload;
   }
 
-  function makeQueueEvent(payload, now) {
+  function makeQueueEvent(payload, now, endpointFingerprint) {
     const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
     if (typeof body !== 'string' || !body) throw new Error('A webhook payload is required.');
     if (body.length > MAX_PAYLOAD_CHARS) throw new Error('The webhook payload is too large to queue.');
+    if (!isValidEndpointFingerprint(endpointFingerprint)) {
+      throw new Error('A verified webhook endpoint fingerprint is required to queue an event.');
+    }
     const queuedAt = isIsoTimestamp(now) ? now : new Date().toISOString();
     const id = 'wh-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
-    return { id, payload: body, queuedAt, attempts: 0 };
+    return { id, payload: body, queuedAt, attempts: 0, endpointFingerprint };
   }
 
   function isValidQueueEvent(event) {
+    const fingerprint = event && event.endpointFingerprint;
+    const legacyUnassigned = fingerprint === undefined || fingerprint === null;
     return Boolean(event && typeof event === 'object'
       && typeof event.id === 'string' && event.id.length > 0 && event.id.length <= 64
       && typeof event.payload === 'string' && event.payload.length > 0
       && event.payload.length <= MAX_PAYLOAD_CHARS
       && isIsoTimestamp(event.queuedAt)
-      && Number.isInteger(event.attempts) && event.attempts >= 0 && event.attempts <= MAX_ATTEMPTS);
+      && Number.isInteger(event.attempts) && event.attempts >= 0 && event.attempts <= MAX_ATTEMPTS
+      && (legacyUnassigned || isValidEndpointFingerprint(fingerprint)));
   }
 
   function validateQueue(value) {
@@ -201,6 +231,16 @@
     if (!Array.isArray(queue) || !validateQueue(queue)) {
       throw new Error('The webhook queue is invalid; no events were changed.');
     }
+    if (!isValidEndpointFingerprint(opts.endpointFingerprint)) {
+      throw new Error('A verified webhook endpoint fingerprint is required before delivery.');
+    }
+    const actualFingerprint = await fingerprintWebhookUrl(url, opts.crypto, opts.TextEncoder);
+    if (actualFingerprint !== opts.endpointFingerprint) {
+      throw new Error('The supplied endpoint fingerprint does not match the webhook URL.');
+    }
+    if (queue.some((event) => event.endpointFingerprint !== opts.endpointFingerprint)) {
+      throw new Error('The webhook queue contains an event for a different or unassigned endpoint; no delivery was attempted.');
+    }
     let list = queue.slice();
     let deliveredCount = 0;
     let droppedCount = 0;
@@ -242,6 +282,8 @@
     DEFAULT_TIMEOUT_MS,
     TIMEOUT_MESSAGE,
     isValidWebhookUrl,
+    isValidEndpointFingerprint,
+    fingerprintWebhookUrl,
     buildTaskCompletedPayload,
     makeQueueEvent,
     isValidQueueEvent,
