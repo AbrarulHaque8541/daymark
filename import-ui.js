@@ -138,7 +138,23 @@
           parts.push(plural(parsed.recurring, 'recurring item') + ' imported once as a one-time task.');
         }
         if (parsed.timezoneDropped > 0) {
-          parts.push('Times were kept as written; time zones were not applied.');
+          parts.push('Time zones were not converted; the written hour and minute values were kept.');
+        }
+        if (parsed.secondsDropped > 0) {
+          parts.push(parsed.secondsDropped + ' imported time' + (parsed.secondsDropped === 1 ? '' : 's') +
+            ' had non-zero seconds; seconds were truncated to minute precision.');
+        }
+        if (parsed.categoriesDropped > 0) {
+          parts.push(plural(parsed.categoriesDropped, 'category value') +
+            ' could not be represented by Daymark tags and were skipped.');
+        }
+        if (parsed.invalidCompletion > 0) {
+          parts.push(parsed.invalidCompletion + ' item' + (parsed.invalidCompletion === 1 ? '' : 's') +
+            ' had invalid completion metadata ignored; left open.');
+        }
+        if (parsed.invalidDateType > 0) {
+          parts.push(plural(parsed.invalidDateType, 'date/time field') +
+            ' had incompatible DATE/DATE-TIME or TZID parameters; the date/time was omitted.');
         }
         if (parsed.cancelled > 0) parts.push(plural(parsed.cancelled, 'cancelled item') + ' skipped.');
         status(parts.join(' '));

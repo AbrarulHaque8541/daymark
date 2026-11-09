@@ -140,6 +140,29 @@
     return tags;
   }
 
+  // iCalendar import reports categories the Daymark tag contract cannot retain.
+  // Mirror cleanTags normalization/deduplication/cap without silently hiding losses.
+  function countDroppedTags(candidates) {
+    const accepted = [];
+    let dropped = 0;
+    for (const raw of candidates) {
+      if (typeof raw !== 'string') continue;
+      const tag = raw.trim().toLowerCase().replace(/ /g, '-');
+      if (!tag) continue;
+      if (!isTag(tag)) {
+        dropped += 1;
+        continue;
+      }
+      if (accepted.indexOf(tag) !== -1) continue;
+      if (accepted.length >= MAX_TAGS) {
+        dropped += 1;
+        continue;
+      }
+      accepted.push(tag);
+    }
+    return dropped;
+  }
+
   function cleanSubtasks(raw, makeId) {
     if (!Array.isArray(raw)) return null;
     const subtasks = [];
@@ -323,9 +346,9 @@
   // RFC 5545 3.1: a line beginning with a space or tab continues the previous
   // logical line; that leading whitespace is removed when unfolding.
 
-  // Splits an RFC 5545 list (CATEGORIES etc.) on unescaped commas or
-  // semicolons, then unescapes each item. Escaped delimiters stay inside
-  // their original value.
+  // CATEGORIES is a comma-separated TEXT list. Semicolons are ordinary
+  // category text, not separators. Split before unescaping so escaped commas
+  // stay inside their original value; cleanTags later rejects unsupported punctuation.
   function icsSplitList(text) {
     if (typeof text !== 'string' || text.length === 0) return [];
     const parts = [];
@@ -337,7 +360,7 @@
         i += 1;
         continue;
       }
-      if (ch === ',' || ch === ';') {
+      if (ch === ',') {
         parts.push(current);
         current = '';
         continue;
@@ -390,28 +413,75 @@
   const ICS_DATE = /^(\d{4})(\d{2})(\d{2})$/;
   const ICS_DATETIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/;
 
-  // Maps a DUE/DTSTART property onto stored dueDate/dueTime. The clock time
-  // is kept exactly as written: a Z suffix or a TZID parameter is counted as
-  // a dropped time zone, never silently re-interpreted.
+  // Maps DUE/DTSTART onto Daymark's date + minute-precision time fields.
+  // Time-zone conversion is deliberately not attempted. Non-zero seconds are
+  // truncated (and disclosed) because the stored task contract is HH:MM.
   function icsDateTaskField(prop) {
-    if (!prop) return { dueDate: null, dueTime: null, timezonePresent: false };
-    const declaredDate = (prop.params.VALUE || '').toUpperCase() === 'DATE';
+    const empty = {
+      dueDate: null, dueTime: null, timezonePresent: false,
+      secondsDropped: false, invalidDateType: false
+    };
+    if (!prop) return empty;
+    const params = prop.params || {};
+    const valueType = (params.VALUE || '').toUpperCase();
+    const hasTzid = Object.prototype.hasOwnProperty.call(params, 'TZID');
+    const invalidType = () => ({ ...empty, invalidDateType: true });
+    if (valueType && valueType !== 'DATE' && valueType !== 'DATE-TIME') return invalidType();
+
     const asDate = prop.value.match(ICS_DATE);
-    if (declaredDate || asDate) {
-      if (!asDate) return { dueDate: null, dueTime: null, timezonePresent: false };
-      return { dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3], dueTime: null, timezonePresent: false };
+    if (valueType === 'DATE') {
+      // RFC 5545 DATE values cannot carry a TZID parameter.
+      if (!asDate || hasTzid) return invalidType();
+      return {
+        dueDate: asDate[1] + '-' + asDate[2] + '-' + asDate[3],
+        dueTime: null,
+        timezonePresent: false,
+        secondsDropped: false,
+        invalidDateType: false
+      };
     }
+    // DATE-TIME is the default value type. A date-only value therefore needs
+    // an explicit VALUE=DATE parameter; never infer DATE from its shape.
+    if (asDate) return invalidType();
+
     const asDateTime = prop.value.match(ICS_DATETIME);
-    if (!asDateTime) return { dueDate: null, dueTime: null, timezonePresent: false };
-    const timezonePresent = asDateTime[7] === 'Z' || Boolean(prop.params.TZID);
+    if (!asDateTime) return empty;
+    // TZID is for local DATE-TIME values and must not accompany a UTC "Z" value.
+    if (hasTzid && asDateTime[7] === 'Z') return invalidType();
     const dueDate = asDateTime[1] + '-' + asDateTime[2] + '-' + asDateTime[3];
     const dueTime = asDateTime[4] + ':' + asDateTime[5];
-    // Validate time before claiming a timezone drop. Invalid clock times are
-    // dropped without counting a timezone simplification.
-    if (!isTimeOnly(dueTime)) {
-      return { dueDate, dueTime: null, timezonePresent: false };
+    const seconds = Number(asDateTime[6]);
+    // RFC 5545 permits 00-60 seconds. Daymark stores minutes only, so valid
+    // non-zero seconds are intentionally truncated and reported to the user.
+    // Invalid clock values must not be counted as either a timezone or
+    // precision simplification.
+    if (!isTimeOnly(dueTime) || seconds > 60) {
+      return { dueDate, dueTime: null, timezonePresent: false, secondsDropped: false, invalidDateType: false };
     }
-    return { dueDate, dueTime, timezonePresent };
+    return {
+      dueDate,
+      dueTime,
+      timezonePresent: asDateTime[7] === 'Z' || hasTzid,
+      secondsDropped: seconds !== 0,
+      invalidDateType: false
+    };
+  }
+
+  // COMPLETED is a VTODO DATE-TIME property, must be UTC, and is valid only
+  // alongside STATUS:COMPLETED. The status property remains the completion
+  // state; a timestamp alone must never mark an item complete.
+  function isValidIcsCompletion(prop) {
+    if (!prop || typeof prop.value !== 'string') return false;
+    const valueType = (prop.params.VALUE || '').toUpperCase();
+    if (valueType && valueType !== 'DATE-TIME') return false;
+    if (prop.params.TZID) return false;
+    const match = prop.value.match(ICS_DATETIME);
+    if (!match || match[7] !== 'Z') return false;
+    const date = match[1] + '-' + match[2] + '-' + match[3];
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+    return isDateOnly(date) && hour <= 23 && minute <= 59 && second <= 60;
   }
 
   // Collects the VTODO/VEVENT components of an unfolded iCalendar stream.
@@ -420,37 +490,99 @@
   function parseIcs(text) {
     const lines = unfoldIcsLines(text);
     const components = [];
+    const stack = [];
     let hasCalendar = false;
+    let calendarClosed = false;
     let current = null;
-    let skipDepth = 0;
+    let currentDepth = 0;
+
     for (const line of lines) {
-      const beginMatch = line.match(/^BEGIN:(.+)$/);
+      if (line.trim().length === 0) continue;
+
+      const beginMatch = line.match(/^BEGIN:(.+)$/i);
       if (beginMatch) {
         const type = beginMatch[1].trim().toUpperCase();
-        if (type === 'VCALENDAR') { hasCalendar = true; continue; }
-        if (current === null && (type === 'VTODO' || type === 'VEVENT')) {
-          current = { type, props: [] };
-          continue;
+        if (!type) throw new Error('Calendar input contains an empty component name.');
+
+        if (stack.length === 0) {
+          if (hasCalendar || calendarClosed) {
+            throw new Error('Calendar input contains more than one VCALENDAR block.');
+          }
+          if (type !== 'VCALENDAR') {
+            throw new Error('Calendar component appears outside the VCALENDAR block.');
+          }
+          hasCalendar = true;
+        } else {
+          if (type === 'VCALENDAR') {
+            throw new Error('Calendar input contains a nested VCALENDAR block.');
+          }
+          if (calendarClosed) {
+            throw new Error('Calendar component appears after the VCALENDAR block.');
+          }
+          if ((type === 'VTODO' || type === 'VEVENT') && stack.length !== 1) {
+            throw new Error(type + ' components cannot be nested inside another calendar component.');
+          }
         }
-        if (current !== null) skipDepth += 1;
+
+        const parentDepth = stack.length;
+        stack.push(type);
+        if (parentDepth === 1 && (type === 'VTODO' || type === 'VEVENT')) {
+          current = { type, props: [] };
+          currentDepth = stack.length;
+        }
         continue;
       }
-      const endMatch = line.match(/^END:(.+)$/);
+
+      const endMatch = line.match(/^END:(.+)$/i);
       if (endMatch) {
         const type = endMatch[1].trim().toUpperCase();
-        if (type === 'VCALENDAR') continue;
-        if (current !== null) {
-          if (type === current.type) { components.push(current); current = null; skipDepth = 0; continue; }
-          if (skipDepth > 0) skipDepth -= 1;
+        if (stack.length === 0) {
+          throw new Error('Calendar input contains an unmatched END:' + type + '.');
+        }
+        const openType = stack[stack.length - 1];
+        if (openType !== type) {
+          throw new Error('Calendar END:' + type + ' does not match BEGIN:' + openType + '.');
+        }
+
+        if (current && stack.length === currentDepth && type === current.type) {
+          components.push(current);
+          current = null;
+          currentDepth = 0;
+        }
+        stack.pop();
+        if (stack.length === 0) {
+          if (type !== 'VCALENDAR') {
+            throw new Error('Calendar input ended outside its VCALENDAR block.');
+          }
+          calendarClosed = true;
         }
         continue;
       }
-      if (current !== null && skipDepth === 0) {
+
+      if (stack.length === 0) {
+        if (!hasCalendar) {
+          throw new Error('Calendar input does not contain a VCALENDAR block.');
+        }
+        if (calendarClosed) {
+          throw new Error('Calendar input contains content after END:VCALENDAR.');
+        }
+        throw new Error('Calendar property appears outside the VCALENDAR block.');
+      }
+
+      // Only direct VTODO/VEVENT properties are imported. Nested components
+      // (including VALARM) are balanced above but never leak properties.
+      if (current && stack.length === currentDepth) {
         const prop = icsProperty(line);
         if (prop) current.props.push(prop);
       }
     }
-    return { components, hasCalendar };
+
+    if (!hasCalendar) return { components, hasCalendar: false };
+    if (!calendarClosed || stack.length !== 0 || current) {
+      const openType = stack.length > 0 ? stack[stack.length - 1] : 'VCALENDAR';
+      throw new Error('Calendar input contains an unclosed ' + openType + ' component.');
+    }
+    return { components, hasCalendar: true };
   }
 
   // Parses task-shaped iCalendar into stored tasks. VTODO and VEVENT both
@@ -463,18 +595,33 @@
   function fromIcs(text, ctx) {
     const parsed = parseIcs(text);
     if (!parsed.hasCalendar) throw new Error('Calendar input does not contain a VCALENDAR block.');
-    const stats = { recurring: 0, timezoneDropped: 0, cancelled: 0 };
+    const stats = { recurring: 0, timezoneDropped: 0, secondsDropped: 0, categoriesDropped: 0, invalidCompletion: 0, invalidDateType: 0, cancelled: 0 };
     const tasks = [];
     let skippedRows = 0;
     for (const component of parsed.components) {
       const byName = {};
+      const categoryProps = [];
       for (const prop of component.props) {
+        if (prop.name === 'CATEGORIES') {
+          categoryProps.push(prop);
+          continue;
+        }
         if (!(prop.name in byName)) byName[prop.name] = prop;
       }
       const status = byName.STATUS ? byName.STATUS.value.trim().toUpperCase() : '';
       if (status === 'CANCELLED') { stats.cancelled += 1; continue; }
       const dueProp = component.type === 'VTODO' ? (byName.DUE || byName.DTSTART) : (byName.DTSTART || byName.DUE);
       const due = icsDateTaskField(dueProp);
+      const rawCategories = categoryProps.reduce((all, prop) => all.concat(icsSplitList(prop.value)), []);
+      const categoriesDropped = countDroppedTags(rawCategories);
+      const completionProp = byName.COMPLETED || null;
+      // RFC 5545 defines COMPLETED as the actual completion timestamp on
+      // VTODO. It is independent of STATUS (the RFC example pairs it with
+      // STATUS:NEEDS-ACTION), so a valid UTC timestamp is completion evidence
+      // even when STATUS is absent or has not been updated.
+      const validCompletion = component.type === 'VTODO' && isValidIcsCompletion(completionProp);
+      const invalidCompletion = (completionProp !== null && !validCompletion) ||
+        (component.type !== 'VTODO' && status === 'COMPLETED');
       const priorityValue = byName.PRIORITY ? byName.PRIORITY.value.trim() : '';
       const priorityNumber = /^\d+$/.test(priorityValue) ? Number(priorityValue) : 0;
       const priority = priorityNumber >= 1 && priorityNumber <= 4 ? 'high'
@@ -486,9 +633,9 @@
         dueDate: due.dueDate,
         dueTime: due.dueTime,
         priority,
-        completed: status === 'COMPLETED' || Boolean(byName.COMPLETED),
+        completed: component.type === 'VTODO' && (status === 'COMPLETED' || validCompletion),
         repeat: null,
-        tags: byName.CATEGORIES ? icsSplitList(byName.CATEGORIES.value) : [],
+        tags: rawCategories,
         notes: byName.DESCRIPTION ? icsUnescape(byName.DESCRIPTION.value) : '',
         subtasks: [],
         createdAt: ctx && ctx.now,
@@ -499,6 +646,10 @@
       // Count simplifications only for successfully imported tasks.
       if (byName.RRULE || byName.RDATE || byName['RECURRENCE-ID']) stats.recurring += 1;
       if (due.timezonePresent && task.dueTime !== null) stats.timezoneDropped += 1;
+      if (due.secondsDropped && task.dueTime !== null) stats.secondsDropped += 1;
+      stats.categoriesDropped += categoriesDropped;
+      if (due.invalidDateType) stats.invalidDateType += 1;
+      if (invalidCompletion) stats.invalidCompletion += 1;
       tasks.push(task);
     }
     return {
@@ -506,6 +657,10 @@
       skippedRows,
       recurring: stats.recurring,
       timezoneDropped: stats.timezoneDropped,
+      secondsDropped: stats.secondsDropped,
+      categoriesDropped: stats.categoriesDropped,
+      invalidCompletion: stats.invalidCompletion,
+      invalidDateType: stats.invalidDateType,
       cancelled: stats.cancelled
     };
   }
