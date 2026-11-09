@@ -55,7 +55,7 @@ def check_sources(parser, store, smoke):
     assert "ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites)" in install, \
         "same-content re-import must preserve enabled state and per-site pause list"
     assert "ExtensionPackageParser.prepareNewUserPackInstall(ext)" in install, \
-        "new or corrupt-on-disk user imports must be prepared disabled until explicit activation"
+        "new user imports must be prepared disabled until explicit activation"
     assert "existing.enabled" in install, "identical re-import must retain the user's activation choice"
 
     # Imported scripts run in the matched page's JavaScript context; surface the same warning for every format.
