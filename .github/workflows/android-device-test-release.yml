@@ -6,7 +6,7 @@ on:
       - 'v*-device-test.*'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: android-device-test-release-${{ github.ref }}
