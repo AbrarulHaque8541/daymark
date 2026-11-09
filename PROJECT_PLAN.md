@@ -4,7 +4,38 @@ Daymark should remain a fast, simple, privacy-first task app that works offline,
 
 **Status snapshot.** This document contains a staged roadmap, not proof that a feature is implemented. Verify live `main`, open PRs/issues, `android-app/app/build.gradle.kts`, and the [Releases page](https://github.com/AbrarulHaque8541/daymark/releases) before making implementation or publication claims. CI/build success does not establish physical-device behavior; device acceptance is tracked separately in issue #160.
 
-## Current execution queue refresh — 2026-11-09T02:36Z
+## Current execution queue refresh — 2026-11-09T11:10Z
+
+Verified main: `1d29085b9c4f9ff3489711fd7e18cc88ab368767` (PR #663 task-editor/toast markup merged). Main Android build and Ubuntu/Windows contracts pass at this exact SHA. The current status index and dated snapshot are in PR #667; re-check its final head after the docs commits complete.
+
+### P0 — Android lifecycle and user-data safety
+
+1. **Focus Timer host input bridge — issue #613 / PR #648.** Latest head `52769e158bf6b2f2c0a52476077bd12cde19c6dd`. Fresh logs exposed that the runner checked `run-as com.abrar.daymark.test`, while instrumentation writes request/result files under `getTargetContext().getFilesDir()` in target package `com.abrar.daymark`. The runner now checks the target package and a source guard prevents regression. Exact-head Android, Focus emulator, Ubuntu/Windows and APK workflows are in progress; do not claim fixed until the API 29/36 jobs finish. Earlier failures on head `30b32f4` are superseded and must not be carried forward. Preserve the ten-run API 36 gate, real tap/swipe/mode assertions, vertical parent-scroll assertion and Task Editor IME acceptance. No blind retries.
+2. **Replace unsafe merged webhook behavior — issues #636/#639, PR #662.** Current main includes #655's localStorage endpoint/lock behavior. PR #662 is the safer current-main-derived replacement: session-only endpoint, Web Locks, fail-closed queue persistence, queue preservation and persist-before-notify task ordering. Its exact-head Android/contracts/device APK checks pass, but it is one commit behind current main and has no independent review. Integrate the automation card without carrying the unsafe localStorage lock, remove-before-POST queue loss or silent overflow. Delivery remains at-least-once, not exactly-once.
+3. **Storage health — issue #603 / PR #666.** Unreadable keys must remain UNKNOWN, not absent; category clear preflights all keys; clear-all preflights every managed key. Exact head `0d1cc0a9e6716855888c040d287d8959f5e7935f`: Node 668/0, Android CI, Ubuntu/Windows and device-test APK PASS. Added a production HTML/UI selector contract test. One commit behind current main; independent data-integrity review required before merge.
+4. **Independent recovery exports — issue #640 / PR #664.** Task and Focus backup reads must fail independently and preserve every readable backup's exact bytes even when the other backup is unreadable. Exact-head Android/contracts/device checks pass; independent review and current-main synchronization remain.
+
+### P0 — Release and extension security
+
+5. **Signing-secret isolation — PR #665 / issue #84.** PR-controlled debug Gradle must never receive production signing secrets. Exact-head Android/contracts/device checks pass. Independent security review is required before release-workflow integration; do not publish or tag.
+6. **Extension import trust/storage — PR #659.** New page scripts remain opt-in/default-disabled; existing packs must not be truncated or overwritten after I/O failures. Historical exact-head Android/contracts/device checks pass; branch is stale/diverged relative to current main and independent security review is absent.
+
+### P1 — Import, reminders, browser and accessibility
+
+7. **iCalendar/open-format integrity — PR #656.** Repeated CATEGORIES, escaped commas/semicolons, completion metadata and lossy time precision must be disclosed and tested. Exact-head Android/contracts/device checks pass; independent review and mainline synchronization remain.
+8. **Terminal recurring reminder — PR #657 / issue #476.** Persist the final supported recurrence fire without overflow or re-arming loops. CI and non-publishing emulator artifact pass; GitHub reports mergeable=false. Real AlarmManager delivery under Doze, reboot, timezone changes and OEM restrictions remains NOT TESTED.
+9. **Press feedback/accessibility — PR #667.** Current-main branch ports card/task-row active feedback after hover and respects prefers-reduced-motion. CSS regression test guards complete stylesheet, selector uniqueness/order, reduced-motion and brace balance. Physical visual/TalkBack acceptance remains NOT TESTED.
+10. **Browser/downloads and cross-platform — issues #348/#325.** Keep new downloads fail-closed until an app-owned HTTPS/redirect/credential-safe transport exists; validate desktop WebView, address handling, extension boundaries and compatibility with evidence.
+
+### P0 — Actual acceptance and governance
+
+11. **Physical Android acceptance — issue #160.** Record device/model, API, WebView provider/version, build SHA, APK SHA and scenario/result. CI APK creation is not device acceptance.
+12. **Main branch governance — issue #646.** Live main is unprotected and repository rulesets are empty. Require independent approval, Android CI, Ubuntu/Windows contracts, resolved conversations and force-push/deletion protection through owner-side settings. No bypass.
+13. **Application identity conflict.** Root AGENTS/Gradle say `com.abrar.daymark`; run-level safety says `com.cue.daymark`. Do not change identity until the owner explicitly reconciles this conflict.
+
+---
+
+## Historical execution queue refresh — 2026-11-09T02:36Z
 
 This priority order supersedes the historical **Execution queue (checked 2026-10-13)** below. Older entries remain as audit history; they are not current implementation or workflow claims. Recheck the live status index and exact PR heads before each action.
 
