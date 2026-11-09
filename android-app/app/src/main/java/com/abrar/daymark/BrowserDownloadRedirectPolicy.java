@@ -143,7 +143,11 @@ final class BrowserDownloadRedirectPolicy {
     }
 
     /** Cookies may be fetched for a redirect target only when it remains same-origin. */
-    static boolean shouldForwardCookies(String fromUrl, String toUrl) {
+    static boolean shouldForwardCookies(Hop from, Hop to) {
+        return from != null && to != null && shouldForwardCookies(from.url, to.url);
+    }
+
+    private static boolean shouldForwardCookies(String fromUrl, String toUrl) {
         try {
             URI from = parseUri(normalizeWebUrl(fromUrl));
             URI to = parseUri(normalizeWebUrl(toUrl));
@@ -158,9 +162,10 @@ final class BrowserDownloadRedirectPolicy {
      * explicitly scoped to the requested download URL; ambient WebView Authorization,
      * Referer, Origin, Proxy-Authorization and caller-supplied arbitrary headers are never copied.
      */
-    static Map<String, String> initialRequestHeaders(String userAgent, String accept,
-                                                     String cookies) {
-        return requestHeaders(userAgent, accept, cookies, true);
+    static Map<String, String> initialRequestHeaders(Hop target, String userAgent,
+                                                     String accept, String cookiesForTarget) {
+        if (target == null) throw new IllegalArgumentException("A validated download hop is required.");
+        return requestHeaders(userAgent, accept, cookiesForTarget, true);
     }
 
     /**
@@ -168,11 +173,14 @@ final class BrowserDownloadRedirectPolicy {
      * when this method's same-origin rule allows them; no previous-hop cookie is forwarded
      * across an origin boundary.
      */
-    static Map<String, String> redirectRequestHeaders(String fromUrl, String toUrl,
+    static Map<String, String> redirectRequestHeaders(Hop from, Hop to,
                                                       String userAgent, String accept,
                                                       String cookiesForTarget) {
+        if (from == null || to == null) {
+            throw new IllegalArgumentException("Validated source and target hops are required.");
+        }
         return requestHeaders(userAgent, accept, cookiesForTarget,
-                shouldForwardCookies(fromUrl, toUrl));
+                shouldForwardCookies(from, to));
     }
 
     private static Map<String, String> requestHeaders(String userAgent, String accept,
