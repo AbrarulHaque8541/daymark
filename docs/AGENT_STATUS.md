@@ -1,4 +1,8 @@
-- [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
+# Agent Status Index
+
+Current reviewed snapshot: [docs/CURRENT_STATUS_20261109T125813Z.md](CURRENT_STATUS_20261109T125813Z.md) — 2026-11-09T12:58:13Z
+
+Previous snapshots (preserved):
 - [Daymark whole-project engineering status — 2026-11-09T12:00:49Z (main 1d29085, Focus #648 direct shell-input and CSS #670)](./CURRENT_STATUS_20261109T120049Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T11:39:14Z (main 1d29085, Focus bridge correction and repo-wide queue)](./CURRENT_STATUS_20261109T113914Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T11:21:40Z (main 1d29085, webhook/recovery and repo-wide queue)](./CURRENT_STATUS_20261109T112140Z.md)
@@ -12,53 +16,28 @@
 - Earlier storage-health snapshot: [2026-11-08T09:51:08Z](./CURRENT_STATUS_20261108T095108Z.md)
 - [Historical snapshot — Daymark whole-project engineering status — 2026-11-08T09:20:00Z (PR #600 exact CI, PRs #599/#601 integration, Gradle distribution reliability, browser address review)](./CURRENT_STATUS_20261108T092000Z.md)
 - Previous snapshot: [Daymark whole-project engineering status — 2026-11-08T08:47:25.228Z (PRs #599/#600, current main CI and device blockers)](./CURRENT_STATUS_20261108T084725Z.md)
-- Use the latest reviewed snapshot above for live branch/CI/backlog state; older entries below are historical.
-
-
 - [Superseded snapshot — 2026-11-08T14:10:00Z was future/mislabeled UTC at the 08:46Z audit; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T141000Z.md)
-
 - [Daymark engineering status — 2026-11-08T04:19:09Z (offline world clock & meeting-overlap card)](./CURRENT_STATUS_20261108T041909Z.md)
-
 - [Timestamp requires correction — 2026-11-08T09:30:00Z is later than the 08:46Z verification; see the latest reviewed snapshot](./CURRENT_STATUS_20261108T093000Z.md)
-
 - [Daymark engineering status — 2026-11-08T02:40:00Z (Cycle A: restore complete download UI + task editor)](./CURRENT_STATUS_20261108T024000Z.md)
-
 - [Daymark engineering status — 2026-11-08T06:35:00Z (Cycle A: download status aria-atomic)](./CURRENT_STATUS_20261108T063500Z.md)
-
 - [Daymark engineering status — 2026-11-08T05:08:00Z (Cycle B: restore announcement + aria-busy)](./CURRENT_STATUS_20261108T050800Z.md)
-
 - [Daymark engineering status — 2026-11-08T03:15:00Z (Cycle B: clear also forgets download journey)](./CURRENT_STATUS_20261108T031500Z.md)
-
 - [Daymark engineering status — 2026-11-08T03:05:00Z (Cycle A: persist last download journey)](./CURRENT_STATUS_20261108T030500Z.md)
-
 - [Daymark engineering status — 2026-11-08T02:05:00Z (Cycle A: copy-plan for download safety card)](./CURRENT_STATUS_20261108T020500Z.md)
-
 - [Daymark engineering status — 2026-11-08T02:05:00Z (Cycle A: copy-plan for download safety card)](./CURRENT_STATUS_20261108T020500Z.md)
-
 - [Daymark engineering status — 2026-11-07T16:27:27Z (browser download safety card)](./CURRENT_STATUS_20261107T162727Z.md)
-
 - [Daymark engineering status — 2026-11-07T04:15:08Z (open-format task import)](./CURRENT_STATUS_20261107T041500Z.md)
-
 - [Daymark engineering status — 2026-11-06T050500Z (public-holidays card)](./CURRENT_STATUS_20261106T050500Z.md)
-
 - [Daymark engineering status — 2026-11-06T03:35:00Z (Cycle A)](./CURRENT_STATUS_20261106T033500Z.md)
-
 - [Daymark engineering status — 2026-11-05T10:36:07Z (paused Focus task identity)](./CURRENT_STATUS_20261105T103607Z.md)
-
 - [Daymark engineering status — 2026-11-05T09:53:05Z (repository and CI postmortem)](./CURRENT_STATUS_20261105T095305Z.md)
-
 - [Daymark whole-project engineering status — 2026-11-05T07:37:00Z (Cycle A)](./CURRENT_STATUS_20261105T073700Z.md)
-
 - [Daymark whole-project engineering status — 2026-11-05T04:50:00Z (Cycle B)](./CURRENT_STATUS_20261105T045000Z.md)
-
 - [Daymark whole-project engineering status — 2026-11-05T04:29:30Z (Cycle B)](./CURRENT_STATUS_20261105T042930.md)
-
 - [Daymark whole-project engineering status — 2026-11-05T04:00:00Z (Cycle B)](./CURRENT_STATUS_20261105T040000Z.md)
-
 - [Daymark whole-project engineering status — 2026-11-05T01:50:00Z (Cycle B)](./CURRENT_STATUS_20261105T015000Z.md)
-
 - [Daymark whole-project engineering status — 2026-11-05T04:15:00Z (Cycle B)](./CURRENT_STATUS_20261105T041500Z.md)
-
 - [Daymark whole-project engineering status — 2026-11-04T16:45:00Z (Cycle A)](./CURRENT_STATUS_20261104T164500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T04:45:00Z (web automation cycle)](./CURRENT_STATUS_20261104T044500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T08:50:00Z (Cycle B)](./CURRENT_STATUS_20261104T085000Z.md)
@@ -95,32 +74,13 @@
 - [Daymark whole-project engineering status — 2026-11-01T15:40:00Z](./CURRENT_STATUS_20261101T154000Z.md)
 - [Daymark whole-project engineering status — 2026-11-01T09:56:00Z](./CURRENT_STATUS_20261101T095600Z.md)
 - [Daymark whole-project engineering status — 2026-11-01T08:44:33Z](./CURRENT_STATUS_20261101T084433Z.md)
-
 # Agent status index
-
 - [2026-11-09T12:00:49Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T120049Z.md)
-
 - [2026-11-09T11:39:14Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T113914Z.md)
-
 - [2026-11-09T11:21:40Z — whole-project engineering snapshot (main 1d29085)](./CURRENT_STATUS_20261109T112140Z.md)
-
-**Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
-
 ## Latest reviewed snapshot
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
 - Previous reviewed snapshot: [2026-11-09T12:00:49Z — current main 1d29085](./CURRENT_STATUS_20261109T120049Z.md)
 - Previous reviewed snapshot: [2026-11-09T11:39:14Z](./CURRENT_STATUS_20261109T113914Z.md)
-
 ## Before acting
-
-1. Open the latest snapshot for context.
-2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
-3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they were current.
-
 ## Snapshot maintenance
-
-- Keep durable policy in root `AGENTS.md`; do not repeat it in every snapshot.
-- Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
-- Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
-- Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
-- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
