@@ -31,7 +31,7 @@ Verified main: `1d29085b9c4f9ff3489711fd7e18cc88ab368767` (PR #663 task-editor/t
 
 11. **Physical Android acceptance — issue #160.** Record device/model, API, WebView provider/version, build SHA, APK SHA and scenario/result. CI APK creation is not device acceptance.
 12. **Main branch governance — issue #646.** Live main is unprotected and repository rulesets are empty. Require independent approval, Android CI, Ubuntu/Windows contracts, resolved conversations and force-push/deletion protection through owner-side settings. No bypass.
-13. **Application identity conflict.** Root AGENTS/Gradle say `com.abrar.daymark`; run-level safety says `com.cue.daymark`. Do not change identity until the owner explicitly reconciles this conflict.
+13. **Application identity conflict.** Root AGENTS/Gradle and the run-level safety instruction name different package identifiers. Do not change identity until the owner explicitly reconciles; the current repository package-cleanliness guard and installed identity remain unchanged.
 
 ---
 
