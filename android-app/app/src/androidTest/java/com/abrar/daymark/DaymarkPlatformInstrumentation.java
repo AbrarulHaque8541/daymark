@@ -291,7 +291,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             dispatchVerticalScrollSwipe(modeRow, canScroll[0]);
             runOnMainSync(() -> scrollY[1] = parentScroll.getScrollY());
             check(canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0],
-                    "parent Tasks ScrollView scrolls after a vertical Focus-mode drag");
+                    "parent Tasks ScrollView scrolls after a vertical Focus-mode drag"
+                            + " (startY=" + scrollY[0] + ", endY=" + scrollY[1]
+                            + ", canScrollDown=" + canScroll[0] + ", canScrollUp=" + canScroll[1] + ")");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical workspace scroll does not change the selected Focus mode");
             dispatchVerticalSwipe(countdown);
