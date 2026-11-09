@@ -207,12 +207,8 @@
     function finishCategoryClear(result, category) {
       if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
         notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
-      } else if (category.id === 'webhook-queue') {
-        if (result.failed.length === 0 && webhookUi
-            && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
-          webhookUi.resetQueueAfterExternalClear();
-        }
-        if (result.removed.length > 0) notifyTaskStorageChange('daymark.webhook.queue.v1');
+      } else if (category.id === 'webhook-queue' && result.removed.length > 0) {
+        notifyTaskStorageChange('daymark.webhook.queue.v1');
       }
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
@@ -223,6 +219,9 @@
             + ' item(s) could not be removed by the browser.';
         render();
         status(message);
+      } else if (result.removed.length === 0 && category.id === 'webhook-queue') {
+        render();
+        status('No saved webhook queue key was present; this tab’s in-memory queue was also cleared.');
       } else if (result.removed.length === 0) {
         render();
         status('No stored data was found for ' + category.label + '. Nothing was changed.');
@@ -264,7 +263,14 @@
           status('Cannot safely clear the webhook queue: shared task/webhook coordination is unavailable. Nothing was cleared.');
           return Promise.resolve(false);
         }
-        return taskMutation.withLocksInOrder(lockManager, taskMutation.CLEAR_ALL_LOCK_ORDER, clear).then((locked) => {
+        return taskMutation.withLocksInOrder(lockManager, taskMutation.CLEAR_ALL_LOCK_ORDER, () => {
+          const result = clear();
+          if (result.failed.length === 0 && webhookUi
+              && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
+            webhookUi.resetQueueAfterExternalClear();
+          }
+          return result;
+        }).then((locked) => {
           setBusy(false);
           if (!locked.ok) {
             status('Could not safely clear ' + category.label + ': '
@@ -348,7 +354,14 @@
       const locked = await taskMutation.withLocksInOrder(
         lockManager,
         taskMutation.CLEAR_ALL_LOCK_ORDER,
-        () => storageApi.clearAll(storage)
+        () => {
+          const result = storageApi.clearAll(storage);
+          if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
+              && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
+            webhookUi.resetQueueAfterExternalClear();
+          }
+          return result;
+        }
       );
       setBusy(false);
       if (!locked.ok) {
@@ -359,10 +372,6 @@
         return false;
       }
       const result = locked.value;
-      if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
-          && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
-        webhookUi.resetQueueAfterExternalClear();
-      }
       if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '

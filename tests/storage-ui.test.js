@@ -121,16 +121,19 @@ test('the module exposes its API and stays inert under Node', () => {
 
 test('webhook queue category clear acquires task, delivery and queue locks before removal', async () => {
   const calls = [];
+  let lockDepth = 0;
+  let resetWhileLocked = false;
   const locks = {
     request(name, options, callback) {
       calls.push(name);
-      return Promise.resolve().then(callback);
+      lockDepth += 1;
+      return Promise.resolve().then(callback).finally(() => { lockDepth -= 1; });
     }
   };
   let resetCount = 0;
   const { env, storageData, dispatched } = fakeEnv({
     data: { 'daymark.webhook.queue.v1': '[]' },
-    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; } },
+    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; resetWhileLocked = lockDepth === 3; } },
     lockManager: locks
   });
   await ui.attachStorageUi(env).onClearCategory('webhook-queue');
@@ -139,14 +142,18 @@ test('webhook queue category clear acquires task, delivery and queue locks befor
   assert.equal(dispatched.length, 1);
   assert.equal(dispatched[0].key, 'daymark.webhook.queue.v1');
   assert.equal(resetCount, 1, 'same-tab memory-only webhook events are cleared too');
+  assert.equal(resetWhileLocked, true, 'the in-memory queue reset happens before the shared locks are released');
 });
 
 test('clear-all acquires the global task/delivery/queue lock order before deleting data', async () => {
   const calls = [];
+  let lockDepth = 0;
+  let resetWhileLocked = false;
   const locks = {
     request(name, options, callback) {
       calls.push(name);
-      return Promise.resolve().then(callback);
+      lockDepth += 1;
+      return Promise.resolve().then(callback).finally(() => { lockDepth -= 1; });
     }
   };
   let resetCount = 0;
@@ -156,7 +163,7 @@ test('clear-all acquires the global task/delivery/queue lock order before deleti
       'daymark.webhook.queue.v1': '[]',
       'daymark.focus.v1': '{}'
     },
-    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; } },
+    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; resetWhileLocked = lockDepth === 3; } },
     lockManager: locks
   });
   await ui.attachStorageUi(env).onClearAll();
@@ -164,6 +171,7 @@ test('clear-all acquires the global task/delivery/queue lock order before deleti
   assert.equal(storageData['daymark.tasks.v1'], undefined);
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
   assert.equal(resetCount, 1, 'Clear All also clears the same tab memory-only queue');
+  assert.equal(resetWhileLocked, true, 'Clear All resets the in-memory queue before releasing its locks');
 });
 
 test('webhook queue and clear-all fail closed if any ordered lock is rejected', async () => {
