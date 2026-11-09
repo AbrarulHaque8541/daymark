@@ -1,21 +1,25 @@
-## Current execution queue — 2026-11-09T20:10:13.760Z (main 1532838c; #648 Focus 10/10 API36 PASS; #686 AndroidX runtime harness in CI)
+## Current execution queue — 2026-11-09T20:26:52.786Z (main 1532838c; #659 malformed-pack recovery store API CI green; #686 Service Worker API26/API36 runtime green)
 
-Full exact-head evidence, all ten open PR heads, issue inventory and delivery ledger are in [CURRENT_STATUS_20261109T201013Z.md](docs/CURRENT_STATUS_20261109T201013Z.md).
+Full exact-head evidence, all ten open PR heads, issue inventory and delivery ledger are in [CURRENT_STATUS_20261109T202652Z.md](docs/CURRENT_STATUS_20261109T202652Z.md).
 
-1. **P0 — #686/#685 Service Worker:** validate the AndroidX JUnit harness on API 26/API 36; then add multi-origin/tab and Activity/renderer recreation coverage. The current policy is globally fail-closed even in Online mode; obtain owner acceptance or implement a reviewed origin-scoped grant model.
-2. **P0 — #675/#640/#636 recovery and webhook:** exact-head Android/contracts/device APK and Node 764/764 PASS; obtain independent storage/security review and manual recovery-export acceptance before integration.
-3. **P0 — #646/#160 governance and device acceptance:** main protection is disabled, rulesets empty, detailed protection endpoint HTTP 403; owner-side rules and physical Android/WebView/OEM acceptance remain required.
-4. **P1 — #671/#678 downloads:** redirect-policy foundation passes, but complete bounded Daymark-owned transport remains absent. Keep downloads fail-closed until host validation, same-origin credentials, bounded streaming, cancellation and cleanup are integrated.
-5. **P1 — #677/#613 Focus/reminders:** #648 now passes API29 and API36 10/10 at its exact head; #677's separate API36 task-editor/IME gate still fails and needs coordinated integration.
-6. **P1 — #683 task storage:** design one Web Lock/re-read/merge/write contract across normal writes, import, recovery and clear-completed; coordinate #675 app.js/storage and #656 import-ui ownership.
-7. **P1 — #687 extensions:** preserve malformed pack bytes and add explicit disabled recovery/export/removal UI; coordinate MainActivity ownership with #648.
-8. **P1 — #684/#476 recurrence:** settle cross-platform completion/overdue semantics before changing task flows; retain AlarmManager/Doze/reboot/timezone/OEM physical acceptance.
-9. **P1 — #656/#659/#665/#676/#682:** independent RFC 5545, extension trust, signing/provenance, injection and browser-data reviews.
-10. **P1 — #679/#84:** owner reconciliation of application identity and action-runtime deprecation/provenance.
-11. **P2 — #325/#348:** measured cross-platform architecture, browser UX, accessibility and performance.
+1. **P0 — #683 task data integrity:** implement one origin-wide atomic mutation contract across normal task writes, import, recovery restore, clear/undo. The current `persistTasks()` still writes a stale snapshot; import compare-before-write is not atomic.
+2. **P0 — #613/#677/#648 Android lifecycle:** integrate #648's tested dialog-insets correction into the reminder branch without overwriting reminder work; rerun strict API 29/36 acceptance. Physical-device acceptance remains NOT TESTED.
+3. **P1 — #675/#640 recovery/storage:** obtain independent data-integrity/security review and manual recovery-export acceptance; preserve unknown bytes and never overwrite the only recovery copy.
+4. **P1 — #687/#659 extension recovery UI:** integrate the new malformed-pack metadata, exact-byte export and fingerprint-checked removal APIs into an accessible disabled manager row; require a separate user confirmation. Coordinate the shared MainActivity edit with #648.
+5. **P1 — #685/#686 Service Worker:** API 26/36 emulator runtime now passes for both app flavors, but the global block while Online remains a compatibility trade-off. Obtain owner acceptance or implement a reviewed origin-scoped grant model; add multi-origin/tab, Activity/renderer recreation and physical request tracing.
+6. **P1 — #671/#678 downloads:** finish Daymark-owned redirect-by-redirect HTTPS transport, DNS/address pinning, TLS hostname verification, same-origin credentials, bounded streaming, cancellation and temp-file cleanup. Keep actual downloads fail-closed until integrated.
+7. **P1 — #684/#476 recurrence/reminders:** settle Android/web completion and catch-up semantics before modifying shared task flows; validate AlarmManager, reboot, Doze, timezone and OEM delivery.
+8. **P1 — #665/#84 signing/provenance:** independently review PR-build secret isolation and provenance; preserve trusted SLSA identity while resolving the transitive Node20 dependency.
+9. **P1 — #656/#676/#682/#659:** complete independent RFC 5545, extension trust/SPA scope, browser-data and recovery UI reviews; preserve cross-tab import guarantees.
+10. **P0 — #646/#160 governance/device:** owner/admin branch protection and independent review policy; physical Android/WebView/OEM acceptance with device/model, API, WebView version, tested SHA and APK SHA.
+11. **P2 — #325/#348:** measured cross-platform architecture, browser UX, accessibility and performance work.
 
 No PR was merged into main. No release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred.
 
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live repository/PR/issue/Actions inventory and exact-head source/test inspection
+Timestamp (UTC): 2026-11-09T20:26:52.786Z
 ---
 
 ## Current whole-project execution queue — 2026-11-09T15:24:39Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
