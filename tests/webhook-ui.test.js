@@ -794,7 +794,7 @@ test('the app persists a newly completed task before queueing its webhook', () =
   const toggleEnd = app.indexOf("} else if", toggleStart);
   assert.ok(toggleStart >= 0 && toggleEnd > toggleStart, 'the task toggle branch must remain identifiable');
   const toggle = app.slice(toggleStart, toggleEnd);
-  const persistAt = toggle.indexOf('const saved = persistTasks();');
+  const persistAt = toggle.indexOf('const saved = await persistTasks();');
   const notifyAt = toggle.indexOf('notifyWebhookTaskCompleted(task)');
   assert.ok(persistAt >= 0 && notifyAt > persistAt,
     'the external webhook must never be queued before the local task write succeeds');
