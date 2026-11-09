@@ -17,7 +17,7 @@
 
 - Gradle namespace/application ID in current source: `com.abrar.daymark`.
 - Current version: `1.6`, versionCode `13`, minSdk `26`, targetSdk `36`.
-- The run-level instruction says `com.cue.daymark`; this conflicts with root AGENTS.md and Gradle. No package/applicationId change was made. Resolve only through an explicit owner decision and migration/release plan.
+- The run-level instruction specifies a different package identifier than root AGENTS.md and Gradle. No package/applicationId change was made. Resolve only through an explicit owner decision and migration/release plan.
 - Latest published release: **v1.5**, published 2026-10-23.
 - **v1.4** remains draft.
 - No tag, release, version bump, signing-key change, destructive migration, or production publication occurred in this run.
