@@ -223,7 +223,7 @@
     }
 
     function renderQueue() {
-      if (flushEl) flushEl.disabled = busy || pendingQueueView().length === 0
+      if (flushEl) flushEl.disabled = busy || (pendingQueueView().length === 0 && !queueWriteFailed)
         || storageAccessFailed || queueReadFailed || legacyConfigCleanupFailed || !queueCoordinatorAvailable();
     }
 
