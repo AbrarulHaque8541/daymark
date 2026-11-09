@@ -933,3 +933,36 @@ test('Clear queue fails closed without Web Locks and preserves the existing queu
   assert.equal(storageData[webhookApi.QUEUE_KEY], raw,
     'a browser without cross-tab coordination cannot mutate the shared queue');
 });
+
+
+test('duplicate webhook event IDs fail closed and preserve the original queue bytes', async () => {
+  const first = webhookApi.makeQueueEvent(
+    webhookApi.buildTaskCompletedPayload({ title: 'first event', priority: 'low' }, '2026-11-09T10:00:00.000Z'),
+    '2026-11-09T10:00:00.000Z'
+  );
+  const duplicate = Object.assign({}, first, {
+    payload: JSON.stringify({ event: 'daymark.task.completed', task: { title: 'different event' } })
+  });
+  const raw = JSON.stringify([first, duplicate]);
+  let fetchCalled = false;
+  const { env, elements, storageData } = fakeEnv({
+    online: true,
+    fetch: async () => {
+      fetchCalled = true;
+      return { ok: true, status: 200 };
+    }
+  });
+  storageData[webhookApi.QUEUE_KEY] = raw;
+  const handle = ui.attachWebhookUi(env);
+  elements['webhook-url'].value = 'https://hooks.example.com/x';
+  handle.onSave({ preventDefault() {} });
+
+  const result = await handle.notifyTaskCompleted(TASK);
+  assert.deepEqual(result, { queued: false, reason: 'storage-unavailable' });
+  await handle.flush();
+  assert.equal(fetchCalled, false, 'ambiguous duplicate IDs must never reach the endpoint');
+  assert.equal(storageData[webhookApi.QUEUE_KEY], raw,
+    'the corrupt queue is preserved byte-for-byte for explicit recovery');
+  assert.match(elements['webhook-status'].textContent, /could not be read/i);
+  assert.equal(elements['webhook-flush'].disabled, true);
+});
