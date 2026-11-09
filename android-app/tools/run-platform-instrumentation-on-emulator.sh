@@ -51,13 +51,19 @@ fi
 
 echo "Running Android instrumentation component: $instrumentation"
 input_package="com.abrar.daymark"
-run_as_output="$(adb shell run-as "$input_package" sh -c 'mkdir -p files && test -d files && test -w files' 2>&1)" || {
+run_as_output="$(adb shell run-as "$input_package" mkdir -p files 2>&1)" || {
   run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
-  if [ -n "$run_as_output" ]; then
-    echo "Target app package $input_package is not accessible through run-as: $run_as_output" >&2
-  else
-    echo "Target app package $input_package is not accessible through run-as (adb returned a non-zero status without diagnostics)." >&2
-  fi
+  echo "Target app package $input_package cannot create its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
+  exit 1
+}
+probe_dir="files/.daymark-host-input-probe-$"
+run_as_output="$(adb shell run-as "$input_package" mkdir "$probe_dir" 2>&1)" || {
+  run_as_output="$(printf '%s' "$run_as_output" | tr -d '\r')"
+  echo "Target app package $input_package cannot write its files directory: ${run_as_output:-adb returned a non-zero status without diagnostics}" >&2
+  exit 1
+}
+if ! adb shell run-as "$input_package" rmdir "$probe_dir" >/dev/null 2>&1; then
+  echo "Target app package $input_package could not remove its temporary host-input probe directory." >&2
   exit 1
 }
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
@@ -65,7 +71,7 @@ phase_log_path="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/instrumentation-phases.log"
 run_instrumentation_once() {
 status_file="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-status.$$"
 rm -f "$status_file"
-adb shell run-as "$input_package" sh -c 'rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp' >/dev/null 2>&1 || true
+adb shell run-as "$input_package" rm -f files/daymark-instrumentation-input-request.txt files/daymark-instrumentation-input-result.txt files/daymark-instrumentation-input-request.txt.tmp files/daymark-instrumentation-input-result.tmp >/dev/null 2>&1 || true
 (
   set +e
   if command -v timeout >/dev/null 2>&1; then
