@@ -211,7 +211,7 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
   assert.equal(storageData['daymark.webhook.lock.v1'], undefined, 'legacy webhook lock is managed and cleared');
   assert.equal(storageData['unrelated.other.key'], 'keep me');
-  assert.match(elements['storage-status-line'].textContent, /Cleared all 3 stored item\(s\)/);
+  assert.match(elements['storage-status-line'].textContent, /Cleared all 4 stored item\(s\)/);
   assert.match(elements['storage-status-line'].textContent, /Nothing outside this browser was affected/);
   assert.equal(elements['storage-clear-all'].disabled, true, 'clear-all disables after the store is empty');
 });
@@ -329,7 +329,7 @@ test('unavailable storage keeps the card honest and never clears anything', () =
   const { env, elements } = fakeEnv({});
   env.localStorage = null;
   ui.attachStorageUi(env);
-  assert.match(elements['storage-status-line'].textContent, /Could not read local data: Browser storage is unavailable/);
+  assert.match(elements['storage-status-line'].textContent, /Local data status is unknown; nothing was changed/);
 });
 
 test('a throwing localStorage getter leaves every category unknown and fails closed', () => {
