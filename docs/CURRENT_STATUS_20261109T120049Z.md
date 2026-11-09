@@ -162,7 +162,7 @@ Issue updates posted this run: #84, #160, #476, #603, #613, #636, #639, #640. PR
 6. **P1 — #659:** independent extension security review; preserve existing packs on I/O failure.
 7. **P1 — #666/#603:** independent storage-health review; preserve UNKNOWN/read-failure semantics.
 8. **P1 — #657/#476:** actual AlarmManager, Doze, reboot and timezone runtime testing.
-9. **P1 — #637:** replace/rebase stale CSS/status-index work; preserve historical status snapshots and resolve active/hover cascade.
+9. **P1 — #670:** CSS press feedback is transplanted to current main and exact-head CI is green; #637 is closed without merge. Continue preserving status-index history through #669.
 10. **P0 — #646:** owner-side main branch protection, required independent approval and required Android/contract checks.
 11. **P0 — #160:** physical Android/WebView/OEM acceptance.
 12. **P2 — #325:** resolve package identity policy and cross-platform compatibility matrix.
