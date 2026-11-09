@@ -1585,7 +1585,7 @@
           localStorage.setItem(FOCUS_KEY, JSON.stringify({ session: null, log: entries }));
           const backupState = readFocusRecoveryBackupState();
           if (!backupState.readable) reportUnknownFocusRecoveryBackup();
-          else if (backupState.hasPayload) reportFocusRecovery(true);
+          else if (backupState.hasBackup) reportFocusRecovery(true);
         } catch (saveError) {
           const backupSaved = backUpRawFocusPayload(saved);
           if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
