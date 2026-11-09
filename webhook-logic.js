@@ -114,6 +114,19 @@
     return list;
   }
 
+  function cancelResponseBody(response) {
+    const body = response && response.body;
+    if (!body || typeof body.cancel !== 'function') return;
+    try {
+      const cancellation = body.cancel();
+      if (cancellation && typeof cancellation.catch === 'function') {
+        cancellation.catch(() => {});
+      }
+    } catch (error) {
+      // Response cleanup must not turn a completed webhook POST into a failure.
+    }
+  }
+
   async function deliverWebhook(url, payload, fetchImpl, timeoutMs) {
     if (!isValidWebhookUrl(url)) throw new Error('Enter a valid https:// webhook URL first. Plain http is not allowed.');
     if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
@@ -150,6 +163,10 @@
         // contain bearer tokens in their path or query string.
         throw new Error('Webhook delivery failed due to a network error. No automatic retry was attempted.');
       }
+      // Webhook responses are not needed. Cancel their bodies on both
+      // success and HTTP failure so a hostile endpoint cannot make Daymark
+      // download an unbounded response after the POST has completed.
+      cancelResponseBody(response);
       if (!response || !response.ok) {
         throw new Error('Webhook endpoint returned HTTP '
           + (response ? response.status : 'unknown')

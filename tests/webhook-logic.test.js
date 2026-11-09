@@ -144,6 +144,38 @@ test('flush delivers queued events in order and empties the queue', async () => 
   assert.deepEqual(order, ['ordered-0', 'ordered-1', 'ordered-2']);
 });
 
+test('deliver cancels unconsumed response bodies on success and HTTP failure', async () => {
+  let cancellations = 0;
+  const response = (ok, status) => ({
+    ok,
+    status,
+    body: {
+      cancel() {
+        cancellations += 1;
+        return Promise.resolve();
+      }
+    }
+  });
+
+  const success = await webhook.deliverWebhook(
+    'https://hooks.example.com/x',
+    { event: 'daymark.task.completed' },
+    async () => response(true, 204)
+  );
+  assert.equal(success.status, 204);
+  assert.equal(cancellations, 1, 'successful response body is cancelled without being read');
+
+  await assert.rejects(
+    webhook.deliverWebhook(
+      'https://hooks.example.com/x',
+      { event: 'daymark.task.completed' },
+      async () => response(false, 503)
+    ),
+    /HTTP 503/
+  );
+  assert.equal(cancellations, 2, 'HTTP error response body is cancelled before reporting failure');
+});
+
 test('a failed flush keeps the event, counts one attempt, and stops there', async () => {
   const event = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload(TASK, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
   const second = webhook.makeQueueEvent(webhook.buildTaskCompletedPayload({ title: 'later', priority: 'low' }, '2026-11-04T10:05:00.000Z'), '2026-11-04T10:05:00.000Z');
