@@ -219,7 +219,7 @@ test('a failed removal during clear-all is reported honestly', () => {
   const handle = ui.attachStorageUi(env);
   env.localStorage.removeItem = () => { throw new Error('blocked'); };
   handle.onClearAll();
-  assert.match(elements['storage-status-line'].textContent, /could not be checked or removed\\. Nothing was cleared/);
+  assert.match(elements['storage-status-line'].textContent, /could not be removed by the browser/);
 });
 
 test('unreadable data is shown as unknown and clear-all fails closed', () => {
@@ -241,7 +241,7 @@ test('unreadable data is shown as unknown and clear-all fails closed', () => {
 
   handle.onClearCategory('tasks');
   assert.equal(storageData['daymark.tasks.v1'], '[]', 'failed reads must not delete the stored value');
-  assert.match(elements['storage-status-line'].textContent, /could not be removed by the browser/);
+  assert.match(elements['storage-status-line'].textContent, /could not be checked or removed\. Nothing was cleared/);
   handle.onClearAll();
   assert.equal(confirmations.length, 1, 'only the category retry was confirmed; clear-all was blocked');
   assert.equal(storageData['daymark.tasks.v1'], '[]', 'unknown data blocks clear-all deletion');
@@ -259,7 +259,7 @@ test('category clear reports a preflight read failure without claiming that anyt
   assert.equal(storageData['daymark.tasks.v1'], '[]',
     'the preflight read failure must preserve the original task data');
   assert.match(elements['storage-status-line'].textContent,
-    /Could not clear Tasks: 1 item\\(s\\) could not be checked or removed\\. Nothing was cleared\\./);
+    /Could not clear Tasks: 1 item\(s\) could not be checked or removed\. Nothing was cleared\./);
   assert.doesNotMatch(elements['storage-status-line'].textContent, /Cleared Tasks/);
 });
 
@@ -273,7 +273,7 @@ test('category clear reports a storage race with no remaining key as no change',
   handle.onClearCategory('tasks');
 
   assert.match(elements['storage-status-line'].textContent,
-    /No stored data was found for Tasks\\. Nothing was changed\\./);
+    /No stored data was found for Tasks\. Nothing was changed\./);
   assert.doesNotMatch(elements['storage-status-line'].textContent, /Cleared Tasks/);
 });
 
