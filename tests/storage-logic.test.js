@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const storage = require('../storage-logic.js');
 
 function fakeStorage(initial) {
@@ -53,6 +55,10 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     }
   }
   assert.deepEqual([...seen].sort(), [...expectedKeys].sort(), 'the managed keys are the full known set');
+  const proxyUi = fs.readFileSync(path.join(__dirname, '..', 'browser-proxy-ui.js'), 'utf8');
+  const proxyKey = proxyUi.match(/const LAST_PROFILE_KEY = '([^']+)'/);
+  assert.ok(proxyKey, 'the browser proxy UI must declare its remembered profile key');
+  assert.ok(seen.has(proxyKey[1]), 'the remembered browser proxy key must be included in the storage inventory');
   assert.equal(storage.isManagedKey('daymark.unknown.v1'), false);
 });
 
