@@ -50,9 +50,9 @@ if [ -z "$instrumentation" ]; then
 fi
 
 echo "Running Android instrumentation component: $instrumentation"
-input_package="com.abrar.daymark"
+input_package="com.abrar.daymark.test"
 if ! adb shell run-as "$input_package" sh -c 'test -d files && test -w files' >/dev/null 2>&1; then
-  echo "Target app package $input_package is not accessible through run-as; host input bridge cannot operate." >&2
+  echo "Instrumentation test package $input_package is not accessible through run-as; host input bridge cannot operate." >&2
   exit 1
 fi
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
