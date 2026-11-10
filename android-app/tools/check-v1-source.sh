@@ -157,10 +157,17 @@ receiver_actions = {
     for intent_filter in receiver.findall("intent-filter")
     for action in intent_filter.findall("action")
 }
-assert receiver_actions == {
+allowed_receiver_actions = {
     "android.intent.action.BOOT_COMPLETED",
     "android.intent.action.QUICKBOOT_POWERON",
-}, "the boot receiver may listen only for boot-completion broadcasts"
+    "android.intent.action.TIME_SET",
+    "android.intent.action.TIMEZONE_CHANGED",
+}
+assert {"android.intent.action.BOOT_COMPLETED", "android.intent.action.QUICKBOOT_POWERON"}.issubset(
+    receiver_actions
+), "the reminder receiver must retain both supported boot-completion broadcasts"
+assert receiver_actions.issubset(allowed_receiver_actions), \
+    "the reminder receiver may listen only for boot and explicit system time/timezone changes"
 providers = app.findall("provider")
 assert len(providers) == 1, "only the grant-only attachment content provider is allowed"
 provider = providers[0]
