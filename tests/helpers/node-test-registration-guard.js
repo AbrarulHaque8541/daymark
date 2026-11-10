@@ -363,19 +363,38 @@ function hasExecutableCallback(callback) {
 }
 
 function isStaticallySkipped(call) {
+  // Node's test/describe options can disable execution through skip or todo.
+  // A test-integrity guard must not assume an opaque options value is safe:
+  // variables, spreads, accessors and dynamic computed keys can all hide one
+  // of these flags. Accept only an inline object whose relevant values are
+  // statically known to be false.
   for (const argument of call.arguments.slice(1, -1)) {
-    if (argument.type !== 'ObjectExpression') continue;
+    if (argument.type !== 'ObjectExpression') return true;
     for (const property of argument.properties) {
-      if (property.type !== 'Property' || property.computed) continue;
-      const key = property.key.type === 'Identifier' ? property.key.name : property.key.value;
-      if ((key === 'skip' || key === 'todo') &&
-          property.value.type === 'Literal' &&
-          (property.value.value === true || typeof property.value.value === 'string')) return true;
+      if (property.type === 'SpreadElement') return true;
+      if (property.type !== 'Property') return true;
+
+      let key = null;
+      if (!property.computed) {
+        key = property.key.type === 'Identifier'
+          ? property.key.name
+          : (property.key.type === 'Literal' ? property.key.value : null);
+      } else if (property.key.type === 'Literal') {
+        key = property.key.value;
+      } else {
+        // A computed key may evaluate to "skip" or "todo".
+        return true;
+      }
+
+      if (key !== 'skip' && key !== 'todo') continue;
+      const value = property.value;
+      if (value.type === 'Literal' &&
+          (value.value === false || value.value === null || value.value === '')) continue;
+      return true;
     }
   }
   return false;
 }
-
 function parseJavaScript(source) {
   const text = String(source);
   try {
