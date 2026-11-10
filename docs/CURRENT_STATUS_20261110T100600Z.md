@@ -1,3 +1,5 @@
+> Historical correction: this 10:06Z snapshot was updated after its initial creation to record the #701-to-#706 status-branch replacement and to remove a retired package literal caught by the repository identity guard. The latest reviewed state is in CURRENT_STATUS_20261110T101300Z.md.
+
 # Daymark engineering status — 2026-11-10T10:06:00Z (whole-project security and data-integrity run)
 
 ## Live baseline

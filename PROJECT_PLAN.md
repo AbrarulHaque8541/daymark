@@ -1,3 +1,21 @@
+## Current execution queue — 2026-11-10T10:13:00Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
+
+Live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733 and cross-platform contracts #42784930716 PASS. Main protection is disabled; rulesets are empty. See docs/CURRENT_STATUS_20261110T101300Z.md for exact heads and run evidence.
+
+1. P0 — production signing authorization (#705, #84): production and device-test/SLSA jobs are owner/repository gated; all four exact-head workflows pass. Independent security review and owner-side tag ruleset/protected-environment controls remain.
+2. P0 — Focus lifecycle and storage (#675, #648, #613, #690): #675 exact head passes seven workflows, including API 29/36; #648's separate API 36 gate still fails. Synchronize/review before replacing the older branch.
+3. P0 — task/import/recovery/webhook races (#683, #656, #689, #639): shared task → delivery → queue → Focus locking is covered; explicit integrated import-vs-normal-write race remains.
+4. P0 — governance (#646): owner/admin must configure required Android CI/contracts, independent approval, up-to-date branch and no-force-push/delete protections.
+5. P0 — physical Android/WebView/OEM acceptance (#160): NOT TESTED.
+6. P1 — extension privacy/runtime (#676, #702, #687): all six workflows, including API 26/36 runtime, pass; main synchronization, physical acceptance and recovery UI remain.
+7. P1 — Service Worker compatibility (#704, #685): exact-head policy, Android, contracts, device artifact and API 26/36 runtime pass; independent review remains.
+8. P1 — secure Android download transport (#671): remain fail-closed until redirect validation, bounded streaming, cancellation and safe publication.
+9. P1 — recurrence parity (#684/#476), Telegram browser acceptance (#700), and desktop reproducibility (#696).
+
+No release/tag/version/signing-key/applicationId change or destructive migration was made. Current source identity remains com.abrar.daymark; a conflicting run-level package instruction is recorded for owner reconciliation without reproducing the retired literal.
+
+---
+
 ## Current execution queue — 2026-11-10T10:06:00Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
 
 Latest live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733 and Ubuntu/Windows contracts #42784930716 pass. Main protection is disabled and rulesets are empty. See docs/CURRENT_STATUS_20261110T100600Z.md for exact base/head SHAs, run links and evidence.
