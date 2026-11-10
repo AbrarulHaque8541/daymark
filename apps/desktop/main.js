@@ -78,7 +78,12 @@ app.whenReady().then(() => {
       createStagingPath: (finalPath, directory) => createStagingPath(directory, finalPath, fs),
       publishFile: (stagingPath, finalPath, directory) => publishStagedFile(directory, stagingPath, finalPath, fs),
       cleanupStaging: (stagingPath, directory) => cleanupStaging(directory, stagingPath, fs),
-      onFailed: () => console.error('Daymark could not safely publish a completed download.'),
+      onFailed: (filename) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-failed', filename);
+        }
+        console.error('Daymark could not safely publish a completed download.');
+      },
       onCleanupError: () => console.error('Daymark could not clean a private download staging directory.'),
       exists: (candidate) => {
         try {
