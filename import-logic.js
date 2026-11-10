@@ -430,10 +430,12 @@
     if (!prop) return empty;
     const params = prop.params || {};
     const valueType = (params.VALUE || '').toUpperCase();
+    const hasValue = Object.prototype.hasOwnProperty.call(params, 'VALUE');
     const hasTzid = Object.prototype.hasOwnProperty.call(params, 'TZID');
     const invalidType = () => ({ ...empty, invalidDateType: true });
     const invalidValue = () => ({ ...empty, invalidDateTimeValue: true });
-    if (valueType && valueType !== 'DATE' && valueType !== 'DATE-TIME') return invalidType();
+    if ((hasValue && valueType !== 'DATE' && valueType !== 'DATE-TIME')
+        || (!hasValue && valueType !== '')) return invalidType();
 
     const asDate = prop.value.match(ICS_DATE);
     if (valueType === 'DATE') {
@@ -487,9 +489,13 @@
   // values and use on VEVENT are ignored and disclosed rather than trusted.
   function isValidIcsCompletion(prop) {
     if (!prop || typeof prop.value !== 'string') return false;
-    const valueType = (prop.params.VALUE || '').toUpperCase();
-    if (valueType && valueType !== 'DATE-TIME') return false;
-    if (prop.params.TZID) return false;
+    const params = prop.params || {};
+    const valueType = (params.VALUE || '').toUpperCase();
+    const hasValue = Object.prototype.hasOwnProperty.call(params, 'VALUE');
+    // COMPLETED is a UTC DATE-TIME: an explicitly empty VALUE or any TZID
+    // parameter is invalid, even when its parameter text is empty.
+    if ((hasValue && valueType !== 'DATE-TIME')
+        || (!hasValue && valueType !== '') || Object.prototype.hasOwnProperty.call(params, 'TZID')) return false;
     const match = prop.value.match(ICS_DATETIME);
     if (!match || match[7] !== 'Z') return false;
     const date = match[1] + '-' + match[2] + '-' + match[3];
