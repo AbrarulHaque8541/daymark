@@ -36,7 +36,8 @@
       try { raw = storage.getItem(STORAGE_KEY); } catch (error) {
         return { tasks: null, reason: 'Task storage could not be read.', note: '' };
       }
-      if (typeof raw !== 'string' || raw.length === 0) return { tasks: [], reason: '', note: '' };
+      if (raw === null) return { tasks: [], reason: '', note: '' };
+      if (typeof raw !== 'string') return { tasks: null, reason: 'Saved tasks could not be read safely.', note: '' };
       let parsed = null;
       try { parsed = JSON.parse(raw); } catch (error) {
         return { tasks: null, reason: 'Saved tasks could not be read as JSON.', note: '' };
