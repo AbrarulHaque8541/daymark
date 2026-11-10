@@ -1,3 +1,15 @@
+## Latest verified repository-wide run — 2026-11-10T02:08:52Z
+
+- [Current engineering snapshot](CURRENT_STATUS_20261110T020852Z.md)
+- Main: `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; 11 open PRs and 21 open issues.
+- Main exact push checks: Android CI #42737255404 PASS; Ubuntu/Windows contracts #42737255215 PASS.
+- PR #675 head `ae4edcce101bf326361452067c1de643c0d30d4b`: Android CI PASS, Node 831/831, contracts PASS; device artifact pending. Focus merged-snapshot adoption and conflict-preservation regressions added.
+- PR #692 head `3ae15ef16e33bdcad141c323fe66c536549c2621`: desktop CI 37/37 on Ubuntu/Windows/macOS and contracts PASS; Android CI/device artifact in progress. Remote filename path traversal is now constrained on the desktop branch.
+- #648/#677 API 36 Focus lifecycle failures remain; #646 governance and #160 physical-device acceptance remain open.
+- No PR merged, no release/tag/version/identity/signing change, no destructive migration, no physical-device test.
+
+---
+
 ## Latest verified repository-wide run — 2026-11-10T00:49:29.624Z
 
 - [Current engineering snapshot](CURRENT_STATUS_20261110T004929Z.md)
