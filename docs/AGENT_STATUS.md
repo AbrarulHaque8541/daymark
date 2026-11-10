@@ -1,3 +1,14 @@
+## Latest verified repository-wide run — 2026-11-10T00:49:29.624Z
+
+- [Current engineering snapshot](CURRENT_STATUS_20261110T004929Z.md)
+- Main: `1532838c78ab350b18f95e96a2c547ba384f0831`; 11 open PRs and 20 open issues.
+- PR #675 code head `4a3306d6ba13a4193c19b5acdbb7f17c27b091a8`: Android CI, Ubuntu/Windows contracts, and device-test APK PASS; Node suite 819 passed, 1 skipped, 0 failed.
+- Focus writes, preset writes, recovery-backup maintenance, Focus clears and Clear All now use the shared Focus mutation/generation contract on the integration branch.
+- PR #675 remains unmerged; no independent approval was found. Main branch protection was last observed disabled.
+- #677 API 36 Task Editor IME failure, #683 cross-tab task race coverage, #646 governance, and #160 physical-device acceptance remain open.
+
+---
+
 ## Latest verified repository-wide run — 2026-11-09T23:26:56Z
 
 - [Current engineering snapshot](CURRENT_STATUS_20261109T232656Z.md)
