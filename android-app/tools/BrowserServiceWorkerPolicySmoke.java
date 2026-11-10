@@ -1,6 +1,6 @@
 package com.abrar.daymark;
 
-/** JDK-only regressions for the fail-closed Service Worker network policy. */
+/** JDK-only regressions for the mode-aware Service Worker network policy. */
 public final class BrowserServiceWorkerPolicySmoke {
     private BrowserServiceWorkerPolicySmoke() { }
 
@@ -9,40 +9,43 @@ public final class BrowserServiceWorkerPolicySmoke {
     }
 
     private static void expect(BrowserServiceWorkerPolicy.Decision expected,
-                               boolean online, boolean explicitNavigation, String scheme) {
+                               boolean online, String scheme) {
         BrowserServiceWorkerPolicy.Decision actual =
-                BrowserServiceWorkerPolicy.decide(online, explicitNavigation, scheme);
+                BrowserServiceWorkerPolicy.decide(online, scheme);
         check(actual == expected, "unexpected decision for online=" + online
-                + ", explicitNavigation=" + explicitNavigation + ", scheme=" + scheme
-                + ": " + actual);
+                + ", scheme=" + scheme + ": " + actual);
     }
 
     public static void main(String[] args) {
-        check(BrowserServiceWorkerPolicy.blocksNetworkLoads(),
-                "the process-wide Service Worker network setting must remain blocked");
+        check(BrowserServiceWorkerPolicy.blocksNetworkLoads(false),
+                "Service Worker network loads must start blocked before explicit Online navigation");
+        check(!BrowserServiceWorkerPolicy.blocksNetworkLoads(true),
+                "Online consent must allow the process-wide Service Worker network setting");
 
         for (boolean online : new boolean[]{false, true}) {
-            for (boolean explicitNavigation : new boolean[]{false, true}) {
-                expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, explicitNavigation, "http");
-                expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, explicitNavigation, "https");
-                expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, explicitNavigation, "ftp");
-                expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, explicitNavigation, "file");
-                expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, explicitNavigation, "content");
-                expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, explicitNavigation, null);
-                expect(BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL, online, explicitNavigation, "data");
-                expect(BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL, online, explicitNavigation, "blob");
-                expect(BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL, online, explicitNavigation, "about");
-            }
+            expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, null);
+            expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, "ftp");
+            expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, "file");
+            expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, "content");
+            expect(BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL, online, "data");
+            expect(BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL, online, "blob");
+            expect(BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL, online, "about");
         }
+        expect(BrowserServiceWorkerPolicy.Decision.BLOCK, false, "http");
+        expect(BrowserServiceWorkerPolicy.Decision.BLOCK, false, "https");
+        expect(BrowserServiceWorkerPolicy.Decision.ALLOW_NETWORK, true, "http");
+        expect(BrowserServiceWorkerPolicy.Decision.ALLOW_NETWORK, true, "https");
 
         check(BrowserServiceWorkerPolicy.shouldShowCompatibilityNotice(),
                 "the compatibility notice must be shown once");
         check(!BrowserServiceWorkerPolicy.shouldShowCompatibilityNotice(),
                 "the compatibility notice must not repeat for every tab");
         String disclosure = BrowserServiceWorkerPolicy.compatibilityDisclosure();
-        check(disclosure.contains("even while Online") && disclosure.contains("Cached responses"),
-                "the user disclosure must explain the Online-mode compatibility trade-off");
+        check(disclosure.contains("Online/Offline mode")
+                        && disclosure.contains("blocked while Offline")
+                        && disclosure.contains("remains blocked even while Online"),
+                "the user disclosure must explain normal mode behavior and the degraded fallback");
 
-        System.out.println("PASS Service Worker policy: 36 state/scheme decisions, global block, one-time disclosure");
+        System.out.println("PASS Service Worker policy: 18 state/scheme decisions, Online/Offline block, one-time disclosure");
     }
 }
