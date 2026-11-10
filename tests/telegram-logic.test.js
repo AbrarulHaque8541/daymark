@@ -178,7 +178,7 @@ test('an API error description redacts the bot token before reaching the UI', as
     { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, networkDeps(fetchFn));
   assert.equal(result.ok, false);
   assert.ok(result.reason.indexOf(VALID_TOKEN) === -1, 'untrusted API descriptions must not echo the bot token');
-  assert.match(result.reason, /\\[redacted\\]/);
+  assert.match(result.reason, /\[redacted\]/);
 });
 
 test('an environment with an explicit null fetch fails closed', async () => {
