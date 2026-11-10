@@ -234,6 +234,9 @@ def check_recovery_ui(main):
     assert "pack.canRemove && pack.sha256 != null" in recovery, (
         "removal must be offered only for fingerprinted, removable files"
     )
+    assert "actions.setOrientation(LinearLayout.VERTICAL);" in recovery, (
+        "recovery actions must remain usable on narrow screens and at larger text scales"
+    )
     assert "Export exact raw bytes" in recovery and "Remove malformed extension file" in recovery, (
         "recovery actions must have accessible descriptions"
     )
