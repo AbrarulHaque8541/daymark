@@ -158,15 +158,10 @@
         || /%(?![0-9A-Fa-f]{2})/.test(base)) return null;
     const authority = parseIntentAuthority(base);
     if (!authority) return null;
-    try {
-      const parsed = new URL(base);
-      if (parsed.protocol !== 'intent:' || !parsed.hostname
-          || parsed.username || parsed.password || parsed.hash) return null;
-      if (parsed.hostname.toLowerCase() !== authority.host.toLowerCase()) return null;
-      if ((parsed.port === '' ? null : Number(parsed.port)) !== authority.port) return null;
-    } catch (error) {
-      return null;
-    }
+    const rest = base.slice('intent://'.length);
+    const boundary = rest.search(/[/?#]/);
+    const suffix = boundary === -1 ? '' : rest.slice(boundary);
+    if (suffix && !suffix.startsWith('/') && !suffix.startsWith('?')) return null;
     return authority;
   }
 
@@ -249,29 +244,10 @@
       if (port < 1 || port > 65535) return null;
     }
 
-    let parsed;
-    try {
-      parsed = new URL(input);
-    } catch (error) {
-      return null;
-    }
-    if (parsed.protocol !== scheme + ':' || !parsed.hostname
-        || parsed.username || parsed.password) return null;
-    if (parsed.hostname.toLowerCase() !== host.toLowerCase()) return null;
-    const parsedPort = parsed.port === '' ? null : Number(parsed.port);
-    if (parsedPort !== null && parsedPort !== Number(portText)) return null;
-    if (parsedPort === null && portText !== null
-        && Number(portText) !== (scheme === 'https' ? 443 : 80)) return null;
-
-    // java.net.URI.normalize() removes dot segments but preserves an absent
-    // path and an explicitly supplied default port; reconstruct both details
-    // instead of relying on WHATWG URL.href's default-port elision.
     const suffix = rest.slice(authority.length);
-    const path = suffix.startsWith('/') ? parsed.pathname : '';
-    return scheme + '://' + host + (portText === null ? '' : ':' + portText)
-      + path + parsed.search + parsed.hash;
+    if (suffix && !suffix.startsWith('/') && !suffix.startsWith('?') && !suffix.startsWith('#')) return null;
+    return scheme + '://' + host + (portText === null ? '' : ':' + portText) + suffix;
   }
-
   function parseIntentUri(raw) {
     const fail = (reason) => ({ ok: false, reason });
     const input = String(raw == null ? '' : raw);
@@ -521,11 +497,8 @@
       const intent = result.intent;
       let fallbackOrigin = null;
       if (intent.fallbackUrl) {
-        try {
-          fallbackOrigin = new URL(intent.fallbackUrl).origin;
-        } catch (error) {
-          fallbackOrigin = 'a validated web address';
-        }
+        const originMatch = /^(https?:\/\/[^/?#]+)/i.exec(intent.fallbackUrl);
+        fallbackOrigin = originMatch ? originMatch[1] : 'a validated web address';
       }
       base.verdict = 'handoff';
       base.title = 'Android intent handoff';
