@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-10T05:53:36Z (main 469b29e; Focus API 36 10/10, desktop download failure UX, Telegram hardening, repository-wide backlog)](./CURRENT_STATUS_20261110T055336Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T05:36:48Z (main 469b29e; Telegram security, Focus coordinate fix, repository-wide backlog)](./CURRENT_STATUS_20261110T053648Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
