@@ -253,3 +253,25 @@ assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll" in mode_test, (
     "the parent Tasks ScrollView must be exercised with a real vertical drag"
 )
 print("PASS Focus Timer instrumentation targets ModeSelector and parent Tasks ScrollView")
+
+tap_start = instrumentation.index("private String dispatchTap(android.view.View view)")
+tap_end = instrumentation.index("private String dispatchSwipe", tap_start)
+tap_method = instrumentation[tap_start:tap_end]
+assert "waitForScrollPositionToSettle(parentScroll);" in tap_method
+assert tap_method.index("waitForScrollPositionToSettle(parentScroll);") < tap_method.index("stableVisibleBounds(view)"), (
+    "child tap coordinates must be computed only after the parent ScrollView has stopped moving"
+)
+settle_start = instrumentation.index("private void waitForScrollPositionToSettle(")
+settle_end = instrumentation.index("private void scrollViewIntoFocus(", settle_start)
+settle_method = instrumentation[settle_start:settle_end]
+assert "stableSamples >= 3" in settle_method and "SystemClock.sleep(50L)" in settle_method
+assert "uptimeMillis() + 2000L" in settle_method, (
+    "ScrollView settling must be bounded and require repeated stable samples"
+)
+scroll_start = instrumentation.index("private void scrollDescendantIntoScrollView(")
+scroll_end = instrumentation.index("private void scrollViewIntoFocus(", scroll_start)
+scroll_method = instrumentation[scroll_start:scroll_end]
+assert "waitForScrollPositionToSettle(scrollView);" in scroll_method, (
+    "programmatic centering must finish before a touch is injected"
+)
+print("PASS Focus Timer tap injection waits for stable parent ScrollView position")
