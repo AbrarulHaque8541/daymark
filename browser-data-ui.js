@@ -11,6 +11,8 @@
  * Mirrors the browser-error-ui.js module style: attachBrowserDataUi(env)
  * is fully injectable for unit tests and the card is stateless, so boot
  * never touches window.localStorage.
+ *
+ * Cycle B addition: Copy explanation button with press/busy feedback.
  */
 ((root) => {
   'use strict';
@@ -18,8 +20,6 @@
   function attachBrowserDataUi(env) {
     if (!env || !env.document) throw new Error('attachBrowserDataUi requires a document.');
     const doc = env.document;
-    // An env may explicitly pass dataApi: null to model a page where the
-    // engine failed to load; only fall back to the global when absent.
     const dataApi = Object.prototype.hasOwnProperty.call(env, 'dataApi')
       ? env.dataApi
       : (root.DaymarkBrowserData || null);
@@ -30,6 +30,9 @@
     const resultEl = element('browser-data-result');
     const formEl = element('browser-data-form');
     const clearEl = element('browser-data-clear');
+    const copyEl = element('browser-data-copy');
+
+    let lastExplanationText = '';
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -42,9 +45,31 @@
       return item;
     }
 
+    function setBusy(button, busy) {
+      if (!button || !button.classList) return;
+      
+      button.classList.toggle('is-busy', busy);
+      button.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+
     function renderExplanation(result) {
       if (!resultEl) return;
       while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+
+      const lines = [];
+      lines.push(result.title);
+      lines.push(result.summary);
+      for (let i = 0; i < result.removes.length; i += 1) {
+        lines.push('Removes · ' + result.removes[i]);
+      }
+      for (let i = 0; i < result.keeps.length; i += 1) {
+        lines.push('Keeps · ' + result.keeps[i]);
+      }
+      lines.push((result.recoverable ? 'Comes back · ' : 'No undo · ') + result.recovery);
+      lines.push('Scope · ' + result.scope);
+      lines.push('Network · ' + result.network);
+      lastExplanationText = lines.join('\n');
+
       const head = doc.createElement('div');
       head.className = 'feed-item';
       const title = doc.createElement('span');
@@ -56,17 +81,8 @@
       head.appendChild(title);
       head.appendChild(summary);
       resultEl.appendChild(head);
-      const lines = [];
-      for (let i = 0; i < result.removes.length; i += 1) {
-        lines.push('Removes \u00b7 ' + result.removes[i]);
-      }
-      for (let i = 0; i < result.keeps.length; i += 1) {
-        lines.push('Keeps \u00b7 ' + result.keeps[i]);
-      }
-      lines.push((result.recoverable ? 'Comes back \u00b7 ' : 'No undo \u00b7 ') + result.recovery);
-      lines.push('Scope \u00b7 ' + result.scope);
-      lines.push('Network \u00b7 ' + result.network);
-      for (let i = 0; i < lines.length; i += 1) {
+
+      for (let i = 2; i < lines.length; i += 1) {
         resultEl.appendChild(makeItem('feed-item', lines[i]));
       }
     }
@@ -74,14 +90,13 @@
     function explain() {
       if (!dataApi || typeof dataApi.explainClearAction !== 'function') {
         status('Clear-action explanations are unavailable.');
+        lastExplanationText = '';
         return;
       }
       const action = actionEl && typeof actionEl.value === 'string' ? actionEl.value : '';
-      // The engine fails closed to the honest unknown entry for any value
-      // the prototype does not know.
       const result = dataApi.explainClearAction(action);
-      status('Explained \u00b7 ' + result.label
-        + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
+      status('Explained · ' + result.label
+        + (result.deletesData ? ' · deletes data' : ' · deletes nothing'));
       renderExplanation(result);
     }
 
@@ -89,7 +104,32 @@
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
+      lastExplanationText = '';
       status('Cleared. Pick an action to see exactly what it touches.');
+    }
+
+    function copyExplanation() {
+      if (!lastExplanationText) {
+        status('Nothing to copy yet. Explain an action first.');
+        return;
+      }
+      const nav = env.navigator || (typeof navigator !== 'undefined' ? navigator : null);
+      if (!nav || !nav.clipboard || typeof nav.clipboard.writeText !== 'function') {
+        status('Clipboard is unavailable in this browser.');
+        return;
+      }
+      setBusy(copyEl, true);
+      status('Copying explanation…');
+      Promise.resolve(nav.clipboard.writeText(lastExplanationText))
+        .then(() => {
+          status('Copied the clear-action explanation.');
+        })
+        .catch(() => {
+          status('Could not copy the explanation.');
+        })
+        .finally(() => {
+          setBusy(copyEl, false);
+        });
     }
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -104,15 +144,17 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { copyExplanation(); });
+    }
 
     explain();
 
     return {
       explain,
       onClear,
+      copyExplanation,
       detach() {
-        // No document-level listener is registered; the returned handle
-        // simply stops being used once it goes out of scope.
         status('');
       }
     };
@@ -123,8 +165,6 @@
   root.DaymarkBrowserDataUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    // This UI is stateless. Do not touch window.localStorage during boot:
-    // storage may be disabled or its getter may throw before the card can render.
     const boot = () => attachBrowserDataUi({ document });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();

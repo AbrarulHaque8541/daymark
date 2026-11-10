@@ -229,3 +229,24 @@ test('DOMContentLoaded boot also avoids a throwing localStorage getter', () => {
   assert.equal(result.elements['browser-data-status'].textContent,
     'Explained · Clear completed tasks · deletes data');
 });
+
+test('copy explanation succeeds when clipboard is available', async () => {
+  const doc = makeDoc([...ALL_IDS, 'browser-data-copy']);
+  const written = [];
+  const nav = { clipboard: { writeText: async (text) => { written.push(text); } } };
+  const api = ui.attachBrowserDataUi({ document: doc, dataApi: engine, navigator: nav });
+  // Ensure something is explained
+  doc.elements['browser-data-action'].value = 'clear-search';
+  api.explain();
+  await api.copyExplanation();
+  assert.ok(written.length > 0, 'clipboard.writeText should be called');
+  assert.match(written[0], /Clear task search|Keeps/);
+});
+
+test('copy explanation fails closed when clipboard is missing', async () => {
+  const doc = makeDoc([...ALL_IDS, 'browser-data-copy']);
+  const api = ui.attachBrowserDataUi({ document: doc, dataApi: engine, navigator: {} });
+  api.explain();
+  await api.copyExplanation();
+  assert.match(doc.elements['browser-data-status'].textContent, /unavailable|Nothing to copy/);
+});
