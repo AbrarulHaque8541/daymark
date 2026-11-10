@@ -22,7 +22,7 @@ Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS 
 - Secure WebSockets (WSS) aur starter tracker-domain blocking
 - Privacy headers: DNT: 1, Sec-GPC: 1
 - Find in page (Ctrl+F)
-- Downloads OS Downloads folder mein sanitized, collision-safe filenames ke saath save hote hain; unsafe destination par download cancel hota hai. Per-download consent/redirect audit abhi production-grade nahi
+- Downloads OS Downloads folder mein sanitized, collision-safe filenames ke saath save hote hain; unsafe destination par download cancel hota hai. Path allocation covers existing entries and in-process reservations, but not a hostile local process racing a path replacement; private-temp/atomic publication is still required for that threat model. Per-download consent/redirect audit abhi production-grade nahi
 - target=_blank / window.open allowed web URLs ko new tab mein route karta hai
 
 ## Security boundary
