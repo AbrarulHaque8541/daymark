@@ -1970,6 +1970,11 @@
         baseRaw: state.focusPersistedRaw,
         expectedGeneration: generation.value,
         desiredSnapshot,
+        validateSnapshot: (snapshot) => {
+          if (snapshot.session && !focus.isValidSession(snapshot.session)) return false;
+          const checkedLog = focus.validateFocusLog(snapshot.log);
+          return checkedLog.rejectedCount === 0 && checkedLog.entries.length === snapshot.log.length;
+        },
         allowOpaqueBase: state.focusPrimaryUnreadable && state.focusRecoveryBackupReady
       });
       if (result.ok) {
@@ -2124,12 +2129,17 @@
     const minutes = focus.presetMinutes(kind);
     const linkedTaskId = taskId || state.focusTaskId || null;
     state.focusSession = focus.createSession({ taskId: linkedTaskId, kind, durationMinutes: minutes }, Date.now());
+    const requestedSessionId = state.focusSession.id;
     state.focusTaskId = linkedTaskId || '';
     const saved = await persistFocusState();
     renderFocus();
-    if (state.focusSession) ensureFocusTimer();
+    if (state.focusSession && state.focusSession.id === requestedSessionId) ensureFocusTimer();
     if (!state.focusSession) {
-      showToast('Focus data was cleared in another tab. The old session was not restored.');
+      showToast('Focus was cleared in another tab. The old session was not restored.');
+      return false;
+    }
+    if (state.focusSession.id !== requestedSessionId) {
+      showToast('Another tab changed the active Focus session; this tab did not replace it.');
       return false;
     }
     const task = linkedTaskId ? state.tasks.find((item) => item.id === linkedTaskId) : null;
