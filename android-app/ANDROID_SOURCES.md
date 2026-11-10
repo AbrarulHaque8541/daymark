@@ -214,19 +214,24 @@ Timestamp (UTC): 2026-10-26T03:57:57Z
 
 Daymark installs its process-wide Android ServiceWorkerController policy during
 DaymarkWebView class initialization, before the first WebView instance is created.
-The controller's ServiceWorkerWebSettings.setBlockNetworkLoads(true) setting and
-a ServiceWorkerClient fail-closed response block remote Service Worker requests.
-This is intentionally stricter than the page-level Online/Offline switch: **Service
-Worker network requests remain blocked even while ordinary page navigation is Online**.
-Explicitly opening a site does not grant a Service Worker network access, and switching
-Offline reasserts the global block. Local data:, blob: and about: responses may
-still be handled locally; cached Service Worker responses may continue to work.
+The controller's ServiceWorkerWebSettings.setBlockNetworkLoads setting and a
+ServiceWorkerClient fail-closed response enforce the browser's user-controlled
+Online/Offline mode. Before the first explicit Online navigation, the process-wide
+worker setting starts blocked. After the existing Online consent/navigation gate
+passes, Daymark unblocks worker network requests for HTTP/HTTPS. Switching Offline
+immediately clears the in-memory Online grant and reasserts the global block. The
+request client independently blocks remote/unknown worker requests while Offline,
+including if a later platform/settings reset clears the global setting. Local
+data:, blob: and about: responses and already cached Service Worker responses may
+still be handled locally.
 
-Compatibility trade-off: sites that rely on Service Worker network fetches, script
-updates, push-related fetches, or background synchronization may be degraded. This is
-a temporary fail-closed boundary until a separately reviewed origin-scoped grant model
-and real-device request-trace acceptance exist. It is **not** a claim that all
-platform-managed WebView/Safe Browsing egress is blocked.
+If the platform cannot change the global ServiceWorkerWebSettings value after Online
+consent, ordinary top-level browsing may continue while Service Worker remote requests
+remain fail-closed; the in-app compatibility notice explains this degraded fallback.
+This policy is process-wide because Android's ServiceWorkerController is process-wide;
+it follows the same global browser Online/Offline choice rather than introducing
+per-origin grants. It is **not** a claim that all platform-managed WebView/Safe Browsing
+egress is blocked.
 
 Official platform references:
 - https://developer.android.com/reference/android/webkit/ServiceWorkerController
