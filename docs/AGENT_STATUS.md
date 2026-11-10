@@ -8,6 +8,11 @@
 - #648/#677 API 36 Focus lifecycle failures remain; #646 governance and #160 physical-device acceptance remain open.
 - No PR merged, no release/tag/version/identity/signing change, no destructive migration, no physical-device test.
 
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live repository, PR, issue and Actions evidence review
+Timestamp (UTC): 2026-11-10T02:08:52Z
+
 ---
 
 ## Latest verified repository-wide run — 2026-11-10T00:49:29.624Z
