@@ -111,7 +111,7 @@ test('an invalid chat target reports honestly and sends nothing', async () => {
   fillValidInputs(doc);
   doc.elements['telegram-chat'].value = 'nope';
   await handle.send();
-  assert.match(doc.elements['telegram-status'].textContent, /chat target/);
+  assert.match(doc.elements['telegram-status'].textContent, /numeric chat ID for a private chat, or an @channelusername for a public channel/);
   assert.equal(fetchFn.calls.length, 0);
 });
 test('chat guidance distinguishes private chat IDs from public channel usernames', async () => {
