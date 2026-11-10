@@ -428,10 +428,11 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         public boolean onInterceptTouchEvent(MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Release any stale parent request at the start of a new stream.
-                    // A tap remains with its child; only a classified horizontal drag
-                    // disallows the parent, while a vertical MOVE remains scrollable.
-                    disallowParentIntercept(false);
+                    // Reserve the initial stream so the parent Tasks ScrollView cannot
+                    // steal a child tap while this selector suppresses child disallow requests
+                    // to observe horizontal MOVE events. A classified vertical MOVE releases
+                    // the parent for normal scrolling; horizontal MOVE keeps it disallowed.
+                    disallowParentIntercept(true);
                     downX = event.getX();
                     downY = event.getY();
                     horizontalGesture = false;
