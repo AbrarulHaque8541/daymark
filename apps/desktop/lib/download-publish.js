@@ -71,7 +71,8 @@ function publishStagedFile(downloadDirectory, stagingPath, finalPath, fsImpl = f
     // a failed staging-path race from leaving an unexpected hard link in the
     // user-visible Downloads directory. If another process replaced that
     // entry, leave it untouched rather than deleting an unverified path.
-    if (linked && publishedStat && publishedStat.ino && publishedStat.dev) {
+    if (linked && publishedStat && Number.isFinite(publishedStat.ino)
+      && publishedStat.ino !== 0 && Number.isFinite(publishedStat.dev)) {
       try {
         const currentStat = fsImpl.lstatSync(paths.target);
         if (currentStat.ino === publishedStat.ino && currentStat.dev === publishedStat.dev) {
