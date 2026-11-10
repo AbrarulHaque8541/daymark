@@ -372,6 +372,26 @@ test('Focus load rejects a snapshot when the clear generation changes during its
     /changed while it was being loaded/i);
 });
 
+test('a stale recovery-backup queue cannot recreate a backup cleared before its storage event', async () => {
+  let clearedDuringBackupRead = false;
+  const app = bootApp({
+    savedFocusValue: '{"session":',
+    beforeGetItem(key, values) {
+      if (key !== FOCUS_BACKUP_KEY || clearedDuringBackupRead) return;
+      clearedDuringBackupRead = true;
+      values.set(focusMutation.FOCUS_GENERATION_KEY, '1');
+      values.delete(FOCUS_BACKUP_KEY);
+    }
+  });
+  await app.settle();
+
+  assert.equal(clearedDuringBackupRead, true);
+  assert.equal(app.storedValues.has(FOCUS_BACKUP_KEY), false,
+    'a backup clear that wins during load must not be undone by stale backup maintenance');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /changed or was cleared in another tab/i);
+});
+
 test('quota failure preserves original focus payload and recovery backup', async () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-storage-failure', start);
