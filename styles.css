@@ -76,6 +76,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .button:active { transform: translateY(1px) scale(.99); }
 .button-primary { color: #fff; background: linear-gradient(145deg, #1d7f6c, #0d5449); box-shadow: 0 6px 16px rgba(22, 112, 95, .24); }
 .button-primary:hover { background: linear-gradient(145deg, #238f79, #116256); box-shadow: 0 8px 20px rgba(22, 112, 95, .3); transform: translateY(-1px); }
+.button:disabled, .button[aria-disabled="true"] { opacity: .65; cursor: not-allowed; transform: none; box-shadow: none; }
 .add-button { height: 44px; white-space: nowrap; }
 .add-button span { margin-right: 3px; font-size: 16px; vertical-align: -1px; }
 .button-quiet { color: #4c5a64; background: rgba(255, 255, 255, .6); border-color: rgba(219, 226, 232, .9); }
