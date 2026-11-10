@@ -177,29 +177,32 @@ test('clear-all acquires the global task/delivery/queue lock order before deleti
   assert.equal(resetWhileLocked, true, 'Clear All resets the in-memory queue before releasing its locks');
 });
 
-test('webhook queue and clear-all fail closed if any ordered lock is rejected', async () => {
+test('webhook queue and Clear All fail closed at every ordered lock position', async () => {
   for (const action of ['webhook-queue', 'all']) {
-    const calls = [];
-    const locks = {
-      request(name, options, callback) {
-        calls.push(name);
-        if (name === mutation.WEBHOOK_QUEUE_LOCK) return Promise.reject(new Error('lock unavailable'));
-        return Promise.resolve().then(callback);
-      }
-    };
-    const queueBytes = '[{"id":"pending"}]';
-    const { env, storageData, elements, removedKeys } = fakeEnv({
-      data: { 'daymark.tasks.v1': '[]', 'daymark.webhook.queue.v1': queueBytes },
-      lockManager: locks
-    });
-    const handle = ui.attachStorageUi(env);
-    if (action === 'all') await handle.onClearAll();
-    else await handle.onClearCategory('webhook-queue');
-    assert.deepEqual(removedKeys, [], 'a later lock failure prevents every storage removal');
-    assert.equal(storageData['daymark.tasks.v1'], '[]');
-    assert.equal(storageData['daymark.webhook.queue.v1'], queueBytes);
-    assert.match(elements['storage-status-line'].textContent, /Nothing was cleared/);
-    assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER.slice(0, 3));
+    for (const failedLock of mutation.CLEAR_ALL_LOCK_ORDER) {
+      const calls = [];
+      const locks = {
+        request(name, options, callback) {
+          calls.push(name);
+          if (name === failedLock) return Promise.reject(new Error('lock unavailable'));
+          return Promise.resolve().then(callback);
+        }
+      };
+      const queueBytes = '[{"id":"pending"}]';
+      const { env, storageData, elements, removedKeys } = fakeEnv({
+        data: { 'daymark.tasks.v1': '[]', 'daymark.webhook.queue.v1': queueBytes },
+        lockManager: locks
+      });
+      const handle = ui.attachStorageUi(env);
+      if (action === 'all') await handle.onClearAll();
+      else await handle.onClearCategory('webhook-queue');
+      assert.deepEqual(removedKeys, [], 'a lock failure prevents every storage removal');
+      assert.equal(storageData['daymark.tasks.v1'], '[]');
+      assert.equal(storageData['daymark.webhook.queue.v1'], queueBytes);
+      assert.match(elements['storage-status-line'].textContent, /Nothing was cleared/);
+      const failedIndex = mutation.CLEAR_ALL_LOCK_ORDER.indexOf(failedLock);
+      assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER.slice(0, failedIndex + 1));
+    }
   }
 });
 
