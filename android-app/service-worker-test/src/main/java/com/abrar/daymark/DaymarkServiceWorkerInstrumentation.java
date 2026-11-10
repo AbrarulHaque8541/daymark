@@ -435,7 +435,21 @@ public final class DaymarkServiceWorkerInstrumentation {
                     Class.forName("com.abrar.daymark.BrowserNetworkPolicy", true, targetLoader),
                     Class.forName("com.abrar.daymark.DaymarkWebView", true, targetLoader));
             prepareNavigation.setAccessible(true);
-            prepareNavigation.invoke(null, networkPolicy, view);
+            final java.lang.reflect.Method prepareNavigationMethod = prepareNavigation;
+            final Object prepareNavigationPolicy = networkPolicy;
+            final WebView prepareNavigationView = view;
+            AtomicReference<Throwable> prepareFailure = new AtomicReference<>();
+            instrumentation.runOnMainSync(() -> {
+                try {
+                    prepareNavigationMethod.invoke(null, prepareNavigationPolicy, prepareNavigationView);
+                } catch (Throwable navigationPrepareError) {
+                    prepareFailure.set(navigationPrepareError);
+                }
+            });
+            if (prepareFailure.get() != null) {
+                throw new AssertionError("could not prepare the production DaymarkWebView for explicit navigation",
+                        prepareFailure.get());
+            }
             load(view, server.url("/private/start"));
             String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
                     + matchingPackId + "\"]";
@@ -839,3 +853,4 @@ public final class DaymarkServiceWorkerInstrumentation {
         }
     }
 }
+
