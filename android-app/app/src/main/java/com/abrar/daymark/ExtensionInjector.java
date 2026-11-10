@@ -25,12 +25,12 @@ final class ExtensionInjector {
 
     private ExtensionInjector() { }
 
-    static void apply(WebView webView, String pageUrl, List<BrowserExtension> packs) {
+    static boolean apply(WebView webView, String pageUrl, List<BrowserExtension> packs) {
         if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)
-                || !pageUrl.equals(webView.getUrl())) return;
+                || !pageUrl.equals(webView.getUrl())) return false;
 
         List<BrowserExtension> matching = matchingPacks(pageUrl, packs);
-        if (!submitCurrentPageStyles(webView, pageUrl, matching)) return;
+        if (!submitCurrentPageStyles(webView, pageUrl, matching)) return false;
 
         StringBuilder js = new StringBuilder();
         for (BrowserExtension ext : matching) {
@@ -43,9 +43,6 @@ final class ExtensionInjector {
                     .append("var __dmExpectedUrl=").append(jsonString(pageUrl)).append(";")
                     .append("if(String(window.location.href)!==__dmExpectedUrl)return;")
                     .append("var __dmId=").append(jsonString(ext.id)).append(";")
-                    .append("if(window.__daymarkRan&&window.__daymarkRan[__dmId])return;")
-                    .append("window.__daymarkRan=window.__daymarkRan||Object.create(null);")
-                    .append("window.__daymarkRan[__dmId]=1;")
                     .append("var __dmAddStyle=function(css){try{")
                     .append("if(String(window.location.href)!==__dmExpectedUrl)return null;")
                     .append("var p=document.head||document.documentElement;")
@@ -63,8 +60,13 @@ final class ExtensionInjector {
         }
         if (js.length() > 0) {
             // A navigation between the style and userscript submissions must not retarget code.
-            webView.evaluateJavascript(jsScript(jsonString(pageUrl), js.toString()), null);
+            try {
+                webView.evaluateJavascript(jsScript(jsonString(pageUrl), js.toString()), null);
+            } catch (RuntimeException rendererUnavailable) {
+                return false;
+            }
         }
+        return true;
     }
 
     /**
