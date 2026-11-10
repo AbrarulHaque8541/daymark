@@ -15,12 +15,28 @@
     if (!env || !env.document) throw new Error('attachStorageUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
+    const injectedStorage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+      && env.storageAccessFailed !== true;
     let storage = null;
-    let storageAccessFailed = false;
-    try {
-      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
-        ? env.localStorage : (win && win.localStorage) || null;
-    } catch (error) { storageAccessFailed = true; }
+    let storageAccessFailed = env.storageAccessFailed === true;
+
+    function acquireStorage() {
+      try {
+        storage = injectedStorage
+          ? env.localStorage : (win && win.localStorage) || null;
+        storageAccessFailed = false;
+        return Boolean(storage && typeof storage.getItem === 'function'
+          && typeof storage.removeItem === 'function');
+      } catch (error) {
+        storage = null;
+        storageAccessFailed = true;
+        return false;
+      }
+    }
+
+    // The browser boot adapter may already have observed a throwing getter.
+    // Keep the initial state unknown until the user explicitly retries.
+    if (!storageAccessFailed) acquireStorage();
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
@@ -44,6 +60,7 @@
         storage.getItem('daymark.data.probe.v1');
         return true;
       } catch (error) {
+        storageAccessFailed = true;
         return false;
       }
     }
@@ -276,7 +293,10 @@
     }
 
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
-      refreshEl.addEventListener('click', () => { render(); });
+      refreshEl.addEventListener('click', () => {
+        if (storageAccessFailed || !storage) acquireStorage();
+        render();
+      });
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
       clearAllEl.addEventListener('click', () => { onClearAll(); });
