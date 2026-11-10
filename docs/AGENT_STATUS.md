@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-10T06:07:29Z (main 469b29e; Focus/reminder API 29/36 gates pass, desktop failure UX, precise test-guard scope, repository-wide backlog)](./CURRENT_STATUS_20261110T060729Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T06:04:17Z (main 469b29e; Focus and reminder API 29/36 gates pass, desktop failure UX, corrected signing review, repository-wide backlog)](./CURRENT_STATUS_20261110T060417Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T06:02:27Z (main 469b29e; Focus and reminder API 29/36 gates pass, desktop failure UX, corrected signing review, repository-wide backlog)](./CURRENT_STATUS_20261110T060227Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T05:57:31Z (main 469b29e; Focus API 36 10/10, reminder API 29 tap trace, desktop download failure UX, repository-wide backlog)](./CURRENT_STATUS_20261110T055731Z.md)
