@@ -6,10 +6,10 @@ import android.content.SharedPreferences;
 import java.io.File;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -544,19 +545,25 @@ final class ExtensionStore {
         if (file == null || !isSafeDirectoryPath(file.getParentFile())) {
             throw new IOException("Private extension pack directory is unsafe; refusing to write.");
         }
-        File tmp = new File(file.getAbsolutePath() + ".tmp");
+        Path temporary = new File(file.getAbsolutePath() + ".tmp").toPath();
+        boolean temporaryCreated = false;
         try {
-            try (FileOutputStream out = new FileOutputStream(tmp)) {
-                out.write(content.getBytes(StandardCharsets.UTF_8));
-                out.getFD().sync();
+            // CREATE_NEW makes an existing file or symlink a hard failure instead of
+            // following it. The private directory is not a reason to trust stale temp paths:
+            // recovery/restore and filesystem corruption must not redirect writes.
+            try (FileChannel out = FileChannel.open(temporary,
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
+                temporaryCreated = true;
+                ByteBuffer bytes = ByteBuffer.wrap(content.getBytes(StandardCharsets.UTF_8));
+                while (bytes.hasRemaining()) out.write(bytes);
+                out.force(true);
             }
             // Same-directory replacement. A failed move leaves the previous pack untouched.
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(temporary, file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            temporaryCreated = false;
         } finally {
-            if (tmp.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                tmp.delete();
-            }
+            // Never delete a pre-existing path when CREATE_NEW failed; it may be user data.
+            if (temporaryCreated) Files.deleteIfExists(temporary);
         }
     }
 }
