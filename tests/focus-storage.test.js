@@ -314,6 +314,36 @@ test('cross-tab Focus generation event rebases the whole domain before a queued 
   assert.equal(app.elements.get('#focus-pause').textContent, 'Pause');
 });
 
+test('a stale Focus completion cannot recreate history after clear before its storage event arrives', async () => {
+  const session = focus.createSession({
+    id: 'focus-cleared-before-storage-event',
+    kind: 'focus',
+    durationMinutes: 25
+  }, Date.now());
+  const original = rawFocusPayload(session);
+  const app = bootApp({ savedFocusValue: original });
+  await app.settle();
+
+  // Simulate another tab completing Clear Focus under the shared lock. Its
+  // storage events are deliberately not dispatched yet, so this tab still
+  // holds the pre-clear session snapshot when the user presses Stop.
+  app.storedValues.set(focusMutation.FOCUS_GENERATION_KEY, '1');
+  app.storedValues.delete(FOCUS_KEY);
+
+  const stopped = await app.trigger('#focus-stop', 'click')[0];
+  await app.settle();
+
+  assert.equal(stopped, false, 'the stale completion is rejected instead of reported as saved');
+  assert.equal(app.storedValues.has(FOCUS_KEY), false,
+    'the stale tab must not recreate a Focus log after the clear');
+  assert.equal(app.storedValues.get(focusMutation.FOCUS_GENERATION_KEY), '1',
+    'the clear generation remains authoritative');
+  assert.equal(app.elements.get('#focus-state-label').textContent, 'Ready',
+    'the stale in-memory session is rebased to the cleared state');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /changed or was cleared in another tab/i);
+});
+
 test('quota failure preserves original focus payload and recovery backup', async () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-storage-failure', start);
