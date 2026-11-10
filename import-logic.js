@@ -280,6 +280,7 @@
         priority: current.priority,
         completed: current.completed,
         repeat: current.repeat,
+        repeatDayOfMonth: current.repeatDayOfMonth,
         tags: current.tags,
         notes: noteLines.join('\n'),
         subtasks: subtaskLines,
