@@ -166,6 +166,12 @@ assert "public void requestDisallowInterceptTouchEvent(boolean disallow)" in mod
 assert "disallowParentIntercept(false);" in mode_selector, (
     "mode selector must release parent interception on taps, vertical drags and terminal paths"
 )
+down_case = mode_selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split(
+    "case MotionEvent.ACTION_MOVE:", 1
+)[0]
+assert "disallowParentIntercept(true);" in down_case, (
+    "mode selector must hold parent ScrollView interception until the gesture is classified"
+)
 assert "disallowParentIntercept(true);" in mode_selector, (
     "only a classified horizontal mode swipe may temporarily block the parent"
 )
