@@ -1,3 +1,29 @@
+## Current execution queue refresh — 2026-11-10T04:42:00Z (main 91f57d7)
+
+Latest live snapshot: [CURRENT_STATUS_20261110T044200Z.md](docs/CURRENT_STATUS_20261110T044200Z.md).
+
+Current baseline: main `91f57d79ab3d344d4d78df116ecf3ed4afe81087`; root AGENTS blob `492ed21e2219a8d1b80c7d6e63575525c98a5a91`; 12 open PRs / 23 open issues. Main push Android CI #42753807924 and contracts #42753807949 pass. Main protection is disabled (`protected=false`), rulesets are empty; detailed protection endpoint returns 403.
+
+### Immediate P0
+1. #648/#613: finish latest Focus single-read/stale-runtime reconciliation checks and the API 36 ten-run gate; then carry the proven correction into #677's right-swipe failure.
+2. #683: complete task save/import/recovery/clear/undo race tests using the shared Web Locks mutation contract.
+3. #646: owner-side required checks and independent approvals; do not bypass protection.
+4. #160: physical Android/WebView/OEM acceptance; CI artifacts are not device tests.
+
+### P1
+- #665/#84: PR workflow now has no signing-secret references; tag-only workflows check main ancestry. Exact-head Android/contracts/device checks pass; independent security/provenance review still required.
+- #694/#693: AST guard now rejects computed/dynamic skip/todo flags and opaque options; five exact-head workflows pass; not yet on main.
+- #675/#656/#684: shared task mutation files are byte-identical, but task-logic differs. Preserve #656 recurrence validation and #675 tag validation together.
+- #671/#678: finish the actual pinned-address, redirect-validating, bounded-stream Android download transport.
+- #692/#696: desktop download staging/publish policy is tested; lockfile remains absent. Local npm registry resolution timed out; generate on network-enabled Node 20/22 and verify npm ci across OSes before changing CI.
+- #659/#687: complete accessible extension recovery UI.
+- #685/#686: retain fail-closed Service Worker policy until a reviewed Online-compatible contract is implemented.
+- #690/#689: finish Focus/webhook cross-domain locking and same-tab invalidation.
+
+No release/tag/version/signer/identity change or destructive migration was made. Current source identity remains `com.abrar.daymark`; the conflicting run-level `com.cue.daymark` instruction remains unresolved and requires owner approval before any identity change.
+
+---
+
 ## Latest repo-wide engineering handoff — 2026-11-10T02:18:05Z
 
 Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; main Android CI and cross-platform contracts PASS. 11 open PRs and 21 open issues.
