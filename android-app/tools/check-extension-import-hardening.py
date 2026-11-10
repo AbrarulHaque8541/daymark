@@ -90,8 +90,15 @@ def check_sources(parser, store, smoke):
     assert install.index("already installed with id") < install.index("writeFile(out, ExtensionPackageParser.toDaymarkJson(ext))"), \
         "the install conflict check must run before the write"
     writer = store.split("private static synchronized void writeFile", 1)[1]
-    assert "Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)" in writer, \
+    assert "FileChannel.open(temporary" in writer, "extension writes must use a channel for durable atomic staging"
+    assert "StandardOpenOption.CREATE_NEW" in writer and "LinkOption.NOFOLLOW_LINKS" in writer, \
+        "extension staging must refuse pre-existing files and symlinks instead of following them"
+    assert "out.force(true)" in writer, "staged extension bytes must be flushed before replacement"
+    assert "Files.move(temporary, file.toPath(), StandardCopyOption.REPLACE_EXISTING)" in writer, \
         "failed extension saves must preserve the previous pack"
+    assert "if (temporaryCreated) Files.deleteIfExists(temporary)" in writer, \
+        "failed extension saves must clean up only a temporary path created by this write"
+    assert "FileOutputStream" not in writer, "extension writes must not follow a pre-existing temporary symlink"
     assert "file.delete()" not in writer, "failed extension saves must not delete the previous pack"
     assert "ext = ext.withEnabled(existing.enabled).withDisabledSites(existing.disabledSites)" in install, \
         "same-content re-import must preserve enabled state and per-site pause list"
