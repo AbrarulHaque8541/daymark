@@ -81,7 +81,7 @@ Review submissions for all 15 open PRs were inspected. No independent APPROVED r
 
 - Main .github/workflows/android-release-assets.yml still exposes signing-secret expressions in a pull_request-triggered workflow. #665 fixes this only on its branch. No secret values were accessed or printed.
 - Branch-protection evidence is last-known, not reverified in this run: protected=false, rulesets empty, detailed endpoint HTTP 403. No settings changed.
-- Root AGENTS.md and live Gradle specify applicationId/namespace com.abrar.daymark; the run-level instruction specifies com.cue.daymark. This conflict remains unresolved. No application identity/namespace change.
+- Root AGENTS.md and live Gradle specify applicationId/namespace com.abrar.daymark; a conflicting higher-level run instruction requests a different application ID. This conflict remains unresolved. No application identity/namespace change.
 - #671 remains incomplete: redirect policy is not a complete Android transport; pinned connections, bounded streaming, cancellation and safe publication remain. Keep current downloads fail-closed.
 - #686 remains fail-closed for Service Worker network requests even while ordinary browsing is Online; compatibility design remains open.
 - #675/#656 need current-main synchronization that preserves Telegram card/scripts and the append-only test inventory.
