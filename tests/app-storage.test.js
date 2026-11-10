@@ -428,6 +428,46 @@ test('a stale tab does not recreate a task list removed by another context', asy
   assert.match(app.elements.get('#storage-status span').textContent, /removed by another context/i);
 });
 
+test('a stale unsaved task cannot be blessed by a new generation before its storage event arrives', async () => {
+  const sharedStorage = new Map([[STORAGE_KEY, '[]'], [FOCUS_KEY, null]]);
+  const app = bootApp({ storageData: sharedStorage, failPrimarySave: true });
+
+  app.elements.get('#new-title').value = 'Pending task from the old generation';
+  await triggerFormSubmit(app, '#add-form');
+  const taskMatch = app.elements.get('#task-list').innerHTML.match(/data-task-id="([^"]+)"/);
+  assert.ok(taskMatch, 'the failed save leaves the pending task visible in this tab');
+  const staleTaskId = taskMatch[1];
+  assert.equal(sharedStorage.get(STORAGE_KEY), '[]',
+    'the first task write failed, leaving the task only in this tab memory');
+
+  // Simulate another tab completing Clear All. Deliberately do not dispatch a
+  // storage event: this tab must still use the generation captured with its
+  // loaded snapshot until the event handler rebases its state.
+  sharedStorage.set(mutation.TASK_GENERATION_KEY, '1:all');
+  sharedStorage.delete(STORAGE_KEY);
+
+  // Let the next write reach storage so the regression distinguishes a stale
+  // generation rejection from an unrelated quota failure.
+  const originalSetItem = app.localStorage.setItem.bind(app.localStorage);
+  app.localStorage.setItem = (key, value) => {
+    if (key === STORAGE_KEY) {
+      sharedStorage.set(key, String(value));
+      return;
+    }
+    originalSetItem(key, value);
+  };
+
+  await triggerTaskCompletion(app, staleTaskId);
+
+  assert.equal(sharedStorage.has(STORAGE_KEY), false,
+    'a later mutation cannot adopt the new durable generation and resurrect the stale pending task');
+  assert.equal(sharedStorage.get(mutation.TASK_GENERATION_KEY), '1:all',
+    'the retained clear generation remains authoritative');
+  assert.doesNotMatch(app.elements.get('#task-list').innerHTML, new RegExp(staleTaskId),
+    'the stale tab rebases from the cleared canonical task list');
+});
+
+
 test('an unreadable replacement is backed up and never replaces a known task baseline', async () => {
   const existing = makeImportTask('existing-before-corruption', 'Existing before corruption');
   const sharedStorage = new Map([[STORAGE_KEY, JSON.stringify([existing])], [FOCUS_KEY, null]]);
