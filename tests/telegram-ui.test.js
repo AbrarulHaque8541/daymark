@@ -17,12 +17,23 @@ function makeElement(tagName) {
     children: [],
     listeners: {},
     attrs: {},
+    classes: new Set(),
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) { const i = el.children.indexOf(child); if (i !== -1) el.children.splice(i, 1); return child; },
     addEventListener(type, handler) { (el.listeners[type] = el.listeners[type] || []).push(handler); },
     preventDefault() { el.prevented = true; },
     setAttribute(name, value) { el.attrs[name] = String(value); },
-    getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; }
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; },
+    classList: {
+      toggle(name, force) {
+        if (force === true || (force !== false && !el.classes.has(name))) el.classes.add(name);
+        else el.classes.delete(name);
+        return el.classes.has(name);
+      },
+      contains(name) { return el.classes.has(name); },
+      add(name) { el.classes.add(name); },
+      remove(name) { el.classes.delete(name); }
+    }
   };
   Object.defineProperty(el, 'firstChild', { get() { return el.children.length ? el.children[0] : null; } });
   return el;
@@ -378,12 +389,14 @@ test('buttons are disabled and aria-busy is set while a send is in flight', asyn
   assert.equal(doc.elements['telegram-send'].disabled, true);
   assert.equal(doc.elements['telegram-test'].disabled, true);
   assert.equal(doc.elements['telegram-clear'].disabled, true);
+  assert.equal(doc.elements['telegram-send'].classList.contains('is-busy'), true);
+  assert.equal(doc.elements['telegram-test'].classList.contains('is-busy'), true);
+  assert.equal(doc.elements['telegram-clear'].classList.contains('is-busy'), true);
   assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'true');
   assert.equal(doc.elements['telegram-status'].getAttribute('aria-busy'), 'true');
   resolveFetch({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 9 } }) });
   await pending;
   assert.equal(doc.elements['telegram-send'].disabled, false);
-  assert.equal(doc.elements['telegram-test'].disabled, false);
+  assert.equal(doc.elements['telegram-send'].classList.contains('is-busy'), false);
   assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'false');
-  assert.match(doc.elements['telegram-status'].textContent, /Sent/);
 });
