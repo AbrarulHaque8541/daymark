@@ -38,7 +38,7 @@
    * Shared four-digit instant contract for web and Android task records.
    * Java Instant.parse's leap-second normalization is supported only at 23:59:60.
    */
-  const TASK_INSTANT_PATTERN = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2})$/;
+  const TASK_INSTANT_PATTERN = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$/;
 
   function isValidInstant(value) {
     if (typeof value !== 'string') return false;
@@ -62,7 +62,9 @@
     if (offset !== 'Z') {
       const offsetHour = Number(offset.slice(1, 3));
       const offsetMinute = Number(offset.slice(4, 6));
-      if (offsetHour > 18 || offsetMinute > 59 || (offsetHour === 18 && offsetMinute !== 0)) return false;
+      const offsetSecond = offset.length >= 9 ? Number(offset.slice(7, 9)) : 0;
+      if (offsetHour > 18 || offsetMinute > 59 || offsetSecond > 59
+          || (offsetHour === 18 && (offsetMinute !== 0 || offsetSecond !== 0))) return false;
     }
     return true;
   }
@@ -83,7 +85,9 @@
     const offset = match[8];
     if (offset !== 'Z') {
       const sign = offset[0] === '+' ? 1 : -1;
-      offsetSeconds = sign * (Number(offset.slice(1, 3)) * 3600 + Number(offset.slice(4, 6)) * 60);
+      const offsetSecond = offset.length >= 9 ? Number(offset.slice(7, 9)) : 0;
+      offsetSeconds = sign * (Number(offset.slice(1, 3)) * 3600
+        + Number(offset.slice(4, 6)) * 60 + offsetSecond);
     }
     return { epochSeconds: Math.floor(utc.getTime() / 1000) - offsetSeconds,
       nanoseconds: Number((match[7] || '').padEnd(9, '0')) };
