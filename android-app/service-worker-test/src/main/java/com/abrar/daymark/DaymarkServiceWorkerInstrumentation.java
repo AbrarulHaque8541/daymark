@@ -152,28 +152,39 @@ public final class DaymarkServiceWorkerInstrumentation {
             check(secondServer.count("/page-egress") == 1,
                     "the second controlled server must receive its explicitly enabled page request");
 
-            // Cached/local Service Worker responses remain usable even though worker network
-            // fetches are denied.
+            // The user's explicit Online navigation consent must enable worker egress on
+            // both origins and all retained tabs, not just ordinary page fetches.
+            Class<?> enforcementType = Class.forName(
+                    "com.abrar.daymark.BrowserServiceWorkerEnforcement", true, targetLoader);
+            Method allowOnline = enforcementType.getDeclaredMethod("allowNetworkAfterExplicitConsent");
+            allowOnline.setAccessible(true);
+            check(Boolean.TRUE.equals(allowOnline.invoke(null)),
+                    "explicit Online consent must enable process-wide Service Worker network access");
+            check(!controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
+                    "Online consent must clear the global Service Worker network block");
+            requestWorkerEgressAllowed(active);
+            requestWorkerEgressAllowed(secondActive);
+            requestWorkerEgressAllowed(secondTab);
+            check(server.count("/worker-egress") == 2,
+                    "both first-origin tabs must reach the worker egress endpoint while Online");
+            check(secondServer.count("/worker-egress") == 1,
+                    "the second origin must reach the worker egress endpoint while Online");
+            check(server.count("/trigger") == 0,
+                    "the first-origin page trigger must still be fulfilled by its Service Worker");
+            check(secondServer.count("/trigger") == 0,
+                    "the second-origin page trigger must still be fulfilled by its Service Worker");
+
+            // Cached/local Service Worker responses remain usable in both modes.
             requestCachedResponse(active);
             requestCachedResponse(secondActive);
             check(server.count("/cached") == 0,
                     "the first origin's cached Service Worker response must not require a network request");
             check(secondServer.count("/cached") == 0,
                     "the second origin's cached Service Worker response must not require a network request");
-
-            requestWorkerEgress(active);
-            requestWorkerEgress(secondActive);
-            requestWorkerEgress(secondTab);
-            check(server.count("/trigger") == 0,
-                    "the first-origin page trigger must be fulfilled by its active Service Worker");
-            check(server.count("/worker-egress") == 0,
-                    "the first-origin Service Worker fetch must never reach its controlled server");
-            check(secondServer.count("/worker-egress") == 0,
-                    "the second-origin Service Worker fetch must never reach its controlled server");
             check(server.count("/sw.js") == initialWorkerScripts,
-                    "the first origin must not fetch its worker script around the global block");
+                    "the first origin must not refetch its worker script during mode changes");
             check(secondServer.count("/sw.js") == secondInitialWorkerScripts,
-                    "the second origin must not fetch its worker script around the global block");
+                    "the second origin must not refetch its worker script during mode changes");
 
             // Exercise the page-level Offline transition independently of the global worker
             // policy. A page request must fail while the same worker remains network-blocked.
@@ -213,10 +224,12 @@ public final class DaymarkServiceWorkerInstrumentation {
             requestWorkerEgress(active);
             requestWorkerEgress(secondActive);
             requestWorkerEgress(secondTab);
-            check(server.count("/worker-egress") == 0,
-                    "first-origin worker egress must remain blocked after Online page access and Offline reassertion");
-            check(secondServer.count("/worker-egress") == 0,
-                    "second-origin worker egress must remain blocked after Online page access and Offline reassertion");
+            check(server.count("/worker-egress") == 2,
+                    "Offline must not add first-origin worker egress after the two Online requests");
+            check(secondServer.count("/worker-egress") == 1,
+                    "Offline must not add second-origin worker egress after its Online request");
+            check(server.count("/trigger") == 0 && secondServer.count("/trigger") == 0,
+                    "both workers must continue intercepting their page triggers while Offline");
 
             // Service Workers outlive individual WebView instances. Destroy this tab and create
             // another WebView in the same app profile; the persisted worker must remain blocked.
@@ -232,10 +245,21 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "the second-origin persisted worker must control a recreated WebView");
             requestCachedResponse(recreated);
             requestWorkerEgress(recreated);
-            check(secondServer.count("/worker-egress") == 0,
-                    "a recreated tab must not regain second-origin Service Worker network access");
+            check(secondServer.count("/worker-egress") == 1,
+                    "a recreated tab must remain Offline until the next explicit Online navigation");
             check(secondServer.count("/trigger") == 0,
                     "the recreated tab's worker must continue to intercept its second-origin trigger");
+
+            check(Boolean.TRUE.equals(allowOnline.invoke(null)),
+                    "a later explicit Online consent must re-enable worker network access");
+            check(!controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
+                    "the recreated tab's Online transition must clear the global worker block");
+            requestWorkerEgressAllowed(recreated);
+            check(secondServer.count("/worker-egress") == 2,
+                    "the recreated tab's worker must reach its origin after explicit Online consent");
+            enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
+            check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
+                    "the instrumentation must leave the worker policy Offline before cleanup");
 
             execute(recreated, "(async()=>{"
                     + "const registration=await navigator.serviceWorker.getRegistration();"
@@ -332,6 +356,14 @@ public final class DaymarkServiceWorkerInstrumentation {
                 + ".catch(()=>document.title='trigger-error');");
         awaitBoolean(view, "document.title === 'trigger-blocked'", WAIT_MS,
                 "the Service Worker must return its local blocked response for network fetch");
+    }
+
+    private void requestWorkerEgressAllowed(WebView view) throws Exception {
+        execute(view, "document.title='trigger-pending';"
+                + "fetch('/trigger').then(r=>r.text()).then(t=>document.title='trigger-'+t)"
+                + ".catch(()=>document.title='trigger-error');");
+        awaitBoolean(view, "document.title === 'trigger-unexpected-egress'", WAIT_MS,
+                "the Service Worker must reach its origin while Daymark is explicitly Online");
     }
 
     private void requestCachedResponse(WebView view) throws Exception {
