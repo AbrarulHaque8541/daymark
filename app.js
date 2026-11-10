@@ -14,7 +14,7 @@
   const focus = window.DaymarkFocus || null;
   const focusMutation = window.DaymarkFocusMutation || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -1804,9 +1804,11 @@
       setStorageStatus('Focus preset could not be saved safely because its storage generation could not be checked.', true);
       return false;
     }
+    const storageEpoch = state.focusStorageEventEpoch;
     const desiredRaw = JSON.stringify({ preset: state.focusPreset });
     const previous = state.focusPresetSaveQueue || Promise.resolve();
     const queued = previous.then(async () => {
+      if (state.focusStorageEventEpoch !== storageEpoch) return false;
       const baseRaw = state.focusPresetPersistedRaw;
       if (typeof baseRaw === 'undefined') {
         setStorageStatus('Focus preset storage is unreadable; the existing value was not changed.', true);
@@ -1834,6 +1836,7 @@
   }
 
   function loadFocusState() {
+    state.focusAutoFinalizePending = false;
     const empty = { session: null, log: [] };
     if (!focus) return empty;
     let saved = null;
@@ -1846,6 +1849,8 @@
     } catch (error) {
       state.focusPersistedRaw = undefined;
       state.focusPrimaryUnreadable = true;
+      state.focusRecoveryBackupPendingPayload = null;
+      state.focusRecoveryBackupReady = false;
       console.warn('Could not read Daymark focus storage:', error);
       let backupRaw = null;
       let backupReadable = false;
@@ -1931,15 +1936,24 @@
       setStorageStatus('Focus data could not be saved safely because its storage generation could not be checked.', true);
       return false;
     }
+    const storageEpoch = state.focusStorageEventEpoch;
     const desiredSnapshot = {
       session: state.focusSession ? focus.serialize(state.focusSession) : null,
       log: JSON.parse(JSON.stringify(state.focusLog))
     };
     const previous = state.focusSaveQueue || Promise.resolve();
     const queued = previous.then(async () => {
+      if (state.focusStorageEventEpoch !== storageEpoch) {
+        setStorageStatus('Focus data changed in another tab; this pending write was not applied.', true);
+        return false;
+      }
       if (state.focusRecoveryBackupPendingPayload !== null) {
         const backupSaved = await scheduleFocusRecoveryBackupMaintenance();
         if (!backupSaved) return false;
+      }
+      if (state.focusStorageEventEpoch !== storageEpoch) {
+        setStorageStatus('Focus data changed in another tab; this pending write was not applied.', true);
+        return false;
       }
       if (typeof state.focusPersistedRaw === 'undefined') {
         setStorageStatus('Focus storage is unreadable; existing bytes were not overwritten.', true);
@@ -1961,12 +1975,15 @@
       if (result.ok) {
         state.focusPersistedRaw = result.payload;
         state.focusPrimaryUnreadable = false;
+        const backupState = readFocusRecoveryBackupState();
+        if (!backupState.readable) reportUnknownFocusRecoveryBackup();
+        else if (backupState.hasBackup) reportFocusRecovery(true);
         return true;
       }
       if (result.reason === 'stale-generation' || result.reason === 'session-conflict'
           || result.reason === 'log-conflict' || result.reason === 'stale-or-invalid-source') {
         setStorageStatus('Focus data changed or was cleared in another tab; this tab did not overwrite it.', true);
-        reconcileFocusStateFromStorage(FOCUS_KEY);
+        reconcileFocusStateFromStorage(FOCUS_KEY, false);
       } else {
         setStorageStatus('Focus data could not be saved safely; existing stored data was left unchanged.', true);
       }
@@ -2385,7 +2402,8 @@
     renderFeed();
   }
 
-  function reconcileFocusStateFromStorage(key) {
+  function reconcileFocusStateFromStorage(key, externalChange = true) {
+    if (externalChange) state.focusStorageEventEpoch += 1;
     if (key === null || key === FOCUS_KEY) {
       stopFocusTimer();
       const focusState = loadFocusState();
@@ -2419,6 +2437,7 @@
   }
 
   function handleFocusStorageCleared(categoryId) {
+    state.focusStorageEventEpoch += 1;
     if (categoryId === 'focus' || categoryId === 'all') {
       reconcileFocusStateFromStorage(FOCUS_KEY);
     }
