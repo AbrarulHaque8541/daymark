@@ -10,6 +10,7 @@ on:
       - contracts/**
       - package.json
       - package-lock.json
+      # The artifact job runs npm test and source guards, so test/script-only changes need this gate too.
       - scripts/**
       - tests/**
 
