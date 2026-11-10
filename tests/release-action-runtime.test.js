@@ -152,9 +152,9 @@ test('production signing workflows run repository tests before accessing signing
   for (const workflowPath of paths) {
     const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
     const tests = content.indexOf('npm test');
-    const secrets = content.indexOf('Validate signing secrets');
+    const secrets = content.indexOf('secrets.KEYSTORE_BASE64');
     assert.ok(tests >= 0, workflowPath + ' must run the repository test suite');
-    assert.ok(secrets > tests, workflowPath + ' must complete repository tests before signing-secret validation');
+    assert.ok(secrets > tests, workflowPath + ' must complete repository tests before any signing secret is referenced');
   }
 });
 
