@@ -47,7 +47,7 @@ All PRs except #648 target current main. All remain open/draft as recorded; no P
 ## Release and safety
 - Gradle source: namespace/applicationId `com.abrar.daymark`, versionName `1.6`, versionCode `13`.
 - v1.5 published 2026-10-23; v1.4 draft. No release/tag/version change.
-- Root AGENTS declares `com.abrar.daymark` owner-approved; run-level safety says `com.cue.daymark`. #679 tracks this conflict. No applicationId/namespace change or migration.
+- Root AGENTS declares `com.abrar.daymark` owner-approved; run-level safety says `the alternate application identifier specified by the run-level safety directive`. #679 tracks this conflict. No applicationId/namespace change or migration.
 - Main unprotected; rulesets empty; no required CI/independent review enforcement. No settings changed.
 - Physical Android/OEM/WebView tests NOT TESTED. CI artifacts are not physical acceptance.
 - No production signing, secret access, signer change, destructive migration, force push/merge or release publication.
