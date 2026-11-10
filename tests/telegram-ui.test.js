@@ -278,7 +278,9 @@ test('Clear empties the token field and says nothing was saved', () => {
 test('pagehide and pageshow clear the token so navigation and bfcache cannot retain it', () => {
   const doc = makeDoc(ALL_IDS);
   const view = makeWindow();
-  const handle = ui.attachTelegramUi(okEnv(doc, { window: view }));
+  // Production boot passes only { document }; the real lifecycle target is document.defaultView.
+  doc.defaultView = view;
+  const handle = ui.attachTelegramUi(okEnv(doc, {}));
   doc.elements['telegram-token'].value = VALID_TOKEN;
   view.dispatch('pagehide');
   assert.equal(doc.elements['telegram-token'].value, '', 'pagehide clears before unload or bfcache freeze');
