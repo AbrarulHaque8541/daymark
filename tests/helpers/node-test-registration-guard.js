@@ -386,6 +386,8 @@ function isStaticallySkipped(call) {
         return true;
       }
 
+      // Object-literal __proto__ can inherit a skip/todo flag from the prototype.
+      if (key === '__proto__') return true;
       if (key !== 'skip' && key !== 'todo') continue;
       const value = property.value;
       if (value.type === 'Literal' &&
