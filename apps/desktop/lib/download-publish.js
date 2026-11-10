@@ -53,14 +53,36 @@ function publishStagedFile(downloadDirectory, stagingPath, finalPath, fsImpl = f
     throw new Error('unsafe-download-staging-file');
   }
 
-  fsImpl.linkSync(paths.stage, paths.target);
-  const publishedStat = fsImpl.lstatSync(paths.target);
-  if (!publishedStat.isFile() || publishedStat.isSymbolicLink()
-    || (stagedStat.ino && publishedStat.ino
-      && (stagedStat.ino !== publishedStat.ino || stagedStat.dev !== publishedStat.dev))) {
-    throw new Error('download-publication-verification-failed');
+  let linked = false;
+  let publishedStat = null;
+  try {
+    fsImpl.linkSync(paths.stage, paths.target);
+    linked = true;
+    publishedStat = fsImpl.lstatSync(paths.target);
+    if (!publishedStat.isFile() || publishedStat.isSymbolicLink()
+      || (stagedStat.ino && publishedStat.ino
+        && (stagedStat.ino !== publishedStat.ino || stagedStat.dev !== publishedStat.dev))) {
+      throw new Error('download-publication-verification-failed');
+    }
+    return paths.target;
+  } catch (error) {
+    // linkSync is an exclusive create: if post-link verification fails, remove
+    // only the same directory entry we observed after our link. This prevents
+    // a failed staging-path race from leaving an unexpected hard link in the
+    // user-visible Downloads directory. If another process replaced that
+    // entry, leave it untouched rather than deleting an unverified path.
+    if (linked && publishedStat && publishedStat.ino && publishedStat.dev) {
+      try {
+        const currentStat = fsImpl.lstatSync(paths.target);
+        if (currentStat.ino === publishedStat.ino && currentStat.dev === publishedStat.dev) {
+          fsImpl.unlinkSync(paths.target);
+        }
+      } catch {
+        // Preserve the original verification failure; cleanup is best-effort.
+      }
+    }
+    throw error;
   }
-  return paths.target;
 }
 
 function cleanupStaging(downloadDirectory, stagingPath, fsImpl = fs) {
