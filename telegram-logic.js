@@ -76,19 +76,34 @@
     const url = API_BASE + 'bot' + botToken + '/sendMessage';
     if (!/^https:\/\//.test(url)) return Promise.resolve({ ok: false, reason: 'The Telegram API address must be HTTPS. Nothing was sent.' });
     let aborted = false;
-    const controller = new AbortControllerCtor();
-    const timer = scheduleAbort(() => { aborted = true; controller.abort(); }, FETCH_TIMEOUT_MS);
+    let controller;
+    let timer;
     const cancelAbort = resolveCallable(deps, 'clearTimeout');
-    return fetchFn(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatTarget, text, disable_web_page_preview: true }),
-      credentials: 'omit',
-      cache: 'no-store',
-      redirect: 'error',
-      referrerPolicy: 'no-referrer',
-      signal: controller.signal
-    }).then((response) => response.json()
+    try {
+      controller = new AbortControllerCtor();
+      timer = scheduleAbort(() => {
+        aborted = true;
+        try { controller.abort(); } catch (error) { /* Preserve the request's own outcome. */ }
+      }, FETCH_TIMEOUT_MS);
+    } catch (error) {
+      return Promise.resolve({ ok: false, reason: 'This environment cannot make network requests.' });
+    }
+    let request;
+    try {
+      request = fetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatTarget, text, disable_web_page_preview: true }),
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'error',
+        referrerPolicy: 'no-referrer',
+        signal: controller.signal
+      });
+    } catch (error) {
+      request = Promise.reject(error);
+    }
+    return Promise.resolve(request).then((response) => response.json()
       .then((body) => ({ response, body }), () => ({ response, body: null })))
       .then(({ response, body }) => {
         const status = response && typeof response.status === 'number' ? response.status : 0;
@@ -105,7 +120,11 @@
         return { ok: true, messageId };
       })
       .catch(() => ({ ok: false, reason: aborted ? 'Telegram did not answer in time. Check the connection and send again.' : 'This device could not reach Telegram. You may be offline, or the request was blocked.' }))
-      .finally(() => { if (cancelAbort) cancelAbort(timer); });
+      .finally(() => {
+        if (cancelAbort) {
+          try { cancelAbort(timer); } catch (error) { /* Timer cleanup must not rewrite delivery status. */ }
+        }
+      });
   }
   const api = { isBotToken, isChatTarget, buildCompletedDigest, classifySendOutcome, sendTelegramMessage, TEST_MESSAGE, MAX_MESSAGE_CHARS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
