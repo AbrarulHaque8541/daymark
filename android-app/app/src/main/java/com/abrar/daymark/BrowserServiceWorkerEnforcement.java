@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 /**
- * Process-wide fail-closed Service Worker network enforcement.
+ * Process-wide Service Worker network enforcement tied to Daymark's Online/Offline mode.
  *
  * <p>ServiceWorkerController is shared by all WebViews. The client must be installed before
  * the first WebView instance is created; DaymarkWebView's class initializer provides that
@@ -24,13 +24,15 @@ final class BrowserServiceWorkerEnforcement {
             "Blocked by Daymark: Service Worker network access is disabled.";
 
     private static volatile boolean installAttempted;
-    private static volatile boolean settingsBlocked;
+    private static volatile boolean settingsControlAvailable;
     private static volatile boolean clientInstalled;
+    private static volatile boolean onlineAllowed;
 
     private BrowserServiceWorkerEnforcement() { }
 
     static synchronized boolean installBeforeFirstWebView() {
-        if (installAttempted) return settingsBlocked || clientInstalled;
+        if (installAttempted) return settingsControlAvailable || clientInstalled;
+        onlineAllowed = false;
         installAttempted = true;
 
         final ServiceWorkerController controller;
@@ -44,8 +46,8 @@ final class BrowserServiceWorkerEnforcement {
 
         try {
             controller.getServiceWorkerWebSettings().setBlockNetworkLoads(
-                    BrowserServiceWorkerPolicy.blocksNetworkLoads());
-            settingsBlocked = true;
+                    BrowserServiceWorkerPolicy.blocksNetworkLoads(onlineAllowed));
+            settingsControlAvailable = true;
         } catch (RuntimeException unavailable) {
             Log.e(TAG, "could not set global Service Worker network block", unavailable);
         }
@@ -57,8 +59,8 @@ final class BrowserServiceWorkerEnforcement {
                     String scheme = request == null || request.getUrl() == null
                             ? null : request.getUrl().getScheme();
                     BrowserServiceWorkerPolicy.Decision decision =
-                            BrowserServiceWorkerPolicy.decide(true, true, scheme);
-                    if (decision == BrowserServiceWorkerPolicy.Decision.ALLOW_LOCAL) {
+                            BrowserServiceWorkerPolicy.decide(onlineAllowed, scheme);
+                    if (decision != BrowserServiceWorkerPolicy.Decision.BLOCK) {
                         return null;
                     }
                     // No URL, headers, cookies or query values are logged or forwarded.
@@ -70,22 +72,44 @@ final class BrowserServiceWorkerEnforcement {
             Log.e(TAG, "could not install Service Worker request client", unavailable);
         }
 
-        if (!settingsBlocked && !clientInstalled) {
+        if (!settingsControlAvailable && !clientInstalled) {
             Log.e(TAG, "Service Worker network policy unavailable; browser navigation must fail closed");
         }
-        return settingsBlocked || clientInstalled;
+        return settingsControlAvailable || clientInstalled;
     }
 
     static synchronized boolean enforceBlocked() {
+        onlineAllowed = false;
         if (!installAttempted) return installBeforeFirstWebView();
         try {
             ServiceWorkerController.getInstance().getServiceWorkerWebSettings()
                     .setBlockNetworkLoads(true);
-            settingsBlocked = true;
+            settingsControlAvailable = true;
         } catch (RuntimeException unavailable) {
             Log.e(TAG, "could not reassert global Service Worker network block", unavailable);
         }
-        return settingsBlocked || clientInstalled;
+        return settingsControlAvailable || clientInstalled;
+    }
+
+    /**
+     * Called only after the browser's existing Online consent/navigation gate has passed.
+     * If the platform setting cannot be changed, keep worker requests fail-closed while
+     * allowing the ordinary page navigation to proceed.
+     */
+    static synchronized boolean allowNetworkAfterExplicitConsent() {
+        if (!installAttempted && !installBeforeFirstWebView()) return false;
+        onlineAllowed = false;
+        try {
+            ServiceWorkerController.getInstance().getServiceWorkerWebSettings()
+                    .setBlockNetworkLoads(false);
+            settingsControlAvailable = true;
+            onlineAllowed = true;
+            return true;
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "could not enable Service Worker network access after Online consent; worker requests remain blocked",
+                    unavailable);
+            return false;
+        }
     }
 
     private static WebResourceResponse blockedResponse() {
