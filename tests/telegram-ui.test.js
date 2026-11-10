@@ -195,6 +195,41 @@ test('a malformed saved list fails closed without sending', async () => {
   assert.match(doc.elements['telegram-status'].textContent, /could not be read as JSON/);
   assert.equal(fetchFn.calls.length, 0);
 });
+test('an empty saved task key is malformed rather than absent and sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.tasks.v1': '' });
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /could not be read as JSON/);
+  assert.match(doc.elements['telegram-status'].textContent, /Nothing was sent/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('a non-string task-store adapter result fails closed instead of becoming an empty list', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = { getItem() { return 0; } };
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /could not be read safely/);
+  assert.match(doc.elements['telegram-status'].textContent, /Nothing was sent/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('a missing task key remains a legitimate empty task list and sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({});
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /No completed tasks to announce/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
 test('a network failure is reported in plain words without the token', async () => {
   const doc = makeDoc(ALL_IDS);
   const seed = {};
