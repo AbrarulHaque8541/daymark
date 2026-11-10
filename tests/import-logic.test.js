@@ -119,7 +119,33 @@ test('fromCsv skips malformed rows and fills lenient defaults', () => {
   assert.equal(task.repeat, 'sometimes', 'unknown repeat metadata is preserved for validation rather than silently dropped');
   assert.equal(importer.mergeTasks([], [task], logic).invalid, 1, 'invalid recurrence metadata is rejected before storage');
   assert.deepEqual(task.tags, ['goodtag'], 'invalid tags are dropped, valid ones kept');
-  assert.equal(task.createdAt, NOW, 'unparseable createdAt falls back to now()');
+  assert.equal(task.createdAt, NOW, 'an empty createdAt falls back to now()');
+});
+
+test('fromCsv preserves explicit malformed timestamps for shared validation instead of replacing them', () => {
+  const invalidCreatedAt = 'not-a-date';
+  const invalidUpdatedAt = '2026-11-10 10:00:00Z';
+  const row = (id, title, createdAt, updatedAt) => [
+    id, title, '', '', 'medium', 'false', '', '', '', '[]', createdAt, updatedAt, ''
+  ].join(',');
+  const csv = importer.CSV_HEADER + '\n'
+    + row('bad-created', 'Bad created timestamp', invalidCreatedAt, NOW) + '\n'
+    + row('bad-updated', 'Bad updated timestamp', NOW, invalidUpdatedAt);
+  const parsed = importer.fromCsv(csv, freshCtx());
+
+  assert.equal(parsed.skippedRows, 0);
+  assert.equal(parsed.tasks.length, 2);
+  assert.equal(parsed.tasks[0].createdAt, invalidCreatedAt);
+  assert.equal(parsed.tasks[1].updatedAt, invalidUpdatedAt);
+
+  const merged = importer.mergeTasks([], parsed.tasks, logic);
+  assert.equal(merged.invalid, 2, 'the shared strict validator rejects both explicit malformed instants');
+  assert.equal(merged.added.length, 0, 'invalid timestamps never enter the stored task list');
+});
+
+test('mergeTasks requires the shared task validator and fails closed when it is absent', () => {
+  assert.throws(() => importer.mergeTasks([], []), /shared task validator/);
+  assert.throws(() => importer.mergeTasks([], [], {}), /shared task validator/);
 });
 
 test('fromCsv skips malformed or duplicate-key subtask JSON instead of silently dropping subtasks', () => {
