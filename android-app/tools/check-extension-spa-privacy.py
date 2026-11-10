@@ -25,8 +25,14 @@ require("doUpdateVisitedHistory(WebView view, String url, boolean isReload)" in 
         "WebViewClient observes visited-history updates")
 require("extensionRuntime.onSameDocumentNavigation(view, url)" in webview,
         "history updates trigger current-URL extension reevaluation")
-require("view.getProgress() < 100" in webview,
-        "same-document injection waits until the committed document is complete")
+navigation_start = runtime.find("void onSameDocumentNavigation")
+navigation_end = runtime.find("private List<BrowserExtension> matchingPacks", navigation_start)
+navigation_callback = runtime[navigation_start:navigation_end] if navigation_start >= 0 and navigation_end > navigation_start else ""
+require("userscriptsAppliedForCurrentDocument" in navigation_callback
+        and "BrowserAddress.isAllowedWebUrl(url)" in navigation_callback,
+        "same-document injection waits for native initial-document success and validates the callback URL")
+require("view.getProgress() < 100" not in webview,
+        "same-document route updates do not rely on a progress gate that can drop history callbacks")
 require('webView.evaluateJavascript("(" + bootstrap + ")(" + config + ");", null)' in injector,
         "configuration is passed as a one-shot function argument")
 require("window.__daymarkSpaConfig" not in injector and "window.__daymarkSpaState" not in injector,

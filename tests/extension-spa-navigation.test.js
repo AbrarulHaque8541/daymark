@@ -220,7 +220,9 @@ test('native same-document history updates run only after initial document injec
   const runtimeEnd = runtimeSource.indexOf('private List<BrowserExtension> matchingPacks', runtimeStart);
   const runtimeCallback = runtimeSource.slice(runtimeStart, runtimeEnd);
   assert.match(runtimeCallback, /userscriptsAppliedForCurrentDocument/);
-  assert.match(runtimeCallback, /isCurrentWebPage\(webView, url\)/);
+  assert.match(runtimeCallback, /BrowserAddress\.isAllowedWebUrl\(url\)/);
+  assert.match(runtimeCallback, /url\.equals\(lastAppliedUrl\)/);
+  assert.match(runtimeSource, /if \(ExtensionInjector\.apply\(webView, url, matching\)\) \{\s*userscriptsAppliedForCurrentDocument = true;/);
 });
 
 test('userscript duplicate suppression stays native and exposes no page-global pack registry', () => {
