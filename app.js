@@ -379,9 +379,15 @@
       setStorageStatus('Task changes not saved: task-generation coordination is unavailable.', true);
       return Promise.resolve(false);
     }
+    // The default generation belongs to the task snapshot loaded by this tab.
+    // Never reread the durable marker here: after another tab clears Tasks but
+    // before its storage event arrives, doing so would bless stale in-memory
+    // intent with the new generation and allow it to resurrect cleared tasks.
     const generation = Number.isSafeInteger(expectedGenerationOverride)
       ? { ok: true, value: expectedGenerationOverride }
-      : mutation.readTaskGeneration(localStorage);
+      : Number.isSafeInteger(state.taskPersistedGeneration)
+        ? { ok: true, value: state.taskPersistedGeneration }
+        : { ok: false, reason: 'generation-unavailable' };
     if (!generation.ok) {
       setStorageStatus('Task changes not saved: the task generation could not be read safely.', true);
       return Promise.resolve(false);
