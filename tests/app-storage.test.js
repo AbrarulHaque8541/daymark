@@ -163,6 +163,10 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   class TestFileReader {
     readAsText(file) {
       fileReadCount += 1;
+      if (file && typeof file.readAsText === 'function') {
+        file.readAsText(this);
+        return;
+      }
       this.result = file.content;
       if (typeof this.onload === 'function') this.onload();
     }
@@ -193,6 +197,8 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   return {
     elements,
     storedValues,
+    localStorage,
+    window,
     classSets,
     listeners,
     confirmMessages,
@@ -472,6 +478,52 @@ test('task import previews additions, duplicates and invalid rows before appendi
   assert.equal(saved[0].title, 'Original task', 'existing data must never be overwritten by an imported duplicate');
   assert.equal(saved[1].id, 'new-id');
   assert.equal(saved[1].title, 'New task');
+});
+
+test('a JSON recovery import started before Clear All cannot restore tasks or Focus data afterward', async () => {
+  const existingTask = makeImportTask('before-clear', 'Existing task');
+  const incomingTask = makeImportTask('recovered-after-clear', 'Must stay cleared');
+  const incomingFocus = makeFocusLogEntry('recovered-focus-after-clear');
+  const taskBackup = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [JSON.stringify([incomingTask])] });
+  const focusBackup = JSON.stringify({ format: 'daymark-focus-recovery-bundle-v1', payloads: [JSON.stringify({ session: null, log: [incomingFocus] })] });
+  const combined = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup, focusBackup });
+  const app = bootApp({
+    savedValue: JSON.stringify([existingTask]),
+    savedFocusValue: JSON.stringify({ session: null, log: [] })
+  });
+  let releaseRead;
+  let markReadStarted;
+  const readStarted = new Promise((resolve) => { markReadStarted = resolve; });
+  const file = {
+    size: Buffer.byteLength(combined),
+    readAsText(reader) {
+      markReadStarted();
+      releaseRead = () => {
+        reader.result = combined;
+        void reader.onload();
+      };
+    }
+  };
+  const importing = triggerTaskImport(app, file);
+  await readStarted;
+
+  const taskGeneration = mutation.incrementTaskGeneration(app.localStorage);
+  const focusGeneration = focusMutation.incrementFocusGeneration(app.localStorage);
+  assert.equal(taskGeneration.value, 1);
+  assert.equal(focusGeneration.value, 1);
+  app.localStorage.removeItem(STORAGE_KEY);
+  app.localStorage.removeItem(FOCUS_KEY);
+
+  releaseRead();
+  await importing;
+
+  assert.equal(app.storedValues.has(STORAGE_KEY), false,
+    'the stale recovery import cannot recreate the task list after Clear All');
+  assert.equal(app.storedValues.has(FOCUS_KEY), false,
+    'the stale recovery import cannot recreate Focus data after Clear All');
+  assert.equal(app.storedValues.get(mutation.TASK_GENERATION_KEY), '1');
+  assert.equal(app.storedValues.get(focusMutation.FOCUS_GENERATION_KEY), '1');
+  assert.match(app.elements.get('#toast').textContent, /Recovery import failed/);
 });
 
 test('declining task import confirmation leaves storage unchanged', async () => {
