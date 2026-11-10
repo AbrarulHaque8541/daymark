@@ -441,18 +441,19 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void stopScrollFlingAndAwait(android.widget.ScrollView scrollView) throws Exception {
-        java.util.concurrent.CountDownLatch settledFrames = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch settled = new java.util.concurrent.CountDownLatch(1);
         runOnMainSync(() -> {
             // A vertical drag can leave ScrollView's private OverScroller running after its
             // scrollY becomes stable. ScrollView.onInterceptTouchEvent(ACTION_DOWN) treats an
-            // unfinished scroller as a drag and steals the next child tap. Stop that fling
-            // before programmatically positioning the target, then let two animation frames
-            // run so the zero-velocity scroller reaches its finished state.
-            scrollView.fling(0);
-            scrollView.postOnAnimation(() -> scrollView.postOnAnimation(settledFrames::countDown));
+            // unfinished scroller as a drag and steals the next child tap. A zero-distance
+            // smoothScrollBy follows ScrollView's public cancellation path: within its
+            // ANIMATED_SCROLL_GAP it aborts the active animation; otherwise it starts a
+            // zero-distance 250 ms scroll. Wait beyond that documented platform interval.
+            scrollView.smoothScrollBy(0, 0);
+            scrollView.postDelayed(settled::countDown, 300L);
         });
-        check(settledFrames.await(1500L, java.util.concurrent.TimeUnit.MILLISECONDS),
-                "parent Tasks ScrollView finishes its prior fling before child tap injection");
+        check(settled.await(1000L, java.util.concurrent.TimeUnit.MILLISECONDS),
+                "parent Tasks ScrollView finishes/cancels its prior fling before child tap injection");
         waitForIdleSync();
     }
 
