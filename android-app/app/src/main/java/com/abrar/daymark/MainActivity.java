@@ -3641,7 +3641,7 @@ public final class MainActivity extends Activity {
             row.addView(description, topMargin(dp(2)));
 
             LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.VERTICAL);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
             Button details = compactButton("Details", false);
             details.setContentDescription("Show permissions, match rules, and warnings for " + ext.name);
             details.setOnClickListener(view -> showExtensionDetailsDialog(ext));
@@ -3761,7 +3761,7 @@ public final class MainActivity extends Activity {
             row.addView(description, topMargin(dp(3)));
 
             LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setOrientation(LinearLayout.VERTICAL);
             if (pack.canExport && pack.sha256 != null) {
                 Button export = compactButton("Export raw bytes", false);
                 export.setContentDescription("Export exact raw bytes of malformed extension file " + pack.fileName);
