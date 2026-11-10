@@ -226,6 +226,24 @@
     return JSON.parse(JSON.stringify(Array.isArray(tasks) ? tasks : []));
   }
 
+  function rebaseTasksAfterGenerationChange(generation) {
+    if (!generation || !generation.ok) return false;
+    state.taskPersistedGeneration = generation.value;
+    state.tasks = loadTasks();
+    state.persistedTasks = cloneTaskList(state.tasks);
+    const reason = generation.reason || 'all';
+    if (reason === 'tasks' || reason === 'task-backup' || reason === 'all') {
+      const hadPendingBackup = state.recoveryBackupPendingPayload !== null;
+      state.recoveryBackupPendingPayload = null;
+      state.recoveryBackupCleanupPending = false;
+      if (reason === 'task-backup' && hadPendingBackup) {
+        setStorageStatus('Recovery backup was cleared as requested; unreadable primary task bytes remain untouched and no replacement backup was created.', true);
+      }
+    }
+    render();
+    return true;
+  }
+
   async function persistTaskSnapshot(desiredTasks, expectedGeneration, afterCommit) {
     const mutation = window.DaymarkTaskMutation;
     if (!mutation || typeof mutation.commitTaskSnapshot !== 'function') {
@@ -322,10 +340,7 @@
       if (result.reason === 'stale-generation') {
         const currentGeneration = mutation.readTaskGeneration(localStorage);
         if (currentGeneration.ok) {
-          state.taskPersistedGeneration = currentGeneration.value;
-          state.tasks = loadTasks();
-          state.persistedTasks = cloneTaskList(state.tasks);
-          render();
+          rebaseTasksAfterGenerationChange(currentGeneration);
         }
       }
       return false;
@@ -382,9 +397,7 @@
     const current = mutation && typeof mutation.readTaskGeneration === 'function'
       ? mutation.readTaskGeneration(localStorage) : { ok: false };
     if (current.ok && current.value !== expectedGeneration) {
-      state.taskPersistedGeneration = current.value;
-      state.tasks = loadTasks();
-      state.persistedTasks = cloneTaskList(state.tasks);
+      rebaseTasksAfterGenerationChange(current);
     } else {
       state.tasks = previousTasks;
     }
@@ -400,14 +413,15 @@
     }
   }
 
-  async function maintainRecoveryBackupUnderTaskLock() {
+  async function maintainRecoveryBackupUnderTaskLock(expectedGeneration) {
     const needsBackup = state.recoveryBackupPendingPayload !== null;
     const needsCleanup = state.recoveryBackupCleanupPending;
     if (!needsBackup && !needsCleanup) return true;
 
     const mutation = window.DaymarkTaskMutation;
     const lockManager = window.navigator && window.navigator.locks;
-    if (!mutation || typeof mutation.withTaskMutationLock !== 'function') {
+    if (!mutation || typeof mutation.withTaskMutationLock !== 'function'
+        || typeof mutation.readTaskGeneration !== 'function') {
       if (needsBackup) {
         setStorageStatus('Recovery backup maintenance is waiting for safe cross-tab coordination; primary task data was not changed.', true);
         showToast('Recovery backup could not be prepared safely because cross-tab coordination is unavailable. Original task data remains in place.');
@@ -418,6 +432,9 @@
     }
 
     const locked = await mutation.withTaskMutationLock(lockManager, () => {
+      const generation = mutation.readTaskGeneration(localStorage);
+      if (!generation.ok) return { ok: false, reason: generation.reason };
+      if (generation.value !== expectedGeneration) return { ok: false, reason: 'stale-generation' };
       let backupCreated = false;
       const pendingPayload = state.recoveryBackupPendingPayload;
       if (pendingPayload !== null) {
@@ -484,6 +501,11 @@
 
     if (!locked.value || locked.value.ok !== true) {
       const reason = locked.value && locked.value.reason;
+      if (reason === 'stale-generation') {
+        const currentGeneration = mutation.readTaskGeneration(localStorage);
+        if (currentGeneration.ok) rebaseTasksAfterGenerationChange(currentGeneration);
+        return true;
+      }
       const message = reason === 'backup-write-failed'
         ? 'Recovery backup could not be created. Free browser storage before saving tasks.'
         : reason === 'primary-read-failed' || reason === 'backup-read-failed'
@@ -502,10 +524,21 @@
   }
 
   function scheduleRecoveryBackupMaintenance() {
+    const mutation = window.DaymarkTaskMutation;
+    if (!mutation || typeof mutation.readTaskGeneration !== 'function') {
+      setStorageStatus('Recovery backup maintenance is waiting for task-generation coordination; primary task data was not changed.', true);
+      return Promise.resolve(false);
+    }
+    const generation = mutation.readTaskGeneration(localStorage);
+    if (!generation.ok) {
+      setStorageStatus('Recovery backup maintenance could not read the task generation; existing data was left unchanged.', true);
+      return Promise.resolve(false);
+    }
+    const expectedGeneration = generation.value;
     const previous = state.recoveryBackupMaintenancePromise || Promise.resolve();
     const queued = previous.then(
-      () => maintainRecoveryBackupUnderTaskLock(),
-      () => maintainRecoveryBackupUnderTaskLock()
+      () => maintainRecoveryBackupUnderTaskLock(expectedGeneration),
+      () => maintainRecoveryBackupUnderTaskLock(expectedGeneration)
     );
     state.recoveryBackupMaintenancePromise = queued.then(() => undefined, () => undefined);
     return queued;
@@ -2707,11 +2740,7 @@
           || state.taskPersistedGeneration !== generation.value) {
         // A generation change is a destructive-clear boundary, not an ordinary
         // concurrent edit. Discard stale in-memory intent and rebase from disk.
-        state.taskPersistedGeneration = generation.value;
-        state.tasks = loadTasks();
-        state.persistedTasks = cloneTaskList(state.tasks);
-        scheduleRecoveryBackupMaintenance();
-        render();
+        rebaseTasksAfterGenerationChange(generation);
         return;
       }
       if (event.key === STORAGE_KEY || event.key === null) {
