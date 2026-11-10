@@ -206,7 +206,7 @@ test('publication failure is fail-closed, reported and cleaned without retaining
   assert.equal(result.ok, true);
   item.emit('done', null, 'completed');
   await flushDone();
-  assert.equal(staging.calls.failed.length, 1);
+  assert.deepEqual(staging.calls.failed, [result.filename]);
   assert.deepEqual(staging.calls.cleaned, [result.stagingPath]);
   assert.equal(reservedPaths.size, 0);
 });
