@@ -2003,20 +2003,47 @@
           const checkedLog = focus.validateFocusLog(snapshot.log);
           return checkedLog.rejectedCount === 0 && checkedLog.entries.length === snapshot.log.length;
         },
-        allowOpaqueBase: state.focusPrimaryUnreadable && state.focusRecoveryBackupReady
+        allowOpaqueBase: state.focusPrimaryUnreadable && state.focusRecoveryBackupReady,
+        afterCommit: (committed) => {
+          const localAfterSave = {
+            session: state.focusSession ? focus.serialize(state.focusSession) : null,
+            log: JSON.parse(JSON.stringify(state.focusLog))
+          };
+          const rebased = focusMutation.mergeFocusSnapshots(
+            desiredSnapshot, localAfterSave, committed.snapshot
+          );
+          if (!rebased.ok) {
+            committed.rebaseConflict = true;
+            return;
+          }
+          state.focusSession = rebased.snapshot.session
+            ? JSON.parse(JSON.stringify(rebased.snapshot.session)) : null;
+          state.focusLog = JSON.parse(JSON.stringify(rebased.snapshot.log));
+          state.focusTaskId = state.focusSession && state.focusSession.taskId
+            ? state.focusSession.taskId : '';
+          state.focusPersistedRaw = committed.payload;
+          state.focusPrimaryUnreadable = false;
+        }
       });
       if (result.ok) {
-        state.focusPersistedRaw = result.payload;
-        state.focusPrimaryUnreadable = false;
+        if (result.rebaseConflict || result.warning === 'post-commit-action-failed') {
+          setStorageStatus('Focus was saved, but a newer local change could not be safely rebased over another tab’s update. This tab kept its in-memory state; export it before reloading.', true);
+        } else {
+          if (state.focusSession) ensureFocusTimer();
+          else stopFocusTimer();
+          renderFocus();
+        }
         const backupState = readFocusRecoveryBackupState();
         if (!backupState.readable) reportUnknownFocusRecoveryBackup();
         else if (backupState.hasBackup) reportFocusRecovery(true);
         return true;
       }
-      if (result.reason === 'stale-generation' || result.reason === 'session-conflict'
-          || result.reason === 'log-conflict' || result.reason === 'stale-or-invalid-source') {
+      if (result.reason === 'stale-generation') {
         setStorageStatus('Focus data changed or was cleared in another tab; this tab did not overwrite it.', true);
         reconcileFocusStateFromStorage(null, false, { suppressBackupMaintenance: true });
+      } else if (result.reason === 'session-conflict' || result.reason === 'log-conflict'
+          || result.reason === 'stale-or-invalid-source') {
+        setStorageStatus('Focus changes conflict with a different or unreadable update from another tab. This tab kept its in-memory changes; export them before reloading. Nothing was overwritten.', true);
       } else {
         if (state.focusFinalizingExpiredSession && result.reason === 'storage-write-failed') {
           setStorageStatus('A Focus session completed while Daymark was closed, but its history could not be saved. The original session is preserved in the recovery backup.', true);
