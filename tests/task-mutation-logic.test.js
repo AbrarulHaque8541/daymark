@@ -68,6 +68,16 @@ function commit(lockManager, storage, baseTasks, desiredTasks) {
   });
 }
 
+test('Clear All lock order places Focus after task and webhook locks', () => {
+  assert.equal(mutation.FOCUS_MUTATION_LOCK, 'daymark.focus.mutation.v1');
+  assert.deepEqual(mutation.CLEAR_ALL_LOCK_ORDER, [
+    mutation.TASK_MUTATION_LOCK,
+    mutation.WEBHOOK_DELIVERY_LOCK,
+    mutation.WEBHOOK_QUEUE_LOCK,
+    mutation.FOCUS_MUTATION_LOCK
+  ]);
+});
+
 test('concurrent additions from two tabs both survive the shared origin lock', async () => {
   const base = [makeTask('existing', 'Existing')];
   const storage = makeStorage(base);
@@ -216,6 +226,72 @@ test('destructive data actions fail closed when the shared task lock is unavaila
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'coordination-unavailable');
   assert.equal(called, false);
+});
+
+test('ordered domain locks acquire task, delivery, queue, then Focus before destructive work', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      assert.equal(options.mode, 'exclusive');
+      calls.push(name);
+      return Promise.resolve().then(callback);
+    }
+  };
+  const result = await mutation.withLocksInOrder(locks, mutation.CLEAR_ALL_LOCK_ORDER, () => {
+    calls.push('callback');
+    return 'cleared';
+  });
+  assert.deepEqual(calls, [mutation.TASK_MUTATION_LOCK, mutation.WEBHOOK_DELIVERY_LOCK,
+    mutation.WEBHOOK_QUEUE_LOCK, mutation.FOCUS_MUTATION_LOCK, 'callback']);
+  assert.deepEqual(result, { ok: true, value: 'cleared' });
+});
+
+test('ordered domain lock failure never runs a partial destructive callback', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      calls.push(name);
+      if (name === mutation.WEBHOOK_QUEUE_LOCK) return Promise.reject(new Error('queue lock unavailable'));
+      return Promise.resolve().then(callback);
+    }
+  };
+  let cleared = false;
+  const result = await mutation.withLocksInOrder(locks, mutation.CLEAR_ALL_LOCK_ORDER, () => { cleared = true; });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'lock-failed');
+  assert.equal(cleared, false);
+  assert.deepEqual(calls, [mutation.TASK_MUTATION_LOCK, mutation.WEBHOOK_DELIVERY_LOCK, mutation.WEBHOOK_QUEUE_LOCK]);
+});
+
+test('afterCommit is awaited inside the task lock and receives only actual changed task ids', async () => {
+  const base = [makeTask('a', 'A')];
+  const storage = makeStorage(base);
+  const order = [];
+  const locks = {
+    request(name, options, callback) {
+      order.push('lock-start');
+      return Promise.resolve().then(callback).finally(() => order.push('lock-end'));
+    }
+  };
+  const result = await mutation.commitTaskSnapshot({
+    lockManager: locks,
+    storage,
+    key: 'daymark.tasks.v1',
+    baseTasks: base,
+    desiredTasks: [makeTask('a', 'A completed')],
+    readCurrent,
+    afterCommit: async (commitResult) => {
+      order.push('after-commit');
+      assert.deepEqual(commitResult.changedIds, ['a']);
+      assert.deepEqual(commitResult.previousTasks, base);
+      assert.equal(JSON.parse(storage.raw)[0].title, 'A completed');
+      await Promise.resolve();
+      order.push('after-commit-finished');
+    }
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(order, ['lock-start', 'after-commit', 'after-commit-finished', 'lock-end']);
+  assert.deepEqual(result.changedIds, ['a']);
 });
 
 test('task equality is independent of object property insertion order', () => {

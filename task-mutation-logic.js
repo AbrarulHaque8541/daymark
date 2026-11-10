@@ -11,6 +11,15 @@
   'use strict';
 
   const TASK_MUTATION_LOCK = 'daymark.tasks.mutation.v1';
+  const WEBHOOK_DELIVERY_LOCK = 'daymark.webhook.delivery.v1';
+  const WEBHOOK_QUEUE_LOCK = 'daymark.webhook.queue.v1';
+  const FOCUS_MUTATION_LOCK = 'daymark.focus.mutation.v1';
+  // Global clear/completion order: task mutation -> webhook delivery -> webhook
+  // queue -> Focus. Task completion appends while holding the task lock; Focus
+  // writers never acquire an earlier lock while holding the Focus lock.
+  const CLEAR_ALL_LOCK_ORDER = Object.freeze([
+    TASK_MUTATION_LOCK, WEBHOOK_DELIVERY_LOCK, WEBHOOK_QUEUE_LOCK, FOCUS_MUTATION_LOCK
+  ]);
 
   function cloneTaskList(tasks) {
     if (!Array.isArray(tasks)) return [];
@@ -70,6 +79,7 @@
     const ids = new Set([...base.keys(), ...desired.keys()]);
     const conflicts = [];
     const addedIds = [];
+    const changedIds = [];
 
     for (const id of ids) {
       const before = base.get(id);
@@ -81,6 +91,7 @@
         if (latest === undefined) {
           merged.push(JSON.parse(JSON.stringify(after)));
           addedIds.push(id);
+          changedIds.push(id);
         } else if (!areTaskListsEqual([latest], [after])) {
           conflicts.push(id);
         }
@@ -91,7 +102,10 @@
         if (latest === undefined) continue;
         if (areTaskListsEqual([latest], [before])) {
           const index = merged.findIndex((task) => task.id === id);
-          if (index >= 0) merged.splice(index, 1);
+          if (index >= 0) {
+            merged.splice(index, 1);
+            changedIds.push(id);
+          }
         } else {
           conflicts.push(id);
         }
@@ -103,7 +117,10 @@
       } else if (areTaskListsEqual([latest], [before])) {
         const index = merged.findIndex((task) => task.id === id);
         if (index < 0) conflicts.push(id);
-        else merged[index] = JSON.parse(JSON.stringify(after));
+        else {
+          merged[index] = JSON.parse(JSON.stringify(after));
+          changedIds.push(id);
+        }
       } else if (!areTaskListsEqual([latest], [after])) {
         conflicts.push(id);
       }
@@ -115,10 +132,11 @@
         reason: 'conflict',
         conflicts: Array.from(new Set(conflicts)).sort(),
         addedIds: [],
+        changedIds: [],
         tasks: []
       };
     }
-    return { ok: true, reason: null, conflicts: [], addedIds, tasks: merged };
+    return { ok: true, reason: null, conflicts: [], addedIds, changedIds, tasks: merged };
   }
 
   async function withTaskMutationLock(lockManager, callback, lockName) {
@@ -137,6 +155,32 @@
           return { ok: false, reason: 'mutation-failed' };
         }
       });
+    } catch (error) {
+      return { ok: false, reason: 'lock-failed' };
+    }
+  }
+
+  async function withLocksInOrder(lockManager, lockNames, callback) {
+    if (!lockManager || typeof lockManager.request !== 'function') {
+      return { ok: false, reason: 'coordination-unavailable' };
+    }
+    if (typeof callback !== 'function' || !Array.isArray(lockNames)
+        || lockNames.length === 0
+        || lockNames.some((name) => typeof name !== 'string' || name.length === 0)
+        || new Set(lockNames).size !== lockNames.length) {
+      return { ok: false, reason: 'invalid-lock-order' };
+    }
+    const acquire = (index) => {
+      if (index === lockNames.length) {
+        return Promise.resolve().then(callback).then(
+          (value) => ({ ok: true, value }),
+          () => ({ ok: false, reason: 'mutation-failed' })
+        );
+      }
+      return lockManager.request(lockNames[index], { mode: 'exclusive' }, () => acquire(index + 1));
+    };
+    try {
+      return await acquire(0);
     } catch (error) {
       return { ok: false, reason: 'lock-failed' };
     }
@@ -224,11 +268,27 @@
             warning = 'post-write-maintenance-failed';
           }
         }
+        if (typeof opts.afterCommit === 'function') {
+          try {
+            // Await while the task lock is still held. A later clear cannot
+            // overtake a completion whose durable task write already committed.
+            await opts.afterCommit({
+              tasks: cloneTaskList(merged.tasks),
+              previousTasks: cloneTaskList(current.tasks),
+              changedIds: merged.changedIds.slice(),
+              payload
+            });
+          } catch (error) {
+            warning = warning || 'post-commit-action-failed';
+          }
+        }
         return {
           ok: true,
           reason: null,
           conflicts: [],
           addedIds: merged.addedIds.slice(),
+          changedIds: merged.changedIds.slice(),
+          previousTasks: cloneTaskList(current.tasks),
           tasks: cloneTaskList(merged.tasks),
           payload,
           warning
@@ -241,10 +301,15 @@
 
   const api = {
     TASK_MUTATION_LOCK,
+    WEBHOOK_DELIVERY_LOCK,
+    WEBHOOK_QUEUE_LOCK,
+    FOCUS_MUTATION_LOCK,
+    CLEAR_ALL_LOCK_ORDER,
     cloneTaskList,
     areTaskListsEqual,
     mergeTaskSnapshots,
     withTaskMutationLock,
+    withLocksInOrder,
     commitTaskSnapshot
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
