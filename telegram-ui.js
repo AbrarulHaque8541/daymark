@@ -1,7 +1,7 @@
-
 ((root) => {
   'use strict';
   const STORAGE_KEY = 'daymark.tasks.v1';
+  const CHAT_STORAGE_KEY = 'daymark.telegram.lastChat.v1';
   function attachTelegramUi(env) {
     if (!env || !env.document) throw new Error('attachTelegramUi requires a document.');
     const doc = env.document;
@@ -49,6 +49,24 @@
         return candidate && typeof candidate.getItem === 'function' ? candidate : null;
       } catch (error) { return null; }
     }
+    function persistChatTarget(target) {
+      if (!target || typeof target !== 'string') return;
+      const storage = resolveStorage();
+      if (!storage || typeof storage.setItem !== 'function') return;
+      try { storage.setItem(CHAT_STORAGE_KEY, target); } catch (error) { /* Fail closed; chat convenience is optional. */ }
+    }
+    function restoreChatTarget() {
+      if (!chatEl) return;
+      const storage = resolveStorage();
+      if (!storage || typeof storage.getItem !== 'function') return;
+      try {
+        const saved = storage.getItem(CHAT_STORAGE_KEY);
+        if (typeof saved === 'string' && saved && logicApi && typeof logicApi.isChatTarget === 'function' && logicApi.isChatTarget(saved)) {
+          chatEl.value = saved;
+        }
+      } catch (error) { /* Ignore unreadable preference. */ }
+    }
+    restoreChatTarget();
     function readStoredTasks() {
       const storage = resolveStorage();
       if (!storage || typeof storage.getItem !== 'function') {
@@ -152,6 +170,7 @@
       status('Sending ' + digest.includedCount + ' completed task(s) to Telegram…');
       const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text);
       if (result.ok) {
+        persistChatTarget(inputs.chatTarget.trim());
         status('Sent \u00b7 ' + digest.includedCount + ' completed task(s) delivered to Telegram.'
           + (digest.omittedCount > 0 ? ' ' + digest.omittedCount + ' omitted for the message limit.' : '')
           + (stored.note || ''));
@@ -169,6 +188,7 @@
       if (!inputs) return;
       status('Sending a test message to Telegram…');
       const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE);
+      if (result.ok) persistChatTarget(inputs.chatTarget.trim());
       status(result.ok ? 'Test message sent to Telegram.' : (result.reason || 'The test message could not be delivered.'));
     }
     function clearTokenField() {
