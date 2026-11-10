@@ -167,6 +167,55 @@ test('a 2xx success response requires a positive safe Telegram message id', asyn
   }
 });
 
+test('a synchronous fetch exception becomes a failure result and still clears the timeout', async () => {
+  let cleared = 0;
+  const deps = networkDeps(() => { throw new Error('synchronous transport failure'); });
+  deps.setTimeout = () => 73;
+  deps.clearTimeout = (handle) => {
+    assert.equal(handle, 73);
+    cleared += 1;
+  };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /could not reach Telegram/);
+  assert.equal(cleared, 1);
+});
+
+test('timeout setup exceptions fail closed before making a network request', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  deps.AbortController = class {
+    constructor() { throw new Error('controller unavailable'); }
+  };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /cannot make network requests/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('a synchronous timeout scheduler exception fails closed before making a request', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  deps.setTimeout = () => { throw new Error('timeout scheduler unavailable'); };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /cannot make network requests/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('timeout cleanup failure cannot turn confirmed delivery into a retry-inducing failure', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  deps.clearTimeout = () => { throw new Error('timer cleanup failed'); };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.messageId, 4242);
+});
+
 test('an offline device reports an honest network reason without echoing the token', async () => {
   const fetchFn = (url, options) => Promise.reject(new Error('offline'));
   const result = await engine.sendTelegramMessage(
@@ -214,4 +263,81 @@ test('the test message is a short fixed Daymark string', () => {
   assert.equal(typeof engine.TEST_MESSAGE, 'string');
   assert.ok(engine.TEST_MESSAGE.length > 0 && engine.TEST_MESSAGE.length <= 200);
   assert.ok(engine.TEST_MESSAGE.indexOf('Daymark') !== -1);
+});
+
+test('timeout path settles even when AbortController.abort throws', async () => {
+  let timeoutCb = null;
+  const fetchFn = () => new Promise(() => { /* never settles */ });
+  const deps = networkDeps(fetchFn);
+  deps.AbortController = class {
+    constructor() { this.signal = { aborted: false }; }
+    abort() { throw new Error('abort refused'); }
+  };
+  deps.setTimeout = (cb) => {
+    timeoutCb = cb;
+    return 91;
+  };
+  let cleared = 0;
+  deps.clearTimeout = () => { cleared += 1; };
+  const pending = engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(typeof timeoutCb, 'function', 'timeout must be scheduled');
+  timeoutCb();
+  const result = await pending;
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /unconfirmed/i);
+  assert.match(result.reason, /check the chat/i);
+  assert.ok(result.reason.indexOf(VALID_TOKEN) === -1);
+  assert.equal(cleared, 1);
+});
+
+test('never-settling fetch is bounded by the independent timeout settlement', async () => {
+  let timeoutCb = null;
+  const fetchFn = () => new Promise(() => { /* hangs forever */ });
+  const deps = networkDeps(fetchFn);
+  deps.setTimeout = (cb) => {
+    timeoutCb = cb;
+    return 42;
+  };
+  const pending = engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  timeoutCb();
+  const result = await pending;
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /unconfirmed/i);
+});
+
+test('late confirmed success after timeout settlement is ignored', async () => {
+  let timeoutCb = null;
+  let resolveFetch = null;
+  const fetchFn = () => new Promise((resolve) => { resolveFetch = resolve; });
+  const deps = networkDeps(fetchFn);
+  deps.setTimeout = (cb) => {
+    timeoutCb = cb;
+    return 7;
+  };
+  const pending = engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  // Timeout fires first
+  timeoutCb();
+  const result = await pending;
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /unconfirmed/i);
+  // Late success must not change the already-settled outcome (promise already resolved)
+  resolveFetch({ status: 200, json: () => Promise.resolve(okBody()) });
+  // Give microtasks a tick; result object remains the timed-out one
+  await Promise.resolve();
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /unconfirmed/i);
+});
+
+test('timeout scheduler that never fires still allows successful delivery', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  // Schedule but never invoke the callback (simulates long timeout / success first)
+  deps.setTimeout = () => 55;
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.messageId, 4242);
 });
