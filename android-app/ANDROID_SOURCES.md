@@ -220,7 +220,7 @@ fail-closed response enforce that browser-wide mode. Before the first explicit O
 worker setting starts blocked. After the existing Online consent/navigation gate
 passes, Daymark unblocks worker network requests for HTTP/HTTPS. Switching Offline
 immediately clears the in-memory Online grant and reasserts the global block. The
-request client independently blocks remote/unknown worker requests while Offline,
+Remote Service Worker requests are blocked while Offline. The request client independently blocks remote/unknown worker requests,
 including if a later platform/settings reset clears the global setting. Local
 data:, blob: and about: responses and already cached Service Worker responses may
 still be handled locally.
