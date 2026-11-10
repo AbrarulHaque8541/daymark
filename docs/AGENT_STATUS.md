@@ -1,4 +1,5 @@
 - [Daymark whole-project engineering status — 2026-11-10T06:15:00Z (main 469b29e; #665/#699 exact-head CI green, Focus/reminder API 29/36 green, 24 open issues)](./CURRENT_STATUS_20261110T061500Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:32:15Z (main 469b29e; Service Worker current-main integration, Online/Offline gates, AST/recovery/ICS checks)](./CURRENT_STATUS_20261110T063215Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T06:29:42Z (main 469b29e; Service Worker Online/Offline restored and verified, AST guard and integrations green)](./CURRENT_STATUS_20261110T062942Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T06:27:20Z (main 469b29e; AST guard and integrations verified, corrected cancelled docs checks, SLSA release blocker)](./CURRENT_STATUS_20261110T062720Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T06:25:08Z (main 469b29e; AST guard five workflows, recovery/iCalendar and Focus/reminder gates pass, SLSA release blocker)](./CURRENT_STATUS_20261110T062508Z.md)
