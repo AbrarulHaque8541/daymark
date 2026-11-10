@@ -15,6 +15,9 @@ report_failure_excerpt() {
   combined="$(adb logcat -d -s DaymarkSWRuntime 2>/dev/null | grep -E "FAIL after|Caused by" | tail -n 6 | tr "\n" " | " | tr -d "\r")"
   encoded="$(printf '%s' "$combined" | head -c 3500 | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')"
   echo "::error title=Service Worker trace failure ($task)::sw-trace-diagnostic: $encoded"
+  lifecycle="$(adb logcat -d -s DaymarkWebView:I 2>/dev/null | grep -E "page (started|finished)|network block sync|spa-diag" | tail -n 20 | tr "\n" " | " | tr -d "\r")"
+  lifecycle_encoded="$(printf '%s' "$lifecycle" | head -c 2500 | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')"
+  echo "::error title=Service Worker trace lifecycle ($task)::sw-trace-lifecycle: $lifecycle_encoded"
 }
 
 run_variant() {

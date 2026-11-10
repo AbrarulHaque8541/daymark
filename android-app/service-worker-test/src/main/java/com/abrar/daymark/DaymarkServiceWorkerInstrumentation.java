@@ -457,8 +457,9 @@ public final class DaymarkServiceWorkerInstrumentation {
                     + unrelatedPackId + "\"]";
             String matchingCount = "document.querySelectorAll('" + matchingSelector + "').length";
             String unrelatedCount = "document.querySelectorAll('" + unrelatedSelector + "').length";
-            awaitBoolean(view, matchingCount + " === 1", WAIT_MS,
-                    "a matching localhost route receives its pack CSS through production injection");
+            awaitSpa(view, matchingCount + " === 1", WAIT_MS,
+                    "a matching localhost route receives its pack CSS through production injection",
+                    extensionStore);
             check(evaluateBoolean(view, unrelatedCount + " === 0"),
                     "a nonmatching installed pack is not injected into the current page");
             check(evaluateBoolean(view,
@@ -471,37 +472,44 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "the page DOM does not contain CSS from a nonmatching installed pack");
 
             execute(view, "history.pushState({}, '', '/public/one');");
-            awaitBoolean(view, "location.pathname === '/public/one' && "
+            awaitSpa(view, "location.pathname === '/public/one' && "
                             + matchingCount + " === 0", WAIT_MS,
-                    "pushState to a nonmatching route removes the previously injected pack CSS");
+                    "pushState to a nonmatching route removes the previously injected pack CSS",
+                    extensionStore);
 
             execute(view, "history.pushState({}, '', '/private/again');");
-            awaitBoolean(view, "location.pathname === '/private/again' && "
+            awaitSpa(view, "location.pathname === '/private/again' && "
                             + matchingCount + " === 1", WAIT_MS,
-                    "pushState back into the matching scope restores only that pack's CSS");
+                    "pushState back into the matching scope restores only that pack's CSS",
+                    extensionStore);
 
             execute(view, "history.replaceState({}, '', '/public/replace');");
-            awaitBoolean(view, "location.pathname === '/public/replace' && "
+            awaitSpa(view, "location.pathname === '/public/replace' && "
                             + matchingCount + " === 0", WAIT_MS,
-                    "replaceState re-evaluates the current route and removes out-of-scope CSS");
+                    "replaceState re-evaluates the current route and removes out-of-scope CSS",
+                    extensionStore);
 
             execute(view, "history.pushState({}, '', '/private/back');");
-            awaitBoolean(view, "location.pathname === '/private/back' && "
+            awaitSpa(view, "location.pathname === '/private/back' && "
                             + matchingCount + " === 1", WAIT_MS,
-                    "a new matching history entry restores the scoped CSS");
+                    "a new matching history entry restores the scoped CSS",
+                    extensionStore);
             execute(view, "history.back();");
-            awaitBoolean(view, "location.pathname === '/public/replace' && "
+            awaitSpa(view, "location.pathname === '/public/replace' && "
                             + matchingCount + " === 0", WAIT_MS,
-                    "history.back re-evaluates extension scope and removes CSS");
+                    "history.back re-evaluates extension scope and removes CSS",
+                    extensionStore);
             execute(view, "history.forward();");
-            awaitBoolean(view, "location.pathname === '/private/back' && "
+            awaitSpa(view, "location.pathname === '/private/back' && "
                             + matchingCount + " === 1", WAIT_MS,
-                    "history.forward re-evaluates extension scope and restores CSS");
+                    "history.forward re-evaluates extension scope and restores CSS",
+                    extensionStore);
 
             execute(view, "location.hash = '#fragment';");
-            awaitBoolean(view, "location.hash === '#fragment' && "
+            awaitSpa(view, "location.hash === '#fragment' && "
                             + matchingCount + " === 1", WAIT_MS,
-                    "fragment navigation preserves CSS while the path remains in scope");
+                    "fragment navigation preserves CSS while the path remains in scope",
+                    extensionStore);
             check(evaluateBoolean(view,
                             "typeof window.__daymarkSpaConfig === 'undefined'"
                             + " && typeof window.__daymarkSpaState === 'undefined'"
@@ -625,6 +633,95 @@ public final class DaymarkServiceWorkerInstrumentation {
                 + ".catch(()=>document.title='cache-error');");
         awaitBoolean(view, "document.title === 'cache-cached-ok'", WAIT_MS,
                 "a previously cached Service Worker response must remain available");
+    }
+
+    /**
+     * Diagnostic-only wrapper around {@link #awaitBoolean} used by the extension SPA phase.
+     * On timeout it appends the observed WebView/page/store/runtime state to the failure so
+     * the anonymous annotation can show why production injection did not satisfy the wait.
+     * It never changes pass/fail semantics; the same condition is polled for the same time.
+     */
+    private void awaitSpa(WebView view, String expression, long timeoutMs, String message,
+                          Object extensionStore) throws Exception {
+        try {
+            awaitBoolean(view, expression, timeoutMs, message);
+        } catch (AssertionError timeout) {
+            throw new AssertionError(message + " | spa-diag " + spaDiagnostics(view, extensionStore), timeout);
+        }
+    }
+
+    private String spaDiagnostics(WebView view, Object extensionStore) {
+        StringBuilder diag = new StringBuilder();
+        final AtomicReference<String> viewUrl = new AtomicReference<>();
+        try {
+            instrumentation.runOnMainSync(() -> viewUrl.set(String.valueOf(view.getUrl())));
+            diag.append("viewUrl=").append(viewUrl.get());
+        } catch (Throwable error) {
+            diag.append("viewUrlError=").append(error);
+        }
+        try {
+            diag.append(" page=").append(evaluateString(view,
+                    "JSON.stringify({"
+                    + "href: String(window.location.href),"
+                    + "ready: document.readyState,"
+                    + "managed: Array.prototype.map.call("
+                    + "document.querySelectorAll('style[data-daymark-managed=\"true\"]'),"
+                    + "function(s){return String(s.getAttribute('data-daymark-pack-id')) + '/'"
+                    + " + String(s.getAttribute('data-daymark-pack-css'));})"
+                    + "})"));
+        } catch (Throwable error) {
+            diag.append(" pageError=").append(error);
+        }
+        try {
+            Class<?> storeType = extensionStore.getClass();
+            java.lang.reflect.Method listAll = storeType.getDeclaredMethod("listAll");
+            listAll.setAccessible(true);
+            java.util.List<?> packs = (java.util.List<?>) listAll.invoke(extensionStore);
+            diag.append(" packs=[");
+            for (Object pack : packs) {
+                Class<?> packType = pack.getClass();
+                java.lang.reflect.Field idField = packType.getDeclaredField("id");
+                idField.setAccessible(true);
+                java.lang.reflect.Field enabledField = packType.getDeclaredField("enabled");
+                enabledField.setAccessible(true);
+                java.lang.reflect.Field matchesField = packType.getDeclaredField("matches");
+                matchesField.setAccessible(true);
+                diag.append(String.valueOf(idField.get(pack))).append('|')
+                        .append(enabledField.get(pack)).append('|')
+                        .append(matchesField.get(pack)).append(';');
+            }
+            diag.append(']');
+        } catch (Throwable error) {
+            diag.append(" packsError=").append(error);
+        }
+        try {
+            java.lang.reflect.Field runtimeField = view.getClass().getDeclaredField("extensionRuntime");
+            runtimeField.setAccessible(true);
+            Object runtime = runtimeField.get(view);
+            java.lang.reflect.Field lastApplied = runtime.getClass().getDeclaredField("lastAppliedUrl");
+            lastApplied.setAccessible(true);
+            java.lang.reflect.Field scriptsApplied =
+                    runtime.getClass().getDeclaredField("userscriptsAppliedForCurrentDocument");
+            scriptsApplied.setAccessible(true);
+            diag.append(" runtimeLastUrl=").append(lastApplied.get(runtime))
+                    .append(" runtimeScriptsApplied=").append(scriptsApplied.get(runtime));
+        } catch (Throwable error) {
+            diag.append(" runtimeError=").append(error);
+        }
+        return diag.toString();
+    }
+
+    private String evaluateString(WebView view, String expression) throws Exception {
+        AtomicReference<String> value = new AtomicReference<>();
+        CountDownLatch completed = new CountDownLatch(1);
+        instrumentation.runOnMainSync(() -> view.evaluateJavascript(expression, result -> {
+            value.set(result);
+            completed.countDown();
+        }));
+        if (!completed.await(5, TimeUnit.SECONDS)) {
+            throw new AssertionError("WebView JavaScript evaluation timed out");
+        }
+        return String.valueOf(value.get());
     }
 
     private void destroy(WebView view) throws Exception {
