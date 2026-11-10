@@ -67,7 +67,7 @@ class FakeAbortController {
 }
 function okEnv(doc, options) {
   options = options || {};
-  return {
+  const env = {
     document: doc,
     logicApi: options.logicApi === undefined ? engine : options.logicApi,
     taskLogicApi: options.taskLogicApi === undefined ? taskLogic : options.taskLogicApi,
@@ -76,6 +76,20 @@ function okEnv(doc, options) {
     AbortController: FakeAbortController,
     setTimeout: () => 0,
     clearTimeout: () => {}
+  };
+  if (options.window) env.window = options.window;
+  return env;
+}
+function makeWindow() {
+  const listeners = {};
+  return {
+    listeners,
+    addEventListener(type, handler) { (listeners[type] = listeners[type] || []).push(handler); },
+    removeEventListener(type, handler) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((candidate) => candidate !== handler);
+    },
+    dispatch(type) { for (const handler of (listeners[type] || []).slice()) handler({ type }); }
   };
 }
 function fillValidInputs(doc) {
@@ -111,7 +125,34 @@ test('an invalid chat target reports honestly and sends nothing', async () => {
   fillValidInputs(doc);
   doc.elements['telegram-chat'].value = 'nope';
   await handle.send();
-  assert.match(doc.elements['telegram-status'].textContent, /chat target/);
+  assert.match(doc.elements['telegram-status'].textContent, /numeric chat ID for a private chat, or an @channelusername for a public channel/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('chat guidance distinguishes private chat IDs from public channel usernames', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { fetch: fetchFn }));
+  assert.equal(doc.elements['telegram-chat'].placeholder, 'Private chat ID or public @channelusername');
+  fillValidInputs(doc);
+  doc.elements['telegram-chat'].value = 'not a target';
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /numeric chat ID for a private chat, or an @channelusername for a public channel/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('a partial Telegram engine without chat validation fails closed before reading storage', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const partialLogic = {
+    isBotToken: engine.isBotToken,
+    buildCompletedDigest: engine.buildCompletedDigest,
+    sendTelegramMessage: engine.sendTelegramMessage
+  };
+  const handle = ui.attachTelegramUi(okEnv(doc, { logicApi: partialLogic, storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /input validation is unavailable/);
+  assert.equal(storage.readCount(), 0);
   assert.equal(fetchFn.calls.length, 0);
 });
 test('sending a digest delivers only completed tasks to Telegram', async () => {
@@ -168,6 +209,41 @@ test('a malformed saved list fails closed without sending', async () => {
   assert.match(doc.elements['telegram-status'].textContent, /could not be read as JSON/);
   assert.equal(fetchFn.calls.length, 0);
 });
+test('an empty saved task key is malformed rather than absent and sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.tasks.v1': '' });
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /could not be read as JSON/);
+  assert.match(doc.elements['telegram-status'].textContent, /Nothing was sent/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('a non-string task-store adapter result fails closed instead of becoming an empty list', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = { getItem() { return 0; } };
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /could not be read safely/);
+  assert.match(doc.elements['telegram-status'].textContent, /Nothing was sent/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('a missing task key remains a legitimate empty task list and sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({});
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /No completed tasks to announce/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
 test('a network failure is reported in plain words without the token', async () => {
   const doc = makeDoc(ALL_IDS);
   const seed = {};
@@ -199,10 +275,48 @@ test('Clear empties the token field and says nothing was saved', () => {
   assert.equal(doc.elements['telegram-token'].value, '');
   assert.match(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
 });
+test('pagehide and pageshow clear the token so navigation and bfcache cannot retain it', () => {
+  const doc = makeDoc(ALL_IDS);
+  const view = makeWindow();
+  // Production boot passes only { document }; the real lifecycle target is document.defaultView.
+  doc.defaultView = view;
+  const handle = ui.attachTelegramUi(okEnv(doc, {}));
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  view.dispatch('pagehide');
+  assert.equal(doc.elements['telegram-token'].value, '', 'pagehide clears before unload or bfcache freeze');
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  view.dispatch('pageshow');
+  assert.equal(doc.elements['telegram-token'].value, '', 'pageshow clears a restored page');
+  assert.equal(view.listeners.pagehide.length, 1);
+  assert.equal(view.listeners.pageshow.length, 1);
+  handle.detach();
+  assert.equal(doc.elements['telegram-token'].value, '', 'detach clears the in-memory credential');
+  assert.equal(view.listeners.pagehide.length, 0);
+  assert.equal(view.listeners.pageshow.length, 0);
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  view.dispatch('pagehide');
+  assert.equal(doc.elements['telegram-token'].value, VALID_TOKEN, 'detached handlers no longer run');
+});
 test('boot never reads storage', () => {
   const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
   ui.attachTelegramUi(okEnv(makeDoc(ALL_IDS), { storage: storage }));
   assert.equal(storage.readCount(), 0, 'attaching the card must not read storage');
+});
+test('a throwing or malformed task validator fails closed without exposing its error', async () => {
+  for (const validator of [
+    { validateStoredTasks() { throw new Error('sensitive validator detail'); } },
+    { validateStoredTasks() { return { tasks: 'not a task list', rejectedCount: 0 }; } }
+  ]) {
+    const doc = makeDoc(ALL_IDS);
+    const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('Buy milk', { completed: true, id: 1 })]) };
+    const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+    const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, taskLogicApi: validator, fetch: fetchFn }));
+    fillValidInputs(doc);
+    await handle.send();
+    assert.match(doc.elements['telegram-status'].textContent, /could not be validated safely/);
+    assert.doesNotMatch(doc.elements['telegram-status'].textContent, /sensitive validator detail/);
+    assert.equal(fetchFn.calls.length, 0);
+  }
 });
 test('a throwing storage read is reported honestly', async () => {
   const doc = makeDoc(ALL_IDS);

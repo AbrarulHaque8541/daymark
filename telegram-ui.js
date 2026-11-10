@@ -11,10 +11,15 @@
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const tokenEl = element('telegram-token');
     const chatEl = element('telegram-chat');
+    if (chatEl) chatEl.placeholder = 'Private chat ID or public @channelusername';
     const statusEl = element('telegram-status');
     const formEl = element('telegram-form');
     const testEl = element('telegram-test');
     const clearEl = element('telegram-clear');
+    const lifecycleWindow = env.window || doc.defaultView || null;
+    const observesPageLifecycle = lifecycleWindow
+      && typeof lifecycleWindow.addEventListener === 'function'
+      && typeof lifecycleWindow.removeEventListener === 'function';
     let busy = false;
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -35,7 +40,8 @@
       try { raw = storage.getItem(STORAGE_KEY); } catch (error) {
         return { tasks: null, reason: 'Task storage could not be read.', note: '' };
       }
-      if (typeof raw !== 'string' || raw.length === 0) return { tasks: [], reason: '', note: '' };
+      if (raw === null) return { tasks: [], reason: '', note: '' };
+      if (typeof raw !== 'string') return { tasks: null, reason: 'Saved tasks could not be read safely.', note: '' };
       let parsed = null;
       try { parsed = JSON.parse(raw); } catch (error) {
         return { tasks: null, reason: 'Saved tasks could not be read as JSON.', note: '' };
@@ -43,11 +49,18 @@
       if (!taskLogicApi || typeof taskLogicApi.validateStoredTasks !== 'function') {
         return { tasks: null, reason: 'Task validation is unavailable, so nothing was sent.', note: '' };
       }
-      const validated = taskLogicApi.validateStoredTasks(parsed);
+      let validated;
+      try { validated = taskLogicApi.validateStoredTasks(parsed); } catch (error) {
+        return { tasks: null, reason: 'Saved tasks could not be validated safely.', note: '' };
+      }
+      if (!validated || !Array.isArray(validated.tasks)) {
+        return { tasks: null, reason: 'Saved tasks could not be validated safely.', note: '' };
+      }
+      const rejectedCount = Number.isInteger(validated.rejectedCount) && validated.rejectedCount > 0 ? validated.rejectedCount : 0;
       return {
         tasks: validated.tasks,
         reason: '',
-        note: validated.rejectedCount > 0 ? ' (' + validated.rejectedCount + ' unreadable task(s) skipped.)' : ''
+        note: rejectedCount > 0 ? ' (' + rejectedCount + ' unreadable task(s) skipped.)' : ''
       };
     }
     function todayLabel() {
@@ -72,12 +85,16 @@
     }
     function validateInputs() {
       const inputs = readInputs();
+      if (!logicApi || typeof logicApi.isBotToken !== 'function' || typeof logicApi.isChatTarget !== 'function') {
+        status('Telegram input validation is unavailable. Nothing was sent.');
+        return null;
+      }
       if (!logicApi.isBotToken(inputs.botToken.trim())) {
         status('Enter a bot token from @BotFather first. Nothing was sent.');
         return null;
       }
       if (!logicApi.isChatTarget(inputs.chatTarget.trim())) {
-        status('Enter a chat target: a numeric chat id or an @username. Nothing was sent.');
+        status('Enter a numeric chat ID for a private chat, or an @channelusername for a public channel. Nothing was sent.');
         return null;
       }
       return inputs;
@@ -136,9 +153,18 @@
       const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE);
       status(result.ok ? 'Test message sent to Telegram.' : (result.reason || 'The test message could not be delivered.'));
     }
-    function onClear() {
+    function clearTokenField() {
       if (tokenEl && typeof tokenEl.value === 'string') tokenEl.value = '';
+    }
+    function onPageHide() { clearTokenField(); }
+    function onPageShow() { clearTokenField(); }
+    function onClear() {
+      clearTokenField();
       status('Cleared. The token field is emptied; nothing was ever saved on this device.');
+    }
+    if (observesPageLifecycle) {
+      lifecycleWindow.addEventListener('pagehide', onPageHide);
+      lifecycleWindow.addEventListener('pageshow', onPageShow);
     }
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
@@ -152,7 +178,14 @@
       send: onSend,
       test: onTest,
       clear: onClear,
-      detach() { status(''); }
+      detach() {
+        clearTokenField();
+        if (observesPageLifecycle) {
+          lifecycleWindow.removeEventListener('pagehide', onPageHide);
+          lifecycleWindow.removeEventListener('pageshow', onPageShow);
+        }
+        status('');
+      }
     };
   }
   const api = { attachTelegramUi };
