@@ -17,6 +17,10 @@ const runtimeSource = fs.readFileSync(
   path.join(__dirname, '..', 'android-app', 'app', 'src', 'main', 'java', 'com', 'abrar', 'daymark', 'ExtensionRuntime.java'),
   'utf8'
 );
+const webViewSource = fs.readFileSync(
+  path.join(__dirname, '..', 'android-app', 'app', 'src', 'main', 'java', 'com', 'abrar', 'daymark', 'DaymarkWebView.java'),
+  'utf8'
+);
 const execute = new Function('window', 'document', 'config', 'return (' + bootstrap + ')(config);');
 
 function makeHarness(initialUrl) {
@@ -203,6 +207,20 @@ test('bootstrap does not install page-readable config, state, or SPA hooks', () 
   assert.doesNotMatch(bootstrap, /history\.(pushState|replaceState)/);
   assert.doesNotMatch(bootstrap, /MutationObserver|popstate|hashchange/);
   assert.match(bootstrap, /^\(function \(config\)/);
+});
+
+test('native same-document history updates run only after initial document injection', () => {
+  const historyCallback = webViewSource
+    .split('public void doUpdateVisitedHistory', 1)[1]
+    .split('public void onPageFinished', 1)[0];
+  assert.match(historyCallback, /extensionRuntime\\.onSameDocumentNavigation\\(view, url\\)/);
+  assert.doesNotMatch(historyCallback, /getProgress\\(\\)\\s*<\\s*100/);
+
+  const runtimeCallback = runtimeSource
+    .split('void onSameDocumentNavigation', 1)[1]
+    .split('private List<BrowserExtension> matchingPacks', 1)[0];
+  assert.match(runtimeCallback, /userscriptsAppliedForCurrentDocument/);
+  assert.match(runtimeCallback, /isCurrentWebPage\\(webView, url\\)/);
 });
 
 test('userscript duplicate suppression stays native and exposes no page-global pack registry', () => {
