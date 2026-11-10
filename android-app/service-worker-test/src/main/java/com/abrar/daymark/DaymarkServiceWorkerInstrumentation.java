@@ -169,6 +169,14 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "explicit Online consent must enable process-wide Service Worker network access");
             check(!controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "Online consent must clear the global Service Worker network block");
+            check(server.count("/sw.js") == firstWorkerScriptsBeforeOnline,
+                    "the first-origin Online policy transition must not refetch its worker script"
+                            + " (before=" + firstWorkerScriptsBeforeOnline
+                            + ", after=" + server.count("/sw.js") + ")");
+            check(secondServer.count("/sw.js") == secondWorkerScriptsBeforeOnline,
+                    "the second-origin Online policy transition must not refetch its worker script"
+                            + " (before=" + secondWorkerScriptsBeforeOnline
+                            + ", after=" + secondServer.count("/sw.js") + ")");
             requestWorkerEgressAllowed(active);
             requestWorkerEgressAllowed(secondActive);
             requestWorkerEgressAllowed(secondTab);
@@ -275,11 +283,16 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "a later explicit Online consent must re-enable worker network access");
             check(!controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "the recreated tab's Online transition must clear the global worker block");
+            // Check the policy transition before issuing the first worker request. That later
+            // request can independently cause Chromium's normal Service Worker update check;
+            // it must not be misattributed to the Online toggle itself.
+            check(secondServer.count("/sw.js") == secondOriginScriptsBeforeReenable,
+                    "the recreated tab's Online policy transition must not refetch its worker script"
+                            + " (before=" + secondOriginScriptsBeforeReenable
+                            + ", after=" + secondServer.count("/sw.js") + ")");
             requestWorkerEgressAllowed(recreated);
             check(secondServer.count("/worker-egress") == 2,
                     "the recreated tab's worker must reach its origin after explicit Online consent");
-            check(secondServer.count("/sw.js") == secondOriginScriptsBeforeReenable,
-                    "the recreated tab's Online transition must not refetch its worker script");
             enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
             check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "the instrumentation must leave the worker policy Offline before cleanup");
