@@ -1,6 +1,11 @@
 name: Focus timer Android emulator lifecycle
 
 on:
+  # Keep exact-head runtime coverage active for long-running Focus branches even
+  # when an older PR base temporarily has merge conflicts.
+  push:
+    branches:
+      - "integration/focus-*"
   pull_request:
     paths:
       - ".github/workflows/focus-timer-emulator.yml"
