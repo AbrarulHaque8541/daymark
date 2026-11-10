@@ -86,7 +86,7 @@ for index in range(MAX_TASKS):
 snapshot_bytes = len(
     json.dumps({"version": 5, "tasks": tasks}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 )
-assert snapshot_bytes == 10_108_603, f"unexpected maximum-profile task JSON size: {snapshot_bytes}"
+assert snapshot_bytes == 9_988_603, f"unexpected maximum-profile task JSON size: {snapshot_bytes}"
 assert snapshot_bytes <= MAX_STORE_BYTES - STORE_CRYPTO_OVERHEAD_BYTES
 
 per_task_manifest = (
