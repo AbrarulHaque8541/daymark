@@ -14,9 +14,12 @@
 
 ## Exact open PR inventory
 
+Note: PR #706 is the delivery branch containing this snapshot, so its head advances as the status index/plan are updated. The row records its exact head at snapshot creation; later head/check state is always read from live PR metadata.
+
+
 | PR | Head SHA | Base / divergence | Latest exact-head evidence | State / blocker |
 |---|---|---|---|---|
-| #706 status/docs | `106638af256296eeeb8d1ceb0346d6f6f2be0100` | main `41fda91`; 17 ahead / 0 behind | Android CI #42829102966 PASS; contracts #42829102817 PASS; unsigned device validation #42829102774 PASS | Draft; this snapshot/index queue is being refreshed on its branch |
+| #706 status/docs | `72f124bbebda95c717b38d010965386f8e966b4a` (snapshot-creation head) | main `41fda91`; 18 ahead / 0 behind at snapshot creation | The snapshot file was created on this head; index/plan updates followed in `5c90180d` and `b717d4da` | Draft; its own head is self-updating—always fetch live PR metadata for the latest SHA/checks |
 | #656 import/export/iCalendar | `a47ba7b4ad991071d2029d75b7c54fa02f9464fb` | main; 90 ahead / 0 behind | 7/7 workflows PASS, including API 29/36 Focus lifecycle | Draft; independent RFC 5545/import/data-integrity review pending |
 | #675 task/Focus/webhook/recovery integration | `a5967f19f5232185b957ef86a940eea9ca94ddc9` | main; 243 ahead / 0 behind | Fresh current-head Android CI, contracts, Focus UI, Live Update, lifecycle and device workflows are in progress/pending | Draft; current API 36 lifecycle result not yet known; large 65-file integration needs independent review |
 | #648 Focus/download branch | `239b180d398f50d5f06812e706220b5367e7afbd` | 202 ahead / 9 behind; diverged from main | No current-head workflow runs returned | Draft/non-mergeable; overlapping MainActivity/Focus history; do not bulk-merge |
