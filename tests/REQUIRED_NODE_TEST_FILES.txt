@@ -38,6 +38,7 @@ tests/export-ui.test.js
 tests/extension-network.test.mjs
 tests/feed-logic.test.js
 tests/focus-logic.test.js
+tests/focus-mutation-logic.test.js
 tests/focus-storage.test.js
 tests/holidays-logic.test.js
 tests/holidays-ui.test.js
@@ -58,6 +59,7 @@ tests/storage-logic.test.js
 tests/storage-ui.test.js
 tests/style-coverage.test.js
 tests/task-logic.test.js
+tests/task-mutation-logic.test.js
 tests/telegram-logic.test.js
 tests/telegram-ui.test.js
 tests/weather-logic.test.js

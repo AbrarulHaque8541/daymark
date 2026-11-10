@@ -495,7 +495,7 @@ public final class PortableBackupSmoke {
             check(tasks.size() == PortableBackupCodec.MAX_TASKS && TaskLogic.isValidTaskList(tasks),
                     "maximum-metadata archive fixture respects all task and attachment schema limits");
             long expectedManifestBytes = 8L
-                    + (long) PortableBackupCodec.MAX_TASKS * (16 + 4 + 480 + 1 + 4 + 10 + 1 + 1 + 4 + 41 + 4 + 41 + 1
+                    + (long) PortableBackupCodec.MAX_TASKS * (16 + 4 + 480 + 1 + 4 + 10 + 1 + 1 + 4 + 35 + 4 + 35 + 1
                             + 4 + 1 + 1 + 1 + 1 + 1 + 1 + 1
                             + TaskLogic.MAX_TAGS * (4 + TaskLogic.MAX_TAG_CHARS)) // DMM2/DMM3 fields plus max tags
                     + (long) AttachmentLogic.MAX_TOTAL_COUNT * (16 + 8 + 4 + 360 + 4 + 129);
@@ -781,7 +781,7 @@ public final class PortableBackupSmoke {
         String title = "\u0800".repeat(160);
         String displayName = "\u0800".repeat(AttachmentLogic.MAX_NAME_CHARS);
         String mimeType = "a".repeat(64) + "/" + "b".repeat(64);
-        String timestamp = "+999999999-12-31T23:59:59.999999999+18:00";
+        String timestamp = "9999-12-31T23:59:59.999999999+18:00";
         String dueDate = "9999-12-31";
         long attachmentSize = AttachmentLogic.MAX_TOTAL_BYTES / AttachmentLogic.MAX_TOTAL_COUNT;
         List<String> maximumTags = Arrays.asList("a".repeat(20) + "0000", "a".repeat(20) + "0001",

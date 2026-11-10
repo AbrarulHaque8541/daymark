@@ -185,3 +185,40 @@ test('generatedAt is required and must be a parseable instant', () => {
   assert.throws(() => exporter.toIcs([baseTask({})], { generatedAt: 'yesterday' }), /generatedAt/);
   assert.throws(() => exporter.render('markdown', [baseTask({})], null), /generatedAt/);
 });
+
+
+test('open-format export rejects task instants outside the shared contract', () => {
+  assert.throws(() => exporter.validateExportTasks([baseTask({ createdAt: '2026-11-10T10:00:00' })]), /createdAt/);
+  assert.throws(() => exporter.validateExportTasks([baseTask({ updatedAt: '2026-02-30T00:00:00Z' })]), /updatedAt/);
+  assert.throws(() => exporter.validateExportTasks([
+    baseTask({ reminderShownFire: '2026-11-10T10:00:00.1234567890Z' })
+  ]), /reminderShownFire/);
+  assert.equal(exporter.validateExportTasks([
+    baseTask({ reminderShownFire: '2016-12-31T23:59:60Z' })
+  ]).length, 1);
+});
+
+test('open-format export sorting preserves nanoseconds and Java leap-second ordering', () => {
+  const precise = exporter.sortTasks([
+    baseTask({ id: 'late', createdAt: '2026-11-10T10:00:00.000000002Z' }),
+    baseTask({ id: 'early', createdAt: '2026-11-10T10:00:00.000000001Z' })
+  ]);
+  assert.deepEqual(precise.map((task) => task.id), ['early', 'late']);
+  const equivalent = exporter.sortTasks([
+    baseTask({ id: 'z-offset', createdAt: '2026-11-10T10:00:00+05:30' }),
+    baseTask({ id: 'a-utc', createdAt: '2026-11-10T04:30:00Z' })
+  ]);
+  assert.deepEqual(equivalent.map((task) => task.id), ['a-utc', 'z-offset']);
+  assert.equal(exporter.sortTasks([
+    baseTask({ id: 'leap', createdAt: '2016-12-31T23:59:60Z' }),
+    baseTask({ id: 'normal', createdAt: '2016-12-31T23:59:59Z' })
+  ])[0].id, 'leap');
+});
+
+test('browser loads task logic before open-format export logic and export UI', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const taskLogic = html.indexOf('<script src="task-logic.js" defer></script>');
+  const exportLogic = html.indexOf('<script src="export-logic.js" defer></script>');
+  const exportUi = html.indexOf('<script src="export-ui.js" defer></script>');
+  assert.ok(taskLogic >= 0 && exportLogic > taskLogic && exportUi > exportLogic);
+});

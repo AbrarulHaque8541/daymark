@@ -97,6 +97,9 @@ public final class TaskOpenExport {
         }
         requireInstant(task.createdAt, "createdAt");
         requireInstant(task.updatedAt == null ? task.createdAt : task.updatedAt, "updatedAt");
+        if (task.reminderShownFire != null && !TaskLogic.isValidInstant(task.reminderShownFire)) {
+            throw new IllegalArgumentException("Export task reminderShownFire is not a valid task instant.");
+        }
         requireCleanText(task.notes == null ? "" : task.notes, "notes");
         if (task.repeatRule != null) requireCleanText(task.repeatRule, "repeat");
         if (task.tags != null) {
@@ -132,11 +135,10 @@ public final class TaskOpenExport {
     }
 
     private static Instant requireInstant(String value, String field) {
-        Instant instant = parseInstantOrNull(value);
-        if (instant == null) {
-            throw new IllegalArgumentException("Export task " + field + " \"" + value + "\" is not a parseable instant.");
+        if (!TaskLogic.isValidInstant(value)) {
+            throw new IllegalArgumentException("Export task " + field + " \"" + value + "\" is not a valid task instant.");
         }
-        return instant;
+        return Instant.parse(value);
     }
 
     /** Accepts the common ISO-8601 instant forms JavaScript's Date.parse accepts. */

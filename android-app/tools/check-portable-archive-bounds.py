@@ -38,12 +38,12 @@ assert "MAX_STORE_BYTES = 10 * 1024 * 1024" in store_source
 title = "\u0800" * 160
 display_name = "\u0800" * MAX_NAME_CHARS
 mime_type = "a" * 64 + "/" + "b" * 64
-timestamp = "+999999999-12-31T23:59:59.999999999+18:00"
+timestamp = "9999-12-31T23:59:59.999999999+18:00"
 due_date = "9999-12-31"
 max_tags = ["a" * 20 + f"{index:04d}" for index in range(MAX_TAGS)]
 assert len(title) == 160 and len(title.encode("utf-8")) == 480
 assert len(display_name) == MAX_NAME_CHARS and len(display_name.encode("utf-8")) == 360
-assert len(mime_type.encode("ascii")) == 129 and len(timestamp.encode("ascii")) == 41
+assert len(mime_type.encode("ascii")) == 129 and len(timestamp.encode("ascii")) == 35
 
 # Match TaskSnapshotCodec.encode field names/order and compact JSON shape (schema v5).
 # The chosen strings require no JSON escaping; the codec's writer retains U+0800 raw.
@@ -86,7 +86,7 @@ for index in range(MAX_TASKS):
 snapshot_bytes = len(
     json.dumps({"version": 5, "tasks": tasks}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 )
-assert snapshot_bytes == 10_108_603, f"unexpected maximum-profile task JSON size: {snapshot_bytes}"
+assert snapshot_bytes == 9_988_603, f"unexpected maximum-profile task JSON size: {snapshot_bytes}"
 assert snapshot_bytes <= MAX_STORE_BYTES - STORE_CRYPTO_OVERHEAD_BYTES
 
 per_task_manifest = (
@@ -111,14 +111,14 @@ per_attachment_manifest = (
     + 4 + len(mime_type.encode("ascii"))
 )
 manifest_bytes = 8 + MAX_TASKS * per_task_manifest + MAX_TOTAL_COUNT * per_attachment_manifest
-assert per_task_manifest == 759
+assert per_task_manifest == 747
 assert per_attachment_manifest == 521
-assert manifest_bytes == 7_642_108 and manifest_bytes < MAX_MANIFEST_BYTES
+assert manifest_bytes == 7_522_108 and manifest_bytes < MAX_MANIFEST_BYTES
 frame_bytes = 28 + (MAX_TOTAL_COUNT + 1) * (57 + 16)
 archive_bytes = MAX_TOTAL_BYTES + manifest_bytes + frame_bytes
 archive_gap = MAX_ARCHIVE_BYTES - archive_bytes
 assert frame_bytes == 7_401
-assert archive_bytes == 112_507_109 and 0 < archive_gap
+assert archive_bytes == 112_387_109 and 0 < archive_gap
 
 print(
     "PASS portable archive bounds: "

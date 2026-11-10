@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 final class TaskLogic {
     static final String FILTER_ALL = "all";
@@ -49,6 +51,9 @@ final class TaskLogic {
     /** Repeats once a year on the same month and day; Feb 29 clamps to Feb 28 in short years. */
     static final String REPEAT_YEARLY = "yearly";
 
+    private static final Pattern TASK_INSTANT_PATTERN = Pattern.compile(
+            "^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$");
+
     private TaskLogic() { }
 
     static boolean isDateOnly(String value) {
@@ -56,6 +61,45 @@ final class TaskLogic {
         try {
             LocalDate parsed = LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
             return parsed.toString().equals(value);
+        } catch (DateTimeParseException exception) {
+            return false;
+        }
+    }
+
+    /**
+     * Validates the shared four-digit task-instant grammar before delegating
+     * leap-second/offset conversion to Java's ISO_INSTANT parser.
+     */
+    static boolean isValidInstant(String value) {
+        if (value == null) return false;
+        Matcher matcher = TASK_INSTANT_PATTERN.matcher(value);
+        if (!matcher.matches()) return false;
+
+        int year = Integer.parseInt(matcher.group(1));
+        int month = Integer.parseInt(matcher.group(2));
+        int day = Integer.parseInt(matcher.group(3));
+        int hour = Integer.parseInt(matcher.group(4));
+        int minute = Integer.parseInt(matcher.group(5));
+        int second = Integer.parseInt(matcher.group(6));
+        try {
+            LocalDate.of(year, month, day);
+        } catch (DateTimeException exception) {
+            return false;
+        }
+        if (hour > 23 || minute > 59
+                || (second > 59 && !(second == 60 && hour == 23 && minute == 59))) return false;
+
+        String offset = matcher.group(8);
+        if (!"Z".equals(offset)) {
+            int offsetHour = Integer.parseInt(offset.substring(1, 3));
+            int offsetMinute = Integer.parseInt(offset.substring(4, 6));
+            int offsetSecond = offset.length() >= 9 ? Integer.parseInt(offset.substring(7, 9)) : 0;
+            if (offsetHour > 18 || offsetMinute > 59 || offsetSecond > 59
+                    || (offsetHour == 18 && (offsetMinute != 0 || offsetSecond != 0))) return false;
+        }
+        try {
+            Instant.parse(value);
+            return true;
         } catch (DateTimeParseException exception) {
             return false;
         }
@@ -83,22 +127,10 @@ final class TaskLogic {
         } else if (task.repeatDayOfMonth != null) {
             return false;
         }
-        if (task.reminderShownFire != null) {
-            try {
-                Instant.parse(task.reminderShownFire);
-            } catch (DateTimeParseException | NullPointerException exception) {
-                return false;
-            }
-        }
+        if (task.reminderShownFire != null && !isValidInstant(task.reminderShownFire)) return false;
         if (!isValidSubtasks(task.subtasks)) return false;
         if (!isValidTags(task.tags)) return false;
-        try {
-            Instant.parse(task.createdAt);
-            Instant.parse(task.updatedAt);
-            return true;
-        } catch (DateTimeParseException | NullPointerException exception) {
-            return false;
-        }
+        return isValidInstant(task.createdAt) && isValidInstant(task.updatedAt);
     }
 
     static boolean isValidSubtasks(List<Subtask> subtasks) {

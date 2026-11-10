@@ -324,21 +324,23 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical workspace scroll does not change the selected Focus mode");
             scrollDescendantIntoScrollView(parentScroll, countdown);
-            dispatchVerticalSwipe(countdown);
+            String countdownVerticalTrace = dispatchVerticalSwipe(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
-                    "a vertical drag inside Countdown cancels the child click");
+                    "a vertical drag inside Countdown cancels the child click (" + countdownVerticalTrace + ")");
             scrollDescendantIntoScrollView(parentScroll, countdown);
             String countdownAfterVerticalDrag = dispatchTap(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
-                    "a tap still works after a rejected vertical drag (" + countdownAfterVerticalDrag + ")");
+                    "a tap still works after a rejected vertical drag (vertical="
+                            + countdownVerticalTrace + ", tap=" + countdownAfterVerticalDrag + ")");
             scrollDescendantIntoScrollView(parentScroll, stopwatch);
-            dispatchVerticalSwipe(stopwatch);
+            String stopwatchVerticalTrace = dispatchVerticalSwipe(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
-                    "a vertical drag inside Stopwatch cancels the child click");
+                    "a vertical drag inside Stopwatch cancels the child click (" + stopwatchVerticalTrace + ")");
             scrollDescendantIntoScrollView(parentScroll, stopwatch);
             String stopwatchAfterVerticalDrag = dispatchTap(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
-                    "a vertical drag does not disable subsequent taps (" + stopwatchAfterVerticalDrag + ")");
+                    "a vertical drag does not disable subsequent taps (vertical="
+                            + stopwatchVerticalTrace + ", tap=" + stopwatchAfterVerticalDrag + ")");
         } finally {
             if (activity != null && !activity.isFinishing()) {
                 Activity closingActivity = activity;
@@ -409,6 +411,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private void scrollDescendantIntoScrollView(android.widget.ScrollView scrollView,
                                                    android.view.View descendant) throws Exception {
+        stopScrollFlingAndAwait(scrollView);
         int[] targetHeight = new int[1];
         runOnMainSync(() -> {
             targetHeight[0] = descendant.getHeight();
@@ -435,6 +438,23 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                         + " (target=" + targetBounds.toShortString()
                         + ", parent=" + parentBounds.toShortString()
                         + ", scrollY=" + actualScroll[0] + ")");
+    }
+
+    private void stopScrollFlingAndAwait(android.widget.ScrollView scrollView) throws Exception {
+        java.util.concurrent.CountDownLatch settled = new java.util.concurrent.CountDownLatch(1);
+        runOnMainSync(() -> {
+            // A vertical drag can leave ScrollView's private OverScroller running after its
+            // scrollY becomes stable. ScrollView.onInterceptTouchEvent(ACTION_DOWN) treats an
+            // unfinished scroller as a drag and steals the next child tap. A zero-distance
+            // smoothScrollBy follows ScrollView's public cancellation path: within its
+            // ANIMATED_SCROLL_GAP it aborts the active animation; otherwise it starts a
+            // zero-distance 250 ms scroll. Wait beyond that documented platform interval.
+            scrollView.smoothScrollBy(0, 0);
+            scrollView.postDelayed(settled::countDown, 300L);
+        });
+        check(settled.await(1000L, java.util.concurrent.TimeUnit.MILLISECONDS),
+                "parent Tasks ScrollView finishes/cancels its prior fling before child tap injection");
+        waitForIdleSync();
     }
 
     private void waitForScrollPositionToSettle(android.widget.ScrollView scrollView) throws Exception {
@@ -649,26 +669,46 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         }
     }
 
-    private void dispatchVerticalSwipe(android.view.View view) throws Exception {
+    private String dispatchVerticalSwipe(android.view.View view) throws Exception {
         android.graphics.Rect bounds = stableVisibleBounds(view);
-        check(bounds.width() > 0 && bounds.height() > 0, "vertical-gesture target has stable visible screen bounds");
+        check(bounds.width() > 0 && bounds.height() > 0,
+                "vertical-gesture target has stable visible screen bounds");
+        android.view.View modeSelector = findAncestorWithSimpleName(view, "ModeSelector");
+        android.widget.ScrollView parentScroll = modeSelector == null
+                ? null : findParentScrollView(modeSelector);
+        android.view.View traceRoot = parentScroll != null ? parentScroll
+                : modeSelector != null ? modeSelector : view;
         StringBuilder touchTrace = new StringBuilder();
-        runOnMainSync(() -> view.setOnTouchListener((targetView, event) -> {
-            appendTouchTrace(touchTrace, "vertical", targetView, event);
-            return false;
-        }));
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        int[] scrollY = new int[2];
+        runOnMainSync(() -> {
+            if (parentScroll != null) scrollY[0] = parentScroll.getScrollY();
+            // Trace the entire parent subtree, not only the target TextView. This records
+            // whether the ScrollView takes over the vertical stream, which terminal event
+            // reaches it, and whether ModeSelector/child receive CANCEL or UP.
+            attachTouchTraceListeners(traceRoot, "vertical", touchTrace, tracedViews);
+        });
         try {
             float distance = verticalGestureDistance(view, bounds);
             injectDrag(bounds.centerX(), bounds.centerY() - distance / 2f,
                     bounds.centerX(), bounds.centerY() + distance / 2f);
         } finally {
-            runOnMainSync(() -> view.setOnTouchListener(null));
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+                if (parentScroll != null) scrollY[1] = parentScroll.getScrollY();
+            });
         }
         String[] capturedTouchTrace = new String[1];
         runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
         check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
-                "vertical drag delivers touchscreen events to target ("
+                "vertical drag delivers touchscreen events to the parent/selector subtree ("
                         + view.getClass().getSimpleName() + ")");
+        check(capturedTouchTrace[0].contains("ACTION_UP"),
+                "vertical drag trace records its terminal ACTION_UP ("
+                        + capturedTouchTrace[0] + ")");
+        return "target=" + describeTouchTarget(view, bounds)
+                + " parentScrollY=" + scrollY[0] + "->" + scrollY[1]
+                + " events=[" + capturedTouchTrace[0] + "]";
     }
 
     private android.view.View findAncestorWithSimpleName(android.view.View view, String simpleName) {

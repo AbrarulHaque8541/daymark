@@ -6,10 +6,24 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
+const mutation = require('../task-mutation-logic.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const INDEX_SOURCE = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const APP_SOURCE = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
+    }
+  };
+}
 
 function bootApp({ savedValue = null } = {}) {
   const elements = new Map();
@@ -46,7 +60,7 @@ function bootApp({ savedValue = null } = {}) {
         dispatch: (type, event = {}) => {
           const listener = listeners.get(type);
           if (listener) {
-            listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
+            return listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
           }
         },
         setAttribute: (name, value) => attributes.set(name, String(value)),
@@ -81,6 +95,8 @@ function bootApp({ savedValue = null } = {}) {
   };
   const window = {
     DaymarkLogic: logic,
+    DaymarkTaskMutation: mutation,
+    navigator: { locks: makeLockManager() },
     addEventListener() {}
   };
 
@@ -145,7 +161,7 @@ test('clearing the search restores full list announcements', () => {
     'the search status goes quiet once no query is active');
 });
 
-test('adding a task during an active search restores live list announcements', () => {
+test('adding a task during an active search restores live list announcements', async () => {
   const timestamp = new Date().toISOString();
   const seed = [{ id: 't1', title: 'Work report', dueDate: null, priority: 'medium', completed: false, createdAt: timestamp, updatedAt: timestamp }];
   const app = bootApp({ savedValue: JSON.stringify(seed) });
@@ -153,7 +169,7 @@ test('adding a task during an active search restores live list announcements', (
   typeSearch(app, 'zz');
 
   app.elements.get('#new-title').value = 'Fresh task';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
 
   assert.equal(taskList.getAttribute('aria-live'), 'polite',
     'a task mutation resets the list to a live region so the addition is announced');

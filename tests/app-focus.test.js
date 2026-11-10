@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const repeat = require('../repeat-logic.js');
 const focus = require('../focus-logic.js');
+const focusMutation = require('../focus-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
@@ -24,6 +25,19 @@ function frozenDate(nowMs) {
     }
     static now() {
       return nowMs;
+    }
+  };
+}
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
     }
   };
 }
@@ -63,7 +77,8 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
         addEventListener: (type, listener) => listeners.set(type, listener),
         dispatch: (type, event = {}) => {
           const listener = listeners.get(type);
-          if (listener) listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
+          if (listener) return listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
+          return undefined;
         },
         setAttribute: (name, value) => attributes.set(name, value),
         removeAttribute: (name) => attributes.delete(name),
@@ -110,6 +125,8 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
   const window = {
     DaymarkLogic: logic,
     DaymarkRepeat: repeat,
+    DaymarkFocusMutation: focusMutation,
+    navigator: { locks: makeLockManager() },
     addEventListener() {}
   };
   if (withFocus) window.DaymarkFocus = focus;
@@ -124,10 +141,11 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
     window,
     clearTimeout() {},
     setTimeout: () => 1,
-    setInterval: () => 1
+    setInterval: () => 1,
+    clearInterval() {}
   }, { filename: 'app.js' });
 
-  return { elements, storedValues };
+  return { elements, storedValues, settle() { return new Promise((resolve) => setImmediate(resolve)); } };
 }
 
 test('a persisted running focus session is revived and shows the remaining time', () => {
@@ -184,8 +202,9 @@ test('an idle focus card shows the default preset clock', () => {
   assert.equal(elements.get('#focus-pause').hidden, true);
 });
 
-test('a corrupt focus payload is kept in a recovery backup and the app still boots', () => {
-  const { elements, storedValues } = bootApp({ savedFocus: '{not valid JSON' });
+test('a corrupt focus payload is kept in a recovery backup and the app still boots', async () => {
+  const { elements, storedValues, settle } = bootApp({ savedFocus: '{not valid JSON' });
+  await settle();
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), '{not valid JSON');
   assert.equal(elements.get('#focus-time').textContent, '25:00', 'falls back to the idle clock');
 });
@@ -196,7 +215,7 @@ test('the app still boots cleanly when the focus module is absent', () => {
 });
 
 
-test('rejected focus-log records are backed up and the original survives later focus saves', () => {
+test('rejected focus-log records are backed up and the original survives later focus saves', async () => {
   const now = Date.now();
   const session = focus.createSession({ kind: 'focus', durationMinutes: 25 }, now);
   focus.finish(session, now + 60_000, false);
@@ -205,13 +224,14 @@ test('rejected focus-log records are backed up and the original survives later f
   const rejectedEntry = { ...validEntry, id: '' };
   const original = JSON.stringify({ session: null, log: [validEntry, rejectedEntry] });
 
-  const { elements, storedValues } = bootApp({ savedFocus: original });
+  const { elements, storedValues, settle } = bootApp({ savedFocus: original });
+  await settle();
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
     'the complete source must be backed up when even one focus-log record is rejected');
   assert.equal(elements.get('#focus-today').textContent, '1',
     'the valid focus-log record remains usable even though the original source stays intact');
 
-  elements.get('#focus-start').dispatch('click');
+  await elements.get('#focus-start').dispatch('click');
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
     'starting/saving a new focus session must not erase rejected originals');
   assert.notEqual(storedValues.get(FOCUS_KEY), original);
@@ -224,13 +244,14 @@ test('rejected focus-log records are backed up and the original survives later f
     'a subsequent reload must retain the recovery backup');
 });
 
-test('multiple corrupt focus payloads are bundled instead of overwriting earlier recovery data', () => {
+test('multiple corrupt focus payloads are bundled instead of overwriting earlier recovery data', async () => {
   const earlier = '{older corrupt focus payload';
   const current = '{new corrupt focus payload';
-  const { elements, storedValues } = bootApp({
+  const { elements, storedValues, settle } = bootApp({
     savedFocus: current,
     savedFocusBackup: earlier
   });
+  await settle();
 
   const bundle = JSON.parse(storedValues.get(FOCUS_BACKUP_KEY));
   assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
@@ -241,10 +262,11 @@ test('multiple corrupt focus payloads are bundled instead of overwriting earlier
     'a later valid focus save must preserve all original recovery payloads');
 });
 
-test('failed focus-backup writes leave the only original primary untouched until retry succeeds', () => {
+test('failed focus-backup writes leave the only original primary untouched until retry succeeds', async () => {
   const original = '{unreadable focus state';
   const failWrites = new Set([FOCUS_BACKUP_KEY]);
-  const { elements, storedValues } = bootApp({ savedFocus: original, failWrites });
+  const { elements, storedValues, settle } = bootApp({ savedFocus: original, failWrites });
+  await settle();
 
   assert.equal(storedValues.get(FOCUS_KEY), original);
   assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false);
@@ -254,23 +276,24 @@ test('failed focus-backup writes leave the only original primary untouched until
     'a focus save must not replace the only original when backup creation still fails');
 
   failWrites.delete(FOCUS_BACKUP_KEY);
-  elements.get('#focus-pause').dispatch('click');
+  await elements.get('#focus-pause').dispatch('click');
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
     'the retry must create the backup before replacing primary focus state');
   assert.notEqual(storedValues.get(FOCUS_KEY), original);
 });
 
 
-test('a malformed focus-recovery envelope is preserved when another source is backed up', () => {
+test('a malformed focus-recovery envelope is preserved when another source is backed up', async () => {
   const earlier = JSON.stringify({
     format: 'daymark-focus-recovery-bundle-v1',
     payloads: [null, 7]
   });
   const current = '{new unreadable focus source';
-  const { storedValues } = bootApp({
+  const { storedValues, settle } = bootApp({
     savedFocus: current,
     savedFocusBackup: earlier
   });
+  await settle();
 
   const bundle = JSON.parse(storedValues.get(FOCUS_BACKUP_KEY));
   assert.equal(bundle.format, 'daymark-focus-recovery-bundle-v1');
@@ -279,9 +302,10 @@ test('a malformed focus-recovery envelope is preserved when another source is ba
 });
 
 
-test('focus recovery backup can be exported without changing its original bytes', () => {
+test('focus recovery backup can be exported without changing its original bytes', async () => {
   const original = '{unreadable focus recovery + bytes\\nनमस्ते';
-  const { elements, storedValues } = bootApp({ savedFocus: original });
+  const { elements, storedValues, settle } = bootApp({ savedFocus: original });
+  await settle();
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), original,
     'the corrupt focus source must remain intact after recovery backup creation');
 
@@ -328,11 +352,11 @@ test('a corrupt focus preset preference is ignored', () => {
   assert.equal(elements.get('#focus-time').textContent, '25:00');
 });
 
-test('choosing a focus preset persists it for the next visit', () => {
+test('choosing a focus preset persists it for the next visit', async () => {
   const { elements, storedValues } = bootApp({
     savedFocus: JSON.stringify({ session: null, log: [] })
   });
-  elements.get('.focus-preset[data-focus-preset="short-break"]').dispatch('click');
+  await elements.get('.focus-preset[data-focus-preset="short-break"]').dispatch('click');
   assert.equal(JSON.parse(storedValues.get(FOCUS_PRESET_KEY)).preset, 'short-break');
   assert.equal(elements.get('#focus-time').textContent, '05:00');
 

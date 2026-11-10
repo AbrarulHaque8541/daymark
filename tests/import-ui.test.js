@@ -6,6 +6,7 @@ const importer = require('../import-logic.js');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
+const mutation = require('../task-mutation-logic.js');
 
 const NOW = '2026-11-07T05:00:00.000Z';
 
@@ -22,6 +23,20 @@ function fakeElement(tag) {
     textContent: '',
     attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; }
+  };
+}
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      assert.equal(options.mode, 'exclusive');
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
+    }
   };
 }
 
@@ -47,11 +62,13 @@ function fakeEnv(options) {
       if (index !== -1) listeners.splice(index, 1);
     }
   };
-  const storageData = {};
+  const storageData = opts.storageData || {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
+  const locks = opts.locks === false ? null : (opts.lockManager || makeLockManager());
+  const writes = [];
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); },
+    setItem(key, value) { writes.push({ key, value: String(value) }); storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
   const dispatched = [];
@@ -59,6 +76,7 @@ function fakeEnv(options) {
     constructor(type, init) { this.type = type; this.key = init && init.key; }
   }
   const win = {
+    navigator: locks ? { locks } : {},
     StorageEvent: MockStorageEvent,
     dispatchEvent(event) { dispatched.push(event); return true; }
   };
@@ -69,12 +87,17 @@ function fakeEnv(options) {
       localStorage: storage,
       importApi: importer,
       logic,
+      taskMutation: mutation,
+      lockManager: locks,
       now: () => NOW
     },
     elements,
     created,
     listeners,
     storageData,
+    storage,
+    locks,
+    writes,
     dispatched
   };
 }
@@ -143,6 +166,39 @@ test('a csv file is intercepted, merged and saved with a status line', async () 
   assert.ok(status, 'a status element exists');
   assert.match(status.textContent, /Imported 1 task from daymark-tasks-2026-11-07\.csv\./);
   assert.match(status.textContent, /1 duplicate skipped\./);
+});
+
+test('an open-format import captured before Clear All cannot recreate the cleared task list', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const csv = exporter.toCsv([
+    { id: 'stale-open-format', title: 'Must remain cleared', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let resolveText;
+  let markReadStarted;
+  const readStarted = new Promise((resolve) => { markReadStarted = resolve; });
+  const file = {
+    name: 'tasks.csv', size: csv.length,
+    text: () => new Promise((resolve) => { resolveText = resolve; markReadStarted(); })
+  };
+  const { env, elements, storageData, storage, writes, dispatched, created, locks } = fakeEnv({
+    stored: original, files: [file]
+  });
+  const pending = ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  await readStarted;
+  await mutation.withTaskMutationLock(locks, () => {
+    assert.deepEqual(mutation.incrementTaskGeneration(storage), { ok: true, value: 1 });
+    storage.removeItem(ui.STORAGE_KEY);
+  });
+  writes.length = 0;
+  resolveText(csv);
+  await pending;
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1');
+  assert.equal(writes.length, 0);
+  assert.equal(dispatched.length, 0);
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /Tasks were cleared while this file was being read/);
 });
 
 test('a markdown file imports with generated ids', async () => {

@@ -16,6 +16,7 @@
   const REMINDER_LEADS = [0, 30, 60, 1440];
   const MAX_TAGS = 5;
   const MAX_TAG_CHARS = 24;
+  const REPEAT_RULES = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
 
   function isDateOnly(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -31,6 +32,73 @@
     const [hour, minute] = value.split(':').map(Number);
     return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
       && value === `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+
+  /**
+   * Shared four-digit instant contract for web and Android task records.
+   * Java Instant.parse's leap-second normalization is supported only at 23:59:60.
+   */
+  const TASK_INSTANT_PATTERN = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$/;
+
+  function isValidInstant(value) {
+    if (typeof value !== 'string') return false;
+    const match = TASK_INSTANT_PATTERN.exec(value);
+    if (!match) return false;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return false;
+    if (hour > 23 || minute > 59
+        || (second > 59 && !(second === 60 && hour === 23 && minute === 59))) return false;
+
+    const offset = match[8];
+    if (offset !== 'Z') {
+      const offsetHour = Number(offset.slice(1, 3));
+      const offsetMinute = Number(offset.slice(4, 6));
+      const offsetSecond = offset.length >= 9 ? Number(offset.slice(7, 9)) : 0;
+      if (offsetHour > 18 || offsetMinute > 59 || offsetSecond > 59
+          || (offsetHour === 18 && (offsetMinute !== 0 || offsetSecond !== 0))) return false;
+    }
+    return true;
+  }
+
+  function instantSortParts(value) {
+    const match = TASK_INSTANT_PATTERN.exec(value);
+    if (!match || !isValidInstant(value)) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]) === 60 ? 59 : Number(match[6]);
+    const utc = new Date(0);
+    utc.setUTCFullYear(year, month - 1, day);
+    utc.setUTCHours(hour, minute, second, 0);
+    let offsetSeconds = 0;
+    const offset = match[8];
+    if (offset !== 'Z') {
+      const sign = offset[0] === '+' ? 1 : -1;
+      const offsetSecond = offset.length >= 9 ? Number(offset.slice(7, 9)) : 0;
+      offsetSeconds = sign * (Number(offset.slice(1, 3)) * 3600
+        + Number(offset.slice(4, 6)) * 60 + offsetSecond);
+    }
+    return { epochSeconds: Math.floor(utc.getTime() / 1000) - offsetSeconds,
+      nanoseconds: Number((match[7] || '').padEnd(9, '0')) };
+  }
+
+  function compareInstants(leftValue, rightValue) {
+    const left = instantSortParts(leftValue);
+    const right = instantSortParts(rightValue);
+    if (!left || !right) throw new TypeError('Cannot compare invalid task instants.');
+    if (left.epochSeconds !== right.epochSeconds) return left.epochSeconds < right.epochSeconds ? -1 : 1;
+    return left.nanoseconds - right.nanoseconds;
   }
 
   function isReminderLead(value) {
@@ -72,6 +140,26 @@
     return normalized;
   }
 
+  function isValidRepeatMetadata(task) {
+    const repeat = task.repeat === undefined || task.repeat === null || task.repeat === ''
+      ? null : task.repeat;
+    const anchor = task.repeatDayOfMonth === undefined || task.repeatDayOfMonth === null
+      ? null : task.repeatDayOfMonth;
+    if (repeat === null) return anchor === null;
+    if (!REPEAT_RULES.includes(repeat) || !isDateOnly(task.dueDate)) return false;
+    if (repeat === 'monthly') {
+      return anchor === null || (Number.isInteger(anchor) && anchor >= 1 && anchor <= 31);
+    }
+    if (repeat === 'yearly') {
+      if (anchor === null) return true;
+      if (!Number.isInteger(anchor) || anchor < 1 || anchor > 31) return false;
+      const [year, month, day] = task.dueDate.split('-').map(Number);
+      const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      return day === anchor || (month === 2 && day === 28 && anchor === 29 && !leapYear);
+    }
+    return anchor === null;
+  }
+
   function isValidTask(task) {
     return Boolean(task && typeof task === 'object'
       && typeof task.id === 'string' && task.id.length > 0
@@ -80,16 +168,17 @@
       && (task.dueDate === null || isDateOnly(task.dueDate))
       && ['low', 'medium', 'high'].includes(task.priority)
       && typeof task.completed === 'boolean'
-      && typeof task.createdAt === 'string' && !Number.isNaN(Date.parse(task.createdAt))
-      && typeof task.updatedAt === 'string' && !Number.isNaN(Date.parse(task.updatedAt))
+      && isValidInstant(task.createdAt)
+      && isValidInstant(task.updatedAt)
       && (task.notes === undefined || (typeof task.notes === 'string' && task.notes.length <= MAX_NOTES_CHARS))
       && (task.dueTime === undefined || task.dueTime === null
         || (isTimeOnly(task.dueTime) && task.dueDate !== null && isDateOnly(task.dueDate)))
       && (task.reminderLeadMinutes === undefined || isReminderLead(task.reminderLeadMinutes))
       && (task.reminderShownFire === undefined || task.reminderShownFire === null
-        || (typeof task.reminderShownFire === 'string' && !Number.isNaN(Date.parse(task.reminderShownFire))))
+        || (isValidInstant(task.reminderShownFire)))
       && (task.subtasks === undefined || isValidSubtasks(task.subtasks))
-      && (task.tags === undefined || task.tags === null || isValidTags(task.tags)));
+      && (task.tags === undefined || task.tags === null || isValidTags(task.tags))
+      && isValidRepeatMetadata(task));
   }
 
   function validateStoredTasks(value) {
@@ -123,7 +212,7 @@
     if (timeA !== null && timeB === null) return -1;
     if (timeA !== timeB) return (timeA || '').localeCompare(timeB || '');
     return (PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
-      || a.createdAt.localeCompare(b.createdAt);
+      || compareInstants(a.createdAt, b.createdAt);
   }
 
   function getFilteredTasks(tasks, filter, query, today) {
@@ -158,13 +247,129 @@
       if (timeA !== null && timeB === null) return -1;
       if (timeA !== timeB) return (timeA || '').localeCompare(timeB || '');
       return (PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
-        || a.createdAt.localeCompare(b.createdAt);
+        || compareInstants(a.createdAt, b.createdAt);
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
+  }
+
+
+  // Detect duplicate JSON object member names before JSON.parse can silently
+  // keep the last value. Invalid JSON remains the caller's parse error; excessive
+  // nesting is rejected here so hostile inputs cannot exhaust the call stack.
+  function hasDuplicateJsonKeys(raw) {
+    if (typeof raw !== 'string') return false;
+    let index = 0;
+    let duplicate = false;
+    let tooDeep = false;
+    const literalPattern = /(?:true|false|null)/y;
+    const numberPattern = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+    const whitespace = () => {
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character !== ' ' && character !== '\t' && character !== '\r' && character !== '\n') break;
+        index += 1;
+      }
+    };
+    const readString = () => {
+      const start = index;
+      index += 1;
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character === '\\') {
+          if (index + 1 >= raw.length) throw new Error('incomplete JSON escape');
+          index += 2;
+          continue;
+        }
+        if (character === '"') {
+          index += 1;
+          return JSON.parse(raw.slice(start, index));
+        }
+        if (character.charCodeAt(0) < 0x20) throw new Error('invalid JSON string');
+        index += 1;
+      }
+      throw new Error('unterminated JSON string');
+    };
+    const readValue = (depth) => {
+      if (depth > 128) {
+        tooDeep = true;
+        throw new Error('JSON nesting limit exceeded');
+      }
+      whitespace();
+      const character = raw[index];
+      if (character === '"') {
+        readString();
+        return;
+      }
+      if (character === '{') {
+        index += 1;
+        whitespace();
+        if (raw[index] === '}') {
+          index += 1;
+          return;
+        }
+        const keys = new Set();
+        for (;;) {
+          whitespace();
+          if (raw[index] !== '"') throw new Error('invalid JSON object key');
+          const key = readString();
+          if (keys.has(key)) duplicate = true;
+          keys.add(key);
+          whitespace();
+          if (raw[index] !== ':') throw new Error('missing JSON object colon');
+          index += 1;
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === '}') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON object separator');
+          index += 1;
+        }
+      }
+      if (character === '[') {
+        index += 1;
+        whitespace();
+        if (raw[index] === ']') {
+          index += 1;
+          return;
+        }
+        for (;;) {
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === ']') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON array separator');
+          index += 1;
+        }
+      }
+      literalPattern.lastIndex = index;
+      if (literalPattern.exec(raw)) {
+        index = literalPattern.lastIndex;
+        return;
+      }
+      numberPattern.lastIndex = index;
+      if (numberPattern.exec(raw)) {
+        index = numberPattern.lastIndex;
+        return;
+      }
+      throw new Error('invalid JSON value');
+    };
+    try {
+      readValue(0);
+      whitespace();
+      return index === raw.length && (duplicate || tooDeep);
+    } catch (error) {
+      return tooDeep;
+    }
   }
 
   const api = {
     localDateString,
     isDateOnly,
+    isValidInstant,
+    compareInstants,
     isTimeOnly,
     isReminderLead,
     isValidSubtasks,
@@ -173,6 +378,7 @@
     isTag,
     isValidTask,
     validateStoredTasks,
+    hasDuplicateJsonKeys,
     getFilteredTasks,
     getSuggestions,
     MAX_NOTES_CHARS,

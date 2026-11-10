@@ -24,6 +24,9 @@ public final class TaskLogicSmoke {
         datesAreStrictAndDateOnly();
         if (args.length > 0) sharedDateContract(Path.of(args[0]));
         if (args.length > 1) sharedRecurrenceContract(Path.of(args[1]));
+        if (args.length > 2) sharedRepeatValidationContract(Path.of(args[2]));
+        if (args.length > 3) sharedInstantContract(Path.of(args[3]));
+        taskInstantFieldsUseStrictContract();
         CRUDKeepsStableIdentityAndTimestamps();
         templatesValidateAndCreateFreshTasks();
         templateListsRejectDuplicatesAndExcess();
@@ -66,6 +69,45 @@ public final class TaskLogicSmoke {
             }
         }
         check(cases == 9, "shared date contract fixture contains all nine cases");
+    }
+
+    private static void sharedInstantContract(Path fixture) throws IOException {
+        int cases = 0;
+        try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
+            String line;
+            int lineNumber = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\\t", -1);
+                check(fields.length == 2, "instant contract fixture line " + lineNumber + " has two columns");
+                boolean expected;
+                if ("true".equals(fields[1])) expected = true;
+                else if ("false".equals(fields[1])) expected = false;
+                else throw new AssertionError("invalid expected boolean at instant contract fixture line " + lineNumber);
+                String value = "~".equals(fields[0]) ? "" : fields[0];
+                check(TaskLogic.isValidInstant(value) == expected,
+                        "Android instant validation matches shared fixture line " + lineNumber);
+                cases++;
+            }
+        }
+        check(cases == 43, "shared instant contract fixture contains all forty-three cases");
+    }
+
+    private static void taskInstantFieldsUseStrictContract() {
+        Task valid = TaskLogic.create("Instant fields", null, "medium");
+        check(TaskLogic.isValid(valid), "generated task timestamps satisfy the strict instant contract");
+        check(!TaskLogic.isValid(new Task(valid.id, valid.title, valid.dueDate, valid.priority, valid.completed,
+                        "2026-02-30T00:00:00Z", valid.updatedAt)),
+                "invalid createdAt is rejected by task validation");
+        check(!TaskLogic.isValid(new Task(valid.id, valid.title, valid.dueDate, valid.priority, valid.completed,
+                        valid.createdAt, "2026-11-10T10:00:00")),
+                "updatedAt without an offset is rejected by task validation");
+        Task invalidReminder = new Task("invalid-reminder-instant", "Reminder", null, "medium", false,
+                valid.createdAt, valid.updatedAt, Collections.<AttachmentRef>emptyList(), "", null, null,
+                "2026-11-10T10:00:00.1234567890Z", Collections.<Subtask>emptyList());
+        check(!TaskLogic.isValid(invalidReminder),
+                "reminderShownFire uses the same strict instant contract");
     }
 
     private static void CRUDKeepsStableIdentityAndTimestamps() {
@@ -816,4 +858,32 @@ public final class TaskLogicSmoke {
         }
         check(cases == 12, "shared recurrence contract fixture contains all twelve cases");
     }
+
+    private static void sharedRepeatValidationContract(Path fixture) throws IOException {
+        int cases = 0;
+        String timestamp = "2026-10-05T00:00:00Z";
+        try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
+            String line;
+            int lineNumber = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\t", -1);
+                check(fields.length == 4, "repeat validation fixture line " + lineNumber + " has four columns");
+                String dueDate = "-".equals(fields[0]) ? null : fields[0];
+                String repeatRule = "-".equals(fields[1]) ? null : fields[1];
+                Integer anchor = "-".equals(fields[2]) ? null : Integer.valueOf(fields[2]);
+                boolean expected = Boolean.parseBoolean(fields[3]);
+                Task candidate = new Task("repeat-validation-" + lineNumber, "Repeat validation",
+                        dueDate, "medium", false, timestamp, timestamp,
+                        Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                        repeatRule, anchor, Collections.<Subtask>emptyList(), Collections.<String>emptyList());
+                check(TaskLogic.isValid(candidate) == expected,
+                        "Android repeat metadata validation must match fixture line " + lineNumber);
+                cases++;
+            }
+        }
+        check(cases == 19, "shared repeat validation fixture covers every boundary case");
+    }
+
 }

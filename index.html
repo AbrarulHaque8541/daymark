@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="styles-motion-efficiency.css">
   <link rel="stylesheet" href="motion-accessibility.css">
   <script src="task-logic.js" defer></script>
+<script src="task-mutation-logic.js" defer></script>
+<script src="export-logic.js" defer></script>
   <script src="repeat-logic.js" defer></script>
   <script src="focus-logic.js" defer></script>
   <script src="feed-logic.js" defer></script>
@@ -461,7 +463,7 @@
         <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="telegram-heading">Telegram task digest</h2>
-          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your token stays in this tab; nothing is saved on this device.</p>
+          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your webhook endpoint stays in this tab only and must be re-entered after reload; it is not saved on this device. Queued events store only a SHA-256 destination fingerprint. Clear all queued events below.</p>
           <form id="telegram-form" class="feed-form" novalidate>
             <label class="sr-only" for="telegram-token">Bot token from @BotFather</label>
             <input id="telegram-token" name="token" type="password" maxlength="120" placeholder="Bot token from @BotFather" autocomplete="off" spellcheck="false">

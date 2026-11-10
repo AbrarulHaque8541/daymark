@@ -15,23 +15,39 @@
     if (!env || !env.document) throw new Error('attachStorageUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = Boolean(env.storageAccessFailed);
+    try {
+      if (!storageAccessFailed) {
+        storage = env.localStorage !== undefined
+          ? env.localStorage
+          : ((win && win.localStorage) || null);
+      }
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const storageApi = env.storageApi || root.DaymarkStorage || null;
+    const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+    const focusMutation = env.focusMutation || root.DaymarkFocusMutation || null;
+    const webhookUi = env.webhookUi || root.DaymarkWebhookUi || null;
+    const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
-    const listEl = element('data-list');
-    const statusEl = element('data-status');
-    const refreshEl = element('data-refresh');
-    const clearAllEl = element('data-clear-all');
+    const listEl = element('storage-list');
+    const statusEl = element('storage-status-line');
+    const refreshEl = element('storage-check');
+    const clearStatusEl = element('storage-clear');
+    const clearAllEl = element('storage-clear-all');
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
     }
 
     function storageAvailable() {
-      if (!storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+      if (storageAccessFailed
+        || !storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
         return false;
       }
       try {
@@ -48,12 +64,21 @@
         return;
       }
       if (!listEl || typeof listEl.appendChild !== 'function') return;
+      if (storageAccessFailed) {
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        status('Browser storage could not be accessed. Local data status is unknown; nothing was changed.');
+        return;
+      }
       let scan = null;
       try {
         scan = storageApi.scanStorage(storage);
       } catch (error) {
-        status('Could not read local data: '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
+        // A failed rescan must not leave old sizes or destructive controls visible.
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        if (typeof listEl.setAttribute === 'function') listEl.setAttribute('aria-busy', 'false');
+        status('Could not read local data. Local data status is unknown; nothing was changed.');
         return;
       }
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
@@ -63,11 +88,20 @@
         const row = make('div');
         if (!row) break;
         if (typeof row.setAttribute === 'function') row.setAttribute('class', 'feed-item');
+        const unreadableCount = Array.isArray(category.unreadableKeys)
+          ? category.unreadableKeys.length : 0;
         const title = make('span');
         if (title) {
           if (typeof title.setAttribute === 'function') title.setAttribute('class', 'feed-item-title');
-          title.textContent = category.label
-            + (category.present ? ' — about ' + storageApi.formatBytes(category.bytes) : ' — not present');
+          let state = ' — not present';
+          if (unreadableCount > 0) {
+            state = category.present
+              ? ' — partially readable (about ' + storageApi.formatBytes(category.bytes) + ')'
+              : ' — status unknown (could not read)';
+          } else if (category.present) {
+            state = ' — about ' + storageApi.formatBytes(category.bytes);
+          }
+          title.textContent = category.label + state;
           row.appendChild(title);
         }
         const summary = make('p');
@@ -85,7 +119,9 @@
             button.setAttribute('aria-label', 'Clear ' + category.label + ' from this browser');
           }
           button.textContent = 'Clear';
-          button.disabled = !category.present;
+          // Allow an explicit retry for unknown data; clearCategory itself still
+          // fails closed when it cannot read the key before attempting removal.
+          button.disabled = !category.present && unreadableCount === 0;
           if (typeof button.addEventListener === 'function') {
             button.addEventListener('click', () => { onClearCategory(category.id); });
           }
@@ -93,12 +129,22 @@
         }
         listEl.appendChild(row);
       }
-      status(scan.presentCount === 0
-        ? 'No local data is stored yet. Add a task or use a card to see it here.'
-        : scan.presentCount + ' of ' + scan.categories.length
+      const unreadableCount = Number.isInteger(scan.unreadableCount) ? scan.unreadableCount : 0;
+      if (unreadableCount > 0) {
+        const known = scan.presentCount === 0
+          ? 'No readable local data was found'
+          : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
+            + storageApi.formatBytes(scan.totalBytes) + ' total)';
+        status(known + '; ' + unreadableCount
+          + ' categories could not be checked. Reported sizes exclude unreadable entries.');
+      } else if (scan.presentCount === 0) {
+        status('No local data is stored yet. Add a task or use a card to see it here.');
+      } else {
+        status(scan.presentCount + ' of ' + scan.categories.length
           + ' categories hold data on this device (about '
           + storageApi.formatBytes(scan.totalBytes) + ' total).');
-      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0;
+      }
+      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0 || unreadableCount > 0;
     }
 
     // Returns 'accepted', 'declined', or 'failed'. A failed confirmation prompt
@@ -131,7 +177,7 @@
       }
       if (listEl) listEl.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (typeof doc.querySelectorAll === 'function') {
-        doc.querySelectorAll('#data-list .tool-button').forEach(btn => {
+        doc.querySelectorAll('#storage-list .tool-button').forEach(btn => {
           if (btn) {
             btn.disabled = busy;
             if (typeof btn.classList !== 'undefined') {
@@ -142,42 +188,68 @@
       }
     }
 
-    function onClearCategory(categoryId) {
-      if (!storageApi || !storageAvailable()) {
-        status('Browser storage is unavailable. Nothing was cleared.');
-        return;
-      }
-      const category = storageApi.categoryById(categoryId);
-      if (!category) {
-        status('Unknown data category. Nothing was cleared.');
-        return;
-      }
-      const outcome = confirmOrReport('Clear ' + category.label + '? '
-        + category.description + ' This cannot be undone.');
-      if (outcome === 'failed') {
-        reportFailedConfirmation();
-        return;
-      }
-      if (outcome === 'declined') {
-        status('Cancelled. Nothing was cleared.');
-        return;
-      }
-      setBusy(true);
-      let result = null;
+    function notifyTaskStorageChange(key) {
+      if (!win || typeof win.dispatchEvent !== 'function') return;
       try {
-        result = storageApi.clearCategory(storage, categoryId);
+        let event = null;
+        if (typeof win.StorageEvent === 'function') {
+          event = new win.StorageEvent('storage', { key });
+        } else if (typeof win.Event === 'function') {
+          event = new win.Event('storage');
+          Object.defineProperty(event, 'key', { value: key });
+        }
+        if (event) win.dispatchEvent(event);
       } catch (error) {
-        setBusy(false);
-        status('Could not clear ' + category.label + ': '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
-        return;
+        // The destructive action is already complete; a later page reload
+        // still observes the canonical storage state if notification fails.
       }
-      setBusy(false);
+    }
+
+    function notifyFocusStorageChange(categoryId) {
+      if (!win || typeof win.dispatchEvent !== 'function') return;
+      try {
+        if (typeof win.CustomEvent === 'function') {
+          win.dispatchEvent(new win.CustomEvent('daymark:focus-storage-cleared', {
+            detail: { categoryId }
+          }));
+        } else if (typeof win.Event === 'function') {
+          const event = new win.Event('daymark:focus-storage-cleared');
+          Object.defineProperty(event, 'detail', { value: { categoryId } });
+          win.dispatchEvent(event);
+        }
+      } catch (error) {
+        // The storage mutation is already complete; reload still observes it.
+      }
+    }
+
+    function finishCategoryClear(result, category) {
+      if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
+        notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
+      } else if (category.id === 'webhook-queue' && result.removed.length > 0) {
+        notifyTaskStorageChange('daymark.webhook.queue.v1');
+      }
+      if (category.id === 'focus' || category.id === 'focus-backup' || category.id === 'focus-preset') {
+        // Every Focus clear attempt advances the shared generation while holding
+        // the Focus lock. Even if the browser refuses every remove, notify the app
+        // to rebase from the still-readable snapshot and adopt the new generation;
+        // otherwise this tab can keep stale in-memory state that can never save.
+        notifyFocusStorageChange(category.id);
+      }
       if (result.failed.length > 0) {
-        const message = 'Cleared ' + category.label + ', but ' + result.failed.length
-          + ' item(s) could not be removed by the browser.';
+        const message = result.removed.length === 0
+          ? 'Could not clear ' + category.label + ': ' + result.failed.length
+            + ' item(s) could not be checked or removed. Nothing was cleared.'
+          : 'Cleared ' + category.label + ' (' + result.removed.length
+            + ' item(s) removed), but ' + result.failed.length
+            + ' item(s) could not be removed by the browser.';
         render();
         status(message);
+      } else if (result.removed.length === 0 && category.id === 'webhook-queue') {
+        render();
+        status('No saved webhook queue key was present; this tab’s in-memory queue was also cleared.');
+      } else if (result.removed.length === 0) {
+        render();
+        status('No stored data was found for ' + category.label + '. Nothing was changed.');
       } else {
         const message = 'Cleared ' + category.label + ' (' + result.removed.length
           + ' item(s) removed). Nothing else was touched.';
@@ -186,14 +258,146 @@
       }
     }
 
-    function onClearAll() {
+    function onClearCategory(categoryId) {
+      if (!storageApi || !storageAvailable()) {
+        status('Browser storage is unavailable. Nothing was cleared.');
+        return false;
+      }
+      const category = storageApi.categoryById(categoryId);
+      if (!category) {
+        status('Unknown data category. Nothing was cleared.');
+        return false;
+      }
+      const outcome = confirmOrReport('Clear ' + category.label + '? '
+        + category.description + ' This cannot be undone.');
+      if (outcome === 'failed') {
+        reportFailedConfirmation();
+        return false;
+      }
+      if (outcome === 'declined') {
+        status('Cancelled. Nothing was cleared.');
+        return false;
+      }
+      setBusy(true);
+
+      const clear = () => storageApi.clearCategory(storage, categoryId);
+      if (categoryId === 'webhook-queue') {
+        if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
+            || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)) {
+          setBusy(false);
+          status('Cannot safely clear the webhook queue: shared task/webhook coordination is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return taskMutation.withLocksInOrder(lockManager, taskMutation.CLEAR_ALL_LOCK_ORDER, () => {
+          const result = clear();
+          if (result.failed.length === 0 && webhookUi
+              && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
+            webhookUi.resetQueueAfterExternalClear();
+          }
+          return result;
+        }).then((locked) => {
+          setBusy(false);
+          if (!locked.ok) {
+            status('Could not safely clear ' + category.label + ': '
+              + (locked.reason === 'coordination-unavailable'
+                ? 'shared task/webhook coordination is unavailable. Nothing was cleared.'
+                : 'a shared task/webhook lock failed. Nothing was cleared.'));
+            return false;
+          }
+          finishCategoryClear(locked.value, category);
+          return true;
+        });
+      }
+
+      if (categoryId === 'focus' || categoryId === 'focus-backup' || categoryId === 'focus-preset') {
+        if (!focusMutation || typeof focusMutation.withFocusMutationLock !== 'function'
+            || typeof focusMutation.incrementFocusGeneration !== 'function') {
+          setBusy(false);
+          status('Cannot safely clear Focus data: Focus cross-tab coordination is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return focusMutation.withFocusMutationLock(lockManager, () => {
+          const generation = focusMutation.incrementFocusGeneration(storage);
+          if (!generation.ok) return { ok: false, reason: generation.reason };
+          let result;
+          try { result = clear(); }
+          catch (error) { return { ok: false, reason: 'storage-clear-failed' }; }
+          return { ok: true, result };
+        }).then((locked) => {
+          setBusy(false);
+          if (!locked.ok || !locked.value || !locked.value.ok) {
+            status('Could not safely clear ' + category.label
+              + ': Focus coordination or storage failed. Nothing was cleared.');
+            return false;
+          }
+          finishCategoryClear(locked.value.result, category);
+          return true;
+        });
+      }
+
+      if (categoryId === 'tasks' || categoryId === 'task-backup') {
+        if (!taskMutation || typeof taskMutation.withTaskMutationLock !== 'function') {
+          setBusy(false);
+          status('Cannot safely clear task data: cross-tab coordination is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        if (typeof taskMutation.incrementTaskGeneration !== 'function') {
+          setBusy(false);
+          status('Cannot safely clear task data: the retained task-generation fence is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return taskMutation.withTaskMutationLock(lockManager, () => {
+          const generation = taskMutation.incrementTaskGeneration(storage, category.id);
+          if (!generation.ok) return { ok: false, reason: generation.reason };
+          return { ok: true, result: clear() };
+        }).then((locked) => {
+          setBusy(false);
+          if (!locked.ok || !locked.value || !locked.value.ok) {
+            status('Could not safely clear ' + category.label + ': '
+              + (locked.reason === 'coordination-unavailable'
+                ? 'cross-tab coordination is unavailable. Nothing was cleared.'
+                : 'the task-generation fence or shared task lock failed. Nothing was cleared.'));
+            return false;
+          }
+          finishCategoryClear(locked.value.result, category);
+          return true;
+        });
+      }
+
+      let result = null;
+      try {
+        result = clear();
+      } catch (error) {
+        setBusy(false);
+        status('Could not clear ' + category.label + ': '
+          + (error && error.message ? error.message : 'storage is unavailable.'));
+        return false;
+      }
+      setBusy(false);
+      finishCategoryClear(result, category);
+      return true;
+    }
+
+    async function onClearAll() {
       if (!storageApi || !storageAvailable()) {
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
       }
+      let scan = null;
+      try { scan = storageApi.scanStorage(storage); }
+      catch (error) {
+        status('Could not verify local data. Nothing was cleared.');
+        return;
+      }
+      if (!scan || scan.complete !== true) {
+        status('Cannot clear all local data while some categories are unreadable. Nothing was cleared.');
+        return;
+      }
       const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, caches, webhook settings, and queued events will be removed. '
-        + 'This cannot be undone.');
+        + 'Tasks, Focus history, the Focus Timer preset, cached data, saved Wikipedia/weather/holiday/currency and browser-search preferences, '
+        + 'the remembered browser download journey, the saved browser proxy profile, the legacy webhook coordination lock, and queued events will be removed. '
+        + 'Small non-personal task and Focus coordination counters remain so another open tab cannot restore data cleared here. '
+        + 'The secret-bearing legacy endpoint is excluded and handled without reading. This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
         return;
@@ -202,17 +406,94 @@
         status('Cancelled. Nothing was cleared.');
         return;
       }
-      setBusy(true);
-      let result = null;
-      try {
-        result = storageApi.clearAll(storage);
-      } catch (error) {
-        setBusy(false);
-        status('Could not clear all data: '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
-        return;
+      if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
+          || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)
+          || typeof taskMutation.incrementTaskGeneration !== 'function'
+          || !focusMutation || typeof focusMutation.incrementFocusGeneration !== 'function') {
+        status('Cannot safely clear all data: shared task, webhook and Focus coordination is unavailable. Nothing was cleared.');
+        return false;
       }
+      setBusy(true);
+      const locked = await taskMutation.withLocksInOrder(
+        lockManager,
+        taskMutation.CLEAR_ALL_LOCK_ORDER,
+        () => {
+          const taskGenerationKey = taskMutation.TASK_GENERATION_KEY;
+          let previousTaskGeneration;
+          try {
+            previousTaskGeneration = storage.getItem(taskGenerationKey);
+          } catch (error) {
+            return { ok: false, reason: 'task-generation-read-failed' };
+          }
+
+          const taskGeneration = taskMutation.incrementTaskGeneration(storage, 'all');
+          if (!taskGeneration.ok) return { ok: false, reason: 'task-generation-failed' };
+
+          const focusGeneration = focusMutation.incrementFocusGeneration(storage);
+          if (!focusGeneration.ok) {
+            // Both counters form one Clear All preparation transaction. If Focus
+            // cannot advance, restore the exact task marker before releasing the
+            // ordered locks so other tabs do not discard valid task intent.
+            let restored = false;
+            try {
+              if (previousTaskGeneration === null) {
+                storage.removeItem(taskGenerationKey);
+              } else {
+                storage.setItem(taskGenerationKey, previousTaskGeneration);
+              }
+            } catch (error) {
+              // A missing marker is semantically generation zero. If removal is
+              // blocked, a canonical zero marker is a safe equivalent fallback.
+              if (previousTaskGeneration === null) {
+                try { storage.setItem(taskGenerationKey, '0'); } catch (restoreError) { }
+              }
+            }
+            try {
+              const currentTaskGeneration = storage.getItem(taskGenerationKey);
+              restored = currentTaskGeneration === previousTaskGeneration
+                || (previousTaskGeneration === null && currentTaskGeneration === '0');
+            } catch (error) { }
+            return {
+              ok: false,
+              reason: restored
+                ? 'focus-generation-failed-rolled-back'
+                : 'partial-generation-coordination'
+            };
+          }
+
+          const result = storageApi.clearAll(storage);
+          if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
+              && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
+            webhookUi.resetQueueAfterExternalClear();
+          }
+          return { ok: true, result };
+        }
+      );
       setBusy(false);
+      if (!locked.ok) {
+        status('Could not safely clear all data: '
+          + (locked.reason === 'coordination-unavailable'
+            ? 'shared task, webhook or Focus coordination is unavailable. Nothing was cleared.'
+            : 'a shared lock or storage operation failed. Nothing was cleared.'));
+        return false;
+      }
+      const clearOutcome = locked.value;
+      if (!clearOutcome || clearOutcome.ok !== true) {
+        if (clearOutcome && clearOutcome.reason === 'focus-generation-failed-rolled-back') {
+          status('Could not safely clear all data: Focus coordination could not advance. Task coordination was restored; nothing was cleared.');
+        } else if (clearOutcome && clearOutcome.reason === 'partial-generation-coordination') {
+          // The task fence may remain advanced. Rebase this tab from durable
+          // storage and be explicit that only coordination state changed.
+          notifyTaskStorageChange(null);
+          status('Could not safely clear all data: task coordination could not be restored after Focus generation failed. No user data was removed. A task-state refresh was requested; reload this tab before editing if the task list does not update.');
+        } else {
+          status('Could not safely clear all data: a shared lock, generation or storage operation failed. Nothing was cleared.');
+        }
+        return false;
+      }
+      const result = clearOutcome.result;
+      notifyFocusStorageChange('all');
+      if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
           + result.failedKeys.length + ' item(s) could not be removed by the browser.';
@@ -229,8 +510,11 @@
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
       refreshEl.addEventListener('click', () => { render(); });
     }
+    if (clearStatusEl && typeof clearStatusEl.addEventListener === 'function') {
+      clearStatusEl.addEventListener('click', () => { status(''); });
+    }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
-      clearAllEl.addEventListener('click', () => { onClearAll(); });
+      clearAllEl.addEventListener('click', () => onClearAll());
     }
 
     render();
@@ -252,7 +536,16 @@
   root.DaymarkStorageUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachStorageUi({ document, window, localStorage: window.localStorage });
+    const boot = () => {
+      let localStorage = null;
+      let storageAccessFailed = false;
+      try {
+        localStorage = window.localStorage;
+      } catch (error) {
+        storageAccessFailed = true;
+      }
+      attachStorageUi({ document, window, localStorage, storageAccessFailed });
+    };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
