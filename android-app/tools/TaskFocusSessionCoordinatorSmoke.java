@@ -234,22 +234,39 @@ public final class TaskFocusSessionCoordinatorSmoke {
         writer.coordinator.startFromUserAction(
                 "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0);
         writer.coordinator.pauseFromUserAction();
-        writer.clock.advance(500L);
+
+        // Model an older Activity/runtime that still believes Task A owns the
+        // paused session while another runtime switches the durable record.
+        Fixture staleRuntime = new Fixture(writer.clock, writer.store);
+        TaskFocusSessionCoordinator.Snapshot stale = staleRuntime.coordinator
+                .restoreAfterProcessStart("task-a", "Task A");
+        check(stale != null && stale.isPaused()
+                        && "task-a".equals(stale.timer.taskId()),
+                "the stale runtime first adopts the original paused task");
+
+        writer.events().clear();
+        TaskFocusSessionCoordinator.Snapshot switched =
+                writer.coordinator.switchTaskWhilePausedFromUserAction("task-b", "Task B");
+        check(switched != null && switched.isPaused()
+                        && "task-b".equals(switched.timer.taskId()),
+                "the writer durably switches the paused session to Task B");
+
         TaskFocusTimer latest = writer.store.load(
                 writer.clock.elapsed, writer.clock.wall, writer.clock.boot);
-        writer.store.events.clear();
+        check(latest != null && "task-b".equals(latest.taskId()),
+                "the caller resolves the latest stored task identity before reconciliation");
+        writer.events().clear();
 
-        Fixture staleRuntime = new Fixture(writer.clock, writer.store);
         TaskFocusSessionCoordinator.Snapshot adopted = staleRuntime.coordinator
-                .restoreLoadedSnapshot(latest, "task-a", "Renamed task A");
+                .restoreLoadedSnapshot(latest, "task-b", "Task B");
         check(adopted != null && adopted.isPaused()
-                        && "task-a".equals(adopted.timer.taskId()),
+                        && "task-b".equals(adopted.timer.taskId()),
                 "a stale runtime adopts the already-resolved latest durable focus record");
-        check("Renamed task A".equals(staleRuntime.notifications.lastTitle)
+        check("Task B".equals(staleRuntime.notifications.lastTitle)
                         && staleRuntime.notifications.active,
                 "the adopted record publishes the current task title, not a cached title");
-        check(writer.store.events.equals(java.util.Collections.singletonList("publish")),
-                "adopting a caller-loaded snapshot publishes once without a second storage read/write");
+        check(writer.events().equals(list("cancel", "publish")),
+                "changing notification identity cancels the old title before publishing without a second storage read/write");
     }
 
     private static void aMissingTaskClearsOnlyTheFocusRecord() throws Exception {
