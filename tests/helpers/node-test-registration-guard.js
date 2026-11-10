@@ -220,10 +220,15 @@ function markAssignedTarget(target, scope) {
     return;
   }
   if (target.type === 'MemberExpression') {
-    const chain = memberChain(target);
-    if (!chain) return;
-    const binding = resolveBinding(scope, chain.base.name);
-    if (binding && binding.kind.startsWith('node-test-')) binding.reassigned = true;
+    // A write through any computed/static property mutates the imported
+    // CommonJS module/function object. Do not require the property name to
+    // be statically resolvable: dynamic keys can still replace test/it.
+    let root = target;
+    while (root && root.type === 'MemberExpression') root = root.object;
+    if (root && root.type === 'Identifier') {
+      const binding = resolveBinding(scope, root.name);
+      if (binding && binding.kind.startsWith('node-test-')) binding.reassigned = true;
+    }
     return;
   }
   if (target.type === 'RestElement') return markAssignedTarget(target.argument, scope);
@@ -339,9 +344,30 @@ function parseJavaScript(source) {
   }
 }
 
+function containsWithStatement(root) {
+  const pending = [root];
+  while (pending.length > 0) {
+    const node = pending.pop();
+    if (!node || typeof node.type !== 'string') continue;
+    // WithStatement creates a dynamic object environment that this static
+    // lexical resolver intentionally does not model. Reject the file rather
+    // than credit a potentially intercepted identifier as node:test.
+    if (node.type === 'WithStatement') return true;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'start' || key === 'end' || key === 'loc') continue;
+      if (Array.isArray(value)) {
+        for (const child of value) if (child && typeof child.type === 'string') pending.push(child);
+      } else if (value && typeof value.type === 'string') {
+        pending.push(value);
+      }
+    }
+  }
+  return false;
+}
+
 function hasRegisteredTestCase(source) {
   const ast = parseJavaScript(source);
-  if (!ast) return false;
+  if (!ast || containsWithStatement(ast)) return false;
   const nodeScopes = buildScopes(ast);
   const calls = [];
   const skippedSuiteRanges = [];

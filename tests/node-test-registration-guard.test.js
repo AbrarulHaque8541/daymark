@@ -90,3 +90,29 @@ test('requires a non-empty inline callback and fails closed on invalid syntax', 
   ];
   for (const [source, expected, label] of cases) assert.equal(hasRegisteredTestCase(source), expected, label);
 });
+
+test('fails closed when a with statement can intercept imported test identifiers', () => {
+  const intercepted = [
+    "const { test } = require('node:test');",
+    "with ({ test: () => {} }) { test('fake', () => assert.ok(true)); }"
+  ].join('\\n');
+  const unrelatedWith = [
+    "const { test } = require('node:test');",
+    "test('otherwise valid', () => assert.ok(true));",
+    "with ({ value: 1 }) { void value; }"
+  ].join('\\n');
+
+  assert.equal(hasRegisteredTestCase(intercepted), false);
+  assert.equal(hasRegisteredTestCase(unrelatedWith), false,
+    'the scanner must reject any file containing an unmodelled dynamic object environment');
+});
+
+test('rejects computed writes to a CommonJS node:test module object', () => {
+  const source = [
+    "const nodeTest = require('node:test');",
+    "nodeTest['te' + 'st'] = () => {};",
+    "nodeTest.test('fake', () => assert.ok(true));"
+  ].join('\\n');
+  assert.equal(hasRegisteredTestCase(source), false,
+    'a dynamic computed write must invalidate the imported module binding');
+});
