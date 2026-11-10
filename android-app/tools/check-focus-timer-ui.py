@@ -60,6 +60,28 @@ for token in required_accessibility:
 assert 'timeValue.setContentDescription("Focus timer value");' not in panel, (
     "a generic timer description must not hide the displayed time from screen readers"
 )
+
+# The selector must never consume the terminal UP of a vertical gesture.
+# The parent Tasks ScrollView owns the complete vertical stream, including UP.
+selector_start = panel.index("public boolean onInterceptTouchEvent(MotionEvent event)")
+selector_end = panel.index("public boolean onTouchEvent(MotionEvent event)", selector_start)
+selector = panel[selector_start:selector_end]
+up_start = selector.index("case MotionEvent.ACTION_UP:")
+up_end = selector.index("case MotionEvent.ACTION_CANCEL:", up_start)
+up_branch = selector[up_start:up_end]
+assert "if (horizontalGesture) return true;" in up_branch, (
+    "horizontal mode swipes must retain their terminal UP"
+)
+assert "if (verticalGesture)" in up_branch and "resetGesture();" in up_branch, (
+    "vertical gesture state must be reset on its terminal UP"
+)
+assert "return false;" in up_branch, (
+    "vertical terminal UP must be returned to the parent ScrollView"
+)
+assert "horizontalGesture || verticalGesture" not in up_branch, (
+    "vertical drags must not steal ACTION_UP from the parent ScrollView"
+)
+
 print("PASS Focus Timer accessible control roles, selected/checkable states and 48dp targets")
 
 required_sound = [
