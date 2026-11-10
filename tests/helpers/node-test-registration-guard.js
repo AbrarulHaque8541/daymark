@@ -534,14 +534,76 @@ function isNoopExpression(node) {
     node.argument.type === 'Literal' && node.argument.value === 0;
 }
 
+function isStaticFalse(node) {
+  return Boolean(node && node.type === 'Literal' && !node.value);
+}
+
+function isStaticTrue(node) {
+  return Boolean(node && node.type === 'Literal' && Boolean(node.value));
+}
+
+function hasExecutedOperation(node) {
+  if (!node || typeof node.type !== 'string') return false;
+
+  // A declaration does not execute the function body it contains. In
+  // particular, an unused helper/arrow must not make a placeholder test pass.
+  if (node.type === 'FunctionDeclaration'
+      || node.type === 'FunctionExpression'
+      || node.type === 'ArrowFunctionExpression'
+      || node.type === 'ClassDeclaration'
+      || node.type === 'ClassExpression') return false;
+
+  if (node.type === 'IfStatement') {
+    if (isStaticFalse(node.test)) return hasExecutedOperation(node.alternate);
+    if (isStaticTrue(node.test)) return hasExecutedOperation(node.consequent);
+    return hasExecutedOperation(node.test)
+      || hasExecutedOperation(node.consequent)
+      || hasExecutedOperation(node.alternate);
+  }
+
+  if (node.type === 'WhileStatement' && isStaticFalse(node.test)) return false;
+  if (node.type === 'ForStatement' && isStaticFalse(node.test)) {
+    return hasExecutedOperation(node.init);
+  }
+
+  if (node.type === 'ConditionalExpression') {
+    if (isStaticFalse(node.test)) return hasExecutedOperation(node.alternate);
+    if (isStaticTrue(node.test)) return hasExecutedOperation(node.consequent);
+    return hasExecutedOperation(node.test)
+      || hasExecutedOperation(node.consequent)
+      || hasExecutedOperation(node.alternate);
+  }
+
+  if (node.type === 'LogicalExpression') {
+    if (node.operator === '&&' && isStaticFalse(node.left)) return hasExecutedOperation(node.left);
+    if (node.operator === '||' && isStaticTrue(node.left)) return hasExecutedOperation(node.left);
+  }
+
+  if (node.type === 'CallExpression'
+      || node.type === 'NewExpression'
+      || node.type === 'AwaitExpression'
+      || node.type === 'YieldExpression'
+      || node.type === 'ThrowStatement'
+      || node.type === 'AssignmentExpression'
+      || node.type === 'UpdateExpression'
+      || node.type === 'ImportExpression'
+      || node.type === 'TaggedTemplateExpression'
+      || (node.type === 'UnaryExpression' && node.operator === 'delete')) return true;
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'start' || key === 'end' || key === 'loc' || key === 'range' || key === 'raw') continue;
+    if (Array.isArray(value)) {
+      if (value.some((child) => hasExecutedOperation(child))) return true;
+    } else if (value && typeof value === 'object' && hasExecutedOperation(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasExecutableCallback(callback) {
   if (!isFunctionNode(callback)) return false;
-  if (callback.body.type !== 'BlockStatement') return !isNoopExpression(callback.body);
-  return callback.body.body.some((statement) => {
-    if (statement.type === 'EmptyStatement') return false;
-    if (statement.type === 'ReturnStatement' && isNoopExpression(statement.argument)) return false;
-    return true;
-  });
+  return hasExecutedOperation(callback.body);
 }
 
 function isStaticallySkipped(call) {
