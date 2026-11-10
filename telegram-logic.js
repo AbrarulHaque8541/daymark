@@ -96,7 +96,12 @@
         if (!body || body.ok !== true) {
           return { ok: false, reason: classifySendOutcome(status, body ? body.ok : undefined, body && typeof body.description === 'string' ? body.description.split(botToken).join('[redacted]') : '') };
         }
-        const messageId = body.result && typeof body.result.message_id === 'number' ? body.result.message_id : null;
+        const message = body.result;
+        const messageId = message && typeof message === 'object' && !Array.isArray(message)
+          ? message.message_id : null;
+        if (!Number.isSafeInteger(messageId) || messageId <= 0) {
+          return { ok: false, reason: 'Telegram returned an incomplete success response. Delivery could not be confirmed.' };
+        }
         return { ok: true, messageId };
       })
       .catch(() => ({ ok: false, reason: aborted ? 'Telegram did not answer in time. Check the connection and send again.' : 'This device could not reach Telegram. You may be offline, or the request was blocked.' }))

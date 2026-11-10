@@ -145,6 +145,28 @@ test('a successful send posts the exact payload over HTTPS and reports the messa
   assert.equal(fetchFn.calls[0].options.redirect, 'error');
   assert.equal(fetchFn.calls[0].options.referrerPolicy, 'no-referrer');
 });
+test('a 2xx success response requires a positive safe Telegram message id', async () => {
+  const invalidBodies = [
+    { ok: true, result: null },
+    { ok: true, result: [] },
+    { ok: true, result: {} },
+    { ok: true, result: { message_id: '4242' } },
+    { ok: true, result: { message_id: 0 } },
+    { ok: true, result: { message_id: -1 } },
+    { ok: true, result: { message_id: 1.5 } },
+    { ok: true, result: { message_id: Number.MAX_SAFE_INTEGER + 1 } }
+  ];
+  for (const body of invalidBodies) {
+    const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(body) }));
+    const result = await engine.sendTelegramMessage(
+      { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, networkDeps(fetchFn));
+    assert.equal(result.ok, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result, 'messageId'), false);
+    assert.match(result.reason, /incomplete success response/);
+    assert.equal(fetchFn.calls.length, 1);
+  }
+});
+
 test('an offline device reports an honest network reason without echoing the token', async () => {
   const fetchFn = (url, options) => Promise.reject(new Error('offline'));
   const result = await engine.sendTelegramMessage(
