@@ -215,6 +215,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 "only the previously persisted running session republishes its notification");
         check("Renamed task".equals(afterProcessDeath.notifications.lastTitle),
                 "the current task title is resolved at restore time and is not stored in the timer record");
+        check(afterProcessDeath.events().equals(list("load", "cancel", "publish")),
+                "first restore cancels a stale prior-process notification before publishing the resolved title");
         check(afterProcessDeath.store.saveCount == first.store.saveCount,
                 "restoration reads the existing record without inventing a new Start or rewriting task data");
 
