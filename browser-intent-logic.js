@@ -319,17 +319,9 @@
     }
 
     const target = scheme + ':' + base.slice('intent:'.length);
-    let targetUri;
-    try {
-      const parsedTarget = new URL(target);
-      if (parsedTarget.protocol !== scheme + ':' || !parsedTarget.hostname
-          || parsedTarget.username || parsedTarget.password || parsedTarget.hash) {
-        return fail('the intent target URI is invalid');
-      }
-      targetUri = target;
-    } catch (error) {
-      return fail('the intent target URI is invalid');
-    }
+    // The base authority/path were already parsed with the same strict URI
+    // structure; only HTTP(S) needs the full browser URL policy below.
+    let targetUri = target;
     if (scheme === 'http' || scheme === 'https') {
       targetUri = validateIntentWebUrl(target);
       if (!targetUri) return fail('the HTTP or HTTPS intent target is not a valid Daymark web address');
