@@ -74,4 +74,17 @@ check("pull_request:" not in PRODUCTION_RELEASE_WORKFLOW
       and "workflow_dispatch:" not in PRODUCTION_RELEASE_WORKFLOW,
       "production release signing must remain push-tag-only")
 
+# Every privileged signing/provenance job must reference the same environment.
+private_job = PRIVATE_MAIN_WORKFLOW.split("private-main-test:", 1)[1]
+check("environment: production-signing" in production_guard,
+      "production release signing must wait on the protected production-signing environment")
+check("environment: production-signing" in signed_build,
+      "signed device-test signing must wait on the protected production-signing environment")
+check("environment: production-signing" in signed_publish,
+      "signed device-test release upload must wait on the protected production-signing environment")
+check("environment: production-signing" in slsa_provenance,
+      "SLSA provenance signing/upload must wait on the protected production-signing environment")
+check("environment: production-signing" in private_job,
+      "private main signing must wait on the protected production-signing environment")
+
 print(f"PASS SLSA workflow source checks: {checks} assertions")
