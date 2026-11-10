@@ -183,6 +183,126 @@ test('clear-all acquires the global task/delivery/queue lock order before deleti
   assert.equal(resetWhileLocked, true, 'Clear All resets the in-memory queue before releasing its locks');
 });
 
+test('Clear All restores exact task and Focus generations when locked storage preflight becomes unreadable', async () => {
+  const taskGenerationKey = mutation.TASK_GENERATION_KEY;
+  const focusGenerationKey = focusMutation.FOCUS_GENERATION_KEY;
+  const { env, storageData, elements, dispatched } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': '[]',
+      'daymark.focus.v1': JSON.stringify({ session: null, log: [] }),
+      [taskGenerationKey]: '7:tasks',
+      [focusGenerationKey]: '4'
+    }
+  });
+  env.storageApi.clearAll = () => ({
+    results: [],
+    removedKeys: [],
+    failedKeys: ['daymark.focus.v1'],
+    unreadableKeys: ['daymark.focus.v1']
+  });
+
+  await ui.attachStorageUi(env).onClearAll();
+
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'preflight failure must preserve tasks');
+  assert.equal(storageData['daymark.focus.v1'], JSON.stringify({ session: null, log: [] }),
+    'preflight failure must preserve Focus data');
+  assert.equal(storageData[taskGenerationKey], '7:tasks',
+    'the exact previous task generation marker is restored');
+  assert.equal(storageData[focusGenerationKey], '4',
+    'the exact previous Focus generation marker is restored');
+  assert.deepEqual(dispatched, [], 'successful rollback does not discard same-tab pending state');
+  assert.match(elements['storage-status-line'].textContent,
+    /Both coordination markers were restored; nothing was cleared/);
+});
+
+test('Clear All reports partial coordination and refreshes both views when generation rollback cannot be verified', async () => {
+  const taskGenerationKey = mutation.TASK_GENERATION_KEY;
+  const focusGenerationKey = focusMutation.FOCUS_GENERATION_KEY;
+  const { env, storageData, elements, dispatched } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': '[]',
+      'daymark.focus.v1': JSON.stringify({ session: null, log: [] }),
+      [taskGenerationKey]: '7:tasks',
+      [focusGenerationKey]: '4'
+    }
+  });
+  const originalSetItem = env.localStorage.setItem.bind(env.localStorage);
+  env.localStorage.setItem = (key, value) => {
+    if ((key === taskGenerationKey && String(value) === '7:tasks')
+        || (key === focusGenerationKey && String(value) === '4')) {
+      throw new Error('generation rollback blocked');
+    }
+    originalSetItem(key, value);
+  };
+  env.storageApi.clearAll = () => ({
+    results: [],
+    removedKeys: [],
+    failedKeys: ['daymark.focus.v1'],
+    unreadableKeys: ['daymark.focus.v1']
+  });
+
+  await ui.attachStorageUi(env).onClearAll();
+
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'no task data was removed');
+  assert.equal(storageData['daymark.focus.v1'], JSON.stringify({ session: null, log: [] }),
+    'no Focus data was removed');
+  assert.equal(storageData[taskGenerationKey], '8:all',
+    'an unverified task rollback is not falsely reported as restored');
+  assert.equal(storageData[focusGenerationKey], '5',
+    'an unverified Focus rollback is not falsely reported as restored');
+  assert.equal(dispatched.length, 2, 'both current-tab views are told to rebase');
+  assert.equal(dispatched.some((event) => event.type === 'storage' && event.key === null), true);
+  assert.equal(dispatched.some((event) => event.type === 'daymark:focus-storage-cleared'
+    && event.detail.categoryId === 'all'), true);
+  assert.match(elements['storage-status-line'].textContent,
+    /coordination markers could not be restored/);
+});
+
+test('Clear Tasks restores its generation when a locked category preflight is unreadable', async () => {
+  const taskGenerationKey = mutation.TASK_GENERATION_KEY;
+  const { env, storageData, elements, dispatched } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': '[]',
+      [taskGenerationKey]: '7:tasks'
+    }
+  });
+  env.storageApi.clearCategory = (storage, categoryId) => ({
+    id: categoryId,
+    removed: [],
+    failed: ['daymark.tasks.v1'],
+    unreadable: ['daymark.tasks.v1']
+  });
+
+  await ui.attachStorageUi(env).onClearCategory('tasks');
+
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(storageData[taskGenerationKey], '7:tasks',
+    'the exact task generation is restored when the category preflight removes nothing');
+  assert.deepEqual(dispatched, [], 'a successful rollback does not rebase same-tab state');
+  assert.match(elements['storage-status-line'].textContent,
+    /task-generation marker was restored; nothing was cleared/);
+});
+
+test('a successful empty Clear Tasks still refreshes the current tab generation', async () => {
+  const taskGenerationKey = mutation.TASK_GENERATION_KEY;
+  const { env, storageData, dispatched } = fakeEnv({
+    data: { [taskGenerationKey]: '7:tasks' }
+  });
+  env.storageApi.clearCategory = (storage, categoryId) => ({
+    id: categoryId,
+    removed: [],
+    failed: [],
+    unreadable: []
+  });
+
+  await ui.attachStorageUi(env).onClearCategory('tasks');
+
+  assert.equal(storageData[taskGenerationKey], '8:tasks');
+  assert.equal(dispatched.length, 1, 'same-tab state adopts the advanced generation even when no key existed');
+  assert.equal(dispatched[0].type, 'storage');
+  assert.equal(dispatched[0].key, 'daymark.tasks.v1');
+});
+
 test('webhook queue and Clear All fail closed at every ordered lock position', async () => {
   for (const action of ['webhook-queue', 'all']) {
     for (const failedLock of mutation.CLEAR_ALL_LOCK_ORDER) {
