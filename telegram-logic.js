@@ -75,38 +75,106 @@
     }
     const url = API_BASE + 'bot' + botToken + '/sendMessage';
     if (!/^https:\/\//.test(url)) return Promise.resolve({ ok: false, reason: 'The Telegram API address must be HTTPS. Nothing was sent.' });
-    let aborted = false;
-    const controller = new AbortControllerCtor();
-    const timer = scheduleAbort(() => { aborted = true; controller.abort(); }, FETCH_TIMEOUT_MS);
-    const cancelAbort = resolveCallable(deps, 'clearTimeout');
-    return fetchFn(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatTarget, text, disable_web_page_preview: true }),
-      credentials: 'omit',
-      cache: 'no-store',
-      redirect: 'error',
-      referrerPolicy: 'no-referrer',
-      signal: controller.signal
-    }).then((response) => response.json()
-      .then((body) => ({ response, body }), () => ({ response, body: null })))
-      .then(({ response, body }) => {
-        const status = response && typeof response.status === 'number' ? response.status : 0;
-        if (status < 200 || status > 299) return { ok: false, reason: classifySendOutcome(status, null, null) };
-        if (!body || body.ok !== true) {
-          return { ok: false, reason: classifySendOutcome(status, body ? body.ok : undefined, body && typeof body.description === 'string' ? body.description.split(botToken).join('[redacted]') : '') };
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let aborted = false;
+      let controller = null;
+      let timer = null;
+      const cancelAbort = resolveCallable(deps, 'clearTimeout');
+
+      function settle(result) {
+        if (settled) return;
+        settled = true;
+        if (cancelAbort) {
+          try { cancelAbort(timer); } catch (error) { /* Timer cleanup must not rewrite delivery status. */ }
         }
-        const message = body.result;
-        const messageId = message && typeof message === 'object' && !Array.isArray(message)
-          ? message.message_id : null;
-        if (!Number.isSafeInteger(messageId) || messageId <= 0) {
-          return { ok: false, reason: 'Telegram returned an incomplete success response. Delivery could not be confirmed.' };
-        }
-        return { ok: true, messageId };
-      })
-      .catch(() => ({ ok: false, reason: aborted ? 'Telegram did not answer in time. Check the connection and send again.' : 'This device could not reach Telegram. You may be offline, or the request was blocked.' }))
-      .finally(() => { if (cancelAbort) cancelAbort(timer); });
+        resolve(result);
+      }
+
+      try {
+        controller = new AbortControllerCtor();
+        timer = scheduleAbort(() => {
+          aborted = true;
+          try {
+            if (controller && typeof controller.abort === 'function') {
+              controller.abort();
+            }
+          } catch (error) { /* Abort failure must not hang the UI; independent settlement follows. */ }
+          // Independent bounded settlement: never leave the UI waiting forever.
+          // A timed-out POST may already have reached Telegram, so do not claim a clean failure.
+          settle({
+            ok: false,
+            reason: 'Delivery is unconfirmed. Telegram may already have the message — check the chat before sending again.'
+          });
+        }, FETCH_TIMEOUT_MS);
+      } catch (error) {
+        settle({ ok: false, reason: 'This environment cannot make network requests.' });
+        return;
+      }
+
+      let request;
+      try {
+        request = fetchFn(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatTarget, text, disable_web_page_preview: true }),
+          credentials: 'omit',
+          cache: 'no-store',
+          redirect: 'error',
+          referrerPolicy: 'no-referrer',
+          signal: controller.signal
+        });
+      } catch (error) {
+        request = Promise.reject(error);
+      }
+
+      Promise.resolve(request).then((response) => response.json()
+        .then((body) => ({ response, body }), () => ({ response, body: null })))
+        .then(({ response, body }) => {
+          const status = response && typeof response.status === 'number' ? response.status : 0;
+          if (status < 200 || status > 299) {
+            settle({ ok: false, reason: classifySendOutcome(status, null, null) });
+            return;
+          }
+          if (!body || body.ok !== true) {
+            settle({
+              ok: false,
+              reason: classifySendOutcome(
+                status,
+                body ? body.ok : undefined,
+                body && typeof body.description === 'string' ? body.description.split(botToken).join('[redacted]') : ''
+              )
+            });
+            return;
+          }
+          const message = body.result;
+          const messageId = message && typeof message === 'object' && !Array.isArray(message)
+            ? message.message_id : null;
+          if (!Number.isSafeInteger(messageId) || messageId <= 0) {
+            settle({ ok: false, reason: 'Telegram returned an incomplete success response. Delivery could not be confirmed.' });
+            return;
+          }
+          settle({ ok: true, messageId });
+        })
+        .catch(() => {
+          // Only used when the request settles before the independent timeout path.
+          // Prefer the timeout's unconfirmed wording when the abort path already ran.
+          if (aborted) {
+            settle({
+              ok: false,
+              reason: 'Delivery is unconfirmed. Telegram may already have the message — check the chat before sending again.'
+            });
+            return;
+          }
+          settle({
+            ok: false,
+            reason: 'This device could not reach Telegram. You may be offline, or the request was blocked.'
+          });
+        });
+    });
   }
+
   const api = { isBotToken, isChatTarget, buildCompletedDigest, classifySendOutcome, sendTelegramMessage, TEST_MESSAGE, MAX_MESSAGE_CHARS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkTelegram = api;
