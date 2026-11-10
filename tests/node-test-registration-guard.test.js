@@ -33,6 +33,9 @@ test('recognizes CommonJS and ESM aliases of node:test', () => {
     ["import { test as register } from 'node:test'; register('real', () => assert.ok(true));", 'ESM named alias'],
     ["import test from 'node:test'; test('real', () => assert.ok(true));", 'ESM default import'],
     ["const nodeTest = require('node:test'); nodeTest.test('real', () => assert.ok(true));", 'CommonJS namespace'],
+    ["const nodeTest = require('node:test'); const alias = nodeTest; alias.test('real', () => assert.ok(true));", 'CommonJS namespace variable alias'],
+    ["const nodeTest = require('node:test'); const { test: register } = nodeTest; register('real', () => assert.ok(true));", 'CommonJS destructured namespace alias'],
+    ["const nodeTest = require('node:test'); const register = nodeTest.test; register('real', () => assert.ok(true));", 'CommonJS member variable alias'],
     ["import * as nodeTest from 'node:test'; nodeTest.it('real', () => assert.ok(true));", 'ESM namespace'],
     ["const { it: spec } = require('node:test'); spec('real', () => assert.ok(true));", 'CommonJS it alias']
   ];
@@ -146,6 +149,12 @@ test('rejects reflective mutation of imported node:test functions and namespace 
     ["const nodeTest = require('node:test'); Reflect.defineProperty(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'Reflect.defineProperty namespace'],
     ["const nodeTest = require('node:test'); delete nodeTest.test; Object.setPrototypeOf(nodeTest, { test: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'delete and prototype replacement'],
     ["const nodeTest = require('node:test'); const alias = nodeTest; Object.defineProperty(alias, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'namespace alias mutation'],
+    ["const nodeTest = require('node:test'); const defineProperty = Object.defineProperty; defineProperty(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'aliased Object.defineProperty'],
+    ["const nodeTest = require('node:test'); const set = Reflect.set; const mutate = set; mutate(nodeTest, 'test', () => {}); nodeTest.test('fake', () => assert.ok(true));", 'aliased Reflect.set chain'],
+    ["const nodeTest = require('node:test'); const { defineProperty: define } = Object; define(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'destructured Object.defineProperty'],
+    ["const nodeTest = require('node:test'); const { set: mutate } = Reflect; mutate(nodeTest, 'test', () => {}); nodeTest.test('fake', () => assert.ok(true));", 'destructured Reflect.set'],
+    ["const nodeTest = require('node:test'); globalThis.Object.defineProperty(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'globalThis Object mutation'],
+    ["const nodeTest = require('node:test'); const method = 'defineProperty'; Object[method](nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'dynamic Object mutation'],
     ["const { test } = require('node:test'); Object.defineProperty(test, 'only', { value: () => {} }); test.only('fake', () => assert.ok(true));", 'imported function mutation'],
     ["const test = require('node:test'); const alias = test; Reflect.set(alias, 'only', () => {}); test.only('fake', () => assert.ok(true));", 'function alias mutation']
   ];
