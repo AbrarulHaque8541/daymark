@@ -16,6 +16,7 @@
   const REMINDER_LEADS = [0, 30, 60, 1440];
   const MAX_TAGS = 5;
   const MAX_TAG_CHARS = 24;
+  const REPEAT_RULES = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
 
   function isDateOnly(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -72,6 +73,26 @@
     return normalized;
   }
 
+  function isValidRepeatMetadata(task) {
+    const repeat = task.repeat === undefined || task.repeat === null || task.repeat === ''
+      ? null : task.repeat;
+    const anchor = task.repeatDayOfMonth === undefined || task.repeatDayOfMonth === null
+      ? null : task.repeatDayOfMonth;
+    if (repeat === null) return anchor === null;
+    if (!REPEAT_RULES.includes(repeat) || !isDateOnly(task.dueDate)) return false;
+    if (repeat === 'monthly') {
+      return anchor === null || (Number.isInteger(anchor) && anchor >= 1 && anchor <= 31);
+    }
+    if (repeat === 'yearly') {
+      if (anchor === null) return true;
+      if (!Number.isInteger(anchor) || anchor < 1 || anchor > 31) return false;
+      const [year, month, day] = task.dueDate.split('-').map(Number);
+      const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      return day === anchor || (month === 2 && day === 28 && anchor === 29 && !leapYear);
+    }
+    return anchor === null;
+  }
+
   function isValidTask(task) {
     return Boolean(task && typeof task === 'object'
       && typeof task.id === 'string' && task.id.length > 0
@@ -89,7 +110,8 @@
       && (task.reminderShownFire === undefined || task.reminderShownFire === null
         || (typeof task.reminderShownFire === 'string' && !Number.isNaN(Date.parse(task.reminderShownFire))))
       && (task.subtasks === undefined || isValidSubtasks(task.subtasks))
-      && (task.tags === undefined || task.tags === null || isValidTags(task.tags)));
+      && (task.tags === undefined || task.tags === null || isValidTags(task.tags))
+      && isValidRepeatMetadata(task));
   }
 
   function validateStoredTasks(value) {
