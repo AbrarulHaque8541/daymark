@@ -150,6 +150,23 @@ test('duplicate or malformed Focus log entries are rejected before storage write
   assert.equal(storage.getItem('daymark.focus.v1'), null);
 });
 
+
+test('domain validation rejects an invalid active session before writing', async () => {
+  const storage = makeStorage();
+  const locks = makeLockManager();
+  const result = await focusMutation.commitFocusSnapshot({
+    lockManager: locks,
+    storage,
+    key: 'daymark.focus.v1',
+    baseRaw: null,
+    expectedGeneration: 0,
+    desiredSnapshot: snapshot({ id: 'invalid-session' }),
+    validateSnapshot: (value) => value.session === null
+  });
+  assert.deepEqual(result, { ok: false, reason: 'invalid-snapshot', conflicts: [] });
+  assert.equal(storage.getItem('daymark.focus.v1'), null);
+});
+
 test('Focus commits fail closed when Web Locks are unavailable', async () => {
   const storage = makeStorage();
   const result = await commit({
