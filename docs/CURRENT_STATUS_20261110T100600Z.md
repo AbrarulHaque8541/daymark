@@ -7,7 +7,7 @@
 - Root AGENTS.md blob: 492ed21e2219a8d1b80c7d6e63575525c98a5a91 (read completely this run).
 - Main Android CI #42784930733: PASS.
 - Main cross-platform contracts #42784930716: PASS.
-- Open PRs: 7 — #676, #705, #701, #704, #675, #648, #656.
+- Open PRs: 7 — #676, #705, #706, #704, #675, #648, #656. PR #701 was closed unmerged as superseded by the clean main-based #706 status branch; its five source/test files were blob-identical to main and its dated documentation history was preserved here.
 - Open non-PR issues: 24 — #646, #684, #702, #685, #613, #680, #700, #687, #84, #671, #691, #696, #640, #160, #679, #689, #690, #683, #603, #639, #636, #476, #348, #325.
 - Main branch metadata reports protected=false; repository rulesets API returns []; branch-protection detail endpoint returns HTTP 403 to the connected integration. No governance setting was changed.
 - Current Gradle identity is com.abrar.daymark, versionName=1.6, versionCode=13. Root AGENTS approves com.abrar.daymark; the run-level safety instruction names com.cue.daymark. No applicationId or namespace change was made; owner reconciliation is required before any migration.
@@ -25,7 +25,11 @@ All base/head SHAs below were freshly read from GitHub. Ahead/behind values comp
 | #675 storage/recovery integration | a27a49e6c9dee911d9fc084100e6ab9796378c13 | 455abe119108fffd71aa335211c7917b011bbd89 | 201 / 2 | Latest head: contracts #42796282092 PASS and Focus UI/Sound #42796282129 PASS; Android CI #42796282123, Focus API 29/36 lifecycle #42796282133, Live Update #42796282126, device artifact #42796282178 and device-test #42796282235 IN PROGRESS. Earlier head ec7251f passed seven workflows (930/930 Node; API 29 372 assertions; API 36 375 assertions); that result is not carried forward to this newer head. Draft; large accumulated integration needs independent review and main sync. |
 | #648 Focus/download integration | 469b29edea6993b19c0f50d427b9d48605b2a4c7 | 8ba322bec73967cc5b8d8e9b40e2df5135ecc647 | 193 / 9 | Android/contract/device artifact checks pass, but Focus lifecycle #42781573077 FAILS on API 36; API 29 passes. This failure is separate from #675's earlier passing head. Draft and behind main. |
 | #656 iCalendar/import-export | 0f59c79eb2d08340f91e6a64cf9b767507b86f4e | 0b1e7b4f26385050bdedeb858417af6b3bc1cb81 | 70 / 7 | Android CI #42782381169, contracts #42782380974, Focus UI #42782380939, Live Update #42782381204, Focus lifecycle #42782381228, device artifact #42782380952 and device-test #42782380933 all PASS. Draft; RFC 5545/data-loss review and main sync remain. |
-| #701 status/docs | 469b29edea6993b19c0f50d427b9d48605b2a4c7 | 8c55548d5c5cdb946efe2b32b0bbe8b8121d9608 before this snapshot commit | 45 / 9 | Prior head Android CI #42781751150, contracts #42781750697 and device assets #42781750797 PASS. This run adds the present snapshot/index/queue update; the resulting new head requires fresh exact-head checks. Draft and behind main. |
+| #706 status/docs | 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc | 24252ed56dffdc73b2f786e7a519c664427f16eb before this correction commit | 1 / 0 | Main-based replacement carrying the historical snapshots and this status/index/queue. This correction advances the PR head; fetch live PR metadata for the resulting SHA. Exact-head Android/contracts/device-artifact checks have not yet been returned. Draft. |
+
+## Status-branch replacement
+
+PR #701 was closed unmerged because its 9-commit-behind branch was reported mergeable=false. Its five non-documentation files (styles.css, telegram-logic.js, telegram-ui.js, tests/telegram-logic.test.js, tests/telegram-ui.test.js) were compared by blob SHA and were identical to current main. The 15 dated status snapshots, current snapshot, status index and project queue were moved to a new one-commit branch from main in PR #706. No shipped source/test change was discarded.
 
 ## Engineering delivered in this run
 
