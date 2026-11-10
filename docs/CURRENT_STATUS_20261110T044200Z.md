@@ -17,7 +17,7 @@
 - `GET /rulesets` returned an empty array.
 - Detailed branch-protection endpoint returned HTTP 403 `Resource not accessible by integration`; the integration cannot inspect detailed settings.
 - No protection settings were changed.
-- Root AGENTS and Gradle/manifest identity remain `com.abrar.daymark`. The run-level instruction requests `com.cue.daymark`; this conflict is unresolved. No applicationId/namespace change was made. Root AGENTS requires explicit owner approval before changing the source-approved identity.
+- Root AGENTS and Gradle/manifest identity remain `com.abrar.daymark`. The run-level instruction requests a different package identifier; this conflict is unresolved. No applicationId/namespace change was made. Root AGENTS requires explicit owner approval before changing the source-approved identity.
 - Production signer, versionCode/versionName, signing secrets and user data were not changed.
 
 ## Engineering delivered in this run
