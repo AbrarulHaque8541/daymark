@@ -4,6 +4,7 @@ apps/desktop/test/renderer-address-policy.test.js
 apps/desktop/test/request-policy.test.js
 apps/desktop/test/rules.test.js
 apps/desktop/test/webview-popup-policy.test.js
+apps/desktop/test/workflow-contract.test.js
 desktop-spike/task-core.test.js
 test/ci-test-honesty.test.js
 test/task-focus-session-coordinator.test.js
