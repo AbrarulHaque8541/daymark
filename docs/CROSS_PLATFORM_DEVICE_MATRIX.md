@@ -1,9 +1,9 @@
 # Daymark multi-device architecture and support matrix
 
 **Status:** Architecture proposal with one CI-tested Java 17 capability-policy slice and a separate experimental Electron desktop-browser prototype; no non-Android full Daymark task-workspace app is shipped. This document is not a compatibility claim.
-**Baseline inspected:** `main` at `555ca0745a5a7ddf3ae443c64859fea9ee2a737a`.
+**Baseline inspected:** `main` at `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`.
 **Owner direction:** Make Daymark useful across device classes and operating systems, including constrained and display-less companions, while preserving the current Android product.
-**Last updated:** 2026-11-08T11:39:41Z
+**Last updated:** 2026-11-10T03:00:00Z
 
 ## 1. Product principle
 
