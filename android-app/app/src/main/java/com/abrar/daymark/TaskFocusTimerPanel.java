@@ -414,30 +414,53 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         }
 
         @Override
+        public void requestDisallowInterceptTouchEvent(boolean disallow) {
+            // The clickable Stopwatch/Countdown children request disallow-intercept
+            // on ACTION_DOWN to protect taps. Do not let that child request set this
+            // selector's FLAG_DISALLOW_INTERCEPT, otherwise this selector never sees
+            // ACTION_MOVE and cannot classify a horizontal mode swipe. The selector
+            // explicitly forwards its own classified horizontal request to its parent
+            // through disallowParentIntercept(); vertical movement remains available
+            // to the parent Tasks ScrollView.
+        }
+
+        @Override
         public boolean onInterceptTouchEvent(MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Clear any ancestor scroll-interception request left by a prior gesture.
-                    requestDisallowInterceptTouchEvent(false);
+                    // Hold the parent ScrollView until this selector classifies the stream.
+                    // This protects a child tap from being stolen by an existing drag; a
+                    // vertical MOVE releases the parent, while a horizontal MOVE stays here.
+                    disallowParentIntercept(true);
                     downX = event.getX();
                     downY = event.getY();
                     horizontalGesture = false;
                     verticalGesture = false;
                     return false;
                 case MotionEvent.ACTION_MOVE:
-                    if (closed || actionPending || timer != null && !timer.isFinished()) return false;
-                    if (verticalGesture) return true;
+                    if (closed || actionPending || timer != null && !timer.isFinished()) {
+                        disallowParentIntercept(false);
+                        return false;
+                    }
+                    if (verticalGesture) {
+                        // A vertical drag belongs to the parent Tasks ScrollView, not this
+                        // horizontal mode selector. Release the parent so it can consume the
+                        // next MOVE and scroll the workspace.
+                        disallowParentIntercept(false);
+                        return false;
+                    }
                     TaskFocusTimerModeGesturePolicy.Result result =
                             TaskFocusTimerModeGesturePolicy.classify(
                                     event.getX() - downX, event.getY() - downY, gestureThresholdPx);
                     if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL) {
                         verticalGesture = true;
-                        return true;
+                        disallowParentIntercept(false);
+                        return false;
                     }
                     if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH
                             || result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
                         horizontalGesture = true;
-                        requestDisallowInterceptTouchEvent(true);
+                        disallowParentIntercept(true);
                         return true;
                     }
                     return false;
@@ -455,17 +478,25 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
 
         @Override
         public boolean onTouchEvent(MotionEvent event) {
-            if (!horizontalGesture && !verticalGesture) return super.onTouchEvent(event);
+            if (verticalGesture) {
+                // Do not keep the vertical stream as the selector's touch target. The parent
+                // Tasks ScrollView must be able to take over and perform the workspace scroll.
+                disallowParentIntercept(false);
+                if (event.getActionMasked() == MotionEvent.ACTION_UP
+                        || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    resetGesture();
+                }
+                return false;
+            }
+            if (!horizontalGesture) return super.onTouchEvent(event);
             if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-                if (horizontalGesture) {
-                    TaskFocusTimerModeGesturePolicy.Result result =
-                            TaskFocusTimerModeGesturePolicy.classify(
-                                    event.getX() - downX, event.getY() - downY, gestureThresholdPx);
-                    if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH) {
-                        chooseMode(TaskFocusTimer.Mode.STOPWATCH);
-                    } else if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
-                        chooseMode(TaskFocusTimer.Mode.COUNTDOWN);
-                    }
+                TaskFocusTimerModeGesturePolicy.Result result =
+                        TaskFocusTimerModeGesturePolicy.classify(
+                                event.getX() - downX, event.getY() - downY, gestureThresholdPx);
+                if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH) {
+                    chooseMode(TaskFocusTimer.Mode.STOPWATCH);
+                } else if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN) {
+                    chooseMode(TaskFocusTimer.Mode.COUNTDOWN);
                 }
                 resetGesture();
                 return true;
@@ -474,12 +505,21 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             return true;
         }
 
+        private void disallowParentIntercept(boolean disallow) {
+            // Do not call requestDisallowInterceptTouchEvent() on this ViewGroup:
+            // that sets its own FLAG_DISALLOW_INTERCEPT and skips this selector's
+            // onInterceptTouchEvent() for the following MOVE events.
+            if (getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(disallow);
+            }
+        }
+
         private void resetGesture() {
             horizontalGesture = false;
             verticalGesture = false;
             // A horizontal gesture temporarily disallows the parent ScrollView from intercepting.
             // Release that request on every terminal path so later vertical drags can scroll normally.
-            requestDisallowInterceptTouchEvent(false);
+            disallowParentIntercept(false);
         }
 
         @Override
