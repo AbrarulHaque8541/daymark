@@ -355,3 +355,28 @@ test('invalid task generations fail closed before reading or writing task snapsh
   assert.equal(result.reason, 'generation-invalid');
   assert.equal(JSON.parse(storage.raw)[0].title, 'A');
 });
+
+
+test('a fresh task commit retires the retained clear reason without resetting the generation', async () => {
+  const storage = makeStorage([]);
+  storage.setItem(mutation.TASK_GENERATION_KEY, '1:task-backup');
+  const result = await commit(makeLockManager(), storage, [], [makeTask('fresh', 'Fresh')], 1);
+  assert.equal(result.ok, true);
+  assert.equal(storage.generationRaw, '1', 'the monotonic value remains while the clear reason is retired');
+  assert.deepEqual(JSON.parse(storage.raw).map((task) => task.id), ['fresh']);
+});
+
+test('a failed clear-reason retirement warns without rolling back a committed task snapshot', async () => {
+  const storage = makeStorage([]);
+  storage.setItem(mutation.TASK_GENERATION_KEY, '1:all');
+  const originalSetItem = storage.setItem.bind(storage);
+  storage.setItem = (key, value) => {
+    if (key === mutation.TASK_GENERATION_KEY && String(value) === '1') throw new Error('quota');
+    originalSetItem(key, value);
+  };
+  const result = await commit(makeLockManager(), storage, [], [makeTask('saved', 'Saved')], 1);
+  assert.equal(result.ok, true, 'metadata cleanup cannot undo an already committed task list');
+  assert.equal(result.warning, 'generation-marker-clear-failed');
+  assert.equal(storage.generationRaw, '1:all');
+  assert.deepEqual(JSON.parse(storage.raw).map((task) => task.id), ['saved']);
+});
