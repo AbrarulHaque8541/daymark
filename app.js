@@ -2461,23 +2461,12 @@
   }
 
   function handleFocusStorageCleared(categoryId) {
+    // Every category clear advances the shared Focus generation. A pending
+    // writer for another Focus key is therefore stale too; rebase the entire
+    // in-memory Focus domain so a rejected write cannot leave a phantom session
+    // or preset in this tab.
     state.focusStorageEventEpoch += 1;
-    if (categoryId === 'focus' || categoryId === 'all') {
-      reconcileFocusStateFromStorage(FOCUS_KEY);
-    }
-    if (categoryId === 'focus-preset' || categoryId === 'all') {
-      reconcileFocusStateFromStorage(FOCUS_PRESET_KEY);
-    }
-    if (categoryId === 'focus-backup' || categoryId === 'all') {
-      state.focusRecoveryBackupPendingPayload = null;
-      state.focusRecoveryBackupReady = false;
-      try {
-        state.focusRecoveryBackupBaseRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
-      } catch (error) {
-        state.focusRecoveryBackupBaseRaw = undefined;
-      }
-    }
-    renderFocus();
+    reconcileFocusStateFromStorage(null, false);
   }
 
   function setUp() {
@@ -2580,6 +2569,13 @@
       }
     });
     window.addEventListener('storage', (event) => {
+      if (focusMutation && event.key === focusMutation.FOCUS_GENERATION_KEY) {
+        // A clear in another tab advances the shared generation before removing
+        // its selected key. Rebase all Focus state immediately so any queued
+        // writer is cancelled against the new generation.
+        reconcileFocusStateFromStorage(null);
+        return;
+      }
       if (event.key === FOCUS_KEY || event.key === FOCUS_BACKUP_KEY
           || event.key === FOCUS_PRESET_KEY || event.key === null) {
         reconcileFocusStateFromStorage(event.key);
