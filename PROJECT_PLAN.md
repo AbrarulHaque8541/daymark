@@ -1,3 +1,48 @@
+
+
+## Current execution queue — 2026-11-10T22:54:19.523Z (main 39b1047a)
+
+This queue supersedes the historical queue below. Do not treat an open PR or green CI as project completion.
+
+### P0 — correctness, security and release blockers
+1. Focus API 29/36 touch/lifecycle reliability; retain real touch assertions and complete ten-consecutive-run acceptance (#613, #648, #675).
+2. Extract task generation fencing, three-way merge and destructive-clear ordering from the divergent integration branch into a focused current-main change (#683).
+3. Complete DNS-pinned, hostname-verified, redirect-validating browser download transport and atomic MediaStore/SAF publication (#671, #708).
+4. Configure main required checks, independent review, stale-review dismissal and push restrictions (#646).
+5. Complete physical Android/WebView acceptance across API 26/29/36 (#160).
+6. Finish exact-head CI and independent reviews for strict timestamp and Intent URI contracts (#707/#722, #712/#723).
+7. Complete Focus clear/write and Clear All/webhook lock ordering (#690, #689).
+
+### P1 — cross-platform integrity and security
+8. Complete storage health and recovery review (#603, #640).
+9. Finish iCalendar/import/export parity and malformed-data validation (#656).
+10. Complete extension SPA scope, metadata privacy and actual System WebView acceptance (#680, #702, #676).
+11. Configure production-signing environment approvals and finish action-runtime/provenance maintenance (#705, #84).
+12. Align repeat-task completion and scheduling semantics (#684, #476).
+13. Verify Telegram browser/WebView CORS and real delivery (#700).
+
+### P2 — maintainability and compatibility
+14. Restore reproducible Electron installs and lockfile generation (#696).
+15. Continue browser UX and cross-platform architecture work (#348, #325).
+
+### Active focused deliveries
+- #722: 58-case Java Instant-compatible task timestamp contract; exact production V8 and JDK fixture harnesses pass; API 29 Focus workflow retry pending.
+- #723: 48-case strict Intent URI parity contract; exact production V8 fixture passes; Focus lifecycle and unsigned device validation pending.
+- #719: export selector script-order correction is merged and mainline CI passed.
+- #721: webhook endpoint session-only privacy and endpoint-bound queue are merged.
+- #704/#708: Service Worker enforcement and bounded download body-transfer foundation are merged; full download transport remains incomplete.
+
+### Governance and safety
+- Main currently reports `protected=false` and no repository rulesets; owner-side governance is required.
+- No independent approved reviews were found on the nine open PRs.
+- Do not change `applicationId`, namespace, version, signing, tags/releases or stored data without explicit authorization. Current Gradle identity is `com.abrar.daymark`; the explicit `com.cue.daymark` instruction conflict remains unresolved.
+- Do not weaken tests to obtain green CI. Separate unrelated Focus failures from the focused PRs, but keep the full required gate.
+
+**Last reviewed:** 2026-11-10T22:54:19.523Z  
+**Main SHA:** `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`  
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; Node 22/V8 and JDK 21 validation harnesses
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
