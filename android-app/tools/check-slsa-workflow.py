@@ -40,7 +40,9 @@ check("base64-subjects" in WORKFLOW,
 # alone is not authorization: a repository writer must not be able to trigger
 # production signing or release-asset writes merely by creating a matching tag.
 SIGNED_RELEASE_WORKFLOW = (ROOT / ".github/workflows/android-signed-device-test-release.yml").read_text()
-PRIVATE_MAIN_WORKFLOW = (ROOT / ".github/workflows/android-private-main-test-apk.yml").read_text()
+PRIVATE_MAIN_WORKFLOW = " ".join(
+    (ROOT / ".github/workflows/android-private-main-test-apk.yml").read_text().split()
+)
 OWNER_GATE = "github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'"
 
 signed_build = SIGNED_RELEASE_WORKFLOW.split("  build-and-verify:", 1)[1].split("  publish-release:", 1)[0]
