@@ -201,6 +201,8 @@ public final class MainActivity extends Activity {
     private boolean attachmentCanCancel;
     private String pendingAttachmentTaskId;
     private String pendingExtensionExportId;
+    private String pendingMalformedExtensionExportFileName;
+    private String pendingMalformedExtensionExportSha256;
     private Uri pendingPickedAttachmentUri;
     private String pendingPickedAttachmentTaskId;
     private final List<Uri> stagedSharedAttachmentUris = new ArrayList<>();
@@ -1182,6 +1184,29 @@ public final class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_EXPORT_EXTENSION) {
+            String malformedFileName = pendingMalformedExtensionExportFileName;
+            String malformedSha256 = pendingMalformedExtensionExportSha256;
+            pendingMalformedExtensionExportFileName = null;
+            pendingMalformedExtensionExportSha256 = null;
+            if (malformedFileName != null) {
+                if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+                if (extensionRuntime == null || malformedSha256 == null) {
+                    showToast("The recovery file could not be exported.");
+                    return;
+                }
+                try {
+                    byte[] raw = extensionRuntime.store().readMalformedUserPackBytes(
+                            malformedFileName, malformedSha256);
+                    try (OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+                        if (out == null) throw new IOException("Could not write the recovery file.");
+                        out.write(raw);
+                    }
+                    showToast("Raw extension recovery bytes exported.");
+                } catch (Exception exception) {
+                    showToast("The file changed or could not be exported. Refresh Extensions and try again.");
+                }
+                return;
+            }
             String exportId = pendingExtensionExportId;
             pendingExtensionExportId = null;
             if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
@@ -3576,6 +3601,8 @@ public final class MainActivity extends Activity {
             content.addView(paused, bottomMargin(dp(8)));
         }
 
+        addMalformedExtensionRecoverySection(content);
+
         if (extensions.isEmpty()) {
             content.addView(text("No extensions installed.", 13, palette.muted, Typeface.NORMAL),
                     bottomMargin(dp(8)));
@@ -3665,6 +3692,120 @@ public final class MainActivity extends Activity {
         content.setTranslationY(dp(8));
         dialog.show();
         content.animate().alpha(1f).translationY(0f).setDuration(160L).start();
+    }
+
+    private void addMalformedExtensionRecoverySection(LinearLayout content) {
+        if (extensionRuntime == null) return;
+        final List<ExtensionStore.MalformedUserPack> malformed;
+        try {
+            malformed = extensionRuntime.store().listMalformedUserPacks();
+        } catch (IOException exception) {
+            TextView warning = text(
+                    "Recovery files could not be inspected safely. No files were changed.",
+                    12, palette.warning, Typeface.NORMAL);
+            warning.setLineSpacing(dp(2), 1f);
+            content.addView(warning, bottomMargin(dp(8)));
+            return;
+        }
+        if (malformed.isEmpty()) return;
+
+        TextView heading = text("Malformed extension files", 14, palette.text, Typeface.BOLD);
+        content.addView(heading, bottomMargin(dp(4)));
+        TextView disclosure = text(
+                "These files are not loaded or executed. Export the exact raw bytes before removal if you may need to recover them.",
+                12, palette.warning, Typeface.NORMAL);
+        disclosure.setLineSpacing(dp(2), 1f);
+        content.addView(disclosure, bottomMargin(dp(8)));
+
+        for (ExtensionStore.MalformedUserPack pack : malformed) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(10), dp(9), dp(10), dp(9));
+            row.setBackground(shape(palette.surface, 14, palette.line));
+
+            TextView name = text(pack.displayId, 13, palette.text, Typeface.BOLD);
+            name.setContentDescription("Malformed extension file " + pack.fileName);
+            row.addView(name);
+
+            String stateLabel;
+            if (ExtensionStore.MalformedUserPack.STATE_MALFORMED.equals(pack.state)) {
+                stateLabel = "Malformed or unsupported encoding";
+            } else if (ExtensionStore.MalformedUserPack.STATE_OVERSIZED.equals(pack.state)) {
+                stateLabel = "Too large for safe recovery inspection";
+            } else if (ExtensionStore.MalformedUserPack.STATE_UNREADABLE.equals(pack.state)) {
+                stateLabel = "Could not be read safely";
+            } else if (ExtensionStore.MalformedUserPack.STATE_NON_REGULAR.equals(pack.state)) {
+                stateLabel = "Not a regular file";
+            } else {
+                stateLabel = "Unknown recovery state";
+            }
+            String size = pack.byteSize >= 0 ? (pack.byteSize + " bytes") : "size unavailable";
+            String detail = stateLabel + " · " + size + "\n" + pack.reason;
+            if (pack.sha256 != null && pack.sha256.length() >= 12) {
+                detail += "\nFingerprint: " + pack.sha256.substring(0, 12) + "…";
+            }
+            TextView description = text(detail, 12, palette.muted, Typeface.NORMAL);
+            description.setLineSpacing(dp(2), 1f);
+            row.addView(description, topMargin(dp(3)));
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            if (pack.canExport && pack.sha256 != null) {
+                Button export = compactButton("Export raw bytes", false);
+                export.setContentDescription("Export exact raw bytes of malformed extension file " + pack.fileName);
+                export.setOnClickListener(view -> exportMalformedExtensionPack(pack));
+                actions.addView(export, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
+            }
+            if (pack.canRemove && pack.sha256 != null) {
+                Button remove = compactButton("Remove file", true);
+                remove.setContentDescription("Remove malformed extension file " + pack.fileName + " after confirmation");
+                remove.setOnClickListener(view -> confirmRemoveMalformedExtensionPack(pack));
+                actions.addView(remove, chipMargin());
+            }
+            if (actions.getChildCount() == 0) {
+                TextView unavailable = text(
+                        "No safe export or removal action is available. The file has been left unchanged.",
+                        12, palette.muted, Typeface.NORMAL);
+                row.addView(unavailable, topMargin(dp(4)));
+            } else {
+                row.addView(actions, topMargin(dp(5)));
+            }
+            content.addView(row, bottomMargin(dp(7)));
+        }
+    }
+
+    private void exportMalformedExtensionPack(ExtensionStore.MalformedUserPack pack) {
+        if (extensionRuntime == null || pack == null || !pack.canExport
+                || pack.sha256 == null || pack.fileName == null) return;
+        pendingExtensionExportId = null;
+        pendingMalformedExtensionExportFileName = pack.fileName;
+        pendingMalformedExtensionExportSha256 = pack.sha256;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/octet-stream");
+        String safeName = pack.fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        intent.putExtra(Intent.EXTRA_TITLE, safeName + ".recovery.bin");
+        startActivityForResult(intent, REQUEST_EXPORT_EXTENSION);
+    }
+
+    private void confirmRemoveMalformedExtensionPack(ExtensionStore.MalformedUserPack pack) {
+        if (extensionRuntime == null || pack == null || !pack.canRemove
+                || pack.sha256 == null || pack.fileName == null) return;
+        new AlertDialog.Builder(this)
+                .setTitle("Remove malformed extension file?")
+                .setMessage("This file is not active and will not be executed. Removing it permanently deletes the stored bytes. Export the raw bytes first if you may need a copy. Daymark rechecks the SHA-256 fingerprint before removal.")
+                .setNegativeButton("Keep file", null)
+                .setPositiveButton("Remove file", (dialog, which) -> {
+                    try {
+                        extensionRuntime.store().removeMalformedUserPack(pack.fileName, pack.sha256);
+                        showToast("Malformed extension file removed.");
+                        showBrowserExtensionsManager();
+                    } catch (Exception exception) {
+                        showToast("The file changed or could not be removed. Refresh Extensions and try again.");
+                    }
+                })
+                .show();
     }
 
     private void showExtensionDetailsDialog(BrowserExtension ext) {
