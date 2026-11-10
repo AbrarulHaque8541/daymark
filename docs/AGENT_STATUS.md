@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-10T05:35:00Z (composer priority preference)](./CURRENT_STATUS_20261110T053500Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)

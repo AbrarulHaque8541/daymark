@@ -7,6 +7,7 @@
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
   const FEED_KEY = 'daymark.feed.v1';
+  const COMPOSER_PRIORITY_KEY = 'daymark.composer.priority.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
@@ -17,6 +18,28 @@
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
+
+  function loadComposerPriority() {
+    try {
+      const saved = localStorage.getItem(COMPOSER_PRIORITY_KEY);
+      if (PRIORITIES.includes(saved)) {
+        const select = $('#new-priority');
+        if (select) select.value = saved;
+      }
+    } catch (error) {
+      console.warn('Could not load composer priority preference:', error);
+    }
+  }
+
+  function saveComposerPriority(priority) {
+    if (!PRIORITIES.includes(priority)) return;
+    try {
+      localStorage.setItem(COMPOSER_PRIORITY_KEY, priority);
+    } catch (error) {
+      console.warn('Could not save composer priority preference:', error);
+    }
+  }
+
 
   function setStorageStatus(message, unavailable = false) {
     const status = $('#storage-status');
@@ -721,8 +744,10 @@
     if (hasDate && repeatRule) task.repeat = repeatRule;
     state.tasks.push(task);
     const saved = persistTasks();
+    const usedPriority = readPriority($('#new-priority'));
+    saveComposerPriority(usedPriority);
     form.reset();
-    $('#new-priority').value = 'medium';
+    loadComposerPriority();
     $('#new-due-time').disabled = true;
     $('#new-reminder').disabled = true;
     $('#new-reminder').value = '';
@@ -1963,6 +1988,7 @@
 
   function setUp() {
     state.tasks = loadTasks();
+    loadComposerPriority();
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
@@ -2046,6 +2072,7 @@
     window.addEventListener('storage', (event) => {
       if (event.key === STORAGE_KEY || event.key === null) {
         state.tasks = loadTasks();
+    loadComposerPriority();
         render();
       }
     });
