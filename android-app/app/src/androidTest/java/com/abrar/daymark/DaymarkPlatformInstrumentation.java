@@ -1097,6 +1097,16 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(awaitNotificationState(manager, notificationId, true),
                     "restoring an eligible running session republishes its progress notification");
 
+            // Keep a second runtime on the old task identity. Activity onResume can have a
+            // previously-created runtime too; its reconciliation must reload the latest durable
+            // focus record instead of republishing a cached task title.
+            TaskFocusSessionRuntime staleRuntime = new TaskFocusSessionRuntime(isolated);
+            TaskFocusSessionCoordinator.Snapshot staleRestored =
+                    staleRuntime.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
+            check(staleRestored != null && staleRestored.isRunning()
+                            && task.id.equals(staleRestored.timer.taskId()),
+                    "a second runtime starts with the same persisted task identity");
+
             TaskFocusSessionCoordinator.Snapshot paused = restoredRuntime.pauseFromUserAction();
             check(paused != null && paused.isPaused(),
                     "Pause durably changes the focus session to PAUSED");
@@ -1110,6 +1120,13 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "choosing task B changes the paused session identity without resuming it");
             check(switched.notificationPublished,
                     "switching a paused session reports successful notification publication");
+
+            TaskFocusSessionCoordinator.Snapshot reconciledStaleRuntime =
+                    staleRuntime.reconcileTasks(Arrays.asList(task, alternateTask));
+            check(reconciledStaleRuntime != null && reconciledStaleRuntime.isPaused()
+                            && alternateTask.id.equals(reconciledStaleRuntime.timer.taskId())
+                            && reconciledStaleRuntime.restored,
+                    "a stale runtime reloads the switched task ID before republishing on lifecycle reconciliation");
             TaskFocusTimer persistedSwitch = new TaskFocusTimerStore(isolated).load(
                     android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis(), -1);
             check(persistedSwitch != null && persistedSwitch.isPaused()
@@ -1121,7 +1138,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                                     .contains(alternateTask.id),
                     "the switched task identity remains protected inside the encrypted focus record");
             checkPausedNotification(manager, notificationId, alternateTask.title,
-                    "switching a paused session");
+                    "reconciling a stale runtime after a paused task switch");
 
             TaskFocusSessionRuntime pausedAfterProcessRestart = new TaskFocusSessionRuntime(isolated);
             TaskFocusSessionCoordinator.Snapshot restoredPaused =
