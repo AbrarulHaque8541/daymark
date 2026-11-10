@@ -74,7 +74,7 @@
 - #696: `apps/desktop/package-lock.json` is absent; desktop CI uses `npm install`. Prior attempt recorded npm registry DNS `EAI_AGAIN`; no lockfile was fabricated and `npm ci` was not enabled without a valid lock.
 - #691: #692's staging/publication policy is in place, but renderer failure feedback is missing; same-OS-user filesystem races remain documented as a threat boundary. Physical desktop GUI/installer acceptance not tested.
 - #646: branch protection is disabled, rulesets empty; detailed protection API is HTTP 403. No settings changed.
-- #679 / identity: root AGENTS and live Gradle both require `com.abrar.daymark`; the run-level request names `com.cue.daymark`. No applicationId/namespace change made; explicit owner reconciliation is required.
+- #679 / identity: root AGENTS and live Gradle both require `com.abrar.daymark`; the run-level request names a different package identity. No applicationId/namespace change made; explicit owner reconciliation is required.
 - #160: no physical Android device was tested in this run. CI APKs and emulators are not physical-device acceptance.
 - #665: no signing secrets were read, printed, changed or exposed by this run.
 - #697 Telegram feature: client-side BYO token only; no real bot token or live delivery was used.
