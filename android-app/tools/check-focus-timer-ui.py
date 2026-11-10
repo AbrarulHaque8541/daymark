@@ -169,10 +169,16 @@ assert "disallowParentIntercept(false);" in mode_selector, (
 down_case = mode_selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split(
     "case MotionEvent.ACTION_MOVE:", 1
 )[0]
-assert "disallowParentIntercept(true);" in down_case, (
-    "mode selector must hold parent ScrollView interception until the gesture is classified"
+assert "disallowParentIntercept(false);" in down_case, (
+    "a fresh tap must release stale parent interception so the child receives ACTION_UP"
 )
-assert "disallowParentIntercept(true);" in mode_selector, (
+assert "disallowParentIntercept(true);" not in down_case, (
+    "the selector must not block the parent before classifying the gesture"
+)
+horizontal_branch = mode_selector.split(
+    "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1
+)[1].split("case MotionEvent.ACTION_UP:", 1)[0]
+assert "disallowParentIntercept(true);" in horizontal_branch, (
     "only a classified horizontal mode swipe may temporarily block the parent"
 )
 assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in mode_selector, (
