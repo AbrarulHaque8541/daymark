@@ -67,7 +67,7 @@ test('existing names receive deterministic suffixes without overwriting', () => 
   assert.ok(reserved.has(reservationKey(second)));
 });
 
-test('case-insensitive reservation keys prevent simultaneous duplicate destinations', () => {
+test('reservations prevent simultaneous duplicate destinations', () => {
   const reserved = new Set();
   const exists = () => false;
   const first = createDownloadPath(downloads, 'Report.pdf', exists, reserved);
@@ -85,4 +85,3 @@ test('allocation failures are fail-closed and never return a default path', () =
     /download-reservations-required/);
 });
 
-console.log('Desktop download policy tests registered');
