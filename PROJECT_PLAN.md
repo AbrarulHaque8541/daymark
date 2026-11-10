@@ -20,7 +20,7 @@ Current baseline: main `91f57d79ab3d344d4d78df116ecf3ed4afe81087`; root AGENTS b
 - #685/#686: retain fail-closed Service Worker policy until a reviewed Online-compatible contract is implemented.
 - #690/#689: finish Focus/webhook cross-domain locking and same-tab invalidation.
 
-No release/tag/version/signer/identity change or destructive migration was made. Current source identity remains `com.abrar.daymark`; the conflicting run-level `com.cue.daymark` instruction remains unresolved and requires owner approval before any identity change.
+No release/tag/version/signer/identity change or destructive migration was made. Current source identity remains `com.abrar.daymark`; the conflicting run-level package-identity instruction remains unresolved and requires owner approval before any identity change.
 
 ---
 
