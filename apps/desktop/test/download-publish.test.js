@@ -70,6 +70,42 @@ test('staging symlinks and paths outside the selected Downloads directory are re
   assert.throws(() => createStagingPath(downloads, outside), /unsafe-download-publication-target/);
 });
 
+test('rollback compares file identity when the filesystem device id is zero', () => {
+  const downloads = path.join(os.tmpdir(), 'daymark-download-zero-device');
+  const stagingDirectory = path.join(downloads, '.daymark-download-zero-device');
+  const stagingPath = path.join(stagingDirectory, 'report.txt');
+  const finalPath = path.join(downloads, 'report.txt');
+  const directoryStat = { isDirectory: () => true, isSymbolicLink: () => false };
+  const stagedStat = { isFile: () => true, isSymbolicLink: () => false, dev: 0, ino: 11 };
+  const publishedStat = { isFile: () => true, isSymbolicLink: () => false, dev: 0, ino: 22 };
+  let targetReads = 0;
+  let removed = false;
+  const fsImpl = {
+    lstatSync(candidate) {
+      if (candidate === stagingDirectory) return directoryStat;
+      if (candidate === stagingPath) return stagedStat;
+      if (candidate === finalPath) {
+        targetReads += 1;
+        return publishedStat;
+      }
+      throw new Error('unexpected-path');
+    },
+    linkSync(source, target) {
+      assert.equal(source, stagingPath);
+      assert.equal(target, finalPath);
+    },
+    unlinkSync(target) {
+      assert.equal(target, finalPath);
+      removed = true;
+    }
+  };
+
+  assert.throws(() => publishStagedFile(downloads, stagingPath, finalPath, fsImpl),
+    /download-publication-verification-failed/);
+  assert.equal(targetReads, 2, 'the just-created destination identity is rechecked before rollback');
+  assert.equal(removed, true, 'zero is a valid device id when inode identity is available');
+});
+
 test('failed post-link verification removes a hard link from a swapped staging directory', {
   skip: process.platform === 'win32',
 }, (t) => {
