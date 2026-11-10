@@ -83,12 +83,15 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
   }
   const excludedNonUserKeys = new Set([
     'daymark.webhook.v1',
-    'daymark.focus.mutation.generation.v1'
+    'daymark.focus.mutation.generation.v1',
+    'daymark.tasks.mutation.generation.v1'
   ]);
   assert.ok(discoveredKeys.has('daymark.webhook.v1'),
     'the legacy secret-bearing endpoint key remains known to the webhook module');
   assert.ok(discoveredKeys.has('daymark.focus.mutation.generation.v1'),
     'the non-personal Focus coordination counter remains an explicit internal key');
+  assert.ok(discoveredKeys.has('daymark.tasks.mutation.generation.v1'),
+    'the non-personal task coordination counter remains an explicit internal key');
   assert.deepEqual([...discoveredKeys].filter((key) => !excludedNonUserKeys.has(key)).sort(),
     [...expectedKeys].sort(),
     'every user-data and preference key declared by a root JS module must be inventoried');
