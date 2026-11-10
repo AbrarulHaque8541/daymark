@@ -8,7 +8,7 @@
 - Main Android CI #42784930733 PASS; Ubuntu/Windows contracts #42784930716 PASS; nightly main audit #42807418062 PASS.
 - Main branch metadata: `protected=false`; repository rulesets API returns `[]`; detailed branch-protection endpoint returns HTTP 403 to the connected integration.
 - Open PRs: 7 — #675, #656, #706, #648, #676, #704, #705.
-- Open issues: 24 — #646, #684, #702, #685, #613, #680, #700, #687, #84, #671, #691, #696, #640, #160, #679, #689, #690, #683, #603, #639, #636, #476, #348, #325, #707.
+- Open issues: 25 — #646, #684, #702, #685, #613, #680, #700, #687, #84, #671, #691, #696, #640, #160, #679, #689, #690, #683, #603, #639, #636, #476, #348, #325, #707.
 - No independent APPROVED review was found on any of the seven open PRs; requested reviewer lists are empty.
 - Latest main merge: #659, commit `41fda91`, requiring imported extension opt-in and preserving existing packs on import failures. Post-merge Android CI, contracts, and nightly audit pass.
 - #701 is closed unmerged and superseded by clean main-based documentation PR #706.
@@ -21,11 +21,11 @@
 |---|---|---|---:|---|
 | #675 storage/Focus/webhook/task integration | 41fda91 | `969f7e52b56e194cd33a539609a8f48fa16f11d3` | 208 / 0 | 7/7 workflows PASS: Android CI (Node 938/938, portable backup smoke 378 assertions, Gradle success), contracts, Focus UI, Live Update, API 29/36 lifecycle (372/375 assertions), device artifact, unsigned device-test validation. Draft; 62 files; no independent review. |
 | #656 iCalendar/import/export | 41fda91 | `db95b1e1b909395399345ffd6c7aaa7148263dce` | 78 / 0 | 7/7 workflows PASS: Android CI (Node 842/842, Gradle success), contracts, Focus UI, Live Update, API 29/36 lifecycle (372/375), device artifact, unsigned device-test validation. Draft; no independent review. |
-| #706 status/docs | 41fda91 | `455b2f21c2d9789731d6ac8e17b3874b2f48dd09` | 5 / 0 | Android CI, contracts and device-test validation PASS on exact head. Draft; documentation-only. This snapshot/index/plan update advances the branch and requires fresh checks. |
+| #706 status/docs | 41fda91 | `6a3defe90dc4355408b12c283b22953ca7bc5e6a` | 9 / 0 | Android CI #42813481893 PASS (Node 780/780, Gradle success); contracts #42813481896 PASS; unsigned device-test #42813481898 still in progress. Draft; documentation-only. This final status refresh advances the branch and requires fresh checks. |
 | #648 Focus/download integration | 469b29e | `239b180d398f50d5f06812e706220b5367e7afbd` | 202 / 9 | Diverged/non-mergeable. No workflow runs returned for this current head. Latest known API 36 ten-run failure is older head `8ba322b`, run #42781573077: API 29 PASS; API 36 failed at run 4/10 with missing paused notification. Current head remains unverified. |
 | #676 extension SPA injection/privacy | 41fda91 | `f6bf233f739e6c85661c0f0f6e32845af2c6cb67` | 51 / 0 | 6/6 workflows PASS, including API 26/36 Service Worker/WebView runtime acceptance. No physical WebView/OEM acceptance. Draft; no independent review. |
 | #704 Service Worker fail-closed correction | 41fda91 | `ed5496c905136f70bf354c982f7c3b8b0d0df09e` | 7 / 0 | 6/6 workflows PASS: policy, contracts, Android CI, device artifact, unsigned device-test validation, API 26/36 runtime. Ready for review; no independent approval. |
-| #705 signing/provenance authorization | 41fda91 | `9810a2959ed4a2caf0be46ead62008a75a4beb8c` | 20 / 0 | Android CI #42812825727 and PR device-test #42812825828 in progress; contracts #42812825716 queued; device artifact #42812825694 pending. Ready for review; no independent security approval. |
+| #705 signing/provenance authorization | 41fda91 | `d0312cb775828cea3375367801e2b009fc64fafb` | 21 / 0 | All 4 exact-head workflows PASS: Android CI #42813190800 (Node 782/782, SLSA guard 23 assertions, Gradle success), contracts #42813190866, non-publishing device artifact #42813190829, unsigned device-test #42813190908. Ready for review; no independent security approval; protected environment configuration remains owner/admin action. |
 
 ## Engineering delivered in this run
 
@@ -85,3 +85,13 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6
 Tooling: GitHub connector via Code Mode; live REST repository/PR/issue/compare/Actions inventory; exact-source V8 probes; GitHub Actions job logs
 Timestamp (UTC): 2026-11-10T12:07:25.537Z
+
+
+## Addendum — 2026-11-10T12:15:01.294Z
+
+- Open-issue count is **25**; issue #707 was created after the earlier 24-issue baseline. The list above includes all 25 current open issues.
+- #705 current head `d0312cb775828cea3375367801e2b009fc64fafb` has all four exact-head workflows PASS; the earlier reusable-SLSA environment placement failure was corrected with a separate `authorize-provenance` gate.
+- #706 current pre-refresh head `6a3defe90dc4355408b12c283b22953ca7bc5e6a` has Android CI and contracts PASS; unsigned device-test validation remains in progress. The earlier docs guard failure was caused by a retired package literal in the snapshot; it was removed and the live AGENTS blob corrected. The next snapshot/index/plan commit will require new exact-head checks.
+- #656 current head `db95b1e1b909395399345ffd6c7aaa7148263dce` and #675 current head `969f7e52b56e194cd33a539609a8f48fa16f11d3` each have all seven workflows PASS. #656's import timestamp correction is covered by those exact-head results.
+- No independent approvals have appeared on the open PRs. No PR was merged by this run.
+
