@@ -158,8 +158,11 @@ final class TaskFocusSessionCoordinator {
             return null;
         }
 
-        boolean replaceNotification = notificationPublished
-                && notificationIdentityChanged(restored, currentTaskTitle);
+        // A newly-created runtime cannot know whether the previous process left
+        // an older notification active under this ID. Cancel once on first restore,
+        // and on every later task/title identity change.
+        boolean replaceNotification = !notificationPublished
+                || notificationIdentityChanged(restored, currentTaskTitle);
         if (replaceNotification) {
             notifications.cancel();
             notificationPublished = false;
