@@ -71,9 +71,12 @@ Do not copy another agent's identity, invent model details, reuse an old timesta
 
 Canonical repository-root checks:
 ```sh
+npm ci
 sh android-app/tools/check-v1-source.sh
 npm test
 ```
+
+The root Node test suite uses a pinned development-only Acorn parser for AST/scope-aware test-registration validation. CI jobs should run `npm ci --ignore-scripts --no-audit --no-fund --include=dev` before `npm test`; the `pretest` bootstrap is a compatibility fallback for legacy/manual workflows that have not yet added an explicit install step.
 
 Run the additional tests/builds required by the changed area and by the current release acceptance checklist. Never bypass failing tests without documenting the root cause and an approved, narrowly scoped fix.
 
