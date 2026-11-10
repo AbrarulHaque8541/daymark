@@ -164,22 +164,57 @@ assert "public void requestDisallowInterceptTouchEvent(boolean disallow)" in mod
     "mode selector must neutralize child disallow-intercept requests so it can classify MOVE"
 )
 assert "disallowParentIntercept(false);" in mode_selector, (
-    "mode selector must release parent interception on taps, vertical drags and terminal paths"
+    "mode selector must release the parent for vertical movement and every terminal path"
 )
 down_case = mode_selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split(
     "case MotionEvent.ACTION_MOVE:", 1
 )[0]
-assert "disallowParentIntercept(false);" in down_case, (
-    "a fresh tap must release stale parent interception so the child receives ACTION_UP"
+assert "disallowParentIntercept(true);" in down_case, (
+    "reserve the touch stream on ACTION_DOWN so a parent ScrollView cannot cancel a child tap before direction is classified"
 )
-assert "disallowParentIntercept(true);" not in down_case, (
-    "the selector must not block the parent before classifying the gesture"
+assert "disallowParentIntercept(false);" not in down_case, (
+    "do not release the parent before the selector has distinguished a tap from a vertical drag"
 )
-horizontal_branch = mode_selector.split(
+move_case = mode_selector.split("case MotionEvent.ACTION_MOVE:", 1)[1].split(
+    "case MotionEvent.ACTION_UP:", 1
+)[0]
+vertical_branch = move_case.split(
+    "if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)", 1
+)[1].split("if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1)[0]
+assert "verticalGesture = true;" in vertical_branch
+assert "disallowParentIntercept(false);" in vertical_branch and "return false;" in vertical_branch, (
+    "a classified vertical drag must release the parent ScrollView and leave the stream available for scrolling"
+)
+horizontal_branch = move_case.split(
     "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1
-)[1].split("case MotionEvent.ACTION_UP:", 1)[0]
-assert "disallowParentIntercept(true);" in horizontal_branch, (
-    "only a classified horizontal mode swipe may temporarily block the parent"
+)[1]
+assert "disallowParentIntercept(true);" in horizontal_branch and "return true;" in horizontal_branch, (
+    "only a classified horizontal mode swipe may keep the parent blocked and intercept the selector stream"
+)
+up_case = mode_selector.split("case MotionEvent.ACTION_UP:", 1)[1].split(
+    "case MotionEvent.ACTION_CANCEL:", 1
+)[0]
+assert "resetGesture();" in up_case and "return false;" in up_case, (
+    "an unclassified tap must release the parent and return ACTION_UP to the clickable child"
+)
+cancel_case = mode_selector.split("case MotionEvent.ACTION_CANCEL:", 1)[1].split(
+    "default:", 1
+)[0]
+assert "resetGesture();" in cancel_case, (
+    "cancellation must always release the parent interception request"
+)
+vertical_touch = mode_selector.split("public boolean onTouchEvent(MotionEvent event)", 1)[1].split(
+    "private void disallowParentIntercept", 1
+)[0]
+assert "if (verticalGesture)" in vertical_touch
+assert "disallowParentIntercept(false);" in vertical_touch and "return false;" in vertical_touch, (
+    "vertical streams must be handed back to the parent rather than consumed by the mode selector"
+)
+reset_method = mode_selector.split("private void resetGesture()", 1)[1].split(
+    "@Override", 1
+)[0]
+assert "disallowParentIntercept(false);" in reset_method, (
+    "all terminal and detach paths must clear the parent's disallow-intercept state"
 )
 assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in mode_selector, (
     "gesture ownership must be forwarded to the parent without setting the selector's own disallow flag"
