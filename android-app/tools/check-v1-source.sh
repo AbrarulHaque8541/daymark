@@ -642,6 +642,10 @@ task_editor_ime = re.search(r'private void configureDialogImeInsets\(Window dial
 assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
 assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
 assert "Api30Window.applyDialogImeInsets(dialogWindow)" in task_editor_ime.group(1)
+api30_dialog_helper = (root / "app/src/main/java/com/abrar/daymark/Api30Window.java").read_text(encoding="utf-8")
+assert "Api30Window.applyDialogImeInsets(dialogWindow)" in task_editor_ime.group(1)
+assert "WindowInsetsPolicy.dialogHeightForIme(" in api30_dialog_helper
+assert "WindowInsetsPolicy.dialogYOffsetForIme(" in api30_dialog_helper, "task editor actions must be positioned in the IME-safe dialog area"
 assert "configureDialogImeInsets(shownDialogWindow)" in activity
 assert (
     "SOFT_INPUT_ADJUST_NOTHING" in activity
