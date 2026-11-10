@@ -21,7 +21,7 @@ import java.util.Collections;
 final class BrowserServiceWorkerEnforcement {
     private static final String TAG = "DaymarkServiceWorker";
     private static final String BLOCKED_BODY =
-            "Blocked by Daymark: Service Worker network access is disabled.";
+            "Blocked by Daymark: Service Worker network access is unavailable while Offline.";
 
     private static volatile boolean installAttempted;
     private static volatile boolean settingsControlAvailable;
