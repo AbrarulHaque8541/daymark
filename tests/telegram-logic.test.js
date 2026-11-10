@@ -167,6 +167,44 @@ test('a 2xx success response requires a positive safe Telegram message id', asyn
   }
 });
 
+test('a synchronous fetch exception becomes a failure result and still clears the timeout', async () => {
+  let cleared = 0;
+  const deps = networkDeps(() => { throw new Error('synchronous transport failure'); });
+  deps.setTimeout = () => 73;
+  deps.clearTimeout = (handle) => {
+    assert.equal(handle, 73);
+    cleared += 1;
+  };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /could not reach Telegram/);
+  assert.equal(cleared, 1);
+});
+
+test('timeout setup exceptions fail closed before making a network request', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  deps.AbortController = class {
+    constructor() { throw new Error('controller unavailable'); }
+  };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /cannot make network requests/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('timeout cleanup failure cannot turn confirmed delivery into a retry-inducing failure', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  deps.clearTimeout = () => { throw new Error('timer cleanup failed'); };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.messageId, 4242);
+});
+
 test('an offline device reports an honest network reason without echoing the token', async () => {
   const fetchFn = (url, options) => Promise.reject(new Error('offline'));
   const result = await engine.sendTelegramMessage(
