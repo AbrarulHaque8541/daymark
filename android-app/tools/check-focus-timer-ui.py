@@ -164,16 +164,57 @@ assert "public void requestDisallowInterceptTouchEvent(boolean disallow)" in mod
     "mode selector must neutralize child disallow-intercept requests so it can classify MOVE"
 )
 assert "disallowParentIntercept(false);" in mode_selector, (
-    "mode selector must release parent interception on taps, vertical drags and terminal paths"
+    "mode selector must release the parent for vertical movement and every terminal path"
 )
 down_case = mode_selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split(
     "case MotionEvent.ACTION_MOVE:", 1
 )[0]
-assert "disallowParentIntercept(true);" in down_case, (
-    "mode selector must hold parent ScrollView interception until the gesture is classified"
+assert "disallowParentIntercept(false);" in down_case, (
+    "ACTION_DOWN must not reserve the parent before direction is known; child taps and vertical drags must remain deliverable"
 )
-assert "disallowParentIntercept(true);" in mode_selector, (
-    "only a classified horizontal mode swipe may temporarily block the parent"
+assert "disallowParentIntercept(true);" not in down_case, (
+    "only a classified horizontal MOVE may disallow parent interception"
+)
+move_case = mode_selector.split("case MotionEvent.ACTION_MOVE:", 1)[1].split(
+    "case MotionEvent.ACTION_UP:", 1
+)[0]
+vertical_branch = move_case.split(
+    "if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)", 1
+)[1].split("if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1)[0]
+assert "verticalGesture = true;" in vertical_branch
+assert "disallowParentIntercept(false);" in vertical_branch and "return false;" in vertical_branch, (
+    "a classified vertical drag must release the parent ScrollView and leave the stream available for scrolling"
+)
+horizontal_branch = move_case.split(
+    "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH", 1
+)[1]
+assert "disallowParentIntercept(true);" in horizontal_branch and "return true;" in horizontal_branch, (
+    "only a classified horizontal mode swipe may keep the parent blocked and intercept the selector stream"
+)
+up_case = mode_selector.split("case MotionEvent.ACTION_UP:", 1)[1].split(
+    "case MotionEvent.ACTION_CANCEL:", 1
+)[0]
+assert "resetGesture();" in up_case and "return false;" in up_case, (
+    "an unclassified tap must release the parent and return ACTION_UP to the clickable child"
+)
+cancel_case = mode_selector.split("case MotionEvent.ACTION_CANCEL:", 1)[1].split(
+    "default:", 1
+)[0]
+assert "resetGesture();" in cancel_case, (
+    "cancellation must always release the parent interception request"
+)
+vertical_touch = mode_selector.split("public boolean onTouchEvent(MotionEvent event)", 1)[1].split(
+    "private void disallowParentIntercept", 1
+)[0]
+assert "if (verticalGesture)" in vertical_touch
+assert "disallowParentIntercept(false);" in vertical_touch and "return false;" in vertical_touch, (
+    "vertical streams must be handed back to the parent rather than consumed by the mode selector"
+)
+reset_method = mode_selector.split("private void resetGesture()", 1)[1].split(
+    "@Override", 1
+)[0]
+assert "disallowParentIntercept(false);" in reset_method, (
+    "all terminal and detach paths must clear the parent's disallow-intercept state"
 )
 assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in mode_selector, (
     "gesture ownership must be forwarded to the parent without setting the selector's own disallow flag"
@@ -212,3 +253,25 @@ assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll" in mode_test, (
     "the parent Tasks ScrollView must be exercised with a real vertical drag"
 )
 print("PASS Focus Timer instrumentation targets ModeSelector and parent Tasks ScrollView")
+
+tap_start = instrumentation.index("private String dispatchTap(android.view.View view)")
+tap_end = instrumentation.index("private String dispatchSwipe", tap_start)
+tap_method = instrumentation[tap_start:tap_end]
+assert "waitForScrollPositionToSettle(parentScroll);" in tap_method
+assert tap_method.index("waitForScrollPositionToSettle(parentScroll);") < tap_method.index("stableVisibleBounds(view)"), (
+    "child tap coordinates must be computed only after the parent ScrollView has stopped moving"
+)
+settle_start = instrumentation.index("private void waitForScrollPositionToSettle(")
+settle_end = instrumentation.index("private void scrollViewIntoFocus(", settle_start)
+settle_method = instrumentation[settle_start:settle_end]
+assert "stableSamples >= 3" in settle_method and "SystemClock.sleep(50L)" in settle_method
+assert "uptimeMillis() + 2000L" in settle_method, (
+    "ScrollView settling must be bounded and require repeated stable samples"
+)
+scroll_start = instrumentation.index("private void scrollDescendantIntoScrollView(")
+scroll_end = instrumentation.index("private void scrollViewIntoFocus(", scroll_start)
+scroll_method = instrumentation[scroll_start:scroll_end]
+assert "waitForScrollPositionToSettle(scrollView);" in scroll_method, (
+    "programmatic centering must finish before a touch is injected"
+)
+print("PASS Focus Timer tap injection waits for stable parent ScrollView position")
