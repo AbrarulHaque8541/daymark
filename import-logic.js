@@ -210,12 +210,15 @@
     const notes = typeof raw.notes === 'string' ? raw.notes.slice(0, MAX_NOTES_CHARS) : '';
     const tags = cleanTags(Array.isArray(raw.tags) ? raw.tags : []);
     const subtasks = cleanSubtasks(Array.isArray(raw.subtasks) ? raw.subtasks : [], makeId) || [];
-    const createdAt = typeof raw.createdAt === 'string' && !Number.isNaN(Date.parse(raw.createdAt))
-      ? raw.createdAt
-      : now;
-    const updatedAt = typeof raw.updatedAt === 'string' && !Number.isNaN(Date.parse(raw.updatedAt))
-      ? raw.updatedAt
-      : createdAt;
+    // Only absent/empty timestamps receive import defaults. Preserve any explicitly
+    // supplied value so the shared TaskLogic validator can reject malformed or
+    // non-canonical instants instead of silently rewriting user data to "now".
+    const createdAt = raw.createdAt === undefined || raw.createdAt === null || raw.createdAt === ''
+      ? now
+      : raw.createdAt;
+    const updatedAt = raw.updatedAt === undefined || raw.updatedAt === null || raw.updatedAt === ''
+      ? createdAt
+      : raw.updatedAt;
     const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId();
     return { id, title, dueDate, dueTime, priority, completed, createdAt, updatedAt, notes, repeat, repeatDayOfMonth, tags, subtasks };
   }
@@ -724,6 +727,7 @@
     const isValidTask = logic && typeof logic.isValidTask === 'function'
       ? logic.isValidTask
       : null;
+    if (!isValidTask) throw new Error('mergeTasks requires the shared task validator.');
     const seen = new Set(existing.map((task) => task && task.id));
     const added = [];
     let duplicates = 0;
