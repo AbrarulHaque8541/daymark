@@ -16,6 +16,14 @@ final class BrowserWorkspaceController {
         if (policy == null || target == null || !policy.allowsRemoteLoads()) {
             throw new IllegalStateException("Explicit Online consent is required before navigation.");
         }
+        if (!DaymarkWebView.isServiceWorkerNetworkPolicyReady()) {
+            throw new SecurityException(
+                    "Daymark could not enforce its service-worker network policy; navigation remains blocked.");
+        }
+        // Service Worker network access follows the same explicit Online consent. If the
+        // platform setting cannot be unblocked, its request client remains fail-closed while
+        // ordinary top-level browsing can still proceed.
+        BrowserServiceWorkerEnforcement.allowNetworkAfterExplicitConsent();
         target.getSettings().setBlockNetworkLoads(false);
     }
 
@@ -26,7 +34,9 @@ final class BrowserWorkspaceController {
      * every load with no WebView callback (#221).
      */
     static void prepareTabsForExplicitNavigation(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
-        if (policy == null || !policy.allowsRemoteLoads() || tabs == null) return;
+        if (policy == null || !policy.allowsRemoteLoads() || tabs == null
+                || !DaymarkWebView.isServiceWorkerNetworkPolicyReady()) return;
+        BrowserServiceWorkerEnforcement.allowNetworkAfterExplicitConsent();
         for (DaymarkWebView tab : tabs) {
             if (tab == null) continue;
             try {
@@ -38,6 +48,11 @@ final class BrowserWorkspaceController {
     }
 
     static void enforceOffline(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
+        if (policy != null && !policy.allowsRemoteLoads()) {
+            // Service Workers use a process-wide controller, not the retained WebView list.
+            // Reassert their global fail-closed boundary even when there are no live tabs.
+            BrowserServiceWorkerEnforcement.enforceBlocked();
+        }
         BrowserOfflineEnforcement.enforceOffline(policy, tabs);
     }
 }

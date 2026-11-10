@@ -9,6 +9,7 @@ instrumentation = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPla
 receiver = (root / "app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java").read_text(encoding="utf-8")
 scheduler = (root / "app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java").read_text(encoding="utf-8")
 policy = (root / "app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java").read_text(encoding="utf-8")
+manifest = (root / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
 task_logic = (root / "app/src/main/java/com/abrar/daymark/TaskLogic.java").read_text(encoding="utf-8")
 core_runner = (root / "tools/run-core-tests.sh").read_text(encoding="utf-8")
 
@@ -35,6 +36,23 @@ assert "advanceRepeatingTasksWithoutReminders();" in method
 assert "TaskLogic.advanceRepeat(current, zone, shownAt)" in listener
 assert "TaskReminderScheduler.rescheduleAll(this, tasks);" in activity
 assert "TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity.this);" in activity
+
+# Boot and system clock/timezone changes must all re-arm the absolute RTC alarm schedule.
+assert "ReminderSchedulePolicy.shouldRescheduleForSystemChange(action)" in receiver
+assert "rescheduleAfterSystemChange(context)" in receiver
+assert "private void rescheduleAfterSystemChange(Context context)" in receiver
+receive_method = receiver.split("public void onReceive(Context context, Intent intent)", 1)[1].split(
+    "private void showReminder", 1
+)[0]
+assert receive_method.index("rescheduleAfterSystemChange(context)") < receive_method.index("showReminder(context, intent)")
+for action in (
+    "android.intent.action.BOOT_COMPLETED",
+    "android.intent.action.QUICKBOOT_POWERON",
+    "android.intent.action.TIME_SET",
+    "android.intent.action.TIMEZONE_CHANGED",
+):
+    assert action in policy and action in manifest, f"system reminder reschedule action is missing: {action}"
+assert "The schedule is recomputed on task saves, app open, boot, and system clock/timezone" in scheduler
 
 # Snooze is a durable override tied to one exact base occurrence, not a fire-time mismatch.
 assert 'static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";' in receiver
