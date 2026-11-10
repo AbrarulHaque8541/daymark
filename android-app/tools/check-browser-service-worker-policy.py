@@ -45,8 +45,10 @@ require("BrowserServiceWorkerPolicy.decide(onlineAllowed, scheme)" in enforcemen
 require("new WebResourceResponse(" in enforcement and "403" in enforcement,
         "return a synthetic blocked response instead of allowing network pass-through")
 require("allowNetworkAfterExplicitConsent()" in enforcement
-        and ".setBlockNetworkLoads(false)" in enforcement,
-        "only the explicit Online consent path may unblock the process-wide Service Worker setting")
+        and ".setBlockNetworkLoads(false)" in enforcement
+        and "return settingsBlocked || clientInstalled;" in enforcement
+        and "if (!enforced)" in enforcement,
+        "only explicit Online consent may unblock workers, and Offline must report a verified block or client fallback")
 require("BrowserServiceWorkerEnforcement.enforceBlocked();" in workspace
         and "BrowserServiceWorkerEnforcement.allowNetworkAfterExplicitConsent();" in workspace
         and "if (policy != null && !policy.allowsRemoteLoads())" in workspace,
