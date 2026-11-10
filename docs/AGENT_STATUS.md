@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-10T19:03:05.933Z (main 08b6eece; #716 merged; eight integration branches synchronized; #715/#717 handoff)](./CURRENT_STATUS_20261110T190305Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T14:22:39Z (main 41fda91; #708 5/5 PASS; #675 API 36 trace refinement and stable-scroll instrumentation)](./CURRENT_STATUS_20261110T142239Z.md)
 - [Previous snapshot — 2026-11-10T14:08:50Z](./CURRENT_STATUS_20261110T140850Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T13:53:03Z (Instant parity, task-generation fence, exact PR/CI inventory)](./CURRENT_STATUS_20261110T135303Z.md)
