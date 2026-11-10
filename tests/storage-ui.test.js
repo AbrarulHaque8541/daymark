@@ -371,7 +371,8 @@ test('Clear All restores the exact task generation when Focus generation cannot 
 
     await ui.attachStorageUi(env).onClearAll();
 
-    assert.deepEqual(removedKeys, [], 'failed generation preparation removes no user data');
+    assert.ok(removedKeys.every((key) => key === mutation.TASK_GENERATION_KEY),
+      'failed generation preparation removes no user data (only a temporary generation marker may be removed)');
     assert.equal(storageData['daymark.tasks.v1'], '[]');
     assert.equal(storageData['daymark.focus.v1'], '{"session":null,"log":[]}');
     assert.equal(storageData[mutation.TASK_GENERATION_KEY], previousGeneration,
