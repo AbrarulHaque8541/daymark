@@ -39,6 +39,8 @@
   <script src="telegram-logic.js" defer></script>
   <script src="telegram-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
+  <script src="task-mutation-logic.js" defer></script>
+  <script src="focus-mutation-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="storage-logic.js" defer></script>
   <script src="storage-ui.js" defer></script>
@@ -438,11 +440,11 @@
             <button class="button button-primary" id="webhook-save" type="submit">Save</button>
             <button class="button button-quiet" id="webhook-test" type="button">Test</button>
             <button class="button button-quiet" id="webhook-flush" type="button">Retry queue</button>
-            <button class="button button-quiet" id="webhook-clear-queue" type="button">Clear queue</button>
+            <button class="button button-quiet" id="webhook-clear-queue" type="button" aria-label="Clear all queued webhook events on this device">Clear all queued events</button>
           </form>
+          <p class="feed-status">The webhook endpoint stays in this tab only and must be re-entered after reload. The saved queue never stores the endpoint URL; it stores a SHA-256 destination fingerprint so events cannot be sent to a different tab's endpoint. Older unassigned events require confirmation before reassignment.</p>
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
-
         <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="telegram-heading">Telegram task digest</h2>
@@ -461,7 +463,7 @@
         <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="storage-heading">Browser storage health</h2>
-          <p class="briefing-description">Local-only check of this origin’s storage. No network.</p>
+          <p class="briefing-description">Local-only check of non-secret storage. The legacy webhook endpoint is excluded; webhook privacy cleanup removes it without reading. No network.</p>
           <form id="storage-form" class="feed-form" novalidate>
             <button class="button button-primary" id="storage-check" type="button">Check</button>
             <button class="button button-quiet" id="storage-clear" type="button">Clear status</button>

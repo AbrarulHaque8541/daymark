@@ -1,3 +1,433 @@
+## Current execution queue refresh — 2026-11-10T05:07:00Z (main 91f57d7)
+
+Latest live snapshot: [CURRENT_STATUS_20261110T050700Z.md](docs/CURRENT_STATUS_20261110T050700Z.md).
+
+- P0: finish #648 Focus notification replacement on API 36 ten-run gate; complete #677 real ModeSelector instrumentation on API 29/36; complete #683 cross-tab save/import/recovery/clear/undo matrix; owner-side governance #646; physical acceptance #160.
+- P1: integrate #665 signing boundary after independent review; complete #671/#678 secure download transport; generate #692 lockfile on network-enabled Node 20/22 (#696); finish #690/#689 Focus/webhook locking and invalidation; extension recovery UI #687; Service Worker Online compatibility #685/#686; recurrence/tag/RFC 5545 parity #684/#656/#675.
+- Exact baseline: main `91f57d79ab3d344d4d78df116ecf3ed4afe81087`; 12 open PRs / 23 issues; main Android/contracts push checks pass. Main branch protection remains disabled and rulesets are empty.
+- #694 latest head `ef936eb1e3c905571547980a048dabd9032c85e2` has five workflows PASS. #675 head `4b33c04b7c131458c19649a45229e4461208d01b` has Android/contracts/device APK PASS. #648 and #677 latest Focus API29/36 gates remain in progress.
+- No PR merged, no release/tag/version/signer/identity change, no destructive migration. Current source identity remains owner-approved `com.abrar.daymark`; the conflicting run-level package-identity request is unresolved.
+
+---
+
+## Current execution queue refresh — 2026-11-10T04:42:00Z (main 91f57d7)
+
+Latest live snapshot: [CURRENT_STATUS_20261110T044200Z.md](docs/CURRENT_STATUS_20261110T044200Z.md).
+
+Current baseline: main `91f57d79ab3d344d4d78df116ecf3ed4afe81087`; root AGENTS blob `492ed21e2219a8d1b80c7d6e63575525c98a5a91`; 12 open PRs / 23 open issues. Main push Android CI #42753807924 and contracts #42753807949 pass. Main protection is disabled (`protected=false`), rulesets are empty; detailed protection endpoint returns 403.
+
+### Immediate P0
+1. #648/#613: finish latest Focus single-read/stale-runtime reconciliation checks and the API 36 ten-run gate; then carry the proven correction into #677's right-swipe failure.
+2. #683: complete task save/import/recovery/clear/undo race tests using the shared Web Locks mutation contract.
+3. #646: owner-side required checks and independent approvals; do not bypass protection.
+4. #160: physical Android/WebView/OEM acceptance; CI artifacts are not device tests.
+
+### P1
+- #665/#84: PR workflow now has no signing-secret references; tag-only workflows check main ancestry. Exact-head Android/contracts/device checks pass; independent security/provenance review still required.
+- #694/#693: AST guard now rejects computed/dynamic skip/todo flags and opaque options; five exact-head workflows pass; not yet on main.
+- #675/#656/#684: shared task mutation files are byte-identical, but task-logic differs. Preserve #656 recurrence validation and #675 tag validation together.
+- #671/#678: finish the actual pinned-address, redirect-validating, bounded-stream Android download transport.
+- #692/#696: desktop download staging/publish policy is tested; lockfile remains absent. Local npm registry resolution timed out; generate on network-enabled Node 20/22 and verify npm ci across OSes before changing CI.
+- #659/#687: complete accessible extension recovery UI.
+- #685/#686: retain fail-closed Service Worker policy until a reviewed Online-compatible contract is implemented.
+- #690/#689: finish Focus/webhook cross-domain locking and same-tab invalidation.
+
+No release/tag/version/signer/identity change or destructive migration was made. Current source identity remains `com.abrar.daymark`; the conflicting run-level package-identity instruction remains unresolved and requires owner approval before any identity change.
+
+---
+
+## Latest repo-wide engineering handoff — 2026-11-10T02:18:05Z
+
+Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; main Android CI and cross-platform contracts PASS. 11 open PRs and 21 open issues.
+
+**Delivered:** Focus merged-snapshot adoption/conflict preservation in #675 (code head `ae4edcce`; current docs head `f776bdc`; Node 831/831, Android/contracts/device artifact PASS). Desktop remote-download path containment and injectable cancellation handler in #692 (head `d6c3dbf`; Desktop 42/42 on Ubuntu/Windows/macOS, contracts PASS, Android CI Node 696/696, device APK verification PASS). Release publishing was skipped.
+
+**Still open:** API 36 Focus failures #648/#677; cross-tab task/import/recovery/undo races #683; governance #646; physical acceptance #160; Android secure downloads #671; desktop local-process TOCTOU boundary #691/#692; signing/provenance #665/#84; extension recovery UI #659/#687; Service Worker compatibility #685/#686; recurrence parity #684/#476. No independent PR approval found. Main protection remains disabled; detailed protection read returns 403. #675 is 176 commits ahead and requires scope review before merge consideration.
+
+**Safety:** no merge, release, tag, version, signing-key, application identity or destructive migration change; no physical-device test. Run-level identity directive conflicts with owner-approved AGENTS/Gradle identity; no migration was performed.
+
+See [full dated evidence snapshot](CURRENT_STATUS_20261110T021805Z.md) for exact heads, workflow IDs, blockers and next priorities.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live source, PR/issue, branch and exact-head Actions review
+Timestamp (UTC): 2026-11-10T02:18:05Z
+
+---
+
+## Latest repo-wide engineering handoff — 2026-11-10T02:08:52Z
+
+**Main:** `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; exact main push Android CI and Ubuntu/Windows contracts PASS. 11 open PRs, 21 open issues.
+
+**Delivered in this run:** PR #675 now reconciles the merged Focus snapshot into in-memory state under the Focus Web Lock before advancing its persisted baseline; conflict paths preserve local state. Exact head `ae4edcce101bf326361452067c1de643c0d30d4b`: Node 831/831, Android CI PASS, contracts PASS, device artifact pending. PR #692 adds sanitized, collision-safe desktop download paths and fail-closed Electron download setup. Exact head `3ae15ef16e33bdcad141c323fe66c536549c2621`: Desktop CI 37/37 on Ubuntu/Windows/macOS and cross-platform contracts PASS; Android CI and device APK build still in progress.
+
+**Still open:** API 36 Focus failures #648/#677; cross-tab task/import/recovery/undo races #683; branch governance #646; physical acceptance #160; Android download transport #671; signing/provenance #665/#84; extension recovery UI #659/#687; Service Worker Online compatibility #685/#686; recurrence parity #684/#476. No independent PR approval found. Main protection remains disabled and detailed protection access returns 403.
+
+**Safety:** no merge, release, tag, version, signing-key, application identity, or destructive migration change. No physical-device testing. Application identity directive mismatch remains unresolved between repository source/AGENTS and the run-level instruction; no identity change or migration was performed.
+
+See [full dated evidence snapshot](docs/CURRENT_STATUS_20261110T020852Z.md) for exact PR heads, workflow IDs, blockers and next priorities.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live repository, PR, issue and Actions evidence review
+Timestamp (UTC): 2026-11-10T02:08:52Z
+
+---
+
+## Latest repo-wide engineering handoff — 2026-11-09T23:26:56Z
+
+**Verified code head:** PR #675 `f0983019e0764b2fd85effece83e3c651bc501bf` (base main `1532838c78ab350b18f95e96a2c547ba384f0831`). Android CI, Ubuntu/Windows contracts, and device-test APK verification all PASS on that exact code head. The APK is an artifact only; no physical-device test or release occurred.
+
+**Delivered:** task completion now appends its webhook event inside an awaited task-lock `afterCommit`; Clear Queue, storage-card queue clear and Clear All share task→delivery→queue lock order; rejected locks fail closed; same-tab memory-only webhook events are reset inside the lock scope; script order ensures the lock helper exists before webhook auto-boot. Regression coverage verifies ordering, fail-closed behavior, after-commit timing, in-flight task-lock waiting and memory-only reset. See [full evidence snapshot](docs/CURRENT_STATUS_20261109T232656Z.md).
+
+**Still open:** #690 Focus writer/clear lock and same-tab invalidation; #683 import-vs-normal-save/clear/recovery races; #677 API 36 Task Editor IME failure; #646 main protection; #160 physical-device acceptance; #671 secure download transport; #665 signing/provenance; #687 extension recovery UI; #684/#476 recurrence parity. Do not close #689 until the Focus dependency is integrated.
+
+**Repository baseline:** 11 open PRs, 20 open issues; main `1532838`; no independent approvals; main protection disabled and no rulesets. No merge, release, tag, version/signing/application identity change, or destructive migration was performed.
+
+---
+
+## Latest verified execution — 2026-11-09T22:17:56.838Z
+
+Main remains `1532838c78ab350b18f95e96a2c547ba384f0831`; exact-main Android CI and Ubuntu/Windows contracts PASS. Full inventory, exact PR heads, run links and device limitations: [CURRENT_STATUS_20261109T221756Z.md](docs/CURRENT_STATUS_20261109T221756Z.md).
+
+New delivery on #688: `8e1f562ee24c2f7094d8006e980cbc4e3d3991c8` tracks the exact `node:test` imported identifier, rejecting local `test`/`it` impostors. Exact-source V8 12/12 PASS; Node 684/684 PASS; Android CI, Ubuntu/Windows contracts and both-flavor device-test APK PASS. PR remains unmerged pending independent approval.
+
+Current P0 queue:
+1. #683 — implement origin-wide Web Locks for task writes/import/recovery/recurrence/clear/undo; reread and apply mutation intent inside lock; deterministic two-tab tests. Webhook queue locks do not protect task storage.
+2. #613/#677/#648 — integrate tested Focus/IME fix sequentially into reminder branch; #677 API36 still fails Cancel with IME visible.
+3. #646/#160 — owner-approved branch protection and physical Android/WebView acceptance.
+
+Next P1: #675 recovery review; #687 malformed-extension recovery UI; #685/#686 Service Worker Online compatibility; #671/#678 complete secure download transport; #684/#476 recurrence parity; #665/#84 signing/provenance; #656/#676/#682 independent data/security review.
+
+No merge, release, tag, version, signing-key, package-identity, manifest-permission or destructive data change this cycle. Physical-device testing NOT TESTED.
+
+Work by: ChatGPT (OpenAI) · Model: GPT-6 · Tooling: GitHub connector via Code Mode · Timestamp (UTC): 2026-11-09T22:17:56.838Z
+
+---
+
+## Latest verified execution — 2026-11-09T22:01:18Z
+
+Main remains 1532838c78ab350b18f95e96a2c547ba384f0831; Android CI and Ubuntu/Windows contracts PASS. Full evidence: [CURRENT_STATUS_20261109T220118Z.md](docs/CURRENT_STATUS_20261109T220118Z.md).
+
+Delivered on existing owner branches:
+- #675: fixed the undefined Focus backup helper and stale hasPayload/hasBackup field mismatch; added four recovery regressions. Exact head d9565581d20fab7d84668ac1b7d9c61f29c0fba6 passes Android CI (768/768 Node tests), contracts and device APK.
+- #688: hardened Node test registration scanning against regex/control-flow and options-object false positives; exact head 2a0e4ea27c5519c7a000ae755bfdfc468b2be3da passes Android CI (684/684), contracts and device APK; ready for review.
+
+Current P0 queue:
+1. #683 — implement a real origin-wide Web Locks mutation contract across app writes/import/recovery/clear/undo; do not merge the localStorage lease branch.
+2. #613/#677/#648 — integrate the tested Task Editor IME fix sequentially; #677 API36 currently fails Cancel while IME is visible.
+3. #646/#160 — owner/admin branch-protection configuration and physical Android/WebView acceptance.
+
+Next P1 queue: #675/#636/#639 recovery/webhook review; #687 malformed extension recovery UI with #659 store APIs and #648 MainActivity ownership; #685/#686 Service Worker compatibility; #671/#678 secure download transport; #684/#476 recurrence; #665/#84 signing/provenance; #656/#676/#682 independent reviews.
+
+Governance: all 11 open PRs target main; no independent APPROVED review and no requested reviewers found. Main reports protected=false, no rulesets, and detailed protection endpoint returns 403. No merge, release, tag, version, signer, package identity or destructive data action was taken.
+
+Work by: ChatGPT (OpenAI) · Model: GPT-6 · Tooling: GitHub connector via Code Mode · Timestamp (UTC): 2026-11-09T22:01:18Z
+
+---
+## Latest documentation-guard correction — 2026-11-09T21:18:11.184Z
+
+The docs-only PR #675 head `b71b8c0461a5694b2173621c333a5be8893e243b` triggered Android CI and device-test asset workflows; both failed at the package-cleanliness guard because the newly added status snapshot repeated a retired application-identity literal while describing Issue #679. This was a documentation-only failure, not a production-source/test failure.
+
+The literal has been removed in commit `fbec70fac0eb707a6421a594ec1eb924ed1ee7a7`. That docs-only commit did not trigger a new Actions run by itself (path filtering). A fresh exact-head run is pending a workflow-relevant plan update; do not treat the older failure as current-main or production-code failure, and do not claim the corrected docs head is green until fresh checks complete.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T21:18:11.184Z
+
+---
+
+## Current execution queue — 2026-11-09T21:12:32.998Z (main 1532838c; #683 branch safety review; #688 test-source guard in CI)
+
+Full live inventory and exact-head evidence: [CURRENT_STATUS_20261109T211232Z.md](docs/CURRENT_STATUS_20261109T211232Z.md).
+
+1. **P0 #683:** reject the non-atomic localStorage lease branch; implement origin-wide Web Locks across normal writes/import/recovery/clear/undo, with fail-closed fallback and true two-context tests.
+2. **P0 #613/#677/#648:** integrate the tested #648 Focus/IME implementation sequentially into #677 and rerun API 29/36; exact #677 API36 currently fails Cancel with IME visible.
+3. **P0 #646/#160:** owner-side branch protection and physical Android/WebView acceptance.
+4. **P1 #675/#640/#636/#639:** independent recovery/webhook data-integrity review; do not conflate queue locking with task locking.
+5. **P1 #687/#659:** accessible malformed-extension recovery/export/removal UI; store-layer parent-symlink protections are already present on #659.
+6. **P1 #685/#686:** decide Service Worker Online compatibility while retaining Offline fail-closed behavior.
+7. **P1 #671/#678:** complete DNS-pinned/TLS-verified bounded browser download transport; keep downloads fail-closed.
+8. **P1 #684/#476:** align Android/web recurrence semantics and validate alarms, Doze, reboot, timezone and OEM delivery.
+9. **P1 #665/#84:** independent signing/provenance review and direct/transitive Actions runtime modernization.
+10. **P1 #656/#676/#682:** independent import/export, extension and browser-data review; integrate imports with the shared task mutation contract.
+11. **P1 #688:** finish exact-head CI and independent review for the Node test-source integrity guard.
+12. **P2 #325/#348:** measured cross-platform, browser UX, accessibility and performance work.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T21:12:32.998Z
+
+---
+
+## Current execution queue — 2026-11-09T20:35:56.690Z (main 1532838c; exact-head follow-up for #675/#686/#659)
+
+Full inventory and evidence: [CURRENT_STATUS_20261109T203556Z.md](docs/CURRENT_STATUS_20261109T203556Z.md).
+
+1. **P0 #683:** cross-tab task mutation contract across normal saves, import, recovery, clear and undo; coordinate #675/#656.
+2. **P0 #613/#677/#648:** integrate Focus/IME correction and rerun strict API 29/36 reminder lifecycle.
+3. **P0 #646/#160:** owner-side branch protection/independent review and physical Android/WebView acceptance.
+4. **P1 #675/#640/#636/#639:** independent recovery/webhook review and manual exact-byte recovery acceptance.
+5. **P1 #687/#659:** accessible malformed-extension recovery/export/removal UI, coordinated with MainActivity ownership.
+6. **P1 #685/#686:** finish multi-origin/Activity/renderer Service Worker acceptance and resolve global-block compatibility.
+7. **P1 #671/#678:** complete secure app-owned download transport; keep actual downloads fail-closed.
+8. **P1 #684/#476:** align Android/web recurrence semantics and validate alarms, Doze, reboot, timezone and OEM delivery.
+9. **P1 #665/#84:** independent signing/provenance and Actions runtime review.
+10. **P1 #656/#676/#682:** independent import/export, extension and browser-data review.
+11. **P2 #325/#348:** measured cross-platform, browser UX, accessibility and performance work.
+
+No release/tag/version/signer/application identity change, destructive migration, force push or protection bypass is authorized.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T20:35:56.690Z
+
+---
+
+## Current execution queue — 2026-11-09T20:35:23.409Z (main 1532838c; #686 multi-origin runtime coverage; #659 host-smoke compile fix)
+
+Full exact-head inventory and delivery ledger: [CURRENT_STATUS_20261109T203523Z.md](docs/CURRENT_STATUS_20261109T203523Z.md).
+
+1. **P0 #683:** shared cross-tab task mutation contract across app writes, imports, recovery, clear and undo; coordinate #675/#656.
+2. **P0 #613/#677/#648:** integrate Focus/IME correction and rerun strict API 29/36 reminder lifecycle acceptance.
+3. **P0 #646/#160:** owner-side required checks/independent review and physical Android/WebView acceptance.
+4. **P1 #675/#640/#636/#639:** independent recovery/webhook security review and exact-byte/manual recovery acceptance.
+5. **P1 #687/#659:** accessible malformed-extension recovery/export/removal UI, coordinated with MainActivity owner.
+6. **P1 #685/#686:** finish multi-origin/Activity/renderer Service Worker acceptance; owner decision on global block while Online.
+7. **P1 #671/#678:** complete secure app-owned browser download transport; keep downloads fail-closed until then.
+8. **P1 #684/#476:** align Android/web recurrence semantics and validate reminders/Doze/reboot/timezone/OEM behavior.
+9. **P1 #665/#84:** independent signing/provenance and Actions runtime review.
+10. **P1 #656/#676/#682:** independent import/export, extension and browser-data reviews.
+11. **P2 #325/#348:** measured cross-platform, browser UX, accessibility and performance work.
+
+No release, tag, version, signer, application identity, destructive migration, force push or protection bypass is authorized.
+
+Work by: ChatGPT (OpenAI)  
+Model: GPT-6  
+Tooling: GitHub connector via Code Mode  
+Timestamp (UTC): 2026-11-09T20:35:23.409Z
+
+---
+
+## Current execution queue — 2026-11-09T20:26:52.786Z (main 1532838c; #659 malformed-pack recovery store API CI green; #686 Service Worker API26/API36 runtime green)
+
+Full exact-head evidence, all ten open PR heads, issue inventory and delivery ledger are in [CURRENT_STATUS_20261109T202652Z.md](docs/CURRENT_STATUS_20261109T202652Z.md).
+
+1. **P0 — #683 task data integrity:** implement one origin-wide atomic mutation contract across normal task writes, import, recovery restore, clear/undo. The current `persistTasks()` still writes a stale snapshot; import compare-before-write is not atomic.
+2. **P0 — #613/#677/#648 Android lifecycle:** integrate #648's tested dialog-insets correction into the reminder branch without overwriting reminder work; rerun strict API 29/36 acceptance. Physical-device acceptance remains NOT TESTED.
+3. **P1 — #675/#640 recovery/storage:** obtain independent data-integrity/security review and manual recovery-export acceptance; preserve unknown bytes and never overwrite the only recovery copy.
+4. **P1 — #687/#659 extension recovery UI:** integrate the new malformed-pack metadata, exact-byte export and fingerprint-checked removal APIs into an accessible disabled manager row; require a separate user confirmation. Coordinate the shared MainActivity edit with #648.
+5. **P1 — #685/#686 Service Worker:** API 26/36 emulator runtime now passes for both app flavors, but the global block while Online remains a compatibility trade-off. Obtain owner acceptance or implement a reviewed origin-scoped grant model; add multi-origin/tab, Activity/renderer recreation and physical request tracing.
+6. **P1 — #671/#678 downloads:** finish Daymark-owned redirect-by-redirect HTTPS transport, DNS/address pinning, TLS hostname verification, same-origin credentials, bounded streaming, cancellation and temp-file cleanup. Keep actual downloads fail-closed until integrated.
+7. **P1 — #684/#476 recurrence/reminders:** settle Android/web completion and catch-up semantics before modifying shared task flows; validate AlarmManager, reboot, Doze, timezone and OEM delivery.
+8. **P1 — #665/#84 signing/provenance:** independently review PR-build secret isolation and provenance; preserve trusted SLSA identity while resolving the transitive Node20 dependency.
+9. **P1 — #656/#676/#682/#659:** complete independent RFC 5545, extension trust/SPA scope, browser-data and recovery UI reviews; preserve cross-tab import guarantees.
+10. **P0 — #646/#160 governance/device:** owner/admin branch protection and independent review policy; physical Android/WebView/OEM acceptance with device/model, API, WebView version, tested SHA and APK SHA.
+11. **P2 — #325/#348:** measured cross-platform architecture, browser UX, accessibility and performance work.
+
+No PR was merged into main. No release/tag/version/signing-key/applicationId change, destructive migration, force push or protection bypass occurred.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live repository/PR/issue/Actions inventory and exact-head source/test inspection
+Timestamp (UTC): 2026-11-09T20:26:52.786Z
+---
+
+## Current whole-project execution queue — 2026-11-09T15:24:39Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed exact-head inventory, CI evidence, issue list and safety limitations are in [the 15:24 status snapshot](docs/CURRENT_STATUS_20261109T152439Z.md). The #675 head recorded there is the fully green plan-refresh head before this new snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Seven open PRs, twelve open issues; all seven PR bases equal current main. No independent approvals/requested reviewers.
+- Main protection disabled, rulesets empty; detailed protection endpoint HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: all Android/contracts/Focus UI/Live Update/device artifact checks PASS; API29 367 assertions PASS; API36 **10/10 runs PASS**, 370 assertions each. Physical acceptance pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545 review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device PASS; Node 541/541, ExtensionStore smoke 12, 16 guard mutations; independent review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device PASS; draft; PR/debug signing secrets isolated, tag-only signed build. SLSA v1.4.0 upstream Node20 dependency remains.
+- **#675** `8fe4a143cfcae3ae546cc2bd337dcc9042296379`: Android CI #42643754741, contracts #42643754413, device APK #42643754424 **PASS**; code/test head `9bda5bf` Node 728/728 and all build/artifact checks PASS; latest docs/plan head also fully green. Draft; independent security/data-integrity review pending.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device PASS; ExtensionInjectorSmoke 41 assertions; independent review and physical browser acceptance pending.
+- **#677** `925930b88649c25017c2cd8f00af72dbf090e6fa`: Android CI/host reminder guards/Node/Gradle PASS; contracts PASS; Focus Live Update PASS; device acceptance and device APK PASS (release skipped). API29 Focus PASS; API36 Focus FAIL at known horizontal-swipe assertion because this main-based branch lacks #648's screen-coordinate correction. Do not weaken/retry away; synchronize after #648 is independently reviewed/merged and rerun.
+
+### Prioritized backlog
+1. **P0 — Independent review/integration:** #648 Focus coordinate fix; #675 webhook/storage/recovery; #665 signing-secret boundary; #656 import semantics; #659/#676 extension security; #677 reminder time-change re-arming. No merge without independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** real devices with model/API/WebView provider/version, APK SHA and evidence for browser, extensions, SAF, updates, reminders and downloads. CI/emulator artifacts are not physical acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport validates downgrade/private addresses/host, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp cleanup and cancellation/error behavior.
+4. **P1 — Reminder delivery (#476/#677):** synchronize #677 with #648, rerun API36, then test actual clock/timezone transitions and reboot/Doze/OEM behavior on physical devices. Browser checks remain nominal 30s and subject to hidden-tab throttling.
+5. **P0 — Governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations, no force-push/deletion.
+6. **P1 — Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or separately review provenance migration.
+7. **P2 — Cross-platform/browser (#325/#348):** measured compatibility and performance.
+
+## Historical whole-project execution queue — 2026-11-09T15:20:06Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed seven-PR inventory, exact heads/checks, issue list, work log and limitations are in [the 15:20 status snapshot](docs/CURRENT_STATUS_20261109T152006Z.md). The #675 head captured there is the plan-refresh head before this snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Seven open PRs, twelve open issues; all seven PR bases equal current main. No independent approvals/requested reviewers.
+- Main protection disabled, rulesets empty; detailed protection endpoint HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: all Android/contracts/Focus UI/Live Update/device artifact checks PASS; API29 367 assertions PASS; API36 **10/10 runs PASS**, 370 assertions each. Physical acceptance pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545 review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device PASS; Node 541/541, ExtensionStore smoke 12, 16 guard mutations; independent review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device PASS; draft; PR/debug signing secrets isolated, tag-only signed build. SLSA v1.4.0 upstream Node20 dependency remains.
+- **#675** `804a97021e514e9ad38ba97dda66ebfdd41fd841`: previous code/test head Node 728/728 and all workflows PASS; docs-only head f55ffb Android/contracts/device PASS; current plan-refresh head contracts PASS, Android CI IN PROGRESS, device APK PENDING.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device PASS; ExtensionInjectorSmoke 41 assertions; independent review and physical browser acceptance pending.
+- **#677** `925930b88649c25017c2cd8f00af72dbf090e6fa`: Android CI/host reminder guards/Node/Gradle PASS; contracts PASS; Focus Live Update PASS; device acceptance artifact and device APK PASS (release skipped). API29 Focus PASS; API36 Focus FAIL at the known horizontal-swipe instrumentation assertion because #677 is based on main and lacks #648's screen-coordinate correction. Do not weaken/retry away; synchronize after #648 is independently reviewed/merged and rerun.
+
+### Prioritized backlog
+1. **P0 — Independent review/integration:** #648 Focus coordinate fix; #675 webhook/storage/recovery; #665 signing-secret boundary; #656 import semantics; #659/#676 extension security; #677 reminder time-change re-arming. No merge without independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** real devices with model/API/WebView provider/version, APK SHA and evidence for browser, extensions, SAF, updates, reminders and downloads. CI/emulator artifacts are not physical acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport validates downgrade/private addresses/host, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp cleanup and cancellation/error behavior.
+4. **P1 — Reminder delivery (#476/#677):** synchronize #677 with #648, rerun API36, then test actual clock/timezone transitions and reboot/Doze/OEM behavior on physical devices. Browser checks remain nominal 30s and subject to hidden-tab throttling.
+5. **P0 — Governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations, no force-push/deletion.
+6. **P1 — Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or separately review provenance migration.
+7. **P2 — Cross-platform/browser (#325/#348):** measured compatibility and performance.
+
+## Historical whole-project execution queue — 2026-11-09T15:17:00Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed seven-PR inventory, exact heads/checks, 12 open issues, delivery log and limitations are in [the 15:17 status snapshot](docs/CURRENT_STATUS_20261109T151700Z.md). The #675 head recorded there is the green code/test head before the snapshot/index/plan documentation commits; the docs-only head is independently re-running CI.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Seven open PRs, twelve open issues; all seven PR bases equal current main. No independent approval and no requested reviewers.
+- Main protection is disabled, rulesets empty; detailed protection endpoint returns HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance remains NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: Android CI, contracts, Focus UI/Sound, Live Update, device acceptance artifact and device-test APK PASS. API29 367 assertions PASS; API36 **10/10 consecutive runs PASS**, 370 assertions each. Root-to-screen coordinate conversion and actual-control viewport positioning fixed the prior injection failures. Physical device acceptance pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545/data-integrity review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device checks PASS; Node 541/541, ExtensionStore smoke 12 assertions, 16 guard mutations; independent extension-security review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device APK PASS; draft. PR/debug builds receive no signing secrets; tag-only signed build and temp-keystore cleanup. Upstream SLSA v1.4.0 still embeds a Node20 artifact action; provenance review required.
+- **#675** `f55ffb2e4e96ad51245ad833a6b76030792224c0`: Android CI #42640818091, Ubuntu/Windows #42640818105 and device-test APK #42640818066 PASS; code/test head `9bda5bf` Node 728/728 and Gradle debug build PASS; release publication skipped. Draft; independent security/data-integrity review pending.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device acceptance/device APK PASS; ExtensionInjectorSmoke 41 assertions. Page-bound CSS/JS injection and JS-only GM_addStyle bootstrap; physical browser acceptance pending.
+- **#677** `925930b88649c25017c2cd8f00af72dbf090e6fa`: draft, 14 commits/9 files/0 behind. Adds TIME_SET/TIMEZONE_CHANGED receiver actions routed through the existing encrypted-task read and `rescheduleAll()`, pure policy smoke tests, manifest/source guards and mutation tests. Current exact-head Android CI, contracts, Focus emulator and device-artifact workflows are IN PROGRESS/PENDING. Previous head `b596f0` passed Android CI/contracts/device-acceptance artifact; Focus emulator/device APK had not completed. Browser docs now disclose nominal 30s in-page checks and background timer throttling.
+
+### Prioritized whole-project backlog
+1. **P0 — Independent review/integration:** #675 webhook endpoint isolation/storage/recovery; #665 signing-secret boundary; #656 import semantics; #659/#676 extension security; #648 Focus/download boundary; #677 reminder system-time re-arming. No merge without fresh independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** current-main APK on real devices with model/API/WebView provider/version, APK SHA and scenario evidence for browser, extensions, SAF, updates, reminders and downloads. CI/emulator artifacts are not physical-device acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep current-main downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport enforces downgrade/private-address/host checks, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp-file cleanup and cancellation/error handling. Do not use preflight-then-DownloadManager.
+4. **P1 — Reminder delivery (#476/#677):** finish exact-head CI; test actual clock/timezone changes and reboot/Doze/OEM behavior on physical devices; retain browser background-throttling limitations.
+5. **P0 — Main governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations and force-push/deletion restrictions.
+6. **P1 — Finish Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or perform a separately reviewed provenance migration.
+7. **P2 — Cross-platform/browser architecture (#325/#348):** measured compatibility and performance work.
+
+## Historical whole-project execution queue — 2026-11-09T15:02:16Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed exact-head inventory, CI evidence, issue list, work log and safety limitations are in [the 15:02 status snapshot](docs/CURRENT_STATUS_20261109T150216Z.md). The #675 head recorded there is the green code/test head before this snapshot/index/plan documentation commits; those docs commits advance the branch and trigger another exact-head CI run.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Six open PRs, twelve open issues; all six PR bases equal current main. No independent approval and no requested reviewers.
+- Main protection is disabled, rulesets empty; detailed protection endpoint returns HTTP 403. No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance remains NOT TESTED.
+
+### Verified delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: Android CI, contracts, Focus UI/Sound, Live Update, device acceptance artifact and device-test APK PASS. API29 367 assertions PASS; API36 **10/10 consecutive runs PASS**, 370 assertions each. Root-view-to-screen conversion and real-control viewport positioning fixed the prior wrong-coordinate injection. Physical device acceptance still pending; downloads remain fail-closed.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545/data-integrity review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device checks PASS; Node 541/541, ExtensionStore smoke 12 assertions, 16 guard mutations; independent extension-security review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device APK PASS; draft. PR/debug builds receive no signing secrets; tag-only signed build and temp-keystore cleanup. Upstream SLSA v1.4.0 still embeds a Node20 artifact action; provenance review required.
+- **#675** `9bda5bfcc2278fdc60522e3492b383340b4b57f8`: Node 728/728, Android CI and Gradle debug build PASS, Ubuntu/Windows contracts PASS, device-test APK PASS (release publication skipped). Current webhook endpoint fingerprints, cross-endpoint queue isolation, legacy confirmation, WebCrypto fail-closed tests, storage clear preflight and independent recovery backup reads all pass. Draft; independent security/data-integrity review pending.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device acceptance/device APK PASS; ExtensionInjectorSmoke 41 assertions. Page-bound CSS/JS injection and JS-only GM_addStyle bootstrap; physical browser acceptance pending.
+
+### Prioritized whole-project backlog
+1. **P0 — Independent review/integration:** #675 webhook endpoint isolation, storage-clear preflight and recovery; #665 signing-secret boundary; #656 import/data semantics; #659/#676 extension security. No merge without fresh independent approval and exact-head CI.
+2. **P0 — Physical Android acceptance (#160):** current-main APK on real devices with model/API/WebView provider/version, APK SHA and scenario evidence for browser, extensions, SAF, updates, reminders and downloads. Emulator/CI artifacts are not physical-device acceptance.
+3. **P0 — Browser downloads (#671/#648):** keep current-main downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport enforces downgrade/private-address/host checks, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp-file cleanup and cancellation/error handling. Do not use preflight-then-DownloadManager.
+4. **P1 — Reminder parity (#476):** recurrence anchors, long-gap catch-up, AlarmManager/Doze/reboot/timezone/OEM behavior.
+5. **P0 — Main governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations and force-push/deletion restrictions.
+6. **P1 — Finish Node24/provenance (#84):** preserve trusted SLSA identity; wait for upstream Node24-compatible reusable workflow or perform a separately reviewed provenance migration.
+7. **P2 — Cross-platform/browser architecture (#325/#348):** measured compatibility and performance work.
+
+## Historical whole-project execution queue — 2026-11-09T14:55:08Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+The detailed exact-head inventory, CI evidence, issue list, work log and safety limitations are in [the 14:55 status snapshot](docs/CURRENT_STATUS_20261109T145508Z.md). Preserve older planning sections below as historical evidence.
+
+### Live baseline
+- Default branch `main`: `59e6961c0645a423eb736d16d129eb0e9cc871f7`; main Android CI and Ubuntu/Windows contracts PASS.
+- Six open PRs, twelve open issues; all six PR bases equal current main. No independent approval and no requested reviewers.
+- Main protection is disabled, rulesets empty; the integration cannot read the detailed protection endpoint (HTTP 403). No settings changed.
+- No release/tag/version/signing/applicationId change; no destructive migration. Physical device acceptance remains NOT TESTED.
+
+### Current delivery gates
+- **#648** `4e1199bcf4336144f04fe5c204a7aa08f2d173c9`: Android CI PASS; Focus UI/Sound and Live Update PASS; API29/API36 Focus lifecycle and device workflows still in progress/pending. New instrumentation translates root-view visible bounds to screen coordinates before UiAutomation injection, positions real controls inside the ScrollView, and guards the ordering. Previous API36 failure was at run 1/10; latest ten-run result not yet verified. Downloads remain fail-closed only on this branch.
+- **#656** `abc85397ebf13375238e6004acd1bd6b6e38b8d8`: Node 687/687, Android, Ubuntu/Windows and device APK PASS; independent RFC5545/data-integrity review pending.
+- **#659** `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd`: Android/contracts/device checks PASS; Node 541/541, ExtensionStore smoke 12 assertions, 16 guard mutations; independent extension-security review pending.
+- **#665** `d3cf902b36e47d1eca512df095fc883bbcd4ebbd`: Android/contracts/device APK PASS; draft. PR/debug builds receive no signing secrets; tag-only signed build and temp-keystore cleanup. Upstream SLSA v1.4.0 still embeds a Node20 artifact action; provenance review required.
+- **#675** `a8d57946cee0645db99304a52b34071e022c3b31`: Android and contracts in progress; device APK pending. Previous head Node 726/726 and all workflows PASS. Current head adds WebCrypto-unavailable tests proving no queue write/network send when SHA-256 is unavailable. Endpoint-partitioned queue stores only SHA-256 destination fingerprints, verifies URL/event match before fetch, preserves other-endpoint events, and requires explicit confirmation for legacy unassigned events. Storage clear preflight and independent task/Focus backup reads remain in the branch.
+- **#676** `59830d290f023c7b0b2cf2828a10de8bedaf195a`: Android/contracts/device acceptance/device APK PASS; ExtensionInjectorSmoke 41 assertions. Page-bound CSS/JS injection and JS-only GM_addStyle bootstrap; physical browser acceptance pending.
+
+### Prioritized whole-project backlog
+1. **P0 — Focus API36 (#648/#613):** finish the latest screen-coordinate/viewport correction and inspect the exact ten-run logs. If it passes, retain and verify real parent-scroll and post-drag tap assertions; if it fails, use the new screen-space diagnostics. No retry or weakened assertions.
+2. **P0 — Webhook/storage/recovery (#675; #636/#639/#640/#603):** finish current exact-head tests, obtain independent security/data-integrity review, verify endpoint partitioning and task-persist-before-notify. Keep unreadable/unknown distinct from absent and preserve opaque backup bytes.
+3. **P0 — Signing boundary (#665/#84):** independent review of PR/debug secret isolation and trusted SLSA transitive action runtime before merge.
+4. **P1 — Extension injection/import (#676/#659):** independent review of page matching, stale navigation, GM_addStyle, default-disabled imports and existing-pack preservation; then physical browser/device acceptance.
+5. **P1 — iCalendar/import-export (#656):** independent RFC5545 review for categories, repeated properties, recurrence, timezone, seconds precision and completion metadata.
+6. **P0 — Browser downloads (#671/#648):** keep current-main downloads blocked until a Daymark-owned redirect-by-redirect HTTPS transport enforces downgrade/private-address/host checks, same-origin cookies, no referrer/ambient credentials, bounded streaming, temp-file cleanup and cancellation/error handling. Do not use preflight-then-DownloadManager.
+7. **P0 — Physical Android acceptance (#160):** test current-main APK on real devices with model/API/WebView provider/version and APK SHA. CI/emulator artifacts are not device acceptance.
+8. **P1 — Reminder parity (#476):** recurrence anchors, long-gap catch-up, AlarmManager/Doze/reboot/timezone/OEM behavior.
+9. **P0 — Main governance (#646):** owner-side PR-only protection, independent approval, required Android and Ubuntu/Windows checks, stale-review dismissal, resolved conversations and force-push/deletion restrictions.
+10. **P2 — Cross-platform/browser architecture (#325/#348):** measured compatibility and performance work.
+
+## Historical whole-project execution queue — 2026-11-09T14:47:38.879Z (main 59e6961c0645a423eb736d16d129eb0e9cc871f7)
+
+This is a new dated status layer. Older planning sections below are historical; do not rewrite their evidence.
+
+### Live baseline and governance
+- Default branch: `main`; current SHA: `59e6961c0645a423eb736d16d129eb0e9cc871f7`.
+- Main Android CI #42619910395: **PASS**. Main Ubuntu/Windows contracts #42619910295: **PASS**.
+- Live inventory: **6 open PRs / 12 open issues**.
+- Main branch API: `protected=false`; required status-check enforcement `off`; rulesets API returns `[]`. Detailed branch-protection endpoint returns HTTP 403 to this integration. No repository settings changed.
+- No open PR has an independent approval record. All six remain unmerged.
+- Source/AGENTS identity remains the current approved package; the run-level safety directive names a different legacy package identifier. No identity, namespace, manifest or signer change was made; reconcile only with explicit owner approval.
+
+### Exact open PR inventory and current checks
+| PR | Exact head (base main) | Latest exact-head evidence | Gate / next action |
+|---|---|---|---|
+| #648 Focus + fail-closed downloads | `dd73640ebdd5b9b12ee668812f9a7c6600de57b7` | Android CI, contracts, Focus UI/Sound, Live Update and device artifacts **PASS**; API 29 lifecycle **PASS**; API 36 lifecycle #42637328004 **FAIL** at run 1/10 after Countdown tap following vertical drag. | Fix coordinate-space mismatch: `getGlobalVisibleRect()` returns root-view coordinates, but `UiAutomation.injectInputEvent()` needs screen coordinates. Keep all gesture assertions and API 36 ten-run gate. No physical device tested. |
+| #656 iCalendar/import-export | `abc85397ebf13375238e6004acd1bd6b6e38b8d8` | Android CI #42633721799, contracts #42633722495, device APK #42633721795 **PASS**. | Independent RFC 5545/data-integrity review pending; no merge yet. |
+| #659 extension trust | `8c96abd770f679796a0ad9fc5e8f5c12cda9e4cd` | Android CI #42622038075, contracts #42622038055, device acceptance #42622038156 and device APK #42622038116 **PASS**. | Independent extension-security review pending; no merge yet. |
+| #665 signing/Node24 | `d3cf902b36e47d1eca512df095fc883bbcd4ebbd` | Android CI #42622047147, contracts #42622047145, device APK #42622047583 **PASS**; release publication skipped. | Independent release-security/provenance review pending; review the trusted SLSA generator's transitive Node 20 action. |
+| #675 webhook/storage/recovery | Code head `dbbf2b9b0852fe00feca89396e7ef3fe36aedb04`; branch also contains a later docs-only queue refresh | Code head Android CI #42636529872 **PASS**, Node **726/726**, contracts #42636529926 **PASS**, device APK #42636529875 **PASS**. The later docs-only branch tip has no Actions run; re-check live head before merge. | Draft; independent data-storage/security review pending. Duplicate-key guard now covers primary task/Focus, outer and nested recovery payloads and selected imports. Keep #640/#603/#639/#636 open until merge and acceptance. |
+| #676 page-bound extension injection | `59830d290f023c7b0b2cf2828a10de8bedaf195a` | Contracts #42637746292 **PASS**; Android CI #42637746064, device acceptance #42637746399 and device APK #42637746704 **IN PROGRESS**. Prior head #6836 failed on a stale JS-only one-submission assertion; #59830 corrects it to the expected two submissions (bootstrap + script). | Draft; wait for exact-head Android/device checks and independent review. No physical device tested. |
+
+### Prioritized whole-project backlog
+1. **P0 — Focus API 36 interaction (#648/#613):** fix root-relative versus screen-space coordinates before display injection; verify with non-zero root origin and post-scroll bounds; retain real tap/swipe/vertical-scroll checks and ten consecutive API 36 passes. Current API 29 pass does not waive API 36 failure.
+2. **P0 — Browser download security (#671):** current main still enqueues `DownloadManager.Request` and forwards the WebView Cookie header while redirects are followed internally. The fail-closed policy exists only on unmerged #648. Keep the branch fail-closed; implement a Daymark-owned redirect-by-redirect transport with downgrade/private-address rejection, same-origin cookies only, no referrer/ambient credentials, bounded streaming, temporary files and cancellation/error cleanup. Do not create a competing MainActivity edit while #648 owns it.
+3. **P1 — Recovery/storage/webhook (#675; #640/#603/#639/#636):** independent review and merge-gate verification; preserve unreadable/unknown versus absent, exact ambiguous bytes, task-persist-before-notify, Web Locks and session-only endpoint secrets. Physical recovery acceptance remains NOT TESTED.
+4. **P1 — iCalendar/import-export (#656):** independent RFC 5545 review for categories, recurrence/timezone/date semantics, repeated properties and completion metadata.
+5. **P1 — Extension trust (#659):** independent review of default-disabled imports, page-local capabilities, match/exclude scope, archive limits and preservation of existing packs on failed reads.
+6. **P1 — Signing/Node24 (#665/#84):** independent security review; PR/debug builds must not receive signing secrets; inspect direct and transitive action runtimes. No release publication.
+7. **P0 — Governance (#646):** owner configures PR-only main, independent approval, stable required Android/Ubuntu/Windows checks, stale-review dismissal, conversation resolution and force-push/deletion restrictions. Integration cannot inspect the protection endpoint; no settings changed.
+8. **P0 — Physical Android acceptance (#160):** test current-main APK on actual devices; record model, API, WebView provider/version, build SHA and APK SHA. CI/emulator artifacts are not physical-device acceptance.
+9. **P1 — Reminder parity (#476):** validate Android/web recurrence anchors and long-gap catch-up; physical AlarmManager/Doze/reboot/timezone/OEM delivery remains open.
+10. **P2 — Browser UX/architecture (#348/#325):** continue compatibility, Reader Mode, app links, performance and measured cross-platform contracts after the P0/P1 security and data-integrity gates.
+
+### Run-specific engineering log
+- Corrected the CSS bootstrap guard-order host-test assertion on #676 (commits `fd34e50ca6366fa2dab0054edb997cbf781dc105` and `1c11500fb47b79b39578649439c5567906e51ff6`). The later exact head failed for a separate stale JS-only submission-count assertion; that was reported and corrected by commit `59830d290f023c7b0b2cf2828a10de8bedaf195a`. The new exact-head checks are pending.
+- Reproduced #648 API 36 failure on head `dd73640`: Countdown bounds `[519,1688][938,1814]`, `getLocationOnScreen=(540,1904)`, injected tap center `(728,1751)`; API 29 passed, API 36 failed at run 1/10. Posted the Android API coordinate-space diagnosis in #613; no competing instrumentation/MainActivity edits made.
+- Revalidated #675 exact-head Android/Node/contracts/device-artifact results and duplicate-key guard coverage; verified #656 and #675 use byte-identical `task-logic.js` helper blobs.
+- Rechecked #659's active import paths: parser warnings appear in both review dialogs; new imported packs remain disabled until user activation. No independent review claimed.
+- Rechecked #665's direct old action references and posted exact-head evidence to #84; no signing secrets, release workflow, tag or release was changed.
+- Confirmed main's browser download path still uses DownloadManager plus Cookie header; posted the unmerged fail-closed/transport distinction to #671.
+- Updated #646 with live unprotected-branch/ruleset evidence; updated #613 with repeated API 36 failures; updated #640 with current duplicate-key coverage; updated #675 with stale status-snapshot inventory. Added this current execution queue to `PROJECT_PLAN.md` on #675; the documentation-only branch tip has no Actions run, while the underlying code head `dbbf2b9` has the listed passing checks.
+- No PR merged by this run. No production release/tag/version bump, signer/package change, destructive migration, automatic restore or user-data mutation. Physical-device acceptance: **NOT TESTED**.
+
+**Work by:** ChatGPT (OpenAI)  
+**Model:** GPT-6  
+**Tooling:** GitHub connector via Code Mode; exact-source/PR/workflow inspection; Android API documentation  
+**Timestamp (UTC):** 2026-11-09T14:47:38.879Z
+
+---
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
@@ -451,3 +881,27 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6  
 Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
 Timestamp (UTC): 2026-11-09T02:36:57.068Z
+
+
+## Whole-project execution update — 2026-11-10T00:49:29.624Z
+
+This is a current execution record, not a replacement for the architecture plan above.
+
+- Current main: `1532838c78ab350b18f95e96a2c547ba384f0831`.
+- Current integration branch `integration/webhook-recovery-safe-main-20261109`, code head `4a3306d6ba13a4193c19b5acdbb7f17c27b091a8`, 149 ahead / 0 behind main.
+- Focus state/preset/recovery writes and Focus-category/Clear-All operations now share a Web Locks + generation contract. The destructive lock order is task → webhook delivery → webhook queue → Focus.
+- Exact code-head checks: Android CI PASS; Ubuntu and Windows contracts PASS; device-test APK PASS; Node suite 820 total / 819 passed / 1 skipped / 0 failed. Release publication skipped; physical device not tested.
+- No merge, release, tag, version, signing-key, application identity, or destructive migration changes.
+
+### Next whole-project queue
+
+1. #690 — define durable semantics after explicit Focus-backup clear; add suppression/rehydration tests and verify timer invalidation.
+2. #683 — add import/save/clear/recovery/undo races across tabs; keep Web Locks fail-closed.
+3. #613/#677 — fix API 36 Task Editor IME layout while retaining the strict Cancel interaction test.
+4. #646/#160 — required CI/independent review governance and physical Android acceptance.
+5. #671/#678 — complete secure download transport; redirect policy alone is not a downloader.
+6. #665/#84, #659/#687, #656, #676 — independent security, extension recovery, import/export and injection reviews.
+7. #685/#686 — Service Worker compatibility without weakening Offline enforcement.
+8. #684/#476 — align recurrence validation and scheduling contracts across Android and web.
+
+See [the latest dated engineering snapshot](docs/CURRENT_STATUS_20261110T004929Z.md) for exact PR heads, workflow run IDs, blockers and the complete 20-issue inventory.
