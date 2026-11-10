@@ -149,16 +149,6 @@ public final class BrowserIntentLinkPolicySmoke {
             // Expected fail-closed behavior.
         }
     }
-    }
-
-    private static void expectFailure(String input, String message) {
-        try {
-            BrowserIntentLinkPolicy.parse(input);
-            throw new AssertionError(message);
-        } catch (IllegalArgumentException expected) {
-            // Expected fail-closed behavior.
-        }
-    }
 
     private static void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
