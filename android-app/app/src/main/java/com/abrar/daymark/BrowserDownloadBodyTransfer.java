@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Bounded, fail-closed response-body transfer for the browser download transport.
@@ -34,7 +35,8 @@ final class BrowserDownloadBodyTransfer {
         BODY_EXCEEDS_DECLARED_LENGTH,
         BODY_LENGTH_MISMATCH,
         IO_ERROR,
-        CLEANUP_FAILED
+        CLEANUP_FAILED,
+        PUBLICATION_NOT_COMMITTED
     }
 
     static final class TransferException extends Exception {
@@ -65,9 +67,18 @@ final class BrowserDownloadBodyTransfer {
      * transfer or switch browsing Offline. A separate check followed by an unlocked commit is not
      * sufficient because it leaves a publication race.
      */
+    interface CommitAction {
+        void commit() throws IOException, TransferException;
+    }
+
     interface PublicationGate {
+        /**
+         * Must invoke the helper-owned commit action while holding the same lock used by
+         * cancellation and Online/Offline state transitions. Returning without invoking it
+         * is a failed publication; invoking it more than once cannot commit the target twice.
+         */
         void commitIfAllowed(Cancellation cancellation, NetworkPolicy networkPolicy,
-                             StagingTarget target, long copiedBytes)
+                             CommitAction commitAction)
                 throws IOException, TransferException;
     }
 
@@ -94,7 +105,7 @@ final class BrowserDownloadBodyTransfer {
                      long configuredMaxBytes, Cancellation cancellation,
                      NetworkPolicy networkPolicy, PublicationGate publicationGate,
                      ProgressListener progress, StagingTarget target) throws TransferException {
-        boolean committed = false;
+        AtomicBoolean committed = new AtomicBoolean(false);
         long copied = 0L;
         // The transfer takes ownership of the response stream, including early validation failures.
         try (InputStream source = input) {
@@ -143,7 +154,7 @@ final class BrowserDownloadBodyTransfer {
                 sink.flush();
             }
         } catch (TransferException failure) {
-            abortAfterFailure(target, committed);
+            abortAfterFailure(target, committed.get());
             throw failure;
         } catch (IOException | RuntimeException failure) {
             abortAfterFailure(target, committed);
@@ -156,21 +167,33 @@ final class BrowserDownloadBodyTransfer {
             }
             throw fatal;
         }
+        AtomicBoolean callbackInvoked = new AtomicBoolean(false);
+        CommitAction commitAction = () -> {
+            if (!callbackInvoked.compareAndSet(false, true)) return;
+            // Recheck inside the gate-owned critical section immediately before publication.
+            checkState(cancellation, networkPolicy);
+            target.commit(copied);
+            committed.set(true);
+        };
         try {
-            publicationGate.commitIfAllowed(cancellation, networkPolicy, target, copied);
-            committed = true;
+            publicationGate.commitIfAllowed(cancellation, networkPolicy, commitAction);
+            if (!committed.get()) throw failure(Failure.PUBLICATION_NOT_COMMITTED);
             return copied;
         } catch (TransferException failure) {
-            abortAfterFailure(target, committed);
+            if (committed.get()) return copied;
+            abortAfterFailure(target, false);
             throw failure;
         } catch (IOException | RuntimeException failure) {
-            abortAfterFailure(target, committed);
+            if (committed.get()) return copied;
+            abortAfterFailure(target, false);
             throw failure(Failure.IO_ERROR);
         } catch (Error fatal) {
-            try {
-                abortAfterFailure(target, committed);
-            } catch (Throwable cleanup) {
-                if (cleanup != fatal) fatal.addSuppressed(cleanup);
+            if (!committed.get()) {
+                try {
+                    abortAfterFailure(target, false);
+                } catch (Throwable cleanup) {
+                    if (cleanup != fatal) fatal.addSuppressed(cleanup);
+                }
             }
             throw fatal;
         }
