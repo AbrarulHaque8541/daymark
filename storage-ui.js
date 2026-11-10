@@ -228,8 +228,10 @@
       } else if (category.id === 'webhook-queue' && result.removed.length > 0) {
         notifyTaskStorageChange('daymark.webhook.queue.v1');
       }
-      if (result.failed.length === 0
+      if ((result.removed.length > 0 || result.failed.length === 0)
           && (category.id === 'focus' || category.id === 'focus-backup' || category.id === 'focus-preset')) {
+        // Even a partial removal must invalidate same-tab Focus state. The
+        // generation has already advanced, so stale writes cannot recreate it.
         notifyFocusStorageChange(category.id);
       }
       if (result.failed.length > 0) {
