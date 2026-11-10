@@ -223,7 +223,7 @@ test('failed Focus removal still rebases the same tab to the new generation', as
   assert.ok(dispatched.some((event) => event.type === 'daymark:focus-storage-cleared'
     && event.detail.categoryId === 'focus'),
     'same-tab app state must rebase to the still-persisted snapshot and new generation');
-  assert.match(elements['storage-status-line'].textContent, /could not clear Focus/);
+  assert.match(elements['storage-status-line'].textContent, /Could not clear Focus timer/);
 });
 
 test('Focus category clear advances the generation while holding the Focus lock', async () => {
