@@ -195,6 +195,17 @@ test('timeout setup exceptions fail closed before making a network request', asy
   assert.equal(fetchFn.calls.length, 0);
 });
 
+test('a synchronous timeout scheduler exception fails closed before making a request', async () => {
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
+  const deps = networkDeps(fetchFn);
+  deps.setTimeout = () => { throw new Error('timeout scheduler unavailable'); };
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, deps);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /cannot make network requests/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
 test('timeout cleanup failure cannot turn confirmed delivery into a retry-inducing failure', async () => {
   const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve(okBody()) }));
   const deps = networkDeps(fetchFn);
