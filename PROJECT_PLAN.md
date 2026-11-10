@@ -1,3 +1,17 @@
+## Latest repo-wide engineering handoff — 2026-11-10T02:08:52Z
+
+**Main:** `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; exact main push Android CI and Ubuntu/Windows contracts PASS. 11 open PRs, 21 open issues.
+
+**Delivered in this run:** PR #675 now reconciles the merged Focus snapshot into in-memory state under the Focus Web Lock before advancing its persisted baseline; conflict paths preserve local state. Exact head `ae4edcce101bf326361452067c1de643c0d30d4b`: Node 831/831, Android CI PASS, contracts PASS, device artifact pending. PR #692 adds sanitized, collision-safe desktop download paths and fail-closed Electron download setup. Exact head `3ae15ef16e33bdcad141c323fe66c536549c2621`: Desktop CI 37/37 on Ubuntu/Windows/macOS and cross-platform contracts PASS; Android CI and device APK build still in progress.
+
+**Still open:** API 36 Focus failures #648/#677; cross-tab task/import/recovery/undo races #683; branch governance #646; physical acceptance #160; Android download transport #671; signing/provenance #665/#84; extension recovery UI #659/#687; Service Worker Online compatibility #685/#686; recurrence parity #684/#476. No independent PR approval found. Main protection remains disabled and detailed protection access returns 403.
+
+**Safety:** no merge, release, tag, version, signing-key, application identity, or destructive migration change. No physical-device testing. Application identity mismatch remains unresolved (`com.abrar.daymark` in source/AGENTS versus required `com.cue.daymark`); no migration was performed.
+
+See [full dated evidence snapshot](docs/CURRENT_STATUS_20261110T020852Z.md) for exact PR heads, workflow IDs, blockers and next priorities.
+
+---
+
 ## Latest repo-wide engineering handoff — 2026-11-09T23:26:56Z
 
 **Verified code head:** PR #675 `f0983019e0764b2fd85effece83e3c651bc501bf` (base main `1532838c78ab350b18f95e96a2c547ba384f0831`). Android CI, Ubuntu/Windows contracts, and device-test APK verification all PASS on that exact code head. The APK is an artifact only; no physical-device test or release occurred.
