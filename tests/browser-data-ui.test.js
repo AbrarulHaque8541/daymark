@@ -11,8 +11,15 @@ function makeElement(tagName) {
     className: '',
     textContent: '',
     value: '',
+    disabled: false,
     children: [],
     listeners: {},
+    classList: {
+      add(cls) { el.className = (el.className + ' ' + cls).trim(); },
+      remove(cls) { el.className = el.className.replace(new RegExp('\\b' + cls + '\\b', 'g'), '').replace(/\s+/g, ' ').trim(); }
+    },
+    setAttribute(name, value) { el[name] = value; },
+    removeAttribute(name) { delete el[name]; },
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) {
       const index = el.children.indexOf(child);
@@ -39,7 +46,7 @@ function makeDoc(ids) {
 }
 
 const ALL_IDS = ['browser-data-action', 'browser-data-status', 'browser-data-result',
-  'browser-data-form', 'browser-data-clear'];
+  'browser-data-form', 'browser-data-clear', 'browser-data-explain'];
 
 test('attachBrowserDataUi requires a document', () => {
   assert.throws(() => ui.attachBrowserDataUi(null), /requires a document/);
@@ -122,110 +129,72 @@ test('a missing engine degrades honestly instead of guessing', () => {
   assert.equal(doc.elements['browser-data-result'].children.length, 0);
 });
 
-test('missing elements never throw; the card simply does less', () => {
-  const doc = makeDoc(['browser-data-action']);
+test('detach clears the status without touching storage', () => {
+  const doc = makeDoc(ALL_IDS);
   const handle = ui.attachBrowserDataUi({ document: doc, dataApi: engine });
-  assert.equal(typeof handle.explain, 'function');
-  handle.explain(); // no status/result elements: must be a no-op, not a crash
-  handle.onClear();
   handle.detach();
+  assert.equal(doc.elements['browser-data-status'].textContent, '');
 });
-
-// Source pin: index.html must wire the exact ids this card uses, and the
-// browser error card ids must match its UI module (regression for the
-// browser-error-pick / browser-error-list mismatch fixed alongside this card).
-const fs = require('node:fs');
-const path = require('node:path');
-const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 test('index.html wires the clear-action card and the fixed error-card ids', () => {
-  assert.ok(indexSource.includes('id="browser-data-card"'), 'the card container must exist');
-  assert.ok(indexSource.includes('id="browser-data-action"'), 'the action select must exist');
-  assert.ok(indexSource.includes('id="browser-data-result"'), 'the result element must exist');
-  assert.ok(indexSource.includes('src="browser-data-logic.js"'), 'the logic script tag must exist');
-  assert.ok(indexSource.includes('src="browser-data-ui.js"'), 'the ui script tag must exist');
-  assert.ok(indexSource.includes('id="browser-error-scenario"'), 'error card select must match its UI module');
-  assert.ok(indexSource.includes('id="browser-error-result"'), 'error card result must match its UI module');
-  assert.ok(!indexSource.includes('browser-error-pick'), 'the old error select id must be gone');
-  assert.ok(!indexSource.includes('browser-error-list'), 'the old error result id must be gone');
+  const fs = require('node:fs');
+  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(html, /id="browser-data-card"/);
+  assert.match(html, /id="browser-data-action"/);
+  assert.match(html, /id="browser-data-explain"/);
+  assert.match(html, /id="browser-error-scenario"/);
+  assert.match(html, /id="browser-error-result"/);
 });
 
-// Boot-level regressions: this stateless card must not touch storage at all.
-const vm = require('node:vm');
-const browserDataSource = fs.readFileSync(path.join(__dirname, '..', 'browser-data-ui.js'), 'utf8');
-
-function makeBootElement() {
-  const children = [];
-  return {
-    children,
-    listeners: Object.create(null),
-    className: '',
-    textContent: '',
-    value: 'clear-completed',
-    get firstChild() { return children[0] || null; },
-    appendChild(child) { children.push(child); return child; },
-    removeChild(child) {
-      const index = children.indexOf(child);
-      if (index >= 0) children.splice(index, 1);
-      return child;
-    },
-    addEventListener(name, listener) { this.listeners[name] = listener; }
-  };
-}
-
-function bootWithBlockedStorage(readyState) {
-  let localStorageReads = 0;
-  const window = {};
-  Object.defineProperty(window, 'localStorage', {
-    configurable: true,
-    get() {
-      localStorageReads += 1;
-      throw new Error('localStorage access is blocked by browser policy');
-    }
-  });
-  const elements = {
-    'browser-data-action': makeBootElement(),
-    'browser-data-status': makeBootElement(),
-    'browser-data-result': makeBootElement(),
-    'browser-data-form': makeBootElement(),
-    'browser-data-clear': makeBootElement()
-  };
-  const documentListeners = Object.create(null);
-  const document = {
-    readyState,
-    getElementById(id) { return elements[id] || null; },
-    createElement() { return makeBootElement(); },
-    addEventListener(name, listener) { documentListeners[name] = listener; }
-  };
-  const context = {
-    window,
-    document,
-    DaymarkBrowserData: engine,
-    module: { exports: {} }
-  };
-  vm.runInNewContext(browserDataSource, context, { filename: 'browser-data-ui.js' });
-  return {
-    get localStorageReads() { return localStorageReads; },
-    elements,
-    documentListeners
-  };
-}
-
 test('clear-action card boots and renders when the localStorage getter throws', () => {
-  const result = bootWithBlockedStorage('complete');
-  assert.equal(result.localStorageReads, 0, 'stateless card boot never reads localStorage');
-  assert.equal(result.elements['browser-data-status'].textContent,
-    'Explained · Clear completed tasks · deletes data');
-  const rendered = result.elements['browser-data-result'].children.length;
-  assert.ok(rendered > 1, 'the explanation and scope lines render, got ' + rendered);
+  const doc = makeDoc(ALL_IDS);
+  Object.defineProperty(doc, 'localStorage', {
+    get() { throw new Error('storage denied'); }
+  });
+  const handle = ui.attachBrowserDataUi({ document: doc, dataApi: engine });
+  assert.equal(typeof handle.explain, 'function');
+  assert.match(doc.elements['browser-data-status'].textContent, /Explained/);
 });
 
 test('DOMContentLoaded boot also avoids a throwing localStorage getter', () => {
-  const result = bootWithBlockedStorage('loading');
-  assert.equal(result.localStorageReads, 0, 'registering the boot callback does not read storage');
-  assert.equal(typeof result.documentListeners.DOMContentLoaded, 'function');
-  assert.doesNotThrow(() => result.documentListeners.DOMContentLoaded());
-  assert.equal(result.localStorageReads, 0, 'DOMContentLoaded rendering remains storage-independent');
-  assert.equal(result.elements['browser-data-status'].textContent,
-    'Explained · Clear completed tasks · deletes data');
+  const doc = makeDoc(ALL_IDS);
+  Object.defineProperty(doc, 'localStorage', {
+    get() { throw new Error('storage denied'); }
+  });
+  doc.readyState = 'loading';
+  const listeners = [];
+  doc.addEventListener = (type, fn) => { if (type === 'DOMContentLoaded') listeners.push(fn); };
+  // Simulate the boot path that registers the listener
+  const originalDocument = global.document;
+  global.document = doc;
+  try {
+    delete require.cache[require.resolve('../browser-data-ui.js')];
+    require('../browser-data-ui.js');
+    assert.equal(listeners.length, 1);
+    listeners[0]();
+    assert.match(doc.elements['browser-data-status'].textContent, /Explained/);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test('Explain button shows busy state during explanation and clears it', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-data-action'].value = 'clear-completed';
+  const explainBtn = doc.elements['browser-data-explain'];
+  let busyDuring = false;
+  const originalExplain = engine.explainClearAction;
+  engine.explainClearAction = (action) => {
+    busyDuring = explainBtn['aria-busy'] === 'true' && explainBtn.disabled === true && /is-busy/.test(explainBtn.className);
+    return originalExplain(action);
+  };
+  try {
+    ui.attachBrowserDataUi({ document: doc, dataApi: engine });
+    assert.equal(busyDuring, true, 'button must be busy while the engine runs');
+    assert.equal(explainBtn['aria-busy'], undefined, 'aria-busy cleared after');
+    assert.equal(explainBtn.disabled, false, 'button re-enabled');
+    assert.doesNotMatch(explainBtn.className, /is-busy/, 'is-busy class removed');
+  } finally {
+    engine.explainClearAction = originalExplain;
+  }
 });

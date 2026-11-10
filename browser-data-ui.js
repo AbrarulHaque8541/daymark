@@ -30,6 +30,20 @@
     const resultEl = element('browser-data-result');
     const formEl = element('browser-data-form');
     const clearEl = element('browser-data-clear');
+    const explainEl = element('browser-data-explain');
+
+    function setBusy(busy) {
+      if (!explainEl) return;
+      if (busy) {
+        explainEl.setAttribute('aria-busy', 'true');
+        if (explainEl.classList && typeof explainEl.classList.add === 'function') explainEl.classList.add('is-busy');
+        explainEl.disabled = true;
+      } else {
+        explainEl.removeAttribute('aria-busy');
+        if (explainEl.classList && typeof explainEl.classList.remove === 'function') explainEl.classList.remove('is-busy');
+        explainEl.disabled = false;
+      }
+    }
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -58,14 +72,14 @@
       resultEl.appendChild(head);
       const lines = [];
       for (let i = 0; i < result.removes.length; i += 1) {
-        lines.push('Removes \u00b7 ' + result.removes[i]);
+        lines.push('Removes · ' + result.removes[i]);
       }
       for (let i = 0; i < result.keeps.length; i += 1) {
-        lines.push('Keeps \u00b7 ' + result.keeps[i]);
+        lines.push('Keeps · ' + result.keeps[i]);
       }
-      lines.push((result.recoverable ? 'Comes back \u00b7 ' : 'No undo \u00b7 ') + result.recovery);
-      lines.push('Scope \u00b7 ' + result.scope);
-      lines.push('Network \u00b7 ' + result.network);
+      lines.push((result.recoverable ? 'Comes back · ' : 'No undo · ') + result.recovery);
+      lines.push('Scope · ' + result.scope);
+      lines.push('Network · ' + result.network);
       for (let i = 0; i < lines.length; i += 1) {
         resultEl.appendChild(makeItem('feed-item', lines[i]));
       }
@@ -76,13 +90,18 @@
         status('Clear-action explanations are unavailable.');
         return;
       }
-      const action = actionEl && typeof actionEl.value === 'string' ? actionEl.value : '';
-      // The engine fails closed to the honest unknown entry for any value
-      // the prototype does not know.
-      const result = dataApi.explainClearAction(action);
-      status('Explained \u00b7 ' + result.label
-        + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
-      renderExplanation(result);
+      setBusy(true);
+      try {
+        const action = actionEl && typeof actionEl.value === 'string' ? actionEl.value : '';
+        // The engine fails closed to the honest unknown entry for any value
+        // the prototype does not know.
+        const result = dataApi.explainClearAction(action);
+        status('Explained \u00b7 ' + result.label
+          + (result.deletesData ? ' \u00b7 deletes data' : ' \u00b7 deletes nothing'));
+        renderExplanation(result);
+      } finally {
+        setBusy(false);
+      }
     }
 
     function onClear() {
@@ -118,15 +137,15 @@
     };
   }
 
-  const api = { attachBrowserDataUi };
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.DaymarkBrowserDataUi = api;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { attachBrowserDataUi };
+  } else {
+    root.attachBrowserDataUi = attachBrowserDataUi;
+  }
 
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    // This UI is stateless. Do not touch window.localStorage during boot:
-    // storage may be disabled or its getter may throw before the card can render.
-    const boot = () => attachBrowserDataUi({ document });
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
+  if (typeof document !== 'undefined' && document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => attachBrowserDataUi({ document, dataApi: root.DaymarkBrowserData }));
+  } else if (typeof document !== 'undefined') {
+    attachBrowserDataUi({ document, dataApi: root.DaymarkBrowserData });
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
