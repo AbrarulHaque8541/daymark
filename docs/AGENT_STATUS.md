@@ -1,4 +1,5 @@
-- [Daymark whole-project engineering status — 2026-11-10T14:08:50Z (main 41fda91; #708 5/5 PASS + 57 assertions; #675 Focus selector correction and current-head API 36 rerun)](./CURRENT_STATUS_20261110T140850Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T14:22:39Z (main 41fda91; #708 5/5 PASS; #675 API 36 trace refinement and stable-scroll instrumentation)](./CURRENT_STATUS_20261110T142239Z.md)
+- [Previous snapshot — 2026-11-10T14:08:50Z](./CURRENT_STATUS_20261110T140850Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T13:53:03Z (Instant parity, task-generation fence, exact PR/CI inventory)](./CURRENT_STATUS_20261110T135303Z.md)
 - [Daymark engineering status — 2026-11-10T10:17:00Z (mainline sync and exact-head CI)](./CURRENT_STATUS_20261110T101700Z.md)
 - [Daymark engineering status — 2026-11-10T10:13:00Z (exact-head verification and whole-project backlog)](./CURRENT_STATUS_20261110T101300Z.md)
@@ -128,7 +129,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-10T14:08:50Z (main 41fda91; #708 exact-head 5/5 PASS; #675 Focus correction and current-head checks)](./CURRENT_STATUS_20261110T140850Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T14:22:39Z (main 41fda91; #708 5/5 PASS; #675 API 36 trace refinement and stable-scroll instrumentation)](./CURRENT_STATUS_20261110T142239Z.md)
+- [Previous reviewed snapshot — 2026-11-10T14:08:50Z](./CURRENT_STATUS_20261110T140850Z.md)
 - [Previous reviewed snapshot — 2026-11-10T13:53:03Z](./CURRENT_STATUS_20261110T135303Z.md)
 - [Daymark engineering status — 2026-11-10T10:17:00Z (mainline sync and exact-head CI)](./CURRENT_STATUS_20261110T101700Z.md)
 - [Daymark engineering status — 2026-11-10T10:13:00Z (exact-head verification and whole-project backlog)](./CURRENT_STATUS_20261110T101300Z.md)
