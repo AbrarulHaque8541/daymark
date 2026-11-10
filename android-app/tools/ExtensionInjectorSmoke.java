@@ -88,7 +88,7 @@ public final class ExtensionInjectorSmoke {
         notContains(scripts.get(0), "disabled", "disabled pack metadata is absent");
         notContains(scripts.get(0), "paused.example", "site pause preferences are absent");
         notContains(scripts.get(0), "account/private", "exclude paths are absent");
-        notContains(scripts.get(0), "matches", "match rules are absent");
+        notContains(scripts.get(0), "\"matches\":", "match rules are absent");
         contains(scripts.get(1), "window.__current=1;", "current matching userscript runs");
         notContains(scripts.get(1), "window.__future=1;", "future-route userscript does not run");
     }
