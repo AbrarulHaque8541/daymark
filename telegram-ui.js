@@ -34,6 +34,9 @@
         if (typeof el.setAttribute === 'function') {
           el.setAttribute('aria-disabled', isBusy ? 'true' : 'false');
         }
+        if (el.classList && typeof el.classList.toggle === 'function') {
+          el.classList.toggle('is-busy', isBusy);
+        }
       }
       if (formEl && typeof formEl.setAttribute === 'function') {
         formEl.setAttribute('aria-busy', isBusy ? 'true' : 'false');
