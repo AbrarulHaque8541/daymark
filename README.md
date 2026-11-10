@@ -52,6 +52,7 @@ Read **[AGENTS.md](AGENTS.md)**, **[RELEASE_SIGNING.md](RELEASE_SIGNING.md)**, a
 From the repository root:
 
 ```sh
+npm ci
 sh android-app/tools/check-v1-source.sh
 npm test
 ```
