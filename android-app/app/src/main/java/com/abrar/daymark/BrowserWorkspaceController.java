@@ -20,6 +20,10 @@ final class BrowserWorkspaceController {
             throw new SecurityException(
                     "Daymark could not enforce its service-worker network policy; navigation remains blocked.");
         }
+        // Service Worker network access follows the same explicit Online consent. If the
+        // platform setting cannot be unblocked, its request client remains fail-closed while
+        // ordinary top-level browsing can still proceed.
+        BrowserServiceWorkerEnforcement.allowNetworkAfterExplicitConsent();
         target.getSettings().setBlockNetworkLoads(false);
     }
 
@@ -32,6 +36,7 @@ final class BrowserWorkspaceController {
     static void prepareTabsForExplicitNavigation(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs) {
         if (policy == null || !policy.allowsRemoteLoads() || tabs == null
                 || !DaymarkWebView.isServiceWorkerNetworkPolicyReady()) return;
+        BrowserServiceWorkerEnforcement.allowNetworkAfterExplicitConsent();
         for (DaymarkWebView tab : tabs) {
             if (tab == null) continue;
             try {
