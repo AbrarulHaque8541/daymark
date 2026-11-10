@@ -69,6 +69,7 @@ function fakeEnv(options) {
   const dispatched = [];
   const locks = opts.locks === false ? null : (opts.lockManager || makeLockManager());
   const readFailures = new Set(opts.readFailures || []);
+  const writeFailures = new Set(opts.writeFailures || []);
   const removeFailures = new Set(opts.removeFailures || []);
   const readKeys = [];
   const removedKeys = [];
@@ -78,7 +79,10 @@ function fakeEnv(options) {
       if (readFailures.has(key)) throw new Error('Read access failure');
       return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
     },
-    setItem(key, value) { storageData[key] = String(value); },
+    setItem(key, value) {
+      if (writeFailures.has(key)) throw new Error('Write access failure');
+      storageData[key] = String(value);
+    },
     removeItem(key) {
       removedKeys.push(key);
       if (removeFailures.has(key)) throw new Error('Remove access failure');
@@ -272,13 +276,14 @@ test('Focus backup and preset clears share the same lock and generation boundary
   }
 });
 
-test('Clear All retains only the non-personal Focus generation counter', async () => {
+test('Clear All retains only the non-personal task and Focus generation counters', async () => {
   const { env, storageData } = fakeEnv({
     data: { 'daymark.tasks.v1': '[]', 'daymark.focus.v1': '{"session":null,"log":[]}' }
   });
   await ui.attachStorageUi(env).onClearAll();
   assert.equal(storageData['daymark.tasks.v1'], undefined);
   assert.equal(storageData['daymark.focus.v1'], undefined);
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1');
   assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], '1');
 });
 
@@ -336,8 +341,33 @@ test('clearing only task recovery backups refreshes recovery status under the sh
   await handle.onClearCategory('task-backup');
   assert.equal(storageData['daymark.tasks.v1'], '[]', 'primary tasks remain untouched');
   assert.equal(storageData['daymark.tasks.v1.backup'], undefined, 'only the recovery backup is cleared');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1', 'pending backup-maintenance writes are fenced');
   assert.equal(dispatched.length, 1);
   assert.equal(dispatched[0].key, null, 'the app reloads recovery metadata after backup removal');
+});
+
+test('task category clear fails closed when the retained generation cannot be written', async () => {
+  const { env, storageData, elements } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' },
+    writeFailures: [mutation.TASK_GENERATION_KEY]
+  });
+  await ui.attachStorageUi(env).onClearCategory('tasks');
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], undefined);
+  assert.match(elements['storage-status-line'].textContent, /task-generation fence or shared task lock failed/i);
+});
+
+test('Clear All fails before deleting any data when the task generation cannot be retained', async () => {
+  const { env, storageData, removedKeys, elements } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]', 'daymark.focus.v1': '{"session":null,"log":[]}' },
+    writeFailures: [mutation.TASK_GENERATION_KEY]
+  });
+  await ui.attachStorageUi(env).onClearAll();
+  assert.deepEqual(removedKeys, []);
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(storageData['daymark.focus.v1'], '{"session":null,"log":[]}');
+  assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], undefined);
+  assert.match(elements['storage-status-line'].textContent, /shared lock or storage operation failed/i);
 });
 
 test('task and clear-all deletion fail closed when the shared lock is unavailable', async () => {
@@ -442,6 +472,7 @@ test('clearing one category asks for confirmation and removes only its keys', as
   assert.match(confirmations[0], /Clear Tasks\?/);
   assert.match(confirmations[0], /This cannot be undone/);
   assert.equal(storageData['daymark.tasks.v1'], undefined, 'the task data is removed');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1', 'the task generation advances before removal');
   assert.equal(storageData['daymark.tasks.v1.backup'], '[]', 'the recovery backup keeps its own category');
   assert.equal(storageData['daymark.webhook.v1'] !== undefined, true, 'webhook settings are untouched');
   assert.equal(dispatched.length, 1, 'same-tab task state is notified after the locked clear');
