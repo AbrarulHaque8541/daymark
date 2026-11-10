@@ -206,9 +206,9 @@ test('bootstrap does not install page-readable config, state, or SPA hooks', () 
 });
 
 test('userscript duplicate suppression stays native and exposes no page-global pack registry', () => {
-  assert.doesNotMatch(injectorSource, /window\\.__daymarkRan/);
+  assert.doesNotMatch(injectorSource, /window\.__daymarkRan/);
   assert.match(runtimeSource, /userscriptsAppliedForCurrentDocument/);
-  assert.match(runtimeSource, /userscriptsAppliedForCurrentDocument\\s*=\\s*false/);
-  assert.match(runtimeSource, /if \\(userscriptsAppliedForCurrentDocument\\)/);
-  assert.match(runtimeSource, /ExtensionInjector\\.applyStyles\\(webView, url, matching\\)/);
+  assert.match(runtimeSource, /userscriptsAppliedForCurrentDocument\s*=\s*false/);
+  assert.match(runtimeSource, /if\s*\(userscriptsAppliedForCurrentDocument\)/);
+  assert.match(runtimeSource, /ExtensionInjector\.applyStyles\(webView, url, matching\)/);
 });
