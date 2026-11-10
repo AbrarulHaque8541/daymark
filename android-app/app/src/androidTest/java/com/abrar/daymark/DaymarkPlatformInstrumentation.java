@@ -411,6 +411,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private void scrollDescendantIntoScrollView(android.widget.ScrollView scrollView,
                                                    android.view.View descendant) throws Exception {
+        stopScrollFlingAndAwait(scrollView);
         int[] targetHeight = new int[1];
         runOnMainSync(() -> {
             targetHeight[0] = descendant.getHeight();
@@ -437,6 +438,22 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                         + " (target=" + targetBounds.toShortString()
                         + ", parent=" + parentBounds.toShortString()
                         + ", scrollY=" + actualScroll[0] + ")");
+    }
+
+    private void stopScrollFlingAndAwait(android.widget.ScrollView scrollView) throws Exception {
+        java.util.concurrent.CountDownLatch settledFrames = new java.util.concurrent.CountDownLatch(1);
+        runOnMainSync(() -> {
+            // A vertical drag can leave ScrollView's private OverScroller running after its
+            // scrollY becomes stable. ScrollView.onInterceptTouchEvent(ACTION_DOWN) treats an
+            // unfinished scroller as a drag and steals the next child tap. Stop that fling
+            // before programmatically positioning the target, then let two animation frames
+            // run so the zero-velocity scroller reaches its finished state.
+            scrollView.fling(0);
+            scrollView.postOnAnimation(() -> scrollView.postOnAnimation(settledFrames::countDown));
+        });
+        check(settledFrames.await(1500L, java.util.concurrent.TimeUnit.MILLISECONDS),
+                "parent Tasks ScrollView finishes its prior fling before child tap injection");
+        waitForIdleSync();
     }
 
     private void waitForScrollPositionToSettle(android.widget.ScrollView scrollView) throws Exception {
