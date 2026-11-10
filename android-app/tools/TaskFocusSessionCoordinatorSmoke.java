@@ -563,10 +563,9 @@ public final class TaskFocusSessionCoordinatorSmoke {
         }
     }
 
-    private static List<String> list(String first, String second) {
+    private static List<String> list(String... entries) {
         List<String> values = new ArrayList<>();
-        values.add(first);
-        values.add(second);
+        for (String entry : entries) values.add(entry);
         return values;
     }
 
