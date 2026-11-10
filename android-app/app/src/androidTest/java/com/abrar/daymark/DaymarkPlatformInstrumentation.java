@@ -1063,6 +1063,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         File root = makeTestDirectory("focus-timer-runtime");
         Context isolated = new IsolatedContext(base, root);
         final int notificationId = 0x44464F43;
+        manager.cancel(notificationId);
+        check(awaitNotificationState(manager, notificationId, false),
+                "stale focus notification is cleared before the isolated lifecycle test");
         final String taskId = "focus-instrumentation-" + UUID.randomUUID();
         Task task = new Task(taskId, "Focus instrumentation task", null, "medium", false,
                 "2026-10-30T18:00:00Z", "2026-10-30T18:00:00Z");
@@ -1168,6 +1171,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(restoredPaused != null && restoredPaused.isPaused() && restoredPaused.restored
                             && alternateTask.id.equals(restoredPaused.timer.taskId()),
                     "the switched task ID survives process recreation while the session remains paused");
+            check(restoredPaused.notificationPublished,
+                    "restoring a paused session reports successful notification publication");
             checkPausedNotification(manager, notificationId, alternateTask.title,
                     "restoring a paused session");
 
@@ -1198,6 +1203,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "restore/deletion reconciliation still leaves tasks.enc byte-for-byte unchanged");
         } finally {
             manager.cancel(notificationId);
+            // The CI runner starts ten instrumentation processes back-to-back. Wait until
+            // NotificationManager has processed this run's cancellation before the next
+            // process can publish the same stable ID, avoiding a stale cross-process cancel.
+            awaitNotificationState(manager, notificationId, false);
             deleteTree(root);
         }
     }
