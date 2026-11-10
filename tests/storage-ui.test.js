@@ -7,6 +7,7 @@ const path = require('node:path');
 const storageApi = require('../storage-logic.js');
 const ui = require('../storage-ui.js');
 const mutation = require('../task-mutation-logic.js');
+const focusMutation = require('../focus-mutation-logic.js');
 
 function fakeElement(tag) {
   const el = {
@@ -95,6 +96,7 @@ function fakeEnv(options) {
     },
     window: {
       navigator: locks ? { locks } : {},
+      CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
       StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } },
       dispatchEvent(event) { dispatched.push(event); return true; },
       addEventListener() {}
@@ -102,6 +104,7 @@ function fakeEnv(options) {
     localStorage: storage,
     storageApi,
     taskMutation: mutation,
+    focusMutation,
     webhookUi: opts.webhookUi,
     lockManager: locks,
     confirm(message) {
@@ -133,7 +136,7 @@ test('webhook queue category clear acquires task, delivery and queue locks befor
   let resetCount = 0;
   const { env, storageData, dispatched } = fakeEnv({
     data: { 'daymark.webhook.queue.v1': '[]' },
-    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; resetWhileLocked = lockDepth === 3; } },
+    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; resetWhileLocked = lockDepth === 4; } },
     lockManager: locks
   });
   await ui.attachStorageUi(env).onClearCategory('webhook-queue');
@@ -163,7 +166,7 @@ test('clear-all acquires the global task/delivery/queue lock order before deleti
       'daymark.webhook.queue.v1': '[]',
       'daymark.focus.v1': '{}'
     },
-    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; resetWhileLocked = lockDepth === 3; } },
+    webhookUi: { resetQueueAfterExternalClear() { resetCount += 1; resetWhileLocked = lockDepth === 4; } },
     lockManager: locks
   });
   await ui.attachStorageUi(env).onClearAll();
@@ -196,8 +199,61 @@ test('webhook queue and clear-all fail closed if any ordered lock is rejected', 
     assert.equal(storageData['daymark.tasks.v1'], '[]');
     assert.equal(storageData['daymark.webhook.queue.v1'], queueBytes);
     assert.match(elements['storage-status-line'].textContent, /Nothing was cleared/);
-    assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
+    assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER.slice(0, 3));
   }
+});
+
+
+test('Focus category clear advances the generation while holding the Focus lock', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      calls.push(name);
+      return Promise.resolve().then(callback);
+    }
+  };
+  const { env, storageData, dispatched } = fakeEnv({
+    data: { 'daymark.focus.v1': '{"session":null,"log":[]}' },
+    lockManager: locks
+  });
+  await ui.attachStorageUi(env).onClearCategory('focus');
+  assert.deepEqual(calls, [focusMutation.FOCUS_MUTATION_LOCK]);
+  assert.equal(storageData['daymark.focus.v1'], undefined);
+  assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], '1');
+  assert.ok(dispatched.some((event) => event.type === 'daymark:focus-storage-cleared'
+    && event.detail.categoryId === 'focus'));
+});
+
+test('Clear All retains only the non-personal Focus generation counter', async () => {
+  const { env, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]', 'daymark.focus.v1': '{"session":null,"log":[]}' }
+  });
+  await ui.attachStorageUi(env).onClearAll();
+  assert.equal(storageData['daymark.tasks.v1'], undefined);
+  assert.equal(storageData['daymark.focus.v1'], undefined);
+  assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], '1');
+});
+
+test('Clear All fails closed when the Focus lock cannot be acquired', async () => {
+  const calls = [];
+  const locks = {
+    request(name, options, callback) {
+      calls.push(name);
+      if (name === focusMutation.FOCUS_MUTATION_LOCK) return Promise.reject(new Error('Focus lock unavailable'));
+      return Promise.resolve().then(callback);
+    }
+  };
+  const originalFocus = '{"session":null,"log":[]}';
+  const { env, storageData, removedKeys } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]', 'daymark.focus.v1': originalFocus },
+    lockManager: locks
+  });
+  await ui.attachStorageUi(env).onClearAll();
+  assert.deepEqual(removedKeys, []);
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(storageData['daymark.focus.v1'], originalFocus);
+  assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], undefined);
+  assert.deepEqual(calls, mutation.CLEAR_ALL_LOCK_ORDER);
 });
 
 test('a webhook queue clear waits for an in-flight task completion transaction', async () => {
