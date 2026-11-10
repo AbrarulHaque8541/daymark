@@ -1,3 +1,25 @@
+## Current execution queue — 2026-11-10T02:44:08Z (main 557af3160d16)
+
+This queue supersedes the older current-priority summaries below; historical evidence remains intact.
+
+1. **P0 — Focus/API 36 acceptance (#613, #648, #677):** investigate the stale paused-notification title after task switch and the API 36 horizontal swipe/Task Editor failures independently. Keep the strict 10-run lifecycle gate; do not weaken assertions.
+2. **P0 — Cross-tab task data integrity (#683, #675):** finish the mutation matrix across normal save, import, recovery merge, clear-completed, undo and queue clear; preserve the shared task → delivery → queue lock order.
+3. **P0 — Main governance (#646):** owner-approved required Android/contracts checks and independent approvals; current protection disabled, rulesets absent, detailed endpoint HTTP 403.
+4. **P0 — Physical acceptance (#160):** install current-source APK on real Android devices and record model/API/WebView provider/version and APK SHA; CI artifacts are not device acceptance.
+5. **P1 — Recurrence validation parity (#684, #656):** coordinate with the current task-logic.js owner; add shared validation fixtures, reject invalid explicit anchors/rules, and preserve legacy records with absent monthly/yearly anchors.
+6. **P1 — Secure downloads (#671, #678, #691, #692):** complete Android redirect-validating transport; decide whether desktop external-process TOCTOU is in scope and use private staging/no-replace publication if required.
+7. **P1 — Signing/provenance (#665, #84):** independent security review and action-runtime/provenance completion.
+8. **P1 — Extension recovery and Service Worker compatibility (#659, #687, #685, #686):** expose malformed-pack recovery in UI and review Online-mode Service Worker compatibility without weakening offline enforcement.
+9. **P1 — Recovery/storage/webhook/Focus integrity (#640, #603, #636, #639, #689, #690):** complete unknown-vs-absent, clear/write and cross-tab queue races.
+10. **P1 — AST test guard (#693/#694):** exact-head CI green; obtain independent review, integrate legacy workflow install steps with #665 ownership, then merge only under verified governance.
+11. **P2 — Browser UX / cross-platform architecture (#348, #325):** continue after the P0 data, security and runtime acceptance gates.
+
+Recent integration: PR #688 merged at 557af3160d16463a6a8a9c3031f5ef887fdb5ef9. Main Android CI #42737255404 and cross-platform contracts #42737255215 pass. No production release/tag was published.
+
+Latest whole-project evidence: [CURRENT_STATUS_20261110T024408Z.md](docs/CURRENT_STATUS_20261110T024408Z.md).
+
+---
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
