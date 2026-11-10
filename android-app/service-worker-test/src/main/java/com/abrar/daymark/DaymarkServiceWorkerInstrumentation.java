@@ -152,6 +152,13 @@ public final class DaymarkServiceWorkerInstrumentation {
             check(secondServer.count("/page-egress") == 1,
                     "the second controlled server must receive its explicitly enabled page request");
 
+            // Take the baseline only after all seed/active/second-tab navigations and page
+            // requests. Chromium may perform a normal Service Worker update check while a
+            // new client is loaded; that setup traffic is not caused by an Online/Offline
+            // mode transition and must not be attributed to one.
+            int firstWorkerScriptsBeforeOnline = server.count("/sw.js");
+            int secondWorkerScriptsBeforeOnline = secondServer.count("/sw.js");
+
             // The user's explicit Online navigation consent must enable worker egress on
             // both origins and all retained tabs, not just ordinary page fetches.
             Class<?> enforcementType = Class.forName(
@@ -181,10 +188,14 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "the first origin's cached Service Worker response must not require a network request");
             check(secondServer.count("/cached") == 0,
                     "the second origin's cached Service Worker response must not require a network request");
-            check(server.count("/sw.js") == initialWorkerScripts,
-                    "the first origin must not refetch its worker script during mode changes");
-            check(secondServer.count("/sw.js") == secondInitialWorkerScripts,
-                    "the second origin must not refetch its worker script during mode changes");
+            check(server.count("/sw.js") == firstWorkerScriptsBeforeOnline,
+                    "the first origin must not refetch its worker script during Online mode change"
+                    + " (before=" + firstWorkerScriptsBeforeOnline
+                    + ", after=" + server.count("/sw.js") + ")");
+            check(secondServer.count("/sw.js") == secondWorkerScriptsBeforeOnline,
+                    "the second origin must not refetch its worker script during Online mode change"
+                    + " (before=" + secondWorkerScriptsBeforeOnline
+                    + ", after=" + secondServer.count("/sw.js") + ")");
 
             // Exercise the page-level Offline transition independently of the global worker
             // policy. A page request must fail while the same worker remains network-blocked.
@@ -197,6 +208,11 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "page-level Offline mode must block ordinary network fetches");
             check(server.count("/page-egress-offline") == 0,
                     "Offline page traffic must not reach the controlled server");
+
+            // Snapshot immediately before the process-wide Offline reassertion. This isolates
+            // the policy transition from the earlier page-navigation/update-check setup.
+            int firstWorkerScriptsBeforeOffline = server.count("/sw.js");
+            int secondWorkerScriptsBeforeOffline = secondServer.count("/sw.js");
 
             // Simulate a settings reset and exercise Daymark's actual Offline reassertion method.
             // No request is issued during the temporary test reset.
@@ -217,6 +233,10 @@ public final class DaymarkServiceWorkerInstrumentation {
             enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
             check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "Offline reassertion must restore the process-wide Service Worker block");
+            check(server.count("/sw.js") == firstWorkerScriptsBeforeOffline,
+                    "Offline reassertion must not refetch the first origin's worker script");
+            check(secondServer.count("/sw.js") == secondWorkerScriptsBeforeOffline,
+                    "Offline reassertion must not refetch the second origin's worker script");
 
             setPageNetworkBlocked(active, false);
             setPageNetworkBlocked(secondActive, false);
@@ -250,6 +270,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             check(secondServer.count("/trigger") == 0,
                     "the recreated tab's worker must continue to intercept its second-origin trigger");
 
+            int secondOriginScriptsBeforeReenable = secondServer.count("/sw.js");
             check(Boolean.TRUE.equals(allowOnline.invoke(null)),
                     "a later explicit Online consent must re-enable worker network access");
             check(!controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
@@ -257,6 +278,8 @@ public final class DaymarkServiceWorkerInstrumentation {
             requestWorkerEgressAllowed(recreated);
             check(secondServer.count("/worker-egress") == 2,
                     "the recreated tab's worker must reach its origin after explicit Online consent");
+            check(secondServer.count("/sw.js") == secondOriginScriptsBeforeReenable,
+                    "the recreated tab's Online transition must not refetch its worker script");
             enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
             check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "the instrumentation must leave the worker policy Offline before cleanup");
