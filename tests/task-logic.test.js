@@ -207,7 +207,7 @@ test('shared task instant contract matches Android strict instant validation', (
       'JavaScript instant validation must match shared fixture line ' + (index + 1));
     cases += 1;
   }
-  assert.equal(cases, 36, 'shared instant contract must include all thirty-six cases');
+  assert.equal(cases, 43, 'shared instant contract must include all forty-three cases');
 });
 
 test('createdAt, updatedAt, and reminderShownFire use the same strict instant contract', () => {
@@ -227,6 +227,9 @@ test('createdAt, updatedAt, and reminderShownFire use the same strict instant co
 
 test('instant comparison matches Java nanosecond, offset, and leap-second ordering', () => {
   assert.equal(logic.compareInstants('2026-11-10T10:00:00+05:30', '2026-11-10T04:30:00Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00+01:30:15', '2026-11-10T08:29:45Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00-00:00:30', '2026-11-10T10:00:30Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00+18:00:00', '2026-11-09T16:00:00Z'), 0);
   assert.equal(logic.compareInstants('2026-11-10T10:00:00.000000001Z',
     '2026-11-10T10:00:00.000000002Z'), -1);
   assert.equal(logic.compareInstants('2016-12-31T23:59:60Z', '2016-12-31T23:59:59Z'), 0);

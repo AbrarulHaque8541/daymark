@@ -91,7 +91,7 @@ public final class TaskLogicSmoke {
                 cases++;
             }
         }
-        check(cases == 36, "shared instant contract fixture contains all thirty-six cases");
+        check(cases == 43, "shared instant contract fixture contains all forty-three cases");
     }
 
     private static void taskInstantFieldsUseStrictContract() {

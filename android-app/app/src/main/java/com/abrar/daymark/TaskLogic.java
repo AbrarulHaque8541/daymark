@@ -52,7 +52,7 @@ final class TaskLogic {
     static final String REPEAT_YEARLY = "yearly";
 
     private static final Pattern TASK_INSTANT_PATTERN = Pattern.compile(
-            "^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2})$");
+            "^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$");
 
     private TaskLogic() { }
 
@@ -93,7 +93,9 @@ final class TaskLogic {
         if (!"Z".equals(offset)) {
             int offsetHour = Integer.parseInt(offset.substring(1, 3));
             int offsetMinute = Integer.parseInt(offset.substring(4, 6));
-            if (offsetHour > 18 || offsetMinute > 59 || (offsetHour == 18 && offsetMinute != 0)) return false;
+            int offsetSecond = offset.length() >= 9 ? Integer.parseInt(offset.substring(7, 9)) : 0;
+            if (offsetHour > 18 || offsetMinute > 59 || offsetSecond > 59
+                    || (offsetHour == 18 && (offsetMinute != 0 || offsetSecond != 0))) return false;
         }
         try {
             Instant.parse(value);
