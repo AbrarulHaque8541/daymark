@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const taskLogic = require('../task-logic.js');
 const focus = require('../focus-logic.js');
 const focusMutation = require('../focus-mutation-logic.js');
+const taskMutation = require('../task-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const TASK_KEY = 'daymark.tasks.v1';
@@ -90,6 +91,7 @@ function bootApp({ savedFocusValue, failFocusSave = false, beforeGetItem }) {
   };
   const window = {
     DaymarkLogic: taskLogic,
+    DaymarkTaskMutation: taskMutation,
     DaymarkFocus: focus,
     DaymarkFocusMutation: focusMutation,
     DaymarkRepeat: null,
