@@ -48,6 +48,8 @@ public final class ExtensionInjectorSmoke {
         contains(scripts.get(0), "data-daymark-pack-id", "current-page styles remain attributable for cleanup");
         contains(scripts.get(1), guard, "userscript retains its exact-page guard");
         contains(scripts.get(1), "var GM_addStyle=__dmAddStyle", "userscript GM_addStyle is pack-scoped");
+        notContains(scripts.get(1), "window.__daymarkRan",
+                "userscript deduplication does not publish pack IDs on the page global");
         contains(scripts.get(1), "data-daymark-pack-css", "userscript-created styles are tracked separately");
         notContains(scripts.get(1), "window.__daymarkAddStyle", "no global style bridge is exposed");
         before(scripts.get(1), guard, "window.__scopeTest=1;", "pack code runs only after the page guard");
