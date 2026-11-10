@@ -210,6 +210,32 @@ Tooling: Git, GitHub CLI, official Android/llama.cpp sources
 Timestamp (UTC): 2026-10-26T03:57:57Z
 
 
+## Imported WebView script trust boundary — 2026-11-09
+
+Android's [`WebView.evaluateJavascript()`](https://developer.android.com/reference/android/webkit/WebView#evaluateJavascript(java.lang.String,android.webkit.ValueCallback)) reference states that JavaScript is evaluated in the currently displayed page's context. Android's [cross-app scripting guidance](https://developer.android.com/privacy-and-security/risks/cross-app-scripting) warns that injected script can execute in a WebView with access to page data; its [JavaScript bridge guidance](https://developer.android.com/privacy-and-security/risks/insecure-webview-native-bridges) warns against exposing broad native interfaces to untrusted pages. Chrome's [content-script execution-world documentation](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts) distinguishes an isolated extension world from page-world execution. Daymark's `ExtensionInjector` uses `evaluateJavascript()` and exposes no native bridge, so imported scripts are not isolated sandboxed extensions.
+
+**Correction to the 2026-10-26 note above:** the live `onActivityResult` import path used a separate review dialog and did not call the more detailed trust-review helper; the helper was not the active path. This branch adds an idempotent page-context/data disclosure to parser warnings shown by the active import summary, defaults new imported packs to disabled until the user separately enables them, and preserves enabled/site-pause state on identical re-import. Existing malformed or unreadable stored packs are preserved; same-ID re-import is rejected rather than overwriting their bytes. The store now exposes `listMalformedUserPacks()` plus fingerprint-checked exact-byte export and removal APIs; the manager still needs a dedicated accessible recovery/removal surface that invokes them only after user confirmation. This is a disclosure and activation safeguard, not a sandbox; matching page-visible data may still be read or sent externally by code the user enables.
+
+---
+Work by: Cue
+Model: not disclosed by runtime
+Tooling: Git, GitHub connector, official Android and Chrome source review, repository host/source tests
+Timestamp (UTC): 2026-11-09T04:01:15Z
+
+
+## Malformed extension recovery UI (PR #659, pending review)
+
+`MainActivity.showBrowserExtensionsManager()` now renders a separate recovery section for stored user-pack files that cannot be loaded safely. The section is metadata-only: malformed files are never parsed into the executable list or run.
+
+- `ExtensionStore.listMalformedUserPacks()` returns bounded, non-executable records with state, reason, size and SHA-256 fingerprint.
+- Regular malformed files expose **Export raw bytes** and **Remove file** actions. Export re-reads through `readMalformedUserPackBytes(fileName, sha256)` only after the user chooses a SAF destination, so the original bytes are fingerprint-checked and exported without text decoding/normalization.
+- Removal requires an explicit confirmation and `removeMalformedUserPack(fileName, sha256)` rechecks the fingerprint and stable bytes before deleting only that selected file.
+- Oversized, unreadable and non-regular entries remain visible but have no export/remove action; the UI does not silently delete or truncate them.
+- The Extensions dialog refresh path dismisses the prior dialog before rebuilding, avoiding stacked stale recovery lists.
+- `check-extension-import-hardening.py` guards the UI wiring, accessible action descriptions, explicit confirmation and fingerprint-checked raw export/removal. `ExtensionStoreSmoke.java` covers byte-identical export, zero-byte and invalid-UTF-8 packs, changed-after-listing, symlinks, oversized and non-regular files.
+
+This implementation is in PR #659 and is not yet on main or a published release. Physical Android/OEM acceptance is still required.
+
 ## Service Worker network boundary
 
 Daymark installs its process-wide Android ServiceWorkerController policy during
@@ -237,4 +263,5 @@ Official platform references:
 - https://developer.android.com/reference/android/webkit/ServiceWorkerController
 - https://developer.android.com/reference/android/webkit/ServiceWorkerWebSettings
 - https://developer.android.com/reference/android/webkit/ServiceWorkerClient
+
 
