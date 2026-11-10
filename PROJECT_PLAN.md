@@ -1,6 +1,16 @@
 ## Current execution queue — 2026-11-10T02:44:08Z (main 557af3160d16)
 
 
+## Whole-project engineering baseline — 2026-11-10T03:50:47.878Z
+
+- Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; root AGENTS blob `492ed21e2219a8d1b80c7d6e63575525c98a5a91`; 13 open PRs / 23 open issues.
+- PR #665 signing workflow split: current head `34308022`; Android CI/contracts/device artifact PASS, dedicated PR debug build pending. PR #694 AST guard: `acc64c2`, five exact-head workflows PASS. PR #692 desktop: `33d5bf9`, Desktop 43/43 all OS, contracts, Android 697/697 and device APK PASS.
+- #675 carries task/webhook/Focus locking and recovery integration, not merged. #648/#677 still have API 36 failures. Main protection disabled; no independent approvals.
+- P0: #646 governance, #160 physical device acceptance, #613 API 36 Focus/Task Editor. P1: #683/#689/#690 storage races, #671/#678 secure downloads, #84/#665 signing/provenance, #659/#687 extension recovery, #685/#686 Service Worker, #684/#476 recurrence, #636/#639 webhook, #640/#603 recovery. P2: #696 desktop lockfile, #348/#325 architecture/UX.
+- No release/tag/version/applicationId/signer/data migration changes. Identity discrepancy remains tracked in #679.
+- Full inventory and exact evidence: [CURRENT_STATUS_20261110T035047Z.md](docs/CURRENT_STATUS_20261110T035047Z.md).
+
+
 ## Current whole-project engineering baseline — 2026-11-10T03:39:16.161Z
 
 - Main: `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; root AGENTS blob: `492ed21e2219a8d1b80c7d6e63575525c98a5a91`.

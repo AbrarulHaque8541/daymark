@@ -1,6 +1,13 @@
 - [Daymark whole-project engineering status — 2026-11-10T02:44:08Z (main 557af316; AST test guard #694; Focus/API 36 and recurrence triage)](./CURRENT_STATUS_20261110T024408Z.md)
 
 
+## Latest whole-project snapshot — 2026-11-10T03:50:47.878Z
+
+- [CURRENT_STATUS_20261110T035047Z.md](CURRENT_STATUS_20261110T035047Z.md) — live main/PR/issue inventory, exact-head CI, #665 signing workflow split, #694 AST guard fixes, #692 desktop CI/security work, #675 storage integration, and prioritized owner blockers.
+- Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; 13 open PRs; 23 open issues.
+- No merges/releases/device acceptance claimed.
+
+
 ## Latest whole-project snapshot — 2026-11-10T03:39:16.161Z
 
 - [CURRENT_STATUS_20261110T033916Z.md](CURRENT_STATUS_20261110T033916Z.md) — live main/PR/issue inventory, exact-head checks, #665 signing workflow split, #694 AST guard bypass fixes, #675 storage coordination, P0/P1 backlog and owner blockers.
