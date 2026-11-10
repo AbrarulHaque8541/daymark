@@ -155,6 +155,13 @@ test('rejects reflective mutation of imported node:test functions and namespace 
     ["const nodeTest = require('node:test'); const { set: mutate } = Reflect; mutate(nodeTest, 'test', () => {}); nodeTest.test('fake', () => assert.ok(true));", 'destructured Reflect.set'],
     ["const nodeTest = require('node:test'); globalThis.Object.defineProperty(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'globalThis Object mutation'],
     ["const nodeTest = require('node:test'); const method = 'defineProperty'; Object[method](nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'dynamic Object mutation'],
+    ["const nodeTest = require('node:test'); const define = Object.defineProperty; define.call(Object, nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'Object.defineProperty.call alias'],
+    ["const nodeTest = require('node:test'); const set = Reflect.set; set.apply(Reflect, [nodeTest, 'test', () => {}]); nodeTest.test('fake', () => assert.ok(true));", 'Reflect.set.apply alias'],
+    ["const nodeTest = require('node:test'); const define = Object.defineProperty; const call = define.call; call(Object, nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'aliased mutator call wrapper'],
+    ["const nodeTest = require('node:test'); const set = Reflect.set; const apply = set.apply; apply(Reflect, [nodeTest, 'test', () => {}]); nodeTest.test('fake', () => assert.ok(true));", 'aliased mutator apply wrapper'],
+    ["const nodeTest = require('node:test'); Reflect.apply(Object.defineProperty, Object, [nodeTest, 'test', { value: () => {} }]); nodeTest.test('fake', () => assert.ok(true));", 'Reflect.apply direct mutator'],
+    ["const nodeTest = require('node:test'); const apply = Reflect.apply; apply(Object.defineProperty, Object, [nodeTest, 'test', { value: () => {} }]); nodeTest.test('fake', () => assert.ok(true));", 'Reflect.apply alias'],
+    ["const nodeTest = require('node:test'); const define = Object.defineProperty; define.bind(Object, nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'bound mutator target'],
     ["const { test } = require('node:test'); Object.defineProperty(test, 'only', { value: () => {} }); test.only('fake', () => assert.ok(true));", 'imported function mutation'],
     ["const test = require('node:test'); const alias = test; Reflect.set(alias, 'only', () => {}); test.only('fake', () => assert.ok(true));", 'function alias mutation']
   ];
