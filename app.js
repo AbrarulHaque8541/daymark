@@ -1905,8 +1905,15 @@
 
       const completedSession = restoreResult.completedSession;
       if (completedSession) {
-        // Preserve the exact pre-finalization bytes before the expiry log is committed.
-        queueFocusRecoveryBackup(saved, saved);
+        // Preserve the exact pre-finalization bytes when no older recovery
+        // source exists. Never replace or bundle over an existing opaque backup
+        // merely because a valid running session expired while the app was closed.
+        if (state.focusRecoveryBackupPendingPayload === null) {
+          const backupState = readFocusRecoveryBackupState();
+          if (!backupState.readable) reportUnknownFocusRecoveryBackup();
+          else if (backupState.hasBackup) reportFocusRecovery(true);
+          else queueFocusRecoveryBackup(saved, saved);
+        }
         const entry = focus.makeLogEntry(completedSession);
         const alreadyLogged = entry && log.entries.some((item) => item.id === entry.id);
         const entries = entry && !alreadyLogged
