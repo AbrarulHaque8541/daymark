@@ -1181,8 +1181,12 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(resumed != null && resumed.isRunning()
                             && alternateTask.id.equals(resumed.timer.taskId()),
                     "Resume restores monotonic state under task B's identity");
-            check(awaitNotificationTitle(manager, notificationId, alternateTask.title) != null,
-                    "resuming after task switch publishes the notification with task B's title");
+            android.app.Notification resumedNotification =
+                    awaitNotificationTitle(manager, notificationId, alternateTask.title);
+            check(resumed.notificationPublished && resumedNotification != null,
+                    "resuming after task switch publishes task B's notification"
+                            + " (published=" + resumed.notificationPublished
+                            + ", observed=" + describeNotification(resumedNotification) + ")");
             TaskFocusSessionCoordinator.Snapshot finished = pausedAfterProcessRestart.finishFromUserAction();
             check(finished != null && finished.isFinished(),
                     "Finish durably ends the focus session without completing the task");
