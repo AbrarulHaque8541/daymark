@@ -347,7 +347,7 @@
           return Promise.resolve(false);
         }
         return taskMutation.withTaskMutationLock(lockManager, () => {
-          const generation = taskMutation.incrementTaskGeneration(storage);
+          const generation = taskMutation.incrementTaskGeneration(storage, category.id);
           if (!generation.ok) return { ok: false, reason: generation.reason };
           return { ok: true, result: clear() };
         }).then((locked) => {
@@ -418,7 +418,7 @@
         lockManager,
         taskMutation.CLEAR_ALL_LOCK_ORDER,
         () => {
-          const taskGeneration = taskMutation.incrementTaskGeneration(storage);
+          const taskGeneration = taskMutation.incrementTaskGeneration(storage, 'all');
           if (!taskGeneration.ok) throw new Error('Task generation could not be advanced');
           const focusGeneration = focusMutation.incrementFocusGeneration(storage);
           if (!focusGeneration.ok) throw new Error('Focus generation could not be advanced');
