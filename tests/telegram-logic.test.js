@@ -140,6 +140,10 @@ test('a successful send posts the exact payload over HTTPS and reports the messa
   assert.equal(payload.chat_id, '@daymark_user');
   assert.equal(payload.text, 'hello');
   assert.equal(fetchFn.calls[0].options.method, 'POST');
+  assert.equal(fetchFn.calls[0].options.credentials, 'omit');
+  assert.equal(fetchFn.calls[0].options.cache, 'no-store');
+  assert.equal(fetchFn.calls[0].options.redirect, 'error');
+  assert.equal(fetchFn.calls[0].options.referrerPolicy, 'no-referrer');
 });
 test('an offline device reports an honest network reason without echoing the token', async () => {
   const fetchFn = (url, options) => Promise.reject(new Error('offline'));
@@ -164,6 +168,19 @@ test('a Telegram error body is surfaced in plain words', async () => {
   assert.equal(result.ok, false);
   assert.match(result.reason, /chat not found/);
 });
+test('an API error description redacts the bot token before reaching the UI', async () => {
+  const description = 'Request failed for https://api.telegram.org/bot' + VALID_TOKEN + '/sendMessage';
+  const fetchFn = makeFetch(() => ({
+    status: 200,
+    json: () => Promise.resolve({ ok: false, description: description })
+  }));
+  const result = await engine.sendTelegramMessage(
+    { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' }, networkDeps(fetchFn));
+  assert.equal(result.ok, false);
+  assert.ok(result.reason.indexOf(VALID_TOKEN) === -1, 'untrusted API descriptions must not echo the bot token');
+  assert.match(result.reason, /\[redacted\]/);
+});
+
 test('an environment with an explicit null fetch fails closed', async () => {
   const result = await engine.sendTelegramMessage(
     { botToken: VALID_TOKEN, chatTarget: '12345', text: 'hello' },
