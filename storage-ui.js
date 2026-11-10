@@ -382,9 +382,10 @@
         return;
       }
       const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, the Focus Timer preset, caches, browser preferences, and queued events will be removed. '
+        + 'Tasks, Focus history, the Focus Timer preset, cached data, saved Wikipedia/weather/holiday/currency and browser-search preferences, '
+        + 'the remembered browser download journey, the saved browser proxy profile, the legacy webhook coordination lock, and queued events will be removed. '
         + 'A small non-personal Focus coordination counter remains so another open tab cannot restore cleared Focus data. '
-        + 'The secret-bearing legacy webhook endpoint is excluded and handled without reading. This cannot be undone.');
+        + 'The secret-bearing legacy endpoint is excluded and handled without reading. This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
         return;
