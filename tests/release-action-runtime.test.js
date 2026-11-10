@@ -69,9 +69,222 @@ function listWorkflowFiles() {
     }));
 }
 
-function hasPullRequestTrigger(content) {
-  return /^\s*pull_request(?:_target)?:\s*(?:#.*)?$/m.test(content);
+function stripYamlComment(line) {
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (quote === '"') {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'" && line[index + 1] === "'") index += 1;
+      else if (character === "'") quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '#' && (index === 0 || /\s/.test(line[index - 1]))) {
+      return line.slice(0, index);
+    }
+  }
+  return line;
 }
+
+function unquoteYamlScalar(value) {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2 && trimmed[0] === "'" && trimmed.endsWith("'")) {
+    return trimmed.slice(1, -1).replace(/''/g, "'");
+  }
+  if (trimmed.length >= 2 && trimmed[0] === '"' && trimmed.endsWith('"')) {
+    try { return JSON.parse(trimmed); } catch { return trimmed.slice(1, -1); }
+  }
+  return trimmed;
+}
+
+function scanFlowState(value) {
+  const stack = [];
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote === '"') {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'" && value[index + 1] === "'") index += 1;
+      else if (character === "'") quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '[' || character === '{') stack.push(character);
+    else if (character === ']' || character === '}') {
+      const expected = character === ']' ? '[' : '{';
+      if (stack.pop() !== expected) throw new Error('Malformed flow-style workflow trigger.');
+    }
+  }
+  return { stack, quote };
+}
+
+function splitFlowEntries(value) {
+  const entries = [];
+  let start = 0;
+  const stack = [];
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote === '"') {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'" && value[index + 1] === "'") index += 1;
+      else if (character === "'") quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '[' || character === '{') stack.push(character);
+    else if (character === ']' || character === '}') stack.pop();
+    else if (character === ',' && stack.length === 0) {
+      entries.push(value.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  const tail = value.slice(start).trim();
+  if (tail) entries.push(tail);
+  return entries;
+}
+
+function findFlowColon(value) {
+  const stack = [];
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote === '"') {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'" && value[index + 1] === "'") index += 1;
+      else if (character === "'") quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '[' || character === '{') stack.push(character);
+    else if (character === ']' || character === '}') stack.pop();
+    else if (character === ':' && stack.length === 0) return index;
+  }
+  return -1;
+}
+
+function hasPullRequestTrigger(content) {
+  const lines = String(content).split(/\r?\n/);
+  const rootOnLines = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = stripYamlComment(lines[index]);
+    const match = line.match(/^(?:on|['"]on['"])\s*:(.*)$/);
+    if (match) rootOnLines.push({ index, value: match[1].trim() });
+  }
+  if (rootOnLines.length === 0) return false;
+  if (rootOnLines.length !== 1) throw new Error('Duplicate top-level on key in workflow.');
+  const root = rootOnLines[0];
+  const isPullRequest = (name) => name === 'pull_request' || name === 'pull_request_target';
+
+  if (root.value.startsWith('[') || root.value.startsWith('{')) {
+    let flow = root.value;
+    let state = scanFlowState(flow);
+    for (let index = root.index + 1; state.stack.length > 0 && index < lines.length; index += 1) {
+      flow += '\n' + stripYamlComment(lines[index]);
+      state = scanFlowState(flow);
+    }
+    if (state.stack.length > 0 || state.quote) {
+      throw new Error('Unterminated flow-style workflow trigger.');
+    }
+    const trimmed = flow.trim();
+    const opening = trimmed[0];
+    const closing = opening === '[' ? ']' : '}';
+    if (!trimmed.endsWith(closing)) throw new Error('Malformed flow-style workflow trigger.');
+    const entries = splitFlowEntries(trimmed.slice(1, -1));
+    if (opening === '[') {
+      return entries.some((entry) => isPullRequest(unquoteYamlScalar(entry)));
+    }
+    return entries.some((entry) => {
+      const colon = findFlowColon(entry);
+      if (colon < 0) throw new Error('Malformed flow-style workflow event mapping.');
+      return isPullRequest(unquoteYamlScalar(entry.slice(0, colon)));
+    });
+  }
+
+  if (root.value) {
+    const scalar = unquoteYamlScalar(root.value);
+    if (!/^[A-Za-z0-9_-]+$/.test(scalar)) {
+      throw new Error('Unsupported top-level on syntax; refusing to skip workflow trigger inspection.');
+    }
+    return isPullRequest(scalar);
+  }
+
+  let directIndent = null;
+  let found = false;
+  for (let index = root.index + 1; index < lines.length; index += 1) {
+    const line = stripYamlComment(lines[index]);
+    if (!line.trim()) continue;
+    const indentation = line.match(/^\s*/)[0].length;
+    if (indentation === 0) break;
+    if (directIndent === null) directIndent = indentation;
+    if (indentation < directIndent) break;
+    if (indentation !== directIndent) continue;
+    const item = line.trim();
+    if (item.startsWith('-')) {
+      if (isPullRequest(unquoteYamlScalar(item.slice(1)))) found = true;
+      continue;
+    }
+    const key = item.match(/^([A-Za-z0-9_-]+|'(?:[^']|'')+'|"(?:[^"]|\\")+")\s*:/);
+    if (key && isPullRequest(unquoteYamlScalar(key[1]))) found = true;
+  }
+  return found;
+}
+test('PR trigger detection recognizes block, sequence and flow-style YAML declarations', () => {
+  assert.equal(hasPullRequestTrigger('on:\n  pull_request:\n    branches: [main]\n'), true);
+  assert.equal(hasPullRequestTrigger('on:\n  pull_request_target:\n    types: [opened]\n'), true);
+  assert.equal(hasPullRequestTrigger('on:\n  - push\n  - pull_request\n'), true);
+  assert.equal(hasPullRequestTrigger('on: [push, pull_request]'), true);
+  assert.equal(hasPullRequestTrigger('on: [push, "pull_request_target"]'), true);
+  assert.equal(hasPullRequestTrigger('on: { push: {}, pull_request: { types: [opened] } }'), true);
+  assert.equal(hasPullRequestTrigger('on: {\n  workflow_dispatch: {},\n  pull_request_target: { types: [opened] }\n}'), true);
+  assert.equal(hasPullRequestTrigger('"on": [push, pull_request]'), true);
+  assert.equal(hasPullRequestTrigger('on: workflow_dispatch'), false);
+  assert.equal(hasPullRequestTrigger('on: [push, workflow_dispatch]'), false);
+  assert.equal(hasPullRequestTrigger('# on: [pull_request]\non:\n  push:\n    branches: [main]\n'), false);
+});
+
+test('PR trigger detection fails closed for ambiguous or unsupported YAML declarations', () => {
+  assert.throws(() => hasPullRequestTrigger('on: *shared-events'), /Unsupported top-level on syntax/);
+  assert.throws(() => hasPullRequestTrigger('on: [pull_request'), /Unterminated flow-style workflow trigger/);
+  assert.throws(() => hasPullRequestTrigger('on:\n  push:\non:\n  pull_request:\n'), /Duplicate top-level on key/);
+});
 
 test('release and provenance workflows pin Node 24 actions to immutable commits', () => {
   for (const [workflowPath, expectedActions] of Object.entries(WORKFLOWS)) {
