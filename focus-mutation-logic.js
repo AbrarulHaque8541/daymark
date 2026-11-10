@@ -191,10 +191,12 @@
     let desiredParsed;
     try { desiredParsed = parseSnapshot(JSON.stringify(opts.desiredSnapshot)); }
     catch (error) { desiredParsed = { ok: false }; }
-    if (!desiredParsed.ok || (typeof opts.validateSnapshot === 'function'
-        && opts.validateSnapshot(desiredParsed.value) !== true)) {
-      return { ok: false, reason: 'invalid-snapshot', conflicts: [] };
+    let desiredValid = desiredParsed.ok;
+    if (desiredValid && typeof opts.validateSnapshot === 'function') {
+      try { desiredValid = opts.validateSnapshot(desiredParsed.value) === true; }
+      catch (error) { desiredValid = false; }
     }
+    if (!desiredValid) return { ok: false, reason: 'invalid-snapshot', conflicts: [] };
     const locked = await withFocusMutationLock(opts.lockManager, async () => {
       const generation = readFocusGeneration(storage);
       if (!generation.ok) return { ok: false, reason: generation.reason, conflicts: [] };
