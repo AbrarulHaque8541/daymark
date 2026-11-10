@@ -101,6 +101,17 @@ public final class TaskOpenExportSmoke {
                         new Task("bad-instant", "T", null, "low", false,
                                 "yesterday", "2026-10-01T00:00:00Z"))),
                 "unparseable createdAt is rejected");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("local-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00", "2026-10-01T00:00:00Z"))),
+                "createdAt without an explicit offset is rejected");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("bad-reminder-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00Z", "2026-10-01T00:00:00Z",
+                                Collections.<AttachmentRef>emptyList(), "", null, null,
+                                "2026-11-10T10:00:00.1234567890Z", null,
+                                Collections.<Subtask>emptyList()))),
+                "invalid reminderShownFire is rejected by export");
 
         System.out.println("PASS task open export smoke tests: " + assertions + " assertions");
     }

@@ -1,10 +1,9 @@
 /*
  * Daymark open-format task export (Markdown / CSV / iCalendar).
  *
- * Pure, dependency-free logic shared by the web prototype and mirrored by the
- * Android host (TaskOpenExport.java). Output is byte-for-byte identical across
- * runtimes for the same inputs; contracts/task-export-fixture.json pins the
- * exact expected strings for both sides.
+ * Pure offline logic shared by the web prototype and mirrored by the Android
+ * host (TaskOpenExport.java). Task timestamps use the shared task-logic instant
+ * validator/comparator; the export fixture pins byte-for-byte output parity.
  *
  * Everything here is offline: no network, no storage, no DOM.
  */
@@ -17,6 +16,19 @@
   const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
   const PRIORITIES = ['low', 'medium', 'high'];
   const CSV_HEADER = 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt';
+  const taskLogic = root.DaymarkLogic || (typeof module !== 'undefined' && module.exports ? require('./task-logic.js') : null);
+
+  function isValidTaskInstant(value) {
+    return Boolean(taskLogic && typeof taskLogic.isValidInstant === 'function'
+      && taskLogic.isValidInstant(value));
+  }
+
+  function compareTaskInstants(left, right) {
+    if (!taskLogic || typeof taskLogic.compareInstants !== 'function') {
+      throw new Error('Shared task instant logic is unavailable.');
+    }
+    return taskLogic.compareInstants(left, right);
+  }
 
   function isFormat(value) {
     return FORMATS.indexOf(value) !== -1;
@@ -89,13 +101,17 @@
       throw new Error('Export task completed flag must be a boolean.');
     }
     requireCleanText(task.createdAt, 'createdAt');
-    if (Number.isNaN(Date.parse(task.createdAt))) {
+    if (!isValidTaskInstant(task.createdAt)) {
       throw new Error('Export task createdAt "' + task.createdAt + '" is not a parseable instant.');
     }
     requireCleanText(task.updatedAt === undefined || task.updatedAt === null ? task.createdAt : task.updatedAt, 'updatedAt');
     const updatedAt = task.updatedAt === undefined || task.updatedAt === null ? task.createdAt : task.updatedAt;
-    if (Number.isNaN(Date.parse(updatedAt))) {
+    if (!isValidTaskInstant(updatedAt)) {
       throw new Error('Export task updatedAt "' + updatedAt + '" is not a parseable instant.');
+    }
+    if (task.reminderShownFire !== undefined && task.reminderShownFire !== null
+        && !isValidTaskInstant(task.reminderShownFire)) {
+      throw new Error('Export task reminderShownFire is not a valid task instant.');
     }
     const notes = typeof task.notes === 'string' ? task.notes : '';
     requireCleanText(notes, 'notes');
@@ -148,9 +164,8 @@
     const rankA = PRIORITY_RANK[a.priority];
     const rankB = PRIORITY_RANK[b.priority];
     if (rankA !== rankB) return rankA - rankB;
-    const createdA = Date.parse(a.createdAt);
-    const createdB = Date.parse(b.createdAt);
-    if (createdA !== createdB) return createdA - createdB;
+    const createdOrder = compareTaskInstants(a.createdAt, b.createdAt);
+    if (createdOrder !== 0) return createdOrder;
     if (a.id < b.id) return -1;
     if (a.id > b.id) return 1;
     return 0;

@@ -67,6 +67,36 @@
     return true;
   }
 
+  function instantSortParts(value) {
+    const match = TASK_INSTANT_PATTERN.exec(value);
+    if (!match || !isValidInstant(value)) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]) === 60 ? 59 : Number(match[6]);
+    const utc = new Date(0);
+    utc.setUTCFullYear(year, month - 1, day);
+    utc.setUTCHours(hour, minute, second, 0);
+    let offsetSeconds = 0;
+    const offset = match[8];
+    if (offset !== 'Z') {
+      const sign = offset[0] === '+' ? 1 : -1;
+      offsetSeconds = sign * (Number(offset.slice(1, 3)) * 3600 + Number(offset.slice(4, 6)) * 60);
+    }
+    return { epochSeconds: Math.floor(utc.getTime() / 1000) - offsetSeconds,
+      nanoseconds: Number((match[7] || '').padEnd(9, '0')) };
+  }
+
+  function compareInstants(leftValue, rightValue) {
+    const left = instantSortParts(leftValue);
+    const right = instantSortParts(rightValue);
+    if (!left || !right) throw new TypeError('Cannot compare invalid task instants.');
+    if (left.epochSeconds !== right.epochSeconds) return left.epochSeconds < right.epochSeconds ? -1 : 1;
+    return left.nanoseconds - right.nanoseconds;
+  }
+
   function isReminderLead(value) {
     return value === null || REMINDER_LEADS.includes(value);
   }
@@ -178,7 +208,7 @@
     if (timeA !== null && timeB === null) return -1;
     if (timeA !== timeB) return (timeA || '').localeCompare(timeB || '');
     return (PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
-      || a.createdAt.localeCompare(b.createdAt);
+      || compareInstants(a.createdAt, b.createdAt);
   }
 
   function getFilteredTasks(tasks, filter, query, today) {
@@ -213,7 +243,7 @@
       if (timeA !== null && timeB === null) return -1;
       if (timeA !== timeB) return (timeA || '').localeCompare(timeB || '');
       return (PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
-        || a.createdAt.localeCompare(b.createdAt);
+        || compareInstants(a.createdAt, b.createdAt);
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
   }
 
@@ -335,6 +365,7 @@
     localDateString,
     isDateOnly,
     isValidInstant,
+    compareInstants,
     isTimeOnly,
     isReminderLead,
     isValidSubtasks,
