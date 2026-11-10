@@ -23,6 +23,8 @@ tests/browser-download-logic.test.js
 tests/browser-download-ui.test.js
 tests/browser-error-logic.test.js
 tests/browser-error-ui.test.js
+tests/browser-intent-logic.test.js
+tests/browser-intent-ui.test.js
 tests/browser-network-policy-contract.test.js
 tests/browser-proxy-logic.test.js
 tests/browser-proxy-ui.test.js
@@ -34,7 +36,6 @@ tests/device-capability-policy.test.js
 tests/export-logic.test.js
 tests/export-ui.test.js
 tests/extension-network.test.mjs
-tests/extension-spa-navigation.test.js
 tests/feed-logic.test.js
 tests/focus-logic.test.js
 tests/focus-storage.test.js
