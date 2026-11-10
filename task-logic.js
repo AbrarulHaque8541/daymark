@@ -34,6 +34,39 @@
       && value === `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   }
 
+  /**
+   * Shared four-digit instant contract for web and Android task records.
+   * Java Instant.parse's leap-second normalization is supported only at 23:59:60.
+   */
+  const TASK_INSTANT_PATTERN = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2})$/;
+
+  function isValidInstant(value) {
+    if (typeof value !== 'string') return false;
+    const match = TASK_INSTANT_PATTERN.exec(value);
+    if (!match) return false;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return false;
+    if (hour > 23 || minute > 59
+        || (second > 59 && !(second === 60 && hour === 23 && minute === 59))) return false;
+
+    const offset = match[8];
+    if (offset !== 'Z') {
+      const offsetHour = Number(offset.slice(1, 3));
+      const offsetMinute = Number(offset.slice(4, 6));
+      if (offsetHour > 18 || offsetMinute > 59 || (offsetHour === 18 && offsetMinute !== 0)) return false;
+    }
+    return true;
+  }
+
   function isReminderLead(value) {
     return value === null || REMINDER_LEADS.includes(value);
   }
@@ -101,14 +134,14 @@
       && (task.dueDate === null || isDateOnly(task.dueDate))
       && ['low', 'medium', 'high'].includes(task.priority)
       && typeof task.completed === 'boolean'
-      && typeof task.createdAt === 'string' && !Number.isNaN(Date.parse(task.createdAt))
-      && typeof task.updatedAt === 'string' && !Number.isNaN(Date.parse(task.updatedAt))
+      && isValidInstant(task.createdAt)
+      && isValidInstant(task.updatedAt)
       && (task.notes === undefined || (typeof task.notes === 'string' && task.notes.length <= MAX_NOTES_CHARS))
       && (task.dueTime === undefined || task.dueTime === null
         || (isTimeOnly(task.dueTime) && task.dueDate !== null && isDateOnly(task.dueDate)))
       && (task.reminderLeadMinutes === undefined || isReminderLead(task.reminderLeadMinutes))
       && (task.reminderShownFire === undefined || task.reminderShownFire === null
-        || (typeof task.reminderShownFire === 'string' && !Number.isNaN(Date.parse(task.reminderShownFire))))
+        || (isValidInstant(task.reminderShownFire)))
       && (task.subtasks === undefined || isValidSubtasks(task.subtasks))
       && (task.tags === undefined || task.tags === null || isValidTags(task.tags))
       && isValidRepeatMetadata(task));
@@ -301,6 +334,7 @@
   const api = {
     localDateString,
     isDateOnly,
+    isValidInstant,
     isTimeOnly,
     isReminderLead,
     isValidSubtasks,

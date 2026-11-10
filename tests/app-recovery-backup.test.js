@@ -1063,3 +1063,22 @@ test('duplicate keys in a Focus recovery envelope remain opaque and exportable',
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), ambiguous);
   assert.equal(app.elements.get('#toast-action').hidden, false);
 });
+
+
+test('strict instant rejection preserves the exact original task payload for recovery', async () => {
+  const invalidCreatedAt = { ...validTask('invalid-created-at', 'Invalid createdAt'),
+    createdAt: '2026-02-30T00:00:00Z' };
+  const invalidUpdatedAt = { ...validTask('invalid-updated-at', 'Invalid updatedAt'),
+    updatedAt: '2026-11-10T10:00:00' };
+  const invalidReminderFire = { ...validTask('invalid-reminder-fire', 'Invalid reminderShownFire'),
+    reminderShownFire: '2026-11-10T10:00:00.1234567890Z' };
+  const original = JSON.stringify([invalidCreatedAt, invalidUpdatedAt, invalidReminderFire]);
+  const storedValues = new Map([[STORAGE_KEY, original]]);
+  const app = bootApp(storedValues);
+  await app.settle();
+
+  assert.equal(storedValues.get(STORAGE_KEY), original,
+    'startup validation must not rewrite the original primary bytes');
+  assert.equal(storedValues.get(BACKUP_KEY), original,
+    'the complete rejected payload must be retained byte-for-byte in the recovery backup');
+});

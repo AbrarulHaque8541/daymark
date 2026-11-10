@@ -192,6 +192,41 @@ test('shared task date contract matches the Java host implementation fixture', (
   assert.equal(cases, 9, 'shared date contract must include all nine cases');
 });
 
+test('shared task instant contract matches Android strict instant validation', () => {
+  const fixturePath = path.join(__dirname, '..', 'contracts', 'task-instant-validation.tsv');
+  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
+  let cases = 0;
+  for (const [index, line] of lines.entries()) {
+    if (!line || line.startsWith('#')) continue;
+    const columns = line.split('\t');
+    assert.equal(columns.length, 2, \`instant fixture line \${index + 1} must have two columns\`);
+    assert.ok(columns[1] === 'true' || columns[1] === 'false',
+      \`instant fixture line \${index + 1} must use a strict boolean\`);
+    const value = columns[0] === '~' ? '' : columns[0];
+    assert.equal(logic.isValidInstant(value), columns[1] === 'true',
+      \`JavaScript instant validation must match shared fixture line \${index + 1}\`);
+    cases += 1;
+  }
+  assert.equal(cases, 36, 'shared instant contract must include all thirty-six cases');
+});
+
+test('createdAt, updatedAt, and reminderShownFire use the same strict instant contract', () => {
+  const valid = task('instant-fields', 'Instant fields');
+  assert.equal(logic.isValidTask(valid), true);
+  assert.equal(logic.isValidTask({ ...valid, createdAt: '2026-02-30T00:00:00Z' }), false);
+  assert.equal(logic.isValidTask({ ...valid, updatedAt: '2026-11-10T10:00:00' }), false);
+  assert.equal(logic.isValidTask({
+    ...valid,
+    reminderShownFire: '2026-11-10T10:00:00.1234567890Z'
+  }), false);
+  assert.equal(logic.isValidTask({
+    ...valid,
+    reminderShownFire: '2016-12-31T23:59:60Z'
+  }), true);
+});
+
+
+
 test('duplicate JSON object keys are detected recursively without scanning string contents', () => {
   assert.equal(logic.hasDuplicateJsonKeys('{"title":"first","title":"last"}'), true);
   assert.equal(logic.hasDuplicateJsonKeys('[{"nested":{"id":1,"id":2}}]'), true);
