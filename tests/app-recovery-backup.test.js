@@ -692,7 +692,11 @@ test('empty strings are malformed recovery payloads, not absent recovery sources
   assert.match(taskParser, /if \(raw\.length === 0\) \{ result\.malformedCount = 1; return result; \}/);
   assert.match(focusParser, /if \(raw\.length === 0\) \{ result\.malformedCount = 1; return result; \}/);
   const focusLoaderStart = APP_SOURCE.indexOf('function loadFocusState() {');
-  const focusPersistStart = APP_SOURCE.indexOf('function persistFocusState() {', focusLoaderStart);
+  const focusPersistMatch = /\n\s*(?:async\s+)?function persistFocusState\(/.exec(
+    APP_SOURCE.slice(focusLoaderStart)
+  );
+  assert.ok(focusPersistMatch, 'Focus persistence function must follow the loader');
+  const focusPersistStart = focusLoaderStart + focusPersistMatch.index;
   const focusLoader = APP_SOURCE.slice(focusLoaderStart, focusPersistStart);
   assert.match(focusLoader, /if \(saved === null\)/);
   assert.doesNotMatch(focusLoader, /if \(!saved\)/);
