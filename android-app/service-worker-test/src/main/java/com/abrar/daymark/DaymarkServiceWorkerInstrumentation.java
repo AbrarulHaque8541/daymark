@@ -327,6 +327,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             final ClassLoader targetLoader = instrumentation.getTargetContext().getClassLoader();
             AtomicReference<WebView> viewRef = new AtomicReference<>();
             AtomicReference<Object> storeRef = new AtomicReference<>();
+            AtomicReference<Object> policyRef = new AtomicReference<>();
             AtomicReference<Throwable> setupFailure = new AtomicReference<>();
             instrumentation.runOnMainSync(() -> {
                 try {
@@ -379,6 +380,7 @@ public final class DaymarkServiceWorkerInstrumentation {
                     testView.resumeTimers();
                     viewRef.set(testView);
                     storeRef.set(store);
+                    policyRef.set(policy);
                 } catch (Throwable failure) {
                     setupFailure.set(failure);
                 }
@@ -389,7 +391,8 @@ public final class DaymarkServiceWorkerInstrumentation {
             }
             view = viewRef.get();
             extensionStore = storeRef.get();
-            check(view != null && extensionStore != null,
+            Object networkPolicy = policyRef.get();
+            check(view != null && extensionStore != null && networkPolicy != null,
                     "the production DaymarkWebView and its native ExtensionStore are available");
 
             Class<?> storeType = extensionStore.getClass();
@@ -425,6 +428,14 @@ public final class DaymarkServiceWorkerInstrumentation {
             installPack.invoke(extensionStore, parsePack.invoke(null, matchingJson, false));
             installPack.invoke(extensionStore, parsePack.invoke(null, unrelatedJson, false));
 
+            Class<?> workspaceController = Class.forName(
+                    "com.abrar.daymark.BrowserWorkspaceController", true, targetLoader);
+            java.lang.reflect.Method prepareNavigation = workspaceController.getDeclaredMethod(
+                    "prepareForExplicitNavigation",
+                    Class.forName("com.abrar.daymark.BrowserNetworkPolicy", true, targetLoader),
+                    Class.forName("com.abrar.daymark.DaymarkWebView", true, targetLoader));
+            prepareNavigation.setAccessible(true);
+            prepareNavigation.invoke(null, networkPolicy, view);
             load(view, server.url("/private/start"));
             String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
                     + matchingPackId + "\"]";
@@ -485,6 +496,16 @@ public final class DaymarkServiceWorkerInstrumentation {
             marker("Daymark WebView extension SPA route acceptance passed");
         } finally {
             if (view != null) destroyQuietly(view);
+            try {
+                Class<?> enforcement = Class.forName(
+                        "com.abrar.daymark.BrowserServiceWorkerEnforcement", true,
+                        instrumentation.getTargetContext().getClassLoader());
+                java.lang.reflect.Method blockWorkers = enforcement.getDeclaredMethod("enforceBlocked");
+                blockWorkers.setAccessible(true);
+                blockWorkers.invoke(null);
+            } catch (Throwable policyCleanupFailure) {
+                Log.w(TAG, "could not restore the fail-closed Service Worker policy", policyCleanupFailure);
+            }
             if (extensionStore != null) {
                 try {
                     Class<?> storeType = extensionStore.getClass();
