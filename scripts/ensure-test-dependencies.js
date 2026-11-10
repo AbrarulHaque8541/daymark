@@ -1,14 +1,20 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
+
+const PINNED_ACORN_VERSION = '8.19.0';
 
 const repositoryRoot = path.resolve(__dirname, '..');
 
 try {
-  require.resolve('acorn', { paths: [repositoryRoot] });
-  process.stdout.write('Node test parser is already installed.\n');
-  process.exit(0);
+  const packagePath = require.resolve('acorn/package.json', { paths: [repositoryRoot] });
+  const installedVersion = JSON.parse(fs.readFileSync(packagePath, 'utf8')).version;
+  if (installedVersion === PINNED_ACORN_VERSION) {
+    process.stdout.write('Pinned Node test parser is already installed.\n');
+    process.exit(0);
+  }
 } catch {
   // Legacy/manual workflows may invoke npm test without an explicit install.
   // Bootstrap only the lockfile-pinned development dependencies in that case;
@@ -40,7 +46,9 @@ if (result.error) {
 if (result.status !== 0) process.exit(result.status === null ? 1 : result.status);
 
 try {
-  require.resolve('acorn', { paths: [repositoryRoot] });
+  const packagePath = require.resolve('acorn/package.json', { paths: [repositoryRoot] });
+  const installedVersion = JSON.parse(fs.readFileSync(packagePath, 'utf8')).version;
+  if (installedVersion !== PINNED_ACORN_VERSION) throw new Error('Unexpected Acorn version: ' + installedVersion);
 } catch {
   process.stderr.write('npm ci completed but the pinned Acorn parser is still unavailable.\n');
   process.exit(1);
