@@ -34,4 +34,32 @@ check("sha256sum" in WORKFLOW and "base64 -w0" in WORKFLOW,
 check("base64-subjects" in WORKFLOW,
       "the generator must receive the real subject digests")
 
+
+
+# Production signing and provenance are owner-triggered only. A tag-on-main check
+# alone is not authorization: a repository writer must not be able to trigger
+# production signing or release-asset writes merely by creating a matching tag.
+SIGNED_RELEASE_WORKFLOW = (ROOT / ".github/workflows/android-signed-device-test-release.yml").read_text()
+PRIVATE_MAIN_WORKFLOW = (ROOT / ".github/workflows/android-private-main-test-apk.yml").read_text()
+OWNER_GATE = "github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'"
+
+signed_build = SIGNED_RELEASE_WORKFLOW.split("  build-and-verify:", 1)[1].split("  publish-release:", 1)[0]
+signed_publish = SIGNED_RELEASE_WORKFLOW.split("  publish-release:", 1)[1]
+slsa_build = WORKFLOW.split("  build:", 1)[1].split("  provenance:", 1)[0]
+slsa_provenance = WORKFLOW.split("  provenance:", 1)[1]
+
+check(OWNER_GATE in signed_build,
+      "production signing secrets must be reachable only from an owner-triggered tag run")
+check(OWNER_GATE in signed_publish and "contents: write" in signed_publish,
+      "production release-asset writes must require the owner actor gate")
+check("pull_request:" not in SIGNED_RELEASE_WORKFLOW and "workflow_dispatch:" not in SIGNED_RELEASE_WORKFLOW,
+      "the signed production workflow must remain tag-push-only")
+check("github.event_name != 'push'" in slsa_build and OWNER_GATE in slsa_build,
+      "SLSA manual dispatch may build only; tag-triggered APK builds must be owner-triggered")
+check("github.event_name == 'push' && github.ref_type == 'tag'" in slsa_provenance
+      and OWNER_GATE in slsa_provenance and "id-token: write" in slsa_provenance,
+      "SLSA provenance signing and release upload must be owner-triggered tag-only")
+check(OWNER_GATE in PRIVATE_MAIN_WORKFLOW,
+      "the private main test APK workflow must retain its owner-only manual-dispatch gate")
+
 print(f"PASS SLSA workflow source checks: {checks} assertions")
