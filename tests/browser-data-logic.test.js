@@ -187,7 +187,7 @@ test('clear-action catalog stays aligned with real Undo expiry and backup cleanu
   const showToast = sourceSection(appSource, 'function showToast(message, action = null) {', 'function readRecoveryExportPayload() {');
   assert.match(clearCompleted, /label: 'Undo'/);
   assert.match(showToast, /action \? 7000 : 2600/);
-  const persistStart = appSource.indexOf('function persistTasks()');
+  const persistStart = appSource.indexOf('function persistTasks(');
   const backupStart = appSource.indexOf('function clearRecoveryBackup()');
   assert.ok(persistStart >= 0 && backupStart > persistStart, 'persistence and backup cleanup functions must exist');
   const persistenceAndBackup = appSource.slice(persistStart, backupStart + 500);
