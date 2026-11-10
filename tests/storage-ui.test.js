@@ -245,7 +245,7 @@ test('unreadable category data is shown as unknown and an explicit retry fails c
 
   assert.match(taskTitle.textContent, /Tasks — status unknown/);
   assert.equal(taskButton.disabled, false, 'an unreadable category offers an explicit retry');
-  assert.match(elements['data-status'].textContent, /1 storage key could not be checked/);
+  assert.match(elements['data-status'].textContent, /1 category could not be checked/);
   assert.equal(elements['data-clear-all'].disabled, true,
     'clear-all is blocked while any category is unreadable');
 
@@ -263,7 +263,7 @@ test('all unreadable categories never produce an empty-store claim or mutate dat
   ui.attachStorageUi(env);
 
   assert.match(elements['data-status'].textContent, /No readable local data was found/);
-  assert.match(elements['data-status'].textContent, /storage keys could not be checked/);
+  assert.match(elements['data-status'].textContent, /categories could not be checked/);
   assert.doesNotMatch(elements['data-status'].textContent, /No local data is stored yet/);
   assert.equal(elements['data-clear-all'].disabled, true);
   const buttons = elements['data-list'].children.map((row) =>

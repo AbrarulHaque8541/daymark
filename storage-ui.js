@@ -123,7 +123,7 @@
           ? 'No readable local data was found'
           : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
             + storageApi.formatBytes(scan.totalBytes) + ' total)';
-        const noun = unreadableCount === 1 ? 'storage key could not be checked' : 'storage keys could not be checked';
+        const noun = unreadableCount === 1 ? 'category could not be checked' : 'categories could not be checked';
         status(known + '; ' + unreadableCount + ' ' + noun
           + '. Reported sizes exclude unreadable entries.');
       } else if (scan.presentCount === 0) {
@@ -209,11 +209,15 @@
       }
       setBusy(false);
       if (result.failed.length > 0) {
+        const unreadable = Array.isArray(result.unreadable) && result.unreadable.length > 0;
         const message = result.removed.length === 0
-          ? 'Could not clear ' + category.label + ': ' + result.failed.length
-            + ' item(s) could not be checked. No item could be removed by the browser; nothing was cleared.'
+          ? unreadable
+            ? 'Could not clear ' + category.label + ': ' + result.unreadable.length
+              + ' item(s) could not be read. Nothing was cleared.'
+            : 'Could not clear ' + category.label + ': ' + result.failed.length
+              + ' item(s) could not be removed by the browser. Nothing was cleared.'
           : 'Cleared ' + category.label + ', but ' + result.failed.length
-            + ' item(s) could not be checked or removed by the browser.';
+            + ' item(s) could not be removed by the browser.';
         render();
         status(message);
       } else {
@@ -252,11 +256,15 @@
       }
       setBusy(false);
       if (result.failedKeys.length > 0) {
+        const unreadableKeys = Array.isArray(result.unreadableKeys) ? result.unreadableKeys : [];
         const message = result.removedKeys.length === 0
-          ? 'Could not clear all data: ' + result.failedKeys.length
-            + ' item(s) could not be checked. No item could be removed by the browser; nothing was cleared.'
+          ? unreadableKeys.length > 0
+            ? 'Could not clear all data: ' + unreadableKeys.length
+              + ' item(s) could not be read. Nothing was cleared.'
+            : 'Could not clear all data: ' + result.failedKeys.length
+              + ' item(s) could not be removed by the browser. Nothing was cleared.'
           : 'Cleared ' + result.removedKeys.length + ' item(s), but '
-            + result.failedKeys.length + ' item(s) could not be checked or removed by the browser.';
+            + result.failedKeys.length + ' item(s) could not be removed by the browser.';
         render();
         status(message);
       } else {

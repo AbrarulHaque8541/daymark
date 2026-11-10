@@ -227,6 +227,7 @@
     const keys = planClear(categoryId);
     const existing = [];
     const failed = [];
+    const unreadable = [];
     // Read every key before deleting any key. A read failure is unknown state,
     // not permission to partially clear a category.
     for (const key of keys) {
@@ -234,9 +235,10 @@
         if (storage.getItem(key) !== null) existing.push(key);
       } catch (error) {
         failed.push(key);
+        unreadable.push(key);
       }
     }
-    if (failed.length > 0) return { id: categoryId, removed: [], failed };
+    if (failed.length > 0) return { id: categoryId, removed: [], failed, unreadable };
     const removed = [];
     for (const key of existing) {
       try {
@@ -246,7 +248,7 @@
         failed.push(key);
       }
     }
-    return { id: categoryId, removed, failed };
+    return { id: categoryId, removed, failed, unreadable };
   }
 
   function clearAll(storage) {
@@ -271,7 +273,7 @@
         removed: [],
         failed: category.keys.filter((key) => unreadable.has(key))
       }));
-      return { results, removedKeys: [], failedKeys };
+      return { results, removedKeys: [], failedKeys, unreadableKeys: failedKeys };
     }
     const results = CATEGORIES.map((category) => {
       const removed = [];
@@ -290,7 +292,8 @@
     return {
       results,
       removedKeys: results.reduce((all, result) => all.concat(result.removed), []),
-      failedKeys: results.reduce((all, result) => all.concat(result.failed), [])
+      failedKeys: results.reduce((all, result) => all.concat(result.failed), []),
+      unreadableKeys: []
     };
   }
 

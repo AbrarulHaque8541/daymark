@@ -169,6 +169,7 @@ test('clearCategory removes exactly its own keys and reports failures honestly',
   const failed = storage.clearCategory(store, 'tasks');
   assert.deepEqual(failed.removed, []);
   assert.deepEqual(failed.failed, ['daymark.tasks.v1'], 'a failed removal is never reported as cleared');
+  assert.deepEqual(failed.unreadable, [], 'a removeItem failure is not mislabeled as a read failure');
   assert.equal(store.snapshot['daymark.tasks.v1'], '[]');
 });
 
@@ -263,6 +264,7 @@ test('clearAll performs a complete read preflight before deleting any stored key
   const result = storage.clearAll(store);
   assert.deepEqual(result.removedKeys, []);
   assert.deepEqual(result.failedKeys, ['daymark.focus.v1']);
+  assert.deepEqual(result.unreadableKeys, ['daymark.focus.v1']);
   assert.equal(store.snapshot['daymark.tasks.v1'], '[]');
   assert.equal(store.snapshot['daymark.weather.v1'], '{}');
   assert.equal(store.snapshot['daymark.webhook.queue.v1'], '[]');
@@ -274,6 +276,7 @@ test('clearCategory does not remove a key when its preflight read fails', () => 
   const result = storage.clearCategory(store, 'tasks');
   assert.deepEqual(result.removed, []);
   assert.deepEqual(result.failed, ['daymark.tasks.v1']);
+  assert.deepEqual(result.unreadable, ['daymark.tasks.v1']);
   assert.equal(store.snapshot['daymark.tasks.v1'], '[]');
 });
 
