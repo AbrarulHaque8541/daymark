@@ -1,7 +1,13 @@
 package com.abrar.daymark;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
 /** Host-side regression tests for safe Android intent:// browser-link parsing. */
 public final class BrowserIntentLinkPolicySmoke {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         BrowserIntentLinkPolicy.Decision app = BrowserIntentLinkPolicy.parse(
                 "intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;"
                         + "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end");
@@ -103,7 +109,46 @@ public final class BrowserIntentLinkPolicySmoke {
         expectFailure("intent://scan/#Intent;scheme=zxing;end#fragment",
                 "trailing fragments rejected");
 
+        if (args.length > 0) verifySharedContract(Path.of(args[0]));
         System.out.println("PASS Android intent link routing policy");
+    }
+
+    private static void verifySharedContract(Path fixture) throws Exception {
+        List<String> lines = Files.readAllLines(fixture, StandardCharsets.UTF_8);
+        int accepted = 0;
+        int rejected = 0;
+        for (String line : lines) {
+            if (line.isEmpty() || line.startsWith("#")) continue;
+            String[] fields = line.split("\\t", -1);
+            if (fields.length != 5) throw new AssertionError("invalid shared Intent fixture row: " + line);
+            String name = fields[0];
+            String expected = fields[1];
+            String input = fields[2];
+            if ("accept".equals(expected)) {
+                BrowserIntentLinkPolicy.Decision decision = BrowserIntentLinkPolicy.parse(input);
+                check(fields[3].equals(decision.targetUri), name + " target mismatch: " + decision.targetUri);
+                String fallback = fields[4].isEmpty() ? null : fields[4];
+                check(java.util.Objects.equals(fallback, decision.fallbackUrl), name + " fallback mismatch");
+                accepted++;
+            } else if ("reject".equals(expected)) {
+                expectFailure(input, name);
+                rejected++;
+            } else {
+                throw new AssertionError("unknown shared Intent fixture expectation: " + expected);
+            }
+        }
+        check(accepted >= 5 && rejected >= 20, "shared Intent fixture must retain accepted and adversarial cases");
+        System.out.println("PASS shared Android/web Intent URI contract: " + accepted + " accepted, " + rejected + " rejected");
+    }
+
+    private static void expectFailure(String input, String message) {
+        try {
+            BrowserIntentLinkPolicy.parse(input);
+            throw new AssertionError(message);
+        } catch (IllegalArgumentException expected) {
+            // Expected fail-closed behavior.
+        }
+    }
     }
 
     private static void expectFailure(String input, String message) {
