@@ -63,11 +63,12 @@ This workflow-level actor gate does not replace repository tag protection or a p
 
 ## Required GitHub environment protection — 2026-11-10
 
-Every privileged signing or provenance-upload job references the GitHub Actions environment **`production-signing`**:
+Every privileged signing job references the GitHub Actions environment **`production-signing`**:
 - production APK/AAB signing and draft creation;
 - signed device-test APK signing and release-asset upload;
-- the owner-only private main test APK workflow;
-- SLSA provenance signing and release-asset upload.
+- the owner-only private main test APK workflow.
+
+The reusable SLSA provenance publisher cannot carry a job-level environment directly. Its owner-triggered `authorize-provenance` job waits on `production-signing`, and the OIDC/contents-write reusable publisher has an explicit dependency on that approved gate.
 
 **The workflow reference is not proof that the environment is protected.** GitHub can automatically create an environment the first time a workflow references it; an automatically created environment has no required reviewers or deployment restrictions by default. Before any signed tag, release, provenance upload, or private signed test run, a repository administrator must explicitly create/configure `production-signing` in Settings → Environments.
 
