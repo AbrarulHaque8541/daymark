@@ -19,6 +19,7 @@ public final class WindowInsetsPolicySmoke {
                 : "a present IME inset must be applied";
         assert !WindowInsetsPolicy.shouldApplyImeInsets(0)
                 : "an absent IME inset must not add padding";
+        // 1920px window: 63px status inset, 872px IME; the dialog is centered in the 985px safe area.
         assert WindowInsetsPolicy.dialogYOffsetForIme(63, 872) == -404
                 : "the dialog center must shift upward by half the additional keyboard occlusion";
         assert WindowInsetsPolicy.dialogYOffsetForIme(96, 72) == 0
