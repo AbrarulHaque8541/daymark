@@ -260,9 +260,11 @@ def check_recovery_ui(main):
     removal = main.split("private void confirmRemoveMalformedExtensionPack", 1)[1].split(
         "private void showExtensionDetailsDialog", 1
     )[0]
-    assert removal.index('.setPositiveButton("Remove file"') < removal.index(
-        "removeMalformedUserPack(pack.fileName, pack.sha256)"
-    ), "malformed-pack deletion must occur only inside the explicit positive confirmation"
+    positive_confirmation = removal.find('.setPositiveButton("Remove file"')
+    delete_call = removal.find("removeMalformedUserPack(pack.fileName, pack.sha256)")
+    assert positive_confirmation >= 0 and delete_call > positive_confirmation, (
+        "malformed-pack deletion must occur only inside the explicit positive confirmation"
+    )
     assert '.setNegativeButton("Keep file", null)' in removal, (
         "malformed-pack removal must provide a non-destructive cancellation action"
     )
