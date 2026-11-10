@@ -418,16 +418,55 @@
         lockManager,
         taskMutation.CLEAR_ALL_LOCK_ORDER,
         () => {
+          const taskGenerationKey = taskMutation.TASK_GENERATION_KEY;
+          let previousTaskGeneration;
+          try {
+            previousTaskGeneration = storage.getItem(taskGenerationKey);
+          } catch (error) {
+            return { ok: false, reason: 'task-generation-read-failed' };
+          }
+
           const taskGeneration = taskMutation.incrementTaskGeneration(storage, 'all');
-          if (!taskGeneration.ok) throw new Error('Task generation could not be advanced');
+          if (!taskGeneration.ok) return { ok: false, reason: 'task-generation-failed' };
+
           const focusGeneration = focusMutation.incrementFocusGeneration(storage);
-          if (!focusGeneration.ok) throw new Error('Focus generation could not be advanced');
+          if (!focusGeneration.ok) {
+            // Both counters form one Clear All preparation transaction. If Focus
+            // cannot advance, restore the exact task marker before releasing the
+            // ordered locks so other tabs do not discard valid task intent.
+            let restored = false;
+            try {
+              if (previousTaskGeneration === null) {
+                storage.removeItem(taskGenerationKey);
+              } else {
+                storage.setItem(taskGenerationKey, previousTaskGeneration);
+              }
+            } catch (error) {
+              // A missing marker is semantically generation zero. If removal is
+              // blocked, a canonical zero marker is a safe equivalent fallback.
+              if (previousTaskGeneration === null) {
+                try { storage.setItem(taskGenerationKey, '0'); } catch (restoreError) { }
+              }
+            }
+            try {
+              const currentTaskGeneration = storage.getItem(taskGenerationKey);
+              restored = currentTaskGeneration === previousTaskGeneration
+                || (previousTaskGeneration === null && currentTaskGeneration === '0');
+            } catch (error) { }
+            return {
+              ok: false,
+              reason: restored
+                ? 'focus-generation-failed-rolled-back'
+                : 'partial-generation-coordination'
+            };
+          }
+
           const result = storageApi.clearAll(storage);
           if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
               && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
             webhookUi.resetQueueAfterExternalClear();
           }
-          return result;
+          return { ok: true, result };
         }
       );
       setBusy(false);
@@ -438,7 +477,21 @@
             : 'a shared lock or storage operation failed. Nothing was cleared.'));
         return false;
       }
-      const result = locked.value;
+      const outcome = locked.value;
+      if (!outcome || outcome.ok !== true) {
+        if (outcome && outcome.reason === 'focus-generation-failed-rolled-back') {
+          status('Could not safely clear all data: Focus coordination could not advance. Task coordination was restored; nothing was cleared.');
+        } else if (outcome && outcome.reason === 'partial-generation-coordination') {
+          // The task fence may remain advanced. Rebase this tab from durable
+          // storage and be explicit that only coordination state changed.
+          notifyTaskStorageChange(null);
+          status('Could not safely clear all data: task coordination could not be restored after Focus generation failed. No user data was removed. A task-state refresh was requested; reload this tab before editing if the task list does not update.');
+        } else {
+          status('Could not safely clear all data: a shared lock, generation or storage operation failed. Nothing was cleared.');
+        }
+        return false;
+      }
+      const result = outcome.result;
       notifyFocusStorageChange('all');
       if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {

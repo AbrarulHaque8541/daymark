@@ -357,6 +357,67 @@ test('task category clear fails closed when the retained generation cannot be wr
   assert.match(elements['storage-status-line'].textContent, /task-generation fence or shared task lock failed/i);
 });
 
+test('Clear All restores the exact task generation when Focus generation cannot advance', async () => {
+  for (const previousGeneration of [null, '7:tasks']) {
+    const data = {
+      'daymark.tasks.v1': '[]',
+      'daymark.focus.v1': '{"session":null,"log":[]}'
+    };
+    if (previousGeneration !== null) data[mutation.TASK_GENERATION_KEY] = previousGeneration;
+    const { env, storageData, removedKeys, elements, dispatched } = fakeEnv({
+      data,
+      writeFailures: [focusMutation.FOCUS_GENERATION_KEY]
+    });
+
+    await ui.attachStorageUi(env).onClearAll();
+
+    assert.deepEqual(removedKeys, [], 'failed generation preparation removes no user data');
+    assert.equal(storageData['daymark.tasks.v1'], '[]');
+    assert.equal(storageData['daymark.focus.v1'], '{"session":null,"log":[]}');
+    assert.equal(storageData[mutation.TASK_GENERATION_KEY], previousGeneration,
+      'the exact previous task generation is restored');
+    assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], undefined);
+    assert.equal(dispatched.length, 0, 'a successful rollback needs no task-state rebase');
+    assert.match(elements['storage-status-line'].textContent,
+      /Task coordination was restored; nothing was cleared/i);
+  }
+});
+
+test('Clear All warns and requests a task-state rebase when generation rollback also fails', async () => {
+  const { env, storageData, removedKeys, elements, dispatched } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': '[]',
+      'daymark.focus.v1': '{"session":null,"log":[]}',
+      [mutation.TASK_GENERATION_KEY]: '7:tasks'
+    }
+  });
+  const originalSetItem = env.localStorage.setItem.bind(env.localStorage);
+  let taskGenerationWrites = 0;
+  env.localStorage.setItem = (key, value) => {
+    if (key === focusMutation.FOCUS_GENERATION_KEY) {
+      throw new Error('Focus generation write failure');
+    }
+    if (key === mutation.TASK_GENERATION_KEY) {
+      taskGenerationWrites += 1;
+      if (taskGenerationWrites === 2) throw new Error('Task generation rollback failure');
+    }
+    originalSetItem(key, value);
+  };
+
+  await ui.attachStorageUi(env).onClearAll();
+
+  assert.deepEqual(removedKeys, [], 'partial coordination failure still removes no user data');
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+  assert.equal(storageData['daymark.focus.v1'], '{"session":null,"log":[]}');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '8:all',
+    'the failed rollback is not misreported as restored');
+  assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], undefined);
+  assert.ok(dispatched.some((event) => event.type === 'storage' && event.key === null),
+    'the current tab is asked to rebase from durable task storage');
+  assert.match(elements['storage-status-line'].textContent,
+    /task coordination could not be restored.*No user data was removed.*task-state refresh was requested/i);
+});
+
 test('Clear All fails before deleting any data when the task generation cannot be retained', async () => {
   const { env, storageData, removedKeys, elements } = fakeEnv({
     data: { 'daymark.tasks.v1': '[]', 'daymark.focus.v1': '{"session":null,"log":[]}' },
