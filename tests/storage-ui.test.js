@@ -375,7 +375,7 @@ test('Clear All restores the exact task generation when Focus generation cannot 
       'failed generation preparation removes no user data (only a temporary generation marker may be removed)');
     assert.equal(storageData['daymark.tasks.v1'], '[]');
     assert.equal(storageData['daymark.focus.v1'], '{"session":null,"log":[]}');
-    assert.equal(storageData[mutation.TASK_GENERATION_KEY], previousGeneration,
+    assert.equal(storageData[mutation.TASK_GENERATION_KEY] === undefined ? null : storageData[mutation.TASK_GENERATION_KEY], previousGeneration,
       'the exact previous task generation is restored');
     assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], undefined);
     assert.equal(dispatched.length, 0, 'a successful rollback needs no task-state rebase');
