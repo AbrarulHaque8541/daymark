@@ -195,6 +195,69 @@ test('unavailable storage keeps the card honest and never clears anything', () =
   assert.match(elements['data-status'].textContent, /Could not read local data: Browser storage is unavailable/);
 });
 
+test('an explicit refresh retries a previously throwing localStorage getter', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' }
+  });
+  const storage = env.localStorage;
+  delete env.localStorage;
+  let attempts = 0;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() {
+      attempts += 1;
+      if (attempts === 1) throw new Error('storage access denied on first attempt');
+      return storage;
+    }
+  });
+
+  ui.attachStorageUi(env);
+  assert.equal(attempts, 1, 'initial access is attempted once');
+  assert.match(elements['data-status'].textContent,
+    /Browser storage could not be accessed\. Local data status is unknown/);
+  assert.equal(elements['data-clear-all'].disabled, true);
+
+  const refresh = elements['data-refresh'].listeners.find((entry) => entry.type === 'click');
+  assert.ok(refresh, 'the explicit refresh action remains available');
+  refresh.handler();
+
+  assert.equal(attempts, 2, 'refresh reacquires the window storage object');
+  assert.match(elements['data-status'].textContent, /1 of \d+ categories hold data/);
+  assert.equal(elements['data-clear-all'].disabled, false,
+    'destructive controls become available only after storage access succeeds');
+  assert.equal(storageData['daymark.tasks.v1'], '[]',
+    'retrying storage access does not mutate user data');
+});
+
+test('the production boot access-failure flag retries window.localStorage only after refresh', () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': '[]' }
+  });
+  const storage = env.localStorage;
+  env.localStorage = null;
+  env.storageAccessFailed = true;
+  let attempts = 0;
+  Object.defineProperty(env.window, 'localStorage', {
+    configurable: true,
+    get() {
+      attempts += 1;
+      return storage;
+    }
+  });
+
+  ui.attachStorageUi(env);
+  assert.equal(attempts, 0,
+    'the boot adapter’s already-observed getter failure is not immediately retried');
+  assert.match(elements['data-status'].textContent,
+    /Browser storage could not be accessed\. Local data status is unknown/);
+
+  const refresh = elements['data-refresh'].listeners.find((entry) => entry.type === 'click');
+  refresh.handler();
+  assert.equal(attempts, 1, 'refresh performs the first explicit retry');
+  assert.match(elements['data-status'].textContent, /1 of \d+ categories hold data/);
+  assert.equal(storageData['daymark.tasks.v1'], '[]');
+});
+
 test('the refresh button rescans without confirmation and without changing data', () => {
   const { env, elements, storageData, confirmations } = fakeEnv({ data: { 'daymark.feed.v1': '{}' } });
   ui.attachStorageUi(env);
