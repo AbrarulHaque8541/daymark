@@ -579,6 +579,31 @@ function hasExecutedOperation(node) {
     if (node.operator === '||' && isStaticTrue(node.left)) return hasExecutedOperation(node.left);
   }
 
+  if (node.type === 'SwitchStatement' && node.discriminant.type === 'Literal') {
+    let selectedIndex = -1;
+    let defaultIndex = -1;
+    for (let index = 0; index < node.cases.length; index++) {
+      const branch = node.cases[index];
+      if (branch.test === null) {
+        defaultIndex = index;
+      } else if (branch.test.type === 'Literal'
+          && Object.is(branch.test.value, node.discriminant.value)) {
+        selectedIndex = index;
+        break;
+      } else if (hasExecutedOperation(branch.test)) {
+        return true;
+      }
+    }
+    if (selectedIndex < 0) selectedIndex = defaultIndex;
+    if (selectedIndex < 0) return false;
+    for (let index = selectedIndex; index < node.cases.length; index++) {
+      const branch = node.cases[index];
+      if (hasExecutedOperation(branch.consequent)) return true;
+      if (branch.consequent.some((statement) => statement.type === 'BreakStatement')) break;
+    }
+    return false;
+  }
+
   if (node.type === 'CallExpression'
       || node.type === 'NewExpression'
       || node.type === 'AwaitExpression'
