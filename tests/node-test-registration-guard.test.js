@@ -27,6 +27,8 @@ test('rejects logical and destructuring reassignment of imported test bindings',
 
 test('recognizes CommonJS and ESM aliases of node:test', () => {
   const cases = [
+    ["const test = require('node:test'); test('real', () => assert.ok(true));", 'CommonJS default require'],
+    ["const nodeTest = require('node:test'); nodeTest.test('real', () => assert.ok(true));", 'CommonJS default module property'],
     ["const { test: register } = require('node:test'); register('real', () => assert.ok(true));", 'CommonJS named alias'],
     ["import { test as register } from 'node:test'; register('real', () => assert.ok(true));", 'ESM named alias'],
     ["import test from 'node:test'; test('real', () => assert.ok(true));", 'ESM default import'],
