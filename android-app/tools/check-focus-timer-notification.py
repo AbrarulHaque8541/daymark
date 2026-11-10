@@ -113,13 +113,15 @@ checks.extend([
     ("TaskFocusTimerNotification.publish(" in runtime,
      "only the Android runtime notification sink publishes focus notifications"),
     ("coordinator.startFromUserAction(" in runtime
-     and "coordinator.restoreAfterProcessStart(" in runtime,
-     "new sessions enter through explicit user action and restore only existing records"),
-    ("store.load(" in runtime and "findTask(tasks" in runtime,
-     "restoration resolves persisted task IDs against the loaded encrypted task list"),
-    ("coordinator.refreshNotification(task.title)" in runtime
-     and "coordinator.clearIfTaskDeleted(" in runtime,
-     "task rename/deletion reconciliation updates or clears only the independent focus session"),
+     and "coordinator.restoreLoadedSnapshot(" in runtime
+     and "coordinator.restoreLoadFailure(" in runtime,
+     "new sessions enter through explicit user action and one caller-loaded record is restored fail-closed"),
+    ("store.load(" in runtime and "findTask(tasks" in runtime
+     and "coordinator.restoreLoadedSnapshot(" in runtime,
+     "restoration resolves one persisted task snapshot against the loaded encrypted task list"),
+    ("TaskFocusSessionCoordinator.Snapshot reconcileTasks(List<Task> tasks)" in runtime
+     and "return restoreAfterProcessStart(tasks);" in runtime,
+     "lifecycle reconciliation reloads durable Focus state instead of republishing a stale coordinator snapshot"),
     ("setContentIntent(actionPendingIntent(" in source and ".addAction(" in source
      and "PendingIntent.getActivity(" in source and "FLAG_IMMUTABLE" in source,
      "focus notification is tappable and carries immutable shade action PendingIntents"),
