@@ -14,7 +14,7 @@
   const focus = window.DaymarkFocus || null;
   const focusMutation = window.DaymarkFocusMutation || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPersistedGeneration: null, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskPersistedGeneration: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPersistedGeneration: null, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -226,7 +226,7 @@
     return JSON.parse(JSON.stringify(Array.isArray(tasks) ? tasks : []));
   }
 
-  async function persistTaskSnapshot(desiredTasks, afterCommit) {
+  async function persistTaskSnapshot(desiredTasks, expectedGeneration, afterCommit) {
     const mutation = window.DaymarkTaskMutation;
     if (!mutation || typeof mutation.commitTaskSnapshot !== 'function') {
       setStorageStatus('Task changes not saved: safe cross-tab coordination is unavailable.', true);
@@ -240,6 +240,7 @@
       key: STORAGE_KEY,
       baseTasks,
       desiredTasks,
+      expectedGeneration,
       beforeWrite: () => {
         if (state.recoveryBackupPendingPayload !== null) {
           // Preserve rejected/unreadable bytes before changing the canonical
@@ -304,6 +305,10 @@
     if (!result.ok) {
       const messages = {
         'coordination-unavailable': 'Task changes not saved: safe cross-tab coordination is unavailable in this browser. Retry in a supported browser.',
+        'invalid-generation': 'Task changes not saved: the task generation is unavailable or invalid.',
+        'generation-invalid': 'Task changes not saved: the task generation is invalid; existing data was preserved.',
+        'generation-unreadable': 'Task changes not saved: the task generation could not be read.',
+        'stale-generation': 'Task changes not saved because Tasks were cleared while this change was pending. Reload the list and retry.',
         'lock-failed': 'Task changes not saved: the cross-tab lock failed. Retry without closing this tab.',
         'conflict': 'Task changes conflict with another tab. Reload the task list and retry your edit.',
         'storage-unavailable': 'Task changes not saved: browser storage is unavailable.',
@@ -314,9 +319,19 @@
         'current-removed': 'The saved task list was removed by another context. Reload before retrying so existing tasks are not lost.'
       };
       setStorageStatus(messages[result.reason] || 'Task changes not saved. Reload and retry.', true);
+      if (result.reason === 'stale-generation') {
+        const currentGeneration = mutation.readTaskGeneration(localStorage);
+        if (currentGeneration.ok) {
+          state.taskPersistedGeneration = currentGeneration.value;
+          state.tasks = loadTasks();
+          state.persistedTasks = cloneTaskList(state.tasks);
+          render();
+        }
+      }
       return false;
     }
 
+    state.taskPersistedGeneration = expectedGeneration;
     state.persistedTasks = cloneTaskList(result.tasks);
     const localAfterSave = cloneTaskList(state.tasks);
     const rebased = mutation.mergeTaskSnapshots(desiredTasks, localAfterSave, result.tasks);
@@ -335,18 +350,44 @@
     return true;
   }
 
-  function persistTasks(afterCommit) {
-    // Serialize same-tab saves too. Each queued operation takes its baseline
-    // after the preceding local save has committed, while the Web Lock handles
-    // cooperating tabs and windows for this origin.
+  function persistTasks(afterCommit, expectedGenerationOverride) {
+    // Capture the intent generation before same-tab queueing. A clear that
+    // overtakes this queued save must invalidate it even if the lock is later
+    // acquired and the canonical task key is now empty.
+    const mutation = window.DaymarkTaskMutation;
+    if (!mutation || typeof mutation.readTaskGeneration !== 'function') {
+      setStorageStatus('Task changes not saved: task-generation coordination is unavailable.', true);
+      return Promise.resolve(false);
+    }
+    const generation = Number.isSafeInteger(expectedGenerationOverride)
+      ? { ok: true, value: expectedGenerationOverride }
+      : mutation.readTaskGeneration(localStorage);
+    if (!generation.ok) {
+      setStorageStatus('Task changes not saved: the task generation could not be read safely.', true);
+      return Promise.resolve(false);
+    }
+    const expectedGeneration = generation.value;
     const desiredTasks = cloneTaskList(state.tasks);
     const previous = state.taskSaveQueue || Promise.resolve();
     const queued = previous.then(
-      () => persistTaskSnapshot(desiredTasks, afterCommit),
-      () => persistTaskSnapshot(desiredTasks, afterCommit)
+      () => persistTaskSnapshot(desiredTasks, expectedGeneration, afterCommit),
+      () => persistTaskSnapshot(desiredTasks, expectedGeneration, afterCommit)
     );
     state.taskSaveQueue = queued.then(() => undefined, () => undefined);
     return queued;
+  }
+
+  function restoreTaskStateAfterFailedSave(previousTasks, expectedGeneration) {
+    const mutation = window.DaymarkTaskMutation;
+    const current = mutation && typeof mutation.readTaskGeneration === 'function'
+      ? mutation.readTaskGeneration(localStorage) : { ok: false };
+    if (current.ok && current.value !== expectedGeneration) {
+      state.taskPersistedGeneration = current.value;
+      state.tasks = loadTasks();
+      state.persistedTasks = cloneTaskList(state.tasks);
+    } else {
+      state.tasks = previousTasks;
+    }
   }
 
   function clearRecoveryBackup() {
@@ -1381,7 +1422,7 @@
     return result;
   }
 
-  async function applyImportedRecovery(recovery, rawText) {
+  async function applyImportedRecovery(recovery, rawText, expectedTaskGeneration, expectedFocusGeneration) {
     let taskRaw = null;
     let focusRaw = null;
     if (recovery.format === 'daymark-combined-recovery-v1') {
@@ -1456,6 +1497,10 @@
     });
 
     const malformedRecovery = taskPayloads.malformedCount + focusPayloads.malformedCount;
+    if ((incomingFocusLog.length || incomingSession) && !Number.isSafeInteger(expectedFocusGeneration)) {
+      showToast('Focus recovery could not be applied because its storage generation is unavailable. Existing data was kept.');
+      return;
+    }
     if (!incomingTasks.length && !incomingFocusLog.length && !incomingSession) {
       showToast(malformedRecovery
         ? 'No valid recovery data could be restored. Existing data was kept.'
@@ -1496,8 +1541,8 @@
     if (incomingTasks.length) {
       const previousTasks = state.tasks;
       state.tasks = previousTasks.concat(incomingTasks);
-      tasksSaved = await persistTasks();
-      if (!tasksSaved) state.tasks = previousTasks;
+      tasksSaved = await persistTasks(undefined, expectedTaskGeneration);
+      if (!tasksSaved) restoreTaskStateAfterFailedSave(previousTasks, expectedTaskGeneration);
     }
     let focusSaved = null;
     if (incomingFocusLog.length || incomingSession) {
@@ -1505,7 +1550,7 @@
       const previousLog = state.focusLog;
       if (incomingSession) state.focusSession = incomingSession;
       state.focusLog = previousLog.concat(incomingFocusLog);
-      focusSaved = await persistFocusState();
+      focusSaved = await persistFocusState(expectedFocusGeneration);
       if (!focusSaved) {
         state.focusSession = previousSession;
         state.focusLog = previousLog;
@@ -1551,7 +1596,7 @@
         ? `Recovery import failed — ${message}.`
         : `Recovery import finished — ${message}.`);
   }
-  async function applyImportedText(text) {
+  async function applyImportedText(text, expectedTaskGeneration, expectedFocusGeneration) {
     if (logic.hasDuplicateJsonKeys(text)) {
       showToast('That file contains duplicate JSON keys or unsupported nesting. Nothing was changed.');
       return;
@@ -1572,7 +1617,7 @@
         || Object.prototype.hasOwnProperty.call(parsed, 'log')
       );
       if (isRecovery) {
-        await applyImportedRecovery(parsed, text);
+        await applyImportedRecovery(parsed, text, expectedTaskGeneration, expectedFocusGeneration);
         return;
       }
       showToast('That backup is not a task list or recovery bundle. Nothing was changed.');
@@ -1618,8 +1663,8 @@
 
     const previousTasks = state.tasks;
     state.tasks = previousTasks.concat(incoming);
-    const saved = await persistTasks();
-    if (!saved) state.tasks = previousTasks;
+    const saved = await persistTasks(undefined, expectedTaskGeneration);
+    if (!saved) restoreTaskStateAfterFailedSave(previousTasks, expectedTaskGeneration);
     render();
     if (!saved) {
       showToast('Import could not be saved. No tasks were imported.');
@@ -1632,6 +1677,18 @@
   }
 
   async function importTasks(file) {
+    const taskMutation = window.DaymarkTaskMutation;
+    if (!taskMutation || typeof taskMutation.readTaskGeneration !== 'function') {
+      showToast('Import is unavailable because safe task-generation coordination is missing. Nothing was changed.');
+      return false;
+    }
+    const taskGeneration = taskMutation.readTaskGeneration(localStorage);
+    if (!taskGeneration.ok) {
+      showToast('Import is unavailable because the task generation could not be read safely. Nothing was changed.');
+      return false;
+    }
+    const focusGeneration = focusMutation && typeof focusMutation.readFocusGeneration === 'function'
+      ? focusMutation.readFocusGeneration(localStorage) : { ok: false };
     if (typeof FileReader === 'undefined') {
       showToast('Import is not available in this browser.');
       return false;
@@ -1648,7 +1705,8 @@
       const reader = new FileReader();
       reader.onload = async () => {
         try {
-          await applyImportedText(String(reader.result || ''));
+          await applyImportedText(String(reader.result || ''), taskGeneration.value,
+            focusGeneration.ok ? focusGeneration.value : null);
           resolve(true);
         } catch (error) {
           showToast('That backup could not be applied. Nothing was changed.');
@@ -1829,7 +1887,8 @@
       setStorageStatus('Focus preset could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
     }
-    const expectedGeneration = state.focusPersistedGeneration;
+    const expectedGeneration = Number.isSafeInteger(expectedGenerationOverride)
+      ? expectedGenerationOverride : state.focusPersistedGeneration;
     if (!Number.isSafeInteger(expectedGeneration)) {
       setStorageStatus('Focus preset could not be saved safely because its loaded storage generation is unavailable.', true);
       return false;
@@ -1982,7 +2041,7 @@
     }
   }
 
-  async function persistFocusState() {
+  async function persistFocusState(expectedGenerationOverride) {
     if (!focus || !focusMutation) {
       setStorageStatus('Focus data could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
@@ -2548,6 +2607,10 @@
   }
 
   function setUp() {
+    const taskMutation = window.DaymarkTaskMutation;
+    const taskGeneration = taskMutation && typeof taskMutation.readTaskGeneration === 'function'
+      ? taskMutation.readTaskGeneration(localStorage) : { ok: false };
+    state.taskPersistedGeneration = taskGeneration.ok ? taskGeneration.value : null;
     state.tasks = loadTasks();
     state.persistedTasks = cloneTaskList(state.tasks);
     const focusState = loadFocusState();
@@ -2631,9 +2694,28 @@
     });
     document.addEventListener('keydown', handleShortcut);
     window.addEventListener('storage', (event) => {
+      const mutation = window.DaymarkTaskMutation;
+      if (!mutation || typeof mutation.readTaskGeneration !== 'function') return;
+      if (event.key !== mutation.TASK_GENERATION_KEY
+          && event.key !== STORAGE_KEY && event.key !== null) return;
+      const generation = mutation.readTaskGeneration(localStorage);
+      if (!generation.ok) {
+        setStorageStatus('Task storage generation could not be checked; pending writes are paused.', true);
+        return;
+      }
+      if (event.key === mutation.TASK_GENERATION_KEY
+          || state.taskPersistedGeneration !== generation.value) {
+        // A generation change is a destructive-clear boundary, not an ordinary
+        // concurrent edit. Discard stale in-memory intent and rebase from disk.
+        state.taskPersistedGeneration = generation.value;
+        state.tasks = loadTasks();
+        state.persistedTasks = cloneTaskList(state.tasks);
+        scheduleRecoveryBackupMaintenance();
+        render();
+        return;
+      }
       if (event.key === STORAGE_KEY || event.key === null) {
-        const mutation = window.DaymarkTaskMutation;
-        const hasLocalChanges = mutation && typeof mutation.areTaskListsEqual === 'function'
+        const hasLocalChanges = typeof mutation.areTaskListsEqual === 'function'
           ? !mutation.areTaskListsEqual(state.tasks, state.persistedTasks || [])
           : JSON.stringify(state.tasks) !== JSON.stringify(state.persistedTasks || []);
         if (!hasLocalChanges) {
