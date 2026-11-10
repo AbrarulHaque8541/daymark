@@ -1,0 +1,45 @@
+name: Browser download redirect policy
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/browser-download-redirect-policy.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadRedirectPolicy.java"
+      - "android-app/tools/BrowserDownloadRedirectPolicySmoke.java"
+      - "android-app/tools/run-browser-download-redirect-policy-tests.sh"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/browser-download-redirect-policy.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadRedirectPolicy.java"
+      - "android-app/tools/BrowserDownloadRedirectPolicySmoke.java"
+      - "android-app/tools/run-browser-download-redirect-policy-tests.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-download-redirect-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Run redirect policy regressions
+        run: sh android-app/tools/run-browser-download-redirect-policy-tests.sh
