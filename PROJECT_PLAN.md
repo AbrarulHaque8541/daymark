@@ -1,3 +1,15 @@
+## Current execution queue refresh — 2026-11-10T05:07:00Z (main 91f57d7)
+
+Latest live snapshot: [CURRENT_STATUS_20261110T050700Z.md](docs/CURRENT_STATUS_20261110T050700Z.md).
+
+- P0: finish #648 Focus notification replacement on API 36 ten-run gate; complete #677 real ModeSelector instrumentation on API 29/36; complete #683 cross-tab save/import/recovery/clear/undo matrix; owner-side governance #646; physical acceptance #160.
+- P1: integrate #665 signing boundary after independent review; complete #671/#678 secure download transport; generate #692 lockfile on network-enabled Node 20/22 (#696); finish #690/#689 Focus/webhook locking and invalidation; extension recovery UI #687; Service Worker Online compatibility #685/#686; recurrence/tag/RFC 5545 parity #684/#656/#675.
+- Exact baseline: main `91f57d79ab3d344d4d78df116ecf3ed4afe81087`; 12 open PRs / 23 issues; main Android/contracts push checks pass. Main branch protection remains disabled and rulesets are empty.
+- #694 latest head `ef936eb1e3c905571547980a048dabd9032c85e2` has five workflows PASS. #675 head `4b33c04b7c131458c19649a45229e4461208d01b` has Android/contracts/device APK PASS. #648 and #677 latest Focus API29/36 gates remain in progress.
+- No PR merged, no release/tag/version/signer/identity change, no destructive migration. Current source identity remains owner-approved `com.abrar.daymark`; the conflicting run-level package-identity request is unresolved.
+
+---
+
 ## Current execution queue refresh — 2026-11-10T04:42:00Z (main 91f57d7)
 
 Latest live snapshot: [CURRENT_STATUS_20261110T044200Z.md](docs/CURRENT_STATUS_20261110T044200Z.md).
