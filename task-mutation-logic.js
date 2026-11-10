@@ -315,7 +315,7 @@
           try {
             opts.afterWrite(payload, merged.tasks);
           } catch (error) {
-            warning = 'post-write-maintenance-failed';
+            warning = warning || 'post-write-maintenance-failed';
           }
         }
         if (typeof opts.afterCommit === 'function') {
