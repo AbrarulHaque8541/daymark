@@ -137,6 +137,23 @@ test('rejects computed writes to a CommonJS node:test module object', () => {
     'a dynamic computed write must invalidate the imported module binding');
 });
 
+test('rejects reflective mutation of imported node:test functions and namespace aliases', () => {
+  const cases = [
+    ["const nodeTest = require('node:test'); Object.defineProperty(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'Object.defineProperty namespace'],
+    ["const nodeTest = require('node:test'); Object.defineProperties(nodeTest, { test: { value: () => {} } }); nodeTest.test('fake', () => assert.ok(true));", 'Object.defineProperties namespace'],
+    ["const nodeTest = require('node:test'); Object.assign(nodeTest, { test: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'Object.assign namespace'],
+    ["const nodeTest = require('node:test'); Reflect.set(nodeTest, 'test', () => {}); nodeTest.test('fake', () => assert.ok(true));", 'Reflect.set namespace'],
+    ["const nodeTest = require('node:test'); Reflect.defineProperty(nodeTest, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'Reflect.defineProperty namespace'],
+    ["const nodeTest = require('node:test'); delete nodeTest.test; Object.setPrototypeOf(nodeTest, { test: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'delete and prototype replacement'],
+    ["const nodeTest = require('node:test'); const alias = nodeTest; Object.defineProperty(alias, 'test', { value: () => {} }); nodeTest.test('fake', () => assert.ok(true));", 'namespace alias mutation'],
+    ["const { test } = require('node:test'); Object.defineProperty(test, 'only', { value: () => {} }); test.only('fake', () => assert.ok(true));", 'imported function mutation'],
+    ["const test = require('node:test'); const alias = test; Reflect.set(alias, 'only', () => {}); test.only('fake', () => assert.ok(true));", 'function alias mutation']
+  ];
+  for (const [source, label] of cases) {
+    assert.equal(hasRegisteredTestCase(source), false, label);
+  }
+});
+
 test('recognizes CommonJS member imports and awaited dynamic ESM imports', () => {
   const cases = [
     ["const test = require('node:test').test; test('real', () => assert.ok(true));", true, 'CommonJS test member'],
