@@ -12,8 +12,9 @@
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
+  const focusMutation = window.DaymarkFocusMutation || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -1476,7 +1477,7 @@
       const previousLog = state.focusLog;
       if (incomingSession) state.focusSession = incomingSession;
       state.focusLog = previousLog.concat(incomingFocusLog);
-      focusSaved = persistFocusState();
+      focusSaved = await persistFocusState();
       if (!focusSaved) {
         state.focusSession = previousSession;
         state.focusLog = previousLog;
@@ -1671,6 +1672,72 @@
     }
   }
 
+  function queueFocusRecoveryBackup(raw, primaryRaw) {
+    state.focusRecoveryBackupPendingPayload = raw;
+    state.focusRecoveryBackupBasePrimaryRaw = primaryRaw;
+    state.focusRecoveryBackupReady = false;
+    try {
+      state.focusRecoveryBackupBaseRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
+    } catch (error) {
+      state.focusRecoveryBackupBaseRaw = undefined;
+    }
+    const generation = focusMutation
+      ? focusMutation.readFocusGeneration(localStorage)
+      : { ok: false };
+    state.focusRecoveryBackupGeneration = generation.ok ? generation.value : null;
+  }
+
+  function scheduleFocusRecoveryBackupMaintenance() {
+    const previous = state.focusBackupMaintenancePromise || Promise.resolve();
+    const queued = previous.then(async () => {
+      const pending = state.focusRecoveryBackupPendingPayload;
+      if (pending === null) return true;
+      if (!focusMutation || !Number.isSafeInteger(state.focusRecoveryBackupGeneration)
+          || typeof state.focusRecoveryBackupBasePrimaryRaw !== 'string'
+          || typeof state.focusRecoveryBackupBaseRaw === 'undefined') {
+        setStorageStatus('Focus recovery backup could not be prepared safely; original Focus data remains in place.', true);
+        return false;
+      }
+      const expectedGeneration = state.focusRecoveryBackupGeneration;
+      const expectedPrimary = state.focusRecoveryBackupBasePrimaryRaw;
+      const expectedBackup = state.focusRecoveryBackupBaseRaw;
+      const locked = await focusMutation.withFocusMutationLock(
+        window.navigator && window.navigator.locks,
+        () => {
+          const generation = focusMutation.readFocusGeneration(localStorage);
+          if (!generation.ok || generation.value !== expectedGeneration) {
+            return { ok: false, reason: 'stale-generation' };
+          }
+          let primaryRaw;
+          let backupRaw;
+          try {
+            primaryRaw = localStorage.getItem(FOCUS_KEY);
+            backupRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
+          } catch (error) {
+            return { ok: false, reason: 'storage-read-failed' };
+          }
+          if (primaryRaw !== expectedPrimary || backupRaw !== expectedBackup) {
+            return { ok: false, reason: 'stale-source' };
+          }
+          if (!backUpRawFocusPayload(pending)) return { ok: false, reason: 'backup-write-failed' };
+          if (state.focusRecoveryBackupPendingPayload === pending) {
+            state.focusRecoveryBackupPendingPayload = null;
+            state.focusRecoveryBackupReady = true;
+          }
+          return { ok: true };
+        }
+      );
+      if (!locked.ok || !locked.value || !locked.value.ok) {
+        setStorageStatus('Focus recovery data changed or was cleared in another tab; no stale backup was written.', true);
+        return false;
+      }
+      reportFocusRecovery(true);
+      return true;
+    }, async () => false);
+    state.focusBackupMaintenancePromise = queued.then(() => undefined, () => undefined);
+    return queued;
+  }
+
   function readFocusRecoveryBackupState() {
     try {
       const raw = localStorage.getItem(FOCUS_BACKUP_KEY);
@@ -1714,11 +1781,12 @@
     let raw = null;
     try {
       raw = localStorage.getItem(FOCUS_PRESET_KEY);
+      state.focusPresetPersistedRaw = raw;
     } catch (error) {
-      // A storage failure just means the default preset stays in use.
+      state.focusPresetPersistedRaw = undefined;
       return null;
     }
-    if (!raw) return null;
+    if (raw === null || raw === '') return null;
     try {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed.preset === 'string' && focus.isKind(parsed.preset)) return parsed.preset;
@@ -1726,12 +1794,43 @@
     return null;
   }
 
-  function persistFocusPreset() {
-    try {
-      localStorage.setItem(FOCUS_PRESET_KEY, JSON.stringify({ preset: state.focusPreset }));
-    } catch (error) {
-      console.warn('Could not save the Daymark focus preset preference:', error);
+  async function persistFocusPreset() {
+    if (!focusMutation) {
+      setStorageStatus('Focus preset could not be saved safely because cross-tab coordination is unavailable.', true);
+      return false;
     }
+    const generation = focusMutation.readFocusGeneration(localStorage);
+    if (!generation.ok) {
+      setStorageStatus('Focus preset could not be saved safely because its storage generation could not be checked.', true);
+      return false;
+    }
+    const desiredRaw = JSON.stringify({ preset: state.focusPreset });
+    const previous = state.focusPresetSaveQueue || Promise.resolve();
+    const queued = previous.then(async () => {
+      const baseRaw = state.focusPresetPersistedRaw;
+      if (typeof baseRaw === 'undefined') {
+        setStorageStatus('Focus preset storage is unreadable; the existing value was not changed.', true);
+        return false;
+      }
+      const result = await focusMutation.commitFocusPreset({
+        lockManager: window.navigator && window.navigator.locks,
+        storage: localStorage,
+        key: FOCUS_PRESET_KEY,
+        baseRaw,
+        desiredRaw,
+        expectedGeneration: generation.value
+      });
+      if (result.ok) {
+        state.focusPresetPersistedRaw = desiredRaw;
+        return true;
+      }
+      setStorageStatus('Focus preset changed or was cleared in another tab; this tab did not overwrite it.', true);
+      state.focusPreset = loadFocusPreset() || 'focus';
+      renderFocus();
+      return false;
+    }, async () => false);
+    state.focusPresetSaveQueue = queued.then(() => undefined, () => undefined);
+    return queued;
   }
 
   function loadFocusState() {
@@ -1740,9 +1839,14 @@
     let saved = null;
     try {
       saved = localStorage.getItem(FOCUS_KEY);
+      state.focusPersistedRaw = saved;
+      state.focusPrimaryUnreadable = false;
+      state.focusRecoveryBackupPendingPayload = null;
+      state.focusRecoveryBackupReady = false;
     } catch (error) {
+      state.focusPersistedRaw = undefined;
+      state.focusPrimaryUnreadable = true;
       console.warn('Could not read Daymark focus storage:', error);
-      // Primary focus key is unreadable. Independently inspect its recovery backup.
       let backupRaw = null;
       let backupReadable = false;
       try {
@@ -1763,6 +1867,9 @@
     }
     if (saved === null) {
       const backupState = readFocusRecoveryBackupState();
+      state.focusRecoveryBackupPendingPayload = null;
+      state.focusRecoveryBackupReady = false;
+      state.focusRecoveryBackupBasePrimaryRaw = null;
       if (!backupState.readable) {
         reportUnknownFocusRecoveryBackup();
       } else if (backupState.hasBackup) {
@@ -1782,12 +1889,9 @@
         : { session: null, completedSession: null };
       const session = restoreResult.session;
       if (log.rejectedCount > 0 || invalidSession) {
-        // Keep the complete source whenever validation rejects any focus record.
-        // Valid sessions/log entries can still be used, but rejected originals
-        // must remain recoverable through future saves and reloads.
-        const backupSaved = backUpRawFocusPayload(saved);
-        if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-        reportFocusRecovery(backupSaved);
+        state.focusPrimaryUnreadable = true;
+        queueFocusRecoveryBackup(saved, saved);
+        setStorageStatus('Focus data contains rejected records; original bytes are being preserved before any replacement.', true);
       } else {
         const backupState = readFocusRecoveryBackupState();
         if (!backupState.readable) reportUnknownFocusRecoveryBackup();
@@ -1801,75 +1905,75 @@
         const entries = entry && !alreadyLogged
           ? focus.appendLogEntry(log.entries, entry)
           : log.entries;
-
-        // If validation already found rejected data and its backup could not
-        // be written, retry that backup before replacing the primary payload.
-        if (state.focusRecoveryBackupPendingPayload !== null) {
-          const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
-          if (!backupSaved) {
-            reportFocusRecovery(false);
-            return { session, log: entries };
-          }
-          state.focusRecoveryBackupPendingPayload = null;
-        }
-
-        // One localStorage key write atomically stores session:null and its
-        // completion log. On quota failure the original primary value remains.
-        try {
-          localStorage.setItem(FOCUS_KEY, JSON.stringify({ session: null, log: entries }));
-          const backupState = readFocusRecoveryBackupState();
-          if (!backupState.readable) reportUnknownFocusRecoveryBackup();
-          else if (backupState.hasBackup) reportFocusRecovery(true);
-        } catch (saveError) {
-          const backupSaved = backUpRawFocusPayload(saved);
-          if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-          setStorageStatus(
-            'Focus session completed while Daymark was closed, but its history could not be saved. Original data was preserved; keep this page open and retry',
-            true
-          );
-        }
+        // Finalization is queued after startup and committed under the Focus
+        // lock. A concurrent clear changes the generation and wins over this
+        // stale startup write.
+        state.focusAutoFinalizePending = true;
         return { session, log: entries };
       }
       return { session, log: log.entries };
     } catch (error) {
       console.warn('Could not load saved Daymark focus state:', error);
-      // Preserve unreadable data and never let a later focus save replace its
-      // only remaining copy if browser storage cannot create the backup.
-      const backupSaved = backUpRawFocusPayload(saved);
-      if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-      reportFocusRecovery(backupSaved);
+      state.focusPrimaryUnreadable = true;
+      queueFocusRecoveryBackup(saved, saved);
+      setStorageStatus('Focus data could not be read; original bytes remain in place while a safe recovery copy is prepared.', true);
       return empty;
     }
   }
 
-  function persistFocusState() {
-    if (!focus) return false;
-    if (state.focusRecoveryBackupPendingPayload !== null) {
-      const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
-      if (!backupSaved) {
-        reportFocusRecovery(false);
-        return false;
-      }
-      state.focusRecoveryBackupPendingPayload = null;
-    }
-    try {
-      const payload = {
-        session: state.focusSession ? focus.serialize(state.focusSession) : null,
-        log: state.focusLog
-      };
-      localStorage.setItem(FOCUS_KEY, JSON.stringify(payload));
-      // Recovery backups are intentionally retained. Clearing one implicitly
-      // here would destroy rejected history before a user recovery/export flow
-      // exists. Only an explicit recovery action may remove it in the future.
-      const backupState = readFocusRecoveryBackupState();
-      if (!backupState.readable) reportUnknownFocusRecoveryBackup();
-      else if (backupState.hasBackup) reportFocusRecovery(true);
-      return true;
-    } catch (error) {
-      console.warn('Could not save Daymark focus state:', error);
-      setStorageStatus('Focus data could not be saved; keep this page open and retry', true);
+  async function persistFocusState() {
+    if (!focus || !focusMutation) {
+      setStorageStatus('Focus data could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
     }
+    const generation = focusMutation.readFocusGeneration(localStorage);
+    if (!generation.ok) {
+      setStorageStatus('Focus data could not be saved safely because its storage generation could not be checked.', true);
+      return false;
+    }
+    const desiredSnapshot = {
+      session: state.focusSession ? focus.serialize(state.focusSession) : null,
+      log: JSON.parse(JSON.stringify(state.focusLog))
+    };
+    const previous = state.focusSaveQueue || Promise.resolve();
+    const queued = previous.then(async () => {
+      if (state.focusRecoveryBackupPendingPayload !== null) {
+        const backupSaved = await scheduleFocusRecoveryBackupMaintenance();
+        if (!backupSaved) return false;
+      }
+      if (typeof state.focusPersistedRaw === 'undefined') {
+        setStorageStatus('Focus storage is unreadable; existing bytes were not overwritten.', true);
+        return false;
+      }
+      if (state.focusPrimaryUnreadable && !state.focusRecoveryBackupReady) {
+        setStorageStatus('Original Focus data has not been safely backed up; save was refused to protect it.', true);
+        return false;
+      }
+      const result = await focusMutation.commitFocusSnapshot({
+        lockManager: window.navigator && window.navigator.locks,
+        storage: localStorage,
+        key: FOCUS_KEY,
+        baseRaw: state.focusPersistedRaw,
+        expectedGeneration: generation.value,
+        desiredSnapshot,
+        allowOpaqueBase: state.focusPrimaryUnreadable && state.focusRecoveryBackupReady
+      });
+      if (result.ok) {
+        state.focusPersistedRaw = result.payload;
+        state.focusPrimaryUnreadable = false;
+        return true;
+      }
+      if (result.reason === 'stale-generation' || result.reason === 'session-conflict'
+          || result.reason === 'log-conflict' || result.reason === 'stale-or-invalid-source') {
+        setStorageStatus('Focus data changed or was cleared in another tab; this tab did not overwrite it.', true);
+        reconcileFocusStateFromStorage(FOCUS_KEY);
+      } else {
+        setStorageStatus('Focus data could not be saved safely; existing stored data was left unchanged.', true);
+      }
+      return false;
+    }, async () => false);
+    state.focusSaveQueue = queued.then(() => undefined, () => undefined);
+    return queued;
   }
 
   function renderFocus() {
@@ -1987,58 +2091,62 @@
     if (!focus || !state.focusSession) return;
     const outcome = focus.tick(state.focusSession, Date.now());
     if (outcome.finished) {
-      endFocusSession(true);
+      void endFocusSession(true);
       return;
     }
     renderFocus();
   }
 
-  function startFocus(taskId) {
-    if (!focus) return;
+  async function startFocus(taskId) {
+    if (!focus) return false;
     if (state.focusSession) {
       showToast('Finish or stop the current focus session first.');
-      return;
+      return false;
     }
     const kind = focus.isKind(state.focusPreset) ? state.focusPreset : 'focus';
     const minutes = focus.presetMinutes(kind);
     const linkedTaskId = taskId || state.focusTaskId || null;
     state.focusSession = focus.createSession({ taskId: linkedTaskId, kind, durationMinutes: minutes }, Date.now());
     state.focusTaskId = linkedTaskId || '';
-    const saved = persistFocusState();
+    const saved = await persistFocusState();
     renderFocus();
-    ensureFocusTimer();
+    if (state.focusSession) ensureFocusTimer();
+    if (!state.focusSession) {
+      showToast('Focus data was cleared in another tab. The old session was not restored.');
+      return false;
+    }
     const task = linkedTaskId ? state.tasks.find((item) => item.id === linkedTaskId) : null;
     showToast(saved
       ? (task
         ? `Focus started for “${task.title}” — ${focus.formatClock(minutes * 60 * 1000)} on the clock.`
         : `Focus started — ${focus.formatClock(minutes * 60 * 1000)} on the clock.`)
       : 'Focus started in this tab, but could not be saved. Keep this page open.');
+    return saved;
   }
 
-  function toggleFocusPause() {
-    if (!focus || !state.focusSession) return;
+  async function toggleFocusPause() {
+    if (!focus || !state.focusSession) return false;
     const now = Date.now();
     if (state.focusSession.state === 'running') focus.pause(state.focusSession, now);
     else focus.resume(state.focusSession, now);
-    const saved = persistFocusState();
+    const saved = await persistFocusState();
     renderFocus();
-    if (!saved) showToast('Focus state changed in this tab but could not be saved. Keep this page open.');
+    if (!saved && state.focusSession) showToast('Focus state changed in this tab but could not be saved. Keep this page open.');
+    return saved;
   }
 
-  function endFocusSession(completed) {
-    if (!focus || !state.focusSession) return;
+  async function endFocusSession(completed) {
+    if (!focus || !state.focusSession) return false;
     const now = Date.now();
     focus.finish(state.focusSession, now, completed);
     const entry = focus.makeLogEntry(state.focusSession);
     if (entry) state.focusLog = focus.appendLogEntry(state.focusLog, entry);
     const task = state.focusSession.taskId ? state.tasks.find((item) => item.id === state.focusSession.taskId) : null;
     state.focusSession = null;
-    const saved = persistFocusState();
+    const saved = await persistFocusState();
     stopFocusTimer();
     renderFocus();
     render();
-    // Brief completion title so the tab shows success even if the user is in another window.
-    // Cleared after a short delay so it does not linger. Guarded for tests.
     if (completed && typeof document !== 'undefined' && document.title != null) {
       document.title = 'Complete · Daymark Focus';
       if (typeof setTimeout === 'function') {
@@ -2057,6 +2165,7 @@
           : `Focus stopped — ${minutes} min logged as partial.`)
         : 'Focus session ended, but its log could not be saved. Keep this page open.');
     }
+    return saved;
   }
 
   function scheduledFireTime(task) {
@@ -2276,6 +2385,58 @@
     renderFeed();
   }
 
+  function reconcileFocusStateFromStorage(key) {
+    if (key === null || key === FOCUS_KEY) {
+      stopFocusTimer();
+      const focusState = loadFocusState();
+      state.focusSession = focusState.session;
+      state.focusLog = focusState.log;
+      state.focusTaskId = focusState.session && focusState.session.taskId
+        ? focusState.session.taskId : '';
+      if (state.focusSession) ensureFocusTimer();
+      if (state.focusAutoFinalizePending) {
+        state.focusAutoFinalizePending = false;
+        void persistFocusState();
+      } else if (state.focusRecoveryBackupPendingPayload !== null) {
+        void scheduleFocusRecoveryBackupMaintenance();
+      }
+    }
+    if (key === null || key === FOCUS_PRESET_KEY) {
+      state.focusPreset = loadFocusPreset() || 'focus';
+    }
+    if (key === FOCUS_BACKUP_KEY) {
+      try {
+        state.focusRecoveryBackupBaseRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
+        if (state.focusRecoveryBackupBaseRaw === null) {
+          state.focusRecoveryBackupPendingPayload = null;
+          state.focusRecoveryBackupReady = false;
+        }
+      } catch (error) {
+        state.focusRecoveryBackupBaseRaw = undefined;
+      }
+    }
+    renderFocus();
+  }
+
+  function handleFocusStorageCleared(categoryId) {
+    if (categoryId === 'focus' || categoryId === 'all') {
+      reconcileFocusStateFromStorage(FOCUS_KEY);
+    }
+    if (categoryId === 'focus-preset' || categoryId === 'all') {
+      reconcileFocusStateFromStorage(FOCUS_PRESET_KEY);
+    }
+    if (categoryId === 'focus-backup' || categoryId === 'all') {
+      state.focusRecoveryBackupPendingPayload = null;
+      state.focusRecoveryBackupReady = false;
+      try {
+        state.focusRecoveryBackupBaseRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
+      } catch (error) {
+        state.focusRecoveryBackupBaseRaw = undefined;
+      }
+    }
+    renderFocus();
+  }
+
   function setUp() {
     state.tasks = loadTasks();
     state.persistedTasks = cloneTaskList(state.tasks);
@@ -2375,6 +2536,17 @@
         }
       }
     });
+    window.addEventListener('storage', (event) => {
+      if (event.key === FOCUS_KEY || event.key === FOCUS_BACKUP_KEY
+          || event.key === FOCUS_PRESET_KEY || event.key === null) {
+        reconcileFocusStateFromStorage(event.key);
+      }
+    });
+    window.addEventListener('daymark:focus-storage-cleared', (event) => {
+      const categoryId = event && event.detail && event.detail.categoryId
+        ? event.detail.categoryId : 'all';
+      handleFocusStorageCleared(categoryId);
+    });
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
     const feedClear = $('#feed-clear');
     if (feedClear) feedClear.addEventListener('click', clearFeed);
@@ -2384,10 +2556,11 @@
     $('#focus-task').addEventListener('change', (event) => {
       state.focusTaskId = event.currentTarget.value;
     });
-    document.querySelectorAll('.focus-preset').forEach((button) => button.addEventListener('click', () => {
+    document.querySelectorAll('.focus-preset').forEach((button) => button.addEventListener('click', async () => {
       if (state.focusSession) return;
       state.focusPreset = button.dataset.focusPreset;
-      persistFocusPreset();
+      const saved = await persistFocusPreset();
+      if (!saved) state.focusPreset = loadFocusPreset() || 'focus';
       renderFocus();
     }));
     window.addEventListener('focus', () => {
@@ -2407,6 +2580,12 @@
       checkReminders();
     }
     scheduleRecoveryBackupMaintenance();
+    if (state.focusAutoFinalizePending) {
+      state.focusAutoFinalizePending = false;
+      void persistFocusState();
+    } else {
+      void scheduleFocusRecoveryBackupMaintenance();
+    }
   }
 
   setUp();
