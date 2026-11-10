@@ -166,7 +166,13 @@ test('shared Android/web Intent URI contract fixture stays in parity', () => {
       assert.equal(parsed.fallbackUrl || '', expectedFallback, name + ' fallback');
       const plan = engine.planIntentHandoff(input);
       assert.equal(plan.verdict, 'handoff', name + ' plan');
-      assert.ok(!JSON.stringify(plan).includes('/product'), name + ' does not echo fallback paths');
+      if (expectedFallback) {
+        const origin = /^(https?:\/\/[^/?#]+)/i.exec(expectedFallback);
+        assert.ok(origin, name + ' fallback origin');
+        assert.ok(JSON.stringify(plan).includes(origin[1]), name + ' discloses only the fallback origin');
+        assert.ok(!JSON.stringify(plan).includes(expectedFallback.slice(origin[1].length)),
+          name + ' does not echo fallback path or query');
+      }
     } else {
       assert.equal(parsed.ok, false, name);
       const plan = engine.planIntentHandoff(input);
