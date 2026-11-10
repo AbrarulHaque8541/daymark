@@ -13,3 +13,4 @@ javac -encoding UTF-8 -d "$TMP" \
   "$ROOT/app/src/main/java/com/abrar/daymark/ExtensionInjector.java" \
   "$ROOT/tools/ExtensionInjectorSmoke.java"
 java -ea -Ddaymark.asset.dir="$ROOT/app/src/main/assets" -cp "$TMP" com.abrar.daymark.ExtensionInjectorSmoke
+python3 "$ROOT/tools/check-extension-spa-privacy.py"
