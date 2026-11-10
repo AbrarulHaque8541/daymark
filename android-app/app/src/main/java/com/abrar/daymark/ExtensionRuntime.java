@@ -10,6 +10,7 @@ import java.util.List;
 final class ExtensionRuntime {
     private final ExtensionStore store;
     private String lastAppliedUrl;
+    private boolean userscriptsAppliedForCurrentDocument;
 
     private ExtensionRuntime(ExtensionStore store) {
         this.store = store;
@@ -24,16 +25,25 @@ final class ExtensionRuntime {
     }
 
     void onPageStarted(String url) {
-        // A full navigation creates a new document. Do not let the previous document's URL
-        // suppress the first extension pass for the new one.
+        // A full navigation creates a new document. Reset native-only duplicate suppression;
+        // never expose the set of executed pack IDs through a page-readable window property.
         lastAppliedUrl = null;
+        userscriptsAppliedForCurrentDocument = false;
     }
 
     void onPageFinished(WebView webView, String url) {
         if (!isCurrentWebPage(webView, url)) return;
         List<BrowserExtension> matching = matchingPacks(url);
-        ExtensionInjector.apply(webView, url, matching);
-        lastAppliedUrl = url;
+        if (userscriptsAppliedForCurrentDocument) {
+            // A repeated finish callback for this document may reconcile styles, but must not
+            // execute userscripts again (including after a same-document route update).
+            if (ExtensionInjector.applyStyles(webView, url, matching)) lastAppliedUrl = url;
+            return;
+        }
+        if (ExtensionInjector.apply(webView, url, matching)) {
+            userscriptsAppliedForCurrentDocument = true;
+            lastAppliedUrl = url;
+        }
     }
 
     /**
