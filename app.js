@@ -14,7 +14,7 @@
   const focus = window.DaymarkFocus || null;
   const focusMutation = window.DaymarkFocusMutation || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskPersistedGeneration: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPersistedGeneration: null, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskPersistedGeneration: null, taskBackupMaintenanceSuppressedGeneration: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPersistedGeneration: null, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -229,15 +229,16 @@
   function rebaseTasksAfterGenerationChange(generation) {
     if (!generation || !generation.ok) return false;
     state.taskPersistedGeneration = generation.value;
+    state.taskBackupMaintenanceSuppressedGeneration = generation.value;
     state.tasks = loadTasks();
     state.persistedTasks = cloneTaskList(state.tasks);
     const reason = generation.reason || 'all';
     if (reason === 'tasks' || reason === 'task-backup' || reason === 'all') {
-      const hadPendingBackup = state.recoveryBackupPendingPayload !== null;
-      state.recoveryBackupPendingPayload = null;
       state.recoveryBackupCleanupPending = false;
-      if (reason === 'task-backup' && hadPendingBackup) {
-        setStorageStatus('Recovery backup was cleared as requested; unreadable primary task bytes remain untouched and no replacement backup was created.', true);
+      if (state.recoveryBackupPendingPayload !== null) {
+        setStorageStatus(reason === 'task-backup'
+          ? 'Recovery backup was cleared as requested; unreadable primary task bytes remain untouched. Automatic backup recreation is paused until a fresh task save.'
+          : 'Task data was cleared; unreadable primary bytes, if any, remain untouched. Automatic backup recreation is paused until a fresh task save.', true);
       }
     }
     render();
@@ -347,6 +348,8 @@
     }
 
     state.taskPersistedGeneration = expectedGeneration;
+    state.taskBackupMaintenanceSuppressedGeneration = result.warning === 'generation-marker-clear-failed'
+      ? expectedGeneration : null;
     state.persistedTasks = cloneTaskList(result.tasks);
     const localAfterSave = cloneTaskList(state.tasks);
     const rebased = mutation.mergeTaskSnapshots(desiredTasks, localAfterSave, result.tasks);
@@ -357,7 +360,9 @@
       // while the lock was pending remains in memory and is not overwritten.
       setStorageStatus('Saved an earlier task change; a newer local edit conflicts and needs review.', true);
     }
-    if (result.warning === 'post-commit-action-failed') {
+    if (result.warning === 'generation-marker-clear-failed') {
+      setStorageStatus('Tasks were saved, but the retained clear marker could not be retired; automatic recovery-backup maintenance remains paused.', true);
+    } else if (result.warning === 'post-commit-action-failed') {
       setStorageStatus('Tasks were saved, but a follow-up action did not finish. Review the related status and retry if needed.', true);
     } else if (result.warning) {
       setStorageStatus('Tasks were saved, but recovery-backup maintenance needs review.', true);
@@ -535,6 +540,9 @@
       return Promise.resolve(false);
     }
     const expectedGeneration = generation.value;
+    if (state.taskBackupMaintenanceSuppressedGeneration === expectedGeneration) {
+      return Promise.resolve(true);
+    }
     const previous = state.recoveryBackupMaintenancePromise || Promise.resolve();
     const queued = previous.then(
       () => maintainRecoveryBackupUnderTaskLock(expectedGeneration),
@@ -2644,6 +2652,8 @@
     const taskGeneration = taskMutation && typeof taskMutation.readTaskGeneration === 'function'
       ? taskMutation.readTaskGeneration(localStorage) : { ok: false };
     state.taskPersistedGeneration = taskGeneration.ok ? taskGeneration.value : null;
+    state.taskBackupMaintenanceSuppressedGeneration = taskGeneration.ok && taskGeneration.value > 0
+      ? taskGeneration.value : null;
     state.tasks = loadTasks();
     state.persistedTasks = cloneTaskList(state.tasks);
     const focusState = loadFocusState();
