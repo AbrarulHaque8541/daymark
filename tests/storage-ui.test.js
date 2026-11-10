@@ -224,6 +224,32 @@ test('Focus category clear advances the generation while holding the Focus lock'
     && event.detail.categoryId === 'focus'));
 });
 
+
+test('Focus backup and preset clears share the same lock and generation boundary', async () => {
+  for (const [categoryId, key] of [
+    ['focus-backup', 'daymark.focus.v1.backup'],
+    ['focus-preset', 'daymark.focus.preset.v1']
+  ]) {
+    const calls = [];
+    const locks = {
+      request(name, options, callback) {
+        calls.push(name);
+        return Promise.resolve().then(callback);
+      }
+    };
+    const { env, storageData, dispatched } = fakeEnv({
+      data: { [key]: 'opaque-or-preference' },
+      lockManager: locks
+    });
+    await ui.attachStorageUi(env).onClearCategory(categoryId);
+    assert.deepEqual(calls, [focusMutation.FOCUS_MUTATION_LOCK]);
+    assert.equal(storageData[key], undefined);
+    assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], '1');
+    assert.ok(dispatched.some((event) => event.type === 'daymark:focus-storage-cleared'
+      && event.detail.categoryId === categoryId));
+  }
+});
+
 test('Clear All retains only the non-personal Focus generation counter', async () => {
   const { env, storageData } = fakeEnv({
     data: { 'daymark.tasks.v1': '[]', 'daymark.focus.v1': '{"session":null,"log":[]}' }
