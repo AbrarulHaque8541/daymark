@@ -30,20 +30,26 @@ function makeLockManager() {
 
 function makeStorage(tasks) {
   let raw = JSON.stringify(tasks);
+  let generationRaw = null;
   return {
     get raw() { return raw; },
+    get generationRaw() { return generationRaw; },
     getItem(key) {
+      if (key === mutation.TASK_GENERATION_KEY) return generationRaw;
       assert.equal(key, 'daymark.tasks.v1');
       return raw;
     },
     setItem(key, value) {
+      if (key === mutation.TASK_GENERATION_KEY) { generationRaw = String(value); return; }
       assert.equal(key, 'daymark.tasks.v1');
       raw = String(value);
-    }
+    },
+    removeItem(key) { assert.equal(key, 'daymark.tasks.v1'); raw = null; }
   };
 }
 
 function readCurrent(raw) {
+  if (raw === null) return { ok: true, tasks: [] };
   if (typeof raw !== 'string' || raw.length === 0) {
     return { ok: false, reason: 'invalid-current' };
   }
@@ -57,13 +63,11 @@ function readCurrent(raw) {
   }
 }
 
-function commit(lockManager, storage, baseTasks, desiredTasks) {
+function commit(lockManager, storage, baseTasks, desiredTasks, expectedGeneration) {
+  const generation = mutation.readTaskGeneration(storage);
   return mutation.commitTaskSnapshot({
-    lockManager,
-    storage,
-    key: 'daymark.tasks.v1',
-    baseTasks,
-    desiredTasks,
+    lockManager, storage, key: 'daymark.tasks.v1', baseTasks, desiredTasks,
+    expectedGeneration: expectedGeneration === undefined ? generation.value : expectedGeneration,
     readCurrent
   });
 }
@@ -298,4 +302,56 @@ test('task equality is independent of object property insertion order', () => {
   const left = [{ id: 'a', title: 'A', completed: false }];
   const right = [{ completed: false, title: 'A', id: 'a' }];
   assert.equal(mutation.areTaskListsEqual(left, right), true);
+});
+
+
+test('task generation is retained across task-key deletion and rejects stale writes', async () => {
+  const storage = makeStorage([makeTask('old', 'Old')]);
+  assert.deepEqual(mutation.readTaskGeneration(storage), { ok: true, value: 0 });
+  const locks = makeLockManager();
+  const clear = await mutation.withTaskMutationLock(locks, () => {
+    const generation = mutation.incrementTaskGeneration(storage);
+    storage.removeItem('daymark.tasks.v1');
+    return generation;
+  });
+  assert.deepEqual(clear.value, { ok: true, value: 1 });
+  assert.equal(storage.raw, null);
+  assert.equal(storage.generationRaw, '1');
+  const stale = await commit(locks, storage, [], [makeTask('stale', 'Stale')], 0);
+  assert.equal(stale.reason, 'stale-generation');
+  assert.equal(storage.raw, null);
+  const fresh = await commit(locks, storage, [], [makeTask('fresh', 'Fresh')], 1);
+  assert.equal(fresh.ok, true);
+  assert.deepEqual(JSON.parse(storage.raw).map((task) => task.id), ['fresh']);
+});
+
+test('a queued task writer behind Clear All cannot resurrect its captured snapshot', async () => {
+  const storage = makeStorage([]);
+  const locks = makeLockManager();
+  let releaseClear;
+  let started;
+  const clearStarted = new Promise((resolve) => { started = resolve; });
+  const clear = mutation.withTaskMutationLock(locks, async () => {
+    const generation = mutation.incrementTaskGeneration(storage);
+    storage.removeItem('daymark.tasks.v1');
+    started();
+    await new Promise((resolve) => { releaseClear = resolve; });
+    return generation;
+  });
+  await clearStarted;
+  const staleWrite = commit(locks, storage, [], [makeTask('queued', 'Queued')], 0);
+  releaseClear();
+  await clear;
+  const result = await staleWrite;
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'stale-generation');
+  assert.equal(storage.raw, null);
+});
+
+test('invalid task generations fail closed before reading or writing task snapshots', async () => {
+  const storage = makeStorage([makeTask('a', 'A')]);
+  storage.setItem(mutation.TASK_GENERATION_KEY, '01');
+  const result = await commit(makeLockManager(), storage, [makeTask('a', 'A')], [makeTask('a', 'B')], 1);
+  assert.equal(result.reason, 'generation-invalid');
+  assert.equal(JSON.parse(storage.raw)[0].title, 'A');
 });
