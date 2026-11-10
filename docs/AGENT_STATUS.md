@@ -1,3 +1,18 @@
+- [Daymark engineering status — 2026-11-10T10:06:00Z (whole-project signing, extension SPA and storage integrity)](./CURRENT_STATUS_20261110T100600Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:15:00Z (main 469b29e; #665/#699 exact-head CI green, Focus/reminder API 29/36 green, 24 open issues)](./CURRENT_STATUS_20261110T061500Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:32:15Z (main 469b29e; Service Worker current-main integration, Online/Offline gates, AST/recovery/ICS checks)](./CURRENT_STATUS_20261110T063215Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:29:42Z (main 469b29e; Service Worker Online/Offline restored and verified, AST guard and integrations green)](./CURRENT_STATUS_20261110T062942Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:27:20Z (main 469b29e; AST guard and integrations verified, corrected cancelled docs checks, SLSA release blocker)](./CURRENT_STATUS_20261110T062720Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:25:08Z (main 469b29e; AST guard five workflows, recovery/iCalendar and Focus/reminder gates pass, SLSA release blocker)](./CURRENT_STATUS_20261110T062508Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:22:34Z (main 469b29e; AST guard 728/728, recovery/iCalendar and Focus/reminder gates pass, SLSA release blocker)](./CURRENT_STATUS_20261110T062234Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:17:36Z (main 469b29e; recovery/iCalendar all checks pass, Focus/reminder gates pass, signing runtime audit)](./CURRENT_STATUS_20261110T061736Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:13:21Z (main 469b29e; recovery/iCalendar branches synchronized with Telegram, Focus/reminder gates pass, desktop failure UX)](./CURRENT_STATUS_20261110T061321Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:07:29Z (main 469b29e; Focus/reminder API 29/36 gates pass, desktop failure UX, precise test-guard scope, repository-wide backlog)](./CURRENT_STATUS_20261110T060729Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:04:17Z (main 469b29e; Focus and reminder API 29/36 gates pass, desktop failure UX, corrected signing review, repository-wide backlog)](./CURRENT_STATUS_20261110T060417Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T06:02:27Z (main 469b29e; Focus and reminder API 29/36 gates pass, desktop failure UX, corrected signing review, repository-wide backlog)](./CURRENT_STATUS_20261110T060227Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T05:57:31Z (main 469b29e; Focus API 36 10/10, reminder API 29 tap trace, desktop download failure UX, repository-wide backlog)](./CURRENT_STATUS_20261110T055731Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T05:53:36Z (main 469b29e; Focus API 36 10/10, desktop download failure UX, Telegram hardening, repository-wide backlog)](./CURRENT_STATUS_20261110T055336Z.md)
+- [Daymark whole-project engineering status — 2026-11-10T05:36:48Z (main 469b29e; Telegram security, Focus coordinate fix, repository-wide backlog)](./CURRENT_STATUS_20261110T053648Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
@@ -109,6 +124,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [Daymark engineering status — 2026-11-10T10:06:00Z (whole-project signing, extension SPA and storage integrity)](./CURRENT_STATUS_20261110T100600Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
