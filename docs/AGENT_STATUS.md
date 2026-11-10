@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-10T10:17:00Z (mainline sync and exact-head CI)](./CURRENT_STATUS_20261110T101700Z.md)
 - [Daymark engineering status — 2026-11-10T10:13:00Z (exact-head verification and whole-project backlog)](./CURRENT_STATUS_20261110T101300Z.md)
 - [Daymark engineering status — 2026-11-10T10:06:00Z (whole-project signing, extension SPA and storage integrity)](./CURRENT_STATUS_20261110T100600Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T06:15:00Z (main 469b29e; #665/#699 exact-head CI green, Focus/reminder API 29/36 green, 24 open issues)](./CURRENT_STATUS_20261110T061500Z.md)
@@ -125,6 +126,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [Daymark engineering status — 2026-11-10T10:17:00Z (mainline sync and exact-head CI)](./CURRENT_STATUS_20261110T101700Z.md)
 - [Daymark engineering status — 2026-11-10T10:13:00Z (exact-head verification and whole-project backlog)](./CURRENT_STATUS_20261110T101300Z.md)
 - [Daymark engineering status — 2026-11-10T10:06:00Z (whole-project signing, extension SPA and storage integrity)](./CURRENT_STATUS_20261110T100600Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)

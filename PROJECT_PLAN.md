@@ -1,3 +1,21 @@
+## Current execution queue — 2026-11-10T10:17:00Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
+
+Live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733 and contracts #42784930716 PASS. Main protection is disabled; rulesets are empty. See docs/CURRENT_STATUS_20261110T101700Z.md for exact heads and workflow evidence.
+
+1. P0 — verify synchronized integration heads: #675 (task/Focus/webhook/storage), #676 (extension SPA), and #656 (iCalendar/import/export) are now 0 behind main via non-force two-parent merge commits. Their new-head workflows are running; do not reuse older PASS results.
+2. P0 — Focus reliability (#648, #675, #613, #690): #675's pre-sync API 29/36 lifecycle passed; #648's separate API 36 gate still fails. Resolve after the synchronized #675 head passes.
+3. P0 — task/import/recovery/webhook races (#683, #656, #689, #639): global task → delivery → queue → Focus lock order is covered; explicit integrated import-vs-normal-write race remains.
+4. P0 — production signing/security (#705, #84): exact repository/owner actor gates are implemented and all four workflows pass; independent security review and owner-side tag ruleset/protected environment remain.
+5. P0 — main governance (#646): owner/admin must configure required Android CI/contracts, independent approval, up-to-date branch and no-force-push/delete protections.
+6. P0 — physical Android/WebView/OEM acceptance (#160): NOT TESTED.
+7. P1 — extension privacy/runtime (#676, #702, #687): previous head all six workflows pass; synchronized merge head requires fresh CI and physical WebView acceptance; recovery UI remains.
+8. P1 — Service Worker compatibility (#704, #685): all six exact-head checks pass; independent review remains.
+9. P1 — secure Android download transport (#671), recurrence parity (#684/#476), Telegram browser acceptance (#700), and desktop reproducibility (#696).
+
+No release/tag/version/signing-key/applicationId change or destructive migration was made. Current source identity remains com.abrar.daymark; owner reconciliation remains open without changing package identity.
+
+---
+
 ## Current execution queue — 2026-11-10T10:13:00Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
 
 Live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733 and cross-platform contracts #42784930716 PASS. Main protection is disabled; rulesets are empty. See docs/CURRENT_STATUS_20261110T101300Z.md for exact heads and run evidence.
