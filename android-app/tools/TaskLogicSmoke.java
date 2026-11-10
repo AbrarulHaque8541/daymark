@@ -79,7 +79,7 @@ public final class TaskLogicSmoke {
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
                 if (line.isEmpty() || line.startsWith("#")) continue;
-                String[] fields = line.split("\\\\t", -1);
+                String[] fields = line.split("\\t", -1);
                 check(fields.length == 2, "instant contract fixture line " + lineNumber + " has two columns");
                 boolean expected;
                 if ("true".equals(fields[1])) expected = true;

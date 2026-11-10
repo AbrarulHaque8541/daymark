@@ -199,12 +199,12 @@ test('shared task instant contract matches Android strict instant validation', (
   for (const [index, line] of lines.entries()) {
     if (!line || line.startsWith('#')) continue;
     const columns = line.split('\t');
-    assert.equal(columns.length, 2, \`instant fixture line \${index + 1} must have two columns\`);
+    assert.equal(columns.length, 2, 'instant fixture line ' + (index + 1) + ' must have two columns');
     assert.ok(columns[1] === 'true' || columns[1] === 'false',
-      \`instant fixture line \${index + 1} must use a strict boolean\`);
+      'instant fixture line ' + (index + 1) + ' must use a strict boolean');
     const value = columns[0] === '~' ? '' : columns[0];
     assert.equal(logic.isValidInstant(value), columns[1] === 'true',
-      \`JavaScript instant validation must match shared fixture line \${index + 1}\`);
+      'JavaScript instant validation must match shared fixture line ' + (index + 1));
     cases += 1;
   }
   assert.equal(cases, 36, 'shared instant contract must include all thirty-six cases');
