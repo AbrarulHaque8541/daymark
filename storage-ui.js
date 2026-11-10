@@ -477,11 +477,11 @@
             : 'a shared lock or storage operation failed. Nothing was cleared.'));
         return false;
       }
-      const outcome = locked.value;
-      if (!outcome || outcome.ok !== true) {
-        if (outcome && outcome.reason === 'focus-generation-failed-rolled-back') {
+      const clearOutcome = locked.value;
+      if (!clearOutcome || clearOutcome.ok !== true) {
+        if (clearOutcome && clearOutcome.reason === 'focus-generation-failed-rolled-back') {
           status('Could not safely clear all data: Focus coordination could not advance. Task coordination was restored; nothing was cleared.');
-        } else if (outcome && outcome.reason === 'partial-generation-coordination') {
+        } else if (clearOutcome && clearOutcome.reason === 'partial-generation-coordination') {
           // The task fence may remain advanced. Rebase this tab from durable
           // storage and be explicit that only coordination state changed.
           notifyTaskStorageChange(null);
@@ -491,7 +491,7 @@
         }
         return false;
       }
-      const result = outcome.result;
+      const result = clearOutcome.result;
       notifyFocusStorageChange('all');
       if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
