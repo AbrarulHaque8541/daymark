@@ -81,12 +81,17 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
       discoveredKeys.add(match[2]);
     }
   }
-  const excludedSecretKeys = new Set(['daymark.webhook.v1']);
+  const excludedNonUserKeys = new Set([
+    'daymark.webhook.v1',
+    'daymark.focus.mutation.generation.v1'
+  ]);
   assert.ok(discoveredKeys.has('daymark.webhook.v1'),
     'the legacy secret-bearing endpoint key remains known to the webhook module');
-  assert.deepEqual([...discoveredKeys].filter((key) => !excludedSecretKeys.has(key)).sort(),
+  assert.ok(discoveredKeys.has('daymark.focus.mutation.generation.v1'),
+    'the non-personal Focus coordination counter remains an explicit internal key');
+  assert.deepEqual([...discoveredKeys].filter((key) => !excludedNonUserKeys.has(key)).sort(),
     [...expectedKeys].sort(),
-    'every non-secret literal daymark storage key declared by a root JS module must be inventoried');
+    'every user-data and preference key declared by a root JS module must be inventoried');
   assert.equal(storage.isManagedKey('daymark.webhook.v1'), false,
     'the secret-bearing legacy endpoint must never be read by the storage health card');
   assert.equal(storage.isManagedKey('daymark.unknown.v1'), false);
