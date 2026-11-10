@@ -65,7 +65,7 @@ check("github.event_name == 'push' && github.ref_type == 'tag'" in slsa_provenan
 check(OWNER_GATE in PRIVATE_MAIN_WORKFLOW,
       "the private main test APK workflow must retain its owner-only manual-dispatch gate")
 production_job = PRODUCTION_RELEASE_WORKFLOW.split("  build-verify-draft:", 1)[1]
-production_guard = production_job.split("    runs-on:", 1)[0]
+production_guard = " ".join(production_job.split("    runs-on:", 1)[0].split())
 check("github.repository == 'AbrarulHaque8541/daymark'" in production_guard
       and "startsWith(github.ref, 'refs/tags/v')" in production_guard
       and OWNER_GATE in production_guard,
