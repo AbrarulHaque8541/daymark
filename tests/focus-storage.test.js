@@ -5,11 +5,25 @@ const path = require('node:path');
 const vm = require('node:vm');
 const taskLogic = require('../task-logic.js');
 const focus = require('../focus-logic.js');
+const focusMutation = require('../focus-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const TASK_KEY = 'daymark.tasks.v1';
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
+
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => gate));
+      return previous.then(callback).finally(release);
+    }
+  };
+}
 
 function bootApp({ savedFocusValue, failFocusSave = false }) {
   const elements = new Map();
@@ -75,8 +89,10 @@ function bootApp({ savedFocusValue, failFocusSave = false }) {
   const window = {
     DaymarkLogic: taskLogic,
     DaymarkFocus: focus,
+    DaymarkFocusMutation: focusMutation,
     DaymarkRepeat: null,
     DaymarkFeed: null,
+    navigator: { locks: makeLockManager() },
     addEventListener() {}
   };
 
@@ -91,10 +107,11 @@ function bootApp({ savedFocusValue, failFocusSave = false }) {
     window,
     clearTimeout() {},
     setTimeout: () => 1,
-    setInterval: () => 1
+    setInterval: () => 1,
+    clearInterval() {}
   }, { filename: 'app.js' });
 
-  return { elements, storedValues };
+  return { elements, storedValues, settle() { return new Promise((resolve) => setImmediate(resolve)); } };
 }
 
 function expiredRunningSession(id, startedAtMs) {
@@ -123,10 +140,11 @@ test('restoreSessionResult exposes natural completion without reviving expired s
   assert.equal(focus.restoreSession(session, start + 90_000), null, 'legacy restore API remains compatible');
 });
 
-test('closed-tab natural expiry atomically persists session:null and one exact completion log', () => {
+test('closed-tab natural expiry atomically persists session:null and one exact completion log', async () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-once', start);
   const app = bootApp({ savedFocusValue: rawFocusPayload(session) });
+  await app.settle();
   const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
 
   assert.equal(saved.session, null);
@@ -136,12 +154,14 @@ test('closed-tab natural expiry atomically persists session:null and one exact c
   assert.equal(saved.log[0].endedAt, new Date(start + 60_000).toISOString());
 });
 
-test('reload after expiry does not append the same completion twice', () => {
+test('reload after expiry does not append the same completion twice', async () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-dedup', start);
   const first = bootApp({ savedFocusValue: rawFocusPayload(session) });
+  await first.settle();
   const firstSaved = first.storedValues.get(FOCUS_KEY);
   const second = bootApp({ savedFocusValue: firstSaved });
+  await second.settle();
   const secondSaved = JSON.parse(second.storedValues.get(FOCUS_KEY));
 
   assert.equal(secondSaved.session, null);
@@ -149,12 +169,13 @@ test('reload after expiry does not append the same completion twice', () => {
   assert.equal(secondSaved.log[0].id, session.id);
 });
 
-test('existing log ID is deduplicated while expired session is cleared', () => {
+test('existing log ID is deduplicated while expired session is cleared', async () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-existing-log', start);
   const finished = focus.restoreSessionResult(session, start + 90_000).completedSession;
   const existing = focus.makeLogEntry(finished);
   const app = bootApp({ savedFocusValue: rawFocusPayload(session, [existing]) });
+  await app.settle();
   const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
 
   assert.equal(saved.session, null);
@@ -189,11 +210,12 @@ test('unexpired running session remains active across reload', () => {
   assert.equal(app.storedValues.get(FOCUS_KEY), original, 'an unexpired running session should remain unchanged');
 });
 
-test('quota failure preserves original focus payload and recovery backup', () => {
+test('quota failure preserves original focus payload and recovery backup', async () => {
   const start = Date.now() - 120_000;
   const session = expiredRunningSession('focus-expired-storage-failure', start);
   const original = rawFocusPayload(session);
   const app = bootApp({ savedFocusValue: original, failFocusSave: true });
+  await app.settle();
 
   assert.equal(app.storedValues.get(FOCUS_KEY), original, 'failed atomic write must leave primary payload intact');
   assert.equal(app.storedValues.get(FOCUS_BACKUP_KEY), original, 'raw original must also be retained in recovery backup');
