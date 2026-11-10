@@ -74,75 +74,217 @@
 
   // --- Android intent:// URI parsing (fail-closed) -----------------------
 
-  function safePercentDecode(value) {
-    try {
-      return decodeURIComponent(value);
-    } catch (error) {
-      return value;
-    }
+  const INTENT_METADATA_KEYS = [
+    'scheme', 'package', 'action', 'category', 'S.browser_fallback_url'
+  ];
+  const INTENT_BLOCKED_SCHEMES = [
+    'intent', 'javascript', 'vbscript', 'file', 'content', 'data', 'blob', 'about'
+  ];
+  const INTENT_SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]{0,63}$/;
+  const INTENT_PACKAGE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/;
+
+  function decodeIntentMetadata(value) {
+    // decodeURIComponent preserves literal '+'; Android's URLDecoder adapter
+    // explicitly protects '+' for the same percent-encoding contract.
+    return decodeURIComponent(value);
   }
 
-  // Parses intent://host/path#Intent;key=value;...;end and returns the
-  // pieces Daymark would act on. The browser fallback URL is only honored
-  // when it decodes to http(s); anything else is reported as ignored
-  // rather than silently dropped.
+  function isValidIntentHost(host) {
+    if (!host || /[^\x00-\x7f]/.test(host)) return false;
+    if (host.startsWith('[') && host.endsWith(']')) {
+      const addressApi = root.DaymarkBrowserAddress;
+      return !!(addressApi && typeof addressApi.isValidIpv6Literal === 'function'
+        && addressApi.isValidIpv6Literal(host.slice(1, -1)));
+    }
+    if (host.indexOf('[') !== -1 || host.indexOf(']') !== -1
+        || host.indexOf(':') !== -1 || host.indexOf('%') !== -1) return false;
+    const value = host.endsWith('.') ? host.slice(0, -1) : host;
+    if (!value || value.length > 253) return false;
+    const labels = value.split('.');
+    if (labels.some((label) => !label || label.length > 63
+        || !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label))) return false;
+    if (labels.length > 1 && !/^[A-Za-z]/.test(labels[labels.length - 1])) {
+      // java.net.URI accepts canonical four-octet decimal IPv4 (including
+      // leading zeroes) but rejects shortened, integer and numeric-TLD hosts.
+      return labels.length === 4 && labels.every((label) => {
+        if (!/^\d{1,3}$/.test(label)) return false;
+        return Number(label) <= 255;
+      });
+    }
+    return true;
+  }
+
+  function parseIntentAuthority(base) {
+    const rest = base.slice('intent://'.length);
+    const boundary = rest.search(/[/?#]/);
+    const authority = boundary === -1 ? rest : rest.slice(0, boundary);
+    if (!authority || authority.indexOf('@') !== -1 || /[\s\\]/.test(authority)) return null;
+
+    let host;
+    let portText = null;
+    if (authority.startsWith('[')) {
+      const close = authority.indexOf(']');
+      if (close < 0) return null;
+      host = authority.slice(0, close + 1);
+      const suffix = authority.slice(close + 1);
+      if (suffix !== '') {
+        if (!suffix.startsWith(':') || suffix.length === 1) return null;
+        portText = suffix.slice(1);
+      }
+    } else {
+      const colon = authority.lastIndexOf(':');
+      if (colon >= 0) {
+        if (authority.indexOf(':') !== colon) return null;
+        host = authority.slice(0, colon);
+        portText = authority.slice(colon + 1);
+      } else {
+        host = authority;
+      }
+    }
+
+    if (!isValidIntentHost(host)) return null;
+    let port = null;
+    if (portText !== null) {
+      if (!/^\d{1,5}$/.test(portText)) return null;
+      port = Number(portText);
+      if (port < 1 || port > 65535) return null;
+    }
+    return { host, port };
+  }
+
+  function parseIntentBase(base) {
+    if (!base.startsWith('intent://') || base.indexOf('#') !== -1
+        || /[\s\\<>"{}|^\x60]/.test(base)
+        || /%(?![0-9A-Fa-f]{2})/.test(base)) return null;
+    const authority = parseIntentAuthority(base);
+    if (!authority) return null;
+    try {
+      const parsed = new URL(base);
+      if (parsed.protocol !== 'intent:' || !parsed.hostname
+          || parsed.username || parsed.password || parsed.hash) return null;
+      if (parsed.hostname.toLowerCase() !== authority.host.toLowerCase()) return null;
+      if ((parsed.port === '' ? null : Number(parsed.port)) !== authority.port) return null;
+    } catch (error) {
+      return null;
+    }
+    return authority;
+  }
+
+  function validateIntentWebUrl(value) {
+    const addressApi = root.DaymarkBrowserAddress;
+    if (!addressApi || typeof addressApi.parseAddressInput !== 'function') return null;
+    const parsed = addressApi.parseAddressInput(value);
+    if (!parsed || parsed.kind !== 'navigate'
+        || (parsed.scheme !== 'http' && parsed.scheme !== 'https')) return null;
+    return parsed.url;
+  }
+
   function parseIntentUri(raw) {
-    const fail = (reason) => ({ ok: false, reason: reason });
+    const fail = (reason) => ({ ok: false, reason });
     const input = String(raw == null ? '' : raw);
-    if (input.slice(0, 9).toLowerCase() !== 'intent://') {
+    if (input.length > MAX_INPUT_CHARS) {
+      return fail('the intent URI exceeds the 2048 character limit');
+    }
+    if (!input.startsWith('intent://')) {
       return fail('an intent URI must start with intent://');
     }
+    if (hasControlChar(input) || containsWhitespace(input)) {
+      return fail('the intent URI contains whitespace or control characters');
+    }
+
     const marker = '#Intent;';
     const hashIndex = input.indexOf(marker);
     if (hashIndex === -1) {
       return fail('an intent URI needs a #Intent; parameter section');
     }
-    const hostSection = input.slice(9, hashIndex);
-    const paramSection = input.slice(hashIndex + marker.length);
-    if (paramSection.slice(-4) !== ';end') {
-      return fail('the intent parameter section must end with ;end');
+    if (input.slice(-4) !== ';end' || input.indexOf('#', hashIndex + 1) !== -1) {
+      return fail('the intent parameter section must end with ;end and contain no fragment');
     }
-    const body = paramSection.slice(0, -4);
-    const slashIndex = hostSection.indexOf('/');
-    const host = slashIndex === -1 ? hostSection : hostSection.slice(0, slashIndex);
-    const path = slashIndex === -1 ? '' : hostSection.slice(slashIndex);
-    const params = body === '' ? [] : body.split(';');
-    let scheme = null;
-    let packageName = null;
-    let fallbackUrl = null;
-    let fallbackHonored = false;
-    let fallbackIgnoredReason = null;
-    const extraKeys = [];
-    for (let i = 0; i < params.length; i += 1) {
-      const param = params[i];
-      if (param === '' || param === 'end') continue;
-      const eq = param.indexOf('=');
-      const key = eq === -1 ? param : param.slice(0, eq);
-      const value = eq === -1 ? '' : param.slice(eq + 1);
-      if (key === 'scheme') {
-        scheme = value === '' ? null : value;
-      } else if (key === 'package') {
-        packageName = value === '' ? null : value;
-      } else if (key === 'S.browser_fallback_url') {
-        fallbackUrl = safePercentDecode(value);
-        fallbackHonored = startsWithWebScheme(fallbackUrl);
-        if (!fallbackHonored) {
-          fallbackIgnoredReason = 'the fallback URL is not http(s), so Daymark would ignore it';
-        }
-      } else {
-        extraKeys.push(key);
+
+    const base = input.slice(0, hashIndex);
+    const baseAuthority = parseIntentBase(base);
+    if (!baseAuthority) return fail('the intent base address is invalid');
+    const body = input.slice(hashIndex + marker.length, -4);
+    const fields = body === '' ? [] : body.split(';');
+    const values = Object.create(null);
+
+    for (const field of fields) {
+      if (!field) return fail('the intent metadata contains an empty field');
+      const equals = field.indexOf('=');
+      if (equals <= 0) return fail('the intent metadata contains an unsupported flag or field');
+      const key = field.slice(0, equals);
+      if (INTENT_METADATA_KEYS.indexOf(key) === -1) {
+        return fail('the intent metadata requests an unsupported capability');
+      }
+      if (Object.prototype.hasOwnProperty.call(values, key)) {
+        return fail('the intent metadata contains duplicate fields');
+      }
+      try {
+        values[key] = decodeIntentMetadata(field.slice(equals + 1));
+      } catch (error) {
+        return fail('the intent metadata encoding is invalid');
       }
     }
+
+    let scheme = values.scheme;
+    if (typeof scheme !== 'string' || !INTENT_SCHEME_PATTERN.test(scheme)) {
+      return fail('the intent URI has no valid target scheme');
+    }
+    scheme = scheme.toLowerCase();
+    if (INTENT_BLOCKED_SCHEMES.indexOf(scheme) !== -1) {
+      return fail('the intent target scheme is blocked');
+    }
+
+    const action = values.action == null ? null : values.action;
+    if (action !== null && action !== 'android.intent.action.VIEW') {
+      return fail('only ordinary VIEW actions are supported');
+    }
+    const category = values.category == null ? null : values.category;
+    if (category !== null && category !== 'android.intent.category.BROWSABLE') {
+      return fail('only the BROWSABLE category is supported');
+    }
+
+    const packageName = values.package == null ? null : values.package;
+    if (packageName !== null && !INTENT_PACKAGE_PATTERN.test(packageName)) {
+      return fail('the intent package name is invalid');
+    }
+
+    const target = scheme + ':' + base.slice('intent:'.length);
+    let targetUri;
+    try {
+      const parsedTarget = new URL(target);
+      if (parsedTarget.protocol !== scheme + ':' || !parsedTarget.hostname
+          || parsedTarget.username || parsedTarget.password || parsedTarget.hash) {
+        return fail('the intent target URI is invalid');
+      }
+      targetUri = target;
+    } catch (error) {
+      return fail('the intent target URI is invalid');
+    }
+    if (scheme === 'http' || scheme === 'https') {
+      targetUri = validateIntentWebUrl(target);
+      if (!targetUri) return fail('the HTTP or HTTPS intent target is not a valid Daymark web address');
+    }
+
+    let fallbackUrl = null;
+    if (Object.prototype.hasOwnProperty.call(values, 'S.browser_fallback_url')) {
+      fallbackUrl = validateIntentWebUrl(values['S.browser_fallback_url']);
+      if (!fallbackUrl) {
+        return fail('the browser fallback must be a valid HTTP or HTTPS address without credentials');
+      }
+    }
+
     return {
       ok: true,
-      host: host,
-      path: path,
-      scheme: scheme,
-      packageName: packageName,
-      fallbackUrl: fallbackUrl,
-      fallbackHonored: fallbackHonored,
-      fallbackIgnoredReason: fallbackIgnoredReason,
-      extraKeys: extraKeys
+      host: baseAuthority.host,
+      scheme,
+      packageName,
+      action,
+      category,
+      targetUri,
+      fallbackUrl,
+      fallbackHonored: fallbackUrl !== null,
+      extraKeys: []
     };
   }
 
@@ -284,20 +426,26 @@
     }
     if (result.kind === 'android-intent') {
       const intent = result.intent;
+      let fallbackOrigin = null;
+      if (intent.fallbackUrl) {
+        try {
+          fallbackOrigin = new URL(intent.fallbackUrl).origin;
+        } catch (error) {
+          fallbackOrigin = 'a validated web address';
+        }
+      }
       base.verdict = 'handoff';
       base.title = 'Android intent handoff';
-      base.summary = result.reason;
+      base.summary = 'A strict, allowlisted Android VIEW handoff; unsupported or ambiguous Intent fields are refused.';
       base.lines = [
         intent.packageName
           ? 'Target app · ' + intent.packageName + ' (pinned by the link)'
           : 'Target app · none pinned, so Android would show the app chooser',
-        'Inner scheme · ' + (intent.scheme || 'not set by the link'),
-        intent.fallbackUrl === null
-          ? 'Fallback · none; if no app handles the intent, nothing opens'
-          : (intent.fallbackHonored
-            ? 'Fallback · if no app handles it, the browser would open ' + truncateForEcho(intent.fallbackUrl)
-            : 'Fallback · ignored (' + intent.fallbackIgnoredReason + ')'),
-        'Extra parameters · ' + intent.extraKeys.length + ' passed through, never logged',
+        'Inner scheme · ' + intent.scheme,
+        fallbackOrigin
+          ? 'Fallback · if no app handles it, the browser fallback origin is ' + fallbackOrigin + ' (path and query are hidden)'
+          : 'Fallback · none; if no app handles the intent, nothing opens',
+        'Intent policy · only VIEW and BROWSABLE metadata are accepted; component, selector, flags and arbitrary extras are refused',
         'Trigger · only an explicit user tap starts it'
       ];
       return base;
