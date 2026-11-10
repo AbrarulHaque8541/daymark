@@ -208,3 +208,33 @@ Work by: Cue
 Model: not disclosed by runtime
 Tooling: Git, GitHub CLI, official Android/llama.cpp sources
 Timestamp (UTC): 2026-10-26T03:57:57Z
+
+
+## Service Worker network boundary
+
+Daymark installs its process-wide Android ServiceWorkerController policy during
+DaymarkWebView class initialization, before the first WebView instance is created.
+Service Worker network requests follow Daymark's Online/Offline mode. The controller's
+ServiceWorkerWebSettings.setBlockNetworkLoads setting and a ServiceWorkerClient
+fail-closed response enforce that browser-wide mode. Before the first explicit Online navigation, the process-wide
+worker setting starts blocked. After the existing Online consent/navigation gate
+passes, Daymark unblocks worker network requests for HTTP/HTTPS. Switching Offline
+immediately clears the in-memory Online grant and reasserts the global block. The
+Remote Service Worker requests are blocked while Offline. The request client independently blocks remote/unknown worker requests,
+including if a later platform/settings reset clears the global setting. Local
+data:, blob: and about: responses and already cached Service Worker responses may
+still be handled locally.
+
+If the platform cannot change the global ServiceWorkerWebSettings value after Online
+consent, ordinary top-level browsing may continue while Service Worker remote requests
+remain fail-closed; the in-app compatibility notice explains this degraded fallback.
+This policy is process-wide because Android's ServiceWorkerController is process-wide;
+it follows the same global browser Online/Offline choice rather than introducing
+per-origin grants. It is **not** a claim that all platform-managed WebView/Safe Browsing
+egress is blocked.
+
+Official platform references:
+- https://developer.android.com/reference/android/webkit/ServiceWorkerController
+- https://developer.android.com/reference/android/webkit/ServiceWorkerWebSettings
+- https://developer.android.com/reference/android/webkit/ServiceWorkerClient
+

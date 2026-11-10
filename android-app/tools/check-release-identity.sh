@@ -8,6 +8,7 @@ UPDATER="$ROOT/app/src/main/java/com/abrar/daymark/updater/UpdaterPublisherConfi
 DEVICE_TEST="$REPO_ROOT/.github/workflows/android-device-test-release.yml"
 PRODUCTION="$REPO_ROOT/.github/workflows/android-production-release.yml"
 RELEASE_ASSETS="$REPO_ROOT/.github/workflows/android-release-assets.yml"
+SIGNED_RELEASE_ASSETS="$REPO_ROOT/.github/workflows/android-signed-device-test-release.yml"
 
 fail() {
   echo "FAIL: $1" >&2
@@ -44,7 +45,23 @@ require_literal "$PRODUCTION" '[[ "$tag" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]' 'pr
 require_literal "$PRODUCTION" '[[ "$target_sdk_version" == "36" ]]' 'production APK must assert target SDK 36'
 require_literal "$PRODUCTION" '[[ "$GITHUB_REF_NAME" == "v${version_name}" ]]' 'production tag must match the Gradle versionName'
 require_literal "$RELEASE_ASSETS" 'platforms;android-36 build-tools;35.0.0' 'release-assets workflow must provision API 36'
-require_literal "$RELEASE_ASSETS" '[[ "$target_sdk" == "36" ]]' 'release asset APK must assert target SDK 36'
+require_literal "$RELEASE_ASSETS" 'platforms;android-36 build-tools;35.0.0' 'PR release-assets workflow must provision API 36'
+require_literal "$RELEASE_ASSETS" '[[ "$target_sdk" == "36" ]]' 'PR debug APK must assert target SDK 36'
+require_literal "$RELEASE_ASSETS" 'assembleGithubSideloadDebug' 'PR workflow must build the unsigned sideload debug variant'
+if grep -Fq -- '${{ secrets.' "$RELEASE_ASSETS"; then
+  fail "PR-triggered Android validation must not reference repository secrets"
+fi
+if grep -Fq -- 'assembleGithubSideloadRelease' "$RELEASE_ASSETS" || grep -Fq -- 'bundleGithubSideloadRelease' "$RELEASE_ASSETS"; then
+  fail "PR-triggered Android validation must not invoke signed release Gradle variants"
+fi
+require_literal "$SIGNED_RELEASE_ASSETS" 'v*-device-test.*' 'signed device-test release workflow must use the device-test tag pattern'
+require_literal "$SIGNED_RELEASE_ASSETS" 'KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}' 'signed tag workflow must read the configured keystore secret'
+require_literal "$SIGNED_RELEASE_ASSETS" 'git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main' 'signed tag workflow must verify tag ancestry on main'
+require_literal "$SIGNED_RELEASE_ASSETS" '[[ "$app_id" == "com.abrar.daymark" ]]' 'signed device-test APK must assert the approved application ID'
+require_literal "$SIGNED_RELEASE_ASSETS" '[[ "$target_sdk" == "36" ]]' 'signed device-test APK must assert target SDK 36'
+if grep -Eq '^[[:space:]]*pull_request:' "$SIGNED_RELEASE_ASSETS"; then
+  fail "signed device-test workflow must not execute on pull_request events"
+fi
 
 require_literal "$PRODUCTION" '--draft --verify-tag' 'production workflow must create a draft release for physical-device acceptance'
 require_literal "$PRODUCTION" '.draft == true' 'production workflow must verify draft status before finishing'

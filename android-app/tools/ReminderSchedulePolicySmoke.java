@@ -8,6 +8,22 @@ public final class ReminderSchedulePolicySmoke {
     private static int assertions;
 
     public static void main(String[] args) {
+        check(ReminderSchedulePolicy.shouldRescheduleForSystemChange(
+                        "android.intent.action.BOOT_COMPLETED"),
+                "boot completion re-arms reminders from encrypted task state");
+        check(ReminderSchedulePolicy.shouldRescheduleForSystemChange(
+                        "android.intent.action.QUICKBOOT_POWERON"),
+                "vendor quick-boot completion re-arms reminders");
+        check(ReminderSchedulePolicy.shouldRescheduleForSystemChange(
+                        "android.intent.action.TIME_SET"),
+                "manual/system clock changes re-arm RTC reminders");
+        check(ReminderSchedulePolicy.shouldRescheduleForSystemChange(
+                        "android.intent.action.TIMEZONE_CHANGED"),
+                "timezone changes re-resolve local due times and re-arm RTC reminders");
+        check(!ReminderSchedulePolicy.shouldRescheduleForSystemChange(null)
+                        && !ReminderSchedulePolicy.shouldRescheduleForSystemChange("android.intent.action.SCREEN_OFF")
+                        && !ReminderSchedulePolicy.shouldRescheduleForSystemChange("daymark.action.dismiss_reminder"),
+                "unrelated and notification actions do not trigger a full reminder reschedule");
         ZoneId zone = ZoneId.of("UTC");
         check(java.util.Arrays.equals(TaskLogic.REMINDER_LEADS, new int[] {0, 30, 60, 1440})
                         && !TaskLogic.isReminderLead(5)

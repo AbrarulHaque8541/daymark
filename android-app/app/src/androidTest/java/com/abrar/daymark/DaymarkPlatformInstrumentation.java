@@ -250,35 +250,95 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             android.view.View modeRow = (android.view.View) stopwatch.getParent();
             check(countdown.getParent() == modeRow,
                     "Stopwatch and Countdown are sibling buttons in the real mode selector");
+            android.view.View modeSelector = findAncestorWithSimpleName(modeRow, "ModeSelector");
+            check(modeSelector != null && modeSelector.getClass().getSimpleName().equals("ModeSelector"),
+                    "mode buttons are wrapped by the real Focus ModeSelector that owns horizontal interception");
+            android.widget.ScrollView parentScroll = findParentScrollView(modeSelector);
+            check(parentScroll != null,
+                    "Focus mode selector remains inside the parent Tasks ScrollView");
+            // Add scrollable content before any mode tap so the actual controls can be
+            // positioned inside the ScrollView viewport, not merely drawn beyond it.
+            final android.widget.ScrollView initialParentScroll = parentScroll;
+            runOnMainSync(() -> {
+                android.view.ViewGroup frame = (android.view.ViewGroup) initialParentScroll.getChildAt(0);
+                android.view.ViewGroup content = (android.view.ViewGroup) frame.getChildAt(0);
+                android.view.View spacer = new android.view.View(mainActivity);
+                content.addView(spacer, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1200));
+                content.requestLayout();
+                initialParentScroll.requestLayout();
+            });
+            waitForIdleSync();
             scrollViewIntoFocus(modeRow);
+            scrollDescendantIntoScrollView(parentScroll, countdown);
+            scrollDescendantIntoScrollView(parentScroll, stopwatch);
+            scrollDescendantIntoScrollView(parentScroll, modeSelector);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "fresh Focus Timer panel starts in Stopwatch mode");
 
-            dispatchTap(countdown);
+            String countdownTap = dispatchTap(mainActivity, "Countdown");
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
-                    "a real tap selects Countdown");
-            dispatchTap(stopwatch);
+                    "a real tap selects Countdown (" + countdownTap + ")");
+            String stopwatchTap = dispatchTap(mainActivity, "Stopwatch");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
-                    "a real tap selects Stopwatch");
+                    "a real tap selects Stopwatch (" + stopwatchTap + ")");
 
-            String leftSwipe = dispatchSwipe(modeRow, true);
+            modeSelector = findFocusModeSelector(mainActivity);
+            parentScroll = findParentScrollView(modeSelector);
+            String leftSwipe = dispatchSwipe(modeSelector, true);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a leftward horizontal swipe selects Countdown (" + leftSwipe + ")");
-            String rightSwipe = dispatchSwipe(modeRow, false);
+            modeSelector = findFocusModeSelector(mainActivity);
+            parentScroll = findParentScrollView(modeSelector);
+            String rightSwipe = dispatchSwipe(modeSelector, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a rightward horizontal swipe selects Stopwatch (" + rightSwipe + ")");
+            // The selector may have moved during horizontal gestures; re-center it
+            // before injecting the parent-scroll gesture.
+            modeSelector = findFocusModeSelector(mainActivity);
+            parentScroll = findParentScrollView(modeSelector);
+            scrollDescendantIntoScrollView(parentScroll, modeSelector);
+            boolean[] canScroll = new boolean[2];
+            int[] scrollY = new int[2];
+            final android.widget.ScrollView scrollForMeasurement = parentScroll;
+            runOnMainSync(() -> {
+                canScroll[0] = scrollForMeasurement.canScrollVertically(1);
+                canScroll[1] = scrollForMeasurement.canScrollVertically(-1);
+                scrollY[0] = scrollForMeasurement.getScrollY();
+            });
+            check(canScroll[0] || canScroll[1],
+                    "Tasks workspace has scrollable content for the vertical-gesture regression");
+            String verticalScrollTrace = dispatchVerticalScrollSwipe(modeSelector, parentScroll, canScroll[0]);
+            long scrollDeadline = android.os.SystemClock.uptimeMillis() + 2000L;
+            final android.widget.ScrollView scrollForCurrentPosition = parentScroll;
+            do {
+                runOnMainSync(() -> scrollY[1] = scrollForCurrentPosition.getScrollY());
+                if (canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0]) break;
+                android.os.SystemClock.sleep(50L);
+            } while (android.os.SystemClock.uptimeMillis() < scrollDeadline);
+            check(canScroll[0] ? scrollY[1] > scrollY[0] : scrollY[1] < scrollY[0],
+                    "parent Tasks ScrollView scrolls after a vertical Focus-mode drag"
+                            + " (startY=" + scrollY[0] + ", endY=" + scrollY[1]
+                            + ", canScrollDown=" + canScroll[0] + ", canScrollUp=" + canScroll[1]
+                            + ", verticalScrollTrace=" + verticalScrollTrace + ")");
+            checkFocusModeState(mainActivity, stopwatch, countdown, false,
+                    "a vertical workspace scroll does not change the selected Focus mode");
+            scrollDescendantIntoScrollView(parentScroll, countdown);
             dispatchVerticalSwipe(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag inside Countdown cancels the child click");
-            dispatchTap(countdown);
+            scrollDescendantIntoScrollView(parentScroll, countdown);
+            String countdownAfterVerticalDrag = dispatchTap(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
-                    "a tap still works after a rejected vertical drag");
+                    "a tap still works after a rejected vertical drag (" + countdownAfterVerticalDrag + ")");
+            scrollDescendantIntoScrollView(parentScroll, stopwatch);
             dispatchVerticalSwipe(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a vertical drag inside Stopwatch cancels the child click");
-            dispatchTap(stopwatch);
+            scrollDescendantIntoScrollView(parentScroll, stopwatch);
+            String stopwatchAfterVerticalDrag = dispatchTap(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
-                    "a vertical drag does not disable subsequent taps");
+                    "a vertical drag does not disable subsequent taps (" + stopwatchAfterVerticalDrag + ")");
         } finally {
             if (activity != null && !activity.isFinishing()) {
                 Activity closingActivity = activity;
@@ -301,6 +361,37 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         return null;
     }
 
+    private android.view.View findFocusModeSelector(Activity activity) throws Exception {
+        android.view.View[] selector = new android.view.View[1];
+        runOnMainSync(() -> {
+            android.view.View root = activity.getWindow().getDecorView();
+            android.view.View currentStopwatch = findVisibleTextView(root, "Stopwatch");
+            android.view.View row = currentStopwatch == null
+                    || !(currentStopwatch.getParent() instanceof android.view.View)
+                    ? null : (android.view.View) currentStopwatch.getParent();
+            selector[0] = row == null ? null : findAncestorWithSimpleName(row, "ModeSelector");
+        });
+        check(selector[0] != null, "current visible Focus controls resolve to the real ModeSelector");
+        return selector[0];
+    }
+
+    private android.view.View findVisibleTextView(android.view.View root, String expected) {
+        if (root == null) return null;
+        if (root instanceof android.widget.TextView) {
+            CharSequence text = ((android.widget.TextView) root).getText();
+            if (text != null && expected.contentEquals(text)
+                    && root.isShown() && root.isAttachedToWindow()) return root;
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = group.getChildCount() - 1; index >= 0; index--) {
+                android.view.View match = findVisibleTextView(group.getChildAt(index), expected);
+                if (match != null) return match;
+            }
+        }
+        return null;
+    }
+
     private android.view.View findViewByText(android.view.View root, String expected) {
         if (root instanceof android.widget.TextView) {
             CharSequence text = ((android.widget.TextView) root).getText();
@@ -314,6 +405,35 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         }
         return null;
+    }
+
+    private void scrollDescendantIntoScrollView(android.widget.ScrollView scrollView,
+                                                   android.view.View descendant) throws Exception {
+        int[] targetHeight = new int[1];
+        runOnMainSync(() -> {
+            targetHeight[0] = descendant.getHeight();
+            android.graphics.Rect target = new android.graphics.Rect(
+                    0, 0, descendant.getWidth(), descendant.getHeight());
+            scrollView.offsetDescendantRectToMyCoords(descendant, target);
+            int viewportHeight = Math.max(1,
+                    scrollView.getHeight() - scrollView.getPaddingTop() - scrollView.getPaddingBottom());
+            int contentHeight = scrollView.getChildAt(0).getHeight();
+            int maximumScroll = Math.max(0, contentHeight - viewportHeight);
+            int desiredScroll = target.centerY() - viewportHeight / 2;
+            scrollView.scrollTo(0, Math.max(0, Math.min(desiredScroll, maximumScroll)));
+        });
+        waitForIdleSync();
+        android.graphics.Rect parentBounds = visibleBounds(scrollView);
+        android.graphics.Rect targetBounds = visibleBounds(descendant);
+        int[] actualScroll = new int[1];
+        runOnMainSync(() -> actualScroll[0] = scrollView.getScrollY());
+        check(targetBounds.height() >= targetHeight[0]
+                        && targetBounds.top >= parentBounds.top
+                        && targetBounds.bottom <= parentBounds.bottom,
+                "Focus control is fully inside the parent Tasks ScrollView before touch injection"
+                        + " (target=" + targetBounds.toShortString()
+                        + ", parent=" + parentBounds.toShortString()
+                        + ", scrollY=" + actualScroll[0] + ")");
     }
 
     private void scrollViewIntoFocus(android.view.View view) throws Exception {
@@ -344,72 +464,400 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private android.graphics.Rect visibleBounds(android.view.View view) throws Exception {
         android.graphics.Rect[] bounds = {new android.graphics.Rect()};
-        runOnMainSync(() -> view.getGlobalVisibleRect(bounds[0]));
+        int[] rootLocation = new int[2];
+        runOnMainSync(() -> {
+            // getGlobalVisibleRect is relative to the root view, but UiAutomation
+            // injects MotionEvents in screen coordinates. Translate before using
+            // these bounds to select tap/drag coordinates.
+            view.getGlobalVisibleRect(bounds[0]);
+            android.view.View rootView = view.getRootView();
+            if (rootView != null) rootView.getLocationOnScreen(rootLocation);
+        });
+        bounds[0].offset(rootLocation[0], rootLocation[1]);
         return bounds[0];
+    }
+
+    private String findFocusStatusText(android.view.View root) {
+        String[] statuses = {
+                "READY WHEN YOU ARE", "TARGET DURATION", "TIME REMAINING",
+                "FOCUS IN PROGRESS", "PAUSED · READY TO RESUME", "SESSION COMPLETE"
+        };
+        for (String status : statuses) {
+            if (findViewByText(root, status) != null) return status;
+        }
+        return "none";
     }
 
     private void checkFocusModeState(Activity activity, android.view.View stopwatch,
             android.view.View countdown, boolean countdownExpected, String message) throws Exception {
         boolean[] selected = new boolean[2];
         boolean[] idleState = new boolean[1];
+        String[] actualStatus = new String[1];
+        String[] startDescription = new String[1];
+        String[] startText = new String[1];
         runOnMainSync(() -> {
-            selected[0] = stopwatch.isSelected();
-            selected[1] = countdown.isSelected();
             android.view.View root = activity.getWindow().getDecorView();
+            android.view.View currentStopwatch = findVisibleTextView(root, "Stopwatch");
+            android.view.View currentCountdown = findVisibleTextView(root, "Countdown");
+            selected[0] = currentStopwatch != null && currentStopwatch.isSelected();
+            selected[1] = currentCountdown != null && currentCountdown.isSelected();
             android.view.View start = findViewByContentDescription(root, "Start focus timer");
             String expectedStatus = countdownExpected ? "TARGET DURATION" : "READY WHEN YOU ARE";
             android.view.View status = findViewByText(root, expectedStatus);
             idleState[0] = start != null && status != null;
+            actualStatus[0] = findFocusStatusText(root);
+            startDescription[0] = start == null ? "none" : String.valueOf(start.getContentDescription());
+            startText[0] = start instanceof android.widget.TextView
+                    ? String.valueOf(((android.widget.TextView) start).getText()) : "none";
         });
+        String observed = "actual Stopwatch=" + selected[0] + ", Countdown=" + selected[1]
+                + ", idle=" + idleState[0] + ", status=" + actualStatus[0]
+                + ", startDescription=" + startDescription[0] + ", startText=" + startText[0];
         check(selected[0] == !countdownExpected && selected[1] == countdownExpected,
-                message + ": exactly the expected mode is selected (actual Stopwatch="
-                        + selected[0] + ", Countdown=" + selected[1] + ", idle=" + idleState[0] + ")");
-        check(idleState[0], message + ": Start remains available and the timer stays idle");
+                message + ": exactly the expected mode is selected (" + observed + ")");
+        check(idleState[0], message + ": Start remains available and the timer stays idle (" + observed + ")");
     }
 
-    private void dispatchTap(android.view.View view) throws Exception {
-        android.graphics.Rect bounds = visibleBounds(view);
-        check(bounds.width() > 0 && bounds.height() > 0, "tap target has visible screen bounds");
+    private String dispatchTap(Activity activity, String label) throws Exception {
+        android.view.View[] target = new android.view.View[1];
+        runOnMainSync(() -> target[0] = findVisibleTextView(
+                activity.getWindow().getDecorView(), label));
+        check(target[0] != null && target[0].isAttachedToWindow()
+                        && target[0].isEnabled() && target[0].isClickable(),
+                "current visible " + label + " mode button is attached, enabled and clickable");
+        return dispatchTap(target[0]);
+    }
+
+    private String dispatchTap(android.view.View view) throws Exception {
+        android.graphics.Rect bounds = stableVisibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0, "tap target has stable visible screen bounds");
+        String target = describeTouchTarget(view, bounds);
         float x = bounds.centerX();
         float y = bounds.centerY();
+        StringBuilder touchTrace = new StringBuilder();
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        android.view.View modeSelector = findAncestorWithSimpleName(view, "ModeSelector");
+        android.widget.ScrollView parentScroll = modeSelector == null
+                ? null : findParentScrollView(modeSelector);
+        android.view.View traceRoot = parentScroll != null ? parentScroll
+                : modeSelector != null ? modeSelector : view;
+        runOnMainSync(() -> attachTouchTraceListeners(traceRoot, "tap", touchTrace, tracedViews));
         long downTime = android.os.SystemClock.uptimeMillis();
-        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, x, y);
-        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime, downTime + 60L, x, y);
-        waitForIdleSync();
+        try {
+            injectTouchSequence(PlatformTouchSequence.tap(x, y, downTime), downTime);
+            waitForIdleSync();
+        } finally {
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+            });
+        }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        return target + " tapCenter=(" + x + "," + y + ") source=UiAutomation/finger"
+                + " events=[" + capturedTouchTrace[0] + "]";
     }
 
     private String dispatchSwipe(android.view.View view, boolean left) throws Exception {
-        android.graphics.Rect bounds = visibleBounds(view);
-        check(bounds.width() > 0 && bounds.height() > 0, "swipe target has visible screen bounds");
+        android.graphics.Rect bounds = stableVisibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0, "swipe target has stable visible screen bounds");
+        String target = describeTouchTarget(view, bounds);
+        StringBuilder touchTrace = new StringBuilder();
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        runOnMainSync(() -> attachTouchTraceListeners(view, "selector", touchTrace, tracedViews));
         float startX = left ? bounds.left + bounds.width() * 0.82f : bounds.left + bounds.width() * 0.18f;
         float endX = left ? bounds.left + bounds.width() * 0.18f : bounds.left + bounds.width() * 0.82f;
         float y = bounds.centerY();
-        injectDrag(startX, y, endX, y);
-        return (left ? "leftward" : "rightward") + " swipe bounds=" + bounds.toShortString()
-                + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")";
+        try {
+            injectDrag(startX, y, endX, y);
+        } finally {
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+            });
+        }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
+                "horizontal swipe delivers touchscreen events to the ModeSelector or descendants (" + target + ")");
+        return (left ? "leftward" : "rightward") + " swipe " + target
+                + " start=(" + startX + "," + y + ") end=(" + endX + "," + y + ")"
+                + " events=[" + capturedTouchTrace[0] + "]";
+    }
+
+    private void attachTouchTraceListeners(android.view.View view, String label,
+                                            StringBuilder trace,
+                                            java.util.List<android.view.View> tracedViews) {
+        view.setOnTouchListener((targetView, event) -> {
+            appendTouchTrace(trace, label, targetView, event);
+            return false;
+        });
+        tracedViews.add(view);
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                attachTouchTraceListeners(group.getChildAt(index), label + "." + index,
+                        trace, tracedViews);
+            }
+        }
+    }
+
+    private void appendTouchTrace(StringBuilder trace, String target, android.view.View targetView,
+                                  android.view.MotionEvent event) {
+        if (trace.length() > 0) trace.append(';');
+        String label = targetView instanceof android.widget.TextView
+                ? String.valueOf(((android.widget.TextView) targetView).getText())
+                : targetView.getClass().getSimpleName();
+        int pointerIndex = event.getPointerCount() == 0 ? 0
+                : Math.min(event.getActionIndex(), event.getPointerCount() - 1);
+        trace.append(target).append(':').append(android.view.MotionEvent.actionToString(event.getActionMasked()))
+                .append(" label=").append(label)
+                .append(" pointerCount=").append(event.getPointerCount());
+        if (event.getPointerCount() > 0) {
+            trace.append(" pointerId=").append(event.getPointerId(pointerIndex))
+                    .append(" toolType=").append(event.getToolType(pointerIndex));
+        }
+        trace.append(" local=(").append(event.getX()).append(',').append(event.getY()).append(')')
+                .append(" raw=(").append(event.getRawX()).append(',').append(event.getRawY()).append(')')
+                .append(" source=").append(event.getSource())
+                .append(" eventTime=").append(event.getEventTime());
+        if (targetView instanceof android.widget.ScrollView) {
+            trace.append(" scrollY=").append(((android.widget.ScrollView) targetView).getScrollY());
+        }
     }
 
     private void dispatchVerticalSwipe(android.view.View view) throws Exception {
-        android.graphics.Rect bounds = visibleBounds(view);
-        check(bounds.width() > 0 && bounds.height() > 0, "vertical-gesture target has visible screen bounds");
-        float distance = Math.min(bounds.height() * 0.70f, 48f);
-        injectDrag(bounds.centerX(), bounds.centerY() - distance / 2f,
-                bounds.centerX(), bounds.centerY() + distance / 2f);
+        android.graphics.Rect bounds = stableVisibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0, "vertical-gesture target has stable visible screen bounds");
+        StringBuilder touchTrace = new StringBuilder();
+        runOnMainSync(() -> view.setOnTouchListener((targetView, event) -> {
+            appendTouchTrace(touchTrace, "vertical", targetView, event);
+            return false;
+        }));
+        try {
+            float distance = verticalGestureDistance(view, bounds);
+            injectDrag(bounds.centerX(), bounds.centerY() - distance / 2f,
+                    bounds.centerX(), bounds.centerY() + distance / 2f);
+        } finally {
+            runOnMainSync(() -> view.setOnTouchListener(null));
+        }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty(),
+                "vertical drag delivers touchscreen events to target ("
+                        + view.getClass().getSimpleName() + ")");
+    }
+
+    private android.view.View findAncestorWithSimpleName(android.view.View view, String simpleName) {
+        android.view.View current = view;
+        while (current != null) {
+            if (simpleName.equals(current.getClass().getSimpleName())) return current;
+            android.view.ViewParent parent = current.getParent();
+            current = parent instanceof android.view.View ? (android.view.View) parent : null;
+        }
+        return null;
+    }
+
+    private android.widget.ScrollView findParentScrollView(android.view.View view) {
+        android.view.ViewParent parent = view.getParent();
+        while (parent != null) {
+            if (parent instanceof android.widget.ScrollView) {
+                return (android.widget.ScrollView) parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+
+    private float verticalGestureDistance(android.view.View view, android.graphics.Rect bounds) {
+        int touchSlop = android.view.ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
+        // A fixed 48px cap can be below touch slop on high-density emulators
+        // (for example, 16dp at 3x density), so ScrollView treats the gesture as a tap.
+        float distance = Math.min(bounds.height() * 0.70f, Math.max(48f, touchSlop * 4f));
+        if (distance <= touchSlop) {
+            throw new AssertionError("vertical gesture distance must exceed scaled touch slop"
+                    + " (distance=" + distance + ", touchSlop=" + touchSlop
+                    + ", boundsHeight=" + bounds.height() + ")");
+        }
+        return distance;
+    }
+
+    private String dispatchVerticalScrollSwipe(android.view.View view,
+                                                android.widget.ScrollView parentScroll,
+                                                boolean fingerMovesUp) throws Exception {
+        android.graphics.Rect bounds = stableVisibleBounds(view);
+        check(bounds.width() > 0 && bounds.height() > 0,
+                "vertical-scroll target has stable visible screen bounds");
+        float distance = verticalGestureDistance(view, bounds);
+        float startY = fingerMovesUp
+                ? bounds.centerY() + distance / 2f
+                : bounds.centerY() - distance / 2f;
+        float endY = fingerMovesUp
+                ? bounds.centerY() - distance / 2f
+                : bounds.centerY() + distance / 2f;
+        StringBuilder selectorTrace = new StringBuilder();
+        // A delivered parent MOVE is rendered as parent-scroll:ACTION_MOVE by appendTouchTrace().
+        // Keeping this label explicit lets the source guard catch regressions in ScrollView tracing.
+        StringBuilder ancestorTrace = new StringBuilder();
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        java.util.ArrayList<android.view.View> tracedAncestors = new java.util.ArrayList<>();
+        int[] parentScrollY = new int[2];
+        String[] parentScrollState = new String[1];
+        runOnMainSync(() -> {
+            android.graphics.Rect parentScrollBounds = new android.graphics.Rect();
+            int[] parentScrollLocation = new int[2];
+            parentScroll.getGlobalVisibleRect(parentScrollBounds);
+            android.view.View rootView = parentScroll.getRootView();
+            int[] rootLocation = new int[2];
+            if (rootView != null) rootView.getLocationOnScreen(rootLocation);
+            parentScrollBounds.offset(rootLocation[0], rootLocation[1]);
+            parentScroll.getLocationOnScreen(parentScrollLocation);
+            parentScrollState[0] = "parentScrollState={enabled=" + parentScroll.isEnabled()
+                    + ", shown=" + parentScroll.isShown()
+                    + ", clickable=" + parentScroll.isClickable()
+                    + ", visibility=" + parentScroll.getVisibility()
+                    + ", locationOnScreen=(" + parentScrollLocation[0] + "," + parentScrollLocation[1] + ")"
+                    + ", visibleBounds=" + parentScrollBounds.toShortString()
+                    + ", height=" + parentScroll.getHeight()
+                    + ", childCount=" + parentScroll.getChildCount()
+                    + ", canScrollDown=" + parentScroll.canScrollVertically(1) + "}";
+            parentScrollY[0] = parentScroll.getScrollY();
+            attachTouchTraceListeners(view, "vertical-selector", selectorTrace, tracedViews);
+            android.view.ViewParent parent = view.getParent();
+            int ancestorIndex = 0;
+            while (parent instanceof android.view.View) {
+                android.view.View ancestor = (android.view.View) parent;
+                final String label = ancestor == parentScroll ? "parent-scroll"
+                        : "ancestor-" + ancestorIndex + "-" + ancestor.getClass().getSimpleName();
+                ancestor.setOnTouchListener((targetView, event) -> {
+                    appendTouchTrace(ancestorTrace, label, targetView, event);
+                    return false;
+                });
+                tracedAncestors.add(ancestor);
+                parent = ancestor.getParent();
+                ancestorIndex += 1;
+            }
+        });
+        try {
+            injectDrag(bounds.centerX(), startY, bounds.centerX(), endY);
+        } finally {
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+                for (android.view.View tracedAncestor : tracedAncestors) tracedAncestor.setOnTouchListener(null);
+                parentScrollY[1] = parentScroll.getScrollY();
+            });
+        }
+        String[] traces = new String[1];
+        runOnMainSync(() -> traces[0] = "selector=[" + selectorTrace + "] ancestors=[" + ancestorTrace + "]");
+        return parentScrollState[0] + " " + traces[0] + " start=(" + bounds.centerX() + "," + startY + ")"
+                + " end=(" + bounds.centerX() + "," + endY + ")"
+                + " parentScrollYBefore=" + parentScrollY[0]
+                + " parentScrollYAfter=" + parentScrollY[1];
+    }
+
+    private android.graphics.Rect stableVisibleBounds(android.view.View view) throws Exception {
+        android.graphics.Rect previous = null;
+        android.graphics.Rect current = new android.graphics.Rect();
+        int stableSamples = 0;
+        long deadline = android.os.SystemClock.uptimeMillis() + 2000L;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            android.graphics.Rect[] visible = {new android.graphics.Rect()};
+            int[] screenLocation = new int[2];
+            int[] size = new int[2];
+            runOnMainSync(() -> {
+                // getGlobalVisibleRect is used only to prove that the whole
+                // target is visible. Its root/window coordinate space can
+                // differ from UiAutomation's screen coordinate space when
+                // Android applies edge-to-edge/window insets. Inject using
+                // getLocationOnScreen, which is the coordinate space expected
+                // by UiAutomation, rather than translating the global rect.
+                view.getGlobalVisibleRect(visible[0]);
+                view.getLocationOnScreen(screenLocation);
+                size[0] = view.getWidth();
+                size[1] = view.getHeight();
+            });
+            if (size[0] > 0 && size[1] > 0
+                    && visible[0].width() >= size[0] && visible[0].height() >= size[1]) {
+                current.set(screenLocation[0], screenLocation[1],
+                        screenLocation[0] + size[0], screenLocation[1] + size[1]);
+            } else {
+                current.setEmpty();
+            }
+            if (current.width() > 0 && current.height() > 0
+                    && previous != null && current.equals(previous)) {
+                stableSamples++;
+                if (stableSamples >= 2) return current;
+            } else {
+                stableSamples = 0;
+            }
+            previous = new android.graphics.Rect(current);
+            android.os.SystemClock.sleep(50L);
+        }
+        throw new AssertionError("touch target screen bounds did not stabilize or were not fully visible: "
+                + current.toShortString());
+    }
+
+    private String describeTouchTarget(android.view.View view, android.graphics.Rect bounds) throws Exception {
+        int[] location = new int[2];
+        boolean[] state = new boolean[5];
+        String[] label = new String[1];
+        runOnMainSync(() -> {
+            view.getLocationOnScreen(location);
+            state[0] = view.isShown();
+            state[1] = view.isEnabled();
+            state[2] = view.isClickable();
+            state[3] = view.isAttachedToWindow();
+            state[4] = view.hasOnClickListeners();
+            if (view instanceof android.widget.TextView) {
+                CharSequence text = ((android.widget.TextView) view).getText();
+                label[0] = text == null ? "" : text.toString();
+            }
+        });
+        return "target=" + label[0] + " bounds=" + bounds.toShortString()
+                + " locationOnScreen=(" + location[0] + "," + location[1] + ")"
+                + " shown=" + state[0] + " enabled=" + state[1] + " clickable=" + state[2]
+                + " attached=" + state[3] + " hasClickListener=" + state[4];
     }
 
     private void injectDrag(float startX, float startY, float endX, float endY) throws Exception {
         long downTime = android.os.SystemClock.uptimeMillis();
-        injectPointerEvent(android.view.MotionEvent.ACTION_DOWN, downTime, downTime, startX, startY);
-        final int moveSteps = 5;
-        for (int step = 1; step <= moveSteps; step++) {
-            float progress = step / (float) moveSteps;
-            float x = startX + (endX - startX) * progress;
-            float y = startY + (endY - startY) * progress;
-            injectPointerEvent(android.view.MotionEvent.ACTION_MOVE, downTime,
-                    downTime + step * 50L, x, y);
+        injectTouchSequence(PlatformTouchSequence.swipe(startX, startY, endX, endY,
+                downTime, PlatformTouchSequence.DEFAULT_SWIPE_DURATION_MS), downTime);
+    }
+
+    private void injectTouchSequence(java.util.List<PlatformTouchSequence.Sample> samples,
+                                     long downTime) throws Exception {
+        android.app.UiAutomation automation = getUiAutomation();
+        boolean adoptedShellIdentity = false;
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            automation.adoptShellPermissionIdentity("android.permission.INJECT_EVENTS");
+            adoptedShellIdentity = true;
+            marker("touch injection adopted shell INJECT_EVENTS identity");
         }
-        injectPointerEvent(android.view.MotionEvent.ACTION_UP, downTime,
-                downTime + (moveSteps + 1) * 50L, endX, endY);
+        try {
+            for (PlatformTouchSequence.Sample sample : samples) {
+                long delayMs = PlatformTouchSequence.delayUntil(
+                        sample.eventTime, android.os.SystemClock.uptimeMillis());
+                if (delayMs > 0L) android.os.SystemClock.sleep(delayMs);
+                android.view.MotionEvent event = android.view.MotionEvent.obtain(
+                        downTime, sample.eventTime, sample.action, sample.x, sample.y, 0);
+                event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
+                // UiAutomation injects onto the default display; setDisplayId is hidden API.
+                try {
+                    boolean injected;
+                    if (android.os.Build.VERSION.SDK_INT >= 29) {
+                        injected = automation.injectInputEvent(event, true);
+                    } else {
+                        sendPointerSync(event);
+                        injected = true;
+                    }
+                    check(injected, "touch event was accepted by UiAutomation (action=" + sample.action
+                            + ", x=" + sample.x + ", y=" + sample.y + ")");
+                } finally {
+                    event.recycle();
+                }
+            }
+        } finally {
+            if (adoptedShellIdentity) automation.dropShellPermissionIdentity();
+        }
         waitForIdleSync();
     }
 
