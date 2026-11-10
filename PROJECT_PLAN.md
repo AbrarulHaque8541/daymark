@@ -805,3 +805,27 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6  
 Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
 Timestamp (UTC): 2026-11-09T02:36:57.068Z
+
+
+## Whole-project execution update — 2026-11-10T00:49:29.624Z
+
+This is a current execution record, not a replacement for the architecture plan above.
+
+- Current main: `1532838c78ab350b18f95e96a2c547ba384f0831`.
+- Current integration branch `integration/webhook-recovery-safe-main-20261109`, code head `4a3306d6ba13a4193c19b5acdbb7f17c27b091a8`, 149 ahead / 0 behind main.
+- Focus state/preset/recovery writes and Focus-category/Clear-All operations now share a Web Locks + generation contract. The destructive lock order is task → webhook delivery → webhook queue → Focus.
+- Exact code-head checks: Android CI PASS; Ubuntu and Windows contracts PASS; device-test APK PASS; Node suite 820 total / 819 passed / 1 skipped / 0 failed. Release publication skipped; physical device not tested.
+- No merge, release, tag, version, signing-key, application identity, or destructive migration changes.
+
+### Next whole-project queue
+
+1. #690 — define durable semantics after explicit Focus-backup clear; add suppression/rehydration tests and verify timer invalidation.
+2. #683 — add import/save/clear/recovery/undo races across tabs; keep Web Locks fail-closed.
+3. #613/#677 — fix API 36 Task Editor IME layout while retaining the strict Cancel interaction test.
+4. #646/#160 — required CI/independent review governance and physical Android acceptance.
+5. #671/#678 — complete secure download transport; redirect policy alone is not a downloader.
+6. #665/#84, #659/#687, #656, #676 — independent security, extension recovery, import/export and injection reviews.
+7. #685/#686 — Service Worker compatibility without weakening Offline enforcement.
+8. #684/#476 — align recurrence validation and scheduling contracts across Android and web.
+
+See [the latest dated engineering snapshot](docs/CURRENT_STATUS_20261110T004929Z.md) for exact PR heads, workflow run IDs, blockers and the complete 20-issue inventory.
