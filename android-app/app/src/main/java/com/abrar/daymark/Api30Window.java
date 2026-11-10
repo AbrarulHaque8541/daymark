@@ -41,13 +41,12 @@ final class Api30Window {
      * bounds), cap the dialog to the unobscured height, and shift its center by half of the
      * additional IME occlusion. Restore WRAP_CONTENT as soon as the IME is hidden.
      */
-    static void applyDialogImeInsets(Context activityContext, Window dialogWindow) {
+    static void applyDialogImeInsets(Context activityContext, Window dialogWindow, WindowInsets dialogInsets) {
         WindowManager manager = activityContext.getSystemService(WindowManager.class);
         if (manager == null) return;
         WindowMetrics metrics = manager.getCurrentWindowMetrics();
-        WindowInsets insets = metrics.getWindowInsets();
-        Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-        int imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom;
+        Insets bars = dialogInsets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+        int imeBottom = dialogInsets.getInsets(WindowInsets.Type.ime()).bottom;
         boolean imeVisible = WindowInsetsPolicy.shouldApplyImeInsets(imeBottom);
 
         View decor = dialogWindow.getDecorView();

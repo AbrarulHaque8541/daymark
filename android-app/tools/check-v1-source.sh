@@ -641,7 +641,7 @@ assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")
 task_editor_ime = re.search(r'private void configureDialogImeInsets\(Window dialogWindow\)\s*\{(.*?)\n    \}', activity, re.S)
 assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
 assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
-assert "Api30Window.applyDialogImeInsets(dialogWindow)" in task_editor_ime.group(1)
+assert "Api30Window.applyDialogImeInsets(MainActivity.this, dialogWindow, insets)" in task_editor_ime.group(1)
 api30_dialog_helper = (root / "app/src/main/java/com/abrar/daymark/Api30Window.java").read_text(encoding="utf-8")
 assert "Api30Window.applyDialogImeInsets(dialogWindow)" in task_editor_ime.group(1)
 assert "WindowInsetsPolicy.dialogHeightForIme(" in api30_dialog_helper
