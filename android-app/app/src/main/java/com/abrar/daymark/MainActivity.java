@@ -7815,7 +7815,7 @@ public final class MainActivity extends Activity {
         Api30Window.setDecorFits(dialogWindow, WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS);
         View dialogDecor = dialogWindow.getDecorView();
         dialogDecor.setOnApplyWindowInsetsListener((view, insets) -> {
-            Api30Window.applyDialogImeInsets(dialogWindow);
+            Api30Window.applyDialogImeInsets(MainActivity.this, dialogWindow);
             return insets;
         });
         dialogDecor.requestApplyInsets();

@@ -1,6 +1,7 @@
 package com.abrar.daymark;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.graphics.Insets;
 import android.view.Gravity;
 import android.view.View;
@@ -40,8 +41,8 @@ final class Api30Window {
      * bounds), cap the dialog to the unobscured height, and shift its center by half of the
      * additional IME occlusion. Restore WRAP_CONTENT as soon as the IME is hidden.
      */
-    static void applyDialogImeInsets(Window dialogWindow) {
-        WindowManager manager = dialogWindow.getContext().getSystemService(WindowManager.class);
+    static void applyDialogImeInsets(Context activityContext, Window dialogWindow) {
+        WindowManager manager = activityContext.getSystemService(WindowManager.class);
         if (manager == null) return;
         WindowMetrics metrics = manager.getCurrentWindowMetrics();
         WindowInsets insets = metrics.getWindowInsets();
