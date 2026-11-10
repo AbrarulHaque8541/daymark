@@ -9,6 +9,14 @@ const bootstrap = fs.readFileSync(
   path.join(__dirname, '..', 'android-app', 'app', 'src', 'main', 'assets', 'daymark-extension-spa.js'),
   'utf8'
 );
+const injectorSource = fs.readFileSync(
+  path.join(__dirname, '..', 'android-app', 'app', 'src', 'main', 'java', 'com', 'abrar', 'daymark', 'ExtensionInjector.java'),
+  'utf8'
+);
+const runtimeSource = fs.readFileSync(
+  path.join(__dirname, '..', 'android-app', 'app', 'src', 'main', 'java', 'com', 'abrar', 'daymark', 'ExtensionRuntime.java'),
+  'utf8'
+);
 const execute = new Function('window', 'document', 'config', 'return (' + bootstrap + ')(config);');
 
 function makeHarness(initialUrl) {
@@ -195,4 +203,12 @@ test('bootstrap does not install page-readable config, state, or SPA hooks', () 
   assert.doesNotMatch(bootstrap, /history\.(pushState|replaceState)/);
   assert.doesNotMatch(bootstrap, /MutationObserver|popstate|hashchange/);
   assert.match(bootstrap, /^\(function \(config\)/);
+});
+
+test('userscript duplicate suppression stays native and exposes no page-global pack registry', () => {
+  assert.doesNotMatch(injectorSource, /window\\.__daymarkRan/);
+  assert.match(runtimeSource, /userscriptsAppliedForCurrentDocument/);
+  assert.match(runtimeSource, /userscriptsAppliedForCurrentDocument\\s*=\\s*false/);
+  assert.match(runtimeSource, /if \\(userscriptsAppliedForCurrentDocument\\)/);
+  assert.match(runtimeSource, /ExtensionInjector\\.applyStyles\\(webView, url, matching\\)/);
 });
