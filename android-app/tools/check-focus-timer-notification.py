@@ -150,9 +150,10 @@ checks.extend([
      and switch_block.index("store.save(next") < switch_block.index("notifications.cancel();")
      < switch_block.index("publishOrCancel("),
      "paused task switch persists, cancels the old notification identity, then publishes the new task title"),
-    ("notificationIdentityChanged(restored, currentTaskTitle)" in restore_block
+    ("!notificationPublished" in restore_block
+     and "notificationIdentityChanged(restored, currentTaskTitle)" in restore_block
      and restore_block.index("notifications.cancel();") < restore_block.index("publishOrCancel("),
-     "restoring a different persisted task/title removes stale notification content before replacement"),
+     "first restore and changed persisted task/title remove stale notification content before replacement"),
     ("sameTaskTitle(this.currentTaskTitle, currentTaskTitle)" in refresh_block
      and refresh_block.index("notifications.cancel();") < refresh_block.index("publishOrCancel("),
      "a changed task title cancels stale content before the refreshed notification is published"),
