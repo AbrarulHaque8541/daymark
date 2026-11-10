@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const address = require('../browser-address-logic.js');
+globalThis.DaymarkBrowserAddress = address;
 const ui = require('../browser-intent-ui.js');
 const engine = require('../browser-intent-logic.js');
 
@@ -71,7 +73,8 @@ test('planning an intent:// link discloses the package and fallback', () => {
   doc.elements['browser-intent-form'].listeners.submit[0]({ preventDefault() {} });
   const lines = doc.elements['browser-intent-result'].children.slice(1).map((child) => child.textContent);
   assert.ok(lines.some((line) => line.indexOf('com.example.scan (pinned by the link)') !== -1));
-  assert.ok(lines.some((line) => line.indexOf('https://example.com/product') !== -1));
+  assert.ok(lines.some((line) => line.indexOf('fallback origin is https://example.com') !== -1));
+  assert.ok(!lines.some((line) => line.indexOf('/product') !== -1), 'fallback path is not echoed');
 });
 
 test('malformed and unknown links fail closed in the card too', () => {

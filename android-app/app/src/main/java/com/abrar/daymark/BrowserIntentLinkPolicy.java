@@ -1,6 +1,9 @@
 package com.abrar.daymark;
 import java.net.URI;
-import java.net.URLDecoder;
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
@@ -15,7 +18,7 @@ import java.util.regex.Pattern;
  * the validated URI; untrusted Intent objects are never launched directly.
  */
 final class BrowserIntentLinkPolicy {
-    private static final int MAX_INPUT_LENGTH = 4096;
+    private static final int MAX_INPUT_LENGTH = 2048;
     private static final Pattern SCHEME = Pattern.compile("[A-Za-z][A-Za-z0-9+.-]{0,63}");
     private static final Pattern PACKAGE = Pattern.compile(
             "[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+");
@@ -38,14 +41,47 @@ final class BrowserIntentLinkPolicy {
      * Percent-decode Android Intent URI metadata.
      * Intent metadata uses percent-encoding, not HTML form encoding, so a literal '+' must be preserved.
      */
+    private static int asciiHexValue(char value) {
+        if (value >= '0' && value <= '9') return value - '0';
+        if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+        if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+        return -1;
+    }
+
     private static String decodeIntentMetadata(String raw) {
         if (raw == null) return "";
-        try {
-            // Protect literal '+' before decoding so it is not treated as a space.
-            return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8.name());
-        } catch (Exception invalid) {
-            throw new IllegalArgumentException("Android app link metadata encoding is invalid.", invalid);
+        StringBuilder decoded = new StringBuilder(raw.length());
+        for (int index = 0; index < raw.length();) {
+            if (raw.charAt(index) != '%') {
+                // A literal '+' is data in an Intent URI, not form-encoded whitespace.
+                decoded.append(raw.charAt(index++));
+                continue;
+            }
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            while (index < raw.length() && raw.charAt(index) == '%') {
+                if (index + 2 >= raw.length()) {
+                    throw new IllegalArgumentException("Android app link metadata encoding is invalid.");
+                }
+                int high = asciiHexValue(raw.charAt(index + 1));
+                int low = asciiHexValue(raw.charAt(index + 2));
+                if (high < 0 || low < 0) {
+                    throw new IllegalArgumentException("Android app link metadata encoding is invalid.");
+                }
+                bytes.write((high << 4) | low);
+                index += 3;
+            }
+            try {
+                String chunk = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes.toByteArray())).toString();
+                decoded.append(chunk);
+            } catch (CharacterCodingException invalidUtf8) {
+                throw new IllegalArgumentException(
+                        "Android app link metadata encoding is invalid.", invalidUtf8);
+            }
         }
+        return decoded.toString();
     }
 
     static Decision parse(String value) {
@@ -66,7 +102,9 @@ final class BrowserIntentLinkPolicy {
             throw new IllegalArgumentException("Android app link address is invalid.", invalid);
         }
         if (!"intent".equalsIgnoreCase(baseUri.getScheme()) || baseUri.getHost() == null
-                || baseUri.getRawUserInfo() != null || baseUri.getRawFragment() != null) {
+                || baseUri.getRawUserInfo() != null || baseUri.getRawFragment() != null
+                || baseUri.getPort() == 0 || baseUri.getPort() > 65535
+                || hasExplicitEmptyPort(baseUri)) {
             throw new IllegalArgumentException("Android app link address is invalid.");
         }
 
@@ -121,7 +159,9 @@ final class BrowserIntentLinkPolicy {
             throw new IllegalArgumentException("Android app link target is invalid.", invalid);
         }
         if (targetUri.getScheme() == null || targetUri.getHost() == null
-                || targetUri.getRawUserInfo() != null || targetUri.getRawFragment() != null) {
+                || targetUri.getRawUserInfo() != null || targetUri.getRawFragment() != null
+                || targetUri.getPort() == 0 || targetUri.getPort() > 65535
+                || hasExplicitEmptyPort(targetUri)) {
             throw new IllegalArgumentException("Android app link target is invalid.");
         }
 
@@ -149,4 +189,19 @@ final class BrowserIntentLinkPolicy {
         }
         return new Decision(normalizedTarget, packageName, fallback);
     }
+    private static boolean hasExplicitEmptyPort(URI uri) {
+        String authority = uri.getRawAuthority();
+        if (authority == null) return false;
+        int userInfoEnd = authority.lastIndexOf('@');
+        if (userInfoEnd >= 0) authority = authority.substring(userInfoEnd + 1);
+        if (authority.startsWith("[")) {
+            int closingBracket = authority.indexOf(']');
+            return closingBracket >= 0 && closingBracket + 1 < authority.length()
+                    && authority.charAt(closingBracket + 1) == ':'
+                    && closingBracket + 2 == authority.length();
+        }
+        int colon = authority.lastIndexOf(':');
+        return colon >= 0 && colon == authority.length() - 1;
+    }
+
 }

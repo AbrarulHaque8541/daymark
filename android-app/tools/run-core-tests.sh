@@ -8,6 +8,7 @@ python3 "$ROOT/tools/check-task-template-source.py" "$ROOT"
 python3 "$ROOT/tools/check-splash-source.py" "$ROOT"
 python3 "$ROOT/tools/check-task-open-export.py" "$ROOT"
 python3 "$ROOT/tools/check-browser-provider-query.py" "$ROOT"
+python3 "$ROOT/tools/check-browser-intent-links.py" "$ROOT"
 javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/host-stubs/android/content/Context.java" \
   "$ROOT/tools/host-stubs/org/json/JSONObject.java" \
@@ -151,7 +152,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExternalLinkPolicySmoke
-java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke "$ROOT/../contracts/intent-uri-validation.tsv"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDownloadFilenamePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDownloadProgressSmoke
