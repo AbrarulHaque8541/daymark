@@ -8,6 +8,24 @@ activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read
 method = activity.split("private void showBrowserDownloadsDialog()", 1)[1].split(
     "private void queueBrowserDownload(", 1
 )[0]
+queue = activity.split("private void queueBrowserDownload(", 1)[1].split(
+    "private void exitBrowserFullscreen", 1
+)[0]
+assert "BrowserAddress.isAllowedWebUrl(url)" in queue, \
+    "the callback must still reject non-web schemes"
+assert "BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads())" in queue, \
+    "new browser downloads must fail closed in both Online and Offline modes"
+assert "showToast(decision.userMessage)" in queue, \
+    "the blocked download action must explain its current limitation"
+for forbidden in ("new DownloadManager.Request(", "manager.enqueue(", "CookieManager.getInstance().getCookie(url)", \
+                  'addRequestHeader("Cookie"'):
+    assert forbidden not in queue, f"new browser downloads must not reach DownloadManager: {forbidden}"
+assert "new DownloadManager.Request(" not in activity and "manager.enqueue(request)" not in activity, \
+    "MainActivity must not persist new browser download URLs/headers through DownloadManager"
+assert "BrowserDownloadEnqueueGate browserDownloadEnqueueGate" not in activity, \
+    "the removed legacy enqueue gate must not remain wired into Activity"
+assert "Download started for the selected media file" not in activity, \
+    "media selection must not claim a download started after the callback is blocked"
 
 for marker, explanation in (
     ("manager.query(new DownloadManager.Query())", "Downloads must be queried from the system provider"),
@@ -23,9 +41,6 @@ for marker, explanation in (
     ("manager.getUriForDownloadedFile(id)", "completed files must use the provider content URI"),
     ("Intent.FLAG_GRANT_READ_URI_PERMISSION", "file handoff must grant read-only access"),
     ("Intent.ACTION_VIEW", "completed files should open only after a user tap"),
-    ("BrowserAddress.isAllowedWebUrl(url)", "retry must validate the web URL before making a new request"),
-    ('setPositiveButton("Retry"', "retry must require explicit user confirmation"),
-    ("android.webkit.WebSettings.getDefaultUserAgent(this)", "retry must not inherit an unrelated tab's user agent"),
     ('setNeutralButton("Refresh"', "the list must offer refresh"),
 ):
     assert marker in method, explanation
@@ -34,6 +49,9 @@ assert "showBrowserDownloadsDialog();" in activity, "the overflow Downloads acti
 selection = activity.split("private void handleBrowserDownloadSelection", 1)[1].split(
     "private boolean isBrowserDownloadActive", 1
 )[0]
+assert "(retry unavailable)" in activity, "failed history rows must not promise a retry"
+assert 'setTitle("Retry download?")' not in selection, "failed rows must not offer a retry that always fails closed"
+assert "queueBrowserDownload(" not in selection, "failed history rows must not start a new network request"
 for marker, explanation in (
     ("DownloadManager.STATUS_PENDING", "queued downloads must expose cancellation"),
     ("DownloadManager.STATUS_RUNNING", "running downloads must expose cancellation"),
@@ -81,18 +99,16 @@ for marker, explanation in (
 provider_error_catch = active_check.index("catch (RuntimeException providerUnavailable)")
 assert "return false;" in active_check[provider_error_catch:provider_error_catch + 120], \
     "provider/query errors must fail closed without removing a file"
-normalized_activity = "".join(activity.split())
-assert (
-    "BrowserDownloadFilenamePolicy.sanitize(URLUtil.guessFileName(url,contentDisposition,mimeType))"
-    in normalized_activity
-), "download names derived from untrusted URL/Content-Disposition must be sanitized before use"
 assert "openDownloadsFolder()" not in activity, "Downloads must not be a generic document picker"
 assert "ACTION_OPEN_DOCUMENT" not in method, "the downloads list must not be implemented as a generic file picker"
-assert "No Daymark browser downloads are available yet." in method, "empty state must be explicit"
+assert "No Daymark browser downloads are available." in method, "empty state must be explicit"
+assert "Downloads are temporarily unavailable until Daymark can validate every redirect safely." in activity, \
+    "the media discovery dialog must disclose that download actions are currently blocked"
+assert "New browser downloads are temporarily blocked" in method, "empty state must disclose the fail-closed policy"
 assert "No compatible app could open this file." in method, "viewer handoff failure must be disclosed"
-print("PASS browser downloads source checks: status/progress, confirmed web retry, safe file handoff, refresh and empty/error states")
+print("PASS browser downloads source checks: bounded history, safe completed-file handoff/cancel, fail-closed new requests, refresh and truthful empty/error states")
 
-# Work by: ChatGPT
+# Work by: ChatGPT (OpenAI)
 # Model: GPT-6
-# Tooling: GitHub MCP tools
-# Timestamp (UTC): 2026-11-01T07:28:39Z
+# Tooling: GitHub connector via Code Mode; exact-main/#648 source comparison; fail-closed policy and source-guard integration
+# Timestamp (UTC): 2026-11-10T14:11:50.811Z
