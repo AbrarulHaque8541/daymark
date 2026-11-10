@@ -53,6 +53,14 @@ After a clean install, a later build can update in place only when it has the sa
 5. Wait for the workflow to create a draft; verify exact commit, package/version/target-SDK/signer assertions and the APK SHA-256. Test the exact draft APK on the owner device before manually publishing the draft. Never treat a successful workflow alone as release approval.
 6. Describe an update as in-place only for a compatible same-application-ID installation. For the current separate identity, do not promise replacement of the older app or automatic data transfer.
 
+## Workflow authorization guard — 2026-11-10
+
+The signed device-test release workflow now requires both `github.actor` and `github.triggering_actor` to equal the repository owner before the job that reads production signing secrets or the job that writes the prerelease can run. A matching tag that points to `main` is necessary, but is not by itself release authorization.
+
+The SLSA workflow permits manual dispatch for build-only validation. Its tag-triggered APK build and provenance-signing/release-upload job are owner-triggered only; the provenance job additionally requires a tag push whose commit is verified on `main`.
+
+This workflow-level actor gate does not replace repository tag protection or a protected production environment with required reviewers. The latest live repository inventory found no repository rulesets and main branch protection disabled; a repository administrator should configure tag-creation restrictions and any required production-environment reviewers in GitHub settings. No repository settings were changed by this engineering work.
+
 ## Debug vs. production
 
 | Build | Signature | Can update a production install? |
