@@ -1,6 +1,6 @@
 /* Daymark motion + tap efficiency layer.
  * Loaded after styles.css. Does not change palette, layout structure, or glass design.
- * Goals: instant press confirmation, battery-aware reduced motion, faster long lists.
+ * Goals: instant press confirmation, battery-aware reduced motion, faster long lists, accessible focus.
  */
 
 /* Battery + a11y: honor reduced motion; kill decorative infinite loops. */
@@ -45,8 +45,25 @@
   transform: scale(.92);
 }
 .task-row:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(24, 40, 48, .05);
+  transform: translateY(0) scale(.995);
+  box-shadow: 0 2px 10px rgba(24, 40, 48, .08);
+  background: rgba(22, 112, 95, .04);
+}
+
+/* Professional focus-visible for keyboard users (accent #16705f, no mouse focus ring). */
+.button:focus-visible,
+.tool-button:focus-visible,
+.icon-button:focus-visible,
+.filter-button:focus-visible,
+.date-chip:focus-visible,
+.task-row:focus-visible,
+.suggestion-item:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #16705f;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(22, 112, 95, .15);
 }
 
 /* Subtle accent-tinted glass edge on primary surfaces for professional depth. */
@@ -215,6 +232,12 @@
   .tool-button.is-busy::before {
     border-color: rgba(42, 143, 122, 0.35);
     border-top-color: #2a8f7a;
+  }
+  .button:focus-visible,
+  .tool-button:focus-visible,
+  input:focus-visible {
+    outline-color: #2a8f7a;
+    box-shadow: 0 0 0 4px rgba(42, 143, 122, .18);
   }
 }
 
