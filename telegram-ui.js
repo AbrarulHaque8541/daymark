@@ -16,6 +16,7 @@
     const formEl = element('telegram-form');
     const testEl = element('telegram-test');
     const clearEl = element('telegram-clear');
+    const sendEl = element('telegram-send');
     const lifecycleWindow = env.window || doc.defaultView || null;
     const observesPageLifecycle = lifecycleWindow
       && typeof lifecycleWindow.addEventListener === 'function'
@@ -23,6 +24,23 @@
     let busy = false;
     function status(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+    function setControlsBusy(isBusy) {
+      busy = isBusy;
+      const controls = [sendEl, testEl, clearEl];
+      for (const el of controls) {
+        if (!el) continue;
+        el.disabled = isBusy;
+        if (typeof el.setAttribute === 'function') {
+          el.setAttribute('aria-disabled', isBusy ? 'true' : 'false');
+        }
+      }
+      if (formEl && typeof formEl.setAttribute === 'function') {
+        formEl.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+      }
+      if (statusEl && typeof statusEl.setAttribute === 'function') {
+        statusEl.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+      }
     }
     function resolveStorage() {
       if (hasOwn.call(env, 'storage')) return env.storage;
@@ -100,13 +118,13 @@
       return inputs;
     }
     async function deliver(botToken, chatTarget, text) {
-      busy = true;
+      setControlsBusy(true);
       let result;
       try {
         result = await logicApi.sendTelegramMessage({ botToken, chatTarget, text }, networkDeps());
       } catch (error) {
         result = { ok: false, reason: 'The send attempt failed unexpectedly. Nothing was announced as sent.' };
-      } finally { busy = false; }
+      } finally { setControlsBusy(false); }
       return result;
     }
     async function onSend() {

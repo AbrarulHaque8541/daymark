@@ -13,12 +13,16 @@ function makeElement(tagName) {
     className: '',
     textContent: '',
     value: '',
+    disabled: false,
     children: [],
     listeners: {},
+    attrs: {},
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) { const i = el.children.indexOf(child); if (i !== -1) el.children.splice(i, 1); return child; },
     addEventListener(type, handler) { (el.listeners[type] = el.listeners[type] || []).push(handler); },
-    preventDefault() { el.prevented = true; }
+    preventDefault() { el.prevented = true; },
+    setAttribute(name, value) { el.attrs[name] = String(value); },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; }
   };
   Object.defineProperty(el, 'firstChild', { get() { return el.children.length ? el.children[0] : null; } });
   return el;
@@ -32,7 +36,7 @@ function makeDoc(ids) {
     createElement(tagName) { return makeElement(tagName); }
   };
 }
-const ALL_IDS = ['telegram-token', 'telegram-chat', 'telegram-status', 'telegram-form', 'telegram-test', 'telegram-clear'];
+const ALL_IDS = ['telegram-token', 'telegram-chat', 'telegram-status', 'telegram-form', 'telegram-test', 'telegram-clear', 'telegram-send'];
 const VALID_TOKEN = '123456789:AAEfiK0sdVHqWlsZb2t3rJpQ5vLmNoPqR4sT';
 function makeTask(title, options) {
   options = options || {};
@@ -360,4 +364,26 @@ test('index.html wires the Telegram card with a password token field', () => {
   assert.ok(indexSource.includes('src="telegram-logic.js"'), 'the logic script tag must exist');
   assert.ok(indexSource.includes('src="telegram-ui.js"'), 'the ui script tag must exist');
   assert.match(indexSource.match(/<input[^>]*id="telegram-token"[^>]*>/)[0], /type="password"/, 'the bot token input must be masked');
+});
+
+test('buttons are disabled and aria-busy is set while a send is in flight', async () => {
+  const doc = makeDoc(ALL_IDS);
+  let resolveFetch;
+  const fetchFn = makeFetch(() => new Promise((resolve) => { resolveFetch = resolve; }));
+  const storage = makeStorage({ 'daymark.tasks.v1': JSON.stringify([makeTask('ship the polish', { completed: true })]) });
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  const pending = handle.send();
+  // After starting, controls should be busy
+  assert.equal(doc.elements['telegram-send'].disabled, true);
+  assert.equal(doc.elements['telegram-test'].disabled, true);
+  assert.equal(doc.elements['telegram-clear'].disabled, true);
+  assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'true');
+  assert.equal(doc.elements['telegram-status'].getAttribute('aria-busy'), 'true');
+  resolveFetch({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 9 } }) });
+  await pending;
+  assert.equal(doc.elements['telegram-send'].disabled, false);
+  assert.equal(doc.elements['telegram-test'].disabled, false);
+  assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'false');
+  assert.match(doc.elements['telegram-status'].textContent, /Sent/);
 });
