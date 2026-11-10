@@ -7833,25 +7833,36 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+        int editorSoftInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                | (Build.VERSION.SDK_INT >= 30
+                        ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                        : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         Window dialogWindow = dialog.getWindow();
-        if (dialogWindow != null) {
-            if (Build.VERSION.SDK_INT >= 30) {
-                // Keep this floating form inside its window insets so its action panel can resize above the IME.
-                Api30Window.setDecorFits(dialogWindow, true);
-            }
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        }
+        if (dialogWindow != null) dialogWindow.setSoftInputMode(editorSoftInputMode);
         dialog.show();
-        // AlertDialog may apply its floating-window attributes during show(). Reapply the
-        // resize policy after the window is attached so the action buttons remain reachable
-        // above the IME on current Android releases (including target-SDK 36).
+        // API 30+ edge-to-edge windows must consume IME insets explicitly. ADJUST_NOTHING
+        // keeps the floating dialog stable while its decor padding moves the action panel
+        // above the keyboard; API 26-29 retain the platform resize behavior.
         Window shownDialogWindow = dialog.getWindow();
         if (shownDialogWindow != null) {
-            shownDialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            shownDialogWindow.setSoftInputMode(editorSoftInputMode);
+            if (Build.VERSION.SDK_INT >= 30) configureDialogImeInsets(shownDialogWindow);
         }
         titleInput.requestFocus();
+        if (Build.VERSION.SDK_INT >= 30 && shownDialogWindow != null) {
+            shownDialogWindow.getDecorView().requestApplyInsets();
+        }
+    }
+
+    private void configureDialogImeInsets(Window dialogWindow) {
+        if (Build.VERSION.SDK_INT < 30) return;
+        Api30Window.setDecorFits(dialogWindow, WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS);
+        View dialogDecor = dialogWindow.getDecorView();
+        dialogDecor.setOnApplyWindowInsetsListener((view, insets) -> {
+            Api30Window.applyInsets(view, insets, 0);
+            return insets;
+        });
+        dialogDecor.requestApplyInsets();
     }
 
     private void saveTaskFromEditor(AlertDialog dialog, Task editing, String normalized,
