@@ -61,7 +61,7 @@ function makeLockManager() {
   };
 }
 
-function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set(), focusApi = null) {
+function bootApp(storedValues, failWrites = new Set(), failExport = false, supportBlob = true, failReads = new Set(), focusApi = null, lockManager = makeLockManager()) {
   const elements = new Map();
 
   function element(selector) {
@@ -152,15 +152,24 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     addEventListener() {}
   };
   const animationFrames = [];
+  const windowListeners = new Map();
   const window = {
     DaymarkTaskMutation: mutation,
     DaymarkFocusMutation: focusMutation,
-    navigator: { locks: makeLockManager() },
+    navigator: { locks: lockManager },
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
     DaymarkFocus: focusApi,
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
-    addEventListener() {}
+    addEventListener(type, listener) {
+      const listeners = windowListeners.get(type) || [];
+      listeners.push(listener);
+      windowListeners.set(type, listeners);
+    },
+    dispatchEvent(event) {
+      (windowListeners.get(event.type) || []).forEach((listener) => listener(event));
+      return true;
+    }
   };
 
   vm.runInNewContext(APP_SOURCE, {
@@ -185,6 +194,8 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
 
   return {
     elements,
+    lockManager,
+    dispatchWindow(event) { return window.dispatchEvent(event); },
     settle() { return new Promise((resolve) => setImmediate(resolve)); },
     getLastBlob: () => lastBlob,
     getRevokedObjectUrls: () => revokedObjectUrls.slice(),
@@ -984,6 +995,61 @@ test('a Focus save succeeds but reports unknown when the recovery backup is unre
     'an unreadable backup does not falsely report that the primary save failed');
   assert.equal(storedValues.has(FOCUS_BACKUP_KEY), false,
     'the unreadable backup key is not recreated or overwritten');
+});
+
+
+test('same-tab Focus clear event invalidates the old session before a fresh session can save', async () => {
+  const oldSession = focusLogic.createSession({ kind: 'focus', durationMinutes: 25 }, Date.now());
+  const oldRaw = JSON.stringify({
+    session: focusLogic.serialize(oldSession),
+    log: [{ id: 'old-log', elapsedMs: 1000 }]
+  });
+  const storedValues = new Map([['daymark.focus.v1', oldRaw]]);
+  const locks = makeLockManager();
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic, locks);
+  await app.settle();
+
+  const storage = {
+    getItem(key) { return storedValues.has(key) ? storedValues.get(key) : null; },
+    setItem(key, value) { storedValues.set(key, String(value)); },
+    removeItem(key) { storedValues.delete(key); }
+  };
+  await focusMutation.withFocusMutationLock(locks, () => {
+    const generation = focusMutation.incrementFocusGeneration(storage);
+    assert.equal(generation.ok, true);
+    storage.removeItem('daymark.focus.v1');
+  });
+  app.dispatchWindow({ type: 'daymark:focus-storage-cleared', detail: { categoryId: 'focus' } });
+
+  await app.elements.get('#focus-start').dispatch('click');
+  const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
+  assert.notEqual(saved.session.id, oldSession.id, 'a new session, not the cleared in-memory session, is saved');
+  assert.deepEqual(saved.log, [], 'the cleared Focus history is not restored from stale memory');
+});
+
+test('same-tab Focus preset clear resets the in-memory preset before the next session', async () => {
+  const presetKey = 'daymark.focus.preset.v1';
+  const storedValues = new Map([[presetKey, JSON.stringify({ preset: 'long-break' })]]);
+  const locks = makeLockManager();
+  const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic, locks);
+  await app.settle();
+
+  const storage = {
+    getItem(key) { return storedValues.has(key) ? storedValues.get(key) : null; },
+    setItem(key, value) { storedValues.set(key, String(value)); },
+    removeItem(key) { storedValues.delete(key); }
+  };
+  await focusMutation.withFocusMutationLock(locks, () => {
+    const generation = focusMutation.incrementFocusGeneration(storage);
+    assert.equal(generation.ok, true);
+    storage.removeItem(presetKey);
+  });
+  app.dispatchWindow({ type: 'daymark:focus-storage-cleared', detail: { categoryId: 'focus-preset' } });
+
+  await app.elements.get('#focus-start').dispatch('click');
+  const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
+  assert.equal(saved.session.durationMs, focusLogic.presetMinutes('focus') * 60 * 1000);
+  assert.equal(storedValues.has(presetKey), false, 'the stale preset is not recreated');
 });
 
 test('duplicate keys in a Focus recovery envelope remain opaque and exportable', () => {
