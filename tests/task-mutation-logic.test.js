@@ -68,6 +68,16 @@ function commit(lockManager, storage, baseTasks, desiredTasks) {
   });
 }
 
+test('Clear All lock order places Focus after task and webhook locks', () => {
+  assert.equal(mutation.FOCUS_MUTATION_LOCK, 'daymark.focus.mutation.v1');
+  assert.deepEqual(mutation.CLEAR_ALL_LOCK_ORDER, [
+    mutation.TASK_MUTATION_LOCK,
+    mutation.WEBHOOK_DELIVERY_LOCK,
+    mutation.WEBHOOK_QUEUE_LOCK,
+    mutation.FOCUS_MUTATION_LOCK
+  ]);
+});
+
 test('concurrent additions from two tabs both survive the shared origin lock', async () => {
   const base = [makeTask('existing', 'Existing')];
   const storage = makeStorage(base);
