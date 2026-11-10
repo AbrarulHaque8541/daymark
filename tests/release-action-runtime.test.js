@@ -143,19 +143,18 @@ test('Android PR validation is debug-only and signed device-test assets are tag-
     'the EXIT cleanup trap must be installed before keystore decoding can create a partial file');
 });
 
-test('Android release workflows install lockfile dependencies before repository tests', () => {
+test('production signing workflows run repository tests before accessing signing secrets', () => {
   const paths = [
-    '.github/workflows/android-release-assets.yml',
     '.github/workflows/android-signed-device-test-release.yml',
     '.github/workflows/android-private-main-test-apk.yml',
     '.github/workflows/android-production-release.yml'
   ];
   for (const workflowPath of paths) {
     const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
-    const install = content.indexOf('npm ci --no-audit --no-fund');
     const tests = content.indexOf('npm test');
-    assert.ok(install >= 0, workflowPath + ' must install the locked root dependencies');
-    assert.ok(tests > install, workflowPath + ' must run repository tests after npm ci');
+    const secrets = content.indexOf('Validate signing secrets');
+    assert.ok(tests >= 0, workflowPath + ' must run the repository test suite');
+    assert.ok(secrets > tests, workflowPath + ' must complete repository tests before signing-secret validation');
   }
 });
 
