@@ -682,6 +682,7 @@
   function addTask(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    const submitBtn = form.querySelector('button[type="submit"], .add-button');
     const titleInput = $('#new-title');
     const rawTitle = titleInput.value.trim();
     const error = $('#add-error');
@@ -699,6 +700,11 @@
       titleInput.setAttribute('aria-invalid', 'true');
       titleInput.focus();
       return;
+    }
+    // Brief press/busy feedback for professional feel (instant local persist)
+    if (submitBtn) {
+      submitBtn.setAttribute('aria-busy', 'true');
+      submitBtn.disabled = true;
     }
     const now = new Date().toISOString();
     const dueDateValue = $('#new-due-date').value;
@@ -735,6 +741,13 @@
     render();
     titleInput.focus();
     showSaveResult(saved, tags ? 'Task added and tagged.' : 'Task added to your list.');
+    if (submitBtn) {
+      // Restore after brief visual feedback
+      setTimeout(() => {
+        submitBtn.removeAttribute('aria-busy');
+        submitBtn.disabled = false;
+      }, 180);
+    }
   }
 
   function openEditor(task) {

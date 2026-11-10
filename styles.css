@@ -863,3 +863,26 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Cycle A: enhanced professional press feedback for glass UI (accent #16705f) */
+.button:active,
+.tool-button:active,
+.filter-button:active,
+.icon-button:active,
+.complete-button:active {
+  transform: translateY(1px) scale(0.985);
+  transition-duration: 0.08s;
+}
+.button-primary:active {
+  box-shadow: 0 3px 8px rgba(22, 112, 95, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button:active,
+  .tool-button:active,
+  .filter-button:active,
+  .icon-button:active,
+  .complete-button:active,
+  .button-primary:active {
+    transform: none;
+  }
+}
