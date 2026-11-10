@@ -232,9 +232,8 @@ public final class BrowserDownloadBodyTransferSmoke {
                 "progress-listener exceptions do not interrupt a safe transfer");
     }
 
-    private static void fatalFailuresAbortAndPreserveError() throws Exception {
-        Target readFailure = new Target();
-        InputStream fatalInput = new InputStream() {
+    private static InputStream fatalInput() {
+        return new InputStream() {
             private boolean sent;
             @Override public int read() {
                 throw new AssertionError("synthetic fatal read");
@@ -248,14 +247,34 @@ public final class BrowserDownloadBodyTransferSmoke {
                 throw new AssertionError("synthetic fatal read");
             }
         };
+    }
+
+    private static void fatalFailuresAbortAndPreserveError() throws Exception {
+        Target readFailure = new Target();
         boolean readErrorPreserved = false;
         try {
-            transfer(200, null, null, fatalInput, 1024, () -> false, () -> true, readFailure, null);
+            transfer(200, null, null, fatalInput(), 1024, () -> false, () -> true, readFailure, null);
         } catch (AssertionError failure) {
             readErrorPreserved = "synthetic fatal read".equals(failure.getMessage());
         }
         check(readErrorPreserved && readFailure.commits == 0 && readFailure.aborts == 1,
                 "fatal stream errors preserve the original error and abort partial staging");
+
+        Target readCleanupFailure = new Target();
+        readCleanupFailure.failAbortError = true;
+        boolean readCleanupOriginalPreserved = false;
+        boolean readCleanupSuppressed = false;
+        try {
+            transfer(200, null, null, fatalInput(), 1024, () -> false, () -> true, readCleanupFailure, null);
+        } catch (AssertionError failure) {
+            readCleanupOriginalPreserved = "synthetic fatal read".equals(failure.getMessage());
+            Throwable[] suppressed = failure.getSuppressed();
+            readCleanupSuppressed = suppressed.length == 1
+                    && "synthetic fatal abort cleanup".equals(suppressed[0].getMessage());
+        }
+        check(readCleanupOriginalPreserved && readCleanupSuppressed
+                        && readCleanupFailure.commits == 0 && readCleanupFailure.aborts == 1,
+                "fatal abort errors are suppressed without replacing the original stream error");
 
         Target publishFailure = new Target();
         BrowserDownloadBodyTransfer.PublicationGate fatalGate = (cancellation, network, staging, copiedBytes) -> {
@@ -270,6 +289,23 @@ public final class BrowserDownloadBodyTransferSmoke {
         }
         check(publicationErrorPreserved && publishFailure.commits == 0 && publishFailure.aborts == 1,
                 "fatal publication errors preserve the original error and abort staged data");
+
+        Target publicationCleanupFailure = new Target();
+        publicationCleanupFailure.failAbortError = true;
+        boolean publicationCleanupOriginalPreserved = false;
+        boolean publicationCleanupSuppressed = false;
+        try {
+            transfer(200, null, null, new ByteArrayInputStream(new byte[]{1}), 1024,
+                    () -> false, () -> true, fatalGate, publicationCleanupFailure, null);
+        } catch (AssertionError failure) {
+            publicationCleanupOriginalPreserved = "synthetic fatal publication".equals(failure.getMessage());
+            Throwable[] suppressed = failure.getSuppressed();
+            publicationCleanupSuppressed = suppressed.length == 1
+                    && "synthetic fatal abort cleanup".equals(suppressed[0].getMessage());
+        }
+        check(publicationCleanupOriginalPreserved && publicationCleanupSuppressed
+                        && publicationCleanupFailure.commits == 0 && publicationCleanupFailure.aborts == 1,
+                "fatal abort errors are suppressed without replacing the original publication error");
     }
 
     private static void zeroLengthBodyIsValid() throws Exception {
@@ -359,6 +395,7 @@ public final class BrowserDownloadBodyTransferSmoke {
         boolean failOpen;
         boolean failCommit;
         boolean failAbort;
+        boolean failAbortError;
         boolean failWrite;
 
         @Override public OutputStream openStream() throws IOException {
@@ -387,6 +424,7 @@ public final class BrowserDownloadBodyTransferSmoke {
 
         @Override public void abort() throws IOException {
             aborts++;
+            if (failAbortError) throw new AssertionError("synthetic fatal abort cleanup");
             if (failAbort) throw new IOException("synthetic abort failure");
             bytes.reset();
         }

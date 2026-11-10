@@ -151,8 +151,8 @@ final class BrowserDownloadBodyTransfer {
         } catch (Error fatal) {
             try {
                 abortAfterFailure(target, committed);
-            } catch (TransferException cleanup) {
-                fatal.addSuppressed(cleanup);
+            } catch (Throwable cleanup) {
+                if (cleanup != fatal) fatal.addSuppressed(cleanup);
             }
             throw fatal;
         }
@@ -169,8 +169,8 @@ final class BrowserDownloadBodyTransfer {
         } catch (Error fatal) {
             try {
                 abortAfterFailure(target, committed);
-            } catch (TransferException cleanup) {
-                fatal.addSuppressed(cleanup);
+            } catch (Throwable cleanup) {
+                if (cleanup != fatal) fatal.addSuppressed(cleanup);
             }
             throw fatal;
         }
