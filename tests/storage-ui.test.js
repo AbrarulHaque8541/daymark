@@ -283,7 +283,7 @@ test('Clear All retains only the non-personal task and Focus generation counters
   await ui.attachStorageUi(env).onClearAll();
   assert.equal(storageData['daymark.tasks.v1'], undefined);
   assert.equal(storageData['daymark.focus.v1'], undefined);
-  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1:all');
   assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], '1');
 });
 
@@ -341,7 +341,7 @@ test('clearing only task recovery backups refreshes recovery status under the sh
   await handle.onClearCategory('task-backup');
   assert.equal(storageData['daymark.tasks.v1'], '[]', 'primary tasks remain untouched');
   assert.equal(storageData['daymark.tasks.v1.backup'], undefined, 'only the recovery backup is cleared');
-  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1', 'pending backup-maintenance writes are fenced');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1:task-backup', 'pending backup-maintenance writes are fenced');
   assert.equal(dispatched.length, 1);
   assert.equal(dispatched[0].key, null, 'the app reloads recovery metadata after backup removal');
 });
@@ -472,7 +472,7 @@ test('clearing one category asks for confirmation and removes only its keys', as
   assert.match(confirmations[0], /Clear Tasks\?/);
   assert.match(confirmations[0], /This cannot be undone/);
   assert.equal(storageData['daymark.tasks.v1'], undefined, 'the task data is removed');
-  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1', 'the task generation advances before removal');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1:tasks', 'the task generation advances before removal');
   assert.equal(storageData['daymark.tasks.v1.backup'], '[]', 'the recovery backup keeps its own category');
   assert.equal(storageData['daymark.webhook.v1'] !== undefined, true, 'webhook settings are untouched');
   assert.equal(dispatched.length, 1, 'same-tab task state is notified after the locked clear');
