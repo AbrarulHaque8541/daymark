@@ -1,3 +1,4 @@
+apps/desktop/test/download-policy.test.js
 apps/desktop/test/renderer-address-policy.test.js
 apps/desktop/test/request-policy.test.js
 apps/desktop/test/rules.test.js
