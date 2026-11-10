@@ -102,7 +102,7 @@ final class TaskLogic {
         }
     }
 
-    static boolean isValid(Task task)
+    static boolean isValid(Task task) {
         if (task == null || task.id == null || task.id.trim().isEmpty()
                 || task.title == null || task.title.trim().isEmpty() || task.title.length() > 160
                 || task.priority == null || !isPriority(task.priority)
