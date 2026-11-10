@@ -27,21 +27,28 @@
     try {
       const raw = storage.getItem(TASK_GENERATION_KEY);
       if (raw === null) return { ok: true, value: 0 };
-      if (typeof raw !== 'string' || !/^(0|[1-9][0-9]*)$/.test(raw)) return { ok: false, reason: 'generation-invalid' };
-      const value = Number(raw);
-      return Number.isSafeInteger(value) ? { ok: true, value } : { ok: false, reason: 'generation-invalid' };
+      const match = typeof raw === 'string'
+        ? /^(0|[1-9][0-9]*)(?::(tasks|task-backup|all))?$/.exec(raw) : null;
+      if (!match) return { ok: false, reason: 'generation-invalid' };
+      const value = Number(match[1]);
+      if (!Number.isSafeInteger(value)) return { ok: false, reason: 'generation-invalid' };
+      const result = { ok: true, value };
+      if (match[2]) result.reason = match[2];
+      return result;
     } catch (error) { return { ok: false, reason: 'generation-unreadable' }; }
   }
 
   // Call only while TASK_MUTATION_LOCK is held. This non-personal fence is
   // intentionally retained when user-data categories are cleared.
-  function incrementTaskGeneration(storage) {
+  function incrementTaskGeneration(storage, reason) {
     if (!storage || typeof storage.setItem !== 'function') return { ok: false, reason: 'storage-unavailable' };
+    if (reason !== undefined && reason !== null
+        && !['tasks', 'task-backup', 'all'].includes(reason)) return { ok: false, reason: 'generation-reason-invalid' };
     const current = readTaskGeneration(storage);
     if (!current.ok) return current;
     if (current.value >= Number.MAX_SAFE_INTEGER) return { ok: false, reason: 'generation-exhausted' };
     const value = current.value + 1;
-    try { storage.setItem(TASK_GENERATION_KEY, String(value)); return { ok: true, value }; }
+    try { storage.setItem(TASK_GENERATION_KEY, String(value) + (reason ? ':' + reason : '')); return { ok: true, value }; }
     catch (error) { return { ok: false, reason: 'generation-write-failed' }; }
   }
 
