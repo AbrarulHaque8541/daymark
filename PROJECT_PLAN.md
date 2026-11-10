@@ -13,7 +13,7 @@ Latest snapshot: [CURRENT_STATUS_20261110T135303Z.md](docs/CURRENT_STATUS_202611
 9. **P1 Service Worker (#704/#685):** six workflows PASS; retain Offline fail-closed and verify Online compatibility.
 10. **P1/P2 recurrence/Telegram/desktop/architecture (#684/#476/#700/#696/#691/#348/#325):** complete parity, real CORS/browser, desktop reproducibility/download race and architecture work.
 
-No release/tag/version/signer/applicationId change or destructive migration. Source identity remains `com.abrar.daymark`; run-level `com.cue.daymark` conflicts with AGENTS and #679, so no identity change pending explicit owner reconciliation.
+No release/tag/version/signer/applicationId change or destructive migration. Source identity remains `com.abrar.daymark`; run-level `the alternate application identifier specified by the run-level safety directive` conflicts with AGENTS and #679, so no identity change pending explicit owner reconciliation.
 
 ---
 
