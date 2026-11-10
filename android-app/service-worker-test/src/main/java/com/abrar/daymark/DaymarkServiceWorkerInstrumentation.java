@@ -427,6 +427,13 @@ public final class DaymarkServiceWorkerInstrumentation {
                     + "\"css\":\"" + unrelatedCss + "\"}";
             installPack.invoke(extensionStore, parsePack.invoke(null, matchingJson, false));
             installPack.invoke(extensionStore, parsePack.invoke(null, unrelatedJson, false));
+            // Imported user packs are intentionally disabled until the user enables them in the
+            // manager. The runtime fixture must exercise that explicit opt-in transition.
+            java.lang.reflect.Method setUserPackEnabled = storeType.getDeclaredMethod(
+                    "setUserPackEnabled", String.class, boolean.class);
+            setUserPackEnabled.setAccessible(true);
+            setUserPackEnabled.invoke(extensionStore, matchingPackId, true);
+            setUserPackEnabled.invoke(extensionStore, unrelatedPackId, true);
 
             Class<?> workspaceController = Class.forName(
                     "com.abrar.daymark.BrowserWorkspaceController", true, targetLoader);
