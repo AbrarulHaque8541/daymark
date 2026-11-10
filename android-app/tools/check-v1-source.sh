@@ -4,6 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
+sh ./tools/run-platform-instrumentation-repeat-tests.sh
 bash ./tools/run-gradle-with-retry-tests.sh
 python3 ./tools/check-ui-motion-wiring.py "$ROOT"
 sh ./tools/run-browser-address-notice-tests.sh
@@ -156,10 +157,17 @@ receiver_actions = {
     for intent_filter in receiver.findall("intent-filter")
     for action in intent_filter.findall("action")
 }
-assert receiver_actions == {
+allowed_receiver_actions = {
     "android.intent.action.BOOT_COMPLETED",
     "android.intent.action.QUICKBOOT_POWERON",
-}, "the boot receiver may listen only for boot-completion broadcasts"
+    "android.intent.action.TIME_SET",
+    "android.intent.action.TIMEZONE_CHANGED",
+}
+assert {"android.intent.action.BOOT_COMPLETED", "android.intent.action.QUICKBOOT_POWERON"}.issubset(
+    receiver_actions
+), "the reminder receiver must retain both supported boot-completion broadcasts"
+assert receiver_actions.issubset(allowed_receiver_actions), \
+    "the reminder receiver may listen only for boot and explicit system time/timezone changes"
 providers = app.findall("provider")
 assert len(providers) == 1, "only the grant-only attachment content provider is allowed"
 provider = providers[0]
@@ -629,6 +637,17 @@ assert "browserStatus.animate().alpha(0f).setDuration(180L)" in activity, \
 assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")' in activity, \
     "actionable failed-navigation status must remain available through the dedicated Retry button"
 
+# Task-editor dialogs must consume IME insets on edge-to-edge Android 11+ windows.
+task_editor_ime = re.search(r'private void configureDialogImeInsets\(Window dialogWindow\)\s*\{(.*?)\n    \}', activity, re.S)
+assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
+assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
+assert "Api30Window.applyInsets(view, insets, 0)" in task_editor_ime.group(1)
+assert "configureDialogImeInsets(shownDialogWindow)" in activity
+assert (
+    "SOFT_INPUT_ADJUST_NOTHING" in activity
+    and "SOFT_INPUT_ADJUST_RESIZE" in activity
+), "API 30+ dialogs must use explicit IME insets while API 26-29 retain resize behavior"
+
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
 # INTERNET for the browser and app clients (issue #45) — a stale summary that contradicted
@@ -651,6 +670,7 @@ python3 "$ROOT/tools/check-source-check-summary.py"
 
 python3 "$ROOT/tools/check-focus-timer-notification.py" "$ROOT"
 python3 "$ROOT/tools/check-focus-timer-ui.py"
+python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT"
 python3 "$ROOT/tools/check-merged-manifests.py" "$ROOT"
 python3 "$ROOT/tools/check-ci-test-honesty.py" "$ROOT/.."
 sh "$ROOT/tools/run-browser-download-list-tests.sh"
