@@ -10,6 +10,8 @@ on:
       - contracts/**
       - package.json
       - package-lock.json
+      - scripts/**
+      - tests/**
 
 permissions:
   contents: read
