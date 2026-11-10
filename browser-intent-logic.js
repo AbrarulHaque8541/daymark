@@ -200,6 +200,14 @@
     return host;
   }
 
+  function toAsciiUri(value) {
+    let output = '';
+    for (const character of String(value)) {
+      output += character.codePointAt(0) <= 0x7f ? character : encodeURIComponent(character);
+    }
+    return output;
+  }
+
   function normalizeIntentWebSuffix(suffix) {
     const fragmentIndex = suffix.indexOf('#');
     const beforeFragment = fragmentIndex < 0 ? suffix : suffix.slice(0, fragmentIndex);
@@ -225,7 +233,7 @@
       path = normalized.join('/');
     }
     try {
-      return encodeURI(path + query + fragment);
+      return toAsciiUri(path + query + fragment);
     } catch (error) {
       return null;
     }
@@ -356,7 +364,7 @@
     // structure; only HTTP(S) needs the full browser URL policy below.
     let targetUri;
     try {
-      targetUri = encodeURI(target);
+      targetUri = toAsciiUri(target);
     } catch (error) {
       return fail('the intent target URI is invalid');
     }
