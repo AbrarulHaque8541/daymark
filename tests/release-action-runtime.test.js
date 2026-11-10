@@ -427,3 +427,12 @@ test('private main test APK remains owner-gated and ciphertext-only', () => {
   assert.doesNotMatch(content, /id-token:\s*write/,
     'private APK transfer does not need an OIDC provenance token');
 });
+
+test('production release signing is tag-push-only and cannot be manually dispatched', () => {
+  const workflowPath = '.github/workflows/android-production-release.yml';
+  const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+  assert.match(content, /^on:\\s*\\n\\s+push:/m);
+  assert.match(content, /tags:\\s*\\['v\\*'\\]/);
+  assert.doesNotMatch(content, /^\\s+workflow_dispatch:/m);
+  assert.match(content, /if: startsWith\\(github\\.ref, 'refs\\/tags\\/v'\\)/);
+});
