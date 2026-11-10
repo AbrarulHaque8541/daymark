@@ -1048,7 +1048,7 @@ test('same-tab Focus preset clear resets the in-memory preset before the next se
 
   await app.elements.get('#focus-start').dispatch('click');
   const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
-  assert.equal(saved.session.durationMs, focusLogic.presetMinutes('focus') * 60 * 1000);
+  assert.equal(saved.session.durationMinutes, focusLogic.presetMinutes('focus'));
   assert.equal(storedValues.has(presetKey), false, 'the stale preset is not recreated');
 });
 
