@@ -33,7 +33,18 @@ for expression in (
     "allows(false, false)",
 ):
     assert expression in smoke, f"missing frame/gesture truth-table regression: {expression}"
-assert "BrowserIntentHandoffPolicySmoke" in core_runner, "canonical host test runner must execute intent handoff regressions"
+compile_start = core_runner.index('javac -encoding UTF-8 --release 17 -d "$BUILD_DIR"')
+compile_end = core_runner.index('java -ea -cp "$BUILD_DIR" com.abrar.daymark.SharedAttachmentPolicySmoke', compile_start)
+compile_block = core_runner[compile_start:compile_end]
+assert '"$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentHandoffPolicy.java"' in compile_block, (
+    "canonical host compile must include the intent handoff policy source"
+)
+assert '"$ROOT/tools/BrowserIntentHandoffPolicySmoke.java"' in compile_block, (
+    "canonical host compile must include the intent handoff smoke source before executing it"
+)
+assert "java -ea -cp \"$BUILD_DIR\" com.abrar.daymark.BrowserIntentHandoffPolicySmoke" in core_runner, (
+    "canonical host runner must execute the compiled intent handoff regression"
+)
 assert "check-browser-intent-handoff.py" in source_guard, "canonical source guard must execute this wiring check"
 
 print("PASS Android intent handoff boundary: main-frame + user gesture required; all four combinations covered")
