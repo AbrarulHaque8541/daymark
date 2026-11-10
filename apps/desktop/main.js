@@ -1,13 +1,16 @@
 'use strict';
 
 const { app, session, BrowserWindow } = require('electron');
+const fs = require('fs');
 const path = require('path');
+const { createDownloadPath, reservationKey } = require('./lib/download-policy');
 const { pathToFileURL } = require('url');
 const { isAllowedUrl } = require('./lib/rules');
 const { isAllowedRequest, isTrackerRequest } = require('./lib/request-policy');
 const { installWebviewPopupPolicy } = require('./lib/webview-popup-policy');
 
 let mainWindow = null;
+const reservedDownloadPaths = new Set();
 const rendererDir = path.join(__dirname, 'renderer');
 const appUiFiles = new Set(['index.html', 'app.js', 'style.css'].map((name) =>
   pathToFileURL(path.join(rendererDir, name)).href,
@@ -64,15 +67,37 @@ app.whenReady().then(() => {
     callback({ requestHeaders: details.requestHeaders });
   });
 
-  // Downloads land in the OS downloads folder.
+  // Remote filenames are untrusted. Allocate a unique basename directly in
+  // Downloads and cancel if the safe destination cannot be established.
   ses.on('will-download', (event, item) => {
+    let savePath = null;
     try {
-      item.setSavePath(path.join(app.getPath('downloads'), item.getFilename()));
+      savePath = createDownloadPath(
+        app.getPath('downloads'),
+        item.getFilename(),
+        (candidate) => {
+          try {
+            fs.lstatSync(candidate); // lstat also treats dangling symlinks as occupied.
+            return true;
+          } catch (error) {
+            if (error && error.code === 'ENOENT') return false;
+            throw error;
+          }
+        },
+        reservedDownloadPaths,
+      );
+      item.once('done', () => reservedDownloadPaths.delete(reservationKey(savePath)));
+      item.setSavePath(savePath);
       if (mainWindow) {
-        mainWindow.webContents.send('download-started', item.getFilename());
+        try {
+          mainWindow.webContents.send('download-started', path.basename(savePath));
+        } catch {
+          // A closed renderer must not change the already-safe download destination.
+        }
       }
     } catch {
-      // fall back to Electron's default download behaviour
+      if (savePath) reservedDownloadPaths.delete(reservationKey(savePath));
+      try { event.preventDefault(); } catch { /* fail closed even if the event is already gone */ }
     }
   });
 
