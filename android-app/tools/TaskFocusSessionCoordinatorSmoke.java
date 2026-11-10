@@ -16,6 +16,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         failedPausedTaskSwitchLeavesOriginalSessionUntouched();
         anActiveSessionCannotBeReplaced();
         processRestorePublishesOnlyAnExistingRunningSession();
+        restoreLoadedSnapshotUsesCallerResolvedRecord();
         aMissingTaskClearsOnlyTheFocusRecord();
         expiredAndUnknownBootRestoresFailClosed();
         failedNotificationPublicationCancelsPriorVisibleState();
@@ -225,6 +226,30 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check(paused.notificationPublished && pausedAfterDeath.notifications.active
                         && pausedAfterDeath.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
                 "a restored paused session republishes its Resume/Finish notification");
+    }
+
+    private static void restoreLoadedSnapshotUsesCallerResolvedRecord() throws Exception {
+        Fixture writer = new Fixture();
+        writer.initializeWithoutSession();
+        writer.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0);
+        writer.coordinator.pauseFromUserAction();
+        writer.clock.advance(500L);
+        TaskFocusTimer latest = writer.store.load(
+                writer.clock.elapsed, writer.clock.wall, writer.clock.boot);
+        writer.store.events.clear();
+
+        Fixture staleRuntime = new Fixture(writer.clock, writer.store);
+        TaskFocusSessionCoordinator.Snapshot adopted = staleRuntime.coordinator
+                .restoreLoadedSnapshot(latest, "task-a", "Renamed task A");
+        check(adopted != null && adopted.isPaused()
+                        && "task-a".equals(adopted.timer.taskId()),
+                "a stale runtime adopts the already-resolved latest durable focus record");
+        check("Renamed task A".equals(staleRuntime.notifications.lastTitle)
+                        && staleRuntime.notifications.active,
+                "the adopted record publishes the current task title, not a cached title");
+        check(writer.store.events.isEmpty(),
+                "adopting a caller-loaded snapshot does not perform a second racy storage read or write");
     }
 
     private static void aMissingTaskClearsOnlyTheFocusRecord() throws Exception {
