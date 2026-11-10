@@ -23,6 +23,8 @@ permissions:
 jobs:
   build:
     name: Build the real APK and hash it
+    # Manual dispatch remains build-only; only the owner may trigger tag builds.
+    if: github.event_name != 'push' || (github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -73,7 +75,7 @@ jobs:
   provenance:
     # Manual dispatch is build-only. Signed provenance and release-asset upload
     # are permitted only for a tag push whose commit was verified on main above.
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'
     needs: [build]
     permissions:
       actions: read   # To read the workflow path.
