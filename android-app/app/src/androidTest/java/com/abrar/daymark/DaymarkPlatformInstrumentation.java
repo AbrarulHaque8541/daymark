@@ -534,9 +534,27 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         String target = describeTouchTarget(view, bounds);
         float x = bounds.centerX();
         float y = bounds.centerY();
+        StringBuilder touchTrace = new StringBuilder();
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        android.view.View modeSelector = findAncestorWithSimpleName(view, "ModeSelector");
+        android.widget.ScrollView parentScroll = modeSelector == null
+                ? null : findParentScrollView(modeSelector);
+        android.view.View traceRoot = parentScroll != null ? parentScroll
+                : modeSelector != null ? modeSelector : view;
+        runOnMainSync(() -> attachTouchTraceListeners(traceRoot, "tap", touchTrace, tracedViews));
         long downTime = android.os.SystemClock.uptimeMillis();
-        injectTouchSequence(PlatformTouchSequence.tap(x, y, downTime), downTime);
-        return target + " tapCenter=(" + x + "," + y + ") source=UiAutomation/finger";
+        try {
+            injectTouchSequence(PlatformTouchSequence.tap(x, y, downTime), downTime);
+            waitForIdleSync();
+        } finally {
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+            });
+        }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        return target + " tapCenter=(" + x + "," + y + ") source=UiAutomation/finger"
+                + " events=[" + capturedTouchTrace[0] + "]";
     }
 
     private String dispatchSwipe(android.view.View view, boolean left) throws Exception {
