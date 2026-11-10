@@ -1,0 +1,16 @@
+/* Cycle B polish — consistent press feedback (additive; does not replace styles.css) */
+.date-chip:active,
+.filter-button:active,
+.tool-button:active,
+.icon-button:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .date-chip:active,
+  .filter-button:active,
+  .tool-button:active,
+  .icon-button:active {
+    transform: none;
+  }
+}
