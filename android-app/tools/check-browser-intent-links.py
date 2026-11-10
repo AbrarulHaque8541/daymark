@@ -17,12 +17,14 @@ for token in ('value.startsWith("intent://")', '"#Intent;"', 'value.endsWith(";e
               'BrowserAddress.requireAllowedWebUrl(fallback)',
               'decodeIntentMetadata(raw)',
               'decoded.append(raw.charAt(index++))',
+              'asciiHexValue(raw.charAt(index + 1))',
+              'asciiHexValue(raw.charAt(index + 2))',
               'CodingErrorAction.REPORT',
               'MAX_INPUT_LENGTH = 2048',
               'hasExplicitEmptyPort(baseUri)',
               'hasExplicitEmptyPort(targetUri)'):
     assert token in policy, f"Intent URI parser missing {token}"
-for forbidden in ('"component".equals(key)', '"selector".equals(key)',
+for forbidden in ('Character.digit(', '"component".equals(key)', '"selector".equals(key)',
                   '"launchFlags".equals(key)', '"S.".equals(key)'):
     assert forbidden not in policy, f"Intent URI parser must not accept {forbidden}"
 

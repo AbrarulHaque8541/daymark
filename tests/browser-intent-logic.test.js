@@ -182,3 +182,12 @@ test('shared Android/web Intent URI contract fixture stays in parity', () => {
     }
   }
 });
+
+test('non-ASCII fullwidth hex digits are rejected in percent escapes', () => {
+  const input = 'intent://scan/#Intent;scheme=%７Ａ;end';
+  const parsed = engine.parseIntentUri(input);
+  assert.equal(parsed.ok, false);
+  const plan = engine.planIntentHandoff(input);
+  assert.equal(plan.verdict, 'refused');
+  assert.equal(plan.kind, 'malformed');
+});

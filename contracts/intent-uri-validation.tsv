@@ -46,3 +46,4 @@ valid-http-target-dot-segments	accept	intent://example.com/a/../b#Intent;scheme=
 valid-custom-unicode-path	accept	intent://scan.example/straße#Intent;scheme=zxing;end	zxing://scan.example/stra%C3%9Fe	
 valid-http-default-port	accept	intent://example.com:443/#Intent;scheme=https;end	https://example.com:443/	
 valid-idn-fallback	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fm%C3%BCnchen.de%2Fstra%C3%9Fe;end	https://example.com/	https://xn--mnchen-3ya.de/stra%C3%9Fe
+reject-non-ascii-percent-hex	reject	intent://scan/#Intent;scheme=%７Ａ;end		

@@ -41,6 +41,13 @@ final class BrowserIntentLinkPolicy {
      * Percent-decode Android Intent URI metadata.
      * Intent metadata uses percent-encoding, not HTML form encoding, so a literal '+' must be preserved.
      */
+    private static int asciiHexValue(char value) {
+        if (value >= '0' && value <= '9') return value - '0';
+        if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+        if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+        return -1;
+    }
+
     private static String decodeIntentMetadata(String raw) {
         if (raw == null) return "";
         StringBuilder decoded = new StringBuilder(raw.length());
@@ -55,8 +62,8 @@ final class BrowserIntentLinkPolicy {
                 if (index + 2 >= raw.length()) {
                     throw new IllegalArgumentException("Android app link metadata encoding is invalid.");
                 }
-                int high = Character.digit(raw.charAt(index + 1), 16);
-                int low = Character.digit(raw.charAt(index + 2), 16);
+                int high = asciiHexValue(raw.charAt(index + 1));
+                int low = asciiHexValue(raw.charAt(index + 2));
                 if (high < 0 || low < 0) {
                     throw new IllegalArgumentException("Android app link metadata encoding is invalid.");
                 }
