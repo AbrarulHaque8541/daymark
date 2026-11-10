@@ -527,6 +527,60 @@ test('duplicate-key task storage blocks import before reading the selected file'
   assert.match(status.textContent, /duplicate JSON keys/);
 });
 
+test('an import started before Clear All cannot recreate the cleared task list', async () => {
+  const original = JSON.stringify(sampleTasks);
+  const csv = exporter.toCsv([
+    { id: 'stale-import', title: 'Must remain cleared', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  let resolveText;
+  let markReadStarted;
+  const readStarted = new Promise((resolve) => { markReadStarted = resolve; });
+  const file = {
+    name: 'tasks.csv',
+    size: csv.length,
+    text: () => new Promise((resolve) => { resolveText = resolve; markReadStarted(); })
+  };
+  const { env, elements, storageData, storage, writes, dispatched, created, locks } = fakeEnv({
+    stored: original,
+    files: [file]
+  });
+  const pending = ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  await readStarted;
+  await mutation.withTaskMutationLock(locks, () => {
+    const generation = mutation.incrementTaskGeneration(storage);
+    assert.deepEqual(generation, { ok: true, value: 1 });
+    storage.removeItem(ui.STORAGE_KEY);
+  });
+  writes.length = 0;
+  resolveText(csv);
+  await pending;
+
+  assert.equal(storageData[ui.STORAGE_KEY], undefined,
+    'the file selected before Clear All cannot recreate the task key');
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1');
+  assert.equal(writes.length, 0, 'a stale import performs no task write');
+  assert.equal(dispatched.length, 0, 'a rejected import does not announce a save');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /Tasks were cleared while this file was being read/);
+});
+
+test('a fresh import using the retained post-clear generation succeeds', async () => {
+  const csv = exporter.toCsv([
+    { id: 'fresh-import', title: 'Fresh after clear', dueDate: null, priority: 'medium',
+      completed: false, createdAt: NOW, updatedAt: NOW, notes: '', repeat: null, tags: [], subtasks: [] }
+  ], { generatedAt: NOW });
+  const { env, elements, storageData, created } = fakeEnv({
+    storageData: { [mutation.TASK_GENERATION_KEY]: '1' },
+    files: [csvFile(csv)]
+  });
+  await ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
+  assert.deepEqual(JSON.parse(storageData[ui.STORAGE_KEY]).map((task) => task.id), ['fresh-import']);
+  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1');
+  assert.match(created.find((el) => el.id === 'import-status').textContent,
+    /Imported 1 task/);
+});
+
 test('production HTML loads the shared task coordinator before app and import UI', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const coordinatorAt = html.indexOf('task-mutation-logic.js');
