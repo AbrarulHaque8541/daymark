@@ -116,11 +116,30 @@ final class TaskFocusSessionCoordinator {
         try {
             restored = store.load(now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         } catch (Exception failure) {
-            notifications.cancel();
-            resetMemory(false);
-            throw failure;
+            return restoreLoadFailure(failure);
         }
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, now);
+    }
 
+    /**
+     * Adopts a focus record already loaded and resolved against the caller's current task snapshot.
+     * This prevents a second store read from observing a different task ID than the one whose title
+     * was resolved by the caller.
+     */
+    synchronized Snapshot restoreLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
+                                                 String currentTaskTitle) throws Exception {
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, readClock());
+    }
+
+    /** Clears stale in-memory/notification state when the runtime cannot read the durable record. */
+    synchronized Snapshot restoreLoadFailure(Exception failure) throws Exception {
+        notifications.cancel();
+        resetMemory(false);
+        throw failure;
+    }
+
+    private Snapshot restoreLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
+                                           String currentTaskTitle, ClockReading now) throws Exception {
         if (restored == null) {
             notifications.cancel();
             resetMemory(true);
@@ -152,7 +171,6 @@ final class TaskFocusSessionCoordinator {
         }
         return snapshot(true);
     }
-
     synchronized Snapshot pauseFromUserAction() throws Exception {
         requireInitialized();
         requireCurrent();
