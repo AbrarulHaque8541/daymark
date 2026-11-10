@@ -43,7 +43,7 @@ function makeStaging(options = {}) {
       calls.cleaned.push(staged);
       if (options.cleanupThrows) throw new Error('staging cleanup failed');
     },
-    onFailed() { calls.failed.push(true); },
+    onFailed(filename) { calls.failed.push(filename); },
     onCleanupError() { calls.cleanupErrors.push(true); },
   };
 }
