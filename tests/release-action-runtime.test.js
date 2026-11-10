@@ -1,7 +1,11 @@
+'use strict';
+
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
+
+const root = path.resolve(__dirname, '..');
 
 const PINNED_NODE24_ACTIONS = {
   'actions/checkout': {
@@ -30,6 +34,11 @@ const WORKFLOWS = {
   '.github/workflows/android-release-assets.yml': [
     'actions/checkout',
     'actions/setup-java',
+    'android-actions/setup-android'
+  ],
+  '.github/workflows/android-signed-device-test-release.yml': [
+    'actions/checkout',
+    'actions/setup-java',
     'android-actions/setup-android',
     'actions/upload-artifact',
     'actions/download-artifact'
@@ -49,9 +58,24 @@ const WORKFLOWS = {
   ]
 };
 
-test('release and provenance build workflows pin Node 24 actions to immutable commits', () => {
+function listWorkflowFiles() {
+  const directory = path.join(root, '.github', 'workflows');
+  return fs.readdirSync(directory)
+    .filter((name) => /\.(?:yml|yaml)$/i.test(name))
+    .sort()
+    .map((name) => ({
+      path: '.github/workflows/' + name,
+      content: fs.readFileSync(path.join(directory, name), 'utf8')
+    }));
+}
+
+function hasPullRequestTrigger(content) {
+  return /^\s*pull_request(?:_target)?:\s*(?:#.*)?$/m.test(content);
+}
+
+test('release and provenance workflows pin Node 24 actions to immutable commits', () => {
   for (const [workflowPath, expectedActions] of Object.entries(WORKFLOWS)) {
-    const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
+    const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
     const uses = content.split(/\r?\n/)
       .map((line) => line.match(/^\s*uses:\s*([^\s#]+)(?:\s+#\s*(.*))?$/))
       .filter(Boolean)
@@ -70,66 +94,58 @@ test('release and provenance build workflows pin Node 24 actions to immutable co
   }
 });
 
+test('every pull-request workflow is free of repository secrets and signed Gradle variants', () => {
+  const workflows = listWorkflowFiles().filter((item) => hasPullRequestTrigger(item.content));
+  assert.ok(workflows.length > 0, 'the repository must retain pull-request CI workflows');
+  assert.ok(workflows.some((item) => item.path === '.github/workflows/android-release-assets.yml'),
+    'the unsigned Android PR validation workflow must remain registered');
 
-test('pull-request device-test builds never receive production signing secrets', () => {
-  const workflowPath = '.github/workflows/android-release-assets.yml';
-  const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
-  const lines = content.split(/\r?\n/);
-
-  function stepBlock(name) {
-    const start = lines.findIndex((line) => line.trim() === '- name: ' + name);
-    assert.equal(start >= 0, true, 'missing workflow step: ' + name);
-    let end = lines.length;
-    for (let index = start + 1; index < lines.length; index += 1) {
-      if (/^      - name: /.test(lines[index])) {
-        end = index;
-        break;
-      }
-    }
-    return { start, end, text: lines.slice(start, end).join('\n') };
+  for (const workflow of workflows) {
+    assert.doesNotMatch(workflow.content, /\$\{\{\s*secrets\./,
+      workflow.path + ' must not expose repository secrets to pull-request-controlled code');
+    assert.doesNotMatch(workflow.content, /\b(?:assemble|bundle)[A-Za-z0-9]*Release\b/,
+      workflow.path + ' must not build signed/release Gradle variants');
   }
-
-  const validation = stepBlock('Validate required release secrets');
-  const debug = stepBlock('Build and check both unsigned debug flavors');
-  const signed = stepBlock('Build and check both signed release flavors');
-
-  assert.match(validation.text, /if: github.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
-  assert.match(debug.text, /if: \$\{\{ github\.event_name != 'push' \|\| !startsWith\(github\.ref, 'refs\/tags\/'\) \}\}/);
-  assert.equal(debug.text.includes('secrets.'), false,
-    'the pull-request debug step must not receive production secrets');
-  assert.match(debug.text, /assembleGithubSideloadDebug/);
-  assert.match(debug.text, /assemblePlayDebug/);
-
-  assert.match(signed.text, /if: \$\{\{ github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\) \}\}/);
-  assert.equal(signed.text.includes('secrets.KEYSTORE_BASE64'), true);
-  assert.match(signed.text, /trap .*release\.keystore.* EXIT/);
-  const cleanupTrap = signed.text.indexOf("trap 'rm -f");
-  const keystoreDecode = signed.text.indexOf('base64 -d > "$RUNNER_TEMP/release.keystore"');
-  assert.ok(cleanupTrap >= 0 && cleanupTrap < keystoreDecode,
-    'the EXIT cleanup trap must be installed before keystore decoding can create a partial file');
-  assert.match(signed.text, /assembleGithubSideloadRelease/);
-  assert.match(signed.text, /assemblePlayRelease/);
-
-  const allowedSecretBlocks = new Set();
-  for (let index = validation.start; index < validation.end; index += 1) allowedSecretBlocks.add(index);
-  for (let index = signed.start; index < signed.end; index += 1) allowedSecretBlocks.add(index);
-  const secretLines = lines.map((line, index) => line.includes('${{ secrets.') ? index : -1).filter((index) => index >= 0);
-  assert.equal(secretLines.length, 8, 'only the two tag-gated steps may reference the four signing secrets');
-  for (const index of secretLines) {
-    assert.equal(allowedSecretBlocks.has(index), true,
-      'signing secret reference outside a tag-gated step at line ' + (index + 1));
-  }
-
-  const publishStart = lines.findIndex((line) => line.trim() === 'publish-release:');
-  assert.equal(publishStart >= 0, true, 'missing publish-release job');
-  assert.match(lines.slice(publishStart, publishStart + 8).join('\n'),
-    /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
 });
 
+test('Android PR validation is debug-only and signed device-test assets are tag-only', () => {
+  const prPath = '.github/workflows/android-release-assets.yml';
+  const tagPath = '.github/workflows/android-signed-device-test-release.yml';
+  const prWorkflow = fs.readFileSync(path.join(root, prPath), 'utf8');
+  const tagWorkflow = fs.readFileSync(path.join(root, tagPath), 'utf8');
+
+  assert.match(prWorkflow, /^\s*pull_request:/m);
+  assert.doesNotMatch(prWorkflow, /^\s*push:/m);
+  assert.doesNotMatch(prWorkflow, /\$\{\{\s*secrets\./);
+  assert.match(prWorkflow, /assembleGithubSideloadDebug/);
+  assert.match(prWorkflow, /assemblePlayDebug/);
+  assert.doesNotMatch(prWorkflow, /\b(?:assemble|bundle)[A-Za-z0-9]*Release\b/);
+
+  assert.match(tagWorkflow, /^\s*push:/m);
+  assert.match(tagWorkflow, /tags:\s*\n\s+- ['"]v\*-device-test\.\*['"]/);
+  assert.doesNotMatch(tagWorkflow, /^\s*pull_request:/m);
+  assert.doesNotMatch(tagWorkflow, /^\s*workflow_dispatch:/m);
+  assert.match(tagWorkflow, /\$\{\{\s*secrets\.KEYSTORE_BASE64\s*\}\}/);
+  assert.match(tagWorkflow, /\$\{\{\s*secrets\.KEYSTORE_PASSWORD\s*\}\}/);
+  assert.match(tagWorkflow, /\$\{\{\s*secrets\.KEY_ALIAS\s*\}\}/);
+  assert.match(tagWorkflow, /\$\{\{\s*secrets\.KEY_PASSWORD\s*\}\}/);
+  assert.match(tagWorkflow, /Verify exact tag commit is on main/);
+  assert.match(tagWorkflow, /git merge-base --is-ancestor "\$GITHUB_SHA" refs\/remotes\/origin\/main/);
+  assert.match(tagWorkflow, /Build and check both signed release flavors/);
+  assert.match(tagWorkflow, /assembleGithubSideloadRelease/);
+  assert.match(tagWorkflow, /assemblePlayRelease/);
+  assert.match(tagWorkflow, /publish-release:/);
+  assert.match(tagWorkflow, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
+
+  const cleanupTrap = tagWorkflow.indexOf("trap 'rm -f");
+  const keystoreDecode = tagWorkflow.indexOf('base64 -d > "$RUNNER_TEMP/release.keystore"');
+  assert.ok(cleanupTrap >= 0 && cleanupTrap < keystoreDecode,
+    'the EXIT cleanup trap must be installed before keystore decoding can create a partial file');
+});
 
 test('SLSA provenance uploads are restricted to mainline device-test tag pushes', () => {
   const workflowPath = '.github/workflows/generator-generic-ossf-slsa3-publish.yml';
-  const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
+  const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
   const verificationStart = content.indexOf('      - name: Verify device-test tag is on main');
   const setupJavaStart = content.indexOf('      - name: Set up JDK 17');
   const provenanceStart = content.indexOf('  provenance:');
@@ -149,10 +165,9 @@ test('SLSA provenance uploads are restricted to mainline device-test tag pushes'
   assert.match(provenance, /upload-assets: true/);
 });
 
-
 test('private main test APK remains owner-gated and ciphertext-only', () => {
   const workflowPath = '.github/workflows/android-private-main-test-apk.yml';
-  const content = fs.readFileSync(path.join(__dirname, '..', workflowPath), 'utf8');
+  const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
   const jobStart = content.indexOf('  private-main-test:');
   const runnerStart = content.indexOf('    runs-on:', jobStart);
   assert.ok(jobStart >= 0 && runnerStart > jobStart, 'missing private main test job');
@@ -166,7 +181,7 @@ test('private main test APK remains owner-gated and ciphertext-only', () => {
   assert.doesNotMatch(content, /pull_request:/,
     'private signing workflow must not be triggerable by pull requests');
   assert.equal(content.includes('[[ "$AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]]'), true,
-    "the one-time age recipient must be validated before any encryption or signing");
+    'the one-time age recipient must be validated before any encryption or signing');
   assert.match(content, /age --encrypt --recipient "\$AGE_RECIPIENT"/);
 
   const uploadStart = content.indexOf('      - name: Upload only the short-lived encrypted transfer');
