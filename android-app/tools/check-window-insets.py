@@ -46,6 +46,8 @@ check("WindowInsetsPolicy.dialogHeightForIme(" in API30,
       "API-30 dialog height must use the pure keyboard-safe height policy")
 check("getCurrentWindowMetrics()" in API30 and "metrics.getWindowInsets()" in API30,
       "dialog placement must use stable Activity window metrics rather than its already-shrunk bounds")
+check("WindowInsetsPolicy.dialogYOffsetForIme(" in API30,
+      "dialog vertical shift must be derived from the pure IME offset policy")
 check("params.height = height" in API30 and "params.y = y" in API30 and "Gravity.CENTER" in API30,
       "the dialog must shrink and move into the unobscured area above the IME")
 check("Api30Window.applyDialogImeInsets(dialogWindow)" in ACTIVITY,

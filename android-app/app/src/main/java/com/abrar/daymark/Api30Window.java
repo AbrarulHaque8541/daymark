@@ -63,7 +63,7 @@ final class Api30Window {
         int targetHeight = WindowInsetsPolicy.dialogHeightForIme(
                 metrics.getBounds().height(), bars.top, bars.bottom, imeBottom);
         int height = targetHeight > 0 ? targetHeight : WindowManager.LayoutParams.WRAP_CONTENT;
-        int y = targetHeight > 0 ? -Math.max(0, imeBottom - bars.bottom) / 2 : 0;
+        int y = WindowInsetsPolicy.dialogYOffsetForIme(bars.bottom, imeBottom);
         WindowManager.LayoutParams params = dialogWindow.getAttributes();
         if (params.height != height || params.y != y || params.gravity != Gravity.CENTER) {
             params.height = height;

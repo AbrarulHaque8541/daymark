@@ -29,6 +29,17 @@ final class WindowInsetsPolicy {
     }
 
     /**
+     * Center offset for a dialog whose height is capped above the IME. The window's normal
+     * centered frame already accounts for the navigation inset, so only the additional IME
+     * occlusion shifts its center.
+     */
+    static int dialogYOffsetForIme(int systemBarsBottom, int imeBottom) {
+        if (!shouldApplyImeInsets(imeBottom)) return 0;
+        int extraOcclusion = Math.max(0, imeBottom - Math.max(0, systemBarsBottom));
+        return -(extraOcclusion / 2);
+    }
+
+    /**
      * Available floating-dialog height above the IME. Zero means restore WRAP_CONTENT.
      * The caller positions the dialog within this height and keeps the form scrollable.
      */

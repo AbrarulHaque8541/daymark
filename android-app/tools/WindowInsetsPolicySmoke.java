@@ -19,6 +19,12 @@ public final class WindowInsetsPolicySmoke {
                 : "a present IME inset must be applied";
         assert !WindowInsetsPolicy.shouldApplyImeInsets(0)
                 : "an absent IME inset must not add padding";
+        assert WindowInsetsPolicy.dialogYOffsetForIme(63, 872) == -404
+                : "the dialog center must shift upward by half the additional keyboard occlusion";
+        assert WindowInsetsPolicy.dialogYOffsetForIme(96, 72) == 0
+                : "a keyboard inset smaller than the navigation inset must not shift the dialog";
+        assert WindowInsetsPolicy.dialogYOffsetForIme(63, 0) == 0
+                : "a hidden keyboard must restore the centered dialog position";
         assert WindowInsetsPolicy.dialogHeightForIme(1920, 63, 63, 872) == 985
                 : "the task editor dialog must fit between the status bar and visible keyboard";
         assert WindowInsetsPolicy.dialogHeightForIme(1920, 63, 96, 72) == 1761
