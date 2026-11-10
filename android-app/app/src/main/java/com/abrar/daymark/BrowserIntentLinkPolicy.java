@@ -66,7 +66,9 @@ final class BrowserIntentLinkPolicy {
             throw new IllegalArgumentException("Android app link address is invalid.", invalid);
         }
         if (!"intent".equalsIgnoreCase(baseUri.getScheme()) || baseUri.getHost() == null
-                || baseUri.getRawUserInfo() != null || baseUri.getRawFragment() != null) {
+                || baseUri.getRawUserInfo() != null || baseUri.getRawFragment() != null
+                || baseUri.getPort() == 0 || baseUri.getPort() > 65535
+                || hasExplicitEmptyPort(baseUri)) {
             throw new IllegalArgumentException("Android app link address is invalid.");
         }
 
@@ -121,7 +123,9 @@ final class BrowserIntentLinkPolicy {
             throw new IllegalArgumentException("Android app link target is invalid.", invalid);
         }
         if (targetUri.getScheme() == null || targetUri.getHost() == null
-                || targetUri.getRawUserInfo() != null || targetUri.getRawFragment() != null) {
+                || targetUri.getRawUserInfo() != null || targetUri.getRawFragment() != null
+                || targetUri.getPort() == 0 || targetUri.getPort() > 65535
+                || hasExplicitEmptyPort(targetUri)) {
             throw new IllegalArgumentException("Android app link target is invalid.");
         }
 
@@ -149,4 +153,19 @@ final class BrowserIntentLinkPolicy {
         }
         return new Decision(normalizedTarget, packageName, fallback);
     }
+    private static boolean hasExplicitEmptyPort(URI uri) {
+        String authority = uri.getRawAuthority();
+        if (authority == null) return false;
+        int userInfoEnd = authority.lastIndexOf('@');
+        if (userInfoEnd >= 0) authority = authority.substring(userInfoEnd + 1);
+        if (authority.startsWith("[")) {
+            int closingBracket = authority.indexOf(']');
+            return closingBracket >= 0 && closingBracket + 1 < authority.length()
+                    && authority.charAt(closingBracket + 1) == ':'
+                    && closingBracket + 2 == authority.length();
+        }
+        int colon = authority.lastIndexOf(':');
+        return colon >= 0 && colon == authority.length() - 1;
+    }
+
 }
