@@ -24,7 +24,9 @@ public final class BrowserDownloadBodyTransferSmoke {
         rejectsTruncatedAndOverlongBodies();
         interruptedAndStorageFailuresAbort();
         cancellationAndOfflineTransitionsAbort();
+        publicationGateRejectsStateChangeBeforeCommit();
         sinkFailuresAbortAndDoNotPublish();
+        fatalFailuresAbortAndPreserveError();
         progressCallbacksCannotBreakTransfers();
         zeroLengthBodyIsValid();
         System.out.println("PASS browser download body transfer: " + assertions + " assertions");
@@ -174,6 +176,31 @@ public final class BrowserDownloadBodyTransferSmoke {
                 "Offline policy is checked before opening a staging stream");
     }
 
+    private static void publicationGateRejectsStateChangeBeforeCommit() throws Exception {
+        Target target = new Target();
+        boolean[] online = {true};
+        boolean[] invoked = {false};
+        BrowserDownloadBodyTransfer.PublicationGate gate = (cancellation, network, staging, copiedBytes) -> {
+            invoked[0] = true;
+            // Model Offline winning while the publication gate owns the shared state lock.
+            online[0] = false;
+            if (cancellation.isCancelled()) {
+                throw new BrowserDownloadBodyTransfer.TransferException(
+                        BrowserDownloadBodyTransfer.Failure.CANCELLED);
+            }
+            if (!network.isOnline()) {
+                throw new BrowserDownloadBodyTransfer.TransferException(
+                        BrowserDownloadBodyTransfer.Failure.NETWORK_DISABLED);
+            }
+            staging.commit(copiedBytes);
+        };
+        expect(BrowserDownloadBodyTransfer.Failure.NETWORK_DISABLED, () -> transfer(200, null, null,
+                new ByteArrayInputStream(new byte[]{1}), 1024, () -> false, () -> online[0],
+                gate, target, null));
+        check(invoked[0] && target.commits == 0 && target.aborts == 1,
+                "publication gate must reject a state change and abort before final visibility");
+    }
+
     private static void sinkFailuresAbortAndDoNotPublish() throws Exception {
         Target openFailure = new Target();
         openFailure.failOpen = true;
@@ -205,6 +232,46 @@ public final class BrowserDownloadBodyTransferSmoke {
                 "progress-listener exceptions do not interrupt a safe transfer");
     }
 
+    private static void fatalFailuresAbortAndPreserveError() throws Exception {
+        Target readFailure = new Target();
+        InputStream fatalInput = new InputStream() {
+            private boolean sent;
+            @Override public int read() {
+                throw new AssertionError("synthetic fatal read");
+            }
+            @Override public int read(byte[] buffer, int offset, int length) {
+                if (!sent) {
+                    sent = true;
+                    buffer[offset] = 1;
+                    return 1;
+                }
+                throw new AssertionError("synthetic fatal read");
+            }
+        };
+        boolean readErrorPreserved = false;
+        try {
+            transfer(200, null, null, fatalInput, 1024, () -> false, () -> true, readFailure, null);
+        } catch (AssertionError failure) {
+            readErrorPreserved = "synthetic fatal read".equals(failure.getMessage());
+        }
+        check(readErrorPreserved && readFailure.commits == 0 && readFailure.aborts == 1,
+                "fatal stream errors preserve the original error and abort partial staging");
+
+        Target publishFailure = new Target();
+        BrowserDownloadBodyTransfer.PublicationGate fatalGate = (cancellation, network, staging, copiedBytes) -> {
+            throw new AssertionError("synthetic fatal publication");
+        };
+        boolean publicationErrorPreserved = false;
+        try {
+            transfer(200, null, null, new ByteArrayInputStream(new byte[]{1}), 1024,
+                    () -> false, () -> true, fatalGate, publishFailure, null);
+        } catch (AssertionError failure) {
+            publicationErrorPreserved = "synthetic fatal publication".equals(failure.getMessage());
+        }
+        check(publicationErrorPreserved && publishFailure.commits == 0 && publishFailure.aborts == 1,
+                "fatal publication errors preserve the original error and abort staged data");
+    }
+
     private static void zeroLengthBodyIsValid() throws Exception {
         Target target = new Target();
         long copied = transfer(200, Collections.singletonList("0"), null,
@@ -219,12 +286,37 @@ public final class BrowserDownloadBodyTransferSmoke {
                                   BrowserDownloadBodyTransfer.NetworkPolicy network,
                                   Target target, BrowserDownloadBodyTransfer.ProgressListener progress)
             throws TransferFailure {
+        return transfer(status, length, encoding, input, maxBytes, cancellation, network,
+                defaultPublicationGate(), target, progress);
+    }
+
+    private static long transfer(int status, List<String> length, List<String> encoding,
+                                  InputStream input, long maxBytes,
+                                  BrowserDownloadBodyTransfer.Cancellation cancellation,
+                                  BrowserDownloadBodyTransfer.NetworkPolicy network,
+                                  BrowserDownloadBodyTransfer.PublicationGate publicationGate,
+                                  Target target, BrowserDownloadBodyTransfer.ProgressListener progress)
+            throws TransferFailure {
         try {
             return BrowserDownloadBodyTransfer.copy(status, length, encoding, input, maxBytes,
-                    cancellation, network, progress, target);
+                    cancellation, network, publicationGate, progress, target);
         } catch (BrowserDownloadBodyTransfer.TransferException exception) {
             throw new TransferFailure(exception.failure);
         }
+    }
+
+    private static BrowserDownloadBodyTransfer.PublicationGate defaultPublicationGate() {
+        return (cancellation, network, target, copiedBytes) -> {
+            if (cancellation.isCancelled()) {
+                throw new BrowserDownloadBodyTransfer.TransferException(
+                        BrowserDownloadBodyTransfer.Failure.CANCELLED);
+            }
+            if (!network.isOnline()) {
+                throw new BrowserDownloadBodyTransfer.TransferException(
+                        BrowserDownloadBodyTransfer.Failure.NETWORK_DISABLED);
+            }
+            target.commit(copiedBytes);
+        };
     }
 
     private static void expect(BrowserDownloadBodyTransfer.Failure expected, Throwing operation) throws Exception {
