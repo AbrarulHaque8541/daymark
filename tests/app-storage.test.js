@@ -526,6 +526,46 @@ test('a JSON recovery import started before Clear All cannot restore tasks or Fo
   assert.match(app.elements.get('#toast').textContent, /Recovery import failed/);
 });
 
+test('a recovery import captured before Clear All cannot recreate cleared task or Focus records', async () => {
+  const existingTask = makeImportTask('existing-before-clear', 'Existing task');
+  const incomingTask = makeImportTask('incoming-after-clear', 'Must remain absent');
+  const incomingLog = makeFocusLogEntry('incoming-focus-after-clear');
+  const taskBackup = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [JSON.stringify([incomingTask])] });
+  const focusBackup = JSON.stringify({ format: 'daymark-focus-recovery-bundle-v1', payloads: [JSON.stringify({ session: null, log: [incomingLog] })] });
+  const combined = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup, focusBackup });
+  const app = bootApp({ savedValue: JSON.stringify([existingTask]), savedFocusValue: JSON.stringify({ session: null, log: [] }) });
+  let releaseRead;
+  let markReadStarted;
+  const readStarted = new Promise((resolve) => { markReadStarted = resolve; });
+  const file = {
+    size: Buffer.byteLength(combined),
+    readAsText(reader) {
+      markReadStarted();
+      releaseRead = () => { reader.result = combined; void reader.onload(); };
+    }
+  };
+  const pendingImport = triggerTaskImport(app, file);
+  await readStarted;
+
+  const taskGeneration = mutation.incrementTaskGeneration(app.localStorage);
+  const focusGeneration = focusMutation.incrementFocusGeneration(app.localStorage);
+  assert.equal(taskGeneration.value, 1);
+  assert.equal(focusGeneration.value, 1);
+  app.localStorage.removeItem(STORAGE_KEY);
+  app.localStorage.removeItem(FOCUS_KEY);
+
+  releaseRead();
+  await pendingImport;
+
+  assert.equal(app.storedValues.has(STORAGE_KEY), false,
+    'the queued task recovery cannot recreate the cleared task key');
+  assert.equal(app.storedValues.has(FOCUS_KEY), false,
+    'the queued Focus recovery cannot recreate the cleared Focus key');
+  assert.equal(app.storedValues.get(mutation.TASK_GENERATION_KEY), '1');
+  assert.equal(app.storedValues.get(focusMutation.FOCUS_GENERATION_KEY), '1');
+  assert.match(app.elements.get('#toast').textContent, /Recovery import failed/);
+});
+
 test('declining task import confirmation leaves storage unchanged', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
