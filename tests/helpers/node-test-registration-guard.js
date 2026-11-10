@@ -28,7 +28,7 @@ function declareBinding(scope, name) {
   if (!scope || !name) return null;
   let binding = scope.bindings.get(name);
   if (!binding) {
-    binding = { name, scope, kind: 'ordinary', importedName: null, reassigned: false };
+    binding = { name, scope, kind: 'ordinary', importedName: null, reassigned: false, aliasOf: null, aliases: new Set() };
     scope.bindings.set(name, binding);
   }
   return binding;
@@ -117,6 +117,16 @@ function markRequirePattern(pattern, scope) {
       markNodeTestBinding(scope, property.value.name, importedName);
     }
   }
+}
+
+function markNodeTestAlias(scope, localName, sourceBinding) {
+  const binding = scope && scope.bindings.get(localName);
+  if (!binding || !sourceBinding || !sourceBinding.kind.startsWith('node-test-')) return;
+  binding.kind = sourceBinding.kind;
+  binding.importedName = sourceBinding.importedName;
+  binding.reassigned = sourceBinding.reassigned;
+  binding.aliasOf = sourceBinding;
+  sourceBinding.aliases.add(binding);
 }
 
 function unwrapAwait(node) {
@@ -236,6 +246,19 @@ function buildScopes(ast) {
       markDynamicImportPattern(declarator.id, scope);
       continue;
     }
+    if (init && init.type === 'Identifier') {
+      const sourceBinding = resolveBinding(scope, init.name);
+      if (declarator.id.type === 'Identifier' && sourceBinding &&
+          sourceBinding.kind.startsWith('node-test-')) {
+        markNodeTestAlias(scope, declarator.id.name, sourceBinding);
+        continue;
+      }
+      if (declarator.id.type === 'ObjectPattern' && sourceBinding &&
+          sourceBinding.kind === 'node-test-namespace') {
+        markRequirePattern(declarator.id, scope);
+        continue;
+      }
+    }
     if (init && init.type === 'MemberExpression') {
       const importedName = staticPropertyName(init);
       if (['test', 'it', 'describe'].includes(importedName) &&
@@ -267,6 +290,55 @@ function memberChain(node) {
   return { base: current, properties };
 }
 
+function nodeTestBindingForTarget(target, scope) {
+  let root = target;
+  while (root && root.type === 'MemberExpression') root = root.object;
+  if (!root || root.type !== 'Identifier') return null;
+  const binding = resolveBinding(scope, root.name);
+  return binding && binding.kind.startsWith('node-test-') ? binding : null;
+}
+
+function markBindingObjectMutated(binding) {
+  const pending = [binding];
+  const seen = new Set();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || seen.has(current)) continue;
+    seen.add(current);
+    current.reassigned = true;
+    if (current.aliasOf) pending.push(current.aliasOf);
+    for (const alias of current.aliases) pending.push(alias);
+  }
+}
+
+function markReflectiveMutation(node, scope) {
+  if (!node || node.type !== 'CallExpression' || !node.callee ||
+      node.callee.type !== 'MemberExpression') return;
+  let rootName = null;
+  let methodName = staticPropertyName(node.callee);
+  const chain = memberChain(node.callee);
+  if (chain && chain.properties.length === 1 &&
+      ['Object', 'Reflect'].includes(chain.base.name)) {
+    rootName = chain.base.name;
+    methodName = chain.properties[0];
+  } else if (chain && chain.base.name === 'globalThis' && chain.properties.length === 2 &&
+      ['Object', 'Reflect'].includes(chain.properties[0])) {
+    rootName = chain.properties[0];
+    methodName = chain.properties[1];
+  } else if (node.callee.object.type === 'Identifier' &&
+      ['Object', 'Reflect'].includes(node.callee.object.name) && methodName === null) {
+    // A dynamic intrinsic method name cannot be proven read-only.
+    rootName = node.callee.object.name;
+  }
+  if (!rootName) return;
+  const mutators = rootName === 'Object'
+    ? new Set(['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf'])
+    : new Set(['set', 'defineProperty', 'deleteProperty', 'setPrototypeOf']);
+  if (methodName !== null && !mutators.has(methodName)) return;
+  const binding = nodeTestBindingForTarget(node.arguments[0], scope);
+  if (binding) markBindingObjectMutated(binding);
+}
+
 function markAssignedTarget(target, scope) {
   if (!target) return;
   if (target.type === 'Identifier') {
@@ -282,7 +354,7 @@ function markAssignedTarget(target, scope) {
     while (root && root.type === 'MemberExpression') root = root.object;
     if (root && root.type === 'Identifier') {
       const binding = resolveBinding(scope, root.name);
-      if (binding && binding.kind.startsWith('node-test-')) binding.reassigned = true;
+      if (binding && binding.kind.startsWith('node-test-')) markBindingObjectMutated(binding);
     }
     return;
   }
@@ -455,10 +527,14 @@ function hasRegisteredTestCase(source) {
 
     if (node.type === 'AssignmentExpression') markAssignedTarget(node.left, scope);
     else if (node.type === 'UpdateExpression') markAssignedTarget(node.argument, scope);
+    else if (node.type === 'UnaryExpression' && node.operator === 'delete') markAssignedTarget(node.argument, scope);
     else if ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') &&
         node.left.type !== 'VariableDeclaration') markAssignedTarget(node.left, scope);
 
-    if (node.type === 'CallExpression') calls.push({ node, scope });
+    if (node.type === 'CallExpression') {
+      markReflectiveMutation(node, scope);
+      calls.push({ node, scope });
+    }
 
     for (const [key, value] of Object.entries(node)) {
       if (key === 'start' || key === 'end' || key === 'loc') continue;
