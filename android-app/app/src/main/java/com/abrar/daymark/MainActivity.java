@@ -203,6 +203,7 @@ public final class MainActivity extends Activity {
     private String pendingExtensionExportId;
     private String pendingMalformedExtensionExportFileName;
     private String pendingMalformedExtensionExportSha256;
+    private AlertDialog browserExtensionsDialog;
     private Uri pendingPickedAttachmentUri;
     private String pendingPickedAttachmentTaskId;
     private final List<Uri> stagedSharedAttachmentUris = new ArrayList<>();
@@ -3570,6 +3571,10 @@ public final class MainActivity extends Activity {
 
     private void showBrowserExtensionsManager() {
         if (extensionRuntime == null) return;
+        if (browserExtensionsDialog != null) {
+            browserExtensionsDialog.dismiss();
+            browserExtensionsDialog = null;
+        }
         List<BrowserExtension> extensions = extensionRuntime.store().listAll();
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -3688,6 +3693,10 @@ public final class MainActivity extends Activity {
                 .setView(scroll)
                 .setPositiveButton("Done", null)
                 .create();
+        browserExtensionsDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (browserExtensionsDialog == dialog) browserExtensionsDialog = null;
+        });
         content.setAlpha(0f);
         content.setTranslationY(dp(8));
         dialog.show();
@@ -3699,7 +3708,7 @@ public final class MainActivity extends Activity {
         final List<ExtensionStore.MalformedUserPack> malformed;
         try {
             malformed = extensionRuntime.store().listMalformedUserPacks();
-        } catch (IOException exception) {
+        } catch (Exception exception) {
             TextView warning = text(
                     "Recovery files could not be inspected safely. No files were changed.",
                     12, palette.warning, Typeface.NORMAL);
