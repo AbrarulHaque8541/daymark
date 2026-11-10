@@ -1,0 +1,249 @@
+
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const ui = require('../telegram-ui.js');
+const engine = require('../telegram-logic.js');
+const taskLogic = require('../task-logic.js');
+function makeElement(tagName) {
+  const el = {
+    tagName: tagName,
+    className: '',
+    textContent: '',
+    value: '',
+    children: [],
+    listeners: {},
+    appendChild(child) { el.children.push(child); return child; },
+    removeChild(child) { const i = el.children.indexOf(child); if (i !== -1) el.children.splice(i, 1); return child; },
+    addEventListener(type, handler) { (el.listeners[type] = el.listeners[type] || []).push(handler); },
+    preventDefault() { el.prevented = true; }
+  };
+  Object.defineProperty(el, 'firstChild', { get() { return el.children.length ? el.children[0] : null; } });
+  return el;
+}
+function makeDoc(ids) {
+  const elements = {};
+  for (const id of ids) elements[id] = makeElement(id.indexOf('form') === -1 ? 'div' : 'form');
+  return {
+    elements: elements,
+    getElementById(id) { return Object.prototype.hasOwnProperty.call(elements, id) ? elements[id] : null; },
+    createElement(tagName) { return makeElement(tagName); }
+  };
+}
+const ALL_IDS = ['telegram-token', 'telegram-chat', 'telegram-status', 'telegram-form', 'telegram-test', 'telegram-clear'];
+const VALID_TOKEN = '123456789:AAEfiK0sdVHqWlsZb2t3rJpQ5vLmNoPqR4sT';
+function makeTask(title, options) {
+  options = options || {};
+  return {
+    id: 'task-' + Math.abs(options.id !== undefined ? options.id : title.length),
+    title: title,
+    completed: options.completed === true,
+    priority: 'medium',
+    dueDate: options.dueDate || null,
+    createdAt: '2026-11-10T09:00:00.000Z',
+    updatedAt: '2026-11-10T09:00:00.000Z'
+  };
+}
+function makeStorage(seed) {
+  const data = new Map();
+  for (const key of Object.keys(seed || {})) data.set(key, seed[key]);
+  let reads = 0;
+  return {
+    readCount() { return reads; },
+    getItem(key) { reads += 1; return data.has(key) ? data.get(key) : null; }
+  };
+}
+function makeFetch(handler) {
+  const calls = [];
+  const fn = (url, options) => { calls.push({ url, options }); return Promise.resolve(handler(calls.length)); };
+  fn.calls = calls;
+  return fn;
+}
+class FakeAbortController {
+  constructor() { this.signal = { aborted: false }; }
+  abort() { this.signal.aborted = true; }
+}
+function okEnv(doc, options) {
+  options = options || {};
+  return {
+    document: doc,
+    logicApi: options.logicApi === undefined ? engine : options.logicApi,
+    taskLogicApi: options.taskLogicApi === undefined ? taskLogic : options.taskLogicApi,
+    storage: options.storage || makeStorage(options.seed || {}),
+    fetch: options.fetch || makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 7 } }) })),
+    AbortController: FakeAbortController,
+    setTimeout: () => 0,
+    clearTimeout: () => {}
+  };
+}
+function fillValidInputs(doc) {
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  doc.elements['telegram-chat'].value = '123456789';
+}
+test('attachTelegramUi requires a document', () => {
+  assert.throws(() => ui.attachTelegramUi(null), /requires a document/);
+  assert.throws(() => ui.attachTelegramUi({}), /requires a document/);
+});
+test('a missing engine degrades honestly instead of guessing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const handle = ui.attachTelegramUi({ document: doc, logicApi: null, taskLogicApi: taskLogic, storage: makeStorage({}) });
+  await handle.send();
+  assert.equal(doc.elements['telegram-status'].textContent, 'Telegram digest is unavailable.');
+});
+test('an invalid token reports honestly, reads no storage, sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({});
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  doc.elements['telegram-token'].value = 'not-a-token';
+  doc.elements['telegram-chat'].value = '123456789';
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /bot token from @BotFather first/);
+  assert.equal(storage.readCount(), 0, 'storage is only read after inputs validate');
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('an invalid chat target reports honestly and sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { fetch: fetchFn }));
+  fillValidInputs(doc);
+  doc.elements['telegram-chat'].value = 'nope';
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /chat target/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('sending a digest delivers only completed tasks to Telegram', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const seed = {};
+  seed['daymark.tasks.v1'] = JSON.stringify([
+    makeTask('Buy milk', { completed: true, dueDate: '2026-11-10', id: 1 }),
+    makeTask('Write report', { completed: true, id: 2 }),
+    makeTask('Still open', { id: 3 })
+  ]);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 7 } }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.equal(fetchFn.calls.length, 1);
+  const payload = JSON.parse(fetchFn.calls[0].options.body);
+  assert.match(payload.text, /Buy milk/);
+  assert.doesNotMatch(payload.text, /Still open/);
+  assert.match(doc.elements['telegram-status'].textContent, /Sent \u00b7 2 completed task\(s\) delivered to Telegram/);
+});
+test('with no completed tasks the card says so and sends nothing', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const seed = {};
+  seed['daymark.tasks.v1'] = JSON.stringify([makeTask('Still open', { id: 1 })]);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /No completed tasks to announce/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('unreadable saved tasks are disclosed honestly', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const seed = {};
+  seed['daymark.tasks.v1'] = JSON.stringify([
+    makeTask('Buy milk', { completed: true, id: 1 }),
+    { broken: true, not: 'a valid task' }
+  ]);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 7 } }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.equal(fetchFn.calls.length, 1);
+  assert.match(doc.elements['telegram-status'].textContent, /1 unreadable task\(s\) skipped/);
+});
+test('a malformed saved list fails closed without sending', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const seed = {};
+  seed['daymark.tasks.v1'] = 'not json{';
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /could not be read as JSON/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('a network failure is reported in plain words without the token', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const seed = {};
+  seed['daymark.tasks.v1'] = JSON.stringify([makeTask('Buy milk', { completed: true, id: 1 })]);
+  const fetchFn = () => Promise.reject(new Error('offline'));
+  const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  const statusText = doc.elements['telegram-status'].textContent;
+  assert.match(statusText, /could not reach Telegram/);
+  assert.ok(statusText.indexOf(VALID_TOKEN) === -1, 'the token must never appear in the status');
+});
+test('the Test button sends only the fixed test message', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 9 } }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.test();
+  assert.equal(fetchFn.calls.length, 1);
+  const payload = JSON.parse(fetchFn.calls[0].options.body);
+  assert.equal(payload.text, engine.TEST_MESSAGE);
+  assert.equal(doc.elements['telegram-status'].textContent, 'Test message sent to Telegram.');
+});
+test('Clear empties the token field and says nothing was saved', () => {
+  const doc = makeDoc(ALL_IDS);
+  const handle = ui.attachTelegramUi(okEnv(doc, {}));
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  handle.clear();
+  assert.equal(doc.elements['telegram-token'].value, '');
+  assert.match(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
+});
+test('boot never reads storage', () => {
+  const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
+  ui.attachTelegramUi(okEnv(makeDoc(ALL_IDS), { storage: storage }));
+  assert.equal(storage.readCount(), 0, 'attaching the card must not read storage');
+});
+test('a throwing storage read is reported honestly', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const brokenStorage = { getItem() { throw new Error('blocked'); } };
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: brokenStorage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /Task storage could not be read/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('submit and buttons are wired', async () => {
+  const doc = makeDoc(ALL_IDS);
+  ui.attachTelegramUi(okEnv(doc, {}));
+  assert.equal(doc.elements['telegram-form'].listeners.submit.length, 1);
+  assert.equal(doc.elements['telegram-test'].listeners.click.length, 1);
+  assert.equal(doc.elements['telegram-clear'].listeners.click.length, 1);
+  const event = makeElement('event');
+  doc.elements['telegram-token'].value = 'not-a-token';
+  doc.elements['telegram-form'].listeners.submit[0](event);
+  assert.equal(event.prevented, true);
+  for (let i = 0; i < 25 && !doc.elements['telegram-status'].textContent; i += 1) {
+    await Promise.resolve();
+  }
+  assert.match(doc.elements['telegram-status'].textContent, /bot token/);
+});
+test('missing elements never throw; the card simply does less', async () => {
+  const doc = makeDoc(['telegram-token']);
+  const handle = ui.attachTelegramUi(okEnv(doc, {}));
+  await handle.send();
+  handle.clear();
+  handle.detach();
+});
+const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+test('index.html wires the Telegram card with a password token field', () => {
+  assert.ok(indexSource.includes('id="telegram-card"'), 'the card container must exist');
+  assert.ok(indexSource.includes('id="telegram-token"'), 'the token input must exist');
+  assert.ok(indexSource.includes('id="telegram-chat"'), 'the chat input must exist');
+  assert.ok(indexSource.includes('id="telegram-send"'), 'the send button must exist');
+  assert.ok(indexSource.includes('id="telegram-status"'), 'the status element must exist');
+  assert.ok(indexSource.includes('src="telegram-logic.js"'), 'the logic script tag must exist');
+  assert.ok(indexSource.includes('src="telegram-ui.js"'), 'the ui script tag must exist');
+  assert.match(indexSource.match(/<input[^>]*id="telegram-token"[^>]*>/)[0], /type="password"/, 'the bot token input must be masked');
+});
