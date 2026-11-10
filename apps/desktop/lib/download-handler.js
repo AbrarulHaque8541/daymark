@@ -63,7 +63,7 @@ function handleWillDownload(options) {
           if (state === 'completed') await opts.publishFile(stagingPath, finalPath, directory);
         } catch {
           if (typeof opts.onFailed === 'function') {
-            try { opts.onFailed(); } catch { /* Do not leak URL or interrupt cleanup. */ }
+            try { opts.onFailed(path.basename(finalPath)); } catch { /* Do not leak URL or interrupt cleanup. */ }
           }
         } finally {
           try {
