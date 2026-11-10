@@ -48,7 +48,8 @@ OWNER_GATE = "github.actor == 'AbrarulHaque8541' && github.triggering_actor == '
 
 signed_build = SIGNED_RELEASE_WORKFLOW.split("  build-and-verify:", 1)[1].split("  publish-release:", 1)[0]
 signed_publish = SIGNED_RELEASE_WORKFLOW.split("  publish-release:", 1)[1]
-slsa_build = WORKFLOW.split("  build:", 1)[1].split("  provenance:", 1)[0]
+slsa_build = WORKFLOW.split("  build:", 1)[1].split("  authorize-provenance:", 1)[0]
+slsa_authorize = WORKFLOW.split("  authorize-provenance:", 1)[1].split("  provenance:", 1)[0]
 slsa_provenance = WORKFLOW.split("  provenance:", 1)[1]
 
 check(OWNER_GATE in signed_build,
@@ -59,9 +60,12 @@ check("pull_request:" not in SIGNED_RELEASE_WORKFLOW and "workflow_dispatch:" no
       "the signed production workflow must remain tag-push-only")
 check("github.event_name != 'push'" in slsa_build and OWNER_GATE in slsa_build,
       "SLSA manual dispatch may build only; tag-triggered APK builds must be owner-triggered")
-check("github.event_name == 'push' && github.ref_type == 'tag'" in slsa_provenance
-      and OWNER_GATE in slsa_provenance and "id-token: write" in slsa_provenance,
-      "SLSA provenance signing and release upload must be owner-triggered tag-only")
+check("github.event_name == 'push' && github.ref_type == 'tag'" in slsa_authorize
+      and OWNER_GATE in slsa_authorize and "environment: production-signing" in slsa_authorize,
+      "SLSA provenance must pass the owner-triggered protected-environment approval job")
+check("needs: [build, authorize-provenance]" in slsa_provenance
+      and "id-token: write" in slsa_provenance and "contents: write" in slsa_provenance,
+      "SLSA signing/upload must depend on the approved gate before using OIDC/write permissions")
 check(OWNER_GATE in PRIVATE_MAIN_WORKFLOW,
       "the private main test APK workflow must retain its owner-only manual-dispatch gate")
 production_job = PRODUCTION_RELEASE_WORKFLOW.split("  build-verify-draft:", 1)[1]
@@ -82,8 +86,8 @@ check("environment: production-signing" in signed_build,
       "signed device-test signing must wait on the protected production-signing environment")
 check("environment: production-signing" in signed_publish,
       "signed device-test release upload must wait on the protected production-signing environment")
-check("environment: production-signing" in slsa_provenance,
-      "SLSA provenance signing/upload must wait on the protected production-signing environment")
+check("environment: production-signing" in slsa_authorize,
+      "SLSA provenance authorization must wait on the protected production-signing environment")
 check("environment: production-signing" in private_job,
       "private main signing must wait on the protected production-signing environment")
 
