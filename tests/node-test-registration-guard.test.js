@@ -84,6 +84,8 @@ test('fails closed when test options can dynamically enable skip or todo', () =>
     [`const { test } = require('node:test'); test('dynamic todo', { todo: shouldBeTodo }, () => assert.ok(true));`, false, 'dynamic todo value'],
     [`const { test } = require('node:test'); test('spread options', { ...sharedOptions }, () => assert.ok(true));`, false, 'spread options'],
     [`const { test } = require('node:test'); test('computed key', { [optionName]: true }, () => assert.ok(true));`, false, 'dynamic computed key'],
+    [`const { test } = require('node:test'); test('prototype skip', { __proto__: { skip: true } }, () => assert.ok(true));`, false, 'inherited skip through object prototype'],
+    [`const { test } = require('node:test'); test('computed prototype', { ['__proto__']: { todo: true } }, () => assert.ok(true));`, false, 'computed prototype key'],
     [`const { test } = require('node:test'); const options = { skip: true }; test('opaque options', options, () => assert.ok(true));`, false, 'opaque options binding'],
     [`const { test } = require('node:test'); test('literal false flags', { skip: false, todo: false, timeout: 100 }, () => assert.ok(true));`, true, 'literal false flags'],
     [`const { test } = require('node:test'); test('ordinary computed option', { ['timeout']: 100 }, () => assert.ok(true));`, true, 'unrelated static computed key'],
