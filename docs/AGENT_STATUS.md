@@ -1,80 +1,5 @@
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
-- [Daymark whole-project engineering status — 2026-11-10T05:07:00Z (main 91f57d7; #694 prototype-safe test guard; #648 Focus notification replacement; #677 real ModeSelector instrumentation)](./CURRENT_STATUS_20261110T050700Z.md)
-- [Daymark whole-project engineering status — 2026-11-10T04:42:00Z (main 91f57d7; #694 AST skip/todo hardening; #648 Focus stale-runtime reconciliation; #665 signing workflow boundary; #656/#675 integration)](./CURRENT_STATUS_20261110T044200Z.md)
-## Latest verified whole-project handoff — 2026-11-10T02:18:05Z
-
-- [Full dated evidence snapshot](CURRENT_STATUS_20261110T021805Z.md)
-- Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; 11 open PRs, 21 open issues.
-- Main exact push checks: Android CI #42737255404 PASS; cross-platform contracts #42737255215 PASS.
-- PR #675 current head `f776bdc`: Android CI, Node 831/831, contracts and device-test APK PASS; release publishing skipped. PR is draft, 176 commits ahead, no independent approval.
-- PR #692 current head `d6c3dbf`: Desktop 42/42 on three OS, contracts PASS, Android CI Node 696/696, device APK signature verification PASS; release publishing skipped.
-- #648/#677 API 36 Focus failures remain. #646 governance and #160 physical-device acceptance remain open.
-- No merge, release, tag, version, signing, package-identity or destructive migration change; no physical-device testing.
-
-Work by: ChatGPT (OpenAI)
-Model: GPT-6
-Tooling: GitHub connector via Code Mode; live source, PR/issue, branch and exact-head Actions review
-Timestamp (UTC): 2026-11-10T02:18:05Z
-
----
-
-## Latest verified repository-wide run — 2026-11-10T02:08:52Z
-
-- [Current engineering snapshot](CURRENT_STATUS_20261110T020852Z.md)
-- Main: `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; 11 open PRs and 21 open issues.
-- Main exact push checks: Android CI #42737255404 PASS; Ubuntu/Windows contracts #42737255215 PASS.
-- PR #675 head `ae4edcce101bf326361452067c1de643c0d30d4b`: Android CI PASS, Node 831/831, contracts PASS; device artifact pending. Focus merged-snapshot adoption and conflict-preservation regressions added.
-- PR #692 head `3ae15ef16e33bdcad141c323fe66c536549c2621`: desktop CI 37/37 on Ubuntu/Windows/macOS and contracts PASS; Android CI/device artifact in progress. Remote filename path traversal is now constrained on the desktop branch.
-- #648/#677 API 36 Focus lifecycle failures remain; #646 governance and #160 physical-device acceptance remain open.
-- No PR merged, no release/tag/version/identity/signing change, no destructive migration, no physical-device test.
-
-Work by: ChatGPT (OpenAI)
-Model: GPT-6
-Tooling: GitHub connector via Code Mode; live repository, PR, issue and Actions evidence review
-Timestamp (UTC): 2026-11-10T02:08:52Z
-
----
-
-## Latest verified repository-wide run — 2026-11-10T00:49:29.624Z
-
-- [Current engineering snapshot](CURRENT_STATUS_20261110T004929Z.md)
-- Main: `1532838c78ab350b18f95e96a2c547ba384f0831`; 11 open PRs and 20 open issues.
-- PR #675 code head `4a3306d6ba13a4193c19b5acdbb7f17c27b091a8`: Android CI, Ubuntu/Windows contracts, and device-test APK PASS; Node suite 819 passed, 1 skipped, 0 failed.
-- Focus writes, preset writes, recovery-backup maintenance, Focus clears and Clear All now use the shared Focus mutation/generation contract on the integration branch.
-- PR #675 remains unmerged; no independent approval was found. Main branch protection was last observed disabled.
-- #677 API 36 Task Editor IME failure, #683 cross-tab task race coverage, #646 governance, and #160 physical-device acceptance remain open.
-
----
-
-## Latest verified repository-wide run — 2026-11-09T23:26:56Z
-
-- [Current engineering snapshot](CURRENT_STATUS_20261109T232656Z.md)
-- Code delivery: PR #675 head `f0983019e0764b2fd85effece83e3c651bc501bf`; exact-head Android CI, Ubuntu/Windows contracts, and device-test APK workflows PASS.
-- Main remains `1532838c78ab350b18f95e96a2c547ba384f0831`; 11 open PRs, 20 open issues; no independent approvals; main protection disabled.
-- #689 task/webhook queue serialization is implemented on #675; #690 Focus writer/clear serialization remains open and blocks claiming whole Clear All is atomic.
-- #683 cross-tab task mutation is partially integrated; import-vs-save/clear/recovery race coverage remains.
-- #677 API 36 Task Editor IME failure remains; #646 governance and #160 physical-device acceptance remain.
-
----
-
-- [Daymark whole-project engineering status — 2026-11-09T22:17:56.838Z (main 1532838c; 664 branches, 11 PRs / 18 issues; #688 test-binding guard exact-head CI green)](./CURRENT_STATUS_20261109T221756Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T22:01:18Z (main 1532838c; #675 Focus recovery-state fix and #688 test-source guard exact-head CI green)](./CURRENT_STATUS_20261109T220118Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T21:12:32.998Z (main 1532838c; 663 branches, 11 open PRs / 18 issues; #683 unsafe lock branch reviewed; #688 test-source guard CI pending)](./CURRENT_STATUS_20261109T211232Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T20:35:56.690Z (main 1532838c; #675 docs head pending checks; #686 API26/36 runtime pending; #659 compile-fix CI pending)](./CURRENT_STATUS_20261109T203556Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T20:35:23.409Z (main 1532838c; #686 multi-origin worker coverage; #659 host-smoke compile fix; 10 PRs / 18 issues)](./CURRENT_STATUS_20261109T203523Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T20:26:52.786Z (main 1532838c; 659 branches, 10 open PRs / 18 issues; #659 malformed-pack recovery store APIs and #686 Service Worker API26/API36 runtime PASS)](./CURRENT_STATUS_20261109T202652Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T20:10:13.760Z (main 1532838c; #648 Focus API29/API36 exact-head PASS; #686 AndroidX Service Worker runtime harness correction pending CI; 10 open PRs / 18 issues)](./CURRENT_STATUS_20261109T201013Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T18:52:06.803Z (main 1532838c; #675 51 ahead/0 behind with exact-head CI green; #686 five workflows green; 10 open PRs / 17 issues)](./CURRENT_STATUS_20261109T185206Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T18:46:54.363Z (main 1532838c; #675 mainline conflict resolved; #686 Service Worker boundary five workflows green; 10 open PRs / 17 issues)](./CURRENT_STATUS_20261109T184654Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T16:46:11.546Z (main 1532838c; 8 open PRs, 14 issues; #675 absent-primary recovery fix pushed, exact-head CI pending)](./CURRENT_STATUS_20261109T164611Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T15:24:39Z (main 59e6961c0645; seven open PRs, twelve issues; #675 exact-head docs/plan CI green, #677 Focus API36 dependency recorded)](./CURRENT_STATUS_20261109T152439Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T15:20:06Z (main 59e6961c0645; seven open PRs, twelve issues; PR #677 time-change re-arm, inherited Focus API36 gate failure)](./CURRENT_STATUS_20261109T152006Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T15:17:00Z (main 59e6961c0645; seven open PRs, twelve issues; Focus API36 10/10, webhook 728/728, reminder time-change PR #677)](./CURRENT_STATUS_20261109T151700Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T15:02:16Z (main 59e6961c0645; six open PRs, twelve issues; Focus API36 10/10, webhook 728/728, extension injection 41 assertions)](./CURRENT_STATUS_20261109T150216Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T14:55:08Z (main 59e6961c0645; six open PRs, twelve issues; webhook endpoint isolation, Focus screen-coordinate correction, extension page-scope)](./CURRENT_STATUS_20261109T145508Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T14:53:34.079Z (main 59e6961c0645; six open PRs, twelve issues; Focus/security backlog re-audited)](./CURRENT_STATUS_20261109T145334Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T13:13:07.642Z (main 59e6961c0645; #675 webhook/storage/recovery, #656 import/export, #659 extension, #665 signing/Node24; Focus #648 blocked)](./CURRENT_STATUS_20261109T131307Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:00:49Z (main 1d29085, Focus #648 direct shell-input and CSS #670)](./CURRENT_STATUS_20261109T120049Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T11:39:14Z (main 1d29085, Focus bridge correction and repo-wide queue)](./CURRENT_STATUS_20261109T113914Z.md)
@@ -136,42 +61,20 @@ Timestamp (UTC): 2026-11-10T02:08:52Z
 
 - [Daymark whole-project engineering status — 2026-11-05T04:15:00Z (Cycle B)](./CURRENT_STATUS_20261105T041500Z.md)
 
-- [Daymark whole-project engineering status — 2026-11-04T16:45:00Z (Cycle A)](./CURRENT_STATUS_20261104T164500Z.md)
-- [Daymark whole-project engineering status — 2026-11-04T04:45:00Z (web automation cycle)](./CURRENT_STATUS_20261104T044500Z.md)
-- [Daymark whole-project engineering status — 2026-11-04T08:50:00Z (Cycle B)](./CURRENT_STATUS_20261104T085000Z.md)
+- [Daymark engineering status — 2026-11-04T16:45:00Z (Cycle A)](./CURRENT_STATUS_20261104T164500Z.md)
+- [Daymark engineering status — 2026-11-04T04:45:00Z (web automation cycle)](./CURRENT_STATUS_20261104T044500Z.md)
+- [Daymark whole-project engineering status — 2026-11-04T08:45:00Z (Cycle B)](./CURRENT_STATUS_20261104T084500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T08:15:00Z (Cycle A)](./CURRENT_STATUS_20261104T081500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T07:15:00Z (Cycle B)](./CURRENT_STATUS_20261104T071500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T05:10:00Z (Cycle B)](./CURRENT_STATUS_20261104T051000Z.md)
-- [Daymark whole-project engineering status — 2026-11-04T00:05:00Z (Cycle B)](./CURRENT_STATUS_20261104T000500Z.md)
+- [Daymark whole-project engineering status — 2026-11-04T00:45:00Z (Cycle B)](./CURRENT_STATUS_20261104T004500Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T07:45:00Z (midday audit)](./CURRENT_STATUS_20261103T074500Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T06:00:00Z](./CURRENT_STATUS_20261103T060000Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T08:45:00Z](./CURRENT_STATUS_20261103T084500Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T08:30:00Z](./CURRENT_STATUS_20261103T083000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T07:15:00Z](./CURRENT_STATUS_20261103T071000Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T00:50:00Z](./CURRENT_STATUS_20261103T005000Z.md)
+- [Daymark whole-project engineering status — 2026-11-03T07:15:00Z](./CURRENT_STATUS_20261103T071500Z.md)
+- [Daymark whole-project engineering status — 2026-11-03T00:15:00Z](./CURRENT_STATUS_20261103T001500Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T00:45:00Z](./CURRENT_STATUS_20261103T004500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T06:05:00Z](./CURRENT_STATUS_20261103T060500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T05:08:00Z](./CURRENT_STATUS_20261103T050800Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T04:45:00Z](./CURRENT_STATUS_20261103T050800Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T04:30:00Z](./CURRENT_STATUS_20261103T043000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T21:30:00Z](./CURRENT_STATUS_20261102T213000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T16:20:00Z](./CURRENT_STATUS_20261102T162000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T15:50:00Z](./CURRENT_STATUS_20261102T1550Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T14:10:00Z](./CURRENT_STATUS_20261102T1410Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T13:30:00Z](./CURRENT_STATUS_20261102T1330Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T11:45:00Z](./CURRENT_STATUS_20261102T1145Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T05:20:00Z](./CURRENT_STATUS_20261102T052000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T05:00:00Z](./CURRENT_STATUS_20261102T050000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T02:45:00Z](./CURRENT_STATUS_20261102T024500Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T00:45:00Z](./CURRENT_STATUS_20261102T004500Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T05:30:00Z](./CURRENT_STATUS_20261102T053000Z.md)
-- [Daymark whole-project engineering status — 2026-11-02T00:05:00Z](./CURRENT_STATUS_20261102T000500Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T18:25:23Z](./CURRENT_STATUS_20261101T182523Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T17:47:00Z](./CURRENT_STATUS_20261101T174700Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T17:30:00Z](./CURRENT_STATUS_20261101T173000Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T15:40:00Z](./CURRENT_STATUS_20261101T154000Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T09:56:00Z](./CURRENT_STATUS_20261101T095600Z.md)
-- [Daymark whole-project engineering status — 2026-11-01T08:44:33Z](./CURRENT_STATUS_20261101T084433Z.md)
 
 # Agent status index
 
@@ -184,10 +87,10 @@ Timestamp (UTC): 2026-11-10T02:08:52Z
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark whole-project engineering status — 2026-11-09T14:55:08Z (main 59e6961c0645; six open PRs, twelve issues)](./CURRENT_STATUS_20261109T145508Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T14:53:34.079Z (main 59e6961c0645; six open PRs, twelve issues)](./CURRENT_STATUS_20261109T145334Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T13:13:07.642Z (main 59e6961c0645; #675 webhook/storage/recovery, #656 import/export, #659 extension, #665 signing/Node24; Focus #648 blocked)](./CURRENT_STATUS_20261109T131307Z.md)
-- Previous reviewed snapshot: [2026-11-09T12:34:39.477Z — main 8d76584bc07e](./CURRENT_STATUS_20261109T123439Z.md)
+- [Daymark engineering status — 20261110T164211Z (offline app-link and intent handoff planner card)](./CURRENT_STATUS_20261110T164211Z.md)
+- [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
+- [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
+- [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
 - Previous reviewed snapshot: [2026-11-09T12:00:49Z — current main 1d29085](./CURRENT_STATUS_20261109T120049Z.md)
 - Previous reviewed snapshot: [2026-11-09T11:39:14Z](./CURRENT_STATUS_20261109T113914Z.md)
 
