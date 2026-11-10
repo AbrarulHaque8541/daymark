@@ -293,6 +293,7 @@ test('afterCommit is awaited inside the task lock and receives only actual chang
     key: 'daymark.tasks.v1',
     baseTasks: base,
     desiredTasks: [makeTask('a', 'A completed')],
+    expectedGeneration: 0,
     readCurrent,
     afterCommit: async (commitResult) => {
       order.push('after-commit');
