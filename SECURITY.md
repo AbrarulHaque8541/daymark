@@ -2,13 +2,14 @@
 
 ## Version and report-triage status
 
-**Checked:** 2026-10-13. This table describes vulnerability-report handling, not a promise of ongoing support, release qualification, or device compatibility. Verify the live [GitHub Releases](https://github.com/AbrarulHaque8541/daymark/releases) page for the latest published artifacts. PR #295 prepared the future `daymark` URL, but the actual GitHub slug remains `AbrarulHaque8541/ai-personal-task-assistant` until the owner applies the separate rename; the prepared link may not resolve before then. This review does not rename the repository.
+**Checked:** 2026-11-10. This table describes vulnerability-report handling, not a promise of ongoing support, release qualification, or device compatibility. Verify the live [GitHub Releases](https://github.com/AbrarulHaque8541/daymark/releases) page for the latest published artifacts. The canonical repository is `AbrarulHaque8541/daymark`; legacy `ai-personal-task-assistant` links redirect to this repository.
 
 | Version/source | Verified boundary | Security-report status |
 |---|---|---|
-| [Latest published: v1.0.5](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.0.5) | Production APK is published; it targets API 35 and uses the previous application identity. It is not an update for the current source identity. | Reports accepted; best-effort triage. This is not a support or device-qualification guarantee. |
-| Current `main` source | `com.abrar.daymark`, `versionName` 1.0 / `versionCode` 7, target API 36; no production release for this identity has been published. | Reports accepted; best-effort triage. Source status is not a published or qualified release. |
-| Earlier tags/builds | Historical; attached assets and verification vary by tag. | Reports accepted; best-effort triage. Check the exact release and artifact before assessing exposure. |
+| [Latest published: v1.5](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.5) | Published 2026-10-23. Production package `com.abrar.daymark`, versionCode 12, target API 36, using the pinned production signer. This is the latest published artifact; it does not include source-only changes made after its tag. | Reports accepted; best-effort triage. This is not a support or device-qualification guarantee. |
+| Current `main` source | Package `com.abrar.daymark`, versionName 1.6 / versionCode 13, minSdk 26 / target API 36. No production release for source version 1.6 has been published. | Reports accepted; best-effort triage. Source status is not a published or qualified release. |
+| Draft release | v1.4 remains a draft and is not the latest published release. Do not describe it as available to users. | Reports accepted; best-effort triage. |
+| Earlier tags/builds | Historical; attached assets and verification vary by tag. Check the exact release and artifact before assessing exposure. | Reports accepted; best-effort triage. |
 
 ## Reporting a Vulnerability
 
