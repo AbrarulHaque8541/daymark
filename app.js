@@ -1887,8 +1887,7 @@
       setStorageStatus('Focus preset could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
     }
-    const expectedGeneration = Number.isSafeInteger(expectedGenerationOverride)
-      ? expectedGenerationOverride : state.focusPersistedGeneration;
+    const expectedGeneration = state.focusPersistedGeneration;
     if (!Number.isSafeInteger(expectedGeneration)) {
       setStorageStatus('Focus preset could not be saved safely because its loaded storage generation is unavailable.', true);
       return false;
@@ -2046,7 +2045,8 @@
       setStorageStatus('Focus data could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
     }
-    const expectedGeneration = state.focusPersistedGeneration;
+    const expectedGeneration = Number.isSafeInteger(expectedGenerationOverride)
+      ? expectedGenerationOverride : state.focusPersistedGeneration;
     if (!Number.isSafeInteger(expectedGeneration)) {
       setStorageStatus('Focus data could not be saved safely because its loaded storage generation is unavailable.', true);
       return false;
