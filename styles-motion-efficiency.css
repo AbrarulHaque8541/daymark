@@ -57,7 +57,8 @@
 .focus-card,
 .weather-card,
 .currency-card,
-.briefing-card {
+.briefing-card,
+#browser-intent-card {
   position: relative;
 }
 .button-primary::after,
@@ -66,7 +67,8 @@
 .focus-card::after,
 .weather-card::after,
 .currency-card::after,
-.briefing-card::after {
+.briefing-card::after,
+#browser-intent-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -82,7 +84,8 @@
 .focus-card:hover::after,
 .weather-card:hover::after,
 .currency-card:hover::after,
-.briefing-card:hover::after {
+.briefing-card:hover::after,
+#browser-intent-card:hover::after {
   opacity: 1;
 }
 
@@ -222,7 +225,19 @@
 .focus-card:focus-within,
 .weather-card:focus-within,
 .currency-card:focus-within,
-.briefing-card:focus-within {
+.briefing-card:focus-within,
+#browser-intent-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+}
+
+/* Reduced-motion-safe result update flash for intent planner. */
+#browser-intent-result.is-updating {
+  opacity: 0.92;
+  transition: opacity 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  #browser-intent-result.is-updating {
+    transition: none;
+  }
 }
