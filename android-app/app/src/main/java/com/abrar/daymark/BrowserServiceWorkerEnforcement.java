@@ -24,14 +24,14 @@ final class BrowserServiceWorkerEnforcement {
             "Blocked by Daymark: Service Worker network access is unavailable while Offline.";
 
     private static volatile boolean installAttempted;
-    private static volatile boolean settingsControlAvailable;
+    private static volatile boolean settingsBlocked;
     private static volatile boolean clientInstalled;
     private static volatile boolean onlineAllowed;
 
     private BrowserServiceWorkerEnforcement() { }
 
     static synchronized boolean installBeforeFirstWebView() {
-        if (installAttempted) return settingsControlAvailable || clientInstalled;
+        if (installAttempted) return settingsBlocked || clientInstalled;
         onlineAllowed = false;
         installAttempted = true;
 
@@ -47,7 +47,7 @@ final class BrowserServiceWorkerEnforcement {
         try {
             controller.getServiceWorkerWebSettings().setBlockNetworkLoads(
                     BrowserServiceWorkerPolicy.blocksNetworkLoads(onlineAllowed));
-            settingsControlAvailable = true;
+            settingsBlocked = true;
         } catch (RuntimeException unavailable) {
             Log.e(TAG, "could not set global Service Worker network block", unavailable);
         }
@@ -72,10 +72,10 @@ final class BrowserServiceWorkerEnforcement {
             Log.e(TAG, "could not install Service Worker request client", unavailable);
         }
 
-        if (!settingsControlAvailable && !clientInstalled) {
+        if (!settingsBlocked && !clientInstalled) {
             Log.e(TAG, "Service Worker network policy unavailable; browser navigation must fail closed");
         }
-        return settingsControlAvailable || clientInstalled;
+        return settingsBlocked || clientInstalled;
     }
 
     static synchronized boolean enforceBlocked() {
@@ -84,11 +84,21 @@ final class BrowserServiceWorkerEnforcement {
         try {
             ServiceWorkerController.getInstance().getServiceWorkerWebSettings()
                     .setBlockNetworkLoads(true);
-            settingsControlAvailable = true;
+            settingsBlocked = true;
         } catch (RuntimeException unavailable) {
+            try {
+                settingsBlocked = ServiceWorkerController.getInstance()
+                        .getServiceWorkerWebSettings().getBlockNetworkLoads();
+            } catch (RuntimeException stateUnavailable) {
+                // Keep the last known state; the request client independently blocks Offline.
+            }
             Log.e(TAG, "could not reassert global Service Worker network block", unavailable);
         }
-        return settingsControlAvailable || clientInstalled;
+        boolean enforced = settingsBlocked || clientInstalled;
+        if (!enforced) {
+            Log.e(TAG, "Offline Service Worker enforcement unavailable; no platform block or request client is active");
+        }
+        return enforced;
     }
 
     /**
@@ -98,17 +108,25 @@ final class BrowserServiceWorkerEnforcement {
      */
     static synchronized boolean allowNetworkAfterExplicitConsent() {
         if (!installAttempted && !installBeforeFirstWebView()) return false;
-        onlineAllowed = false;
+        // The user has already passed Daymark's explicit Online gate. The client may
+        // allow HTTP/HTTPS now; the platform setting is separately unblocked when supported.
+        onlineAllowed = true;
         try {
             ServiceWorkerController.getInstance().getServiceWorkerWebSettings()
                     .setBlockNetworkLoads(false);
-            settingsControlAvailable = true;
-            onlineAllowed = true;
+            settingsBlocked = false;
             return true;
         } catch (RuntimeException unavailable) {
-            Log.w(TAG, "could not enable Service Worker network access after Online consent; worker requests remain blocked",
+            try {
+                settingsBlocked = ServiceWorkerController.getInstance()
+                        .getServiceWorkerWebSettings().getBlockNetworkLoads();
+            } catch (RuntimeException stateUnavailable) {
+                // Unknown is not treated as unblocked. The request client remains the
+                // fail-closed fallback when installed.
+            }
+            Log.w(TAG, "could not change the Service Worker platform setting after Online consent; the current setting is retained",
                     unavailable);
-            return false;
+            return !settingsBlocked;
         }
     }
 
