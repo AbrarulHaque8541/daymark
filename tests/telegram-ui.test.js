@@ -114,6 +114,33 @@ test('an invalid chat target reports honestly and sends nothing', async () => {
   assert.match(doc.elements['telegram-status'].textContent, /chat target/);
   assert.equal(fetchFn.calls.length, 0);
 });
+test('chat guidance distinguishes private chat IDs from public channel usernames', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { fetch: fetchFn }));
+  assert.equal(doc.elements['telegram-chat'].placeholder, 'Private chat ID or public @channelusername');
+  fillValidInputs(doc);
+  doc.elements['telegram-chat'].value = 'not a target';
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /numeric chat ID for a private chat, or an @channelusername for a public channel/);
+  assert.equal(fetchFn.calls.length, 0);
+});
+test('a partial Telegram engine without chat validation fails closed before reading storage', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+  const partialLogic = {
+    isBotToken: engine.isBotToken,
+    buildCompletedDigest: engine.buildCompletedDigest,
+    sendTelegramMessage: engine.sendTelegramMessage
+  };
+  const handle = ui.attachTelegramUi(okEnv(doc, { logicApi: partialLogic, storage: storage, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  assert.match(doc.elements['telegram-status'].textContent, /input validation is unavailable/);
+  assert.equal(storage.readCount(), 0);
+  assert.equal(fetchFn.calls.length, 0);
+});
 test('sending a digest delivers only completed tasks to Telegram', async () => {
   const doc = makeDoc(ALL_IDS);
   const seed = {};
@@ -203,6 +230,22 @@ test('boot never reads storage', () => {
   const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
   ui.attachTelegramUi(okEnv(makeDoc(ALL_IDS), { storage: storage }));
   assert.equal(storage.readCount(), 0, 'attaching the card must not read storage');
+});
+test('a throwing or malformed task validator fails closed without exposing its error', async () => {
+  for (const validator of [
+    { validateStoredTasks() { throw new Error('sensitive validator detail'); } },
+    { validateStoredTasks() { return { tasks: 'not a task list', rejectedCount: 0 }; } }
+  ]) {
+    const doc = makeDoc(ALL_IDS);
+    const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('Buy milk', { completed: true, id: 1 })]) };
+    const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
+    const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, taskLogicApi: validator, fetch: fetchFn }));
+    fillValidInputs(doc);
+    await handle.send();
+    assert.match(doc.elements['telegram-status'].textContent, /could not be validated safely/);
+    assert.doesNotMatch(doc.elements['telegram-status'].textContent, /sensitive validator detail/);
+    assert.equal(fetchFn.calls.length, 0);
+  }
 });
 test('a throwing storage read is reported honestly', async () => {
   const doc = makeDoc(ALL_IDS);
