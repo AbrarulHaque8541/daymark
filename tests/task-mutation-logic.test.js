@@ -30,20 +30,32 @@ function makeLockManager() {
 
 function makeStorage(tasks) {
   let raw = JSON.stringify(tasks);
+  let generationRaw = null;
   return {
     get raw() { return raw; },
+    get generationRaw() { return generationRaw; },
     getItem(key) {
+      if (key === mutation.TASK_GENERATION_KEY) return generationRaw;
       assert.equal(key, 'daymark.tasks.v1');
       return raw;
     },
     setItem(key, value) {
+      if (key === mutation.TASK_GENERATION_KEY) {
+        generationRaw = String(value);
+        return;
+      }
       assert.equal(key, 'daymark.tasks.v1');
       raw = String(value);
+    },
+    removeItem(key) {
+      assert.equal(key, 'daymark.tasks.v1');
+      raw = null;
     }
   };
 }
 
 function readCurrent(raw) {
+  if (raw === null) return { ok: true, tasks: [] };
   if (typeof raw !== 'string' || raw.length === 0) {
     return { ok: false, reason: 'invalid-current' };
   }
@@ -57,13 +69,15 @@ function readCurrent(raw) {
   }
 }
 
-function commit(lockManager, storage, baseTasks, desiredTasks) {
+function commit(lockManager, storage, baseTasks, desiredTasks, expectedGeneration) {
+  const generation = mutation.readTaskGeneration(storage);
   return mutation.commitTaskSnapshot({
     lockManager,
     storage,
     key: 'daymark.tasks.v1',
     baseTasks,
     desiredTasks,
+    expectedGeneration: expectedGeneration === undefined ? generation.value : expectedGeneration,
     readCurrent
   });
 }
@@ -298,4 +312,69 @@ test('task equality is independent of object property insertion order', () => {
   const left = [{ id: 'a', title: 'A', completed: false }];
   const right = [{ completed: false, title: 'A', id: 'a' }];
   assert.equal(mutation.areTaskListsEqual(left, right), true);
+});
+
+
+test('task generation is monotonic, retained outside user data, and checked before merge', async () => {
+  const storage = makeStorage([makeTask('old', 'Old')]);
+  assert.deepEqual(mutation.readTaskGeneration(storage), { ok: true, value: 0 });
+  const locks = makeLockManager();
+  const advanced = await mutation.withTaskMutationLock(locks, () => {
+    const next = mutation.incrementTaskGeneration(storage);
+    storage.removeItem('daymark.tasks.v1');
+    return next;
+  });
+  assert.equal(advanced.ok, true);
+  assert.deepEqual(advanced.value, { ok: true, value: 1 });
+  assert.equal(storage.raw, null, 'the primary task key is removed');
+  assert.equal(storage.generationRaw, '1', 'the non-personal generation survives the clear');
+  const stale = await commit(locks, storage, [], [makeTask('stale', 'Stale')], 0);
+  assert.equal(stale.ok, false);
+  assert.equal(stale.reason, 'stale-generation');
+  assert.equal(storage.raw, null, 'a stale writer cannot recreate cleared tasks');
+  const fresh = await commit(locks, storage, [], [makeTask('fresh', 'Fresh')], 1);
+  assert.equal(fresh.ok, true, 'a new intent using the post-clear generation can save');
+  assert.deepEqual(JSON.parse(storage.raw).map((task) => task.id), ['fresh']);
+});
+
+test('a task mutation queued behind Clear All is rejected using its captured generation', async () => {
+  const storage = makeStorage([]);
+  const locks = makeLockManager();
+  let releaseClear;
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  const clear = mutation.withTaskMutationLock(locks, async () => {
+    const generation = mutation.incrementTaskGeneration(storage);
+    assert.equal(generation.ok, true);
+    storage.removeItem('daymark.tasks.v1');
+    markStarted();
+    await new Promise((resolve) => { releaseClear = resolve; });
+    return generation;
+  });
+  await started;
+  const queuedStaleWrite = commit(locks, storage, [], [makeTask('queued', 'Queued before clear')], 0);
+  releaseClear();
+  await clear;
+  const stale = await queuedStaleWrite;
+  assert.equal(stale.ok, false);
+  assert.equal(stale.reason, 'stale-generation');
+  assert.equal(storage.raw, null, 'the queued stale addition remains absent');
+  const fresh = await commit(locks, storage, [], [makeTask('fresh', 'Fresh after clear')], 1);
+  assert.equal(fresh.ok, true);
+  assert.deepEqual(JSON.parse(storage.raw).map((task) => task.id), ['fresh']);
+});
+
+test('invalid or unreadable task generation fails closed without changing task data', async () => {
+  const storage = makeStorage([makeTask('a', 'A')]);
+  storage.setItem(mutation.TASK_GENERATION_KEY, '01');
+  const invalid = await commit(makeLockManager(), storage, [makeTask('a', 'A')], [makeTask('a', 'Changed')], 1);
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.reason, 'generation-invalid');
+  assert.equal(JSON.parse(storage.raw)[0].title, 'A');
+  storage.setItem(mutation.TASK_GENERATION_KEY, '2');
+  storage.getItem = () => { throw new Error('blocked'); };
+  const unreadable = await commit(makeLockManager(), storage, [makeTask('a', 'A')], [makeTask('a', 'Changed')], 2);
+  assert.equal(unreadable.ok, false);
+  assert.equal(unreadable.reason, 'generation-unreadable');
+  assert.equal(JSON.parse(storage.raw)[0].title, 'A');
 });
