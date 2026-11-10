@@ -3,7 +3,7 @@
 const { app, session, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { createDownloadPath, reservationKey } = require('./lib/download-policy');
+const { handleWillDownload } = require('./lib/download-handler');
 const { pathToFileURL } = require('url');
 const { isAllowedUrl } = require('./lib/rules');
 const { isAllowedRequest, isTrackerRequest } = require('./lib/request-policy');
@@ -67,37 +67,29 @@ app.whenReady().then(() => {
     callback({ requestHeaders: details.requestHeaders });
   });
 
-  // Remote filenames are untrusted. Allocate a unique basename directly in
-  // Downloads and cancel if the safe destination cannot be established.
+  // Remote filenames are untrusted. The injectable handler owns safe path
+  // allocation, cancellation fallback and reservation cleanup.
   ses.on('will-download', (event, item) => {
-    let savePath = null;
-    try {
-      savePath = createDownloadPath(
-        app.getPath('downloads'),
-        item.getFilename(),
-        (candidate) => {
-          try {
-            fs.lstatSync(candidate); // lstat also treats dangling symlinks as occupied.
-            return true;
-          } catch (error) {
-            if (error && error.code === 'ENOENT') return false;
-            throw error;
-          }
-        },
-        reservedDownloadPaths,
-      );
-      item.once('done', () => reservedDownloadPaths.delete(reservationKey(savePath)));
-      item.setSavePath(savePath);
-      if (mainWindow) {
+    const result = handleWillDownload({
+      event,
+      item,
+      downloadDirectory: () => app.getPath('downloads'),
+      exists: (candidate) => {
         try {
-          mainWindow.webContents.send('download-started', path.basename(savePath));
-        } catch {
-          // A closed renderer must not change the already-safe download destination.
+          fs.lstatSync(candidate); // lstat also treats dangling symlinks as occupied.
+          return true;
+        } catch (error) {
+          if (error && error.code === 'ENOENT') return false;
+          throw error;
         }
-      }
-    } catch {
-      if (savePath) reservedDownloadPaths.delete(reservationKey(savePath));
-      try { event.preventDefault(); } catch { /* fail closed even if the event is already gone */ }
+      },
+      reservedPaths: reservedDownloadPaths,
+      onStarted: (filename) => {
+        if (mainWindow) mainWindow.webContents.send('download-started', filename);
+      },
+    });
+    if (!result.ok && !result.cancelled) {
+      console.error('Daymark could not cancel an unsafe download destination.');
     }
   });
 
