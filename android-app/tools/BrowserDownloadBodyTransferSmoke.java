@@ -25,6 +25,7 @@ public final class BrowserDownloadBodyTransferSmoke {
         interruptedAndStorageFailuresAbort();
         cancellationAndOfflineTransitionsAbort();
         publicationGateRejectsStateChangeBeforeCommit();
+        publicationGateMustCommitExactlyOnce();
         sinkFailuresAbortAndDoNotPublish();
         fatalFailuresAbortAndPreserveError();
         progressCallbacksCannotBreakTransfers();
@@ -180,25 +181,52 @@ public final class BrowserDownloadBodyTransferSmoke {
         Target target = new Target();
         boolean[] online = {true};
         boolean[] invoked = {false};
-        BrowserDownloadBodyTransfer.PublicationGate gate = (cancellation, network, staging, copiedBytes) -> {
+        BrowserDownloadBodyTransfer.PublicationGate gate = (cancellation, network, commitAction) -> {
             invoked[0] = true;
             // Model Offline winning while the publication gate owns the shared state lock.
             online[0] = false;
-            if (cancellation.isCancelled()) {
-                throw new BrowserDownloadBodyTransfer.TransferException(
-                        BrowserDownloadBodyTransfer.Failure.CANCELLED);
-            }
-            if (!network.isOnline()) {
-                throw new BrowserDownloadBodyTransfer.TransferException(
-                        BrowserDownloadBodyTransfer.Failure.NETWORK_DISABLED);
-            }
-            staging.commit(copiedBytes);
+            commitAction.commit();
         };
         expect(BrowserDownloadBodyTransfer.Failure.NETWORK_DISABLED, () -> transfer(200, null, null,
                 new ByteArrayInputStream(new byte[]{1}), 1024, () -> false, () -> online[0],
                 gate, target, null));
         check(invoked[0] && target.commits == 0 && target.aborts == 1,
                 "publication gate must reject a state change and abort before final visibility");
+    }
+
+    private static void publicationGateMustCommitExactlyOnce() throws Exception {
+        Target noOp = new Target();
+        BrowserDownloadBodyTransfer.PublicationGate noOpGate =
+                (cancellation, network, commitAction) -> { };
+        expect(BrowserDownloadBodyTransfer.Failure.PUBLICATION_NOT_COMMITTED, () -> transfer(200, null, null,
+                new ByteArrayInputStream(new byte[]{1}), 1024, () -> false, () -> true,
+                noOpGate, noOp, null));
+        check(noOp.commits == 0 && noOp.aborts == 1,
+                "a publication gate that returns without invoking the helper commit action fails closed");
+
+        Target duplicate = new Target();
+        BrowserDownloadBodyTransfer.PublicationGate duplicateGate =
+                (cancellation, network, commitAction) -> {
+                    commitAction.commit();
+                    commitAction.commit();
+                };
+        long copied = transfer(200, null, null, new ByteArrayInputStream(new byte[]{1, 2}), 1024,
+                () -> false, () -> true, duplicateGate, duplicate, null);
+        check(copied == 2 && duplicate.commits == 1 && duplicate.aborts == 0,
+                "a duplicate callback cannot publish the staged target more than once");
+
+        Target cancelledBeforeCallback = new Target();
+        boolean[] cancelled = {false};
+        BrowserDownloadBodyTransfer.PublicationGate cancelGate =
+                (cancellation, network, commitAction) -> {
+                    cancelled[0] = true;
+                    commitAction.commit();
+                };
+        expect(BrowserDownloadBodyTransfer.Failure.CANCELLED, () -> transfer(200, null, null,
+                new ByteArrayInputStream(new byte[]{1}), 1024, () -> cancelled[0], () -> true,
+                cancelGate, cancelledBeforeCallback, null));
+        check(cancelledBeforeCallback.commits == 0 && cancelledBeforeCallback.aborts == 1,
+                "cancellation before the gate callback prevents publication and aborts staging");
     }
 
     private static void sinkFailuresAbortAndDoNotPublish() throws Exception {
@@ -277,7 +305,7 @@ public final class BrowserDownloadBodyTransferSmoke {
                 "fatal abort errors are suppressed without replacing the original stream error");
 
         Target publishFailure = new Target();
-        BrowserDownloadBodyTransfer.PublicationGate fatalGate = (cancellation, network, staging, copiedBytes) -> {
+        BrowserDownloadBodyTransfer.PublicationGate fatalGate = (cancellation, network, commitAction) -> {
             throw new AssertionError("synthetic fatal publication");
         };
         boolean publicationErrorPreserved = false;
@@ -342,7 +370,7 @@ public final class BrowserDownloadBodyTransferSmoke {
     }
 
     private static BrowserDownloadBodyTransfer.PublicationGate defaultPublicationGate() {
-        return (cancellation, network, target, copiedBytes) -> {
+        return (cancellation, network, commitAction) -> {
             if (cancellation.isCancelled()) {
                 throw new BrowserDownloadBodyTransfer.TransferException(
                         BrowserDownloadBodyTransfer.Failure.CANCELLED);
@@ -351,7 +379,7 @@ public final class BrowserDownloadBodyTransferSmoke {
                 throw new BrowserDownloadBodyTransfer.TransferException(
                         BrowserDownloadBodyTransfer.Failure.NETWORK_DISABLED);
             }
-            target.commit(copiedBytes);
+            commitAction.commit();
         };
     }
 
