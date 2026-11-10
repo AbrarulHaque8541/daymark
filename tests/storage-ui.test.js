@@ -474,8 +474,10 @@ test('clear-all confirms once, removes managed data, and never reads the legacy 
   assert.equal(removedKeys.includes('daymark.webhook.v1'), false, 'the storage UI never removes the endpoint');
   assert.doesNotMatch(confirmations[0], /legacy webhook settings/i);
   assert.equal(storageData['unrelated.other.key'], 'keep me');
-  assert.equal(dispatched.length, 1, 'same-tab task state is notified after clear-all');
-  assert.equal(dispatched[0].key, null, 'clear-all notification reloads the whole task state');
+  assert.equal(dispatched.length, 2, 'clear-all notifies both Focus and task state in the same tab');
+  assert.equal(dispatched[0].type, 'daymark:focus-storage-cleared');
+  assert.equal(dispatched[0].detail.categoryId, 'all');
+  assert.equal(dispatched[1].key, null, 'clear-all notification reloads the whole task state');
   assert.match(elements['storage-status-line'].textContent, /Cleared all 4 stored item\(s\)/);
   assert.match(elements['storage-status-line'].textContent, /Nothing outside this browser was affected/);
   assert.equal(elements['storage-clear-all'].disabled, true, 'clear-all disables after the store is empty');
