@@ -61,6 +61,24 @@ The SLSA workflow permits manual dispatch for build-only validation. Its tag-tri
 
 This workflow-level actor gate does not replace repository tag protection or a protected production environment with required reviewers. The latest live repository inventory found no repository rulesets and main branch protection disabled; a repository administrator should configure tag-creation restrictions and any required production-environment reviewers in GitHub settings. No repository settings were changed by this engineering work.
 
+## Required GitHub environment protection — 2026-11-10
+
+Every privileged signing or provenance-upload job references the GitHub Actions environment **`production-signing`**:
+- production APK/AAB signing and draft creation;
+- signed device-test APK signing and release-asset upload;
+- the owner-only private main test APK workflow;
+- SLSA provenance signing and release-asset upload.
+
+**The workflow reference is not proof that the environment is protected.** GitHub can automatically create an environment the first time a workflow references it; an automatically created environment has no required reviewers or deployment restrictions by default. Before any signed tag, release, provenance upload, or private signed test run, a repository administrator must explicitly create/configure `production-signing` in Settings → Environments.
+
+Required owner-side configuration:
+1. Add at least one independent required reviewer and enable **Prevent self-review** where available.
+2. Restrict deployment refs to the intended `main` dispatch and approved version/device-test tag patterns; do not allow arbitrary branches or tags.
+3. Verify the environment's protection rules are saved and active before any privileged workflow is triggered.
+4. Keep signing credentials in the existing protected repository secrets; this change does not move, rotate, print, or replace them.
+
+Until that configuration is independently verified, treat all signed workflows as **blocked for release use**, even though their source guards and ordinary PR CI may pass. The workflow code now references the environment, but no GitHub environment settings were changed or verified by this engineering run.
+
 ## Debug vs. production
 
 | Build | Signature | Can update a production install? |
