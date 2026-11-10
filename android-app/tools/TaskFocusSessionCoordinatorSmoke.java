@@ -205,6 +205,10 @@ public final class TaskFocusSessionCoordinatorSmoke {
         first.clock.advance(3_000);
 
         Fixture afterProcessDeath = new Fixture(first.clock, first.store);
+        // The durable store is intentionally reused, but its event log also
+        // contains the prior process's Start writes. Reset only the observation
+        // log so this assertion covers the restore sequence, not the earlier process.
+        afterProcessDeath.store.events.clear();
         TaskFocusSessionCoordinator.Snapshot restored =
                 afterProcessDeath.coordinator.restoreAfterProcessStart("task-restore", "Renamed task");
         check(restored != null && restored.restored, "a stored session is identified as restored, not newly started");
