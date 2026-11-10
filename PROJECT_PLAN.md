@@ -1,3 +1,30 @@
+## Current execution queue — 2026-11-10T05:36:48Z (main 469b29edea69)
+
+Latest whole-project snapshot: [CURRENT_STATUS_20261110T053648Z.md](docs/CURRENT_STATUS_20261110T053648Z.md).
+
+Current main is `469b29edea6993b19c0f50d427b9d48605b2a4c7`; root AGENTS blob is `492ed21e2219a8d1b80c7d6e63575525c98a5a91`. Live inventory: **14 open PRs / 23 open issues**. Main Android CI and Ubuntu/Windows contracts pass on the exact main SHA. Main protection is disabled; rulesets are empty; the detailed protection endpoint is HTTP 403.
+
+### P0 — runtime, data integrity and governance
+1. **#648/#613 Focus instrumentation:** latest head `13933d6bb017d51475aa2e16bedefe1c78cdfa33` fixes the shared event-log fixture and derives UiAutomation touch rectangles from `getLocationOnScreen()`; Android CI/contracts/device artifact pass, API 29/36 lifecycle and device-test APK are still running. Keep strict gates.
+2. **#677 reminders/gesture:** latest head `f50650a1984768f2729c28cc263568263586e84d`; API 36 fails at the same 153 px touch-coordinate mismatch. Reuse #648 only after its new exact-head lifecycle passes.
+3. **#683/#689/#690:** finish task, webhook and Focus Web Locks/clear ordering, import/recovery/undo concurrency and same-tab invalidation.
+4. **#646/#160:** owner-approved required CI/independent review governance and physical Android/WebView acceptance.
+
+### P1 — security, integration and correctness
+5. **#665:** signing-secret split has green exact-head CI, but flow-style YAML PR triggers are not recognized by its regression guard; fix and independently review.
+6. **#694/#693:** AST test guard has no exact-head Actions run; declaration-only and statically dead callbacks can still satisfy the callback predicate.
+7. **#692/#691:** private staging/no-replace desktop publication is green; add renderer-visible failure feedback after publication errors. Physical desktop GUI remains untested.
+8. **#671/#678:** complete the actual redirect-validating, pinned, bounded Android download transport; keep current downloads fail-closed.
+9. **#675/#656:** synchronize accumulated recovery/webhook and iCalendar branches with main, preserve the Telegram card, and obtain independent storage/RFC review.
+10. **#659/#687 and #686/#685:** accessible malformed-extension recovery UI and Service Worker Online/Offline compatibility.
+
+### P2 — infrastructure and cross-platform behavior
+11. **#696:** generate a real Electron package lock only when npm registry DNS is available; current `package-lock.json` is absent and CI uses `npm install`.
+12. **#684/#476:** align Android/web recurrence validation, anchors, catch-up, Doze/reboot/timezone semantics.
+13. **#348/#325:** resume broader browser UX and cross-platform architecture after P0/P1 gates.
+
+Recent main merges: #697 Telegram task-digest card, #695 platform support matrix, #688 Node test-integrity guard. Latest published release remains v1.5 (2026-10-23); no release/tag is authorized or created.
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
