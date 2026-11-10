@@ -219,6 +219,12 @@ def check_recovery_ui(main):
     assert "addMalformedExtensionRecoverySection(content);" in manager, (
         "Extensions manager must expose malformed-pack recovery metadata"
     )
+    valid_rows = manager.split("for (BrowserExtension ext : extensions)", 1)[1].split(
+        "addMalformedExtensionRecoverySection(content);", 1
+    )[0]
+    assert "actions.setOrientation(LinearLayout.HORIZONTAL);" in valid_rows, (
+        "existing valid-extension actions must retain their horizontal layout"
+    )
     assert "browserExtensionsDialog.dismiss();" in manager and "browserExtensionsDialog = dialog;" in manager, (
         "refreshing recovery actions must replace the current Extensions dialog, not stack stale copies"
     )
