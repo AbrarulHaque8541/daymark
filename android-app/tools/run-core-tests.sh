@@ -152,6 +152,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExternalLinkPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentHandoffPolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDownloadFilenamePolicySmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserDownloadProgressSmoke
