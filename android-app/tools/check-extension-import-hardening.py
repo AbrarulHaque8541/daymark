@@ -212,6 +212,100 @@ def check_sources(parser, store, smoke):
         assert marker in smoke, f"missing import-hardening regression: {marker}"
 
 
+def check_recovery_ui(main):
+    manager = main.split("private void showBrowserExtensionsManager()", 1)[1].split(
+        "private void showExtensionDetailsDialog", 1
+    )[0]
+    assert "addMalformedExtensionRecoverySection(content);" in manager, (
+        "Extensions manager must expose malformed-pack recovery metadata"
+    )
+
+    recovery = main.split("private void addMalformedExtensionRecoverySection", 1)[1].split(
+        "private void exportMalformedExtensionPack", 1
+    )[0]
+    assert "listMalformedUserPacks()" in recovery, "manager must enumerate recovery records"
+    assert "pack.canExport && pack.sha256 != null" in recovery, (
+        "raw export must be offered only for fingerprinted, exportable files"
+    )
+    assert "pack.canRemove && pack.sha256 != null" in recovery, (
+        "removal must be offered only for fingerprinted, removable files"
+    )
+    assert "Export exact raw bytes" in recovery and "Remove malformed extension file" in recovery, (
+        "recovery actions must have accessible descriptions"
+    )
+    assert "No safe export or removal action is available" in recovery, (
+        "unsafe recovery records must remain visible without destructive actions"
+    )
+
+    export = main.split("private void exportMalformedExtensionPack", 1)[1].split(
+        "private void confirmRemoveMalformedExtensionPack", 1
+    )[0]
+    assert "Intent.ACTION_CREATE_DOCUMENT" in export and "application/octet-stream" in export, (
+        "raw recovery export must use an explicit user-selected document destination"
+    )
+    assert "pendingMalformedExtensionExportSha256 = pack.sha256;" in export, (
+        "raw export must retain the listing fingerprint until the user selects a destination"
+    )
+
+    result = main.split("if (requestCode == REQUEST_EXPORT_EXTENSION)", 1)[1].split(
+        "if (requestCode == REQUEST_IMPORT_EXTENSION)", 1
+    )[0]
+    assert "readMalformedUserPackBytes(" in result and "malformedSha256" in result, (
+        "raw recovery export must re-read and verify the exact fingerprint after destination selection"
+    )
+    assert "pendingMalformedExtensionExportFileName = null;" in result and "pendingMalformedExtensionExportSha256 = null;" in result, (
+        "pending recovery export state must be cleared on every result path"
+    )
+
+    removal = main.split("private void confirmRemoveMalformedExtensionPack", 1)[1].split(
+        "private void showExtensionDetailsDialog", 1
+    )[0]
+    assert removal.index('.setPositiveButton("Remove file"') < removal.index(
+        "removeMalformedUserPack(pack.fileName, pack.sha256)"
+    ), "malformed-pack deletion must occur only inside the explicit positive confirmation"
+    assert '.setNegativeButton("Keep file", null)' in removal, (
+        "malformed-pack removal must provide a non-destructive cancellation action"
+    )
+    assert "SHA-256 fingerprint before removal" in removal, (
+        "removal confirmation must explain the fingerprint recheck"
+    )
+    assert main.count("removeMalformedUserPack(") == 1, (
+        "malformed-pack removal must have one explicit, confirmed UI call site"
+    )
+
+
+def test_recovery_ui_guard_mutations(main):
+    """Prove recovery UI safeguards fail closed when their wiring is removed."""
+    mutations = [
+        (
+            "raw export fingerprint check removed",
+            "readMalformedUserPackBytes(",
+            "userPackJson(",
+            "raw recovery export must re-read and verify the exact fingerprint",
+        ),
+        (
+            "removal confirmation removed",
+            '.setPositiveButton("Remove file"',
+            '.setPositiveButton("Remove now"',
+            "malformed-pack deletion must occur only inside the explicit positive confirmation",
+        ),
+        (
+            "export accessibility removed",
+            'setContentDescription("Export exact raw bytes',
+            'setText("Export exact raw bytes',
+            "recovery actions must have accessible descriptions",
+        ),
+    ]
+    for name, before, after, diagnostic in mutations:
+        assert main.count(before) == 1, f"UI mutation fixture must match once: {name}"
+        try:
+            check_recovery_ui(main.replace(before, after, 1))
+        except AssertionError as rejected:
+            assert diagnostic in str(rejected), f"{name} failed for an unrelated reason: {rejected}"
+        else:
+            raise AssertionError(f"recovery UI guard accepted mutation: {name}")
+
+
 def test_limit_guard_mutations(parser, store, smoke):
     """Prove each new guard rejects a targeted regression, not an unrelated error."""
     mutations = [
@@ -326,6 +420,9 @@ if __name__ == "__main__":
     store = (root / "app/src/main/java/com/abrar/daymark/ExtensionStore.java").read_text(encoding="utf-8")
     smoke = (root / "tools/ExtensionPackageParserSmoke.java").read_text(encoding="utf-8")
     store_smoke = (root / "tools/ExtensionStoreSmoke.java").read_text(encoding="utf-8")
+    main_activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
+    check_recovery_ui(main_activity)
+    test_recovery_ui_guard_mutations(main_activity)
     for marker in (
         "a readable but malformed existing extension pack is rejected without replacing its exact bytes",
         "a readable zero-byte existing pack remains present and byte-for-byte unchanged",
