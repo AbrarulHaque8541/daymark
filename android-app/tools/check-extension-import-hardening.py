@@ -219,6 +219,10 @@ def check_recovery_ui(main):
     assert "addMalformedExtensionRecoverySection(content);" in manager, (
         "Extensions manager must expose malformed-pack recovery metadata"
     )
+    assert "browserExtensionsDialog.dismiss();" in manager and "browserExtensionsDialog = dialog;" in manager, (
+        "refreshing recovery actions must replace the current Extensions dialog, not stack stale copies"
+    )
+    assert "setOnDismissListener" in manager, "Extensions dialog ownership must clear on dismissal"
 
     recovery = main.split("private void addMalformedExtensionRecoverySection", 1)[1].split(
         "private void exportMalformedExtensionPack", 1
