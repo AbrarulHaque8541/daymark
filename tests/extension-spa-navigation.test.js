@@ -210,17 +210,17 @@ test('bootstrap does not install page-readable config, state, or SPA hooks', () 
 });
 
 test('native same-document history updates run only after initial document injection', () => {
-  const historyCallback = webViewSource
-    .split('public void doUpdateVisitedHistory', 1)[1]
-    .split('public void onPageFinished', 1)[0];
-  assert.match(historyCallback, /extensionRuntime\\.onSameDocumentNavigation\\(view, url\\)/);
-  assert.doesNotMatch(historyCallback, /getProgress\\(\\)\\s*<\\s*100/);
+  const historyStart = webViewSource.indexOf('public void doUpdateVisitedHistory');
+  const historyEnd = webViewSource.indexOf('public void onPageFinished', historyStart);
+  const historyCallback = webViewSource.slice(historyStart, historyEnd);
+  assert.match(historyCallback, /extensionRuntime\.onSameDocumentNavigation\(view, url\)/);
+  assert.doesNotMatch(historyCallback, /getProgress\(\)\s*<\s*100/);
 
-  const runtimeCallback = runtimeSource
-    .split('void onSameDocumentNavigation', 1)[1]
-    .split('private List<BrowserExtension> matchingPacks', 1)[0];
+  const runtimeStart = runtimeSource.indexOf('void onSameDocumentNavigation');
+  const runtimeEnd = runtimeSource.indexOf('private List<BrowserExtension> matchingPacks', runtimeStart);
+  const runtimeCallback = runtimeSource.slice(runtimeStart, runtimeEnd);
   assert.match(runtimeCallback, /userscriptsAppliedForCurrentDocument/);
-  assert.match(runtimeCallback, /isCurrentWebPage\\(webView, url\\)/);
+  assert.match(runtimeCallback, /isCurrentWebPage\(webView, url\)/);
 });
 
 test('userscript duplicate suppression stays native and exposes no page-global pack registry', () => {
