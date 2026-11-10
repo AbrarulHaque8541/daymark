@@ -21,8 +21,17 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 
-/** A narrow wrapper around Android System WebView; no native bridge or request interception is used. */
+/**
+ * A narrow wrapper around Android System WebView; no native JavaScript bridge is exposed.
+ * Service-worker network policy is installed during class initialization, before the first
+ * WebView instance is constructed.
+ */
 final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.Tab {
+    // Java initializes this class before invoking the first constructor, so the global
+    // ServiceWorkerController client is installed before super(activity) creates a WebView.
+    private static final boolean SERVICE_WORKER_NETWORK_POLICY_READY =
+            BrowserServiceWorkerEnforcement.installBeforeFirstWebView();
+
     interface Listener {
         void onPageStarted(String url);
         void onPageFinished(String url);
@@ -47,7 +56,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
     }
 
     private void syncNetworkBlockWithPolicy(WebView view) {
-        if (!networkPolicy.allowsRemoteLoads()) return;
+        if (!networkPolicy.allowsRemoteLoads() || !SERVICE_WORKER_NETWORK_POLICY_READY) return;
         try {
             view.getSettings().setBlockNetworkLoads(false);
         } catch (RuntimeException rendererUnavailable) {
@@ -178,6 +187,10 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
     private final BrowserNetworkPolicy networkPolicy;
     private final Listener listener;
 
+    static boolean isServiceWorkerNetworkPolicyReady() {
+        return SERVICE_WORKER_NETWORK_POLICY_READY;
+    }
+
     boolean isShowingCustomView() {
         return fullscreenView != null;
     }
@@ -200,6 +213,13 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         this.networkPolicy = networkPolicy;
         this.listener = listener;
         this.extensionRuntime = ExtensionRuntime.create(activity);
+        if (BrowserServiceWorkerPolicy.shouldShowCompatibilityNotice()) {
+            String disclosure = BrowserServiceWorkerPolicy.compatibilityDisclosure();
+            if (!SERVICE_WORKER_NETWORK_POLICY_READY) {
+                disclosure += " Browser navigation remains blocked because enforcement could not be installed.";
+            }
+            android.widget.Toast.makeText(activity, disclosure, android.widget.Toast.LENGTH_LONG).show();
+        }
         try {
             android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
             cookieManager.setAcceptCookie(true);
