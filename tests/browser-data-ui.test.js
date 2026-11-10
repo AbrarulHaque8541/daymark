@@ -60,13 +60,23 @@ test('the card explains the selected clear action at boot', () => {
   assert.equal(result.children[0].children[1].className, 'feed-item-summary');
   const expected = engine.explainClearAction('clear-completed');
   assert.equal(result.children.length,
-    1 + expected.removes.length + expected.keeps.length + 3);
-  assert.match(result.children[1].textContent, /^Removes · /);
-  assert.match(result.children[2].textContent, /^Keeps · /);
-  const recoveryIndex = 1 + expected.removes.length + expected.keeps.length;
-  assert.match(result.children[recoveryIndex].textContent, /^No undo · /);
+    1 + expected.removes.length + expected.keeps.length + 3 + (expected.undoWindowSeconds > 0 ? 1 : 0));
+  let lineIndex = 1;
+  for (let i = 0; i < expected.removes.length; i += 1) {
+    assert.match(result.children[lineIndex++].textContent, /^Removes · /);
+  }
+  for (let i = 0; i < expected.keeps.length; i += 1) {
+    assert.match(result.children[lineIndex++].textContent, /^Keeps · /);
+  }
+  let recoveryIndex = lineIndex;
+  if (expected.undoWindowSeconds > 0) {
+    assert.equal(result.children[recoveryIndex].textContent, 'Undo window · 7 seconds');
+    recoveryIndex += 1;
+  }
+  assert.match(result.children[recoveryIndex].textContent, /^Comes back · /);
   assert.match(result.children[recoveryIndex + 1].textContent, /^Scope · This device only/);
   assert.match(result.children[recoveryIndex + 2].textContent, /^Network · /);
+  assert.equal(doc.elements['browser-data-clear'].textContent, 'Clear explanation');
   assert.equal(typeof handle.explain, 'function');
 });
 
@@ -110,7 +120,7 @@ test('form submit re-explains and the clear button empties the card', () => {
     'Clear webhook queue');
   click[0]();
   assert.equal(doc.elements['browser-data-result'].children.length, 0);
-  assert.match(doc.elements['browser-data-status'].textContent, /Cleared./);
+  assert.match(doc.elements['browser-data-status'].textContent, /Explanation cleared; no task or storage data was changed/);
 });
 
 test('a missing engine degrades honestly instead of guessing', () => {
@@ -228,4 +238,25 @@ test('DOMContentLoaded boot also avoids a throwing localStorage getter', () => {
   assert.equal(result.localStorageReads, 0, 'DOMContentLoaded rendering remains storage-independent');
   assert.equal(result.elements['browser-data-status'].textContent,
     'Explained · Clear completed tasks · deletes data');
+});
+
+
+test('unavailable storage controls are disclosed without claiming an action ran', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-data-action'].value = 'storage-clear-status';
+  ui.attachBrowserDataUi({ document: doc, dataApi: engine });
+  assert.match(doc.elements['browser-data-status'].textContent,
+    /^Unavailable · Clear storage status · no action was run/);
+  assert.match(doc.elements['browser-data-result'].children[0].children[1].textContent,
+    /neither operation currently runs/);
+});
+
+test('the card clear button is explicitly scoped to the explanation only', () => {
+  const doc = makeDoc(ALL_IDS);
+  const button = doc.elements['browser-data-clear'];
+  let ariaLabel = '';
+  button.setAttribute = (name, value) => { if (name === 'aria-label') ariaLabel = value; };
+  ui.attachBrowserDataUi({ document: doc, dataApi: engine });
+  assert.equal(button.textContent, 'Clear explanation');
+  assert.match(ariaLabel, /no task or storage data is changed/);
 });
