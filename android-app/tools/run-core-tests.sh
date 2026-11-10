@@ -173,6 +173,12 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserCookieImportSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.CosmeticFilterToCssSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TasksHomeLayoutPolicySmoke
 
+# Platform touch sequence builder used by Android gesture instrumentation.
+javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
+  "$ROOT/app/src/androidTest/java/com/abrar/daymark/PlatformTouchSequence.java" \
+  "$ROOT/tools/PlatformTouchSequenceSmoke.java"
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.PlatformTouchSequenceSmoke
+
 # Focus timer engine, lifecycle coordinator and encrypted snapshot codec.
 sh "$ROOT/tools/run-focus-timer-tests.sh"
 sh "$ROOT/tools/run-focus-session-coordinator-tests.sh"
