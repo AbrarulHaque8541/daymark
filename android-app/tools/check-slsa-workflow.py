@@ -66,6 +66,8 @@ check("github.event_name == 'push' && github.ref_type == 'tag'" in slsa_authoriz
 check("needs: [build, authorize-provenance]" in slsa_provenance
       and "id-token: write" in slsa_provenance and "contents: write" in slsa_provenance,
       "SLSA signing/upload must depend on the approved gate before using OIDC/write permissions")
+check("environment: production-signing" not in slsa_provenance,
+      "the reusable SLSA workflow-call job must not declare unsupported job-level environment")
 check(OWNER_GATE in PRIVATE_MAIN_WORKFLOW,
       "the private main test APK workflow must retain its owner-only manual-dispatch gate")
 production_job = PRODUCTION_RELEASE_WORKFLOW.split("  build-verify-draft:", 1)[1]
