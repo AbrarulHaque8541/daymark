@@ -77,6 +77,24 @@ test('rejects focused, skipped, todo-only, and skipped-suite registrations', () 
   for (const [source, label] of cases) assert.equal(hasRegisteredTestCase(source), false, label);
 });
 
+test('fails closed when test options can dynamically enable skip or todo', () => {
+  const cases = [
+    [`const { test } = require('node:test'); test('computed skip', { ['skip']: true }, () => assert.ok(true));`, false, 'computed literal skip key'],
+    [`const { test } = require('node:test'); test('dynamic skip', { skip: process.env.CI }, () => assert.ok(true));`, false, 'dynamic skip value'],
+    [`const { test } = require('node:test'); test('dynamic todo', { todo: shouldBeTodo }, () => assert.ok(true));`, false, 'dynamic todo value'],
+    [`const { test } = require('node:test'); test('spread options', { ...sharedOptions }, () => assert.ok(true));`, false, 'spread options'],
+    [`const { test } = require('node:test'); test('computed key', { [optionName]: true }, () => assert.ok(true));`, false, 'dynamic computed key'],
+    [`const { test } = require('node:test'); const options = { skip: true }; test('opaque options', options, () => assert.ok(true));`, false, 'opaque options binding'],
+    [`const { test } = require('node:test'); test('literal false flags', { skip: false, todo: false, timeout: 100 }, () => assert.ok(true));`, true, 'literal false flags'],
+    [`const { test } = require('node:test'); test('ordinary computed option', { ['timeout']: 100 }, () => assert.ok(true));`, true, 'unrelated static computed key'],
+    [`const { test } = require('node:test'); test('empty reason', { skip: '', todo: null }, () => assert.ok(true));`, true, 'empty literal flags'],
+    [`const { test, describe } = require('node:test'); describe('dynamic suite', { ['todo']: shouldBeTodo }, () => { test('nested', () => assert.ok(true)); });`, false, 'dynamic skipped suite']
+  ];
+  for (const [source, expected, label] of cases) {
+    assert.equal(hasRegisteredTestCase(source), expected, label);
+  }
+});
+
 test('requires a non-empty inline callback and fails closed on invalid syntax', () => {
   const cases = [
     ["const { test } = require('node:test'); test('empty', () => {});", false, 'empty arrow'],
