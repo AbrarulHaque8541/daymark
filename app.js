@@ -1997,7 +1997,7 @@
       if (result.reason === 'stale-generation' || result.reason === 'session-conflict'
           || result.reason === 'log-conflict' || result.reason === 'stale-or-invalid-source') {
         setStorageStatus('Focus data changed or was cleared in another tab; this tab did not overwrite it.', true);
-        reconcileFocusStateFromStorage(FOCUS_KEY, false);
+        reconcileFocusStateFromStorage(null, false, { suppressBackupMaintenance: true });
       } else {
         if (state.focusFinalizingExpiredSession && result.reason === 'storage-write-failed') {
           setStorageStatus('A Focus session completed while Daymark was closed, but its history could not be saved. The original session is preserved in the recovery backup.', true);
@@ -2425,7 +2425,7 @@
     renderFeed();
   }
 
-  function reconcileFocusStateFromStorage(key, externalChange = true) {
+  function reconcileFocusStateFromStorage(key, externalChange = true, options = {}) {
     if (externalChange) state.focusStorageEventEpoch += 1;
     if (key === null || key === FOCUS_KEY) {
       stopFocusTimer();
@@ -2439,17 +2439,18 @@
         state.focusAutoFinalizePending = false;
         state.focusFinalizingExpiredSession = true;
         void persistFocusState().finally(() => { state.focusFinalizingExpiredSession = false; });
-      } else if (state.focusRecoveryBackupPendingPayload !== null) {
+      } else if (state.focusRecoveryBackupPendingPayload !== null
+          && options.suppressBackupMaintenance !== true) {
         void scheduleFocusRecoveryBackupMaintenance();
       }
     }
     if (key === null || key === FOCUS_PRESET_KEY) {
       state.focusPreset = loadFocusPreset() || 'focus';
     }
-    if (key === FOCUS_BACKUP_KEY) {
+    if (key === null || key === FOCUS_BACKUP_KEY) {
       try {
         state.focusRecoveryBackupBaseRaw = localStorage.getItem(FOCUS_BACKUP_KEY);
-        if (state.focusRecoveryBackupBaseRaw === null) {
+        if (state.focusRecoveryBackupBaseRaw === null && options.clearBackupPending === true) {
           state.focusRecoveryBackupPendingPayload = null;
           state.focusRecoveryBackupReady = false;
         }
@@ -2461,12 +2462,15 @@
   }
 
   function handleFocusStorageCleared(categoryId) {
-    // Every category clear advances the shared Focus generation. A pending
-    // writer for another Focus key is therefore stale too; rebase the entire
-    // in-memory Focus domain so a rejected write cannot leave a phantom session
-    // or preset in this tab.
+    // Every category clear advances the shared Focus generation. Rebase the
+    // whole domain, but an explicit backup clear must not immediately recreate
+    // the backup from a still-corrupt primary payload.
+    const clearingBackup = categoryId === 'focus-backup';
     state.focusStorageEventEpoch += 1;
-    reconcileFocusStateFromStorage(null, false);
+    reconcileFocusStateFromStorage(null, false, {
+      suppressBackupMaintenance: clearingBackup,
+      clearBackupPending: clearingBackup
+    });
   }
 
   function setUp() {
@@ -2570,15 +2574,27 @@
     });
     window.addEventListener('storage', (event) => {
       if (focusMutation && event.key === focusMutation.FOCUS_GENERATION_KEY) {
-        // A clear in another tab advances the shared generation before removing
-        // its selected key. Rebase all Focus state immediately so any queued
-        // writer is cancelled against the new generation.
-        reconcileFocusStateFromStorage(null);
+        // A clear in another tab advances the shared generation before key
+        // removal events arrive. Rebase now, but defer backup maintenance until
+        // the changed key identifies whether the backup itself was cleared.
+        state.focusStorageEventEpoch += 1;
+        reconcileFocusStateFromStorage(null, false, { suppressBackupMaintenance: true });
         return;
       }
-      if (event.key === FOCUS_KEY || event.key === FOCUS_BACKUP_KEY
-          || event.key === FOCUS_PRESET_KEY || event.key === null) {
-        reconcileFocusStateFromStorage(event.key);
+      if (event.key === FOCUS_BACKUP_KEY) {
+        if (event.newValue === null) {
+          state.focusStorageEventEpoch += 1;
+          reconcileFocusStateFromStorage(null, false, {
+            suppressBackupMaintenance: true,
+            clearBackupPending: true
+          });
+        } else {
+          reconcileFocusStateFromStorage(FOCUS_BACKUP_KEY);
+        }
+        return;
+      }
+      if (event.key === FOCUS_KEY || event.key === FOCUS_PRESET_KEY || event.key === null) {
+        reconcileFocusStateFromStorage(null);
       }
     });
     window.addEventListener('daymark:focus-storage-cleared', (event) => {
