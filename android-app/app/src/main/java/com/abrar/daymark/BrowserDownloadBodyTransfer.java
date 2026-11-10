@@ -84,9 +84,10 @@ final class BrowserDownloadBodyTransfer {
                      StagingTarget target) throws TransferException {
         boolean committed = false;
         long copied = 0L;
-        try {
+        // The transfer takes ownership of the response stream, including early validation failures.
+        try (InputStream source = input) {
             if (statusCode != 200) throw failure(Failure.HTTP_STATUS);
-            if (input == null || cancellation == null || networkPolicy == null || target == null
+            if (source == null || cancellation == null || networkPolicy == null || target == null
                     || configuredMaxBytes <= 0L) {
                 throw failure(Failure.INVALID_ARGUMENT);
             }
@@ -98,7 +99,7 @@ final class BrowserDownloadBodyTransfer {
 
             OutputStream output = target.openStream();
             if (output == null) throw failure(Failure.IO_ERROR);
-            try (InputStream source = input; OutputStream sink = output) {
+            try (OutputStream sink = output) {
                 byte[] buffer = new byte[BUFFER_BYTES];
                 while (true) {
                     checkState(cancellation, networkPolicy);
@@ -129,6 +130,14 @@ final class BrowserDownloadBodyTransfer {
                 }
                 sink.flush();
             }
+        } catch (TransferException failure) {
+            abortAfterFailure(target, committed);
+            throw failure;
+        } catch (IOException | RuntimeException failure) {
+            abortAfterFailure(target, committed);
+            throw failure(Failure.IO_ERROR);
+        }
+        try {
             checkState(cancellation, networkPolicy);
             target.commit(copied);
             committed = true;
