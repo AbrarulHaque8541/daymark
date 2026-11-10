@@ -69,6 +69,7 @@ function fakeEnv(options) {
   const dispatched = [];
   const locks = opts.locks === false ? null : (opts.lockManager || makeLockManager());
   const readFailures = new Set(opts.readFailures || []);
+  const removeFailures = new Set(opts.removeFailures || []);
   const readKeys = [];
   const removedKeys = [];
   const storage = {
@@ -80,6 +81,7 @@ function fakeEnv(options) {
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) {
       removedKeys.push(key);
+      if (removeFailures.has(key)) throw new Error('Remove access failure');
       delete storageData[key];
     }
   };
@@ -206,6 +208,23 @@ test('webhook queue and Clear All fail closed at every ordered lock position', a
   }
 });
 
+
+test('failed Focus removal still rebases the same tab to the new generation', async () => {
+  const original = '{"session":null,"log":[]}';
+  const { env, storageData, dispatched, elements } = fakeEnv({
+    data: { 'daymark.focus.v1': original },
+    removeFailures: ['daymark.focus.v1']
+  });
+  await ui.attachStorageUi(env).onClearCategory('focus');
+  assert.equal(storageData['daymark.focus.v1'], original,
+    'a refused browser removal preserves the original Focus bytes');
+  assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], '1',
+    'the failed clear attempt still advanced the shared generation under lock');
+  assert.ok(dispatched.some((event) => event.type === 'daymark:focus-storage-cleared'
+    && event.detail.categoryId === 'focus'),
+    'same-tab app state must rebase to the still-persisted snapshot and new generation');
+  assert.match(elements['storage-status-line'].textContent, /could not clear Focus/);
+});
 
 test('Focus category clear advances the generation while holding the Focus lock', async () => {
   const calls = [];

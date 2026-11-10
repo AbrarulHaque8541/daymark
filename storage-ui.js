@@ -228,10 +228,11 @@
       } else if (category.id === 'webhook-queue' && result.removed.length > 0) {
         notifyTaskStorageChange('daymark.webhook.queue.v1');
       }
-      if ((result.removed.length > 0 || result.failed.length === 0)
-          && (category.id === 'focus' || category.id === 'focus-backup' || category.id === 'focus-preset')) {
-        // Even a partial removal must invalidate same-tab Focus state. The
-        // generation has already advanced, so stale writes cannot recreate it.
+      if (category.id === 'focus' || category.id === 'focus-backup' || category.id === 'focus-preset') {
+        // Every Focus clear attempt advances the shared generation while holding
+        // the Focus lock. Even if the browser refuses every remove, notify the app
+        // to rebase from the still-readable snapshot and adopt the new generation;
+        // otherwise this tab can keep stale in-memory state that can never save.
         notifyFocusStorageChange(category.id);
       }
       if (result.failed.length > 0) {
