@@ -79,8 +79,11 @@ jobs:
           sh ./tools/run-storage-recovery-tests.sh
           sh ./tools/run-updater-picker-routing-tests.sh
           python3 ./tools/check-ci-test-honesty.py "$GITHUB_WORKSPACE"
-          (cd .. && npm ci --no-audit --no-fund
-npm test)
+          (
+            cd ..
+            npm ci --no-audit --no-fund
+            npm test
+          )
 
       - name: Validate signing secrets and restore production keystore
         env:

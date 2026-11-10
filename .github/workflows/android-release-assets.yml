@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
-npm test
+          npm test
           cd android-app
           sh ./tools/run-core-tests.sh
           sh ./tools/run-updater-picker-routing-tests.sh
