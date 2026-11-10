@@ -341,16 +341,25 @@
           status('Cannot safely clear task data: cross-tab coordination is unavailable. Nothing was cleared.');
           return Promise.resolve(false);
         }
-        return taskMutation.withTaskMutationLock(lockManager, clear).then((locked) => {
+        if (typeof taskMutation.incrementTaskGeneration !== 'function') {
           setBusy(false);
-          if (!locked.ok) {
+          status('Cannot safely clear task data: the retained task-generation fence is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return taskMutation.withTaskMutationLock(lockManager, () => {
+          const generation = taskMutation.incrementTaskGeneration(storage);
+          if (!generation.ok) return { ok: false, reason: generation.reason };
+          return { ok: true, result: clear() };
+        }).then((locked) => {
+          setBusy(false);
+          if (!locked.ok || !locked.value || !locked.value.ok) {
             status('Could not safely clear ' + category.label + ': '
               + (locked.reason === 'coordination-unavailable'
                 ? 'cross-tab coordination is unavailable. Nothing was cleared.'
-                : 'the shared task lock failed. Nothing was cleared.'));
+                : 'the task-generation fence or shared task lock failed. Nothing was cleared.'));
             return false;
           }
-          finishCategoryClear(locked.value, category);
+          finishCategoryClear(locked.value.result, category);
           return true;
         });
       }
@@ -387,7 +396,7 @@
       const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
         + 'Tasks, Focus history, the Focus Timer preset, cached data, saved Wikipedia/weather/holiday/currency and browser-search preferences, '
         + 'the remembered browser download journey, the saved browser proxy profile, the legacy webhook coordination lock, and queued events will be removed. '
-        + 'A small non-personal Focus coordination counter remains so another open tab cannot restore cleared Focus data. '
+        + 'Small non-personal task and Focus coordination counters remain so another open tab cannot restore data cleared here. '
         + 'The secret-bearing legacy endpoint is excluded and handled without reading. This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
@@ -399,6 +408,7 @@
       }
       if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
           || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)
+          || typeof taskMutation.incrementTaskGeneration !== 'function'
           || !focusMutation || typeof focusMutation.incrementFocusGeneration !== 'function') {
         status('Cannot safely clear all data: shared task, webhook and Focus coordination is unavailable. Nothing was cleared.');
         return false;
@@ -408,8 +418,10 @@
         lockManager,
         taskMutation.CLEAR_ALL_LOCK_ORDER,
         () => {
-          const generation = focusMutation.incrementFocusGeneration(storage);
-          if (!generation.ok) throw new Error('Focus generation could not be advanced');
+          const taskGeneration = taskMutation.incrementTaskGeneration(storage);
+          if (!taskGeneration.ok) throw new Error('Task generation could not be advanced');
+          const focusGeneration = focusMutation.incrementFocusGeneration(storage);
+          if (!focusGeneration.ok) throw new Error('Focus generation could not be advanced');
           const result = storageApi.clearAll(storage);
           if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
               && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
