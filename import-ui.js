@@ -118,6 +118,16 @@
           || typeof logic.hasDuplicateJsonKeys !== 'function') {
           throw new Error('task logic is unavailable');
         }
+        if (!taskMutation || typeof taskMutation.readTaskGeneration !== 'function'
+            || typeof taskMutation.commitTaskSnapshot !== 'function') {
+          throw new Error('safe cross-tab task-generation coordination is unavailable; nothing was changed');
+        }
+        // Capture the import intent before awaiting File.text/FileReader. A
+        // Clear All that overtakes the read invalidates this import at commit.
+        const generation = taskMutation.readTaskGeneration(storage);
+        if (!generation.ok) {
+          throw new Error('the task generation could not be read safely; nothing was changed');
+        }
         const raw = storage.getItem(STORAGE_KEY);
         let stored = [];
         if (raw !== null) {
@@ -160,6 +170,7 @@
             key: STORAGE_KEY,
             baseTasks: validated.tasks,
             desiredTasks: merge.merged,
+            expectedGeneration: generation.value,
             readCurrent: (currentRaw) => {
               if (currentRaw === null) {
                 return validated.tasks.length
@@ -188,6 +199,10 @@
           if (!committed.ok) {
             const failures = {
               'coordination-unavailable': 'safe cross-tab task coordination is unavailable',
+              'invalid-generation': 'the task generation is unavailable or invalid',
+              'generation-invalid': 'the task generation is invalid',
+              'generation-unreadable': 'the task generation could not be read',
+              'stale-generation': 'Tasks were cleared while this file was being read; select the file again after the clear',
               'lock-failed': 'cross-tab task coordination failed',
               'conflict': 'an imported task conflicts with a newer task from another tab',
               'current-removed': 'the saved task list was removed while import was being prepared',
