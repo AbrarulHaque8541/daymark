@@ -1,3 +1,21 @@
+## Current execution queue — 2026-11-10T14:08:50Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
+
+Latest snapshot: [CURRENT_STATUS_20261110T140850Z.md](docs/CURRENT_STATUS_20261110T140850Z.md). Live inventory: **8 open PRs / 25 open issues**. Main Android CI #42784930733, contracts #42784930716 and nightly audit #42807418062 are recorded PASS. No independent APPROVED review exists on the eight open PRs. Main protection was last observed disabled/rulesets empty at 13:53Z; this run could not re-read the protection endpoint.
+
+1. **P0 #675 Focus + storage integration:** current head `a5967f19f5232185b957ef86a940eea9ca94ddc9`, 243 ahead / 0 behind. This run corrected ModeSelector ACTION_DOWN to release parent interception until gesture direction is classified and updated the source guard (commits `7d47dec`, `cd548a3`); the latest branch retains the fix and includes a separate storage rollback test commit. Current-head Focus API 29/36, Android CI, contracts, Focus UI/Live Update and device workflows are running/pending. Intermediate head `cd548a3` API 29 passed; API 36 failed before emulator startup because the Android SDK system-image archive was corrupt, so no instrumentation assertion ran. Do not call that a product result. Preserve all tap/swipe/vertical-scroll assertions.
+2. **P0 #708 secure download body transfer:** head `2119020ad2c89644df94dfff7860c0afb17f7c90`, 8 ahead / 0 behind; **5/5 exact-head workflows PASS**, including 57 JDK body-transfer assertions. PublicationGate serializes final cancellation/Online check with commit; fatal Error paths abort staging. This is only a body-transfer primitive: DNS-pinned TLS, manual redirects/cookie policy, Android staging adapter and MainActivity/history integration remain absent. Keep downloads fail-closed.
+3. **P0 #648 Focus/download branch:** head `239b180d398f50d5f06812e706220b5367e7afbd`, 202 ahead / 9 behind, diverged/non-mergeable; no current-head workflow runs. Contains fail-closed download mitigation but also shared MainActivity/Focus work. Extract the security mitigation in an owner-coordinated focused integration; do not bulk-merge.
+4. **P0 storage integrity (#683/#689/#690/#640/#603):** review #675 task-generation rollback, cross-tab task/import/recovery/undo races, Focus generation/write/clear coordination, webhook queue ordering and backup preservation. Preserve task → delivery → queue → Focus lock order.
+5. **P1 #656 import/export:** head `a47ba7b4`, 90 ahead / 0 behind, 7/7 workflows PASS including API 29/36. Independent RFC 5545, category and timestamp/data-integrity review remains.
+6. **P0 governance/device (#646/#160):** required main checks and independent approvals are not enforced in the last observed configuration; physical Android/WebView/OEM/SAF acceptance remains NOT TESTED.
+7. **P1 signing (#705/#84):** head `d0312cb7`, 4/4 workflows PASS. Owner must configure and verify protected production-signing environment reviewer/ref restrictions; no signing secret/key was accessed or changed.
+8. **P1 extensions/Service Worker (#676/#702/#680/#687/#704/#685):** #676 has 6/6 previously reported PASS but real System WebView SPA/OEM acceptance remains; #704 retains fail-closed Service Worker policy, with current exact-head run lookup unavailable.
+9. **P1/P2 recurrence, Telegram, desktop and architecture (#684/#476/#700/#696/#691/#348/#325):** finish Android/web repeat parity, real Telegram CORS/browser verification, desktop lockfile/npm ci and local-process download race protection, then architecture/compatibility work.
+
+No merge, release/tag, version, signing-key/signer-pin, applicationId/namespace or destructive data change was made. Live source identity is `com.abrar.daymark`; run-level safety requires `com.cue.daymark`. This conflict remains with #679 and no identity migration is authorized. Physical device testing remains NOT TESTED.
+
+---
+
 ## Current execution queue — 2026-11-10T13:53:03Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
 
 Latest snapshot: [CURRENT_STATUS_20261110T135303Z.md](docs/CURRENT_STATUS_20261110T135303Z.md). Inventory: **8 open PRs / 25 open issues**. Main Android CI/contracts/nightly audit PASS; main protection disabled, rulesets empty.
