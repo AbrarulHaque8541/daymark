@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const focus = require('../focus-logic.js');
+const focusMutation = require('../focus-mutation-logic.js');
 const repeat = require('../repeat-logic.js');
 const mutation = require('../task-mutation-logic.js');
 
@@ -150,6 +151,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     DaymarkWebhookUi: webhookUi,
     DaymarkLogic: appLogic,
     DaymarkFocus: focus,
+    DaymarkFocusMutation: focusMutation,
     DaymarkRepeat: repeat,
     confirm(message) {
       confirmMessages.push(String(message));
@@ -184,7 +186,8 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     setInterval: (callback, delay) => {
       intervalCallbacks.push({ callback, delay });
       return intervalCallbacks.length;
-    }
+    },
+    clearInterval() {}
   }, { filename: 'app.js' });
 
   return {
@@ -957,13 +960,14 @@ test('present opaque Focus backup is surfaced when the primary Focus key is abse
   }
 });
 
-test('empty Focus recovery backup bytes survive a malformed-primary backup write', () => {
+test('empty Focus recovery backup bytes survive a malformed-primary backup write', async () => {
   const malformedPrimary = '{"session":';
   const app = bootApp({
     savedValue: JSON.stringify([]),
     savedFocusValue: malformedPrimary,
     savedFocusBackupValue: ''
   });
+  await app.settle();
 
   const storedBackup = app.storedValues.get(FOCUS_BACKUP_KEY);
   const bundle = JSON.parse(storedBackup);
