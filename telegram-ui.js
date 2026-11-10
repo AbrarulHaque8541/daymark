@@ -1,0 +1,166 @@
+
+((root) => {
+  'use strict';
+  const STORAGE_KEY = 'daymark.tasks.v1';
+  function attachTelegramUi(env) {
+    if (!env || !env.document) throw new Error('attachTelegramUi requires a document.');
+    const doc = env.document;
+    const hasOwn = Object.prototype.hasOwnProperty;
+    const logicApi = hasOwn.call(env, 'logicApi') ? env.logicApi : (root.DaymarkTelegram || null);
+    const taskLogicApi = hasOwn.call(env, 'taskLogicApi') ? env.taskLogicApi : (root.DaymarkLogic || null);
+    const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
+    const tokenEl = element('telegram-token');
+    const chatEl = element('telegram-chat');
+    const statusEl = element('telegram-status');
+    const formEl = element('telegram-form');
+    const testEl = element('telegram-test');
+    const clearEl = element('telegram-clear');
+    let busy = false;
+    function status(message) {
+      if (statusEl) statusEl.textContent = message;
+    }
+    function resolveStorage() {
+      if (hasOwn.call(env, 'storage')) return env.storage;
+      try {
+        const candidate = root.localStorage;
+        return candidate && typeof candidate.getItem === 'function' ? candidate : null;
+      } catch (error) { return null; }
+    }
+    function readStoredTasks() {
+      const storage = resolveStorage();
+      if (!storage || typeof storage.getItem !== 'function') {
+        return { tasks: null, reason: 'Task storage is unavailable in this browser.', note: '' };
+      }
+      let raw = null;
+      try { raw = storage.getItem(STORAGE_KEY); } catch (error) {
+        return { tasks: null, reason: 'Task storage could not be read.', note: '' };
+      }
+      if (typeof raw !== 'string' || raw.length === 0) return { tasks: [], reason: '', note: '' };
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch (error) {
+        return { tasks: null, reason: 'Saved tasks could not be read as JSON.', note: '' };
+      }
+      if (!taskLogicApi || typeof taskLogicApi.validateStoredTasks !== 'function') {
+        return { tasks: null, reason: 'Task validation is unavailable, so nothing was sent.', note: '' };
+      }
+      const validated = taskLogicApi.validateStoredTasks(parsed);
+      return {
+        tasks: validated.tasks,
+        reason: '',
+        note: validated.rejectedCount > 0 ? ' (' + validated.rejectedCount + ' unreadable task(s) skipped.)' : ''
+      };
+    }
+    function todayLabel() {
+      if (taskLogicApi && typeof taskLogicApi.localDateString === 'function') {
+        try { return taskLogicApi.localDateString(new Date()); } catch (error) { return ''; }
+      }
+      return '';
+    }
+    function readInputs() {
+      return {
+        botToken: tokenEl && typeof tokenEl.value === 'string' ? tokenEl.value : '',
+        chatTarget: chatEl && typeof chatEl.value === 'string' ? chatEl.value : ''
+      };
+    }
+    function networkDeps() {
+      const deps = {};
+      if (hasOwn.call(env, 'fetch')) deps.fetch = env.fetch;
+      if (hasOwn.call(env, 'AbortController')) deps.AbortController = env.AbortController;
+      if (hasOwn.call(env, 'setTimeout')) deps.setTimeout = env.setTimeout;
+      if (hasOwn.call(env, 'clearTimeout')) deps.clearTimeout = env.clearTimeout;
+      return deps;
+    }
+    function validateInputs() {
+      const inputs = readInputs();
+      if (!logicApi.isBotToken(inputs.botToken.trim())) {
+        status('Enter a bot token from @BotFather first. Nothing was sent.');
+        return null;
+      }
+      if (!logicApi.isChatTarget(inputs.chatTarget.trim())) {
+        status('Enter a chat target: a numeric chat id or an @username. Nothing was sent.');
+        return null;
+      }
+      return inputs;
+    }
+    async function deliver(botToken, chatTarget, text) {
+      busy = true;
+      let result;
+      try {
+        result = await logicApi.sendTelegramMessage({ botToken, chatTarget, text }, networkDeps());
+      } catch (error) {
+        result = { ok: false, reason: 'The send attempt failed unexpectedly. Nothing was announced as sent.' };
+      } finally { busy = false; }
+      return result;
+    }
+    async function onSend() {
+      if (!logicApi || typeof logicApi.sendTelegramMessage !== 'function' || typeof logicApi.buildCompletedDigest !== 'function' || typeof logicApi.isBotToken !== 'function') {
+        status('Telegram digest is unavailable.');
+        return;
+      }
+      if (busy) { status('Still sending the previous request. Wait a moment.'); return; }
+      const inputs = validateInputs();
+      if (!inputs) return;
+      const stored = readStoredTasks();
+      if (stored.tasks === null) {
+        status((stored.reason || 'Saved tasks could not be read.') + ' Nothing was sent.');
+        return;
+      }
+      const digest = logicApi.buildCompletedDigest(stored.tasks, { dateLabel: todayLabel() });
+      if (!digest || digest.ok !== true) {
+        status((digest && digest.reason) ? digest.reason + ' Nothing was sent.' : 'The digest could not be built. Nothing was sent.');
+        return;
+      }
+      if (digest.totalCompleted === 0) {
+        status('No completed tasks to announce. Nothing was sent to Telegram.' + (stored.note || ''));
+        return;
+      }
+      status('Sending ' + digest.includedCount + ' completed task(s) to Telegram…');
+      const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text);
+      if (result.ok) {
+        status('Sent \u00b7 ' + digest.includedCount + ' completed task(s) delivered to Telegram.'
+          + (digest.omittedCount > 0 ? ' ' + digest.omittedCount + ' omitted for the message limit.' : '')
+          + (stored.note || ''));
+      } else {
+        status(result.reason || 'The message could not be delivered.');
+      }
+    }
+    async function onTest() {
+      if (!logicApi || typeof logicApi.sendTelegramMessage !== 'function' || typeof logicApi.TEST_MESSAGE !== 'string') {
+        status('Telegram digest is unavailable.');
+        return;
+      }
+      if (busy) { status('Still sending the previous request. Wait a moment.'); return; }
+      const inputs = validateInputs();
+      if (!inputs) return;
+      status('Sending a test message to Telegram…');
+      const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE);
+      status(result.ok ? 'Test message sent to Telegram.' : (result.reason || 'The test message could not be delivered.'));
+    }
+    function onClear() {
+      if (tokenEl && typeof tokenEl.value === 'string') tokenEl.value = '';
+      status('Cleared. The token field is emptied; nothing was ever saved on this device.');
+    }
+    if (formEl && typeof formEl.addEventListener === 'function') {
+      formEl.addEventListener('submit', (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        onSend();
+      });
+    }
+    if (testEl && typeof testEl.addEventListener === 'function') testEl.addEventListener('click', onTest);
+    if (clearEl && typeof clearEl.addEventListener === 'function') clearEl.addEventListener('click', onClear);
+    return {
+      send: onSend,
+      test: onTest,
+      clear: onClear,
+      detach() { status(''); }
+    };
+  }
+  const api = { attachTelegramUi };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.DaymarkTelegramUi = api;
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const boot = () => attachTelegramUi({ document });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);

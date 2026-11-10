@@ -36,6 +36,8 @@
   <script src="browser-proxy-ui.js" defer></script>
   <script src="browser-data-logic.js" defer></script>
   <script src="browser-data-ui.js" defer></script>
+  <script src="telegram-logic.js" defer></script>
+  <script src="telegram-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
   <script src="task-mutation-logic.js" defer></script>
@@ -440,6 +442,21 @@
             <button class="button button-quiet" id="webhook-clear-queue" type="button">Clear queue</button>
           </form>
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        </aside>
+        <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="telegram-heading">Telegram task digest</h2>
+          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your token stays in this tab; nothing is saved on this device.</p>
+          <form id="telegram-form" class="feed-form" novalidate>
+            <label class="sr-only" for="telegram-token">Bot token from @BotFather</label>
+            <input id="telegram-token" name="token" type="password" maxlength="120" placeholder="Bot token from @BotFather" autocomplete="off" spellcheck="false">
+            <label class="sr-only" for="telegram-chat">Chat id or @username</label>
+            <input id="telegram-chat" name="chat" type="text" maxlength="64" placeholder="Chat id or @username" autocomplete="off" spellcheck="false">
+            <button class="button button-primary" id="telegram-send" type="submit">Send digest</button>
+            <button class="button button-quiet" id="telegram-test" type="button">Test</button>
+            <button class="button button-quiet" id="telegram-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="telegram-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
         <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
