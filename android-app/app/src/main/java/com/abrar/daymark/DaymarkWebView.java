@@ -308,6 +308,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 Log.i("DaymarkWebView", "page started origin=" + BrowserLogPolicy.redactedOrigin(url));
+                if (extensionRuntime != null) extensionRuntime.onPageStarted(url);
                 if (!networkPolicy.allowsRemoteLoads()) {
                     listener.onOfflineNavigationBlocked();
                     return;
@@ -319,6 +320,18 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             public void onPageCommitVisible(WebView view, String url) {
                 Log.i("DaymarkWebView", "page commit visible origin="
                         + BrowserLogPolicy.redactedOrigin(url));
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                super.doUpdateVisitedHistory(view, url, isReload);
+                // Use the native visited-history callback as the route-change signal. Full
+                // document injection remains in onPageFinished; progress 100 avoids applying
+                // page-world code before the committed document is ready. Exact SPA event coverage
+                // is an emulator acceptance requirement, not inferred from this callback alone.
+                if (extensionRuntime == null || !networkPolicy.allowsRemoteLoads()
+                        || view == null || view.getProgress() < 100) return;
+                extensionRuntime.onSameDocumentNavigation(view, url);
             }
 
             @Override
