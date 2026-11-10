@@ -6,6 +6,7 @@ panel = (root / "app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java").
 sound = (root / "app/src/main/java/com/abrar/daymark/TaskFocusTimerSoundscape.java").read_text()
 activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text()
 runtime = (root / "app/src/main/java/com/abrar/daymark/TaskFocusSessionRuntime.java").read_text()
+instrumentation = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java").read_text()
 
 required_panel = [
     "STOPWATCH", "COUNTDOWN", "onStart(TaskFocusTimer.Mode mode, long targetDurationMs)",
@@ -155,3 +156,59 @@ assert "if (widthDp >= 840)" in layout_policy
 assert "new Layout(1040, 24, 2, 16, 12)" in layout_policy
 assert "new Layout(720, 24, 1, 0, 12)" in layout_policy
 print("PASS responsive Tasks Home: centered max-width content and two-column expanded task grid")
+
+mode_start = panel.index("    private final class ModeSelector extends LinearLayout {")
+mode_end = panel.index("    private void chooseDisplayUnit(", mode_start)
+mode_selector = panel[mode_start:mode_end]
+assert "public void requestDisallowInterceptTouchEvent(boolean disallow)" in mode_selector, (
+    "mode selector must neutralize child disallow-intercept requests so it can classify MOVE"
+)
+assert "disallowParentIntercept(false);" in mode_selector, (
+    "mode selector must release parent interception on taps, vertical drags and terminal paths"
+)
+down_case = mode_selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split(
+    "case MotionEvent.ACTION_MOVE:", 1
+)[0]
+assert "disallowParentIntercept(true);" in down_case, (
+    "mode selector must hold parent ScrollView interception until the gesture is classified"
+)
+assert "disallowParentIntercept(true);" in mode_selector, (
+    "only a classified horizontal mode swipe may temporarily block the parent"
+)
+assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in mode_selector, (
+    "gesture ownership must be forwarded to the parent without setting the selector's own disallow flag"
+)
+assert "if (verticalGesture)" in mode_selector and "return false;" in mode_selector, (
+    "vertical movement must be released to the parent Tasks ScrollView"
+)
+assert "if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)" in mode_selector, (
+    "the selector must classify vertical movement before intercepting horizontal swipes"
+)
+assert "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH" in mode_selector, (
+    "rightward horizontal movement must be explicitly classified for Stopwatch"
+)
+assert "|| result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN)" in mode_selector, (
+    "leftward horizontal movement must be explicitly classified for Countdown"
+)
+assert "requestDisallowInterceptTouchEvent(true)" not in mode_selector
+assert "requestDisallowInterceptTouchEvent(false)" not in mode_selector, (
+    "the selector must forward parent interception through disallowParentIntercept(), not set its own flag"
+)
+print("PASS Focus Timer gesture arbitration: horizontal mode swipes and parent vertical scrolling")
+
+mode_test_start = instrumentation.index("private void focusTimerModeSelectorTapsAndSwipes()")
+mode_test_end = instrumentation.index("private android.view.View findViewByContentDescription", mode_test_start)
+mode_test = instrumentation[mode_test_start:mode_test_end]
+assert 'findAncestorWithSimpleName(modeRow, "ModeSelector")' in mode_test, (
+    "gesture acceptance must resolve the real ModeSelector parent, not inject directly into the button row"
+)
+assert "dispatchSwipe(modeSelector, true)" in mode_test
+assert "dispatchSwipe(modeSelector, false)" in mode_test, (
+    "both horizontal directions must be injected through the actual ModeSelector"
+)
+assert "findParentScrollView(modeSelector)" in mode_test
+assert "scrollDescendantIntoScrollView(parentScroll, modeSelector)" in mode_test
+assert "dispatchVerticalScrollSwipe(modeSelector, parentScroll" in mode_test, (
+    "the parent Tasks ScrollView must be exercised with a real vertical drag"
+)
+print("PASS Focus Timer instrumentation targets ModeSelector and parent Tasks ScrollView")

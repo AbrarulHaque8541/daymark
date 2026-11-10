@@ -6,6 +6,8 @@ ACTIVITY="$ROOT/app/src/main/java/com/abrar/daymark/MainActivity.java"
 PROVIDER="$ROOT/app/src/main/java/com/abrar/daymark/AttachmentContentProvider.java"
 RECEIVER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderReceiver.java"
 SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
+POLICY="$ROOT/app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java"
+MANIFEST="$ROOT/app/src/main/AndroidManifest.xml"
 RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
@@ -93,6 +95,12 @@ expect_fail_after_removal check-web-clip.py 'saveTasksAsync("Saving offline clip
 # Reminder notification must retain the per-duration action labels and only re-arm its alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + minutes + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIME_SET" "$POLICY" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIMEZONE_CHANGED" "$POLICY" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIME_SET" "$MANIFEST" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "android.intent.action.TIMEZONE_CHANGED" "$MANIFEST" "$ROOT"
+expect_fail_after_removal check-reminder-lifecycle.py "ReminderSchedulePolicy.shouldRescheduleForSystemChange(action)" "$RECEIVER" "$ROOT"
+expect_fail_after_removal check-focus-coordinate-translation.py "bounds[0].offset(rootLocation[0], rootLocation[1]);" "$ROOT/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java" "$ROOT"
 # Site history search and single-site removal must fail closed.
 python3 "$ROOT/tools/check-browser-history.py" "$ROOT" >/dev/null
 echo "PASS meta: check-browser-history.py passes on current source"
@@ -112,5 +120,8 @@ for checker in check-text-scale.py check-window-insets.py check-web-mode-state.p
 done
 python3 "$ROOT/tools/check-attachment-source.py" "$ROOT" >/dev/null
 echo "PASS meta: check-attachment-source.py passes on current source"
+
+python3 "$ROOT/tools/check-focus-coordinate-translation.py" "$ROOT" >/dev/null
+echo "PASS meta: check-focus-coordinate-translation.py passes on current source"
 
 echo "PASS source-check guard regression tests"
