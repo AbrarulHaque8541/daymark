@@ -1,13 +1,17 @@
 'use strict';
 
 const { app, session, BrowserWindow } = require('electron');
+const fs = require('fs');
 const path = require('path');
+const { handleWillDownload } = require('./lib/download-handler');
+const { createStagingPath, publishStagedFile, cleanupStaging } = require('./lib/download-publish');
 const { pathToFileURL } = require('url');
 const { isAllowedUrl } = require('./lib/rules');
 const { isAllowedRequest, isTrackerRequest } = require('./lib/request-policy');
 const { installWebviewPopupPolicy } = require('./lib/webview-popup-policy');
 
 let mainWindow = null;
+const reservedDownloadPaths = new Set();
 const rendererDir = path.join(__dirname, 'renderer');
 const appUiFiles = new Set(['index.html', 'app.js', 'style.css'].map((name) =>
   pathToFileURL(path.join(rendererDir, name)).href,
@@ -64,15 +68,39 @@ app.whenReady().then(() => {
     callback({ requestHeaders: details.requestHeaders });
   });
 
-  // Downloads land in the OS downloads folder.
+  // Remote filenames are untrusted. The injectable handler owns safe path
+  // allocation, cancellation fallback and reservation cleanup.
   ses.on('will-download', (event, item) => {
-    try {
-      item.setSavePath(path.join(app.getPath('downloads'), item.getFilename()));
-      if (mainWindow) {
-        mainWindow.webContents.send('download-started', item.getFilename());
-      }
-    } catch {
-      // fall back to Electron's default download behaviour
+    const result = handleWillDownload({
+      event,
+      item,
+      downloadDirectory: () => fs.realpathSync(app.getPath('downloads')),
+      createStagingPath: (finalPath, directory) => createStagingPath(directory, finalPath, fs),
+      publishFile: (stagingPath, finalPath, directory) => publishStagedFile(directory, stagingPath, finalPath, fs),
+      cleanupStaging: (stagingPath, directory) => cleanupStaging(directory, stagingPath, fs),
+      onFailed: (filename) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-failed', filename);
+        }
+        console.error('Daymark could not safely publish a completed download.');
+      },
+      onCleanupError: () => console.error('Daymark could not clean a private download staging directory.'),
+      exists: (candidate) => {
+        try {
+          fs.lstatSync(candidate); // lstat also treats dangling symlinks as occupied.
+          return true;
+        } catch (error) {
+          if (error && error.code === 'ENOENT') return false;
+          throw error;
+        }
+      },
+      reservedPaths: reservedDownloadPaths,
+      onStarted: (filename) => {
+        if (mainWindow) mainWindow.webContents.send('download-started', filename);
+      },
+    });
+    if (!result.ok && !result.cancelled) {
+      console.error('Daymark could not cancel an unsafe download destination.');
     }
   });
 

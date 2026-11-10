@@ -22,7 +22,7 @@ Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS 
 - Secure WebSockets (WSS) aur starter tracker-domain blocking
 - Privacy headers: DNT: 1, Sec-GPC: 1
 - Find in page (Ctrl+F)
-- Downloads currently OS Downloads folder mein auto-save hote hain; per-download consent/redirect audit abhi production-grade nahi
+- Downloads pehle ek private per-download staging directory mein likhe jaate hain, phir completed file hard-link ke through atomic no-replace publication se user-visible Downloads folder mein aati hai. Late collision ya hard-link unsupported filesystem par existing file overwrite nahi hoti; publication fail-closed rehti hai. Per-download consent/redirect audit abhi production-grade nahi
 - target=_blank / window.open allowed web URLs ko new tab mein route karta hai
 
 ## Security boundary
@@ -33,6 +33,7 @@ Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS 
 - file: access exact packaged renderer files tak limited hai. data:/blob: sirf subresources ke liye, aur about:blank/about:srcdoc sirf child frames ke liye allowed hain. Top-level file:, data:, chrome:, devtools:, javascript: aur unknown schemes blocked hain.
 - HTTPS/WSS allowed; remote HTTP/WS blocked; localhost HTTP/WS development exception hai.
 - Tracker list starter list hai, comprehensive network-level ad/tracker blocker nahi.
+- Filesystem threat boundary: staging directories are private to the current OS user (mode `0700` on POSIX). This prototype does not claim isolation from malware already running as the same user; portable Node path APIs cannot eliminate every same-user directory-replacement race. A detected staging/publication identity mismatch fails closed and best-effort removes the just-created final link when its file identity is still verifiable.
 
 Android app ka browser policy alag hai: production Android WebView HTTP aur HTTPS dono support karta hai, aur plain HTTP ko “Not encrypted” label karta hai. Is desktop prototype ki HTTPS-only policy ko Android behavior ka replacement na samjhein.
 
