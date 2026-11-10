@@ -67,6 +67,44 @@ test('concurrent additions to different Focus log entries are merged without los
   assert.deepEqual(saved.log.map((entry) => entry.id), ['base', 'tab-a', 'tab-b']);
 });
 
+test('afterCommit runs after the Focus write while the mutation lock is still held', async () => {
+  const key = 'daymark.focus.v1';
+  const baseRaw = JSON.stringify(snapshot());
+  const storage = makeStorage({ [key]: baseRaw });
+  let lockHeld = false;
+  let callbackObservedLock = false;
+  const locks = {
+    request(name, options, callback) {
+      assert.equal(name, focusMutation.FOCUS_MUTATION_LOCK);
+      assert.equal(options.mode, 'exclusive');
+      return Promise.resolve().then(() => {
+        lockHeld = true;
+        return callback();
+      }).finally(() => { lockHeld = false; });
+    }
+  };
+
+  const result = await focusMutation.commitFocusSnapshot({
+    lockManager: locks,
+    storage,
+    key,
+    baseRaw,
+    expectedGeneration: 0,
+    desiredSnapshot: snapshot(null, [{ id: 'committed-log' }]),
+    afterCommit(committed) {
+      callbackObservedLock = lockHeld;
+      assert.equal(storage.getItem(key), committed.payload,
+        'the callback observes the durable payload before the lock is released');
+      committed.adopted = true;
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(callbackObservedLock, true);
+  assert.equal(result.adopted, true);
+  assert.equal(lockHeld, false, 'the lock is released after state reconciliation completes');
+});
+
 test('concurrent edits to different active Focus sessions fail closed instead of overwriting', async () => {
   const baseRaw = JSON.stringify(snapshot());
   const storage = makeStorage({ 'daymark.focus.v1': baseRaw });
