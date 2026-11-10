@@ -169,11 +169,11 @@ assert "disallowParentIntercept(false);" in mode_selector, (
 down_case = mode_selector.split("case MotionEvent.ACTION_DOWN:", 1)[1].split(
     "case MotionEvent.ACTION_MOVE:", 1
 )[0]
-assert "disallowParentIntercept(true);" in down_case, (
-    "reserve the touch stream on ACTION_DOWN so a parent ScrollView cannot cancel a child tap before direction is classified"
+assert "disallowParentIntercept(false);" in down_case, (
+    "ACTION_DOWN must not reserve the parent before direction is known; child taps and vertical drags must remain deliverable"
 )
-assert "disallowParentIntercept(false);" not in down_case, (
-    "do not release the parent before the selector has distinguished a tap from a vertical drag"
+assert "disallowParentIntercept(true);" not in down_case, (
+    "only a classified horizontal MOVE may disallow parent interception"
 )
 move_case = mode_selector.split("case MotionEvent.ACTION_MOVE:", 1)[1].split(
     "case MotionEvent.ACTION_UP:", 1
