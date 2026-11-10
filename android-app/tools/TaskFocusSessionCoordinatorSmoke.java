@@ -119,10 +119,10 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check("task-b".equals(fixture.store.saved.taskId)
                         && fixture.store.saved.status == TaskFocusTimer.Status.PAUSED,
                 "the selected task ID and paused state are durably saved before returning");
-        check(fixture.events().equals(list("save", "publish"))
+        check(fixture.events().equals(list("save", "cancel", "publish"))
                         && fixture.notifications.active
                         && fixture.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
-                "switch persists first and republishes the paused notification without resuming");
+                "switch persists, cancels the old notification identity, then publishes the paused replacement");
         check("Task B".equals(fixture.notifications.lastTitle),
                 "paused task switch updates the title before publishing its notification");
 
@@ -367,10 +367,11 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 "failed task-switch publication cancels the old-title notification");
         check("Task A".equals(fixture.notifications.lastTitle),
                 "the fake notification retained its old title until cancellation");
-        check(fixture.events().size() == 3 && "save".equals(fixture.events().get(0))
-                        && "publish".equals(fixture.events().get(1))
-                        && "cancel".equals(fixture.events().get(2)),
-                "task switch persists, attempts new-title publication, then cancels stale content");
+        check(fixture.events().size() == 4 && "save".equals(fixture.events().get(0))
+                        && "cancel".equals(fixture.events().get(1))
+                        && "publish".equals(fixture.events().get(2))
+                        && "cancel".equals(fixture.events().get(3)),
+                "task switch persists, removes the old title, publishes the replacement, and fails closed if publication fails");
 
         fixture.notifications.available = true;
         check(fixture.coordinator.refreshNotification("Task B").notificationPublished
@@ -382,10 +383,11 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 fixture.coordinator.refreshNotification("Task B renamed");
         check(!refreshed.notificationPublished && !fixture.notifications.active,
                 "failed title refresh also removes the stale visible notification");
-        check(fixture.notifications.events.size() == 2
-                        && "publish".equals(fixture.notifications.events.get(0))
-                        && "cancel".equals(fixture.notifications.events.get(1)),
-                "failed refresh attempts publication and then cancels without rewriting timer data");
+        check(fixture.notifications.events.size() == 3
+                        && "cancel".equals(fixture.notifications.events.get(0))
+                        && "publish".equals(fixture.notifications.events.get(1))
+                        && "cancel".equals(fixture.notifications.events.get(2)),
+                "a changed title removes the old notification before attempting publication and remains fail-closed");
     }
 
     private static void persistenceFailureDoesNotPublishOrMutateTheCurrentSession() throws Exception {
