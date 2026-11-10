@@ -257,7 +257,17 @@
       } catch (error) {
         return { ok: false, reason: 'storage-write-failed', conflicts: [] };
       }
-      return { ok: true, reason: null, payload, snapshot };
+      const committed = { ok: true, reason: null, payload, snapshot };
+      // Reconcile the caller's in-memory state before releasing the same-origin
+      // Focus lock. A clear in another tab cannot overtake durable commit + adoption.
+      if (typeof opts.afterCommit === 'function') {
+        try {
+          opts.afterCommit(committed);
+        } catch (error) {
+          committed.warning = 'post-commit-action-failed';
+        }
+      }
+      return committed;
     });
     if (!locked.ok) return locked;
     return locked.value;
