@@ -191,7 +191,10 @@
     let desiredParsed;
     try { desiredParsed = parseSnapshot(JSON.stringify(opts.desiredSnapshot)); }
     catch (error) { desiredParsed = { ok: false }; }
-    if (!desiredParsed.ok) return { ok: false, reason: 'invalid-snapshot', conflicts: [] };
+    if (!desiredParsed.ok || (typeof opts.validateSnapshot === 'function'
+        && opts.validateSnapshot(desiredParsed.value) !== true)) {
+      return { ok: false, reason: 'invalid-snapshot', conflicts: [] };
+    }
     const locked = await withFocusMutationLock(opts.lockManager, async () => {
       const generation = readFocusGeneration(storage);
       if (!generation.ok) return { ok: false, reason: generation.reason, conflicts: [] };
@@ -221,18 +224,29 @@
         if (!parsed.ok && !(opts.allowOpaqueBase === true && typeof currentRaw === 'string')) {
           return { ok: false, reason: parsed.reason, conflicts: [] };
         }
-        snapshot = opts.desiredSnapshot;
+        if (parsed.ok && typeof opts.validateSnapshot === 'function'
+            && opts.validateSnapshot(parsed.value) !== true) {
+          return { ok: false, reason: 'invalid-current', conflicts: [] };
+        }
+        snapshot = desiredParsed.value;
       } else {
         const base = parseSnapshot(opts.baseRaw);
         const current = parseSnapshot(currentRaw);
         if (!base.ok || !current.ok) {
           return { ok: false, reason: 'stale-or-invalid-source', conflicts: [] };
         }
-        const merged = mergeFocusSnapshots(base.value, opts.desiredSnapshot, current.value);
+        if (typeof opts.validateSnapshot === 'function'
+            && (opts.validateSnapshot(base.value) !== true || opts.validateSnapshot(current.value) !== true)) {
+          return { ok: false, reason: 'stale-or-invalid-source', conflicts: [] };
+        }
+        const merged = mergeFocusSnapshots(base.value, desiredParsed.value, current.value);
         if (!merged.ok) return merged;
         snapshot = merged.snapshot;
       }
 
+      if (typeof opts.validateSnapshot === 'function' && opts.validateSnapshot(snapshot) !== true) {
+        return { ok: false, reason: 'invalid-snapshot', conflicts: [] };
+      }
       let payload;
       try {
         payload = JSON.stringify(snapshot);
