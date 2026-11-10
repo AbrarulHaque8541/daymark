@@ -12,7 +12,7 @@ report_failure_excerpt() {
     excerpt="$(adb logcat -d -s DaymarkSWRuntime:I 2>/dev/null | tail -n 40 || true)"
   fi
   gradle_tail="$(tail -n 20 "$gradle_log" 2>/dev/null || true)"
-  combined="$(printf '%s\n%s' "$gradle_tail" "$excerpt" | tr -d '\r')"
+  combined="$(adb logcat -d -s DaymarkSWRuntime:I 2>/dev/null | grep -F "FAIL after" | tail -n 1)"
   encoded="$(printf '%s' "$combined" | head -c 3500 | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')"
   echo "::error title=Service Worker trace failure ($task)::sw-trace-diagnostic: $encoded"
 }
