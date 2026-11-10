@@ -1681,10 +1681,12 @@
     } catch (error) {
       state.focusRecoveryBackupBaseRaw = undefined;
     }
-    const generation = focusMutation
-      ? focusMutation.readFocusGeneration(localStorage)
-      : { ok: false };
-    state.focusRecoveryBackupGeneration = generation.ok ? generation.value : null;
+    // Bind the queued backup to the same generation as the primary snapshot
+    // that produced it. Reading the current generation here could let a stale
+    // tab recreate a backup after another tab cleared it but before its storage
+    // event was delivered.
+    state.focusRecoveryBackupGeneration = Number.isSafeInteger(state.focusPersistedGeneration)
+      ? state.focusPersistedGeneration : null;
   }
 
   function scheduleFocusRecoveryBackupMaintenance() {
