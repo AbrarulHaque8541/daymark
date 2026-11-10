@@ -95,12 +95,12 @@ test('fails closed when a with statement can intercept imported test identifiers
   const intercepted = [
     "const { test } = require('node:test');",
     "with ({ test: () => {} }) { test('fake', () => assert.ok(true)); }"
-  ].join('\\n');
+  ].join('\n');
   const unrelatedWith = [
     "const { test } = require('node:test');",
     "test('otherwise valid', () => assert.ok(true));",
     "with ({ value: 1 }) { void value; }"
-  ].join('\\n');
+  ].join('\n');
 
   assert.equal(hasRegisteredTestCase(intercepted), false);
   assert.equal(hasRegisteredTestCase(unrelatedWith), false,
@@ -112,7 +112,7 @@ test('rejects computed writes to a CommonJS node:test module object', () => {
     "const nodeTest = require('node:test');",
     "nodeTest['te' + 'st'] = () => {};",
     "nodeTest.test('fake', () => assert.ok(true));"
-  ].join('\\n');
+  ].join('\n');
   assert.equal(hasRegisteredTestCase(source), false,
     'a dynamic computed write must invalidate the imported module binding');
 });
