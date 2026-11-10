@@ -70,6 +70,41 @@ test('staging symlinks and paths outside the selected Downloads directory are re
   assert.throws(() => createStagingPath(downloads, outside), /unsafe-download-publication-target/);
 });
 
+test('failed post-link verification removes a hard link from a swapped staging directory', {
+  skip: process.platform === 'win32',
+}, (t) => {
+  const downloads = makeDownloads(t);
+  const outside = path.join(path.dirname(downloads), 'outside');
+  fs.mkdirSync(outside);
+  const outsideFile = path.join(outside, 'report.txt');
+  fs.writeFileSync(outsideFile, 'outside payload');
+
+  const finalPath = path.join(downloads, 'report.txt');
+  const stagingPath = createStagingPath(downloads, finalPath);
+  const stagingDirectory = path.dirname(stagingPath);
+  fs.writeFileSync(stagingPath, 'expected download payload');
+
+  let swapped = false;
+  const fsImpl = Object.create(fs);
+  fsImpl.lstatSync = (candidate) => {
+    const stat = fs.lstatSync(candidate);
+    if (!swapped && candidate === stagingPath) {
+      swapped = true;
+      fs.renameSync(stagingDirectory, stagingDirectory + '.original');
+      fs.symlinkSync(outside, stagingDirectory, 'dir');
+    }
+    return stat;
+  };
+
+  assert.throws(() => publishStagedFile(downloads, stagingPath, finalPath, fsImpl),
+    /download-publication-verification-failed/);
+  assert.equal(swapped, true, 'the test replaced the staging directory after source validation');
+  assert.equal(fs.existsSync(finalPath), false,
+    'a failed publication must not leave an unexpected hard link in Downloads');
+  assert.equal(fs.readFileSync(outsideFile, 'utf8'), 'outside payload',
+    'the external source file remains untouched');
+});
+
 test('cleanup refuses a staging directory outside Downloads', (t) => {
   const downloads = makeDownloads(t);
   const outside = path.join(path.dirname(downloads), '.daymark-download-outside', 'report.txt');
