@@ -1,3 +1,29 @@
+## Current execution queue — 2026-11-10T06:04:17Z (main 469b29edea69)
+
+Latest whole-project snapshot: [CURRENT_STATUS_20261110T060417Z.md](docs/CURRENT_STATUS_20261110T060417Z.md).
+
+Current main is `469b29edea6993b19c0f50d427b9d48605b2a4c7`; root AGENTS blob is `492ed21e2219a8d1b80c7d6e63575525c98a5a91`. Live inventory: **15 open PRs / 23 open issues**. Main Android CI and Ubuntu/Windows contracts pass on the exact main SHA. Main protection is disabled; rulesets are empty; detailed protection endpoint is HTTP 403.
+
+### P0 — runtime, data integrity and governance
+1. **#677/#613:** API 29/36 full lifecycle, selector gestures and Task Editor IME/Cancel pass on exact #677 head; synchronize with main and obtain independent review.
+2. **#683/#689/#690:** finish task, Focus and webhook Web Locks/clear ordering, import/recovery/undo concurrency and same-tab invalidation.
+3. **#646/#160:** owner-approved required CI/independent review governance and physical Android/WebView acceptance.
+
+### P1 — security, integration and correctness
+4. **#84/#665:** direct action pins and signing-secret separation pass; flow-style YAML trigger detection is already implemented and tested. Remaining work is independent release/provenance review and a fresh transitive SLSA generator runtime audit.
+5. **#694/#693:** callback declaration/dead-branch bypass is addressed in code/tests, but exact-head Actions are absent; synchronize and run canonical CI.
+6. **#675/#656:** synchronize accumulated recovery/webhook and iCalendar branches with current main while preserving the Telegram card/scripts.
+7. **#692/#691:** private staging/no-replace desktop publication and URL-free failure IPC pass Desktop/Android/contracts/device-artifact CI; physical desktop GUI remains untested.
+8. **#671/#678:** complete the actual redirect-validating, pinned, bounded Android download transport; keep current downloads fail-closed.
+9. **#659/#687 and #686/#685:** accessible malformed-extension recovery UI and Service Worker Online/Offline compatibility.
+
+### P2 — infrastructure and cross-platform behavior
+10. **#696:** generate a real Electron package lock only when npm registry DNS is available; current lockfile is absent and CI uses `npm install`.
+11. **#684/#476:** align Android/web recurrence validation, anchors, catch-up, Doze/reboot/timezone semantics.
+12. **#348/#325:** resume broader browser UX and cross-platform architecture after P0/P1 gates.
+
+Recent main merges: #697 Telegram task-digest card, #695 platform support matrix, #688 Node test-registration guard. Latest published release remains v1.5 (2026-10-23); no release/tag is authorized or created.
+
 ## Current execution queue — 2026-11-10T06:02:27Z (main 469b29edea69)
 
 Latest whole-project snapshot: [CURRENT_STATUS_20261110T060227Z.md](docs/CURRENT_STATUS_20261110T060227Z.md).
