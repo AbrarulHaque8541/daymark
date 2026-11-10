@@ -52,9 +52,12 @@ Read **[AGENTS.md](AGENTS.md)**, **[RELEASE_SIGNING.md](RELEASE_SIGNING.md)**, a
 From the repository root:
 
 ```sh
+npm ci
 sh android-app/tools/check-v1-source.sh
 npm test
 ```
+
+The root test suite installs a pinned development-only Acorn parser for AST-based test-registration checks; it is not included in the Android application runtime.
 
 For Android SDK setup, build commands, measured artifact metadata, and device-test caveats, see [`android-app/README.md`](android-app/README.md).
 

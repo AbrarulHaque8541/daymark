@@ -16,7 +16,7 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 
 1. Fork the repo and create your branch from `main`.
 2. Ensure any new features include unit/smoke tests under `android-app/tools/`.
-3. Verify that changes run cleanly against the test suite (`npm test` for web, `sh android-app/tools/run-core-tests.sh` for Android).
+3. Verify that changes run cleanly against the test suite (`npm ci && npm test` for web, `sh android-app/tools/run-core-tests.sh` for Android).
 4. Clearly state what problem your PR solves and verify backward compatibility.
 
 ## Language, frameworks, and tools
