@@ -4,6 +4,7 @@ const { app, session, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { handleWillDownload } = require('./lib/download-handler');
+const { createStagingPath, publishStagedFile, cleanupStaging } = require('./lib/download-publish');
 const { pathToFileURL } = require('url');
 const { isAllowedUrl } = require('./lib/rules');
 const { isAllowedRequest, isTrackerRequest } = require('./lib/request-policy');
@@ -73,7 +74,12 @@ app.whenReady().then(() => {
     const result = handleWillDownload({
       event,
       item,
-      downloadDirectory: () => app.getPath('downloads'),
+      downloadDirectory: () => fs.realpathSync(app.getPath('downloads')),
+      createStagingPath: (finalPath, directory) => createStagingPath(directory, finalPath, fs),
+      publishFile: (stagingPath, finalPath, directory) => publishStagedFile(directory, stagingPath, finalPath, fs),
+      cleanupStaging: (stagingPath, directory) => cleanupStaging(directory, stagingPath, fs),
+      onFailed: () => console.error('Daymark could not safely publish a completed download.'),
+      onCleanupError: () => console.error('Daymark could not clean a private download staging directory.'),
       exists: (candidate) => {
         try {
           fs.lstatSync(candidate); // lstat also treats dangling symlinks as occupied.

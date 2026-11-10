@@ -12,7 +12,6 @@ function cancelUnsafeDownload(event, item) {
   } catch {
     // Electron may have invalidated the will-download event; try the item API.
   }
-
   try {
     if (item && typeof item.cancel === 'function') {
       item.cancel();
@@ -25,39 +24,79 @@ function cancelUnsafeDownload(event, item) {
 }
 
 /**
- * Apply the main-process destination policy to one Electron will-download event.
- * All dependencies are injected so failure/cancellation behavior is host-testable.
+ * Save each Electron download into a private per-download directory first.
+ * Only a completed file is published to the user-visible destination. The
+ * publisher must use an atomic no-replace primitive; it must never overwrite.
  */
 function handleWillDownload(options) {
   const opts = options || {};
   const item = opts.item;
-  let savePath = null;
+  let directory = null;
+  let finalPath = null;
+  let stagingPath = null;
+  let doneListener = null;
 
   try {
     if (!item || typeof item.getFilename !== 'function'
       || typeof item.once !== 'function' || typeof item.setSavePath !== 'function') {
       throw new TypeError('electron-download-item-required');
     }
+    if (typeof opts.createStagingPath !== 'function'
+      || typeof opts.publishFile !== 'function'
+      || typeof opts.cleanupStaging !== 'function') {
+      throw new TypeError('download-staging-contract-required');
+    }
 
-    const directory = typeof opts.downloadDirectory === 'function'
+    directory = typeof opts.downloadDirectory === 'function'
       ? opts.downloadDirectory() : opts.downloadDirectory;
-    savePath = createDownloadPath(directory, item.getFilename(), opts.exists, opts.reservedPaths);
+    finalPath = createDownloadPath(directory, item.getFilename(), opts.exists, opts.reservedPaths);
+    stagingPath = opts.createStagingPath(finalPath, directory);
+    if (typeof stagingPath !== 'string' || !path.isAbsolute(stagingPath)
+      || path.resolve(stagingPath) === path.resolve(finalPath)) {
+      throw new TypeError('private-download-staging-path-required');
+    }
 
-    item.once('done', () => opts.reservedPaths.delete(reservationKey(savePath)));
-    item.setSavePath(savePath);
+    const reservation = reservationKey(finalPath);
+    doneListener = (event, state) => {
+      const finalize = async () => {
+        try {
+          if (state === 'completed') await opts.publishFile(stagingPath, finalPath, directory);
+        } catch {
+          if (typeof opts.onFailed === 'function') {
+            try { opts.onFailed(); } catch { /* Do not leak URL or interrupt cleanup. */ }
+          }
+        } finally {
+          try {
+            await opts.cleanupStaging(stagingPath, directory);
+          } catch {
+            if (typeof opts.onCleanupError === 'function') {
+              try { opts.onCleanupError(); } catch { /* Best-effort cleanup reporting. */ }
+            }
+          }
+          opts.reservedPaths.delete(reservation);
+        }
+      };
+      void finalize();
+    };
 
+    item.once('done', doneListener);
+    item.setSavePath(stagingPath);
     if (typeof opts.onStarted === 'function') {
-      try {
-        opts.onStarted(path.basename(savePath));
-      } catch {
+      try { opts.onStarted(path.basename(finalPath)); } catch {
         // A renderer notification failure must not cancel an already-safe download.
       }
     }
 
-    return { ok: true, path: savePath, filename: path.basename(savePath) };
+    return { ok: true, path: finalPath, stagingPath, filename: path.basename(finalPath) };
   } catch {
-    if (savePath && opts.reservedPaths instanceof Set) {
-      opts.reservedPaths.delete(reservationKey(savePath));
+    if (doneListener && item && typeof item.removeListener === 'function') {
+      try { item.removeListener('done', doneListener); } catch { /* Best effort. */ }
+    }
+    if (stagingPath && typeof opts.cleanupStaging === 'function') {
+      try { opts.cleanupStaging(stagingPath, directory); } catch { /* Best effort. */ }
+    }
+    if (finalPath && opts.reservedPaths instanceof Set) {
+      opts.reservedPaths.delete(reservationKey(finalPath));
     }
     return {
       ok: false,
