@@ -1,5 +1,16 @@
 ## Current execution queue — 2026-11-10T02:44:08Z (main 557af3160d16)
 
+
+## Current whole-project engineering baseline — 2026-11-10T03:39:16.161Z
+
+- Main: `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; root AGENTS blob: `492ed21e2219a8d1b80c7d6e63575525c98a5a91`.
+- 13 open PRs / 22 open issues. Main branch protection disabled; no repository rulesets; no independent PR approvals found.
+- Current run delivered the signed-workflow trust-boundary split on #665 (head `86b2932`, all four exact-head workflows PASS, Node 689/689) and two AST test-integrity bypass fixes on #694 (head `a9e34c2`, all five exact-head workflows PASS, Node 692/692).
+- #675 carries the task/webhook/Focus lock and generation implementation (Node 831/831 on its code head; not merged; physical multi-tab testing pending).
+- P0: main governance #646, physical Android acceptance #160, API 36 Focus/Task Editor #613/#648/#677. P1: cross-tab task/webhook/Focus #683/#689/#690, Android downloads #671/#678, signing/provenance #84/#665, extension recovery #659/#687, Service Worker #685/#686, recurrence #684/#476, data recovery #640/#603, webhook privacy/concurrency #636/#639.
+- No release/tag/version/applicationId/signer/data migration changes. Package identity discrepancy remains tracked in #679.
+- Full exact-head inventory and blockers: [CURRENT_STATUS_20261110T033916Z.md](CURRENT_STATUS_20261110T033916Z.md).
+
 This queue supersedes the older current-priority summaries below; historical evidence remains intact.
 
 1. **P0 — Focus/API 36 acceptance (#613, #648, #677):** investigate the stale paused-notification title after task switch and the API 36 horizontal swipe/Task Editor failures independently. Keep the strict 10-run lifecycle gate; do not weaken assertions.

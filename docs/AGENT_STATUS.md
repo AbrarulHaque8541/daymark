@@ -1,4 +1,12 @@
 - [Daymark whole-project engineering status — 2026-11-10T02:44:08Z (main 557af316; AST test guard #694; Focus/API 36 and recurrence triage)](./CURRENT_STATUS_20261110T024408Z.md)
+
+
+## Latest whole-project snapshot — 2026-11-10T03:39:16.161Z
+
+- [CURRENT_STATUS_20261110T033916Z.md](CURRENT_STATUS_20261110T033916Z.md) — live main/PR/issue inventory, exact-head checks, #665 signing workflow split, #694 AST guard bypass fixes, #675 storage coordination, P0/P1 backlog and owner blockers.
+- Current main: `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; 13 open PRs; 22 open issues.
+- Latest code delivery: #665 head `86b293226a9939e71a97f5a6c591ff05f1e71d6c`, four workflows PASS; #694 head `a9e34c2bb9ed4418fdb91b15217973851d28991a`, five workflows PASS.
+- No merge/release/device acceptance is claimed.
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:00:49Z (main 1d29085, Focus #648 direct shell-input and CSS #670)](./CURRENT_STATUS_20261109T120049Z.md)
