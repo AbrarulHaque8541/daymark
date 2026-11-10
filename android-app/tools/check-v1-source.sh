@@ -641,7 +641,7 @@ assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")
 task_editor_ime = re.search(r'private void configureDialogImeInsets\(Window dialogWindow\)\s*\{(.*?)\n    \}', activity, re.S)
 assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
 assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
-assert "Api30Window.applyInsets(view, insets, 0)" in task_editor_ime.group(1)
+assert "Api30Window.applyDialogImeInsets(dialogWindow)" in task_editor_ime.group(1)
 assert "configureDialogImeInsets(shownDialogWindow)" in activity
 assert (
     "SOFT_INPUT_ADJUST_NOTHING" in activity
