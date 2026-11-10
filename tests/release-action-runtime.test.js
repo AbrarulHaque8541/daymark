@@ -400,6 +400,8 @@ test('SLSA reusable provenance publishing depends on the protected approval job'
   assert.ok(provenanceStart >= 0, 'missing reusable provenance job');
   const provenance = content.slice(provenanceStart);
   assert.match(provenance, /needs: \[build, authorize-provenance\]/);
+  assert.doesNotMatch(provenance, /^\\s+environment:/m,
+    'the reusable workflow-call job must rely on the separate environment approval gate');
   assert.match(provenance, /id-token: write/);
   assert.match(provenance, /contents: write/);
 });
