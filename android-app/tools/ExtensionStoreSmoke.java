@@ -171,6 +171,25 @@ public final class ExtensionStoreSmoke {
                             && Arrays.equals(targetBytes, Files.readAllBytes(targetFile.toPath())),
                     "legacy install/uninstall paths also preserve symlink and target bytes");
 
+            // A stale temporary symlink must never redirect the next atomic pack write.
+            String tempSymlinkId = "user.temp-symlink-smoke";
+            File tempTarget = new File(root, "extension-temp-target.txt");
+            byte[] tempTargetBytes = "preserve-temp-target".getBytes(StandardCharsets.UTF_8);
+            Files.write(tempTarget.toPath(), tempTargetBytes);
+            File tempLink = new File(new File(root, "browser_extensions"),
+                    tempSymlinkId + ".daymark-ext.json.tmp");
+            Files.createSymbolicLink(tempLink.toPath(), tempTarget.toPath());
+            BrowserExtension tempSymlinkImport = ExtensionPackageParser.parseDaymarkJson(
+                    pack(tempSymlinkId, "window.tempSymlink = true;", true), false);
+            expectWriteFailure(store, tempSymlinkImport);
+            check(Files.isSymbolicLink(tempLink.toPath())
+                            && Arrays.equals(tempTargetBytes, Files.readAllBytes(tempTarget.toPath())),
+                    "pack writer refuses to follow or delete a pre-existing temporary symlink");
+            File tempDestination = new File(new File(root, "browser_extensions"),
+                    tempSymlinkId + ".daymark-ext.json");
+            check(!Files.exists(tempDestination.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS),
+                    "refused temporary symlink does not publish an extension pack");
+
             // A symlinked parent directory must not expose a valid pack stored outside userDir.
             File userDirectory = new File(root, "browser_extensions");
             File externalDirectory = new File(root, "external_browser_extensions");
@@ -309,6 +328,16 @@ public final class ExtensionStoreSmoke {
             if (!expected.getMessage().contains("refusing to replace it")) {
                 throw new AssertionError("read failure must be reported as a preservation refusal", expected);
             }
+        }
+    }
+
+    private static void expectWriteFailure(ExtensionStore store, BrowserExtension ext) throws Exception {
+        assertions++;
+        try {
+            store.installUserPack(ext);
+            throw new AssertionError("expected a pre-existing temporary path to block pack installation");
+        } catch (IOException expected) {
+            // CREATE_NEW must reject the existing path without following or deleting it.
         }
     }
 
