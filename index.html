@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="styles-motion-efficiency.css">
   <link rel="stylesheet" href="motion-accessibility.css">
   <script src="task-logic.js" defer></script>
-  <script src="export-logic.js" defer></script>
+<script src="task-mutation-logic.js" defer></script>
+<script src="export-logic.js" defer></script>
   <script src="repeat-logic.js" defer></script>
   <script src="focus-logic.js" defer></script>
   <script src="feed-logic.js" defer></script>
@@ -37,11 +38,12 @@
   <script src="browser-proxy-ui.js" defer></script>
   <script src="browser-data-logic.js" defer></script>
   <script src="browser-data-ui.js" defer></script>
+  <script src="browser-intent-logic.js" defer></script>
+  <script src="browser-intent-ui.js" defer></script>
   <script src="telegram-logic.js" defer></script>
   <script src="telegram-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
   <script src="webhook-ui.js" defer></script>
-  <script src="task-mutation-logic.js" defer></script>
   <script src="storage-logic.js" defer></script>
   <script src="storage-ui.js" defer></script>
   <script src="motion-policy.js" defer></script>
@@ -430,6 +432,19 @@
           <p class="feed-status" id="browser-data-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="browser-data-result" aria-live="polite"></div>
         </aside>
+        <aside class="briefing-card" id="browser-intent-card" aria-labelledby="browser-intent-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="browser-intent-heading">App links, planned safely</h2>
+          <p class="briefing-description">Paste a link to see, offline, what would open: the page, another app, or nothing.</p>
+          <form id="browser-intent-form" class="feed-form" novalidate>
+            <label class="sr-only" for="browser-intent-link">Link to plan</label>
+            <input id="browser-intent-link" name="link" type="text" maxlength="2048" placeholder="tg://resolve?domain=example or intent://…" autocomplete="off" spellcheck="false">
+            <button class="button button-primary" id="browser-intent-plan" type="submit">Plan</button>
+            <button class="button button-quiet" id="browser-intent-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="browser-intent-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="browser-intent-result" aria-live="polite"></div>
+        </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="webhook-heading">Task completion webhook</h2>
@@ -444,6 +459,7 @@
           </form>
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
+
         <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="telegram-heading">Telegram task digest</h2>

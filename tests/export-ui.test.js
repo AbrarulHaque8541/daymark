@@ -247,3 +247,26 @@ test('duplicate-key task storage fails closed for open-format export', () => {
   const status = created.find((el) => el.id === 'export-status');
   assert.match(status.textContent, /duplicate JSON keys/);
 });
+
+test('index loads task mutation and export logic before their UI consumers', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script\\s+src=["']([^"']+)["'][^>]*>/g)].map((match) => match[1]);
+  const at = (name) => scripts.indexOf(name);
+  assert.ok(at('task-logic.js') >= 0, 'task logic is loaded');
+  assert.ok(at('task-mutation-logic.js') > at('task-logic.js'),
+    'task mutation follows its task contract');
+  assert.ok(at('task-mutation-logic.js') < at('webhook-ui.js'),
+    'task mutation is available before webhook UI initialization');
+  assert.ok(at('task-mutation-logic.js') < at('app.js'),
+    'task mutation is available before app initialization');
+  assert.ok(at('export-logic.js') > at('task-logic.js'),
+    'export renderer follows task validation logic');
+  assert.ok(at('export-logic.js') < at('export-ui.js'),
+    'export renderer is available before export UI initialization');
+  assert.ok(at('webhook-logic.js') < at('webhook-ui.js'),
+    'webhook logic is available before webhook UI initialization');
+  assert.ok(at('browser-intent-logic.js') < at('browser-intent-ui.js'),
+    'intent planner logic is available before its UI');
+});
