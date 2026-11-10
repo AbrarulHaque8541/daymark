@@ -304,6 +304,47 @@ test('undo waits for lock-backed persistence before reporting a restored task', 
   assert.match(app.elements.get('#toast').textContent, /Completed tasks restored/);
 });
 
+test('two tabs completing the same recurring occurrence create one deterministic next task', async () => {
+  const recurring = makeImportTask('cross-tab-repeat-source', 'Daily recurring task');
+  recurring.dueDate = '2026-11-10';
+  recurring.repeat = 'daily';
+  recurring.subtasks = [{ id: 'review-subtask', title: 'Review report', done: false }];
+  const sharedStorage = new Map([[STORAGE_KEY, JSON.stringify([recurring])], [FOCUS_KEY, null]]);
+  const sharedLocks = makeLockManager();
+  const notifications = [];
+  const webhookUi = {
+    async notifyTaskCompleted(candidate) {
+      notifications.push(candidate.id);
+      return { queued: true, reason: 'queued' };
+    }
+  };
+  const options = {
+    storageData: sharedStorage,
+    lockManager: sharedLocks,
+    fixedToday: '2026-11-10',
+    dateNow: '2026-11-10T04:00:00.123Z',
+    webhookUi
+  };
+  const first = bootApp(options);
+  const second = bootApp(options);
+
+  await Promise.all([
+    triggerTaskCompletion(first, recurring.id),
+    triggerTaskCompletion(second, recurring.id)
+  ]);
+
+  const saved = JSON.parse(sharedStorage.get(STORAGE_KEY));
+  const next = saved.filter((task) => task.id.startsWith('repeat-v1-'));
+  assert.equal(saved.length, 2, 'the original occurrence and exactly one next occurrence are persisted');
+  assert.equal(saved[0].completed, true);
+  assert.equal(next.length, 1, 'the same source occurrence must not create two random-ID successors');
+  assert.equal(next[0].dueDate, '2026-11-11');
+  assert.match(next[0].id, /^repeat-v1-[0-9a-f]{32}$/);
+  assert.match(next[0].subtasks[0].id, /^repeat-subtask-v1-[0-9a-f]{32}$/);
+  assert.deepEqual(notifications, [recurring.id],
+    'the second tab must not enqueue a duplicate completion webhook');
+});
+
 test('two tabs adding different tasks preserve both committed mutations', async () => {
   const initial = makeImportTask('existing', 'Existing');
   const sharedStorage = new Map([[STORAGE_KEY, JSON.stringify([initial])], [FOCUS_KEY, null]]);

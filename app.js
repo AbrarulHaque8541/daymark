@@ -479,6 +479,26 @@
     return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
+  // Stable bounded IDs make recurrence side effects idempotent across tabs.
+  // This non-cryptographic 128-bit hash is an identifier, never a security token.
+  function makeStableTaskId(namespace, value) {
+    const input = `${namespace}\\u0000${String(value)}`;
+    let first = 0x811c9dc5;
+    let second = 0x9e3779b9;
+    let third = 0x85ebca6b;
+    let fourth = 0xc2b2ae35;
+    for (let index = 0; index < input.length; index += 1) {
+      const code = input.charCodeAt(index);
+      first = Math.imul(first ^ code, 0x01000193);
+      second = Math.imul(second ^ (code + index), 0x85ebca6b);
+      third = Math.imul(third ^ (code ^ (index * 31)), 0xc2b2ae3d);
+      fourth = Math.imul(fourth ^ (code + (index << 1)), 0x27d4eb2f);
+    }
+    const digest = [first, second, third, fourth]
+      .map((part) => (part >>> 0).toString(16).padStart(8, '0')).join('');
+    return `${namespace}-${digest}`;
+  }
+
   function escapeHTML(value) {
     return String(value).replace(/[&<>"']/g, (character) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1125,9 +1145,13 @@
       : undefined;
     const nextDue = repeat.nextDueDate(task.dueDate, rule, logic.localDateString(), repeatDayOfMonth);
     if (!nextDue) return null;
+    const nextId = makeStableTaskId('repeat-v1', task.id);
+    if (state.tasks.some((item) => item.id === nextId)) {
+      return `Task completed — its next occurrence is already scheduled for ${formatDate(nextDue)}.`;
+    }
     const now = new Date().toISOString();
     const next = {
-      id: makeId(),
+      id: nextId,
       title: task.title,
       dueDate: nextDue,
       dueTime: logic.isTimeOnly(task.dueTime) ? task.dueTime : null,
@@ -1139,7 +1163,11 @@
     if (typeof task.notes === 'string' && task.notes.trim()) next.notes = task.notes;
     if (Array.isArray(task.tags) && task.tags.length) next.tags = task.tags.slice();
     if (Array.isArray(task.subtasks) && task.subtasks.length) {
-      next.subtasks = task.subtasks.map((subtask) => ({ id: makeId(), title: subtask.title, done: false }));
+      next.subtasks = task.subtasks.map((subtask) => ({
+        id: makeStableTaskId('repeat-subtask-v1', `${nextId}\\u0000${subtask.id}`),
+        title: subtask.title,
+        done: false
+      }));
     }
     if (logic.isReminderLead(task.reminderLeadMinutes) && task.reminderLeadMinutes !== null) {
       next.reminderLeadMinutes = task.reminderLeadMinutes;
