@@ -32,6 +32,7 @@ assert "ancestorTrace" in platform_test, "vertical diagnostics must trace the pa
 assert "pointerId=" in platform_test and "toolType=" in platform_test, "touch diagnostics must record pointer identity and tool type"
 
 canonical = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
+assert 'branches:\n      - "integration/focus-*"' in workflow, "Focus integration branches must run the lifecycle gate on push even while a PR has merge conflicts"
 assert "timeout-minutes: 90" in workflow
 assert "DAYMARK_FOCUS_EMULATOR_REPEAT_COUNT: ${{ matrix.api-level == 36 && '10' || '1' }}" in workflow
 for path in (
