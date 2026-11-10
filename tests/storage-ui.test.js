@@ -429,7 +429,7 @@ test('Clear All fails before deleting any data when the task generation cannot b
   assert.equal(storageData['daymark.tasks.v1'], '[]');
   assert.equal(storageData['daymark.focus.v1'], '{"session":null,"log":[]}');
   assert.equal(storageData[focusMutation.FOCUS_GENERATION_KEY], undefined);
-  assert.match(elements['storage-status-line'].textContent, /shared lock or storage operation failed/i);
+  assert.match(elements['storage-status-line'].textContent, /shared lock, generation or storage operation failed/i);
 });
 
 test('task and clear-all deletion fail closed when the shared lock is unavailable', async () => {
