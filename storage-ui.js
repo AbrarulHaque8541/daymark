@@ -28,6 +28,7 @@
     }
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+    const focusMutation = env.focusMutation || root.DaymarkFocusMutation || null;
     const webhookUi = env.webhookUi || root.DaymarkWebhookUi || null;
     const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
@@ -204,11 +205,32 @@
       }
     }
 
+    function notifyFocusStorageChange(categoryId) {
+      if (!win || typeof win.dispatchEvent !== 'function') return;
+      try {
+        if (typeof win.CustomEvent === 'function') {
+          win.dispatchEvent(new win.CustomEvent('daymark:focus-storage-cleared', {
+            detail: { categoryId }
+          }));
+        } else if (typeof win.Event === 'function') {
+          const event = new win.Event('daymark:focus-storage-cleared');
+          Object.defineProperty(event, 'detail', { value: { categoryId } });
+          win.dispatchEvent(event);
+        }
+      } catch (error) {
+        // The storage mutation is already complete; reload still observes it.
+      }
+    }
+
     function finishCategoryClear(result, category) {
       if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
         notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
       } else if (category.id === 'webhook-queue' && result.removed.length > 0) {
         notifyTaskStorageChange('daymark.webhook.queue.v1');
+      }
+      if (result.failed.length === 0
+          && (category.id === 'focus' || category.id === 'focus-backup' || category.id === 'focus-preset')) {
+        notifyFocusStorageChange(category.id);
       }
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
@@ -284,6 +306,32 @@
         });
       }
 
+      if (categoryId === 'focus' || categoryId === 'focus-backup' || categoryId === 'focus-preset') {
+        if (!focusMutation || typeof focusMutation.withFocusMutationLock !== 'function'
+            || typeof focusMutation.incrementFocusGeneration !== 'function') {
+          setBusy(false);
+          status('Cannot safely clear Focus data: Focus cross-tab coordination is unavailable. Nothing was cleared.');
+          return Promise.resolve(false);
+        }
+        return focusMutation.withFocusMutationLock(lockManager, () => {
+          const generation = focusMutation.incrementFocusGeneration(storage);
+          if (!generation.ok) return { ok: false, reason: generation.reason };
+          let result;
+          try { result = clear(); }
+          catch (error) { return { ok: false, reason: 'storage-clear-failed' }; }
+          return { ok: true, result };
+        }).then((locked) => {
+          setBusy(false);
+          if (!locked.ok || !locked.value || !locked.value.ok) {
+            status('Could not safely clear ' + category.label
+              + ': Focus coordination or storage failed. Nothing was cleared.');
+            return false;
+          }
+          finishCategoryClear(locked.value.result, category);
+          return true;
+        });
+      }
+
       if (categoryId === 'tasks' || categoryId === 'task-backup') {
         if (!taskMutation || typeof taskMutation.withTaskMutationLock !== 'function') {
           setBusy(false);
@@ -324,9 +372,8 @@
         return;
       }
       let scan = null;
-      try {
-        scan = storageApi.scanStorage(storage);
-      } catch (error) {
+      try { scan = storageApi.scanStorage(storage); }
+      catch (error) {
         status('Could not verify local data. Nothing was cleared.');
         return;
       }
@@ -335,8 +382,9 @@
         return;
       }
       const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, the Focus Timer preset, cached data, saved Wikipedia/weather/holiday/currency and browser-search preferences, the remembered browser download journey, the saved browser proxy profile, the legacy webhook coordination lock, and queued events will be removed. The secret-bearing legacy endpoint is excluded and handled without reading. '
-        + 'This cannot be undone.');
+        + 'Tasks, Focus history, the Focus Timer preset, caches, browser preferences, and queued events will be removed. '
+        + 'A small non-personal Focus coordination counter remains so another open tab cannot restore cleared Focus data. '
+        + 'The secret-bearing legacy webhook endpoint is excluded and handled without reading. This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
         return;
@@ -346,8 +394,9 @@
         return;
       }
       if (!taskMutation || typeof taskMutation.withLocksInOrder !== 'function'
-          || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)) {
-        status('Cannot safely clear all data: shared task/webhook coordination is unavailable. Nothing was cleared.');
+          || !Array.isArray(taskMutation.CLEAR_ALL_LOCK_ORDER)
+          || !focusMutation || typeof focusMutation.incrementFocusGeneration !== 'function') {
+        status('Cannot safely clear all data: shared task, webhook and Focus coordination is unavailable. Nothing was cleared.');
         return false;
       }
       setBusy(true);
@@ -355,6 +404,8 @@
         lockManager,
         taskMutation.CLEAR_ALL_LOCK_ORDER,
         () => {
+          const generation = focusMutation.incrementFocusGeneration(storage);
+          if (!generation.ok) throw new Error('Focus generation could not be advanced');
           const result = storageApi.clearAll(storage);
           if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
               && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
@@ -367,11 +418,12 @@
       if (!locked.ok) {
         status('Could not safely clear all data: '
           + (locked.reason === 'coordination-unavailable'
-            ? 'shared task/webhook coordination is unavailable. Nothing was cleared.'
-            : 'a shared task/webhook lock failed. Nothing was cleared.'));
+            ? 'shared task, webhook or Focus coordination is unavailable. Nothing was cleared.'
+            : 'a shared lock or storage operation failed. Nothing was cleared.'));
         return false;
       }
       const result = locked.value;
+      notifyFocusStorageChange('all');
       if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
