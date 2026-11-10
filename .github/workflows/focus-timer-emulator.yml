@@ -38,6 +38,8 @@ jobs:
     timeout-minutes: 90
     # API 36 has had intermittent lifecycle failures. Run the complete suite
     # ten consecutive times on one clean emulator; API 29 remains one baseline.
+    # platform-instrumentation-repeat.sh clears only the disposable app package between runs
+    # and stops at the first failure; it never retries a failed instrumentation attempt.
     env:
       DAYMARK_FOCUS_EMULATOR_REPEAT_COUNT: ${{ matrix.api-level == 36 && '10' || '1' }}
     strategy:
