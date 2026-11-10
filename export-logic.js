@@ -16,7 +16,8 @@
   const ICS_LINE_OCTETS = 75; // RFC 5545 folding limit, counted in UTF-8 octets
   const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
   const PRIORITIES = ['low', 'medium', 'high'];
-  const CSV_HEADER = 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt';
+  const REPEAT_RULES = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
+  const CSV_HEADER = 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt,repeatDayOfMonth';
 
   function isFormat(value) {
     return FORMATS.indexOf(value) !== -1;
@@ -41,6 +42,35 @@
     const hours = Number(parts[0]);
     const minutes = Number(parts[1]);
     return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+  }
+
+  function normalizeRepeatMetadata(task, dueDate) {
+    const repeat = task.repeat === undefined || task.repeat === null || task.repeat === ''
+      ? null : task.repeat;
+    const hasAnchor = task.repeatDayOfMonth !== undefined && task.repeatDayOfMonth !== null;
+    if (repeat === null) {
+      if (hasAnchor) throw new Error('Export repeatDayOfMonth requires a monthly or yearly repeat rule.');
+      return { repeat: null, repeatDayOfMonth: null };
+    }
+    if (!REPEAT_RULES.includes(repeat) || dueDate === null) {
+      throw new Error('Export repeat rule must be supported and requires a valid due date.');
+    }
+    if (repeat === 'monthly' || repeat === 'yearly') {
+      const anchor = hasAnchor ? task.repeatDayOfMonth : Number(dueDate.slice(8));
+      if (!Number.isInteger(anchor) || anchor < 1 || anchor > 31) {
+        throw new Error('Export repeatDayOfMonth must be an integer from 1 to 31.');
+      }
+      if (repeat === 'yearly') {
+        const [year, month, day] = dueDate.split('-').map(Number);
+        const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+        if (day !== anchor && !(month === 2 && day === 28 && anchor === 29 && !leapYear)) {
+          throw new Error('Export yearly repeatDayOfMonth must match the due date, except a clamped February 29.');
+        }
+      }
+      return { repeat, repeatDayOfMonth: anchor };
+    }
+    if (hasAnchor) throw new Error('Export repeatDayOfMonth is only valid for monthly or yearly rules.');
+    return { repeat, repeatDayOfMonth: null };
   }
 
   function hasLoneSurrogate(value) {
@@ -99,8 +129,7 @@
     }
     const notes = typeof task.notes === 'string' ? task.notes : '';
     requireCleanText(notes, 'notes');
-    const repeat = task.repeat === undefined || task.repeat === null || task.repeat === '' ? null : task.repeat;
-    if (repeat !== null) requireCleanText(repeat, 'repeat');
+    const repeatMetadata = normalizeRepeatMetadata(task, dueDate);
     const rawTags = task.tags === undefined || task.tags === null ? [] : task.tags;
     if (!Array.isArray(rawTags)) throw new Error('Export task tags must be an array.');
     const tags = rawTags.map((tag) => {
@@ -126,7 +155,8 @@
       createdAt: task.createdAt,
       updatedAt,
       notes,
-      repeat,
+      repeat: repeatMetadata.repeat,
+      repeatDayOfMonth: repeatMetadata.repeatDayOfMonth,
       tags,
       subtasks
     };
@@ -190,6 +220,10 @@
       }
       parts.push(task.priority + ' priority');
       if (task.repeat) parts.push('repeats ' + task.repeat);
+      if (task.repeatDayOfMonth !== null) {
+        const dueDay = Number(task.dueDate.slice(8));
+        if (task.repeatDayOfMonth !== dueDay) parts.push('repeat day ' + task.repeatDayOfMonth);
+      }
       for (const tag of task.tags) parts.push('#' + tag);
       const lines = ['- ' + box + ' **' + mdEscape(task.title) + '** · ' + parts.join(' · ')];
       if (task.notes) {
@@ -262,7 +296,8 @@
         task.notes,
         subtasksJson(task.subtasks),
         task.createdAt,
-        task.updatedAt
+        task.updatedAt,
+        task.repeatDayOfMonth === null ? '' : String(task.repeatDayOfMonth)
       ].map(csvQuote).join(','));
     }
     return enforceCap(rows.join('\r\n') + '\r\n');

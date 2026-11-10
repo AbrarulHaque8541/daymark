@@ -21,6 +21,7 @@ function baseTask(overrides) {
     updatedAt: '2026-01-01T00:00:00.000Z',
     notes: '',
     repeat: null,
+    repeatDayOfMonth: null,
     tags: [],
     subtasks: []
   }, overrides);
@@ -88,6 +89,7 @@ test('validation normalizes optional fields', () => {
   assert.equal(task.dueTime, null);
   assert.equal(task.notes, '');
   assert.equal(task.repeat, null);
+  assert.equal(task.repeatDayOfMonth, null);
   assert.deepEqual(task.tags, []);
   assert.deepEqual(task.subtasks, []);
   assert.equal(task.updatedAt, task.createdAt);
@@ -184,4 +186,35 @@ test('generatedAt is required and must be a parseable instant', () => {
   assert.throws(() => exporter.toCsv([baseTask({})], {}), /generatedAt/);
   assert.throws(() => exporter.toIcs([baseTask({})], { generatedAt: 'yesterday' }), /generatedAt/);
   assert.throws(() => exporter.render('markdown', [baseTask({})], null), /generatedAt/);
+});
+
+
+test('monthly/yearly recurrence anchors validate and survive open-format export', () => {
+  const meta = { generatedAt: '2026-11-02T12:00:00.000Z' };
+  const clamped = baseTask({
+    id: 'clamped-month',
+    dueDate: '2026-11-30',
+    repeat: 'monthly',
+    repeatDayOfMonth: 31
+  });
+  const [normalized] = exporter.validateExportTasks([clamped]);
+  assert.equal(normalized.repeatDayOfMonth, 31);
+  assert.ok(exporter.toMarkdown([clamped], meta).includes('repeats monthly · repeat day 31'));
+  const csv = exporter.toCsv([clamped], meta).split('\r\n');
+  assert.equal(csv[0], exporter.CSV_HEADER);
+  assert.equal(csv[1].split(',').at(-1), '31');
+  assert.ok(exporter.toIcs([clamped], meta).includes('Repeats: monthly'));
+
+  const legacy = baseTask({ dueDate: '2026-11-30', repeat: 'monthly' });
+  assert.equal(exporter.validateExportTasks([legacy])[0].repeatDayOfMonth, 30,
+    'legacy monthly records without an anchor derive it from the due date');
+  assert.equal(exporter.validateExportTasks([baseTask({
+    dueDate: '2025-02-28', repeat: 'yearly', repeatDayOfMonth: 29
+  })])[0].repeatDayOfMonth, 29, 'a clamped February 29 yearly anchor is retained');
+
+  assert.throws(() => exporter.validateExportTasks([baseTask({ dueDate: '2026-11-30', repeat: 'hourly' })]), /repeat rule/);
+  assert.throws(() => exporter.validateExportTasks([baseTask({ dueDate: '2026-11-30', repeat: 'monthly', repeatDayOfMonth: 32 })]), /repeatDayOfMonth/);
+  assert.throws(() => exporter.validateExportTasks([baseTask({ dueDate: '2024-02-28', repeat: 'yearly', repeatDayOfMonth: 29 })]), /yearly repeatDayOfMonth/);
+  assert.throws(() => exporter.validateExportTasks([baseTask({ dueDate: '2026-11-30', repeatDayOfMonth: 31 })]), /requires a monthly or yearly/);
+  assert.throws(() => exporter.validateExportTasks([baseTask({ repeat: 'daily' })]), /repeat rule/);
 });

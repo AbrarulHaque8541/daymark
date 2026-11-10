@@ -22,9 +22,19 @@
     if (!env || !env.document) throw new Error('attachImportUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
+    const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+    const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     let idCounter = 0;
     const makeId = () => {
@@ -101,44 +111,133 @@
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
         }
+        if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+          throw new Error('browser storage is unavailable; nothing was changed');
+        }
+        if (!logic || typeof logic.validateStoredTasks !== 'function'
+          || typeof logic.hasDuplicateJsonKeys !== 'function') {
+          throw new Error('task logic is unavailable');
+        }
+        const raw = storage.getItem(STORAGE_KEY);
+        let stored = [];
+        if (raw !== null) {
+          if (logic.hasDuplicateJsonKeys(raw)) {
+            throw new Error('saved tasks contain duplicate JSON keys; nothing was changed');
+          }
+          stored = JSON.parse(raw);
+          if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
+        }
+        const validated = logic.validateStoredTasks(stored);
+        if (!validated || !Array.isArray(validated.tasks)
+          || !Number.isSafeInteger(validated.rejectedCount) || validated.rejectedCount < 0) {
+          throw new Error('saved tasks could not be validated; nothing was changed');
+        }
+        if (validated.rejectedCount > 0) {
+          throw new Error('existing saved tasks contain ' + validated.rejectedCount
+            + ' invalid or duplicate record(s); import was not applied');
+        }
+        // Validate the existing store before reading the selected file so an
+        // import cannot silently sanitize malformed or duplicate user data.
         const text = await readText(file);
         if (format === 'ics' && typeof importApi.fromIcs !== 'function') {
           throw new Error('calendar import is unavailable in this build');
         }
         const parsed = format === 'csv'
-          ? importApi.fromCsv(text, { now: now(), makeId })
+          ? importApi.fromCsv(text, { now: now(), makeId, hasDuplicateJsonKeys: logic.hasDuplicateJsonKeys })
           : format === 'markdown'
             ? importApi.fromMarkdown(text, { now: now(), makeId })
             : importApi.fromIcs(text, { now: now(), makeId });
-        if (!logic || typeof logic.validateStoredTasks !== 'function') {
-          throw new Error('task logic is unavailable');
-        }
-        const raw = storage && typeof storage.getItem === 'function' ? storage.getItem(STORAGE_KEY) : null;
-        let stored = [];
-        if (raw) {
-          stored = JSON.parse(raw);
-          if (!Array.isArray(stored)) throw new Error('saved tasks are unreadable; nothing was changed');
-        }
-        const validated = logic.validateStoredTasks(stored);
         const merge = importApi.mergeTasks(validated.tasks, parsed.tasks, logic);
+        let addedCount = 0;
+        let concurrentDuplicates = 0;
         if (merge.added.length > 0) {
-          if (!storage || typeof storage.setItem !== 'function') {
-            throw new Error('browser storage is unavailable; nothing was changed');
+          if (!taskMutation || typeof taskMutation.commitTaskSnapshot !== 'function') {
+            throw new Error('safe cross-tab task coordination is unavailable; nothing was changed');
           }
-          storage.setItem(STORAGE_KEY, JSON.stringify(merge.merged));
+          const committed = await taskMutation.commitTaskSnapshot({
+            lockManager,
+            storage,
+            key: STORAGE_KEY,
+            baseTasks: validated.tasks,
+            desiredTasks: merge.merged,
+            readCurrent: (currentRaw) => {
+              if (currentRaw === null) {
+                return validated.tasks.length
+                  ? { ok: false, reason: 'current-removed' }
+                  : { ok: true, tasks: [] };
+              }
+              if (typeof currentRaw !== 'string' || currentRaw.length === 0
+                  || logic.hasDuplicateJsonKeys(currentRaw)) {
+                return { ok: false, reason: 'invalid-current' };
+              }
+              let currentParsed;
+              try {
+                currentParsed = JSON.parse(currentRaw);
+              } catch (error) {
+                return { ok: false, reason: 'invalid-current' };
+              }
+              if (!Array.isArray(currentParsed)) return { ok: false, reason: 'invalid-current' };
+              const currentValidated = logic.validateStoredTasks(currentParsed);
+              if (!currentValidated || !Array.isArray(currentValidated.tasks)
+                  || currentValidated.rejectedCount > 0) {
+                return { ok: false, reason: 'invalid-current' };
+              }
+              return { ok: true, tasks: currentValidated.tasks };
+            }
+          });
+          if (!committed.ok) {
+            const failures = {
+              'coordination-unavailable': 'safe cross-tab task coordination is unavailable',
+              'lock-failed': 'cross-tab task coordination failed',
+              'conflict': 'an imported task conflicts with a newer task from another tab',
+              'current-removed': 'the saved task list was removed while import was being prepared',
+              'invalid-current': 'the saved task list changed to an unreadable value',
+              'storage-read-failed': 'browser storage could not be read',
+              'storage-write-failed': 'browser storage rejected the task write',
+              'storage-unavailable': 'browser storage is unavailable'
+            };
+            throw new Error((failures[committed.reason] || 'the task list could not be updated') + '; nothing was changed');
+          }
+          addedCount = Array.isArray(committed.addedIds) ? committed.addedIds.length : merge.added.length;
+          concurrentDuplicates = Math.max(0, merge.added.length - addedCount);
           notifySaved();
         }
         const parts = [];
-        if (merge.added.length > 0) parts.push('Imported ' + plural(merge.added.length, 'task') + ' from ' + fileLabel + '.');
+        if (addedCount > 0) parts.push('Imported ' + plural(addedCount, 'task') + ' from ' + fileLabel + '.');
         else parts.push('No new tasks were imported from ' + fileLabel + '.');
-        if (merge.duplicates > 0) parts.push(plural(merge.duplicates, 'duplicate') + ' skipped.');
+        const duplicateCount = merge.duplicates + concurrentDuplicates;
+        if (duplicateCount > 0) parts.push(plural(duplicateCount, 'duplicate') + ' skipped.');
         if (merge.invalid > 0) parts.push(plural(merge.invalid, 'invalid task') + ' skipped.');
         if (parsed.skippedRows > 0) parts.push(plural(parsed.skippedRows, 'malformed row') + ' skipped.');
         if (parsed.recurring > 0) {
           parts.push(plural(parsed.recurring, 'recurring item') + ' imported once as a one-time task.');
         }
         if (parsed.timezoneDropped > 0) {
-          parts.push('Times were kept as written; time zones were not applied.');
+          parts.push('Time zones were not converted; the written hour and minute values were kept.');
+        }
+        if (parsed.secondsDropped > 0) {
+          parts.push(parsed.secondsDropped + ' imported time' + (parsed.secondsDropped === 1 ? '' : 's') +
+            ' had non-zero seconds; seconds were truncated to minute precision.');
+        }
+        if (parsed.categoriesDropped > 0) {
+          parts.push(plural(parsed.categoriesDropped, 'category value') +
+            ' could not be represented by Daymark tags and were skipped.');
+        }
+        if (parsed.invalidCompletion > 0) {
+          parts.push(parsed.invalidCompletion + ' item' + (parsed.invalidCompletion === 1 ? '' : 's') +
+            ' had invalid completion metadata ignored; left open.');
+        }
+        if (parsed.invalidDateType > 0) {
+          parts.push(plural(parsed.invalidDateType, 'date/time field') +
+            ' had incompatible DATE/DATE-TIME or TZID parameters; the date/time was omitted.');
+        }
+        if (parsed.invalidDateTimeValue > 0) {
+          parts.push(plural(parsed.invalidDateTimeValue, 'invalid date/time value') +
+            ' omitted; affected tasks were kept without that date/time.');
+        }
+        if (parsed.ambiguousComponents > 0) {
+          parts.push(plural(parsed.ambiguousComponents, 'calendar component') +
+            ' with duplicate singleton properties skipped as ambiguous.');
         }
         if (parsed.cancelled > 0) parts.push(plural(parsed.cancelled, 'cancelled item') + ' skipped.');
         status(parts.join(' '));
@@ -163,7 +262,7 @@
   root.DaymarkImportUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachImportUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachImportUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
