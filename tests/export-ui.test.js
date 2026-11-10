@@ -21,6 +21,8 @@ function fakeElement(tag) {
     removed: false,
     attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
+    getAttribute(name) { return this.attributes[name]; },
+    removeAttribute(name) { delete this.attributes[name]; },
     closest(selector) {
       return selector === '#' + this.id && this.id ? this : null;
     },
@@ -205,4 +207,15 @@ test('page loads the open-format renderer before the export UI', () => {
   assert.ok(taskLogic >= 0, 'task validation loads');
   assert.ok(exportLogic > taskLogic, 'open-format renderer loads after task logic');
   assert.ok(exportUi > exportLogic, 'export UI loads after its renderer');
+});
+
+test('visible export-status element is updated in place and button reports busy during work', () => {
+  const { env, elements, created } = fakeEnv({ format: 'markdown', stored: JSON.stringify(sampleTasks) });
+  elements['export-status'] = Object.assign(fakeElement('p'), { id: 'export-status', className: 'export-status' });
+  const handle = ui.attachExportUi(env);
+  const event = clickEvent(elements['export-tasks']);
+  handle.onClick(event);
+  assert.equal(elements['export-status'].textContent.includes('2 tasks as MARKDOWN'), true);
+  assert.equal(created.filter((el) => el.id === 'export-status').length, 0, 'does not create a second status element');
+  assert.equal(elements['export-tasks'].attributes['aria-busy'], undefined, 'aria-busy is cleared after completion');
 });
