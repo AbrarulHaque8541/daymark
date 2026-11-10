@@ -28,6 +28,15 @@
   .date-chip:hover {
     transform: none !important;
   }
+  /* Static professional glass for skeleton when motion is reduced */
+  .skeleton-row {
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, .62) 0%,
+      rgba(22, 112, 95, .10) 50%,
+      rgba(255, 255, 255, .62) 100%) !important;
+    background-size: 100% 100% !important;
+    border-color: rgba(22, 112, 95, .22) !important;
+  }
 }
 
 /* Instant press feedback — same spring language, no cartoon bounce. */
@@ -193,6 +202,16 @@
   .tool-button.is-busy::before {
     border-top-color: #16705f;
     border-color: #16705f;
+  }
+  /* Dark-mode static glass for reduced-motion skeleton */
+  @media (prefers-color-scheme: dark) {
+    .skeleton-row {
+      background: linear-gradient(135deg,
+        rgba(26, 33, 40, .65) 0%,
+        rgba(22, 112, 95, .14) 50%,
+        rgba(26, 33, 40, .65) 100%) !important;
+      border-color: rgba(22, 112, 95, .32) !important;
+    }
   }
 }
 
