@@ -157,7 +157,7 @@ final class BrowserDownloadBodyTransfer {
             abortAfterFailure(target, committed.get());
             throw failure;
         } catch (IOException | RuntimeException failure) {
-            abortAfterFailure(target, committed);
+            abortAfterFailure(target, committed.get());
             throw failure(Failure.IO_ERROR);
         } catch (Error fatal) {
             try {
