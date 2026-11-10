@@ -180,7 +180,7 @@ assert "if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)" in mode_
 assert "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH" in mode_selector, (
     "rightward horizontal movement must be explicitly classified for Stopwatch"
 )
-assert "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN)" in mode_selector, (
+assert "|| result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN)" in mode_selector, (
     "leftward horizontal movement must be explicitly classified for Countdown"
 )
 assert mode_selector.count("requestDisallowInterceptTouchEvent(") == 2, (
