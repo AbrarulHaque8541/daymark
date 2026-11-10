@@ -191,3 +191,16 @@ test('shared task date contract matches the Java host implementation fixture', (
   }
   assert.equal(cases, 9, 'shared date contract must include all nine cases');
 });
+
+test('relative due labels cover near-term and fall back for distant dates', () => {
+  assert.equal(logic.relativeDueLabel('2026-11-11', '2026-11-11'), 'Due today');
+  assert.equal(logic.relativeDueLabel('2026-11-12', '2026-11-11'), 'Due tomorrow');
+  assert.equal(logic.relativeDueLabel('2026-11-14', '2026-11-11'), 'Due in 3 days');
+  assert.equal(logic.relativeDueLabel('2026-11-18', '2026-11-11'), 'Due in 7 days');
+  assert.equal(logic.relativeDueLabel('2026-11-10', '2026-11-11'), 'Overdue by 1 day');
+  assert.equal(logic.relativeDueLabel('2026-11-04', '2026-11-11'), 'Overdue by 7 days');
+  assert.equal(logic.relativeDueLabel('2026-11-19', '2026-11-11'), null);
+  assert.equal(logic.relativeDueLabel('2026-11-03', '2026-11-11'), null);
+  assert.equal(logic.relativeDueLabel('not-a-date', '2026-11-11'), null);
+  assert.equal(logic.relativeDueLabel(null, '2026-11-11'), null);
+});
