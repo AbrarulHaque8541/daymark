@@ -5,6 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const NODE_TEST_FILE_RE = /^(?:test(?:-.*)?|.*-test|.*\.test)\.(?:js|mjs|cjs)$/i;
+const NODE_TEST_MUTATOR_METHODS = {
+  Object: ['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf'],
+  Reflect: ['set', 'defineProperty', 'deleteProperty', 'setPrototypeOf']
+};
 const GENERATED_TEST_SCAN_EXCLUSIONS = new Set([
   '.git', '.gradle', '.idea', '.cache', 'node_modules',
   'build', 'dist', 'out', 'coverage', 'target'
@@ -116,6 +120,27 @@ function markRequirePattern(pattern, scope) {
     if (property.value.type === 'Identifier') {
       markNodeTestBinding(scope, property.value.name, importedName);
     }
+  }
+}
+
+function markNodeTestMutatorBinding(scope, localName, rootName, methodName) {
+  const binding = scope && scope.bindings.get(localName);
+  if (!binding) return;
+  binding.kind = 'node-test-mutator';
+  binding.importedName = `${rootName}.${methodName}`;
+}
+
+function markNodeTestMutatorPattern(pattern, scope, rootName) {
+  if (!pattern || pattern.type !== 'ObjectPattern' ||
+      !NODE_TEST_MUTATOR_METHODS[rootName]) return;
+  for (const property of pattern.properties) {
+    if (property.type !== 'Property' || property.computed) continue;
+    const methodName = property.key.type === 'Identifier'
+      ? property.key.name
+      : (property.key.type === 'Literal' ? property.key.value : null);
+    if (!NODE_TEST_MUTATOR_METHODS[rootName].includes(methodName)) continue;
+    const local = property.value.type === 'AssignmentPattern' ? property.value.left : property.value;
+    if (local.type === 'Identifier') markNodeTestMutatorBinding(scope, local.name, rootName, methodName);
   }
 }
 
@@ -254,13 +279,38 @@ function buildScopes(ast) {
         continue;
       }
       if (declarator.id.type === 'ObjectPattern' && sourceBinding &&
-          sourceBinding.kind === 'node-test-namespace') {
+          ['node-test-namespace', 'node-test-default'].includes(sourceBinding.kind)) {
         markRequirePattern(declarator.id, scope);
+        continue;
+      }
+      if (declarator.id.type === 'ObjectPattern' &&
+          ['Object', 'Reflect'].includes(init.name)) {
+        markNodeTestMutatorPattern(declarator.id, scope, init.name);
         continue;
       }
     }
     if (init && init.type === 'MemberExpression') {
       const importedName = staticPropertyName(init);
+      const chain = memberChain(init);
+      if (declarator.id.type === 'Identifier' && chain && chain.properties.length === 1 &&
+          ['test', 'it', 'describe'].includes(chain.properties[0])) {
+        const sourceBinding = resolveBinding(scope, chain.base.name);
+        if (sourceBinding && ['node-test-default', 'node-test-namespace'].includes(sourceBinding.kind)) {
+          markNodeTestBinding(scope, declarator.id.name, chain.properties[0]);
+          continue;
+        }
+      }
+      const mutator = mutationIntrinsicName(init);
+      if (declarator.id.type === 'Identifier' && mutator) {
+        const [rootName, methodName] = mutator.split('.');
+        markNodeTestMutatorBinding(scope, declarator.id.name, rootName, methodName);
+        continue;
+      }
+      const mutatorRoot = mutationIntrinsicNamespaceRoot(init);
+      if (declarator.id.type === 'ObjectPattern' && mutatorRoot) {
+        markNodeTestMutatorPattern(declarator.id, scope, mutatorRoot);
+        continue;
+      }
       if (['test', 'it', 'describe'].includes(importedName) &&
           isNodeTestRequireCall(init.object, nodeScopes) &&
           declarator.id.type === 'Identifier') {
@@ -290,6 +340,46 @@ function memberChain(node) {
   return { base: current, properties };
 }
 
+function mutationIntrinsicNamespaceRoot(expression) {
+  if (!expression) return null;
+  if (expression.type === 'Identifier' && ['Object', 'Reflect'].includes(expression.name)) {
+    return expression.name;
+  }
+  const chain = memberChain(expression);
+  if (chain && chain.base.name === 'globalThis' && chain.properties.length === 1 &&
+      ['Object', 'Reflect'].includes(chain.properties[0])) return chain.properties[0];
+  return null;
+}
+
+function mutationIntrinsicName(expression) {
+  const chain = memberChain(expression);
+  if (chain && chain.properties.length === 1 &&
+      NODE_TEST_MUTATOR_METHODS[chain.base.name] &&
+      NODE_TEST_MUTATOR_METHODS[chain.base.name].includes(chain.properties[0])) {
+    return `${chain.base.name}.${chain.properties[0]}`;
+  }
+  if (chain && chain.base.name === 'globalThis' && chain.properties.length === 2 &&
+      NODE_TEST_MUTATOR_METHODS[chain.properties[0]] &&
+      NODE_TEST_MUTATOR_METHODS[chain.properties[0]].includes(chain.properties[1])) {
+    return `${chain.properties[0]}.${chain.properties[1]}`;
+  }
+  if (expression && expression.type === 'MemberExpression' &&
+      expression.computed && staticPropertyName(expression) === null) {
+    const root = mutationIntrinsicNamespaceRoot(expression.object);
+    if (root) return `${root}.*`;
+  }
+  return null;
+}
+
+function resolveMutationIntrinsic(callee, scope) {
+  if (callee && callee.type === 'Identifier') {
+    const binding = resolveBinding(scope, callee.name);
+    if (binding && binding.kind === 'node-test-mutator') return binding.importedName;
+    return null;
+  }
+  return mutationIntrinsicName(callee);
+}
+
 function nodeTestBindingForTarget(target, scope) {
   let root = target;
   while (root && root.type === 'MemberExpression') root = root.object;
@@ -312,29 +402,9 @@ function markBindingObjectMutated(binding) {
 }
 
 function markReflectiveMutation(node, scope) {
-  if (!node || node.type !== 'CallExpression' || !node.callee ||
-      node.callee.type !== 'MemberExpression') return;
-  let rootName = null;
-  let methodName = staticPropertyName(node.callee);
-  const chain = memberChain(node.callee);
-  if (chain && chain.properties.length === 1 &&
-      ['Object', 'Reflect'].includes(chain.base.name)) {
-    rootName = chain.base.name;
-    methodName = chain.properties[0];
-  } else if (chain && chain.base.name === 'globalThis' && chain.properties.length === 2 &&
-      ['Object', 'Reflect'].includes(chain.properties[0])) {
-    rootName = chain.properties[0];
-    methodName = chain.properties[1];
-  } else if (node.callee.object.type === 'Identifier' &&
-      ['Object', 'Reflect'].includes(node.callee.object.name) && methodName === null) {
-    // A dynamic intrinsic method name cannot be proven read-only.
-    rootName = node.callee.object.name;
-  }
-  if (!rootName) return;
-  const mutators = rootName === 'Object'
-    ? new Set(['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf'])
-    : new Set(['set', 'defineProperty', 'deleteProperty', 'setPrototypeOf']);
-  if (methodName !== null && !mutators.has(methodName)) return;
+  if (!node || node.type !== 'CallExpression' || !node.callee) return;
+  const mutator = resolveMutationIntrinsic(node.callee, scope);
+  if (!mutator) return;
   const binding = nodeTestBindingForTarget(node.arguments[0], scope);
   if (binding) markBindingObjectMutated(binding);
 }
