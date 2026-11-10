@@ -203,3 +203,43 @@ test('duplicate JSON object keys are detected recursively without scanning strin
   const deeplyNested = '['.repeat(130) + '0' + ']'.repeat(130);
   assert.equal(logic.hasDuplicateJsonKeys(deeplyNested), true);
 });
+
+
+test('repeat metadata matches the shared Android/web validation contract', () => {
+  const fixturePath = path.join(__dirname, '..', 'contracts', 'task-repeat-validation.tsv');
+  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
+  let cases = 0;
+  for (const [index, line] of lines.entries()) {
+    if (!line || line.startsWith('#')) continue;
+    const fields = line.split('\t');
+    assert.equal(fields.length, 4, 'repeat validation fixture line ' + (index + 1) + ' must have four columns');
+    const [dueDate, repeatRule, anchorText, expectedText] = fields;
+    const candidate = task('repeat-' + index, 'Repeat validation', {
+      dueDate: dueDate === '-' ? null : dueDate
+    });
+    if (repeatRule !== '-') candidate.repeat = repeatRule;
+    if (anchorText !== '-') candidate.repeatDayOfMonth = Number(anchorText);
+    assert.equal(logic.isValidTask(candidate), expectedText === 'true',
+      'repeat metadata validation must match fixture line ' + (index + 1));
+    cases += 1;
+  }
+  assert.equal(cases, 19, 'shared repeat validation fixture covers every boundary case');
+  const dated = task('repeat-string-anchor', 'Monthly task', { dueDate: '2026-02-28' });
+  dated.repeat = 'monthly';
+  dated.repeatDayOfMonth = '31';
+  assert.equal(logic.isValidTask(dated), false, 'string anchors are not silently coerced');
+  assert.equal(logic.isValidTask({ ...dated, repeatDayOfMonth: 31 }), true,
+    'a numeric month-end anchor is valid after date clamping');
+  assert.equal(logic.isValidTask({ ...dated, repeat: '', repeatDayOfMonth: null }), true,
+    'the legacy empty repeat sentinel is treated as absent');
+});
+
+test('tag and repeat metadata are validated together', () => {
+  const candidate = task('tagged-repeat', 'Monthly task', { dueDate: '2026-02-28' });
+  candidate.tags = ['work'];
+  candidate.repeat = 'monthly';
+  candidate.repeatDayOfMonth = 31;
+  assert.equal(logic.isValidTask(candidate), true);
+  assert.equal(logic.isValidTask({ ...candidate, tags: ['bad tag'] }), false);
+  assert.equal(logic.isValidTask({ ...candidate, repeatDayOfMonth: '31' }), false);
+});
