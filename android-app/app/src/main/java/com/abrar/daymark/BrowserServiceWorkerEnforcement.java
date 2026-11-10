@@ -121,8 +121,8 @@ final class BrowserServiceWorkerEnforcement {
                 settingsBlocked = ServiceWorkerController.getInstance()
                         .getServiceWorkerWebSettings().getBlockNetworkLoads();
             } catch (RuntimeException stateUnavailable) {
-                // Unknown is not treated as unblocked. The request client remains the
-                // fail-closed fallback when installed.
+                // Retain the last known platform state. When installed, the request client
+                // still applies the explicit Online/Offline decision independently.
             }
             Log.w(TAG, "could not change the Service Worker platform setting after Online consent; the current setting is retained",
                     unavailable);
