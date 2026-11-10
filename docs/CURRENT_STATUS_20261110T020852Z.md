@@ -108,7 +108,7 @@ No PR was merged in this run. Six branches still use the prior main base `153283
 - No merge, force push, protection bypass, release, tag, version bump, signing-key change, package identity change, or destructive migration.
 - No physical-device testing.
 - No production publishing.
-- Android application identity discrepancy remains unresolved: current root AGENTS/Gradle source identifies `com.abrar.daymark`; the run-level instruction requires `com.cue.daymark`. No identity change was made; owner reconciliation/migration authorization is still required.
+- Android application identity discrepancy remains unresolved between the repository's authoritative AGENTS/Gradle configuration and the run-level instruction. No identity change was made; owner reconciliation/migration authorization is still required.
 
 ## Next execution
 
