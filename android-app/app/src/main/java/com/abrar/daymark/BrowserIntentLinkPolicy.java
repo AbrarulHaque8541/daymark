@@ -1,6 +1,9 @@
 package com.abrar.daymark;
 import java.net.URI;
-import java.net.URLDecoder;
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
@@ -15,7 +18,7 @@ import java.util.regex.Pattern;
  * the validated URI; untrusted Intent objects are never launched directly.
  */
 final class BrowserIntentLinkPolicy {
-    private static final int MAX_INPUT_LENGTH = 4096;
+    private static final int MAX_INPUT_LENGTH = 2048;
     private static final Pattern SCHEME = Pattern.compile("[A-Za-z][A-Za-z0-9+.-]{0,63}");
     private static final Pattern PACKAGE = Pattern.compile(
             "[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+");
@@ -40,12 +43,38 @@ final class BrowserIntentLinkPolicy {
      */
     private static String decodeIntentMetadata(String raw) {
         if (raw == null) return "";
-        try {
-            // Protect literal '+' before decoding so it is not treated as a space.
-            return URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8.name());
-        } catch (Exception invalid) {
-            throw new IllegalArgumentException("Android app link metadata encoding is invalid.", invalid);
+        StringBuilder decoded = new StringBuilder(raw.length());
+        for (int index = 0; index < raw.length();) {
+            if (raw.charAt(index) != '%') {
+                // A literal '+' is data in an Intent URI, not form-encoded whitespace.
+                decoded.append(raw.charAt(index++));
+                continue;
+            }
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            while (index < raw.length() && raw.charAt(index) == '%') {
+                if (index + 2 >= raw.length()) {
+                    throw new IllegalArgumentException("Android app link metadata encoding is invalid.");
+                }
+                int high = Character.digit(raw.charAt(index + 1), 16);
+                int low = Character.digit(raw.charAt(index + 2), 16);
+                if (high < 0 || low < 0) {
+                    throw new IllegalArgumentException("Android app link metadata encoding is invalid.");
+                }
+                bytes.write((high << 4) | low);
+                index += 3;
+            }
+            try {
+                String chunk = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes.toByteArray())).toString();
+                decoded.append(chunk);
+            } catch (CharacterCodingException invalidUtf8) {
+                throw new IllegalArgumentException(
+                        "Android app link metadata encoding is invalid.", invalidUtf8);
+            }
         }
+        return decoded.toString();
     }
 
     static Decision parse(String value) {
