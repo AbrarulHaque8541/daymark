@@ -265,7 +265,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check("Task B".equals(staleRuntime.notifications.lastTitle)
                         && staleRuntime.notifications.active,
                 "the adopted record publishes the current task title, not a cached title");
-        check(writer.events().equals(list("cancel", "publish")),
+        check(staleRuntime.events().equals(list("cancel", "publish")),
                 "changing notification identity cancels the old title before publishing without a second storage read/write");
     }
 
