@@ -10,7 +10,7 @@
 - Open PRs: 7 — #676, #705, #706, #704, #675, #648, #656. PR #701 was closed unmerged as superseded by the clean main-based #706 status branch; its five source/test files were blob-identical to main and its dated documentation history was preserved here.
 - Open non-PR issues: 24 — #646, #684, #702, #685, #613, #680, #700, #687, #84, #671, #691, #696, #640, #160, #679, #689, #690, #683, #603, #639, #636, #476, #348, #325.
 - Main branch metadata reports protected=false; repository rulesets API returns []; branch-protection detail endpoint returns HTTP 403 to the connected integration. No governance setting was changed.
-- Current Gradle identity is com.abrar.daymark, versionName=1.6, versionCode=13. Root AGENTS approves com.abrar.daymark; the run-level safety instruction names com.cue.daymark. No applicationId or namespace change was made; owner reconciliation is required before any migration.
+- Current Gradle identity is com.abrar.daymark, versionName=1.6, versionCode=13. Root AGENTS approves this source identity; the run-level safety instruction names a conflicting package identifier. No applicationId or namespace change was made; owner reconciliation is required before any migration.
 - No production release, tag, version change, signer change, or destructive data migration was performed.
 
 ## Current open PR matrix

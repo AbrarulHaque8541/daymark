@@ -12,7 +12,7 @@ Latest live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733
 8. P1 — secure Android download transport (#671): keep fail-closed until redirect validation, cookie/referrer isolation, bounded streaming, cancellation and atomic publication are implemented.
 9. P1 — recurrence parity (#684, #476), Telegram browser acceptance (#700), and desktop reproducibility (#696): complete shared contracts, real browser tests and lockfile/npm-ci work.
 
-No release/tag/version/signing-key/applicationId change or destructive migration was made. Current source application ID remains com.abrar.daymark; run-level com.cue.daymark wording conflicts with root AGENTS, so identity remains unchanged pending owner reconciliation.
+No release/tag/version/signing-key/applicationId change or destructive migration was made. Current source application ID remains com.abrar.daymark; the run-level package instruction conflicts with root AGENTS, so identity remains unchanged pending owner reconciliation.
 
 ---
 
