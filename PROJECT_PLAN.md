@@ -1,3 +1,35 @@
+## Current execution queue — 2026-11-10T06:15:00Z (main 469b29edea69)
+
+Latest whole-project snapshot: [CURRENT_STATUS_20261110T061500Z.md](docs/CURRENT_STATUS_20261110T061500Z.md).
+
+Live inventory: 15 open PRs / 24 open issues. Main Android CI and Ubuntu/Windows contracts pass on exact main 469b29edea6993b19c0f50d427b9d48605b2a4c7. PR #665 signing isolation and #699 Telegram storage-integrity fixes have exact-head canonical CI green; #648/#677 API 29/36 lifecycle gates are green. No PR merged in this run.
+
+### P0 — security, runtime, data integrity and governance
+1. **#665/#84:** current main still exposes signing-secret expressions in a pull_request-triggered workflow. PR #665 exact head f54c6108 has Android CI, contracts, non-publishing device acceptance and PR device validation PASS; npm 723/723. Obtain independent security/provenance review, synchronize with current main and verify owner-side Actions secret/environment controls before integration.
+2. **#648/#677/#613:** both current Focus/reminder heads pass API 29/36 lifecycle. Coordinate overlapping instrumentation/Focus UI files, synchronize with current main, rerun combined acceptance and obtain independent review.
+3. **#683/#689/#690:** finish cross-tab task, Focus and webhook Web Locks, import/recovery/undo races and same-tab invalidation.
+4. **#646/#160:** owner-approved required CI/independent-review governance and physical Android/WebView acceptance.
+
+### P1 — integration and security
+5. **#675/#656:** synchronize accumulated recovery/webhook and iCalendar branches with current main while preserving Telegram card/scripts and the append-only test inventory.
+6. **#694/#693:** resolve merge conflict, run exact-head canonical CI and independent test-integrity review; current head has no workflow runs.
+7. **#671/#678:** complete actual redirect-validating, pinned, bounded Android download transport; keep downloads fail-closed.
+8. **#687/#659 and #685/#686:** accessible malformed-extension recovery UI and Service Worker Online/Offline compatibility.
+9. **#700/#698/#699:** Telegram logic/UI CI is green, but live browser/WebView CORS and token lifecycle remain untested.
+10. **#691/#692:** desktop private staging/no-replace publication passes CI; physical desktop GUI/installer acceptance remains untested.
+
+### P2 — infrastructure and cross-platform behavior
+11. **#696:** generate a real Electron lockfile only when registry DNS works; clean npm lock generation failed with EAI_AGAIN.
+12. **#684/#476:** align Android/web recurrence validation, anchors, catch-up, Doze/reboot/timezone semantics.
+13. **#348/#325:** resume browser UX and cross-platform architecture after P0/P1 gates.
+
+No release/tag/version/signing-key/application identity change or destructive migration was made. Physical Android and desktop GUI acceptance remain NOT TESTED.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live PR/issue/Actions/source audit
+Timestamp (UTC): 2026-11-10T06:15:00Z
+
 ## Current execution queue — 2026-11-10T06:07:29Z (main 469b29edea69)
 
 Latest whole-project snapshot: [CURRENT_STATUS_20261110T060729Z.md](docs/CURRENT_STATUS_20261110T060729Z.md).
