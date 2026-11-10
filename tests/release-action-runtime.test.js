@@ -428,6 +428,29 @@ test('private main test APK remains owner-gated and ciphertext-only', () => {
     'private APK transfer does not need an OIDC provenance token');
 });
 
+test('every privileged signing and provenance job requires the production-signing environment', () => {
+  const cases = [
+    ['.github/workflows/android-production-release.yml', 'build-verify-draft'],
+    ['.github/workflows/android-signed-device-test-release.yml', 'build-and-verify'],
+    ['.github/workflows/android-signed-device-test-release.yml', 'publish-release'],
+    ['.github/workflows/android-private-main-test-apk.yml', 'private-main-test'],
+    ['.github/workflows/generator-generic-ossf-slsa3-publish.yml', 'provenance']
+  ];
+
+  for (const [workflowPath, jobName] of cases) {
+    const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+    const header = `  ${jobName}:`;
+    const start = content.indexOf(header);
+    assert.ok(start >= 0, workflowPath + ' is missing job ' + jobName);
+    const nextJobPattern = /^  [a-z][a-z0-9-]*:/gm;
+    nextJobPattern.lastIndex = start + header.length;
+    const nextJob = nextJobPattern.exec(content);
+    const block = content.slice(start, nextJob ? nextJob.index : content.length);
+    assert.match(block, /^    environment: production-signing$/m,
+      workflowPath + ' job ' + jobName + ' must wait for the protected environment');
+  }
+});
+
 test('production release signing is tag-push-only and cannot be manually dispatched', () => {
   const workflowPath = '.github/workflows/android-production-release.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
