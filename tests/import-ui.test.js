@@ -65,9 +65,10 @@ function fakeEnv(options) {
   const storageData = opts.storageData || {};
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const locks = opts.locks === false ? null : (opts.lockManager || makeLockManager());
+  const writes = [];
   const storage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); },
+    setItem(key, value) { writes.push({ key, value: String(value) }); storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
   const dispatched = [];
@@ -96,6 +97,7 @@ function fakeEnv(options) {
     storageData,
     storage,
     locks,
+    writes,
     dispatched
   };
 }
