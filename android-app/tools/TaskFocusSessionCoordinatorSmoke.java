@@ -12,6 +12,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
     public static void main(String[] args) throws Exception {
         restoreMustPrecedeAnyUserStart();
         explicitStartPauseResumeFinishIsDurableAndOrdered();
+        staleRuntimeReplacesNotificationWhenPresentationChanges();
         pausedTaskSwitchPersistsIdentityAcrossRestoreAndResume();
         failedPausedTaskSwitchLeavesOriginalSessionUntouched();
         anActiveSessionCannotBeReplaced();
@@ -62,8 +63,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check(paused.notificationPublished && fixture.notifications.active
                         && fixture.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
                 "Pause retains a Resume/Finish notification after persistence");
-        check(fixture.events().equals(list("save", "publish")),
-                "Pause persists before publishing the paused notification");
+        check(fixture.events().equals(list("save", "cancel", "publish")),
+                "Pause persists, removes the old running presentation, then publishes the paused notification");
 
         fixture.clock.advance(60_000);
         fixture.notifications.events.clear();
@@ -75,8 +76,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 "paused wall time is not counted as focus time");
         check(fixture.store.saved.status == TaskFocusTimer.Status.RUNNING,
                 "the resumed state is persisted");
-        check(fixture.events().equals(list("save", "publish")),
-                "Resume persists before republishing the ongoing notification");
+        check(fixture.events().equals(list("save", "cancel", "publish")),
+                "Resume persists, removes the paused presentation, then republishes the running notification");
 
         fixture.clock.advance(2_000);
         fixture.notifications.events.clear();
@@ -97,6 +98,29 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check(fixture.coordinator.currentSnapshot() == null, "clearing removes the in-memory focus session");
         check(fixture.events().equals(list("cancel", "clear")),
                 "clearing cancels only the focus notification and then clears its separate record");
+    }
+
+    private static void staleRuntimeReplacesNotificationWhenPresentationChanges() throws Exception {
+        Fixture original = new Fixture();
+        original.initializeWithoutSession();
+        original.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0);
+
+        Fixture secondRuntime = new Fixture(original.clock, original.store);
+        secondRuntime.coordinator.restoreAfterProcessStart("task-a", "Task A");
+        secondRuntime.coordinator.pauseFromUserAction();
+
+        original.store.events.clear();
+        original.notifications.events.clear();
+        TaskFocusSessionCoordinator.Snapshot reconciled =
+                original.coordinator.restoreAfterProcessStart("task-a", "Task A");
+        check(reconciled != null && reconciled.isPaused(),
+                "the stale runtime adopts the durable paused session");
+        check(original.events().equals(list("load", "cancel", "publish")),
+                "a stale running notification is cancelled before the paused presentation is republished");
+        check(original.notifications.active
+                        && original.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "the notification sink ends with the paused session presentation");
     }
 
     private static void pausedTaskSwitchPersistsIdentityAcrossRestoreAndResume() throws Exception {
@@ -370,10 +394,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
         TaskFocusSessionCoordinator.Snapshot paused = fixture.coordinator.pauseFromUserAction();
         check(paused.isPaused() && !paused.notificationPublished && !fixture.notifications.active,
                 "failed paused publication cancels the previously visible running notification");
-        check(fixture.events().size() == 3 && "save".equals(fixture.events().get(0))
-                        && "publish".equals(fixture.events().get(1))
-                        && "cancel".equals(fixture.events().get(2)),
-                "pause persistence precedes attempted publication and stale-state cancellation");
+        check(fixture.events().equals(list("save", "cancel", "publish", "cancel")),
+                "pause persistence precedes old-style cancellation, attempted replacement publication and fail-closed cancellation");
 
         fixture.notifications.available = true;
         check(fixture.coordinator.refreshNotification("Task A").notificationPublished

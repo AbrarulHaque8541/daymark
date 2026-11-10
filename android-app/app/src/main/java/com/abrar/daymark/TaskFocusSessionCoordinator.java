@@ -162,7 +162,8 @@ final class TaskFocusSessionCoordinator {
         // an older notification active under this ID. Cancel once on first restore,
         // and on every later task/title identity change.
         boolean replaceNotification = !notificationPublished
-                || notificationIdentityChanged(restored, currentTaskTitle);
+                || notificationIdentityChanged(restored, currentTaskTitle)
+                || notificationPresentationChanged(restored);
         if (replaceNotification) {
             notifications.cancel();
             notificationPublished = false;
@@ -197,6 +198,10 @@ final class TaskFocusSessionCoordinator {
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
         if (next.isPaused()) {
+            if (notificationPresentationChanged(next)) {
+                notifications.cancel();
+                notificationPublished = false;
+            }
             notificationPublished = publishOrCancel(
                     next, currentTaskTitle, now.elapsedRealtimeMs);
         } else {
@@ -252,6 +257,10 @@ final class TaskFocusSessionCoordinator {
         this.currentTaskTitle = currentTaskTitle;
 
         if (next.isRunning()) {
+            if (notificationPresentationChanged(next)) {
+                notifications.cancel();
+                notificationPublished = false;
+            }
             notificationPublished = publishOrCancel(
                     next, currentTaskTitle, now.elapsedRealtimeMs);
         } else {
@@ -361,6 +370,11 @@ final class TaskFocusSessionCoordinator {
 
     private void requireCurrent() {
         if (current == null) throw new IllegalStateException("There is no active focus session.");
+    }
+
+    private boolean notificationPresentationChanged(TaskFocusTimer next) {
+        return current != null && (current.isRunning() != next.isRunning()
+                || current.isCountdown() != next.isCountdown());
     }
 
     private boolean notificationIdentityChanged(TaskFocusTimer next, String nextTitle) {
