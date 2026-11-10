@@ -188,6 +188,10 @@
         || !Number.isSafeInteger(opts.expectedGeneration) || !opts.desiredSnapshot) {
       return { ok: false, reason: 'invalid-options', conflicts: [] };
     }
+    let desiredParsed;
+    try { desiredParsed = parseSnapshot(JSON.stringify(opts.desiredSnapshot)); }
+    catch (error) { desiredParsed = { ok: false }; }
+    if (!desiredParsed.ok) return { ok: false, reason: 'invalid-snapshot', conflicts: [] };
     const locked = await withFocusMutationLock(opts.lockManager, async () => {
       const generation = readFocusGeneration(storage);
       if (!generation.ok) return { ok: false, reason: generation.reason, conflicts: [] };
