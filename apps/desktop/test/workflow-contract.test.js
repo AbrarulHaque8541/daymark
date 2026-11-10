@@ -22,3 +22,64 @@ test('desktop CI pins Node 24 action runtimes and installs Electron dependencies
   assert.ok(install >= 0 && tests > install,
     'desktop dependencies must be installed before the cross-platform unit suite');
 });
+
+
+test('download publication failures reach the renderer through a URL-free IPC contract', () => {
+  const Module = require('node:module');
+  const preloadPath = path.join(__dirname, '..', 'preload.js');
+  const mainPath = path.join(__dirname, '..', 'main.js');
+  const rendererPath = path.join(__dirname, '..', 'renderer', 'app.js');
+  const originalLoad = Module._load;
+  const listeners = new Map();
+  let exposedName = null;
+  let exposedApi = null;
+
+  Module._load = function (request, parent, isMain) {
+    if (request === 'electron') {
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, api) {
+            exposedName = name;
+            exposedApi = api;
+          }
+        },
+        ipcRenderer: {
+          on(channel, listener) { listeners.set(channel, listener); },
+          removeListener(channel, listener) {
+            if (listeners.get(channel) === listener) listeners.delete(channel);
+          }
+        }
+      };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    delete require.cache[preloadPath];
+    require(preloadPath);
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[preloadPath];
+  }
+
+  assert.equal(exposedName, 'daymark');
+  assert.equal(typeof exposedApi.onDownloadFailed, 'function');
+  const received = [];
+  const unsubscribe = exposedApi.onDownloadFailed((filename) => received.push(filename));
+  const listener = listeners.get('download-failed');
+  assert.equal(typeof listener, 'function');
+  listener({}, 'report-safe.txt');
+  assert.deepEqual(received, ['report-safe.txt']);
+  unsubscribe();
+  assert.equal(listeners.has('download-failed'), false,
+    'the renderer can release its IPC listener');
+
+  const main = fs.readFileSync(mainPath, 'utf8');
+  const renderer = fs.readFileSync(rendererPath, 'utf8');
+  assert.match(main, /onFailed: \\(filename\\) => \\{[\\s\\S]*?webContents\\.send\\('download-failed', filename\\)/,
+    'main forwards only the sanitized basename on the dedicated failure channel');
+  assert.match(renderer, /onDownloadFailed\\(\\(name\\) => \\{[\\s\\S]*?toast\\('Could not safely save '/,
+    'renderer gives the user a visible failure status');
+  assert.match(renderer, /Could not safely save '\\s*\\+ safeName \\+ '; no file was published\\.'/,
+    'failure status explains that no final file was published');
+});
