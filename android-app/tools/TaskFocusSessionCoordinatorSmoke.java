@@ -248,8 +248,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check("Renamed task A".equals(staleRuntime.notifications.lastTitle)
                         && staleRuntime.notifications.active,
                 "the adopted record publishes the current task title, not a cached title");
-        check(writer.store.events.isEmpty(),
-                "adopting a caller-loaded snapshot does not perform a second racy storage read or write");
+        check(writer.store.events.equals(java.util.Collections.singletonList("publish")),
+                "adopting a caller-loaded snapshot publishes once without a second storage read/write");
     }
 
     private static void aMissingTaskClearsOnlyTheFocusRecord() throws Exception {
