@@ -423,6 +423,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             scrollView.scrollTo(0, Math.max(0, Math.min(desiredScroll, maximumScroll)));
         });
         waitForIdleSync();
+        waitForScrollPositionToSettle(scrollView);
         android.graphics.Rect parentBounds = visibleBounds(scrollView);
         android.graphics.Rect targetBounds = visibleBounds(descendant);
         int[] actualScroll = new int[1];
@@ -434,6 +435,29 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                         + " (target=" + targetBounds.toShortString()
                         + ", parent=" + parentBounds.toShortString()
                         + ", scrollY=" + actualScroll[0] + ")");
+    }
+
+    private void waitForScrollPositionToSettle(android.widget.ScrollView scrollView) throws Exception {
+        int previousScrollY = Integer.MIN_VALUE;
+        int stableSamples = 0;
+        int lastScrollY = 0;
+        long deadline = android.os.SystemClock.uptimeMillis() + 2000L;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            int[] currentScrollY = new int[1];
+            runOnMainSync(() -> currentScrollY[0] = scrollView.getScrollY());
+            lastScrollY = currentScrollY[0];
+            if (lastScrollY == previousScrollY) {
+                stableSamples++;
+                if (stableSamples >= 3) return;
+            } else {
+                stableSamples = 0;
+            }
+            previousScrollY = lastScrollY;
+            android.os.SystemClock.sleep(50L);
+        }
+        check(stableSamples >= 3,
+                "parent Tasks ScrollView settles before child tap injection"
+                        + " (lastScrollY=" + lastScrollY + ", stableSamples=" + stableSamples + ")");
     }
 
     private void scrollViewIntoFocus(android.view.View view) throws Exception {
@@ -529,6 +553,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private String dispatchTap(android.view.View view) throws Exception {
+        android.view.View modeSelector = findAncestorWithSimpleName(view, "ModeSelector");
+        android.widget.ScrollView parentScroll = modeSelector == null
+                ? null : findParentScrollView(modeSelector);
+        if (parentScroll != null) waitForScrollPositionToSettle(parentScroll);
         android.graphics.Rect bounds = stableVisibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0, "tap target has stable visible screen bounds");
         String target = describeTouchTarget(view, bounds);
@@ -536,9 +564,6 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         float y = bounds.centerY();
         StringBuilder touchTrace = new StringBuilder();
         java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
-        android.view.View modeSelector = findAncestorWithSimpleName(view, "ModeSelector");
-        android.widget.ScrollView parentScroll = modeSelector == null
-                ? null : findParentScrollView(modeSelector);
         android.view.View traceRoot = parentScroll != null ? parentScroll
                 : modeSelector != null ? modeSelector : view;
         runOnMainSync(() -> attachTouchTraceListeners(traceRoot, "tap", touchTrace, tracedViews));
