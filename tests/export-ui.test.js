@@ -197,7 +197,7 @@ test('auto-boot stays inert under Node (no window) and the module exposes its AP
 
 test('page loads the open-format renderer before the export UI', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const scripts = [...html.matchAll(/<script\\s+src=["']([^"']+)["'][^>]*>/g)]
+  const scripts = [...html.matchAll(/<script\s+src=["']([^"']+)["'][^>]*>/g)]
     .map((match) => match[1]);
   const taskLogic = scripts.indexOf('task-logic.js');
   const exportLogic = scripts.indexOf('export-logic.js');
