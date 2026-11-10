@@ -1,3 +1,19 @@
+## Current execution queue — 2026-11-10T12:07:25.537Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
+
+Latest live snapshot: [CURRENT_STATUS_20261110T120725Z.md](docs/CURRENT_STATUS_20261110T120725Z.md). Live inventory: 7 open PRs / 24 open issues. Main Android CI, contracts and nightly audit PASS. Main protection remains disabled; rulesets are empty.
+
+1. P0 — #705 signing security: exact head `9810a295` is 20 ahead / 0 behind; owner environment gates are wired, but exact-head Android/contracts/device workflows are still running. Configure and verify the `production-signing` environment with independent required reviewers and restricted refs before any signed workflow.
+2. P0 — #648 Focus lifecycle: current head `239b180` is 202 ahead / 9 behind and diverged; no exact-head run returned. Latest known older-head API 36 ten-run gate failed. Resolve notification ownership and finish 10/10 before integration.
+3. P0 — #675/#656 task, import, Focus, webhook and timestamp integrity: both are synchronized with main and all seven exact-head workflows pass (#675 Node 938/938, API 29/36 372/375; #656 Node 842/842, API 29/36 372/375). #656 now preserves explicit malformed import timestamps and requires the shared validator. Keep both draft pending independent data/security review and integration.
+4. P0 — #683/#689/#690: complete independent review of cross-tab task/import/recovery, webhook queue and Focus clear/write locking; deterministic race coverage is present on the integration branches but not merged.
+5. P0 — #646/#160: owner/admin main protection and independent review configuration; physical Android/WebView/OEM acceptance remains NOT TESTED.
+6. P1 — #704 Service Worker (6/6 workflows PASS) and #676 extension SPA (6/6 PASS): obtain independent review and complete physical/runtime compatibility acceptance; extension recovery UI #687 remains.
+7. P1 — #671/#678 secure Android download transport; #684/#476 recurrence parity; #700 Telegram CORS/live delivery; #691/#692/#696 desktop race/reproducibility; #84 action deprecation audit.
+
+No PR merged by this run; #659 was merged by prior/concurrent automation and post-merge main checks pass. No release/tag/version/signer/applicationId change or destructive migration. Current source identity remains com.abrar.daymark; conflicting run-level package wording remains an owner-reconciliation issue without identity change.
+
+---
+
 ## Current execution queue — 2026-11-10T10:17:00Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
 
 Live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733 and contracts #42784930716 PASS. Main protection is disabled; rulesets are empty. See docs/CURRENT_STATUS_20261110T101700Z.md for exact heads and workflow evidence.
