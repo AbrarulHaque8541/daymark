@@ -631,6 +631,15 @@ assert "browserStatus.animate().alpha(0f).setDuration(180L)" in activity, \
 assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")' in activity, \
     "actionable failed-navigation status must remain available through the dedicated Retry button"
 
+# Task-editor dialogs must consume IME insets on edge-to-edge Android 11+ windows.
+task_editor_ime = re.search(r"private void configureDialogImeInsets\\(Window dialogWindow\\)\\s*\\{(.*?)\\n    \\}", activity, re.S)
+assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
+assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
+assert "Api30Window.applyInsets(view, insets, 0)" in task_editor_ime.group(1)
+assert "configureDialogImeInsets(shownDialogWindow)" in activity
+assert "SOFT_INPUT_ADJUST_NOTHING" in activity and "SOFT_INPUT_ADJUST_RESIZE" in activity, \\
+    "API 30+ dialogs must use explicit IME insets while API 26-29 retain resize behavior"
+
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
 # INTERNET for the browser and app clients (issue #45) — a stale summary that contradicted
