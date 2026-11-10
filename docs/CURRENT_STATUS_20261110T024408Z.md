@@ -42,6 +42,15 @@ State: open, draft, unmerged.
 
 The first AST head `bfe4ccdefd9fcbe8ec3e0ddb11b0bee89561c45c` failed one existing guard assertion because CommonJS `const test = require('node:test')` is the callable default export, not only a namespace. The other 689 tests passed on that run. The binding model was corrected to distinguish the callable default export from namespace imports, support `nodeTest.test()`, and add permanent regressions. No tests were weakened or removed.
 
+A later documentation-only head `23ca81f4aaab64c836f23c2925ab5607fbb04ed8` failed the retired-identity source guard because this snapshot copied the old identifier while describing the unresolved owner/run-level identity conflict. The guard was correct; no source guard or application ID was changed. Commit `4345fdabb1870730c363fc3af52ba56a3ffbcac2` rewrote the note without repeating the retired identifier. Fresh exact-head checks on `4345fda` all passed:
+- Android CI #42744947868: PASS; Node 690/690, source guards and Gradle build PASS.
+- Cross-platform contracts #42744948236: PASS on Ubuntu and Windows.
+- Browser cookie import safety #42744947996: PASS.
+- Device acceptance artifact #42744947918: PASS.
+- Android device-test release assets #42744948070: PASS; release-secret validation and release job SKIPPED.
+
+The latest verified non-code branch head at this snapshot refresh is `4345fdabb1870730c363fc3af52ba56a3ffbcac2`; this snapshot refresh itself is documentation-only.
+
 ### Exact-head verification on `27f8eb9`
 
 | Workflow | Run | Result |
