@@ -161,7 +161,7 @@ final class BrowserDownloadBodyTransfer {
             throw failure(Failure.IO_ERROR);
         } catch (Error fatal) {
             try {
-                abortAfterFailure(target, committed);
+                abortAfterFailure(target, committed.get());
             } catch (Throwable cleanup) {
                 if (cleanup != fatal) fatal.addSuppressed(cleanup);
             }
