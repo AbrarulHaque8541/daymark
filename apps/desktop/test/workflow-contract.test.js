@@ -76,10 +76,15 @@ test('download publication failures reach the renderer through a URL-free IPC co
 
   const main = fs.readFileSync(mainPath, 'utf8');
   const renderer = fs.readFileSync(rendererPath, 'utf8');
-  assert.match(main, /onFailed: \\(filename\\) => \\{[\\s\\S]*?webContents\\.send\\('download-failed', filename\\)/,
+  const failureHandlerStart = main.indexOf('onFailed: (filename) => {');
+  const cleanupHandlerStart = main.indexOf('onCleanupError:', failureHandlerStart);
+  assert.ok(failureHandlerStart >= 0 && cleanupHandlerStart > failureHandlerStart);
+  const failureHandler = main.slice(failureHandlerStart, cleanupHandlerStart);
+  assert.ok(failureHandler.includes("webContents.send('download-failed', filename)"),
     'main forwards only the sanitized basename on the dedicated failure channel');
-  assert.match(renderer, /onDownloadFailed\\(\\(name\\) => \\{[\\s\\S]*?toast\\('Could not safely save '/,
-    'renderer gives the user a visible failure status');
-  assert.match(renderer, /Could not safely save '\\s*\\+ safeName \\+ '; no file was published\\.'/,
-    'failure status explains that no final file was published');
+  assert.ok(!/url/i.test(failureHandler),
+    'failure IPC must not include a remote URL');
+  assert.ok(renderer.includes('window.daymark.onDownloadFailed((name) => {')
+      && renderer.includes("toast('Could not safely save ' + safeName + '; no file was published.')"),
+    'renderer gives the user a visible, URL-free failure status');
 });
