@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T05:07:00Z (main 91f57d7; #694 prototype-safe test guard; #648 Focus notification replacement; #677 real ModeSelector instrumentation)](./CURRENT_STATUS_20261110T050700Z.md)
 - [Daymark whole-project engineering status — 2026-11-10T04:42:00Z (main 91f57d7; #694 AST skip/todo hardening; #648 Focus stale-runtime reconciliation; #665 signing workflow boundary; #656/#675 integration)](./CURRENT_STATUS_20261110T044200Z.md)
 ## Latest verified whole-project handoff — 2026-11-10T02:18:05Z
