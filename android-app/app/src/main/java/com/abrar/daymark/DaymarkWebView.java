@@ -346,12 +346,10 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             @Override
             public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
                 super.doUpdateVisitedHistory(view, url, isReload);
-                // Use the native visited-history callback as the route-change signal. Full
-                // document injection remains in onPageFinished; progress 100 avoids applying
-                // page-world code before the committed document is ready. Exact SPA event coverage
-                // is an emulator acceptance requirement, not inferred from this callback alone.
-                if (extensionRuntime == null || !networkPolicy.allowsRemoteLoads()
-                        || view == null || view.getProgress() < 100) return;
+                // WebView reports pushState/replaceState and back/forward through this callback.
+                // The runtime ignores updates until initial document injection has completed, so
+                // a progress==100 gate here would incorrectly drop same-document route changes.
+                if (extensionRuntime == null || !networkPolicy.allowsRemoteLoads() || view == null) return;
                 extensionRuntime.onSameDocumentNavigation(view, url);
             }
 
