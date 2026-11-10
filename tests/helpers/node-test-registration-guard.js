@@ -95,14 +95,15 @@ function isNodeTestRequireCall(node, nodeScopes) {
 function markNodeTestBinding(scope, localName, importedName) {
   const binding = scope && scope.bindings.get(localName);
   if (!binding) return;
-  binding.kind = importedName === '*' ? 'node-test-namespace' : 'node-test-function';
+  binding.kind = importedName === '*' ? 'node-test-namespace'
+    : (importedName === 'default' ? 'node-test-default' : 'node-test-function');
   binding.importedName = importedName === 'default' ? 'test' : importedName;
 }
 
 function markRequirePattern(pattern, scope) {
   if (!pattern) return;
   if (pattern.type === 'Identifier') {
-    markNodeTestBinding(scope, pattern.name, '*');
+    markNodeTestBinding(scope, pattern.name, 'default');
     return;
   }
   if (pattern.type !== 'ObjectPattern') return;
@@ -241,7 +242,7 @@ function markAssignedTarget(target, scope) {
 function resolveTestApiCallee(callee, scope) {
   if (callee.type === 'Identifier') {
     const binding = resolveBinding(scope, callee.name);
-    if (binding && binding.kind === 'node-test-function' && !binding.reassigned) {
+    if (binding && ['node-test-function', 'node-test-default'].includes(binding.kind) && !binding.reassigned) {
       return { binding, apiName: binding.importedName, member: null };
     }
     return null;
@@ -255,6 +256,18 @@ function resolveTestApiCallee(callee, scope) {
   if (binding.kind === 'node-test-function' && chain.properties.length === 1 &&
       ['only', 'skip', 'todo'].includes(chain.properties[0])) {
     return { binding, apiName: binding.importedName, member: chain.properties[0] };
+  }
+  if (binding.kind === 'node-test-default') {
+    if (chain.properties.length === 1 && ['only', 'skip', 'todo'].includes(chain.properties[0])) {
+      return { binding, apiName: 'test', member: chain.properties[0] };
+    }
+    if (chain.properties.length === 1 && ['test', 'it', 'describe'].includes(chain.properties[0])) {
+      return { binding, apiName: chain.properties[0], member: null };
+    }
+    if (chain.properties.length === 2 && ['test', 'it', 'describe'].includes(chain.properties[0]) &&
+        ['only', 'skip', 'todo'].includes(chain.properties[1])) {
+      return { binding, apiName: chain.properties[0], member: chain.properties[1] };
+    }
   }
   if (binding.kind === 'node-test-namespace') {
     if (chain.properties.length === 1 && ['test', 'it', 'describe'].includes(chain.properties[0])) {
