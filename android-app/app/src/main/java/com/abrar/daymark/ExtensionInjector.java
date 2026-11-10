@@ -11,15 +11,14 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Applies page-local CSS/JS for enabled packs. No native bridge.
+ * Applies only packs matching the current page. No native bridge and no page-readable pack catalog.
  *
- * <p>WebView.evaluateJavascript is asynchronous and targets the currently displayed page.
- * Every submitted payload is bound to the exact URL that produced onPageFinished. The
- * page-local bootstrap separately re-evaluates CSS scopes on same-document SPA navigation.
+ * <p>The small asset is invoked as a function with a one-shot, current-page-only argument. It
+ * keeps no global config/state and receives no match rules, excludes, disabled-site preferences,
+ * or metadata for packs that do not match the current URL.
  */
 final class ExtensionInjector {
     private static final String SPA_BOOTSTRAP_ASSET = "daymark-extension-spa.js";
-    private static final int MAX_SPA_PACKS = 64;
     private static final int MAX_SPA_CONFIG_CHARS = 2_000_000;
     private static final int MAX_BOOTSTRAP_BYTES = 65_536;
     private static volatile String cachedSpaBootstrap;
@@ -27,109 +26,103 @@ final class ExtensionInjector {
     private ExtensionInjector() { }
 
     static void apply(WebView webView, String pageUrl, List<BrowserExtension> packs) {
-        if (webView == null || packs == null) return;
-        if (!BrowserAddress.isAllowedWebUrl(pageUrl)) return;
+        if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)
+                || !pageUrl.equals(webView.getUrl())) return;
 
-        // onPageFinished can be stale if a newer navigation has already started.
-        if (!pageUrl.equals(webView.getUrl())) return;
-
-        String bootstrap = loadSpaBootstrap(webView);
-        if (bootstrap == null) return;
-
-        List<BrowserExtension> enabled = new ArrayList<>();
-        boolean tooManyPacks = false;
-        for (BrowserExtension ext : packs) {
-            if (ext == null || !ext.enabled) continue;
-            if ((ext.css == null || ext.css.isEmpty()) && (ext.js == null || ext.js.isEmpty())) continue;
-            if (enabled.size() >= MAX_SPA_PACKS) {
-                tooManyPacks = true;
-                break;
-            }
-            enabled.add(ext);
-        }
-
-        if (tooManyPacks) {
-            // Fail closed and remove prior Daymark styles instead of leaving stale CSS active.
-            submitSpaConfig(webView, pageUrl, Collections.<BrowserExtension>emptyList(), bootstrap);
-            return;
-        }
-
-        String config = spaConfig(pageUrl, enabled);
-        if (config == null || config.length() > MAX_SPA_CONFIG_CHARS) {
-            // Oversized configuration must not leave previously injected styles on this page.
-            submitSpaConfig(webView, pageUrl, Collections.<BrowserExtension>emptyList(), bootstrap);
-            return;
-        }
-        webView.evaluateJavascript("window.__daymarkSpaConfig=" + config + ";\n" + bootstrap, null);
+        List<BrowserExtension> matching = matchingPacks(pageUrl, packs);
+        if (!submitCurrentPageStyles(webView, pageUrl, matching)) return;
 
         StringBuilder js = new StringBuilder();
-        int matchingPacks = 0;
-        for (BrowserExtension ext : enabled) {
-            if (!ext.matchesUrl(pageUrl)) continue;
-            if (matchingPacks >= BrowserExtension.MAX_ENABLED_PER_PAGE) break;
-            matchingPacks++;
+        for (BrowserExtension ext : matching) {
             if (ext.js == null || ext.js.isEmpty()) continue;
 
-            // A local GM_addStyle closure keeps asynchronous userscript styles attributed to
-            // their owning pack, so a later SPA route can remove only that pack's styles.
-            js.append("(function(){var __dmId=").append(jsonString(ext.id)).append(";try{")
+            // Userscripts run only on the matching document. GM_addStyle creates a pack-owned
+            // style node so the next native same-document update can remove it if the pack stops
+            // matching, without retaining a page-readable catalog of other packs.
+            js.append("(function(){try{")
+                    .append("var __dmExpectedUrl=").append(jsonString(pageUrl)).append(";")
+                    .append("if(String(window.location.href)!==__dmExpectedUrl)return;")
+                    .append("var __dmId=").append(jsonString(ext.id)).append(";")
                     .append("if(window.__daymarkRan&&window.__daymarkRan[__dmId])return;")
                     .append("window.__daymarkRan=window.__daymarkRan||Object.create(null);")
                     .append("window.__daymarkRan[__dmId]=1;")
-                    .append("var __dmState=window.__daymarkSpaState;")
-                    .append("if(__dmState)__dmState.currentPackId=__dmId;")
-                    .append("var __dmAddStyle=function(css){try{if(window.__daymarkAddStyle)")
-                    .append("window.__daymarkAddStyle(__dmId,css);}catch(e){}};")
+                    .append("var __dmAddStyle=function(css){try{")
+                    .append("if(String(window.location.href)!==__dmExpectedUrl)return null;")
+                    .append("var p=document.head||document.documentElement;")
+                    .append("if(!p||typeof p.appendChild!=='function'||typeof document.createElement!=='function')return null;")
+                    .append("var s=document.createElement('style');")
+                    .append("s.setAttribute('data-daymark-managed','true');")
+                    .append("s.setAttribute('data-daymark-pack-id',__dmId);")
+                    .append("s.setAttribute('data-daymark-pack-css','false');")
+                    .append("s.textContent=String(css==null?'':css);p.appendChild(s);return s;")
+                    .append("}catch(e){return null;}};")
                     .append("(function(){var GM_addStyle=__dmAddStyle;")
                     .append(ext.js)
                     .append("}).call(window);")
-                    .append("}catch(e){}finally{try{var __s=window.__daymarkSpaState;")
-                    .append("if(__s&&__s.currentPackId===__dmId)__s.currentPackId=null;")
-                    .append("}catch(e){}}})()\n");
+                    .append("}catch(e){}})();\n");
         }
         if (js.length() > 0) {
-            // A navigation between the bootstrap and script submissions must not retarget scripts.
+            // A navigation between the style and userscript submissions must not retarget code.
             webView.evaluateJavascript(jsScript(jsonString(pageUrl), js.toString()), null);
         }
     }
 
-    private static void submitSpaConfig(WebView webView, String pageUrl,
-                                        List<BrowserExtension> packs, String bootstrap) {
+    /**
+     * Reconciles page-owned styles after a same-document URL change. Only the packs matching the
+     * new URL are passed to the page; JavaScript userscripts are deliberately not re-run.
+     *
+     * @return true when a current-page reconciliation script was submitted.
+     */
+    static boolean applyStyles(WebView webView, String pageUrl, List<BrowserExtension> packs) {
+        if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)
+                || !pageUrl.equals(webView.getUrl())) return false;
+        return submitCurrentPageStyles(webView, pageUrl, matchingPacks(pageUrl, packs));
+    }
+
+    private static List<BrowserExtension> matchingPacks(String pageUrl, List<BrowserExtension> packs) {
+        List<BrowserExtension> matching = new ArrayList<>();
+        for (BrowserExtension ext : packs) {
+            if (ext == null || !ext.enabled || !ext.matchesUrl(pageUrl)) continue;
+            if (matching.size() >= BrowserExtension.MAX_ENABLED_PER_PAGE) break;
+            matching.add(ext);
+        }
+        return matching;
+    }
+
+    private static boolean submitCurrentPageStyles(WebView webView, String pageUrl,
+                                                   List<BrowserExtension> packs) {
+        String bootstrap = loadSpaBootstrap(webView);
+        if (bootstrap == null) return false;
+
         String config = spaConfig(pageUrl, packs);
         if (config == null || config.length() > MAX_SPA_CONFIG_CHARS) {
+            // Never leave stale styles active when a current-page configuration is unusable.
             config = spaConfig(pageUrl, Collections.<BrowserExtension>emptyList());
         }
-        webView.evaluateJavascript("window.__daymarkSpaConfig=" + config + ";\n" + bootstrap, null);
+        if (config == null) return false;
+
+        try {
+            // The config exists only as an invocation argument in this isolated IIFE. It is never
+            // assigned to window or retained by a page-readable global.
+            webView.evaluateJavascript("(" + bootstrap + ")(" + config + ");", null);
+            return true;
+        } catch (RuntimeException rendererUnavailable) {
+            return false;
+        }
     }
 
     private static String spaConfig(String pageUrl, List<BrowserExtension> packs) {
         StringBuilder out = new StringBuilder(256);
-        out.append("{\"expectedUrl\":").append(jsonString(pageUrl))
-                .append(",\"maxEnabled\":").append(BrowserExtension.MAX_ENABLED_PER_PAGE)
-                .append(",\"packs\":[");
+        out.append("{\"expectedUrl\":").append(jsonString(pageUrl)).append(",\"packs\":[");
         for (int i = 0; i < packs.size(); i++) {
             BrowserExtension ext = packs.get(i);
             if (i > 0) out.append(',');
             out.append("{\"id\":").append(jsonString(ext.id))
-                    .append(",\"matches\":").append(jsonArray(ext.matches))
-                    .append(",\"excludes\":").append(jsonArray(ext.excludes))
-                    .append(",\"disabledSites\":").append(jsonArray(ext.disabledSites))
                     .append(",\"css\":").append(jsonString(ext.css))
                     .append('}');
             if (out.length() > MAX_SPA_CONFIG_CHARS) return null;
         }
         return out.append("]}").toString();
-    }
-
-    private static String jsonArray(List<String> values) {
-        StringBuilder out = new StringBuilder("[");
-        if (values != null) {
-            for (int i = 0; i < values.size(); i++) {
-                if (i > 0) out.append(',');
-                out.append(jsonString(values.get(i)));
-            }
-        }
-        return out.append(']').toString();
     }
 
     private static String loadSpaBootstrap(WebView webView) {
@@ -148,8 +141,8 @@ final class ExtensionInjector {
                     if (total > MAX_BOOTSTRAP_BYTES) return null;
                     output.write(buffer, 0, read);
                 }
-                cached = new String(output.toByteArray(), StandardCharsets.UTF_8);
-                if (cached.trim().isEmpty()) return null;
+                cached = new String(output.toByteArray(), StandardCharsets.UTF_8).trim();
+                if (cached.isEmpty()) return null;
                 cachedSpaBootstrap = cached;
                 return cached;
             } catch (Exception unavailable) {
