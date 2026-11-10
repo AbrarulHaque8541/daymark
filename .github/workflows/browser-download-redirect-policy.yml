@@ -8,7 +8,9 @@ on:
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadRedirectPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadBodyTransfer.java"
       - "android-app/tools/BrowserDownloadRedirectPolicySmoke.java"
+      - "android-app/tools/BrowserDownloadBodyTransferSmoke.java"
       - "android-app/tools/run-browser-download-redirect-policy-tests.sh"
   pull_request:
     branches: ["main"]
@@ -17,7 +19,9 @@ on:
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadRedirectPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserDownloadBodyTransfer.java"
       - "android-app/tools/BrowserDownloadRedirectPolicySmoke.java"
+      - "android-app/tools/BrowserDownloadBodyTransferSmoke.java"
       - "android-app/tools/run-browser-download-redirect-policy-tests.sh"
   workflow_dispatch:
 
@@ -41,5 +45,5 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Run redirect policy regressions
+      - name: Run redirect and bounded-body regressions
         run: sh android-app/tools/run-browser-download-redirect-policy-tests.sh
