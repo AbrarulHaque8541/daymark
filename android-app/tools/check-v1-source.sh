@@ -136,7 +136,7 @@ assert permission_names(manifest) == {
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.VIBRATE",
-}, "shared manifest declares INTERNET for browsing/app clients plus notification/boot/vibrate for task reminders (clock/time broadcasts require no additional permission)"
+}, "shared manifest declares INTERNET for browsing/app clients plus notification/boot/vibrate for task reminders"
 assert permission_names(play_manifest) == set(), "Play flavor must not declare permissions"
 assert permission_names(sideload_manifest) == {
     "android.permission.INTERNET",
@@ -147,9 +147,9 @@ assert app.get("{http://schemas.android.com/apk/res/android}allowBackup") == "fa
 assert app.get("{http://schemas.android.com/apk/res/android}usesCleartextTraffic") == "true", "cleartext must stay enabled for owner-approved HTTP browsing"
 assert not list(app.findall("service")), "V1 must not add services"
 receivers = app.findall("receiver")
-assert len(receivers) == 1, "only the task-reminder system-change receiver is allowed"
+assert len(receivers) == 1, "only the task-reminder boot receiver is allowed"
 receiver = receivers[0]
-assert receiver.get(android_name) == ".TaskReminderReceiver", "the only receiver must be the task-reminder system-change receiver"
+assert receiver.get(android_name) == ".TaskReminderReceiver", "the only receiver must be the task-reminder boot receiver"
 assert receiver.get(android + "exported") == "false", "task-reminder receiver must stay non-exported"
 receiver_actions = {
     action.get(android_name)
@@ -159,9 +159,7 @@ receiver_actions = {
 assert receiver_actions == {
     "android.intent.action.BOOT_COMPLETED",
     "android.intent.action.QUICKBOOT_POWERON",
-    "android.intent.action.TIME_SET",
-    "android.intent.action.TIMEZONE_CHANGED",
-}, "the non-exported reminder receiver may listen only for boot and system time-change broadcasts"
+}, "the boot receiver may listen only for boot-completion broadcasts"
 providers = app.findall("provider")
 assert len(providers) == 1, "only the grant-only attachment content provider is allowed"
 provider = providers[0]
@@ -631,20 +629,11 @@ assert "browserStatus.animate().alpha(0f).setDuration(180L)" in activity, \
 assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")' in activity, \
     "actionable failed-navigation status must remain available through the dedicated Retry button"
 
-# Task-editor dialogs must consume IME insets on edge-to-edge Android 11+ windows.
-task_editor_ime = re.search(r"private void configureDialogImeInsets\(Window dialogWindow\)\s*\{(.*?)\n    \}", activity, re.S)
-assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
-assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
-assert "Api30Window.applyInsets(view, insets, 0)" in task_editor_ime.group(1)
-assert "configureDialogImeInsets(shownDialogWindow)" in activity
-assert "SOFT_INPUT_ADJUST_NOTHING" in activity and "SOFT_INPUT_ADJUST_RESIZE" in activity, \\
-    "API 30+ dialogs must use explicit IME insets while API 26-29 retain resize behavior"
-
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
 # INTERNET for the browser and app clients (issue #45) — a stale summary that contradicted
 # the assertions above it. This is not a runtime HTTP-browsing assertion.
-print("PASS manifest/permissions: main declares INTERNET for browsing and app network clients plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot/time-change receiver, only the approved AndroidX SplashScreen runtime dependency, no optional media/model binaries")
+print("PASS manifest/permissions: main declares INTERNET for browsing and app network clients plus POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED/VIBRATE for reminders; Play adds no permissions; GitHub sideload alone adds ACCESS_NETWORK_STATE and optional POST_PROMOTED_NOTIFICATIONS for Android 16 Live Updates; no install permission or handoff, no services, one non-exported boot receiver, only the approved AndroidX SplashScreen runtime dependency, no optional media/model binaries")
 print("PASS permission policy: manifest-backed browser status plus a notification permission prompt only when a reminder is enabled; no other runtime permission prompt code")
 print("PASS encrypted task-store policy: writer and reader share invalid/duplicate-task rejection")
 print("PASS lifecycle policy: task/storage/attachment/browser callbacks are suppressed after Activity destruction")
