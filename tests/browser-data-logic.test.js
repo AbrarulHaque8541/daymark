@@ -11,7 +11,8 @@ test('catalog ids are stable and in card order', () => {
     'webhook-clear-queue',
     'storage-clear-status',
     'import-merge',
-    'export-backup'
+    'export-backup',
+    'clear-focus'
   ]);
 });
 

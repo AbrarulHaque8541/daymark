@@ -4,7 +4,7 @@
  * Pure, dependency-free catalog behind the "What each Clear button really
  * does" card: for every destructive or storage-touching action the web
  * prototype offers (Clear completed, Clear search, Clear webhook queue,
- * Clear storage status, Import, Export) it states, in plain words, exactly
+ * Clear storage status, Import, Export, Clear Focus history) it states, in plain words, exactly
  * what the action removes, what it keeps, whether the data can come back,
  * what scope it has (this device only) and whether any network is involved.
  *
@@ -24,7 +24,8 @@
     'webhook-clear-queue',
     'storage-clear-status',
     'import-merge',
-    'export-backup'
+    'export-backup',
+    'clear-focus'
   ];
 
   const CATALOG = {
@@ -99,7 +100,19 @@
       deletesData: false,
       scope: 'A new local file',
       network: 'None \u2014 the file never leaves this device unless you share it yourself'
-    }
+    },
+    'clear-focus': {
+      label: 'Clear Focus history',
+      title: 'Clear Focus history',
+      summary: 'Removes the Focus session history log and any active session data from this device’s local storage. Tasks, other caches, and settings are untouched. Nothing is sent anywhere.',
+      removes: ['Focus session history and active session (daymark.focus.v1)'],
+      keeps: ['All tasks', 'Other caches (weather, holidays, etc.)', 'Webhook settings'],
+      recoverable: false,
+      recovery: 'Cleared Focus history cannot be brought back. Export a backup first if you want to keep a copy.',
+      deletesData: true,
+      scope: 'This device only',
+      network: 'None — this never contacts the network'
+    },
   };
 
   // The honest fallback used whenever an action id is not in the catalog.
