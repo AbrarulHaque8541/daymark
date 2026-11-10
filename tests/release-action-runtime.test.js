@@ -143,6 +143,22 @@ test('Android PR validation is debug-only and signed device-test assets are tag-
     'the EXIT cleanup trap must be installed before keystore decoding can create a partial file');
 });
 
+test('Android release workflows install lockfile dependencies before repository tests', () => {
+  const paths = [
+    '.github/workflows/android-release-assets.yml',
+    '.github/workflows/android-signed-device-test-release.yml',
+    '.github/workflows/android-private-main-test-apk.yml',
+    '.github/workflows/android-production-release.yml'
+  ];
+  for (const workflowPath of paths) {
+    const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+    const install = content.indexOf('npm ci --no-audit --no-fund');
+    const tests = content.indexOf('npm test');
+    assert.ok(install >= 0, workflowPath + ' must install the locked root dependencies');
+    assert.ok(tests > install, workflowPath + ' must run repository tests after npm ci');
+  }
+});
+
 test('SLSA provenance uploads are restricted to mainline device-test tag pushes', () => {
   const workflowPath = '.github/workflows/generator-generic-ossf-slsa3-publish.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');

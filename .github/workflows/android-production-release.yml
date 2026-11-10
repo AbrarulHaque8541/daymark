@@ -51,6 +51,14 @@ jobs:
         with:
           packages: 'platforms;android-36 build-tools;35.0.0'
 
+      - name: Install locked Node dependencies and run repository tests before signing
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm test
+
       - name: Run source and host regression checks before signing
         shell: bash
         run: |
