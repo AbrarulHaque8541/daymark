@@ -6,7 +6,7 @@
 
 **Still open:** API 36 Focus failures #648/#677; cross-tab task/import/recovery/undo races #683; branch governance #646; physical acceptance #160; Android download transport #671; signing/provenance #665/#84; extension recovery UI #659/#687; Service Worker Online compatibility #685/#686; recurrence parity #684/#476. No independent PR approval found. Main protection remains disabled and detailed protection access returns 403.
 
-**Safety:** no merge, release, tag, version, signing-key, application identity, or destructive migration change. No physical-device testing. Application identity mismatch remains unresolved (`com.abrar.daymark` in source/AGENTS versus required `com.cue.daymark`); no migration was performed.
+**Safety:** no merge, release, tag, version, signing-key, application identity, or destructive migration change. No physical-device testing. Application identity directive mismatch remains unresolved between repository source/AGENTS and the run-level instruction; no identity change or migration was performed.
 
 See [full dated evidence snapshot](docs/CURRENT_STATUS_20261110T020852Z.md) for exact PR heads, workflow IDs, blockers and next priorities.
 
