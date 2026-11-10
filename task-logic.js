@@ -34,7 +34,7 @@
   }
 
   /**
-   * Shared four-digit instant contract for web and Android task records.
+   * Shared Java Instant-compatible contract for web and Android task records.
    * Java Instant.parse's leap-second normalization is supported only at 23:59:60.
    */
   const TASK_INSTANT_PATTERN = /^([+-]?[0-9]{4,10})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$/;
