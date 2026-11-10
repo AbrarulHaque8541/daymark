@@ -71,17 +71,34 @@
       }
     }
 
+    function setBusy(on) {
+      const form = formEl;
+      const stat = statusEl;
+      if (form && typeof form.setAttribute === 'function') {
+        form.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      if (stat && typeof stat.setAttribute === 'function') {
+        stat.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      if (form && form.classList && typeof form.classList.toggle === 'function') {
+        form.classList.toggle('is-busy', !!on);
+      }
+    }
+
     function plan() {
       if (!intentApi || typeof intentApi.planIntentHandoff !== 'function') {
         status('App-link planning is unavailable.');
         return;
       }
+      setBusy(true);
       const link = linkEl && typeof linkEl.value === 'string' ? linkEl.value : '';
       // The engine fails closed: unknown or malformed links get an honest
       // "not planned" explanation instead of a guessed verdict.
       const planResult = intentApi.planIntentHandoff(link);
       status('Planned · ' + planResult.title + ' · nothing was opened');
       renderPlan(planResult);
+      // Release the brief busy state after the status is announced.
+      setTimeout(() => setBusy(false), 120);
     }
 
     function onClear() {
@@ -89,6 +106,19 @@
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
       status('Plan cleared; no link was followed and nothing was opened.');
+    }
+
+    const planBtn = element('browser-intent-plan');
+    if (planBtn && typeof planBtn.addEventListener === 'function') {
+      planBtn.addEventListener('pointerdown', () => {
+        if (planBtn.classList && typeof planBtn.classList.add === 'function') planBtn.classList.add('is-pressed');
+      });
+      planBtn.addEventListener('pointerup', () => {
+        if (planBtn.classList && typeof planBtn.classList.remove === 'function') planBtn.classList.remove('is-pressed');
+      });
+      planBtn.addEventListener('pointercancel', () => {
+        if (planBtn.classList && typeof planBtn.classList.remove === 'function') planBtn.classList.remove('is-pressed');
+      });
     }
 
     if (clearEl) {
