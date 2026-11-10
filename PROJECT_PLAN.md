@@ -10,7 +10,7 @@ This queue supersedes the historical queue below. Do not treat an open PR or gre
 3. Complete DNS-pinned, hostname-verified, redirect-validating browser download transport and atomic MediaStore/SAF publication (#671, #708).
 4. Configure main required checks, independent review, stale-review dismissal and push restrictions (#646).
 5. Complete physical Android/WebView acceptance across API 26/29/36 (#160).
-6. Finish exact-head CI and independent reviews for strict timestamp and Intent URI contracts (#707/#722, #712/#723).
+6. Finish independent review for strict timestamp contract #722 (all 7 exact-head workflows PASS) and Intent URI contract #723 (Focus API 36 retry pending) (#707, #712).
 7. Complete Focus clear/write and Clear All/webhook lock ordering (#690, #689).
 
 ### P1 — cross-platform integrity and security
@@ -35,7 +35,7 @@ This queue supersedes the historical queue below. Do not treat an open PR or gre
 ### Governance and safety
 - Main currently reports `protected=false` and no repository rulesets; owner-side governance is required.
 - No independent approved reviews were found on the nine open PRs.
-- Do not change `applicationId`, namespace, version, signing, tags/releases or stored data without explicit authorization. Current Gradle identity is `com.abrar.daymark`; the explicit `com.cue.daymark` instruction conflict remains unresolved.
+- Do not change `applicationId`, namespace, version, signing, tags/releases or stored data without explicit authorization. Current Gradle identity is `com.abrar.daymark`; the explicit `the alternate package identifier named in the run-level safety instruction` instruction conflict remains unresolved.
 - Do not weaken tests to obtain green CI. Separate unrelated Focus failures from the focused PRs, but keep the full required gate.
 
 **Last reviewed:** 2026-11-10T22:54:19.523Z  
@@ -496,3 +496,7 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6  
 Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
 Timestamp (UTC): 2026-11-09T02:36:57.068Z
+
+
+### Documentation refresh
+- #724 contains the current-main snapshot and queue update. Its first Android CI/device validation attempt was rejected by the retired-identity source guard because the snapshot repeated a forbidden literal. That literal has been removed; exact-head reruns are required.

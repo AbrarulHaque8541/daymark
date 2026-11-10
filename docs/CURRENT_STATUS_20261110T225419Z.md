@@ -18,9 +18,9 @@ Project plan base blob: `c9ce1266762999ac6e36da21223c0ae7c3e78320`
 - Main Android CI and Ubuntu/Windows contract workflows passed on the latest retrieved main head.
 - Main branch metadata reports `protected=false`; repository rulesets are empty.
 - Both `CODEOWNERS` and `.github/CODEOWNERS` are absent.
-- No independent APPROVED review was found on the nine open PRs. No requested reviewers were returned.
+- No independent APPROVED review was found on the ten open PRs. No requested reviewers were returned.
 - The main branch protection endpoint returned HTTP 403 to the connected GitHub integration; no settings were changed.
-- Current Gradle identity remains `namespace/applicationId = com.abrar.daymark`, `versionName=1.6`, `versionCode=13`. The run-level safety instruction requires `com.cue.daymark`; this conflict is unresolved. No identity or migration change was made.
+- Current Gradle identity remains `namespace/applicationId = com.abrar.daymark`, `versionName=1.6`, `versionCode=13`. The run-level safety instruction requires `the alternate package identifier named in the run-level safety instruction`; this conflict is unresolved. No identity or migration change was made.
 
 ## 2. Recent mainline integrations
 
@@ -38,11 +38,12 @@ The intermediate stylesheet change at `f6278029` removed existing feature rules;
 
 ## 3. Open PR inventory
 
-All nine open PRs were inventoried. Base/head comparisons below are against current main `39b1047a`.
+All ten open PRs were inventoried. Base/head comparisons below are against current main `39b1047a`.
 
 | PR | Head SHA | Base SHA | Ahead / behind | Latest exact-head workflow evidence | Review/lifecycle |
 |---|---|---|---:|---|---|
-| #723 Intent URI contract | `4b53dc0bc86f17e25f7226e9cd4653e27d6115e8` | `39b1047a2d4888e5c1adb56b6a798e030d10f1b5` | 1 / 0 | 5 PASS; Focus lifecycle and unsigned device validation IN PROGRESS | Draft; no independent approval |
+| #724 documentation snapshot | `0fabe582f8f4c3ed55572ad41c4a6b5b5b8b4289` | `39b1047a` | 1 / 0 | Initial Android CI/device validation failed on source guard; correction in progress | Draft; no independent approval |
+| #723 Intent URI contract | `4b53dc0bc86f17e25f7226e9cd4653e27d6115e8` | `39b1047a` | 1 / 0 | 6 PASS; Focus lifecycle API 36 FAIL, retry IN PROGRESS | Draft; no independent approval |
 | #722 task Instant contract | `5b6f21b49d6e36bef2da86266ac0f97439eb0633` | `39b1047a2d4888e5c1adb56b6a798e030d10f1b5` | 9 / 0 | 6 PASS; API 36 Focus lifecycle PASS; API 29 first attempt failed and single-job retry IN PROGRESS | Draft; no independent approval |
 | #705 signing/provenance | `c13c6238023cc4a27224c8284341de83a487d3fa` | `08b6eece` | 24 / 43 | 4 PASS | Ready; owner environment protection unverified |
 | #675 storage/Focus integration | `69450f875caac2cd8bf1c880774092001030000a` | `08b6eece` | 259 / 43 | 6 PASS; Focus lifecycle FAIL | Draft; large divergent integration |
@@ -61,7 +62,7 @@ Current source changes preserve Java `Instant.parse()` compatibility, including 
 - Focused JDK 21/Java 17-compatible validator fixture harness: 58/58 PASS.
 - The original `PortableBackupSmoke.java` maximum-metadata archive regression was restored verbatim after an intermediate placeholder replacement; the current PR diff does not change that file.
 - Exact-head Android CI, contracts, device-test validation, device artifact, Focus UI/Sound and Focus Live Update passed.
-- API 29 Focus lifecycle failed once in the unrelated post-vertical-drag Stopwatch tap scenario; API 36 passed. The API 29 job retry was still running at snapshot time.
+- API 29 and API 36 lifecycle both passed after rerunning the first API 29 failure. All seven exact-head workflows are PASS.
 - No Focus source was changed in #722. Keep draft until retry and independent review.
 
 ### PR #723 — strict Intent URI parity
@@ -165,6 +166,11 @@ The latest #722 lifecycle run showed API 36 PASS and API 29 failure. The failure
 - No PR was merged by this run.
 - No release/tag/version bump, signing-key change, application identity change or destructive migration was performed.
 - No physical Android device was tested.
-- The current Gradle application ID remains `com.abrar.daymark`; the user-specified `com.cue.daymark` conflict remains unresolved.
+- The current Gradle application ID remains `com.abrar.daymark`; the user-specified `the alternate package identifier named in the run-level safety instruction` conflict remains unresolved.
 - Exact-head CI claims are limited to the runs listed above; pending/retried jobs are not treated as PASS.
 - Main branch remains unprotected; no protection bypass was attempted.
+
+
+## 8. Documentation PR correction
+
+PR #724's first Android CI and unsigned-device validation attempts failed because the new snapshot/plan repeated a retired package-identity literal. The repository guard correctly rejects that literal. The docs have been corrected to describe the instruction conflict without repeating the retired identifier. Contracts passed on the first head; Android CI and device validation are being rerun on the corrected head.
