@@ -76,4 +76,4 @@
       parent.appendChild(element);
     }
   } catch (reconcileFailure) { }
-});
+})
