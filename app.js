@@ -14,7 +14,7 @@
   const focus = window.DaymarkFocus || null;
   const focusMutation = window.DaymarkFocusMutation || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPersistedGeneration: null, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -1799,9 +1799,9 @@
       setStorageStatus('Focus preset could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
     }
-    const generation = focusMutation.readFocusGeneration(localStorage);
-    if (!generation.ok) {
-      setStorageStatus('Focus preset could not be saved safely because its storage generation could not be checked.', true);
+    const expectedGeneration = state.focusPersistedGeneration;
+    if (!Number.isSafeInteger(expectedGeneration)) {
+      setStorageStatus('Focus preset could not be saved safely because its loaded storage generation is unavailable.', true);
       return false;
     }
     const storageEpoch = state.focusStorageEventEpoch;
@@ -1820,7 +1820,7 @@
         key: FOCUS_PRESET_KEY,
         baseRaw,
         desiredRaw,
-        expectedGeneration: generation.value
+        expectedGeneration
       });
       if (result.ok) {
         state.focusPresetPersistedRaw = desiredRaw;
@@ -1839,15 +1839,32 @@
     state.focusAutoFinalizePending = false;
     const empty = { session: null, log: [] };
     if (!focus) return empty;
+    const generationBefore = focusMutation
+      ? focusMutation.readFocusGeneration(localStorage) : { ok: false };
     let saved = null;
     try {
       saved = localStorage.getItem(FOCUS_KEY);
+      const generationAfter = focusMutation
+        ? focusMutation.readFocusGeneration(localStorage) : { ok: false };
+      state.focusPersistedGeneration = generationBefore.ok && generationAfter.ok
+        && generationBefore.value === generationAfter.value
+        ? generationAfter.value : null;
+      if (generationBefore.ok && generationAfter.ok
+          && generationBefore.value !== generationAfter.value) {
+        state.focusPersistedRaw = undefined;
+        state.focusPrimaryUnreadable = false;
+        state.focusRecoveryBackupPendingPayload = null;
+        state.focusRecoveryBackupReady = false;
+        setStorageStatus('Focus data changed while it was being loaded; waiting for cross-tab synchronization. No write was made.', true);
+        return empty;
+      }
       state.focusPersistedRaw = saved;
       state.focusPrimaryUnreadable = false;
       state.focusRecoveryBackupPendingPayload = null;
       state.focusRecoveryBackupReady = false;
     } catch (error) {
       state.focusPersistedRaw = undefined;
+      state.focusPersistedGeneration = null;
       state.focusPrimaryUnreadable = true;
       state.focusRecoveryBackupPendingPayload = null;
       state.focusRecoveryBackupReady = false;
@@ -1940,9 +1957,9 @@
       setStorageStatus('Focus data could not be saved safely because cross-tab coordination is unavailable.', true);
       return false;
     }
-    const generation = focusMutation.readFocusGeneration(localStorage);
-    if (!generation.ok) {
-      setStorageStatus('Focus data could not be saved safely because its storage generation could not be checked.', true);
+    const expectedGeneration = state.focusPersistedGeneration;
+    if (!Number.isSafeInteger(expectedGeneration)) {
+      setStorageStatus('Focus data could not be saved safely because its loaded storage generation is unavailable.', true);
       return false;
     }
     const storageEpoch = state.focusStorageEventEpoch;
@@ -1977,7 +1994,7 @@
         storage: localStorage,
         key: FOCUS_KEY,
         baseRaw: state.focusPersistedRaw,
-        expectedGeneration: generation.value,
+        expectedGeneration,
         desiredSnapshot,
         validateSnapshot: (snapshot) => {
           if (snapshot.session && !focus.isValidSession(snapshot.session)) return false;
