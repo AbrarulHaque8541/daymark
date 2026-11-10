@@ -16,7 +16,11 @@ for token in ('value.startsWith("intent://")', '"#Intent;"', 'value.endsWith(";e
               'targetUri.getRawUserInfo() != null',
               'BrowserAddress.requireAllowedWebUrl(fallback)',
               'decodeIntentMetadata(raw)',
-              'raw.replace("+", "%2B")'):
+              'decoded.append(raw.charAt(index++))',
+              'CodingErrorAction.REPORT',
+              'MAX_INPUT_LENGTH = 2048',
+              'hasExplicitEmptyPort(baseUri)',
+              'hasExplicitEmptyPort(targetUri)'):
     assert token in policy, f"Intent URI parser missing {token}"
 for forbidden in ('"component".equals(key)', '"selector".equals(key)',
                   '"launchFlags".equals(key)', '"S.".equals(key)'):
