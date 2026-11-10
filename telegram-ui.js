@@ -31,6 +31,9 @@
       for (const el of controls) {
         if (!el) continue;
         el.disabled = isBusy;
+        if (el.classList && typeof el.classList.toggle === "function") {
+          el.classList.toggle("is-busy", isBusy);
+        }
         if (typeof el.setAttribute === 'function') {
           el.setAttribute('aria-disabled', isBusy ? 'true' : 'false');
         }
