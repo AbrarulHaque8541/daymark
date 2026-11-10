@@ -200,6 +200,37 @@
     return host;
   }
 
+  function normalizeIntentWebSuffix(suffix) {
+    const fragmentIndex = suffix.indexOf('#');
+    const beforeFragment = fragmentIndex < 0 ? suffix : suffix.slice(0, fragmentIndex);
+    const fragment = fragmentIndex < 0 ? '' : suffix.slice(fragmentIndex);
+    const queryIndex = beforeFragment.indexOf('?');
+    const rawPath = queryIndex < 0 ? beforeFragment : beforeFragment.slice(0, queryIndex);
+    const query = queryIndex < 0 ? '' : beforeFragment.slice(queryIndex);
+    let path = rawPath;
+    if (path.startsWith('/')) {
+      const segments = path.split('/');
+      const normalized = [];
+      for (let index = 0; index < segments.length; index += 1) {
+        const segment = segments[index];
+        if (segment === '.') {
+          if (index === segments.length - 1) normalized.push('');
+        } else if (segment === '..') {
+          if (normalized.length > 1) normalized.pop();
+          if (index === segments.length - 1) normalized.push('');
+        } else {
+          normalized.push(segment);
+        }
+      }
+      path = normalized.join('/');
+    }
+    try {
+      return encodeURI(path + query + fragment);
+    } catch (error) {
+      return null;
+    }
+  }
+
   function validateIntentWebUrl(value) {
     const input = String(value == null ? '' : value);
     if (!input || input.length > MAX_INPUT_CHARS + 8
@@ -246,7 +277,9 @@
 
     const suffix = rest.slice(authority.length);
     if (suffix && !suffix.startsWith('/') && !suffix.startsWith('?') && !suffix.startsWith('#')) return null;
-    return scheme + '://' + host + (portText === null ? '' : ':' + portText) + suffix;
+    const normalizedSuffix = normalizeIntentWebSuffix(suffix);
+    if (normalizedSuffix === null) return null;
+    return scheme + '://' + host + (portText === null ? '' : ':' + portText) + normalizedSuffix;
   }
   function parseIntentUri(raw) {
     const fail = (reason) => ({ ok: false, reason });
@@ -321,7 +354,12 @@
     const target = scheme + ':' + base.slice('intent:'.length);
     // The base authority/path were already parsed with the same strict URI
     // structure; only HTTP(S) needs the full browser URL policy below.
-    let targetUri = target;
+    let targetUri;
+    try {
+      targetUri = encodeURI(target);
+    } catch (error) {
+      return fail('the intent target URI is invalid');
+    }
     if (scheme === 'http' || scheme === 'https') {
       targetUri = validateIntentWebUrl(target);
       if (!targetUri) return fail('the HTTP or HTTPS intent target is not a valid Daymark web address');
