@@ -116,3 +116,19 @@ test('rejects computed writes to a CommonJS node:test module object', () => {
   assert.equal(hasRegisteredTestCase(source), false,
     'a dynamic computed write must invalidate the imported module binding');
 });
+
+test('recognizes CommonJS member imports and awaited dynamic ESM imports', () => {
+  const cases = [
+    ["const test = require('node:test').test; test('real', () => assert.ok(true));", true, 'CommonJS test member'],
+    ["const register = require('node:test').it; register('real', () => assert.ok(true));", true, 'CommonJS it member alias'],
+    ["const { test: register } = await import('node:test'); register('real', () => assert.ok(true));", true, 'dynamic ESM named alias'],
+    ["const nodeTest = await import('node:test'); nodeTest.test('real', () => assert.ok(true));", true, 'dynamic ESM namespace'],
+    ["const register = (await import('node:test')).test; register('real', () => assert.ok(true));", true, 'dynamic ESM member alias'],
+    ["const { default: register } = await import('node:test'); register('real', () => assert.ok(true));", true, 'dynamic ESM default alias'],
+    ["const { test } = await import('node:assert'); test('fake', () => assert.ok(true));", false, 'unrelated dynamic import'],
+    ["function require() { return { test() {} }; } const register = require('node:test').test; register('fake', () => assert.ok(true));", false, 'shadowed CommonJS require']
+  ];
+  for (const [source, expected, label] of cases) {
+    assert.equal(hasRegisteredTestCase(source), expected, label);
+  }
+});

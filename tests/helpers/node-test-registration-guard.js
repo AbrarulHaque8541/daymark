@@ -119,6 +119,39 @@ function markRequirePattern(pattern, scope) {
   }
 }
 
+function unwrapAwait(node) {
+  let current = node;
+  while (current && current.type === 'AwaitExpression') current = current.argument;
+  return current;
+}
+
+function isNodeTestImportExpression(node) {
+  const expression = unwrapAwait(node);
+  return !!expression && expression.type === 'ImportExpression' &&
+    expression.source.type === 'Literal' && expression.source.value === 'node:test';
+}
+
+function markDynamicImportPattern(pattern, scope) {
+  if (!pattern) return;
+  if (pattern.type === 'Identifier') {
+    // import() resolves to the module namespace, not the callable default.
+    markNodeTestBinding(scope, pattern.name, '*');
+    return;
+  }
+  if (pattern.type !== 'ObjectPattern') return;
+  for (const property of pattern.properties) {
+    if (property.type !== 'Property' || property.computed) continue;
+    const importedName = property.key.type === 'Identifier'
+      ? property.key.name
+      : (property.key.type === 'Literal' ? property.key.value : null);
+    if (!['default', 'test', 'it', 'describe'].includes(importedName)) continue;
+    const local = property.value.type === 'AssignmentPattern' ? property.value.left : property.value;
+    if (local.type === 'Identifier') {
+      markNodeTestBinding(scope, local.name, importedName);
+    }
+  }
+}
+
 function buildScopes(ast) {
   const nodeScopes = new WeakMap();
   const declarators = [];
@@ -194,7 +227,29 @@ function buildScopes(ast) {
   visit(ast, null);
 
   for (const { declarator, scope } of declarators) {
-    if (isNodeTestRequireCall(declarator.init, nodeScopes)) markRequirePattern(declarator.id, scope);
+    const init = declarator.init;
+    if (isNodeTestRequireCall(init, nodeScopes)) {
+      markRequirePattern(declarator.id, scope);
+      continue;
+    }
+    if (isNodeTestImportExpression(init)) {
+      markDynamicImportPattern(declarator.id, scope);
+      continue;
+    }
+    if (init && init.type === 'MemberExpression') {
+      const importedName = staticPropertyName(init);
+      if (['test', 'it', 'describe'].includes(importedName) &&
+          isNodeTestRequireCall(init.object, nodeScopes) &&
+          declarator.id.type === 'Identifier') {
+        markNodeTestBinding(scope, declarator.id.name, importedName);
+        continue;
+      }
+      if (['test', 'it', 'describe'].includes(importedName) &&
+          isNodeTestImportExpression(init.object) &&
+          declarator.id.type === 'Identifier') {
+        markNodeTestBinding(scope, declarator.id.name, importedName);
+      }
+    }
   }
   return nodeScopes;
 }
