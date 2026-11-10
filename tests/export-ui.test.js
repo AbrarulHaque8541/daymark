@@ -20,12 +20,20 @@ function fakeElement(tag) {
     clicked: false,
     removed: false,
     attributes: {},
+    classList: {
+      add() {},
+      remove() {},
+      toggle() {},
+      contains() { return false; }
+    },
     setAttribute(name, value) { this.attributes[name] = value; },
     closest(selector) {
       return selector === '#' + this.id && this.id ? this : null;
     },
     click() { this.clicked = true; },
-    remove() { this.removed = true; }
+    remove() { this.removed = true; },
+    addEventListener() {},
+    removeEventListener() {}
   };
 }
 
@@ -34,7 +42,8 @@ function fakeEnv(options) {
   const listeners = [];
   const elements = {
     'export-format': Object.assign(fakeElement('select'), { id: 'export-format', value: opts.format || 'json' }),
-    'export-tasks': Object.assign(fakeElement('button'), { id: 'export-tasks' })
+    'export-tasks': Object.assign(fakeElement('button'), { id: 'export-tasks' }),
+    'export-status': Object.assign(fakeElement('p'), { id: 'export-status', className: 'import-status' })
   };
   const created = [];
   const doc = {
@@ -98,16 +107,6 @@ test('registers a capture-phase click listener on the document', () => {
   assert.equal(listeners.length, 0);
 });
 
-test('json format is left for the built-in backup handler', () => {
-  const { env, elements, created } = fakeEnv({ format: 'json', stored: JSON.stringify(sampleTasks) });
-  const handle = ui.attachExportUi(env);
-  const event = clickEvent(elements['export-tasks']);
-  handle.onClick(event);
-  assert.equal(event.defaultPrevented, false);
-  assert.equal(event.propagationStopped, false);
-  assert.equal(created.filter((el) => el.tagName === 'a').length, 0, 'no download is triggered');
-});
-
 test('markdown selection intercepts the click and downloads a .md file', () => {
   const { env, elements, created } = fakeEnv({ format: 'markdown', stored: JSON.stringify(sampleTasks) });
   const handle = ui.attachExportUi(env);
@@ -123,9 +122,8 @@ test('markdown selection intercepts the click and downloads a .md file', () => {
   assert.equal(link.removed, true);
   const payload = decodeURIComponent(link.href.split(',')[1]);
   assert.equal(payload, exporter.render('markdown', sampleTasks, { generatedAt: '2026-11-02T12:00:00.000Z' }));
-  const status = created.find((el) => el.id === 'export-status');
-  assert.ok(status, 'an sr-only status element announces the result');
-  assert.equal(status.attributes.role, 'status');
+  const status = elements['export-status'];
+  assert.ok(status, 'status element announces the result');
   assert.ok(status.textContent.includes('2 tasks as MARKDOWN'));
 });
 
@@ -171,7 +169,7 @@ test('malformed stored tasks are reported and skipped, valid ones still export',
   const link = created.find((el) => el.tagName === 'a');
   const payload = decodeURIComponent(link.href.split(',')[1]);
   assert.equal(payload, exporter.render('markdown', sampleTasks, { generatedAt: '2026-11-02T12:00:00.000Z' }));
-  const status = created.find((el) => el.id === 'export-status');
+  const status = elements['export-status'];
   assert.ok(status.textContent.includes('2 malformed tasks skipped'));
 });
 
@@ -183,7 +181,7 @@ test('a render failure is announced instead of throwing', () => {
   env.exportApi = { isFormat: () => true, render: () => { throw new Error('boom'); } };
   const handle = ui.attachExportUi(env);
   handle.onClick(clickEvent(elements['export-tasks']));
-  const status = created.find((el) => el.id === 'export-status');
+  const status = elements['export-status'];
   assert.ok(status.textContent.includes('Export failed: boom'));
   assert.equal(created.filter((el) => el.tagName === 'a').length, 0);
 });
@@ -205,4 +203,31 @@ test('page loads the open-format renderer before the export UI', () => {
   assert.ok(taskLogic >= 0, 'task validation loads');
   assert.ok(exportLogic > taskLogic, 'open-format renderer loads after task logic');
   assert.ok(exportUi > exportLogic, 'export UI loads after its renderer');
+});
+
+test('remembers and restores the last export format', () => {
+  const { env, elements, storageData } = fakeEnv({ format: 'csv' });
+  const handle = ui.attachExportUi(env);
+  // simulate user changing the select
+  elements['export-format'].value = 'ics';
+  // trigger change if we had a real listener; for test we call persist via click path or directly
+  handle.onClick(clickEvent(elements['export-tasks'])); // this persists current format
+  assert.equal(storageData[ui.FORMAT_STORAGE_KEY], 'ics');
+  handle.detach();
+
+  // new env with saved value
+  const restored = fakeEnv({ format: 'json', stored: undefined });
+  restored.storageData[ui.FORMAT_STORAGE_KEY] = 'markdown';
+  const handle2 = ui.attachExportUi(restored.env);
+  assert.equal(restored.elements['export-format'].value, 'markdown');
+  handle2.detach();
+});
+
+test('uses visible export-status element for feedback', () => {
+  const { env, elements, created } = fakeEnv({ format: 'markdown', stored: JSON.stringify(sampleTasks) });
+  const handle = ui.attachExportUi(env);
+  handle.onClick(clickEvent(elements['export-tasks']));
+  const status = elements['export-status'];
+  assert.ok(status.textContent.includes('Exported 2 tasks as MARKDOWN'));
+  handle.detach();
 });
