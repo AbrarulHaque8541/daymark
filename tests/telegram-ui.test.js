@@ -1,4 +1,3 @@
-
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -386,4 +385,54 @@ test('buttons are disabled and aria-busy is set while a send is in flight', asyn
   assert.equal(doc.elements['telegram-test'].disabled, false);
   assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'false');
   assert.match(doc.elements['telegram-status'].textContent, /Sent/);
+});
+
+test('last valid chat target is restored on attach when storage holds one', () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.telegram.lastChat.v1': '987654321' });
+  ui.attachTelegramUi(okEnv(doc, { storage: storage }));
+  assert.equal(doc.elements['telegram-chat'].value, '987654321');
+});
+
+test('an invalid or missing stored chat target is ignored', () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.telegram.lastChat.v1': 'not-a-target' });
+  ui.attachTelegramUi(okEnv(doc, { storage: storage }));
+  assert.equal(doc.elements['telegram-chat'].value, '');
+});
+
+test('successful send persists the chat target for next session', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({});
+  storage.setItem = (key, value) => { storage._data = storage._data || {}; storage._data[key] = value; };
+  storage.getItem = (key) => (storage._data && storage._data[key]) || null;
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 11 } }) }));
+  const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('ship it', { completed: true })]) };
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  doc.elements['telegram-chat'].value = '@daymarkchannel';
+  await handle.send();
+  assert.equal(storage.getItem('daymark.telegram.lastChat.v1'), '@daymarkchannel');
+});
+
+test('failed send does not persist the chat target', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({});
+  storage.setItem = () => { throw new Error('should not be called'); };
+  const fetchFn = makeFetch(() => ({ status: 403, json: () => Promise.resolve({ ok: false }) }));
+  const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('ship it', { completed: true })]) };
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, seed: seed, fetch: fetchFn }));
+  fillValidInputs(doc);
+  await handle.send();
+  // no throw means setItem was not called
+});
+
+test('Clear empties only the token; chat target preference remains', () => {
+  const doc = makeDoc(ALL_IDS);
+  const handle = ui.attachTelegramUi(okEnv(doc, {}));
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  doc.elements['telegram-chat'].value = '123456789';
+  handle.clear();
+  assert.equal(doc.elements['telegram-token'].value, '');
+  assert.equal(doc.elements['telegram-chat'].value, '123456789');
 });
