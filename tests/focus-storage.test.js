@@ -147,6 +147,16 @@ function rawFocusPayload(session, log = []) {
   return JSON.stringify({ session, log });
 }
 
+function completedLogEntry(id, startedAtMs) {
+  const session = focus.createSession({
+    id,
+    kind: 'focus',
+    durationMinutes: 25
+  }, startedAtMs);
+  focus.finish(session, startedAtMs + 30_000, false);
+  return focus.makeLogEntry(session);
+}
+
 test('restoreSessionResult exposes natural completion without reviving expired session', () => {
   const start = 1_800_000_000_000;
   const session = expiredRunningSession('expired-result', start);
@@ -202,6 +212,66 @@ test('existing log ID is deduplicated while expired session is cleared', async (
   assert.equal(saved.session, null);
   assert.equal(saved.log.length, 1);
   assert.equal(saved.log[0].id, session.id);
+});
+
+test('the app adopts a merged Focus log before the next same-tab save', async () => {
+  const startedAt = Date.now() - 30_000;
+  const session = focus.createSession({
+    id: 'focus-merge-adoption-session',
+    kind: 'focus',
+    durationMinutes: 25
+  }, startedAt);
+  const baseLog = completedLogEntry('focus-merge-base-log', startedAt - 60_000);
+  const remoteLog = completedLogEntry('focus-merge-remote-log', startedAt - 30_000);
+  const app = bootApp({ savedFocusValue: rawFocusPayload(session, [baseLog]) });
+  await app.settle();
+
+  // A second tab commits an unrelated log entry after this tab loaded its base.
+  // No storage event is delivered yet, so this tab must merge the remote entry.
+  app.storedValues.set(FOCUS_KEY, rawFocusPayload(session, [baseLog, remoteLog]));
+  await app.trigger('#focus-stop', 'click')[0];
+
+  const afterMerge = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.equal(afterMerge.session, null);
+  assert.deepEqual(afterMerge.log.map((entry) => entry.id), [
+    baseLog.id, remoteLog.id, session.id
+  ]);
+
+  // The next same-tab write must use the merged in-memory snapshot. Without
+  // adoption, it writes the stale local log and silently drops remoteLog.
+  await app.trigger('#focus-start', 'click')[0];
+  const afterNextSave = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.ok(afterNextSave.session, 'the new Focus session was persisted');
+  assert.ok(afterNextSave.log.some((entry) => entry.id === remoteLog.id),
+    'the remote tab log survives the next same-tab write');
+  assert.ok(afterNextSave.log.some((entry) => entry.id === session.id),
+    'the locally completed session remains in the merged history');
+});
+
+test('a conflicting remote Focus session does not replace this tab in-memory state', async () => {
+  const startedAt = Date.now() - 10_000;
+  const localSession = focus.createSession({
+    id: 'focus-session-conflict',
+    kind: 'focus',
+    durationMinutes: 25
+  }, startedAt);
+  const remoteSession = JSON.parse(JSON.stringify(localSession));
+  focus.pause(remoteSession, startedAt + 5_000);
+  const app = bootApp({ savedFocusValue: rawFocusPayload(localSession) });
+  await app.settle();
+
+  // Another tab pauses the same session. This tab independently stops it.
+  app.storedValues.set(FOCUS_KEY, rawFocusPayload(remoteSession));
+  await app.trigger('#focus-stop', 'click')[0];
+  await app.settle();
+
+  const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.equal(saved.session.state, 'paused',
+    'the conflicting remote snapshot remains the durable value');
+  assert.equal(app.elements.get('#focus-state-label').textContent, 'Ready',
+    'the local stop is retained in memory rather than silently replaced by the remote pause');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /kept its in-memory changes/i);
 });
 
 test('paused session remains paused and does not create a completion log', () => {
