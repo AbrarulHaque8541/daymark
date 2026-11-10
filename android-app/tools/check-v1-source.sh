@@ -46,6 +46,7 @@ python3 ./tools/check-task-webhook.py "$ROOT"
 python3 ./tools/check-github-public-issues.py "$ROOT"
 python3 ./tools/check-integration-catalog-panel.py "$ROOT"
 python3 ./tools/check-browser-intent-links.py "$ROOT"
+python3 ./tools/check-browser-intent-handoff.py "$ROOT"
 sh ./tools/run-browser-app-link-approval-tests.sh
 python3 ./tools/check-browser-app-link-approval.py "$ROOT"
 python3 ./tools/check-oauth-pkce.py "$ROOT"
