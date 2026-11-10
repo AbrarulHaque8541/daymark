@@ -80,6 +80,20 @@ test('rejects focused, skipped, todo-only, and skipped-suite registrations', () 
   for (const [source, label] of cases) assert.equal(hasRegisteredTestCase(source), false, label);
 });
 
+test('rejects callbacks whose only apparent work is declared or statically unreachable', () => {
+  const cases = [
+    [`const { test } = require('node:test'); test('placeholder', () => { function unused() { assert.ok(true); } });`, false, 'unused function declaration'],
+    [`const { test } = require('node:test'); test('placeholder', () => { const unused = () => assert.ok(true); });`, false, 'unused arrow declaration'],
+    [`const { test } = require('node:test'); test('placeholder', () => { if (false) assert.ok(true); });`, false, 'statically false if branch'],
+    [`const { test } = require('node:test'); test('placeholder', () => { while (false) assert.ok(true); });`, false, 'statically false loop'],
+    [`const { test } = require('node:test'); test('real', () => { if (true) assert.ok(true); });`, true, 'statically true branch executes'],
+    [`const { test } = require('node:test'); test('real', () => { const result = makeFixture(); });`, true, 'executed initializer call']
+  ];
+  for (const [source, expected, label] of cases) {
+    assert.equal(hasRegisteredTestCase(source), expected, label);
+  }
+});
+
 test('fails closed when test options can dynamically enable skip or todo', () => {
   const cases = [
     [`const { test } = require('node:test'); test('computed skip', { ['skip']: true }, () => assert.ok(true));`, false, 'computed literal skip key'],
