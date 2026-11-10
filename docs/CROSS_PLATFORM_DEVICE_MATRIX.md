@@ -27,8 +27,9 @@ The full product should adapt to:
 | Android range | minSdk 26 (Android 8.0+), targetSdk 36 in inspected source |
 | Storage | Local encrypted task/attachment stores and encrypted portable backup; no account or mandatory cloud sync |
 | Browser | Android System WebView adapter with explicit network consent and platform-specific policy; not a universal browser engine |
+| Desktop browser | Separate Electron/Chromium prototype under `apps/desktop`; experimental, not the Android app or a full task workspace |
 | UI | Programmatic native Android views; no shared cross-platform UI module in current baseline |
-| Other OS/device apps | Not implemented by this baseline; see matrix below |
+| Other OS/device apps | No non-Android full Daymark task workspace is shipped; see the separate desktop-browser rows below |
 
 Source inspection does not prove current APK publication, physical-device compatibility, or release readiness. Preserve the production signer pin, encrypted formats, backup compatibility, existing feature behavior and release gates.
 
@@ -51,9 +52,12 @@ Status meanings:
 | Apple Watch | Short task actions, timer, complications/widgets and notifications | UNSUPPORTED | watchOS/SwiftUI/WidgetKit implementation and real watch testing |
 | Smart ring | Haptic/LED/button acknowledgements and a few companion-triggered actions | EXPERIMENTAL (API survey only) | Per-vendor public SDK/API, supported commands, radio/battery limits and paired-device tests |
 | Display-less BLE device / button | Explicit start/pause/finish or acknowledge/snooze commands | EXPERIMENTAL (design only) | Authenticated pairing, replay protection, debounce, feedback and lost-connection behavior |
-| Windows desktop/laptop | Keyboard-first task workspace, tray/menu, multi-window and local data | UNSUPPORTED | Installer/signing, secure storage, accessibility, update and GUI smoke tests |
-| macOS desktop/laptop | Native desktop workspace, menu bar, shortcuts and local data | UNSUPPORTED | Hardened/notarized distribution, Keychain, sandbox and GUI tests |
-| Linux desktop/laptop | Desktop workspace, keyboard shortcuts and local data | UNSUPPORTED | Distro/package/ABI matrix, secret storage and desktop integration |
+| Windows desktop/laptop — full task workspace | Keyboard-first task workspace, tray/menu, multi-window and local data | UNSUPPORTED | Installer/signing, secure storage, accessibility, update and GUI smoke tests |
+| macOS desktop/laptop — full task workspace | Native desktop workspace, menu bar, shortcuts and local data | UNSUPPORTED | Hardened/notarized distribution, Keychain, sandbox and GUI tests |
+| Linux desktop/laptop — full task workspace | Desktop workspace, keyboard shortcuts and local data | UNSUPPORTED | Distro/package/ABI matrix, secret storage and desktop integration |
+| Windows — Electron browser prototype | Tabbed mini-browser, address/navigation policy and downloads; no Daymark task workspace | EXPERIMENTAL; CI-TESTED on PR #692 head only | GUI/installer acceptance, keyboard/screen-reader checks, secure download publication and OS integration |
+| macOS — Electron browser prototype | Tabbed mini-browser, address/navigation policy and downloads; no Daymark task workspace | EXPERIMENTAL; CI-TESTED on PR #692 head only | GUI/installer acceptance, keyboard/screen-reader checks, secure download publication and OS integration |
+| Linux — Electron browser prototype | Tabbed mini-browser, address/navigation policy and downloads; no Daymark task workspace | EXPERIMENTAL; CI-TESTED on PR #692 head only | GUI/installer acceptance, keyboard/screen-reader checks, secure download publication and OS integration |
 | Web / installable PWA | Responsive companion for task capture and review | UNSUPPORTED | Browser storage/security limits, offline tests, installability and sync contract |
 | ChromeOS | Android app or desktop/web experience depending on device | EXPERIMENTAL | Windowing/input/storage and actual Chromebook testing |
 | Android Auto | Restricted glanceable/voice-first actions where app category is allowed | UNSUPPORTED | Google-supported category/template eligibility and policy review |
