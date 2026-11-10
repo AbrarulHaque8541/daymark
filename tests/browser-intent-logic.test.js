@@ -1,0 +1,148 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const engine = require('../browser-intent-logic.js');
+
+test('a plain https link stays in the browser with no handoff', () => {
+  const result = engine.classifyLink('https://example.com/page');
+  assert.equal(result.kind, 'web');
+  assert.equal(result.host, 'example.com');
+  assert.equal(result.credentialsRefused, false);
+  const plan = engine.planIntentHandoff('https://example.com/page');
+  assert.equal(plan.verdict, 'opens-in-browser');
+  assert.equal(plan.title, 'Stays in the browser');
+});
+
+test('embedded credentials in a web link are refused and disclosed', () => {
+  const result = engine.classifyLink('https://user:secret@example.com/');
+  assert.equal(result.kind, 'web');
+  assert.equal(result.credentialsRefused, true);
+  const plan = engine.planIntentHandoff('https://user:secret@example.com/');
+  assert.ok(plan.lines.some((line) => line.indexOf('refused before navigation') !== -1));
+  // The echoed host must not carry the credentials.
+  assert.ok(!plan.lines.some((line) => line.indexOf('user:secret') !== -1));
+});
+
+test('mailto, tel and sms are explicit user-triggered handoffs', () => {
+  for (const scheme of engine.EXTERNAL_SCHEMES) {
+    const result = engine.classifyLink(scheme + ':someone');
+    assert.equal(result.kind, 'external-handoff', scheme);
+    const plan = engine.planIntentHandoff(scheme + ':someone');
+    assert.equal(plan.verdict, 'handoff');
+    assert.ok(plan.lines.some((line) => line.indexOf('explicit user tap') !== -1));
+  }
+});
+
+test('a malformed external handoff fails closed', () => {
+  const result = engine.classifyLink('mailto:hello world');
+  assert.equal(result.kind, 'malformed');
+  const plan = engine.planIntentHandoff('mailto:hello world');
+  assert.equal(plan.verdict, 'refused');
+  assert.equal(plan.title, 'Not planned');
+});
+
+test('a tg:// deep link plans an honest Telegram handoff', () => {
+  const result = engine.classifyLink('tg://resolve?domain=example');
+  assert.equal(result.kind, 'telegram-deep-link');
+  const plan = engine.planIntentHandoff('tg://resolve?domain=example');
+  assert.equal(plan.verdict, 'handoff');
+  assert.ok(plan.lines.some((line) => line.indexOf('no store redirect') !== -1));
+  assert.ok(plan.lines.some((line) => line.indexOf('Daymark stays in front') !== -1));
+});
+
+test('a full intent:// URI parses package, scheme and encoded fallback', () => {
+  const link = 'intent://scan/#Intent;scheme=zxing;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
+  const parsed = engine.parseIntentUri(link);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.packageName, 'com.example.scan');
+  assert.equal(parsed.scheme, 'zxing');
+  assert.equal(parsed.fallbackUrl, 'https://example.com/product');
+  assert.equal(parsed.fallbackHonored, true);
+  const plan = engine.planIntentHandoff(link);
+  assert.equal(plan.kind, 'android-intent');
+  assert.equal(plan.verdict, 'handoff');
+  assert.ok(plan.lines.some((line) => line.indexOf('com.example.scan (pinned by the link)') !== -1));
+  assert.ok(plan.lines.some((line) => line.indexOf('https://example.com/product') !== -1));
+});
+
+test('an intent without a pinned package discloses the chooser', () => {
+  const link = 'intent://share/#Intent;scheme=https;action=android.intent.action.SEND;end';
+  const parsed = engine.parseIntentUri(link);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.packageName, null);
+  assert.deepEqual(parsed.extraKeys, ['action']);
+  const plan = engine.planIntentHandoff(link);
+  assert.ok(plan.lines.some((line) => line.indexOf('app chooser') !== -1));
+});
+
+test('a non-http fallback URL is disclosed as ignored, not silently dropped', () => {
+  const link = 'intent://x/#Intent;package=com.example.app;S.browser_fallback_url=javascript%3Aalert(1);end';
+  const parsed = engine.parseIntentUri(link);
+  assert.equal(parsed.fallbackHonored, false);
+  const plan = engine.planIntentHandoff(link);
+  assert.ok(plan.lines.some((line) => line.indexOf('ignored') !== -1));
+  assert.ok(!plan.lines.some((line) => line.indexOf('javascript') !== -1 && line.indexOf('open') !== -1));
+});
+
+test('malformed intent URIs fail closed with a reason', () => {
+  const missingParams = engine.parseIntentUri('intent://example.com/page');
+  assert.equal(missingParams.ok, false);
+  assert.match(missingParams.reason, new RegExp('parameter section'));
+  const missingEnd = engine.parseIntentUri('intent://example.com/#Intent;package=com.example.app');
+  assert.equal(missingEnd.ok, false);
+  assert.match(missingEnd.reason, new RegExp(';end'));
+  const plan = engine.planIntentHandoff('intent://example.com/page');
+  assert.equal(plan.verdict, 'refused');
+  assert.equal(plan.title, 'Not planned');
+});
+
+test('blocked schemes are refused outright', () => {
+  const blocked = ['javascript', 'data', 'file', 'about'];
+  for (const scheme of blocked) {
+    const result = engine.classifyLink(scheme + ':whatever');
+    assert.equal(result.kind, 'blocked', scheme);
+    const plan = engine.planIntentHandoff(scheme + ':whatever');
+    assert.equal(plan.verdict, 'refused');
+    assert.equal(plan.title, 'Blocked scheme');
+  }
+});
+
+test('unknown schemes plan nothing instead of guessing', () => {
+  const result = engine.classifyLink('weirdapp://open');
+  assert.equal(result.kind, 'unknown-scheme');
+  const plan = engine.planIntentHandoff('weirdapp://open');
+  assert.equal(plan.verdict, 'refused');
+  assert.ok(plan.summary.indexOf('cannot prove') !== -1);
+});
+
+test('empty, scheme-less and control-character input never plans a handoff', () => {
+  assert.equal(engine.classifyLink('').kind, 'none');
+  assert.equal(engine.classifyLink('   ').kind, 'none');
+  const noScheme = engine.classifyLink('just some words');
+  assert.equal(noScheme.kind, 'no-scheme');
+  const plan = engine.planIntentHandoff('just some words');
+  assert.equal(plan.verdict, 'not-planned');
+  const control = engine.classifyLink('https://example.com/x' + String.fromCharCode(7));
+  assert.equal(control.kind, 'malformed');
+});
+
+test('oversized input fails closed at the documented limit', () => {
+  const long = 'https://example.com/' + 'a'.repeat(engine.MAX_INPUT_CHARS + 1);
+  const result = engine.classifyLink(long);
+  assert.equal(result.kind, 'malformed');
+  assert.ok(result.reason.indexOf('2048') !== -1);
+});
+
+test('long targets are truncated before they are echoed back', () => {
+  const long = 'tg://resolve?domain=' + 'b'.repeat(300);
+  const result = engine.classifyLink(long);
+  assert.ok(result.target.length <= engine.MAX_ECHO_CHARS + 16);
+  assert.ok(result.target.indexOf('(truncated)') !== -1);
+});
+
+test('the card never claims anything ran automatically', () => {
+  const plan = engine.planIntentHandoff('tg://resolve?domain=example');
+  assert.ok(plan.network.indexOf('explicit user action') !== -1);
+  assert.ok(plan.network.indexOf('None') === 0);
+});
