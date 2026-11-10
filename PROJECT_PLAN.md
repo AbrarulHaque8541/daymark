@@ -1,3 +1,21 @@
+## Current execution queue — 2026-11-10T10:06:00Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
+
+Latest live inventory: 7 open PRs / 24 open issues. Main Android CI #42784930733 and Ubuntu/Windows contracts #42784930716 pass. Main protection is disabled and rulesets are empty. See docs/CURRENT_STATUS_20261110T100600Z.md for exact base/head SHAs, run links and evidence.
+
+1. P0 — production signing authorization (#705, #84): exact production job now has repository + owner actor + triggering-actor gates; all four exact-head workflows pass. Keep draft until independent security review. Owner/admin must separately configure tag rulesets and protected-environment reviewers; no settings changed.
+2. P0 — Focus lifecycle and storage (#648, #675, #613, #690): #648 API 36 lifecycle still fails; #675 prior head passed API 29/36, but its latest Focus-clear regression head is undergoing fresh checks. Do not reuse old-head PASS results.
+3. P0 — cross-tab task/webhook consistency (#683, #689, #639): #675 implements the global task → delivery → queue → Focus lock order and broad tests; explicit import-vs-normal-write race coverage and independent review remain.
+4. P0 — main governance (#646): configure required Android CI/contracts, independent approval, up-to-date branch and no-force-push/delete only after owner/admin approval and stable check-name verification.
+5. P0 — physical Android/WebView acceptance (#160): real-device/OEM matrix remains NOT TESTED.
+6. P1 — extension privacy/runtime (#676, #702, #687): source guards and core CI pass on #676; WebView runtime acceptance remains in progress; malformed-pack recovery UI remains.
+7. P1 — Service Worker compatibility (#704, #685): exact-head policy, Android and API 26/36 runtime checks pass; independent review and compatibility acceptance remain.
+8. P1 — secure Android download transport (#671): keep fail-closed until redirect validation, cookie/referrer isolation, bounded streaming, cancellation and atomic publication are implemented.
+9. P1 — recurrence parity (#684, #476), Telegram browser acceptance (#700), and desktop reproducibility (#696): complete shared contracts, real browser tests and lockfile/npm-ci work.
+
+No release/tag/version/signing-key/applicationId change or destructive migration was made. Current source application ID remains com.abrar.daymark; run-level com.cue.daymark wording conflicts with root AGENTS, so identity remains unchanged pending owner reconciliation.
+
+---
+
 ## Current execution queue — 2026-11-10T06:32:15Z (main 469b29edea69)
 
 Latest whole-project snapshot: [CURRENT_STATUS_20261110T063215Z.md](docs/CURRENT_STATUS_20261110T063215Z.md).
