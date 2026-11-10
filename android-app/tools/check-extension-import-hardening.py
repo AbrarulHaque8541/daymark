@@ -243,9 +243,9 @@ def check_recovery_ui(main):
     assert "actions.setOrientation(LinearLayout.VERTICAL);" in recovery, (
         "recovery actions must remain usable on narrow screens and at larger text scales"
     )
-    assert "Export exact raw bytes" in recovery and "Remove malformed extension file" in recovery, (
-        "recovery actions must have accessible descriptions"
-    )
+    assert 'setContentDescription("Export exact raw bytes' in recovery and (
+        'setContentDescription("Remove malformed extension file' in recovery
+    ), "recovery actions must have accessible descriptions"
     assert "No safe export or removal action is available" in recovery, (
         "unsafe recovery records must remain visible without destructive actions"
     )
@@ -307,7 +307,13 @@ def test_recovery_ui_guard_mutations(main):
         (
             "export accessibility removed",
             'setContentDescription("Export exact raw bytes',
-            'setText("Export exact raw bytes',
+            'setText("Export raw bytes',
+            "recovery actions must have accessible descriptions",
+        ),
+        (
+            "remove accessibility removed",
+            'setContentDescription("Remove malformed extension file',
+            'setText("Remove malformed extension file',
             "recovery actions must have accessible descriptions",
         ),
     ]
