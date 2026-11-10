@@ -49,10 +49,16 @@ final class ExtensionRuntime {
     /**
      * Re-evaluates only the current URL after WebView reports a same-document history update.
      * No match rules, disabled-site preferences, or nonmatching pack metadata are sent to the page.
+     *
+     * <p>The exact-document safety boundary lives in the page-world expected-URL guard of the
+     * bootstrap asset, so this path deliberately trusts the native visited-history callback URL
+     * instead of comparing it against {@link WebView#getUrl()}, which some WebView versions do
+     * not update for pushState/replaceState route changes.
      */
     void onSameDocumentNavigation(WebView webView, String url) {
         if (!userscriptsAppliedForCurrentDocument
-                || !isCurrentWebPage(webView, url)
+                || webView == null || url == null
+                || !BrowserAddress.isAllowedWebUrl(url)
                 || url.equals(lastAppliedUrl)) return;
         List<BrowserExtension> matching = matchingPacks(url);
         if (ExtensionInjector.applyStyles(webView, url, matching)) {

@@ -73,11 +73,17 @@ final class ExtensionInjector {
      * Reconciles page-owned styles after a same-document URL change. Only the packs matching the
      * new URL are passed to the page; JavaScript userscripts are deliberately not re-run.
      *
+     * <p>The safety boundary for a same-document update is the page-world exact-URL guard inside
+     * the bootstrap asset, not {@link WebView#getUrl()}: WebView implementations report
+     * pushState/replaceState through {@code doUpdateVisitedHistory} before (or without ever)
+     * updating {@code getUrl()}, so comparing against it here would silently drop real route
+     * changes on those versions. The one-shot config still reaches only the document whose
+     * {@code window.location.href} matches {@code expectedUrl} exactly.
+     *
      * @return true when a current-page reconciliation script was submitted.
      */
     static boolean applyStyles(WebView webView, String pageUrl, List<BrowserExtension> packs) {
-        if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)
-                || !pageUrl.equals(webView.getUrl())) return false;
+        if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)) return false;
         return submitCurrentPageStyles(webView, pageUrl, matchingPacks(pageUrl, packs));
     }
 
