@@ -14,7 +14,8 @@
   'use strict';
 
   const FORMATS = ['csv', 'markdown', 'ics'];
-  const CSV_HEADER = 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt';
+  const LEGACY_CSV_HEADER = 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt';
+  const CSV_HEADER = LEGACY_CSV_HEADER + ',repeatDayOfMonth';
   const PRIORITIES = ['low', 'medium', 'high'];
   const REPEATS = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
   const MAX_IMPORT_CHARS = 2000000; // UTF-16 code units, mirrors the export cap
@@ -179,9 +180,8 @@
   }
 
   // Builds one stored-shape task from raw candidate fields. Returns null for
-  // a row without a usable title; everything else is normalized leniently:
-  // unknown priority -> medium, unknown repeat -> none, invalid dates ->
-  // no due date, over-long text truncated to stored-task limits.
+  // a row without a usable title. Unknown repeat metadata is preserved so the
+  // shared task validator can reject it instead of silently converting it to none.
   function buildTask(raw, ctx) {
     const now = ctx && typeof ctx.now === 'string' ? ctx.now : new Date().toISOString();
     const makeId = ctx && typeof ctx.makeId === 'function'
@@ -200,8 +200,13 @@
       ? raw.completed
       : typeof raw.completed === 'string' ? raw.completed.trim().toLowerCase() : '';
     const completed = completedRaw === 'true' || completedRaw === '1' || completedRaw === true;
-    const repeatRaw = typeof raw.repeat === 'string' ? raw.repeat.trim().toLowerCase() : '';
-    const repeat = REPEATS.indexOf(repeatRaw) !== -1 ? repeatRaw : null;
+    const repeatRaw = raw.repeat;
+    const repeat = repeatRaw === undefined || repeatRaw === null || repeatRaw === ''
+      ? null : (typeof repeatRaw === 'string' ? raw.repeat.trim().toLowerCase() : repeatRaw);
+    const repeatDayRaw = raw.repeatDayOfMonth;
+    const repeatDayOfMonth = repeatDayRaw === undefined || repeatDayRaw === null || repeatDayRaw === ''
+      ? ((repeat === 'monthly' || repeat === 'yearly') && dueDate !== null ? Number(dueDate.slice(8)) : null)
+      : (typeof repeatDayRaw === 'string' && /^\d+$/.test(repeatDayRaw) ? Number(repeatDayRaw) : repeatDayRaw);
     const notes = typeof raw.notes === 'string' ? raw.notes.slice(0, MAX_NOTES_CHARS) : '';
     const tags = cleanTags(Array.isArray(raw.tags) ? raw.tags : []);
     const subtasks = cleanSubtasks(Array.isArray(raw.subtasks) ? raw.subtasks : [], makeId) || [];
@@ -212,7 +217,7 @@
       ? raw.updatedAt
       : createdAt;
     const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId();
-    return { id, title, dueDate, dueTime, priority, completed, createdAt, updatedAt, notes, repeat, tags, subtasks };
+    return { id, title, dueDate, dueTime, priority, completed, createdAt, updatedAt, notes, repeat, repeatDayOfMonth, tags, subtasks };
   }
 
   function parseSubtasksJson(value, ctx) {
@@ -228,10 +233,12 @@
   function fromCsv(text, ctx) {
     const rows = parseCsv(text);
     if (rows.length === 0) throw new Error('CSV input is empty.');
-    if (rows[0].join(',') !== CSV_HEADER) {
+    const header = rows[0].join(',');
+    const legacyHeader = header === LEGACY_CSV_HEADER;
+    if (!legacyHeader && header !== CSV_HEADER) {
       throw new Error('CSV header does not match the Daymark export header.');
     }
-    const width = CSV_HEADER.split(',').length;
+    const width = (legacyHeader ? LEGACY_CSV_HEADER : CSV_HEADER).split(',').length;
     const tasks = [];
     let skippedRows = 0;
     for (let i = 1; i < rows.length; i += 1) {
@@ -242,7 +249,8 @@
       const task = buildTask({
         id: row[0], title: row[1], dueDate: row[2], dueTime: row[3], priority: row[4],
         completed: row[5], repeat: row[6], tags: row[7] ? row[7].split(' ') : [], notes: row[8],
-        subtasks, createdAt: row[10], updatedAt: row[11]
+        subtasks, createdAt: row[10], updatedAt: row[11],
+        repeatDayOfMonth: legacyHeader ? undefined : row[12]
       }, ctx);
       if (task === null) { skippedRows += 1; continue; }
       tasks.push(task);
@@ -292,6 +300,7 @@
         const dueTime = [];
         let priority = '';
         let repeat = null;
+        let repeatDayOfMonth = null;
         const tags = [];
         for (const part of taskMatch[3].split(' · ')) {
           const due = part.match(/^due (\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}))?$/);
@@ -300,6 +309,8 @@
           if (prio) { priority = prio[1]; continue; }
           const rep = part.match(/^repeats (.+)$/);
           if (rep) { repeat = rep[1]; continue; }
+          const repeatDay = part.match(/^repeat day (\d{1,2})$/);
+          if (repeatDay) { repeatDayOfMonth = Number(repeatDay[1]); continue; }
           const tag = part.match(/^#(.+)$/);
           if (tag) { tags.push(tag[1]); continue; }
         }
@@ -311,6 +322,7 @@
           dueTime: dueTime[0] || null,
           priority,
           repeat,
+          repeatDayOfMonth,
           tags
         };
         continue;
@@ -727,6 +739,7 @@
   const api = {
     FORMATS,
     CSV_HEADER,
+    LEGACY_CSV_HEADER,
     MAX_IMPORT_CHARS,
     isFormat,
     isCsvFileName,
