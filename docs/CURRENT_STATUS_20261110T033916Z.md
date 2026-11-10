@@ -129,7 +129,7 @@ Other open issues: #680 (SPA match/exclude reevaluation), #679 (package identity
 
 ## Owner decisions / safety boundaries
 
-- Root AGENTS.md and current Gradle still specify `com.abrar.daymark`; the run-level directive specifies `com.cue.daymark`. No applicationId, namespace, manifest identity or data migration was changed. Issue #679 remains an explicit owner decision.
+- Root AGENTS.md and current Gradle specify the owner-approved installed application identity; the run-level directive conflicts with that recorded identity. No applicationId, namespace, manifest identity or data migration was changed. Issue #679 remains an explicit owner decision.
 - Main protection is disabled and the detailed protection endpoint returned 403; no settings were changed.
 - Repository-level secret-to-PR settings were not inspected/changed. Current PR workflows are guarded, but owner-level setting is still required for a durable boundary against a future newly added workflow.
 - No production release/tag/version bump, signing-key/secret change, destructive migration or user-data operation occurred.
