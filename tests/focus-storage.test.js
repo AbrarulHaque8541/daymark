@@ -28,6 +28,7 @@ function makeLockManager() {
 function bootApp({ savedFocusValue, failFocusSave = false }) {
   const elements = new Map();
   const listeners = new Map();
+  const windowListeners = new Map();
   const storedValues = new Map([[TASK_KEY, '[]'], [FOCUS_KEY, savedFocusValue]]);
 
   function element(selector) {
@@ -93,7 +94,15 @@ function bootApp({ savedFocusValue, failFocusSave = false }) {
     DaymarkRepeat: null,
     DaymarkFeed: null,
     navigator: { locks: makeLockManager() },
-    addEventListener() {}
+    addEventListener(type, handler) {
+      const handlers = windowListeners.get(type) || [];
+      handlers.push(handler);
+      windowListeners.set(type, handlers);
+    },
+    dispatchEvent(event) {
+      (windowListeners.get(event.type) || []).forEach((handler) => handler(event));
+      return true;
+    }
   };
 
   element('#storage-status').classList.add('is-checking');
@@ -111,7 +120,18 @@ function bootApp({ savedFocusValue, failFocusSave = false }) {
     clearInterval() {}
   }, { filename: 'app.js' });
 
-  return { elements, storedValues, settle() { return new Promise((resolve) => setImmediate(resolve)); } };
+  return {
+    elements,
+    storedValues,
+    trigger(selector, type) {
+      return (listeners.get(`${selector}:${type}`) || [])
+        .map((handler) => handler({ currentTarget: element(selector) }));
+    },
+    dispatchWindowEvent(type, properties = {}) {
+      window.dispatchEvent(Object.assign({ type }, properties));
+    },
+    settle() { return new Promise((resolve) => setImmediate(resolve)); }
+  };
 }
 
 function expiredRunningSession(id, startedAtMs) {
@@ -208,6 +228,51 @@ test('unexpired running session remains active across reload', () => {
   assert.equal(saved.session.startedAtMs, start);
   assert.equal(saved.log.length, 0);
   assert.equal(app.storedValues.get(FOCUS_KEY), original, 'an unexpired running session should remain unchanged');
+});
+
+test('same-tab Focus preset or backup clear rebases a pending session write', async () => {
+  for (const categoryId of ['focus-preset', 'focus-backup']) {
+    const session = focus.createSession({
+      id: `focus-pending-${categoryId}`,
+      kind: 'focus',
+      durationMinutes: 25
+    }, Date.now());
+    const original = rawFocusPayload(session);
+    const app = bootApp({ savedFocusValue: original });
+
+    const pendingPause = app.trigger('#focus-pause', 'click')[0];
+    app.dispatchWindowEvent('daymark:focus-storage-cleared', { detail: { categoryId } });
+    await pendingPause;
+    await app.settle();
+
+    const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
+    assert.equal(saved.session.state, 'running',
+      `clearing ${categoryId} must not leave a paused in-memory session after its write is rejected`);
+    assert.equal(app.elements.get('#focus-state-label').textContent, 'Focusing');
+    assert.equal(app.elements.get('#focus-pause').textContent, 'Pause');
+  }
+});
+
+test('cross-tab Focus generation event rebases the whole domain before a queued write resumes', async () => {
+  const session = focus.createSession({
+    id: 'focus-pending-cross-tab-generation',
+    kind: 'focus',
+    durationMinutes: 25
+  }, Date.now());
+  const original = rawFocusPayload(session);
+  const app = bootApp({ savedFocusValue: original });
+
+  const pendingPause = app.trigger('#focus-pause', 'click')[0];
+  app.storedValues.set(focusMutation.FOCUS_GENERATION_KEY, '1');
+  app.dispatchWindowEvent('storage', { key: focusMutation.FOCUS_GENERATION_KEY });
+  await pendingPause;
+  await app.settle();
+
+  const saved = JSON.parse(app.storedValues.get(FOCUS_KEY));
+  assert.equal(saved.session.state, 'running',
+    'a generation change in another tab must rebase the session before the stale pause write can leave it in memory');
+  assert.equal(app.elements.get('#focus-state-label').textContent, 'Focusing');
+  assert.equal(app.elements.get('#focus-pause').textContent, 'Pause');
 });
 
 test('quota failure preserves original focus payload and recovery backup', async () => {
