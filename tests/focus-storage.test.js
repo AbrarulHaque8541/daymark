@@ -253,6 +253,45 @@ test('same-tab Focus preset or backup clear rebases a pending session write', as
   }
 });
 
+test('same-tab explicit Focus-backup clear is not undone by corrupt-primary recovery', async () => {
+  const original = '{"session":';
+  const app = bootApp({ savedFocusValue: original });
+  await app.settle();
+
+  assert.equal(typeof app.storedValues.get(FOCUS_BACKUP_KEY), 'string',
+    'startup recovery should first preserve the corrupt primary bytes');
+  app.storedValues.delete(FOCUS_BACKUP_KEY);
+  app.storedValues.set(focusMutation.FOCUS_GENERATION_KEY, '1');
+  app.dispatchWindowEvent('daymark:focus-storage-cleared', {
+    detail: { categoryId: 'focus-backup' }
+  });
+  await app.settle();
+
+  assert.equal(app.storedValues.has(FOCUS_BACKUP_KEY), false,
+    'an explicit backup clear must not immediately recreate the backup from the still-corrupt primary');
+  assert.equal(app.storedValues.get(FOCUS_KEY), original,
+    'the corrupt primary bytes remain untouched');
+});
+
+test('cross-tab explicit Focus-backup clear cancels pending backup recreation', async () => {
+  const original = '{"session":';
+  const app = bootApp({ savedFocusValue: original });
+  await app.settle();
+
+  assert.equal(typeof app.storedValues.get(FOCUS_BACKUP_KEY), 'string',
+    'startup recovery should first preserve the corrupt primary bytes');
+  app.storedValues.delete(FOCUS_BACKUP_KEY);
+  app.storedValues.set(focusMutation.FOCUS_GENERATION_KEY, '1');
+  app.dispatchWindowEvent('storage', { key: focusMutation.FOCUS_GENERATION_KEY });
+  app.dispatchWindowEvent('storage', { key: FOCUS_BACKUP_KEY, newValue: null });
+  await app.settle();
+
+  assert.equal(app.storedValues.has(FOCUS_BACKUP_KEY), false,
+    'the cross-tab backup-removal event must cancel the pending backup recreation');
+  assert.equal(app.storedValues.get(FOCUS_KEY), original,
+    'the corrupt primary bytes remain untouched');
+});
+
 test('cross-tab Focus generation event rebases the whole domain before a queued write resumes', async () => {
   const session = focus.createSession({
     id: 'focus-pending-cross-tab-generation',
