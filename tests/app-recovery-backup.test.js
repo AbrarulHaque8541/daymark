@@ -7,6 +7,7 @@ const logic = require('../task-logic.js');
 const feedLogic = require('../feed-logic.js');
 const focusLogic = require('../focus-logic.js');
 const mutation = require('../task-mutation-logic.js');
+const focusMutation = require('../focus-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
@@ -153,6 +154,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
   const animationFrames = [];
   const window = {
     DaymarkTaskMutation: mutation,
+    DaymarkFocusMutation: focusMutation,
     navigator: { locks: makeLockManager() },
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
@@ -629,9 +631,10 @@ test('an empty Focus backup remains exportable when the primary Focus read throw
     'the zero-byte Focus recovery source must remain unchanged');
 });
 
-test('an empty primary Focus value is preserved as opaque recovery data', () => {
+test('an empty primary Focus value is preserved as opaque recovery data', async () => {
   const storedValues = new Map([['daymark.focus.v1', '']]);
   const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  await app.settle();
   const action = app.elements.get('#toast-action');
 
   assert.equal(storedValues.get('daymark.focus.v1'), '',
@@ -644,13 +647,14 @@ test('an empty primary Focus value is preserved as opaque recovery data', () => 
     'the recovery export must preserve the exact primary bytes');
 });
 
-test('an empty primary Focus value does not overwrite an older opaque recovery source', () => {
+test('an empty primary Focus value does not overwrite an older opaque recovery source', async () => {
   const prior = '{older Focus recovery bytes';
   const storedValues = new Map([
     ['daymark.focus.v1', ''],
     [FOCUS_BACKUP_KEY, prior]
   ]);
   const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  await app.settle();
   const backup = JSON.parse(storedValues.get(FOCUS_BACKUP_KEY));
 
   assert.equal(storedValues.get('daymark.focus.v1'), '',
@@ -889,10 +893,11 @@ test('duplicate keys in a task recovery backup remain opaque and are never auto-
   assert.equal(storedValues.get(BACKUP_KEY), ambiguousBackup);
 });
 
-test('duplicate keys in primary Focus state are backed up without rewriting the primary', () => {
+test('duplicate keys in primary Focus state are backed up without rewriting the primary', async () => {
   const ambiguous = '{"session":null,"session":{"id":"ambiguous-session"},"log":[]}';
   const storedValues = new Map([['daymark.focus.v1', ambiguous]]);
   const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  await app.settle();
   assert.equal(storedValues.get('daymark.focus.v1'), ambiguous);
   assert.equal(storedValues.get(FOCUS_BACKUP_KEY), ambiguous);
   assert.match(app.elements.get('#storage-status span').textContent, /Focus data recovery backup retained/);
@@ -924,7 +929,7 @@ test('a valid primary Focus state still exposes a readable opaque recovery backu
 
 
 
-test('an expired Focus session can be finalized without hiding an existing recovery backup', () => {
+test('an expired Focus session can be finalized without hiding an existing recovery backup', async () => {
   const now = Date.now();
   const expired = focusLogic.createSession({ kind: 'focus', durationMinutes: 1 }, now - 2 * 60 * 1000);
   const primary = JSON.stringify({ session: focusLogic.serialize(expired), log: [] });
@@ -935,6 +940,7 @@ test('an expired Focus session can be finalized without hiding an existing recov
     [FOCUS_BACKUP_KEY, backup]
   ]);
   const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
+  await app.settle();
   const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
 
   assert.equal(saved.session, null, 'an expired running session is finalized on reload');
@@ -947,12 +953,12 @@ test('an expired Focus session can be finalized without hiding an existing recov
     /Focus data recovery backup retained/);
 });
 
-test('a normal Focus save succeeds when no recovery backup exists', () => {
+test('a normal Focus save succeeds when no recovery backup exists', async () => {
   const primary = JSON.stringify({ session: null, log: [] });
   const storedValues = new Map([[ 'daymark.focus.v1', primary ]]);
   const app = bootApp(storedValues, new Set(), false, true, new Set(), focusLogic);
 
-  app.elements.get('#focus-start').dispatch('click');
+  await app.elements.get('#focus-start').dispatch('click');
 
   const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
   assert.ok(saved.session, 'the new running Focus session is persisted');
@@ -962,12 +968,12 @@ test('a normal Focus save succeeds when no recovery backup exists', () => {
     'an absent recovery backup is not a save failure');
 });
 
-test('a Focus save succeeds but reports unknown when the recovery backup is unreadable', () => {
+test('a Focus save succeeds but reports unknown when the recovery backup is unreadable', async () => {
   const primary = JSON.stringify({ session: null, log: [] });
   const storedValues = new Map([[ 'daymark.focus.v1', primary ]]);
   const app = bootApp(storedValues, new Set(), false, true, new Set([FOCUS_BACKUP_KEY]), focusLogic);
 
-  app.elements.get('#focus-start').dispatch('click');
+  await app.elements.get('#focus-start').dispatch('click');
 
   const saved = JSON.parse(storedValues.get('daymark.focus.v1'));
   assert.ok(saved.session, 'the valid primary Focus state is saved');
