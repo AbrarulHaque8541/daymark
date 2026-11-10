@@ -393,6 +393,17 @@ test('SLSA provenance uploads are restricted to mainline device-test tag pushes'
   assert.match(provenance, /upload-assets: true/);
 });
 
+test('SLSA reusable provenance publishing depends on the protected approval job', () => {
+  const content = fs.readFileSync(path.join(root,
+    '.github/workflows/generator-generic-ossf-slsa3-publish.yml'), 'utf8');
+  const provenanceStart = content.indexOf('  provenance:');
+  assert.ok(provenanceStart >= 0, 'missing reusable provenance job');
+  const provenance = content.slice(provenanceStart);
+  assert.match(provenance, /needs: \[build, authorize-provenance\]/);
+  assert.match(provenance, /id-token: write/);
+  assert.match(provenance, /contents: write/);
+});
+
 test('private main test APK remains owner-gated and ciphertext-only', () => {
   const workflowPath = '.github/workflows/android-private-main-test-apk.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
@@ -434,7 +445,7 @@ test('every privileged signing and provenance job requires the production-signin
     ['.github/workflows/android-signed-device-test-release.yml', 'build-and-verify'],
     ['.github/workflows/android-signed-device-test-release.yml', 'publish-release'],
     ['.github/workflows/android-private-main-test-apk.yml', 'private-main-test'],
-    ['.github/workflows/generator-generic-ossf-slsa3-publish.yml', 'provenance']
+    ['.github/workflows/generator-generic-ossf-slsa3-publish.yml', 'authorize-provenance']
   ];
 
   for (const [workflowPath, jobName] of cases) {
