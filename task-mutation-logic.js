@@ -13,11 +13,12 @@
   const TASK_MUTATION_LOCK = 'daymark.tasks.mutation.v1';
   const WEBHOOK_DELIVERY_LOCK = 'daymark.webhook.delivery.v1';
   const WEBHOOK_QUEUE_LOCK = 'daymark.webhook.queue.v1';
-  // Global clear/completion order: task mutation -> webhook delivery -> webhook queue.
-  // Completion notifications append while holding the task lock, so a clear cannot
-  // erase the queue and then have an earlier completion re-append behind it.
+  const FOCUS_MUTATION_LOCK = 'daymark.focus.mutation.v1';
+  // Global clear/completion order: task mutation -> webhook delivery -> webhook
+  // queue -> Focus. Task completion appends while holding the task lock; Focus
+  // writers never acquire an earlier lock while holding the Focus lock.
   const CLEAR_ALL_LOCK_ORDER = Object.freeze([
-    TASK_MUTATION_LOCK, WEBHOOK_DELIVERY_LOCK, WEBHOOK_QUEUE_LOCK
+    TASK_MUTATION_LOCK, WEBHOOK_DELIVERY_LOCK, WEBHOOK_QUEUE_LOCK, FOCUS_MUTATION_LOCK
   ]);
 
   function cloneTaskList(tasks) {
@@ -302,6 +303,7 @@
     TASK_MUTATION_LOCK,
     WEBHOOK_DELIVERY_LOCK,
     WEBHOOK_QUEUE_LOCK,
+    FOCUS_MUTATION_LOCK,
     CLEAR_ALL_LOCK_ORDER,
     cloneTaskList,
     areTaskListsEqual,
