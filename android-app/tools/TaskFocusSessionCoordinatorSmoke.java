@@ -178,8 +178,8 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check("Task B".equals(afterProcessDeath.notifications.lastTitle)
                         && afterProcessDeath.notifications.active,
                 "the resumed notification title belongs to the newly selected task");
-        check(afterProcessDeath.events().equals(list("save", "publish")),
-                "resume writes the selected task before publishing its notification");
+        check(afterProcessDeath.events().equals(list("save", "cancel", "publish")),
+                "resume persists the running state, cancels the paused presentation, then publishes the running notification");
     }
 
     private static void failedPausedTaskSwitchLeavesOriginalSessionUntouched() throws Exception {
