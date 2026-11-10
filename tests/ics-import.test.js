@@ -200,6 +200,14 @@ test('valid VTODO COMPLETED timestamps mark tasks done independently of STATUS',
     'SUMMARY:Local completion without UTC',
     'COMPLETED:20261108T100000',
     'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Completion with explicitly empty VALUE',
+    'COMPLETED;VALUE=:20261108T100000Z',
+    'END:VTODO',
+    'BEGIN:VTODO',
+    'SUMMARY:Completion with explicitly empty TZID',
+    'COMPLETED;VALUE=DATE-TIME;TZID=:20261108T100000Z',
+    'END:VTODO',
     'BEGIN:VEVENT',
     'SUMMARY:Event status is not completion',
     'STATUS:COMPLETED',
@@ -212,10 +220,10 @@ test('valid VTODO COMPLETED timestamps mark tasks done independently of STATUS',
     ''
   ].join('\n');
   const result = importer.fromIcs(ics, freshCtx());
-  assert.equal(result.tasks.length, 10);
+  assert.equal(result.tasks.length, 12);
   assert.deepEqual(result.tasks.map((task) => task.completed),
-    [true, true, true, true, false, false, false, false, false, false]);
-  assert.equal(result.invalidCompletion, 6,
+    [true, true, true, true, false, false, false, false, false, false, false, false]);
+  assert.equal(result.invalidCompletion, 8,
     'malformed VTODO metadata and VEVENT completion misuse are disclosed, not trusted');
 });
 
@@ -678,6 +686,10 @@ test('DATE and DATE-TIME value types and TZID combinations are validated', () =>
     'DUE;TZID=UTC:20261113T091500Z',
     'END:VTODO',
     'BEGIN:VTODO',
+    'SUMMARY:Explicitly empty VALUE is invalid',
+    'DUE;VALUE=:20261117T091500',
+    'END:VTODO',
+    'BEGIN:VTODO',
     'SUMMARY:Valid DATE',
     'DUE;VALUE=DATE:20261114',
     'END:VTODO',
@@ -692,15 +704,15 @@ test('DATE and DATE-TIME value types and TZID combinations are validated', () =>
     'END:VCALENDAR'
   ].join('\n');
   const result = importer.fromIcs(ics, freshCtx());
-  assert.equal(result.tasks.length, 8);
-  assert.deepEqual(result.tasks.slice(0, 5).map((task) => [task.dueDate, task.dueTime]),
-    [[null, null], [null, null], [null, null], [null, null], [null, null]]);
-  assert.deepEqual(result.tasks.slice(5).map((task) => [task.dueDate, task.dueTime]), [
+  assert.equal(result.tasks.length, 9);
+  assert.deepEqual(result.tasks.slice(0, 6).map((task) => [task.dueDate, task.dueTime]),
+    [[null, null], [null, null], [null, null], [null, null], [null, null], [null, null]]);
+  assert.deepEqual(result.tasks.slice(6).map((task) => [task.dueDate, task.dueTime]), [
     ['2026-11-14', null],
     ['2026-11-15', '09:15'],
     ['2026-11-16', '09:15']
   ]);
-  assert.equal(result.invalidDateType, 5);
+  assert.equal(result.invalidDateType, 6);
   assert.equal(result.timezoneDropped, 1);
 });
 
