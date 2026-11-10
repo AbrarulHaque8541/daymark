@@ -35,9 +35,9 @@ require("window.__daymarkSpaConfig" not in injector and "window.__daymarkSpaStat
 start = injector.find("private static String spaConfig(")
 end = injector.find("private static String loadSpaBootstrap(", start)
 config_builder = injector[start:end] if start >= 0 and end > start else ""
-require('"id"' in config_builder and '"css"' in config_builder,
+require(r'\\\"id\\\"' in config_builder and r'\\\"css\\\"' in config_builder,
         "current-page config contains only pack id and CSS")
-for field in ('"matches"', '"excludes"', '"disabledSites"'):
+for field in (r'\\\"matches\\\"', r'\\\"excludes\\\"', r'\\\"disabledSites\\\"'):
     require(field not in config_builder,
             f"current-page config excludes {field} metadata")
 
