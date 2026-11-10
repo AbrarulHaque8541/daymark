@@ -168,11 +168,12 @@ final class BrowserDownloadBodyTransfer {
             throw fatal;
         }
         AtomicBoolean callbackInvoked = new AtomicBoolean(false);
+        final long bytesToCommit = copied;
         CommitAction commitAction = () -> {
             if (!callbackInvoked.compareAndSet(false, true)) return;
             // Recheck inside the gate-owned critical section immediately before publication.
             checkState(cancellation, networkPolicy);
-            target.commit(copied);
+            target.commit(bytesToCommit);
             committed.set(true);
         };
         try {
