@@ -392,6 +392,7 @@ test('open-format import merges a normal task write completed while the file is 
     key: ui.STORAGE_KEY,
     baseTasks: sampleTasks,
     desiredTasks: sampleTasks.concat(normalTask),
+    expectedGeneration: 0,
     readCurrent: readValidTasks
   });
   assert.equal(normalSave.ok, true);
