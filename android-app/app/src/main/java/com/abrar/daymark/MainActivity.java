@@ -3641,7 +3641,7 @@ public final class MainActivity extends Activity {
             row.addView(description, topMargin(dp(2)));
 
             LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setOrientation(LinearLayout.VERTICAL);
             Button details = compactButton("Details", false);
             details.setContentDescription("Show permissions, match rules, and warnings for " + ext.name);
             details.setOnClickListener(view -> showExtensionDetailsDialog(ext));
@@ -3669,7 +3669,10 @@ public final class MainActivity extends Activity {
                                 showBrowserExtensionsManager();
                             }).show();
                 });
-                actions.addView(remove, chipMargin());
+                LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+                removeParams.topMargin = dp(4);
+                actions.addView(remove, removeParams);
             }
             row.addView(actions, topMargin(dp(5)));
             content.addView(row, bottomMargin(dp(7)));
@@ -3764,7 +3767,7 @@ public final class MainActivity extends Activity {
                 export.setContentDescription("Export exact raw bytes of malformed extension file " + pack.fileName);
                 export.setOnClickListener(view -> exportMalformedExtensionPack(pack));
                 actions.addView(export, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
             }
             if (pack.canRemove && pack.sha256 != null) {
                 Button remove = compactButton("Remove file", true);
