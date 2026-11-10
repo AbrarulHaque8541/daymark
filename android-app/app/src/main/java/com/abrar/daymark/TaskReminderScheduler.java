@@ -34,7 +34,8 @@ import java.util.Set;
  * own task/occurrence metadata, so a second mirrored ID index cannot drift out of sync.
  *
  * Alarms use inexact setAndAllowWhileIdle: Doze and battery saver may delay them.
- * The schedule is recomputed on task saves and app open; nothing polls in the background.
+ * The schedule is recomputed on task saves, app open, boot, and system clock/timezone
+ * changes; nothing polls in the background.
  */
 final class TaskReminderScheduler {
     static final String REMINDER_PREFERENCES = "daymark.reminders.v1";

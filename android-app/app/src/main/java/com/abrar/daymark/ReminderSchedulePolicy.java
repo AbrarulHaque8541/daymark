@@ -10,8 +10,19 @@ import java.time.ZoneId;
 final class ReminderSchedulePolicy {
     private static final char SEPARATOR = '\n';
     private static final int[] SNOOZE_PRESETS_MINUTES = {5, 10, 30};
+    private static final String ACTION_BOOT_COMPLETED = "android.intent.action.BOOT_COMPLETED";
+    private static final String ACTION_QUICKBOOT_POWERON = "android.intent.action.QUICKBOOT_POWERON";
+    private static final String ACTION_TIME_CHANGED = "android.intent.action.TIME_SET";
+    private static final String ACTION_TIMEZONE_CHANGED = "android.intent.action.TIMEZONE_CHANGED";
 
     private ReminderSchedulePolicy() { }
+
+    static boolean shouldRescheduleForSystemChange(String action) {
+        return ACTION_BOOT_COMPLETED.equals(action)
+                || ACTION_QUICKBOOT_POWERON.equals(action)
+                || ACTION_TIME_CHANGED.equals(action)
+                || ACTION_TIMEZONE_CHANGED.equals(action);
+    }
 
     static int[] snoozePresetsMinutes() {
         return SNOOZE_PRESETS_MINUTES.clone();
