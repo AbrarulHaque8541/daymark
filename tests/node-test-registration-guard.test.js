@@ -200,3 +200,23 @@ test('recognizes CommonJS member imports and awaited dynamic ESM imports', () =>
     assert.equal(hasRegisteredTestCase(source), expected, label);
   }
 });
+
+test('only counts test registrations that execute during module or test-suite evaluation', () => {
+  const cases = [
+    [`const { test } = require('node:test'); function register() { test('fake', () => assert.ok(true)); }`, false, 'registration in an uncalled function declaration'],
+    [`const { test } = require('node:test'); const register = () => test('fake', () => assert.ok(true));`, false, 'registration in an unused arrow helper'],
+    [`const { test } = require('node:test'); if (false) test('fake', () => assert.ok(true));`, false, 'literal-false branch'],
+    [`const { test } = require('node:test'); if (1 === 0) test('fake', () => assert.ok(true));`, false, 'constant binary-false branch'],
+    [`const { test } = require('node:test'); if (!true) test('fake', () => assert.ok(true));`, false, 'constant unary-false branch'],
+    [`const { test } = require('node:test'); while (0) test('fake', () => assert.ok(true));`, false, 'zero-iteration while loop'],
+    [`const { test } = require('node:test'); for (; 2 < 1;) test('fake', () => assert.ok(true));`, false, 'zero-iteration for loop'],
+    [`const { test } = require('node:test'); false && test('fake', () => assert.ok(true));`, false, 'short-circuited logical AND'],
+    [`const { test } = require('node:test'); true || test('fake', () => assert.ok(true));`, false, 'short-circuited logical OR'],
+    [`const { test } = require('node:test'); false ? test('fake', () => assert.ok(true)) : null;`, false, 'unselected conditional branch'],
+    [`const { test } = require('node:test'); switch (1 + 1) { case 3: test('fake', () => assert.ok(true)); }`, false, 'unmatched constant switch case'],
+    [`const { test } = require('node:test'); (() => test('real', () => assert.ok(true)))();`, true, 'immediately-invoked registration helper'],
+    [`const { test, describe } = require('node:test'); describe('suite', () => { test('real', () => assert.ok(true)); });`, true, 'test registration in an executed describe callback'],
+    [`const { test } = require('node:test'); if (1 === 1) test('real', () => assert.ok(true));`, true, 'constant-true branch']
+  ];
+  for (const [source, expected, label] of cases) assert.equal(hasRegisteredTestCase(source), expected, label);
+});

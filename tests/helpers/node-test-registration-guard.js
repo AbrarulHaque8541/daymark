@@ -534,12 +534,88 @@ function isNoopExpression(node) {
     node.argument.type === 'Literal' && node.argument.value === 0;
 }
 
+function staticPrimitiveValue(node) {
+  if (!node || typeof node.type !== 'string') return { known: false };
+  if (node.type === 'Literal') {
+    const value = node.value;
+    if (value === null || ['string', 'number', 'boolean', 'bigint'].includes(typeof value)) return { known: true, value };
+    return { known: false };
+  }
+  if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return { known: true, value: node.quasis.map((part) => part.value.cooked ?? part.value.raw).join('') };
+  }
+  if (node.type === 'SequenceExpression' && node.expressions.length > 0) {
+    return staticPrimitiveValue(node.expressions[node.expressions.length - 1]);
+  }
+  if (node.type === 'UnaryExpression') {
+    const argument = staticPrimitiveValue(node.argument);
+    if (!argument.known) return { known: false };
+    try {
+      switch (node.operator) {
+        case '!': return { known: true, value: !argument.value };
+        case 'void': return { known: true, value: undefined };
+        case '+': return { known: true, value: +argument.value };
+        case '-': return { known: true, value: -argument.value };
+        case '~': return { known: true, value: ~argument.value };
+        case 'typeof': return { known: true, value: typeof argument.value };
+        default: return { known: false };
+      }
+    } catch { return { known: false }; }
+  }
+  if (node.type === 'BinaryExpression') {
+    const left = staticPrimitiveValue(node.left);
+    const right = staticPrimitiveValue(node.right);
+    if (!left.known || !right.known) return { known: false };
+    try {
+      switch (node.operator) {
+        case '===': return { known: true, value: left.value === right.value };
+        case '!==': return { known: true, value: left.value !== right.value };
+        case '==': return { known: true, value: left.value == right.value };
+        case '!=': return { known: true, value: left.value != right.value };
+        case '<': return { known: true, value: left.value < right.value };
+        case '<=': return { known: true, value: left.value <= right.value };
+        case '>': return { known: true, value: left.value > right.value };
+        case '>=': return { known: true, value: left.value >= right.value };
+        case '+': return { known: true, value: left.value + right.value };
+        case '-': return { known: true, value: left.value - right.value };
+        case '*': return { known: true, value: left.value * right.value };
+        case '/': return { known: true, value: left.value / right.value };
+        case '%': return { known: true, value: left.value % right.value };
+        case '**': return { known: true, value: left.value ** right.value };
+        case '&': return { known: true, value: left.value & right.value };
+        case '|': return { known: true, value: left.value | right.value };
+        case '^': return { known: true, value: left.value ^ right.value };
+        case '<<': return { known: true, value: left.value << right.value };
+        case '>>': return { known: true, value: left.value >> right.value };
+        case '>>>': return { known: true, value: left.value >>> right.value };
+        default: return { known: false };
+      }
+    } catch { return { known: false }; }
+  }
+  if (node.type === 'LogicalExpression') {
+    const left = staticPrimitiveValue(node.left);
+    if (!left.known) return { known: false };
+    if (node.operator === '&&' && !Boolean(left.value)) return left;
+    if (node.operator === '||' && Boolean(left.value)) return left;
+    if (node.operator === '??' && left.value !== null && left.value !== undefined) return left;
+    if (['&&', '||', '??'].includes(node.operator)) return staticPrimitiveValue(node.right);
+    return { known: false };
+  }
+  if (node.type === 'ConditionalExpression') {
+    const test = staticPrimitiveValue(node.test);
+    return test.known ? staticPrimitiveValue(test.value ? node.consequent : node.alternate) : { known: false };
+  }
+  return { known: false };
+}
+
 function isStaticFalse(node) {
-  return Boolean(node && node.type === 'Literal' && !node.value);
+  const value = staticPrimitiveValue(node);
+  return value.known && !Boolean(value.value);
 }
 
 function isStaticTrue(node) {
-  return Boolean(node && node.type === 'Literal' && Boolean(node.value));
+  const value = staticPrimitiveValue(node);
+  return value.known && Boolean(value.value);
 }
 
 function hasExecutedOperation(node) {
@@ -710,16 +786,88 @@ function containsWithStatement(root) {
   return false;
 }
 
+function isWithinSubtree(node, ancestor, parents) {
+  for (let current = node; current; current = parents.get(current)) {
+    if (current === ancestor) return true;
+  }
+  return false;
+}
+
+function isUnreachableSwitchCase(caseNode, parents) {
+  const switchNode = parents.get(caseNode);
+  if (!switchNode || switchNode.type !== 'SwitchStatement') return false;
+  const discriminant = staticPrimitiveValue(switchNode.discriminant);
+  if (!discriminant.known) return false;
+  let selectedIndex = -1;
+  let defaultIndex = -1;
+  for (let index = 0; index < switchNode.cases.length; index++) {
+    const branch = switchNode.cases[index];
+    if (branch.test === null) { defaultIndex = index; continue; }
+    const value = staticPrimitiveValue(branch.test);
+    if (!value.known) return false;
+    if (value.value === discriminant.value) { selectedIndex = index; break; }
+  }
+  if (selectedIndex < 0) selectedIndex = defaultIndex;
+  if (selectedIndex < 0) return true;
+  const targetIndex = switchNode.cases.indexOf(caseNode);
+  if (targetIndex < selectedIndex) return true;
+  for (let index = selectedIndex; index < targetIndex; index++) {
+    if (switchNode.cases[index].consequent.some((statement) =>
+      ['BreakStatement', 'ReturnStatement', 'ThrowStatement'].includes(statement.type))) return true;
+  }
+  return false;
+}
+
+function isStaticallyUnreachableCall(node, parents) {
+  let child = node;
+  for (let parent = parents.get(child); parent; child = parent, parent = parents.get(parent)) {
+    if (parent.type === 'IfStatement') {
+      if (isStaticFalse(parent.test) && isWithinSubtree(child, parent.consequent, parents)) return true;
+      if (parent.alternate && isStaticTrue(parent.test) && isWithinSubtree(child, parent.alternate, parents)) return true;
+    } else if (parent.type === 'WhileStatement' && isStaticFalse(parent.test) && isWithinSubtree(child, parent.body, parents)) return true;
+    else if (parent.type === 'ForStatement' && parent.test && isStaticFalse(parent.test) && isWithinSubtree(child, parent.body, parents)) return true;
+    else if (parent.type === 'LogicalExpression' && isWithinSubtree(child, parent.right, parents)) {
+      if (parent.operator === '&&' && isStaticFalse(parent.left)) return true;
+      if (parent.operator === '||' && isStaticTrue(parent.left)) return true;
+    } else if (parent.type === 'ConditionalExpression') {
+      if (isStaticFalse(parent.test) && isWithinSubtree(child, parent.consequent, parents)) return true;
+      if (isStaticTrue(parent.test) && isWithinSubtree(child, parent.alternate, parents)) return true;
+    } else if (parent.type === 'SwitchCase' && isWithinSubtree(child, parent.consequent, parents) &&
+        isUnreachableSwitchCase(parent, parents)) return true;
+  }
+  return false;
+}
+
+function isExecutedFunctionContainer(fn, parents, nodeScopes) {
+  const owner = parents.get(fn);
+  if (!owner || owner.type !== 'CallExpression') return false;
+  if (owner.callee === fn) return true;
+  if (owner.arguments[owner.arguments.length - 1] !== fn) return false;
+  const api = resolveTestApiCallee(owner.callee, nodeScopes.get(owner));
+  return Boolean(api && !api.member && ['test', 'it', 'describe'].includes(api.apiName) && !isStaticallySkipped(owner));
+}
+
+function isExecutedRegistrationCall(node, parents, nodeScopes) {
+  if (isStaticallyUnreachableCall(node, parents)) return false;
+  for (let current = parents.get(node); current; current = parents.get(current)) {
+    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(current.type) &&
+        !isExecutedFunctionContainer(current, parents, nodeScopes)) return false;
+  }
+  return true;
+}
+
 function hasRegisteredTestCase(source) {
   const ast = parseJavaScript(source);
   if (!ast || containsWithStatement(ast)) return false;
   const nodeScopes = buildScopes(ast);
   const calls = [];
+  const nodeParents = new WeakMap();
   const skippedSuiteRanges = [];
   let focusedTest = false;
 
-  function visit(node) {
+  function visit(node, parent) {
     if (!node || typeof node.type !== 'string') return;
+    if (parent) nodeParents.set(node, parent);
     const scope = nodeScopes.get(node);
 
     if (node.type === 'AssignmentExpression') markAssignedTarget(node.left, scope);
@@ -736,13 +884,14 @@ function hasRegisteredTestCase(source) {
     for (const [key, value] of Object.entries(node)) {
       if (key === 'start' || key === 'end' || key === 'loc') continue;
       if (Array.isArray(value)) {
-        for (const child of value) if (child && typeof child.type === 'string') visit(child);
-      } else if (value && typeof value.type === 'string') visit(value);
+        for (const child of value) if (child && typeof child.type === 'string') visit(child, node);
+      } else if (value && typeof value.type === 'string') visit(value, node);
     }
   }
-  visit(ast);
+  visit(ast, null);
 
   for (const { node, scope } of calls) {
+    if (!isExecutedRegistrationCall(node, nodeParents, nodeScopes)) continue;
     const api = resolveTestApiCallee(node.callee, scope);
     if (!api) continue;
     if (api.member === 'only' && ['test', 'it', 'describe'].includes(api.apiName)) focusedTest = true;
@@ -755,6 +904,7 @@ function hasRegisteredTestCase(source) {
   if (focusedTest) return false;
 
   for (const { node, scope } of calls) {
+    if (!isExecutedRegistrationCall(node, nodeParents, nodeScopes)) continue;
     const api = resolveTestApiCallee(node.callee, scope);
     if (!api || api.member || !['test', 'it'].includes(api.apiName)) continue;
     const callback = node.arguments[node.arguments.length - 1];
