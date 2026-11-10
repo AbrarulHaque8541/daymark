@@ -2652,7 +2652,7 @@
     const taskGeneration = taskMutation && typeof taskMutation.readTaskGeneration === 'function'
       ? taskMutation.readTaskGeneration(localStorage) : { ok: false };
     state.taskPersistedGeneration = taskGeneration.ok ? taskGeneration.value : null;
-    state.taskBackupMaintenanceSuppressedGeneration = taskGeneration.ok && taskGeneration.value > 0
+    state.taskBackupMaintenanceSuppressedGeneration = taskGeneration.ok && taskGeneration.reason
       ? taskGeneration.value : null;
     state.tasks = loadTasks();
     state.persistedTasks = cloneTaskList(state.tasks);
@@ -2746,11 +2746,17 @@
         setStorageStatus('Task storage generation could not be checked; pending writes are paused.', true);
         return;
       }
-      if (event.key === mutation.TASK_GENERATION_KEY
-          || state.taskPersistedGeneration !== generation.value) {
-        // A generation change is a destructive-clear boundary, not an ordinary
-        // concurrent edit. Discard stale in-memory intent and rebase from disk.
+      if (state.taskPersistedGeneration !== generation.value) {
+        // A numeric generation change is a destructive-clear boundary, not an
+        // ordinary concurrent edit. Discard stale in-memory intent and rebase.
         rebaseTasksAfterGenerationChange(generation);
+        return;
+      }
+      if (event.key === mutation.TASK_GENERATION_KEY) {
+        // A same-generation event only retires or updates the non-personal
+        // clear-reason marker after a fresh commit; it is not another clear.
+        state.taskBackupMaintenanceSuppressedGeneration = generation.reason
+          ? generation.value : null;
         return;
       }
       if (event.key === STORAGE_KEY || event.key === null) {
