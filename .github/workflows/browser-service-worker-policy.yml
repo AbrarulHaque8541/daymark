@@ -1,0 +1,50 @@
+name: Browser Service Worker policy
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/browser-service-worker-policy.yml"
+      - "android-app/ANDROID_SOURCES.md"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerEnforcement.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserOfflineEnforcement.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserWorkspaceController.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/DaymarkWebView.java"
+      - "android-app/tools/BrowserServiceWorkerPolicySmoke.java"
+      - "android-app/tools/check-browser-service-worker-policy.py"
+      - "android-app/tools/run-browser-service-worker-policy-tests.sh"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/browser-service-worker-policy.yml"
+      - "android-app/ANDROID_SOURCES.md"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerEnforcement.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserOfflineEnforcement.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserWorkspaceController.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/DaymarkWebView.java"
+      - "android-app/tools/BrowserServiceWorkerPolicySmoke.java"
+      - "android-app/tools/check-browser-service-worker-policy.py"
+      - "android-app/tools/run-browser-service-worker-policy-tests.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-service-worker-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Run Service Worker policy regressions and source guard
+        run: sh android-app/tools/run-browser-service-worker-policy-tests.sh

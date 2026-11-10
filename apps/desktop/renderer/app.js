@@ -262,6 +262,10 @@ if (window.daymark) {
     }
   });
   window.daymark.onDownloadStarted((name) => toast('Downloading: ' + name));
+  window.daymark.onDownloadFailed((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Could not safely save ' + safeName + '; no file was published.');
+  });
 }
 
 createTab();

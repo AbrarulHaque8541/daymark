@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "DaymarkAndroid"
-include(":app")
+include(":app", ":service-worker-test")
