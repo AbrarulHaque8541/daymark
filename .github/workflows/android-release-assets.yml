@@ -102,5 +102,6 @@ jobs:
           min_sdk="$(awk -F"'" '/^sdkVersion:/ {print $2; exit}' "$badging")"
           target_sdk="$(awk -F"'" '/^targetSdkVersion:/ {print $2; exit}' "$badging")"
           [[ "$app_id" == "com.abrar.daymark" ]]
-          [[ "$min_sdk" == "26" && "$target_sdk" == "36" ]]
+          [[ "$min_sdk" == "26" ]]
+          [[ "$target_sdk" == "36" ]]
           [[ -n "$version_code" && -n "$version_name" ]]
