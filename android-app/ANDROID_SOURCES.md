@@ -221,3 +221,17 @@ Work by: Cue
 Model: not disclosed by runtime
 Tooling: Git, GitHub connector, official Android and Chrome source review, repository host/source tests
 Timestamp (UTC): 2026-11-09T04:01:15Z
+
+
+## Malformed extension recovery UI (PR #659, pending review)
+
+`MainActivity.showBrowserExtensionsManager()` now renders a separate recovery section for stored user-pack files that cannot be loaded safely. The section is metadata-only: malformed files are never parsed into the executable list or run.
+
+- `ExtensionStore.listMalformedUserPacks()` returns bounded, non-executable records with state, reason, size and SHA-256 fingerprint.
+- Regular malformed files expose **Export raw bytes** and **Remove file** actions. Export re-reads through `readMalformedUserPackBytes(fileName, sha256)` only after the user chooses a SAF destination, so the original bytes are fingerprint-checked and exported without text decoding/normalization.
+- Removal requires an explicit confirmation and `removeMalformedUserPack(fileName, sha256)` rechecks the fingerprint and stable bytes before deleting only that selected file.
+- Oversized, unreadable and non-regular entries remain visible but have no export/remove action; the UI does not silently delete or truncate them.
+- The Extensions dialog refresh path dismisses the prior dialog before rebuilding, avoiding stacked stale recovery lists.
+- `check-extension-import-hardening.py` guards the UI wiring, accessible action descriptions, explicit confirmation and fingerprint-checked raw export/removal. `ExtensionStoreSmoke.java` covers byte-identical export, zero-byte and invalid-UTF-8 packs, changed-after-listing, symlinks, oversized and non-regular files.
+
+This implementation is in PR #659 and is not yet on main or a published release. Physical Android/OEM acceptance is still required.
