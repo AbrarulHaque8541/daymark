@@ -16,6 +16,7 @@ public final class ExtensionInjectorSmoke {
         bindsEverySubmissionToTheFinishedPage();
         jsOnlyUserscriptsReceiveScopedStyleHelper();
         filtersNonmatchingAndDisabledPacksBeforeSerialization();
+        rejectsExcludedAndPausedPacksNatively();
         appliesStylesOnlyForSameDocumentUpdates();
         skipsStaleOnPageFinishedCallbacks();
         skipsInvalidAndEmptyInputs();
@@ -90,6 +91,34 @@ public final class ExtensionInjectorSmoke {
         notContains(scripts.get(0), "matches", "match rules are absent");
         contains(scripts.get(1), "window.__current=1;", "current matching userscript runs");
         notContains(scripts.get(1), "window.__future=1;", "future-route userscript does not run");
+    }
+
+    private static void rejectsExcludedAndPausedPacksNatively() {
+        BrowserExtension excluded = pack("excluded", true,
+                Collections.singletonList("https://example.com/account*"),
+                Collections.singletonList("https://example.com/account*"),
+                Collections.<String>emptyList(),
+                "body{color:red}", "window.__excluded=1;");
+        WebView excludedView = new WebView(PAGE);
+        ExtensionInjector.apply(excludedView, PAGE, Collections.singletonList(excluded));
+        equal(1, excludedView.getEvaluatedScripts().size(), "excluded pack still sends only an empty cleanup config");
+        notContains(excludedView.getEvaluatedScripts().get(0), "excluded",
+                "excluded pack id never reaches the page");
+        notContains(excludedView.getEvaluatedScripts().get(0), "body{color:red}",
+                "excluded pack CSS never reaches the page");
+
+        BrowserExtension paused = pack("paused", true,
+                Collections.singletonList("https://example.com/account*"),
+                Collections.<String>emptyList(),
+                Collections.singletonList("example.com"),
+                "body{display:none}", "window.__paused=1;");
+        WebView pausedView = new WebView(PAGE);
+        ExtensionInjector.apply(pausedView, PAGE, Collections.singletonList(paused));
+        equal(1, pausedView.getEvaluatedScripts().size(), "site-paused pack sends only an empty cleanup config");
+        notContains(pausedView.getEvaluatedScripts().get(0), "paused",
+                "site-paused pack id never reaches the page");
+        notContains(pausedView.getEvaluatedScripts().get(0), "body{display:none}",
+                "site-paused pack CSS never reaches the page");
     }
 
     private static void appliesStylesOnlyForSameDocumentUpdates() {
