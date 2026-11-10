@@ -741,7 +741,28 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         int stableSamples = 0;
         long deadline = android.os.SystemClock.uptimeMillis() + 2000L;
         while (android.os.SystemClock.uptimeMillis() < deadline) {
-            current = visibleBounds(view);
+            android.graphics.Rect[] visible = {new android.graphics.Rect()};
+            int[] screenLocation = new int[2];
+            int[] size = new int[2];
+            runOnMainSync(() -> {
+                // getGlobalVisibleRect is used only to prove that the whole
+                // target is visible. Its root/window coordinate space can
+                // differ from UiAutomation's screen coordinate space when
+                // Android applies edge-to-edge/window insets. Inject using
+                // getLocationOnScreen, which is the coordinate space expected
+                // by UiAutomation, rather than translating the global rect.
+                view.getGlobalVisibleRect(visible[0]);
+                view.getLocationOnScreen(screenLocation);
+                size[0] = view.getWidth();
+                size[1] = view.getHeight();
+            });
+            if (size[0] > 0 && size[1] > 0
+                    && visible[0].width() >= size[0] && visible[0].height() >= size[1]) {
+                current.set(screenLocation[0], screenLocation[1],
+                        screenLocation[0] + size[0], screenLocation[1] + size[1]);
+            } else {
+                current.setEmpty();
+            }
             if (current.width() > 0 && current.height() > 0
                     && previous != null && current.equals(previous)) {
                 stableSamples++;
@@ -752,7 +773,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             previous = new android.graphics.Rect(current);
             android.os.SystemClock.sleep(50L);
         }
-        throw new AssertionError("touch target bounds did not stabilize: " + current.toShortString());
+        throw new AssertionError("touch target screen bounds did not stabilize or were not fully visible: "
+                + current.toShortString());
     }
 
     private String describeTouchTarget(android.view.View view, android.graphics.Rect bounds) throws Exception {
