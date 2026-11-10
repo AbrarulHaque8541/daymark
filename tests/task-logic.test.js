@@ -207,7 +207,7 @@ test('shared task instant contract matches Android strict instant validation', (
       'JavaScript instant validation must match shared fixture line ' + (index + 1));
     cases += 1;
   }
-  assert.equal(cases, 43, 'shared instant contract must include all forty-three cases');
+  assert.equal(cases, 58, 'shared instant contract must include all fifty-eight cases');
 });
 
 test('createdAt, updatedAt, and reminderShownFire use the same strict instant contract', () => {
@@ -244,3 +244,28 @@ test('task ordering compares createdAt instants rather than their offset-bearing
     ['earlier', 'later']);
 });
 
+
+
+test('expanded Java Instant years remain valid and sort without Date range loss', () => {
+  const archiveMaximum = '+999999999-12-31T23:59:59.999999999+18:00';
+  const sameLocalUtc = '+999999999-12-31T23:59:59.999999999Z';
+  assert.equal(logic.isValidInstant(archiveMaximum), true);
+  assert.equal(logic.isValidInstant('+1000000000-12-31T23:59:59.999999999Z'), true);
+  assert.equal(logic.isValidInstant('+1000000001-01-01T00:00:00+18:00'), true);
+  assert.equal(logic.isValidInstant('+1000000001-01-01T23:59:59+18:00'), false);
+  assert.equal(logic.compareInstants(archiveMaximum, sameLocalUtc), -1);
+  assert.equal(logic.compareInstants(
+    '+1000000001-01-01T00:00:00+18:00',
+    '+1000000000-12-31T06:00:00Z'), 0);
+  assert.equal(logic.compareInstants(
+    '-1000000001-12-31T23:59:59-18:00',
+    '-1000000000-01-01T17:59:59Z'), 0);
+
+  const tasks = [
+    task('later-expanded', 'Later expanded year', { createdAt: sameLocalUtc }),
+    task('archive-maximum', 'Portable backup maximum', { createdAt: archiveMaximum })
+  ];
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'all', '', TODAY).map((item) => item.id),
+    ['archive-maximum', 'later-expanded']);
+  assert.equal(logic.isValidTask(tasks[1]), true);
+});

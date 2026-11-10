@@ -37,66 +37,103 @@
    * Shared four-digit instant contract for web and Android task records.
    * Java Instant.parse's leap-second normalization is supported only at 23:59:60.
    */
-  const TASK_INSTANT_PATTERN = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$/;
+  const TASK_INSTANT_PATTERN = /^([+-]?[0-9]{4,10})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$/;
 
-  function isValidInstant(value) {
-    if (typeof value !== 'string') return false;
+  // Java Instant supports signed expanded years. Keep epoch days and time-of-day
+  // separate so ordering stays exact without Date's limited year range or BigInt.
+  function daysFromCivil(year, month, day) {
+    const adjustedYear = year - (month <= 2 ? 1 : 0);
+    const era = Math.floor(adjustedYear / 400);
+    const yearOfEra = adjustedYear - era * 400;
+    const monthPrime = month + (month > 2 ? -3 : 9);
+    const dayOfYear = Math.floor((153 * monthPrime + 2) / 5) + day - 1;
+    const dayOfEra = yearOfEra * 365 + Math.floor(yearOfEra / 4)
+      - Math.floor(yearOfEra / 100) + dayOfYear;
+    return era * 146097 + dayOfEra - 719468;
+  }
+
+  const MIN_INSTANT_EPOCH_DAY = daysFromCivil(-1000000000, 1, 1);
+  const MAX_INSTANT_EPOCH_DAY = daysFromCivil(1000000000, 12, 31);
+
+  function parseTaskInstant(value) {
+    if (typeof value !== 'string') return null;
     const match = TASK_INSTANT_PATTERN.exec(value);
-    if (!match) return false;
+    if (!match) return null;
 
-    const year = Number(match[1]);
+    const yearText = match[1];
+    const yearDigits = yearText[0] === '+' || yearText[0] === '-'
+      ? yearText.slice(1) : yearText;
+    const absoluteYear = Number(yearDigits);
+    let year;
+    if (yearText[0] === '+') {
+      if (absoluteYear <= 9999) return null;
+      year = absoluteYear;
+    } else if (yearText[0] === '-') {
+      if (absoluteYear === 0) return null;
+      year = -absoluteYear;
+    } else {
+      if (yearText.length !== 4) return null;
+      year = absoluteYear;
+    }
+    if (!Number.isSafeInteger(year)) return null;
+
     const month = Number(match[2]);
     const day = Number(match[3]);
     const hour = Number(match[4]);
     const minute = Number(match[5]);
     const second = Number(match[6]);
     const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-    if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return false;
+    const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30,
+      31, 31, 30, 31, 30, 31];
+    if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return null;
     if (hour > 23 || minute > 59
-        || (second > 59 && !(second === 60 && hour === 23 && minute === 59))) return false;
+        || (second > 59 && !(second === 60 && hour === 23 && minute === 59))) return null;
 
+    let offsetSeconds = 0;
     const offset = match[8];
     if (offset !== 'Z') {
       const offsetHour = Number(offset.slice(1, 3));
       const offsetMinute = Number(offset.slice(4, 6));
       const offsetSecond = offset.length >= 9 ? Number(offset.slice(7, 9)) : 0;
       if (offsetHour > 18 || offsetMinute > 59 || offsetSecond > 59
-          || (offsetHour === 18 && (offsetMinute !== 0 || offsetSecond !== 0))) return false;
+          || (offsetHour === 18 && (offsetMinute !== 0 || offsetSecond !== 0))) return null;
+      const magnitude = offsetHour * 3600 + offsetMinute * 60 + offsetSecond;
+      offsetSeconds = offset[0] === '+' ? magnitude : -magnitude;
     }
-    return true;
+
+    // Java Instant.parse normalizes the supported leap-second form to second 59.
+    const normalizedSecond = second === 60 ? 59 : second;
+    let epochDay = daysFromCivil(year, month, day);
+    let secondOfDay = hour * 3600 + minute * 60 + normalizedSecond - offsetSeconds;
+    if (secondOfDay < 0) {
+      epochDay -= 1;
+      secondOfDay += 86400;
+    } else if (secondOfDay >= 86400) {
+      epochDay += 1;
+      secondOfDay -= 86400;
+    }
+
+    const nanoseconds = Number((match[7] || '').padEnd(9, '0'));
+    if (epochDay < MIN_INSTANT_EPOCH_DAY || epochDay > MAX_INSTANT_EPOCH_DAY) return null;
+    return { epochDay, secondOfDay, nanoseconds };
+  }
+
+  function isValidInstant(value) {
+    return parseTaskInstant(value) !== null;
   }
 
   function instantSortParts(value) {
-    const match = TASK_INSTANT_PATTERN.exec(value);
-    if (!match || !isValidInstant(value)) return null;
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    const hour = Number(match[4]);
-    const minute = Number(match[5]);
-    const second = Number(match[6]) === 60 ? 59 : Number(match[6]);
-    const utc = new Date(0);
-    utc.setUTCFullYear(year, month - 1, day);
-    utc.setUTCHours(hour, minute, second, 0);
-    let offsetSeconds = 0;
-    const offset = match[8];
-    if (offset !== 'Z') {
-      const sign = offset[0] === '+' ? 1 : -1;
-      const offsetSecond = offset.length >= 9 ? Number(offset.slice(7, 9)) : 0;
-      offsetSeconds = sign * (Number(offset.slice(1, 3)) * 3600
-        + Number(offset.slice(4, 6)) * 60 + offsetSecond);
-    }
-    return { epochSeconds: Math.floor(utc.getTime() / 1000) - offsetSeconds,
-      nanoseconds: Number((match[7] || '').padEnd(9, '0')) };
+    return parseTaskInstant(value);
   }
 
   function compareInstants(leftValue, rightValue) {
     const left = instantSortParts(leftValue);
     const right = instantSortParts(rightValue);
     if (!left || !right) throw new TypeError('Cannot compare invalid task instants.');
-    if (left.epochSeconds !== right.epochSeconds) return left.epochSeconds < right.epochSeconds ? -1 : 1;
+    if (left.epochDay !== right.epochDay) return left.epochDay < right.epochDay ? -1 : 1;
+    if (left.secondOfDay !== right.secondOfDay) {
+      return left.secondOfDay < right.secondOfDay ? -1 : 1;
+    }
     return left.nanoseconds - right.nanoseconds;
   }
 
