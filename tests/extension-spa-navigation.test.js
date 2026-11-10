@@ -4,26 +4,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const bootstrap = fs.readFileSync(
   path.join(__dirname, '..', 'android-app', 'app', 'src', 'main', 'assets', 'daymark-extension-spa.js'),
   'utf8'
 );
+const execute = new Function('window', 'document', 'config', 'return (' + bootstrap + ')(config);');
 
-function pack(id, matches, css, options) {
-  const extra = options || {};
-  return {
-    id,
-    matches,
-    excludes: extra.excludes || [],
-    disabledSites: extra.disabledSites || [],
-    css: css || ''
-  };
-}
-
-function makeHarness(initialUrl, packs, options) {
-  const opts = options || {};
+function makeHarness(initialUrl) {
   const root = {
     children: [],
     appendChild(element) {
@@ -41,6 +29,11 @@ function makeHarness(initialUrl, packs, options) {
   const document = {
     head: root,
     documentElement: root,
+    querySelectorAll(selector) {
+      assert.equal(selector, 'style[data-daymark-managed="true"]');
+      return root.children.filter((element) =>
+        element.tagName === 'STYLE' && element.getAttribute('data-daymark-managed') === 'true');
+    },
     createElement(tagName) {
       const attributes = Object.create(null);
       return {
@@ -48,205 +41,158 @@ function makeHarness(initialUrl, packs, options) {
         parentNode: null,
         textContent: '',
         setAttribute(name, value) { attributes[name] = String(value); },
-        getAttribute(name) { return Object.prototype.hasOwnProperty.call(attributes, name) ? attributes[name] : null; }
+        getAttribute(name) {
+          return Object.prototype.hasOwnProperty.call(attributes, name) ? attributes[name] : null;
+        }
       };
     }
   };
-  const listeners = Object.create(null);
-  const location = { href: initialUrl };
-  const history = {
-    pushState(_state, _title, nextUrl) {
-      location.href = new URL(nextUrl, location.href).href;
-      return 'push-result';
-    },
-    replaceState(_state, _title, nextUrl) {
-      location.href = new URL(nextUrl, location.href).href;
-      return 'replace-result';
-    }
-  };
-  const observers = [];
-  class MutationObserver {
-    constructor(callback) { this.callback = callback; observers.push(this); }
-    observe() { }
-    disconnect() { }
-    trigger() { this.callback(); }
-  }
-  const window = {
-    location,
-    history,
-    MutationObserver,
-    addEventListener(type, callback) {
-      listeners[type] = listeners[type] || [];
-      listeners[type].push(callback);
-    }
-  };
-  window.__daymarkSpaConfig = {
-    expectedUrl: opts.expectedUrl || initialUrl,
-    maxEnabled: opts.maxEnabled || 8,
-    packs
-  };
+  const window = { location: { href: initialUrl } };
 
-  function executeBootstrap() {
-    vm.runInNewContext(bootstrap, { window, document, URL, console });
+  function reconcile(url, packs) {
+    window.location.href = url;
+    const config = { expectedUrl: url, packs };
+    execute(window, document, config);
+    return JSON.stringify(config);
   }
-  executeBootstrap();
 
   return {
     window,
-    location,
-    history,
-    refreshConfig(config) {
-      window.__daymarkSpaConfig = config;
-      executeBootstrap();
-    },
-    styles() {
-      return root.children.filter((element) =>
-        element.tagName === 'STYLE' && element.getAttribute('data-daymark-managed') === 'true');
-    },
-    trigger(type) {
-      for (const callback of listeners[type] || []) callback();
-    },
-    triggerMutations() {
-      for (const observer of observers) observer.trigger();
+    document,
+    reconcile,
+    styles() { return document.querySelectorAll('style[data-daymark-managed="true"]'); },
+    addUserStyle(packId, css) {
+      const element = document.createElement('style');
+      element.setAttribute('data-daymark-managed', 'true');
+      element.setAttribute('data-daymark-pack-id', packId);
+      element.setAttribute('data-daymark-pack-css', 'false');
+      element.textContent = css;
+      root.appendChild(element);
+      return element;
     }
   };
 }
 
-test('matching-to-nonmatching pushState removes only the pack-owned CSS', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}')
+function pack(id, css) {
+  return { id, css };
+}
+
+test('a matching page receives only its current pack CSS', () => {
+  const h = makeHarness('https://example.com/private/home');
+  const serialized = h.reconcile('https://example.com/private/home', [
+    pack('private-pack', 'body{color:red}')
   ]);
-  assert.equal(h.styles().length, 1);
-  assert.equal(h.styles()[0].getAttribute('data-daymark-pack-id'), 'private');
-
-  h.history.pushState({}, '', '/public');
-
-  assert.equal(h.styles().length, 0);
-});
-
-test('nonmatching-to-matching pushState activates a future-route pack', () => {
-  const h = makeHarness('https://example.com/public', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}')
-  ]);
-  assert.equal(h.styles().length, 0);
-
-  h.history.pushState({}, '', '/private/home');
 
   assert.equal(h.styles().length, 1);
+  assert.equal(h.styles()[0].getAttribute('data-daymark-pack-id'), 'private-pack');
   assert.equal(h.styles()[0].textContent, 'body{color:red}');
+  assert.match(serialized, /private-pack/);
+  assert.doesNotMatch(serialized, /other-site|disabledSites|matches|excludes/);
 });
 
-test('exclude transitions remove and later restore a broad matching pack', () => {
-  const h = makeHarness('https://example.com/private', [
-    pack('broad', ['https://example.com/*'], 'body{color:blue}', {
-      excludes: ['https://example.com/admin/*']
-    })
+test('a nonmatching page receives an empty config and no other pack metadata', () => {
+  const h = makeHarness('https://news.example.net/');
+  const serialized = h.reconcile('https://news.example.net/', []);
+
+  assert.equal(h.styles().length, 0);
+  assert.equal(serialized, '{"expectedUrl":"https://news.example.net/","packs":[]}');
+  assert.deepEqual(Object.keys(h.window), ['location']);
+});
+
+test('a transition to a nonmatching route removes previously owned styles', () => {
+  const h = makeHarness('https://example.com/private/home');
+  h.reconcile('https://example.com/private/home', [
+    pack('private-pack', 'body{color:red}')
   ]);
   assert.equal(h.styles().length, 1);
 
-  h.history.pushState({}, '', '/admin/settings');
+  h.reconcile('https://example.com/public/home', []);
+
+  assert.equal(h.styles().length, 0);
+});
+
+test('a transition from a nonmatching route can activate only newly matching packs', () => {
+  const h = makeHarness('https://example.com/public/home');
+  h.reconcile('https://example.com/public/home', []);
   assert.equal(h.styles().length, 0);
 
-  h.history.pushState({}, '', '/public');
+  const serialized = h.reconcile('https://example.com/private/home', [
+    pack('private-pack', 'body{color:red}')
+  ]);
+
   assert.equal(h.styles().length, 1);
+  assert.equal(h.styles()[0].getAttribute('data-daymark-pack-id'), 'private-pack');
+  assert.match(serialized, /private-pack/);
 });
 
-test('multiple packs keep matching CSS and remove only scopes that no longer match', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}'),
-    pack('general', ['https://example.com/*'], 'body{background:black}')
+test('multiple current packs remain while a no-longer-matching pack is removed', () => {
+  const h = makeHarness('https://example.com/private/home');
+  h.reconcile('https://example.com/private/home', [
+    pack('private', 'body{color:red}'),
+    pack('general', 'body{background:black}')
   ]);
-  assert.deepEqual(h.styles().map((element) => element.getAttribute('data-daymark-pack-id')).sort(),
-    ['general', 'private']);
+  assert.deepEqual(h.styles().map((element) =>
+    element.getAttribute('data-daymark-pack-id')).sort(), ['general', 'private']);
 
-  h.history.pushState({}, '', '/public');
+  h.reconcile('https://example.com/public/home', [
+    pack('general', 'body{background:black}')
+  ]);
 
-  assert.deepEqual(h.styles().map((element) => element.getAttribute('data-daymark-pack-id')),
-    ['general']);
+  assert.deepEqual(h.styles().map((element) =>
+    element.getAttribute('data-daymark-pack-id')), ['general']);
   assert.equal(h.styles()[0].textContent, 'body{background:black}');
 });
 
-test('per-site pause applies to the host and its subdomains', () => {
-  const pausedPack = pack('paused', ['*://*/*'], 'body{display:none}', {
-    disabledSites: ['example.com']
-  });
-  const apex = makeHarness('https://example.com/private', [pausedPack]);
-  const subdomain = makeHarness('https://news.example.com/private', [pausedPack]);
-  const other = makeHarness('https://other.example.net/private', [pausedPack]);
-
-  assert.equal(apex.styles().length, 0);
-  assert.equal(subdomain.styles().length, 0);
-  assert.equal(other.styles().length, 1);
-});
-
-test('hash-only navigation does not change path-scoped matching', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}')
+test('userscript-created styles survive only while their owning pack still matches', () => {
+  const h = makeHarness('https://example.com/private/home');
+  h.reconcile('https://example.com/private/home', [
+    pack('script-pack', '')
   ]);
-  h.location.href = 'https://example.com/private/home#public';
-  h.trigger('hashchange');
-  assert.equal(h.styles().length, 1);
-});
-
-test('replaceState, popstate and mutation fallback re-evaluate the current URL', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}')
-  ]);
-  h.history.replaceState({}, '', '/public');
-  assert.equal(h.styles().length, 0);
-
-  h.location.href = 'https://example.com/private/again';
-  h.trigger('popstate');
+  const userStyle = h.addUserStyle('script-pack', 'body{color:purple}');
   assert.equal(h.styles().length, 1);
 
-  h.location.href = 'https://example.com/public-again';
-  h.triggerMutations();
-  assert.equal(h.styles().length, 0);
-});
-
-test('userscript-created GM_addStyle nodes are removed with their owning pack', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('script-only', ['https://example.com/private/*'], '')
-  ]);
-  const style = h.window.__daymarkAddStyle('script-only', 'body{color:purple}');
-  assert.ok(style);
-  assert.equal(h.styles().length, 1);
-
-  h.history.pushState({}, '', '/public');
+  h.reconcile('https://example.com/public/home', []);
 
   assert.equal(h.styles().length, 0);
+  assert.equal(userStyle.parentNode, null);
 });
 
-test('a later empty configuration removes styles from packs that were disabled or removed', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}')
+test('empty CSS removes only the pack CSS and preserves matching userscript styles', () => {
+  const h = makeHarness('https://example.com/private/home');
+  h.reconcile('https://example.com/private/home', [
+    pack('script-pack', 'body{color:red}')
   ]);
-  assert.equal(h.styles().length, 1);
+  const userStyle = h.addUserStyle('script-pack', 'body{color:purple}');
 
-  h.refreshConfig({
-    expectedUrl: h.location.href,
-    maxEnabled: 8,
-    packs: []
+  h.reconcile('https://example.com/private/home', [
+    pack('script-pack', '')
+  ]);
+
+  assert.equal(h.styles().length, 1);
+  assert.equal(h.styles()[0], userStyle);
+});
+
+test('stale page-bound config cannot mutate the current document', () => {
+  const h = makeHarness('https://example.com/current');
+  h.reconcile('https://example.com/current', [
+    pack('current', 'body{color:red}')
+  ]);
+  const before = h.styles()[0];
+
+  execute(h.window, h.document, {
+    expectedUrl: 'https://example.com/old',
+    packs: [pack('stale', 'body{display:none}')]
   });
 
-  assert.equal(h.styles().length, 0);
+  assert.equal(h.styles().length, 1);
+  assert.equal(h.styles()[0], before);
 });
 
-test('a stale page-bound bootstrap cannot install or mutate extension state', () => {
-  const h = makeHarness('https://example.com/private/home', [
-    pack('private', ['https://example.com/private/*'], 'body{color:red}')
-  ], { expectedUrl: 'https://example.com/other' });
-  assert.equal(h.window.__daymarkSpaState, undefined);
-  assert.equal(h.styles().length, 0);
-});
-
-test('only the first eight matching packs own styles on a page', () => {
-  const packs = [];
-  for (let i = 0; i < 10; i++) {
-    packs.push(pack('pack-' + i, ['https://example.com/*'], 'body{--pack:' + i + '}'));
-  }
-  const h = makeHarness('https://example.com/home', packs);
-  assert.equal(h.styles().length, 8);
-  assert.equal(h.styles().some((element) => element.getAttribute('data-daymark-pack-id') === 'pack-8'), false);
-  assert.equal(h.styles().some((element) => element.getAttribute('data-daymark-pack-id') === 'pack-9'), false);
+test('bootstrap does not install page-readable config, state, or SPA hooks', () => {
+  assert.doesNotMatch(bootstrap, /window\.__daymarkSpaConfig/);
+  assert.doesNotMatch(bootstrap, /window\.__daymarkSpaState/);
+  assert.doesNotMatch(bootstrap, /window\.__daymarkAddStyle/);
+  assert.doesNotMatch(bootstrap, /history\.(pushState|replaceState)/);
+  assert.doesNotMatch(bootstrap, /MutationObserver|popstate|hashchange/);
+  assert.match(bootstrap, /^\(function \(config\)/);
 });
