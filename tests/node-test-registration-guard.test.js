@@ -86,6 +86,7 @@ test('rejects callbacks whose only apparent work is declared or statically unrea
     [`const { test } = require('node:test'); test('placeholder', () => { const unused = () => assert.ok(true); });`, false, 'unused arrow declaration'],
     [`const { test } = require('node:test'); test('placeholder', () => { if (false) assert.ok(true); });`, false, 'statically false if branch'],
     [`const { test } = require('node:test'); test('placeholder', () => { while (false) assert.ok(true); });`, false, 'statically false loop'],
+    [`const { test } = require('node:test'); test('placeholder', () => { switch (1) { case 2: assert.ok(true); } });`, false, 'statically unreachable switch case'],
     [`const { test } = require('node:test'); test('real', () => { if (true) assert.ok(true); });`, true, 'statically true branch executes'],
     [`const { test } = require('node:test'); test('real', () => { const result = makeFixture(); });`, true, 'executed initializer call']
   ];
