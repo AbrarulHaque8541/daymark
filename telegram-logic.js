@@ -83,6 +83,10 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatTarget, text, disable_web_page_preview: true }),
+      credentials: 'omit',
+      cache: 'no-store',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
       signal: controller.signal
     }).then((response) => response.json()
       .then((body) => ({ response, body }), () => ({ response, body: null })))
@@ -90,7 +94,7 @@
         const status = response && typeof response.status === 'number' ? response.status : 0;
         if (status < 200 || status > 299) return { ok: false, reason: classifySendOutcome(status, null, null) };
         if (!body || body.ok !== true) {
-          return { ok: false, reason: classifySendOutcome(status, body ? body.ok : undefined, body && typeof body.description === 'string' ? body.description : '') };
+          return { ok: false, reason: classifySendOutcome(status, body ? body.ok : undefined, body && typeof body.description === 'string' ? body.description.split(botToken).join('[redacted]') : '') };
         }
         const messageId = body.result && typeof body.result.message_id === 'number' ? body.result.message_id : null;
         return { ok: true, messageId };
