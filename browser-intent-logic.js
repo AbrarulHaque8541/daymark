@@ -170,13 +170,106 @@
     return authority;
   }
 
-  function validateIntentWebUrl(value) {
+  function endsInWhatwgIpv4Number(label) {
+    return /^[0-9]+$/.test(label)
+      || /^0[xX][0-9a-fA-F]*$/.test(label)
+      || (label.length > 1 && label[0] === '0' && /^[0-7]+$/.test(label.slice(1)));
+  }
+
+  function isCanonicalWebIpv4(host) {
+    const parts = host.split('.');
+    if (parts.length !== 4) return false;
+    return parts.every((part) => /^(?:0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255);
+  }
+
+  function normalizeIntentWebHost(rawHost) {
     const addressApi = root.DaymarkBrowserAddress;
-    if (!addressApi || typeof addressApi.parseAddressInput !== 'function') return null;
-    const parsed = addressApi.parseAddressInput(value);
-    if (!parsed || parsed.kind !== 'navigate'
-        || (parsed.scheme !== 'http' && parsed.scheme !== 'https')) return null;
-    return parsed.url;
+    let host = rawHost;
+    if (/[^\x00-\x7f]/.test(host)) {
+      if (!addressApi || typeof addressApi.normalizeHost !== 'function') return null;
+      const trailingDot = host.endsWith('.');
+      const candidate = trailingDot ? host.slice(0, -1) : host;
+      const singleLabel = candidate.indexOf('.') === -1;
+      const normalized = addressApi.normalizeHost(singleLabel ? candidate + '.daymark.invalid' : candidate);
+      if (!normalized) return null;
+      host = singleLabel
+        ? normalized.host.replace(/\.daymark\.invalid$/, '')
+        : normalized.host;
+      if (trailingDot) host += '.';
+    }
+    if (!isValidIntentHost(host)) return null;
+    const withoutTrailingDot = host.endsWith('.') ? host.slice(0, -1) : host;
+    const labels = withoutTrailingDot.split('.');
+    const last = labels[labels.length - 1];
+    if (endsInWhatwgIpv4Number(last) && !isCanonicalWebIpv4(withoutTrailingDot)) return null;
+    return host;
+  }
+
+  function validateIntentWebUrl(value) {
+    const input = String(value == null ? '' : value);
+    if (!input || input.length > MAX_INPUT_CHARS + 8
+        || /[\u0000-\u0020\u007f\\<>"{}|^\x60]/.test(input)
+        || /%(?![0-9A-Fa-f]{2})/.test(input)) return null;
+    const match = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/(.*)$/.exec(input);
+    if (!match) return null;
+    const scheme = match[1].toLowerCase();
+    if (scheme !== 'http' && scheme !== 'https') return null;
+    const rest = match[2];
+    const boundary = rest.search(/[/?#]/);
+    const authority = boundary === -1 ? rest : rest.slice(0, boundary);
+    if (!authority || authority.indexOf('@') !== -1) return null;
+
+    let rawHost;
+    let portText = null;
+    if (authority.startsWith('[')) {
+      const close = authority.indexOf(']');
+      if (close < 0) return null;
+      rawHost = authority.slice(0, close + 1);
+      const suffix = authority.slice(close + 1);
+      if (suffix !== '') {
+        if (!suffix.startsWith(':') || suffix.length === 1) return null;
+        portText = suffix.slice(1);
+      }
+    } else {
+      const colon = authority.lastIndexOf(':');
+      if (colon >= 0) {
+        if (authority.indexOf(':') !== colon) return null;
+        rawHost = authority.slice(0, colon);
+        portText = authority.slice(colon + 1);
+      } else {
+        rawHost = authority;
+      }
+    }
+
+    const host = normalizeIntentWebHost(rawHost);
+    if (!host) return null;
+    if (portText !== null) {
+      if (!/^\d{1,5}$/.test(portText)) return null;
+      const port = Number(portText);
+      if (port < 1 || port > 65535) return null;
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(input);
+    } catch (error) {
+      return null;
+    }
+    if (parsed.protocol !== scheme + ':' || !parsed.hostname
+        || parsed.username || parsed.password) return null;
+    if (parsed.hostname.toLowerCase() !== host.toLowerCase()) return null;
+    const parsedPort = parsed.port === '' ? null : Number(parsed.port);
+    if (parsedPort !== null && parsedPort !== Number(portText)) return null;
+    if (parsedPort === null && portText !== null
+        && Number(portText) !== (scheme === 'https' ? 443 : 80)) return null;
+
+    // java.net.URI.normalize() removes dot segments but preserves an absent
+    // path and an explicitly supplied default port; reconstruct both details
+    // instead of relying on WHATWG URL.href's default-port elision.
+    const suffix = rest.slice(authority.length);
+    const path = suffix.startsWith('/') ? parsed.pathname : '';
+    return scheme + '://' + host + (portText === null ? '' : ':' + portText)
+      + path + parsed.search + parsed.hash;
   }
 
   function parseIntentUri(raw) {
