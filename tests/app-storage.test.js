@@ -830,6 +830,11 @@ test('clearing the task recovery backup does not let queued maintenance recreate
   assert.equal(app.storedValues.has(BACKUP_KEY), false,
     'the explicit recovery-backup clear is not undone by automatic maintenance');
   assert.equal(app.storedValues.get(mutation.TASK_GENERATION_KEY), '1:task-backup');
+
+  const reloaded = bootApp({ storageData: app.storedValues });
+  await reloaded.settle();
+  assert.equal(reloaded.storedValues.has(BACKUP_KEY), false,
+    'the retained clear reason also suppresses automatic backup recreation after reload');
 });
 
 test('startup recovery backup fails closed when Web Locks are unavailable', async () => {
