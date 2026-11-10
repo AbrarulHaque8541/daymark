@@ -45,9 +45,11 @@ require("BrowserServiceWorkerPolicy.decide(onlineAllowed, scheme)" in enforcemen
 require("new WebResourceResponse(" in enforcement and "403" in enforcement,
         "return a synthetic blocked response instead of allowing network pass-through")
 consent_gate = "if (!BrowserServiceWorkerPolicy.canEnableNetworkAfterConsent(clientInstalled))"
+platform_unblock = ".setBlockNetworkLoads(false)"
 require(consent_gate in enforcement
-        and enforcement.index(consent_gate) < enforcement.index("onlineAllowed = true;"),
-        "do not grant Online worker networking before proving the independent request client is installed")
+        and enforcement.index(consent_gate) < enforcement.index("onlineAllowed = true;")
+        and enforcement.index(consent_gate) < enforcement.index(platform_unblock),
+        "do not grant Online worker networking or remove the platform block before proving the independent request client is installed")
 consent_failure = enforcement.split(consent_gate, 1)[1].split("onlineAllowed = true;", 1)[0]
 require("onlineAllowed = false;" in consent_failure and "return false;" in consent_failure,
         "a missing request client must retain the fail-closed worker state")
