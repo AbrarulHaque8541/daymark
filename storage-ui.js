@@ -222,8 +222,23 @@
       }
     }
 
+    function restoreGenerationMarker(storage, key, previousValue) {
+      if (previousValue !== null && typeof previousValue !== 'string') return false;
+      try {
+        if (previousValue === null) storage.removeItem(key);
+        else storage.setItem(key, previousValue);
+      } catch (error) {
+        // Verify below: a storage operation can fail after the underlying write.
+      }
+      try {
+        return storage.getItem(key) === previousValue;
+      } catch (error) {
+        return false;
+      }
+    }
+
     function finishCategoryClear(result, category) {
-      if (result.removed.length > 0 && (category.id === 'tasks' || category.id === 'task-backup')) {
+      if (category.id === 'tasks' || category.id === 'task-backup') {
         notifyTaskStorageChange(category.id === 'tasks' ? 'daymark.tasks.v1' : null);
       } else if (category.id === 'webhook-queue' && result.removed.length > 0) {
         notifyTaskStorageChange('daymark.webhook.queue.v1');
@@ -347,19 +362,54 @@
           return Promise.resolve(false);
         }
         return taskMutation.withTaskMutationLock(lockManager, () => {
+          let previousGeneration;
+          try {
+            previousGeneration = storage.getItem(taskMutation.TASK_GENERATION_KEY);
+          } catch (error) {
+            return { ok: false, reason: 'task-generation-read-failed' };
+          }
           const generation = taskMutation.incrementTaskGeneration(storage, category.id);
           if (!generation.ok) return { ok: false, reason: generation.reason };
-          return { ok: true, result: clear() };
+
+          let result;
+          try {
+            result = clear();
+          } catch (error) {
+            return { ok: false, reason: 'clear-operation-failed' };
+          }
+          const unreadable = Array.isArray(result.unreadable) ? result.unreadable : [];
+          const removed = Array.isArray(result.removed) ? result.removed : [];
+          if (unreadable.length > 0 && removed.length === 0) {
+            const restored = restoreGenerationMarker(
+              storage, taskMutation.TASK_GENERATION_KEY, previousGeneration
+            );
+            return {
+              ok: false,
+              reason: restored ? 'clear-preflight-failed-rolled-back' : 'partial-generation-coordination'
+            };
+          }
+          return { ok: true, result };
         }).then((locked) => {
           setBusy(false);
-          if (!locked.ok || !locked.value || !locked.value.ok) {
-            status('Could not safely clear ' + category.label + ': '
-              + (locked.reason === 'coordination-unavailable'
-                ? 'cross-tab coordination is unavailable. Nothing was cleared.'
-                : 'the task-generation fence or shared task lock failed. Nothing was cleared.'));
+          const outcome = locked.ok ? locked.value : null;
+          if (!outcome || outcome.ok !== true) {
+            const reason = outcome && outcome.reason ? outcome.reason : locked.reason;
+            if (reason === 'clear-preflight-failed-rolled-back') {
+              status('Could not clear ' + category.label
+                + ': storage became unreadable during the locked preflight. The task-generation marker was restored; nothing was cleared.');
+            } else if (reason === 'partial-generation-coordination') {
+              notifyTaskStorageChange(categoryId === 'tasks' ? 'daymark.tasks.v1' : null);
+              status('Could not safely clear ' + category.label
+                + ': the task-generation marker could not be restored after a storage preflight failure. No data was intentionally removed; task state was refreshed. Reload before editing if it does not update.');
+            } else {
+              status('Could not safely clear ' + category.label + ': '
+                + (reason === 'coordination-unavailable'
+                  ? 'cross-tab coordination is unavailable. Nothing was cleared.'
+                  : 'the task-generation fence, shared lock or storage operation failed. Review storage before retrying.'));
+            }
             return false;
           }
-          finishCategoryClear(locked.value.result, category);
+          finishCategoryClear(outcome.result, category);
           return true;
         });
       }
@@ -419,11 +469,14 @@
         taskMutation.CLEAR_ALL_LOCK_ORDER,
         () => {
           const taskGenerationKey = taskMutation.TASK_GENERATION_KEY;
+          const focusGenerationKey = focusMutation.FOCUS_GENERATION_KEY;
           let previousTaskGeneration;
+          let previousFocusGeneration;
           try {
             previousTaskGeneration = storage.getItem(taskGenerationKey);
+            previousFocusGeneration = storage.getItem(focusGenerationKey);
           } catch (error) {
-            return { ok: false, reason: 'task-generation-read-failed' };
+            return { ok: false, reason: 'generation-read-failed' };
           }
 
           const taskGeneration = taskMutation.incrementTaskGeneration(storage, 'all');
@@ -431,28 +484,7 @@
 
           const focusGeneration = focusMutation.incrementFocusGeneration(storage);
           if (!focusGeneration.ok) {
-            // Both counters form one Clear All preparation transaction. If Focus
-            // cannot advance, restore the exact task marker before releasing the
-            // ordered locks so other tabs do not discard valid task intent.
-            let restored = false;
-            try {
-              if (previousTaskGeneration === null) {
-                storage.removeItem(taskGenerationKey);
-              } else {
-                storage.setItem(taskGenerationKey, previousTaskGeneration);
-              }
-            } catch (error) {
-              // A missing marker is semantically generation zero. If removal is
-              // blocked, a canonical zero marker is a safe equivalent fallback.
-              if (previousTaskGeneration === null) {
-                try { storage.setItem(taskGenerationKey, '0'); } catch (restoreError) { }
-              }
-            }
-            try {
-              const currentTaskGeneration = storage.getItem(taskGenerationKey);
-              restored = currentTaskGeneration === previousTaskGeneration
-                || (previousTaskGeneration === null && currentTaskGeneration === '0');
-            } catch (error) { }
+            const restored = restoreGenerationMarker(storage, taskGenerationKey, previousTaskGeneration);
             return {
               ok: false,
               reason: restored
@@ -461,7 +493,29 @@
             };
           }
 
-          const result = storageApi.clearAll(storage);
+          let result;
+          try {
+            result = storageApi.clearAll(storage);
+          } catch (error) {
+            return { ok: false, reason: 'clear-operation-failed' };
+          }
+          const unreadableKeys = Array.isArray(result && result.unreadableKeys)
+            ? result.unreadableKeys : [];
+          const removedKeys = Array.isArray(result && result.removedKeys)
+            ? result.removedKeys : [];
+          if (unreadableKeys.length > 0 && removedKeys.length === 0) {
+            const taskRestored = restoreGenerationMarker(storage, taskGenerationKey, previousTaskGeneration);
+            const focusRestored = restoreGenerationMarker(storage, focusGenerationKey, previousFocusGeneration);
+            return {
+              ok: false,
+              reason: taskRestored && focusRestored
+                ? 'clear-preflight-failed-rolled-back'
+                : 'partial-generation-coordination'
+            };
+          }
+          if (!result || !Array.isArray(result.failedKeys) || !Array.isArray(result.removedKeys)) {
+            return { ok: false, reason: 'clear-operation-failed' };
+          }
           if (!result.failedKeys.includes('daymark.webhook.queue.v1') && webhookUi
               && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
             webhookUi.resetQueueAfterExternalClear();
@@ -481,19 +535,29 @@
       if (!clearOutcome || clearOutcome.ok !== true) {
         if (clearOutcome && clearOutcome.reason === 'focus-generation-failed-rolled-back') {
           status('Could not safely clear all data: Focus coordination could not advance. Task coordination was restored; nothing was cleared.');
+        } else if (clearOutcome && clearOutcome.reason === 'clear-preflight-failed-rolled-back') {
+          status('Could not safely clear all data: storage became unreadable during the locked preflight. Both coordination markers were restored; nothing was cleared.');
         } else if (clearOutcome && clearOutcome.reason === 'partial-generation-coordination') {
-          // The task fence may remain advanced. Rebase this tab from durable
-          // storage and be explicit that only coordination state changed.
+          // A generation marker may remain advanced. Rebase both current-tab
+          // views and make the uncertain coordination state explicit.
           notifyTaskStorageChange(null);
-          status('Could not safely clear all data: task coordination could not be restored after Focus generation failed. No user data was removed. A task-state refresh was requested; reload this tab before editing if the task list does not update.');
+          notifyFocusStorageChange('all');
+          status('Could not safely clear all data: coordination markers could not be restored after the storage preflight failed. No user data was removed; task and Focus state were refreshed. Reload before editing if either view does not update.');
         } else {
-          status('Could not safely clear all data: a shared lock, generation or storage operation failed. Nothing was cleared.');
+          // The clear operation may have failed after partially changing data.
+          // Keep the advanced fences and reconcile both views rather than risk
+          // allowing stale task or Focus state to overwrite the remaining data.
+          notifyTaskStorageChange(null);
+          notifyFocusStorageChange('all');
+          status('Could not safely clear all data: the clear operation or generation transaction failed. Data may be partially cleared; task and Focus state were refreshed. Review storage before retrying.');
         }
         return false;
       }
       const result = clearOutcome.result;
       notifyFocusStorageChange('all');
-      if (result.removedKeys.length > 0) notifyTaskStorageChange(null);
+      // The task generation advanced even when the task key was already absent.
+      // Refresh this tab so a same-tab Clear All cannot leave stale in-memory tasks.
+      notifyTaskStorageChange(null);
       if (result.failedKeys.length > 0) {
         const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
           + result.failedKeys.length + ' item(s) could not be removed by the browser.';
