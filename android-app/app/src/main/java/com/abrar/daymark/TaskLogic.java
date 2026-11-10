@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class TaskLogic {
@@ -67,9 +68,50 @@ final class TaskLogic {
     }
 
     static boolean isValidInstant(String value) {
-        if (value == null || !TASK_INSTANT_PATTERN.matcher(value).matches()) return false;
+        if (value == null) return false;
+        Matcher matcher = TASK_INSTANT_PATTERN.matcher(value);
+        if (!matcher.matches()) return false;
+
+        String yearText = matcher.group(1);
+        boolean positiveYear = yearText.charAt(0) == '+';
+        boolean negativeYear = yearText.charAt(0) == '-';
+        String yearDigits = positiveYear || negativeYear ? yearText.substring(1) : yearText;
+        long absoluteYear = Long.parseLong(yearDigits);
+        long year;
+        if (positiveYear) {
+            if (absoluteYear <= 9999L) return false;
+            year = absoluteYear;
+        } else if (negativeYear) {
+            if (absoluteYear == 0L) return false;
+            year = -absoluteYear;
+        } else {
+            if (yearText.length() != 4) return false;
+            year = absoluteYear;
+        }
+
+        int month = Integer.parseInt(matcher.group(2));
+        int day = Integer.parseInt(matcher.group(3));
+        int hour = Integer.parseInt(matcher.group(4));
+        int minute = Integer.parseInt(matcher.group(5));
+        int second = Integer.parseInt(matcher.group(6));
+        boolean leapYear = year % 4L == 0L && (year % 100L != 0L || year % 400L == 0L);
+        int[] daysInMonth = { 31, leapYear ? 29 : 28, 31, 30, 31, 30,
+                31, 31, 30, 31, 30, 31 };
+        if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return false;
+        if (hour > 23 || minute > 59
+                || (second > 59 && !(second == 60 && hour == 23 && minute == 59))) return false;
+
+        String offset = matcher.group(8);
+        if (!"Z".equals(offset)) {
+            int offsetHour = Integer.parseInt(offset.substring(1, 3));
+            int offsetMinute = Integer.parseInt(offset.substring(4, 6));
+            int offsetSecond = offset.length() >= 9 ? Integer.parseInt(offset.substring(7, 9)) : 0;
+            if (offsetHour > 18 || offsetMinute > 59 || offsetSecond > 59
+                    || (offsetHour == 18 && (offsetMinute != 0 || offsetSecond != 0))) return false;
+        }
+
         try {
-            // Instant.parse is the canonical range/calendar authority, including expanded years.
+            // Instant.parse is the canonical Instant-range authority after local validation.
             Instant.parse(value);
             return true;
         } catch (DateTimeParseException exception) {
