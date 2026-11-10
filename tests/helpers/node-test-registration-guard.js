@@ -832,7 +832,8 @@ function isStaticallyUnreachableCall(node, parents) {
     } else if (parent.type === 'ConditionalExpression') {
       if (isStaticFalse(parent.test) && isWithinSubtree(child, parent.consequent, parents)) return true;
       if (isStaticTrue(parent.test) && isWithinSubtree(child, parent.alternate, parents)) return true;
-    } else if (parent.type === 'SwitchCase' && isWithinSubtree(child, parent.consequent, parents) &&
+    } else if (parent.type === 'SwitchCase' &&
+        parent.consequent.some((statement) => isWithinSubtree(child, statement, parents)) &&
         isUnreachableSwitchCase(parent, parents)) return true;
   }
   return false;

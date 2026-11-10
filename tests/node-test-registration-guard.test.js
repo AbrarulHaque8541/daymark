@@ -214,6 +214,8 @@ test('only counts test registrations that execute during module or test-suite ev
     [`const { test } = require('node:test'); true || test('fake', () => assert.ok(true));`, false, 'short-circuited logical OR'],
     [`const { test } = require('node:test'); false ? test('fake', () => assert.ok(true)) : null;`, false, 'unselected conditional branch'],
     [`const { test } = require('node:test'); switch (1 + 1) { case 3: test('fake', () => assert.ok(true)); }`, false, 'unmatched constant switch case'],
+    [`const { test } = require('node:test'); switch (2) { case 1: test('fake', () => assert.ok(true)); break; case 2: test('real', () => assert.ok(true)); }`, true, 'selected switch case after an unreachable case'],
+    [`const { test } = require('node:test'); switch (1) { case 1: case 2: test('real', () => assert.ok(true)); }`, true, 'reachable switch fallthrough'],
     [`const { test } = require('node:test'); (() => test('real', () => assert.ok(true)))();`, true, 'immediately-invoked registration helper'],
     [`const { test, describe } = require('node:test'); describe('suite', () => { test('real', () => assert.ok(true)); });`, true, 'test registration in an executed describe callback'],
     [`const { test } = require('node:test'); if (1 === 1) test('real', () => assert.ok(true));`, true, 'constant-true branch']
