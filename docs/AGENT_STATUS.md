@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-10T02:44:08Z (main 557af316; AST test guard #694; Focus/API 36 and recurrence triage)](./CURRENT_STATUS_20261110T024408Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:00:49Z (main 1d29085, Focus #648 direct shell-input and CSS #670)](./CURRENT_STATUS_20261109T120049Z.md)
