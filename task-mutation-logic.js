@@ -52,6 +52,18 @@
     catch (error) { return { ok: false, reason: 'generation-write-failed' }; }
   }
 
+  function clearTaskGenerationReason(storage, expectedGeneration) {
+    const current = readTaskGeneration(storage);
+    if (!current.ok || current.value !== expectedGeneration) return false;
+    if (!current.reason) return true;
+    try {
+      storage.setItem(TASK_GENERATION_KEY, String(current.value));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   function cloneTaskList(tasks) {
     if (!Array.isArray(tasks)) return [];
     return JSON.parse(JSON.stringify(tasks));
@@ -297,7 +309,8 @@
           return { ok: false, reason: 'storage-write-failed', conflicts: [] };
         }
 
-        let warning = null;
+        let warning = clearTaskGenerationReason(storage, opts.expectedGeneration)
+          ? null : 'generation-marker-clear-failed';
         if (typeof opts.afterWrite === 'function') {
           try {
             opts.afterWrite(payload, merged.tasks);
@@ -341,6 +354,7 @@
     TASK_GENERATION_KEY,
     readTaskGeneration,
     incrementTaskGeneration,
+    clearTaskGenerationReason,
     WEBHOOK_DELIVERY_LOCK,
     WEBHOOK_QUEUE_LOCK,
     FOCUS_MUTATION_LOCK,
