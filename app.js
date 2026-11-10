@@ -916,13 +916,14 @@
     syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
   }
 
-  function notifyWebhookTaskCompleted(task) {
+  async function notifyWebhookTaskCompleted(task, options) {
     const webhookUi = window.DaymarkWebhookUi;
     if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
     try {
-      webhookUi.notifyTaskCompleted(task);
+      return await webhookUi.notifyTaskCompleted(task, options);
     } catch (error) {
       console.warn('Could not queue the Daymark task-completed webhook:', error);
+      return { queued: false, reason: 'error' };
     }
   }
 
@@ -935,9 +936,9 @@
     if (button.dataset.action === 'toggle') {
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
+      if (saved && task.completed) void notifyWebhookTaskCompleted(task);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
