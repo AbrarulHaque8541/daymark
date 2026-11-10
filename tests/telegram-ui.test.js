@@ -67,7 +67,7 @@ class FakeAbortController {
 }
 function okEnv(doc, options) {
   options = options || {};
-  return {
+  const env = {
     document: doc,
     logicApi: options.logicApi === undefined ? engine : options.logicApi,
     taskLogicApi: options.taskLogicApi === undefined ? taskLogic : options.taskLogicApi,
@@ -76,6 +76,20 @@ function okEnv(doc, options) {
     AbortController: FakeAbortController,
     setTimeout: () => 0,
     clearTimeout: () => {}
+  };
+  if (options.window) env.window = options.window;
+  return env;
+}
+function makeWindow() {
+  const listeners = {};
+  return {
+    listeners,
+    addEventListener(type, handler) { (listeners[type] = listeners[type] || []).push(handler); },
+    removeEventListener(type, handler) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((candidate) => candidate !== handler);
+    },
+    dispatch(type) { for (const handler of (listeners[type] || []).slice()) handler({ type }); }
   };
 }
 function fillValidInputs(doc) {
@@ -260,6 +274,26 @@ test('Clear empties the token field and says nothing was saved', () => {
   handle.clear();
   assert.equal(doc.elements['telegram-token'].value, '');
   assert.match(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
+});
+test('pagehide and pageshow clear the token so navigation and bfcache cannot retain it', () => {
+  const doc = makeDoc(ALL_IDS);
+  const view = makeWindow();
+  const handle = ui.attachTelegramUi(okEnv(doc, { window: view }));
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  view.dispatch('pagehide');
+  assert.equal(doc.elements['telegram-token'].value, '', 'pagehide clears before unload or bfcache freeze');
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  view.dispatch('pageshow');
+  assert.equal(doc.elements['telegram-token'].value, '', 'pageshow clears a restored page');
+  assert.equal(view.listeners.pagehide.length, 1);
+  assert.equal(view.listeners.pageshow.length, 1);
+  handle.detach();
+  assert.equal(doc.elements['telegram-token'].value, '', 'detach clears the in-memory credential');
+  assert.equal(view.listeners.pagehide.length, 0);
+  assert.equal(view.listeners.pageshow.length, 0);
+  doc.elements['telegram-token'].value = VALID_TOKEN;
+  view.dispatch('pagehide');
+  assert.equal(doc.elements['telegram-token'].value, VALID_TOKEN, 'detached handlers no longer run');
 });
 test('boot never reads storage', () => {
   const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
