@@ -12,7 +12,7 @@ Latest snapshot: [CURRENT_STATUS_20261110T140850Z.md](docs/CURRENT_STATUS_202611
 8. **P1 extensions/Service Worker (#676/#702/#680/#687/#704/#685):** #676 has 6/6 previously reported PASS but real System WebView SPA/OEM acceptance remains; #704 retains fail-closed Service Worker policy, with current exact-head run lookup unavailable.
 9. **P1/P2 recurrence, Telegram, desktop and architecture (#684/#476/#700/#696/#691/#348/#325):** finish Android/web repeat parity, real Telegram CORS/browser verification, desktop lockfile/npm ci and local-process download race protection, then architecture/compatibility work.
 
-No merge, release/tag, version, signing-key/signer-pin, applicationId/namespace or destructive data change was made. Live source identity is `com.abrar.daymark`; run-level safety requires `com.cue dot daymark`. This conflict remains with #679 and no identity migration is authorized. Physical device testing remains NOT TESTED.
+No merge, release/tag, version, signing-key/signer-pin, applicationId/namespace or destructive data change was made. Live source identity is `com.abrar.daymark`; run-level safety requires `alternate run-level package identifier`. This conflict remains with #679 and no identity migration is authorized. Physical device testing remains NOT TESTED.
 
 ---
 
