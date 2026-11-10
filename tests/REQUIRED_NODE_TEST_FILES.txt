@@ -54,6 +54,8 @@ tests/storage-logic.test.js
 tests/storage-ui.test.js
 tests/style-coverage.test.js
 tests/task-logic.test.js
+tests/telegram-logic.test.js
+tests/telegram-ui.test.js
 tests/weather-logic.test.js
 tests/weather-ui.test.js
 tests/web-accessibility.test.js
