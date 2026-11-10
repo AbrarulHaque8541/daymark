@@ -26,12 +26,13 @@ import android.util.Log;
  * Service-worker network policy is installed during class initialization, before the first
  * WebView instance is constructed.
  */
+final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.Tab {
+
     // Java initializes this class before invoking the first constructor, so the global
     // ServiceWorkerController client is installed before super(activity) creates a WebView.
     private static final boolean SERVICE_WORKER_NETWORK_POLICY_READY =
             BrowserServiceWorkerEnforcement.installBeforeFirstWebView();
 
-final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.Tab {
     interface Listener {
         void onPageStarted(String url);
         void onPageFinished(String url);
@@ -55,8 +56,8 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         getSettings().setBlockNetworkLoads(blocked);
     }
 
+    private void syncNetworkBlockWithPolicy(WebView view) {
         if (!networkPolicy.allowsRemoteLoads() || !SERVICE_WORKER_NETWORK_POLICY_READY) return;
-        if (!networkPolicy.allowsRemoteLoads()) return;
         try {
             view.getSettings().setBlockNetworkLoads(false);
         } catch (RuntimeException rendererUnavailable) {
