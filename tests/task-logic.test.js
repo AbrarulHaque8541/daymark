@@ -65,7 +65,6 @@ test('title search is case-insensitive and composes with the active filter using
   assert.deepEqual(logic.getFilteredTasks(tasks, 'all', '  PROJECT ', TODAY).map((item) => item.id), ['a', 'b']);
   assert.deepEqual(logic.getFilteredTasks(tasks, 'today', 'project', TODAY).map((item) => item.id), ['a']);
   assert.deepEqual(logic.getFilteredTasks(tasks, 'all', 'missing', TODAY), []);
-  // Deterministic search match verification
   const mixedTasks = [task('d', 'TURKISH İNDEX', { dueDate: TODAY })];
   assert.deepEqual(logic.getFilteredTasks(mixedTasks, 'all', 'İNDEX', TODAY).map((item) => item.id), ['d']);
 });
@@ -190,4 +189,37 @@ test('shared task date contract matches the Java host implementation fixture', (
     cases += 1;
   }
   assert.equal(cases, 9, 'shared date contract must include all nine cases');
+});
+
+test('mergeTaskListsByUpdatedAt keeps newer records and unique ids from both sides', () => {
+  const local = [
+    Object.assign(task('shared', 'Local edit'), { updatedAt: '2026-11-10T12:00:00.000Z' }),
+    Object.assign(task('only-local', 'Only local'), { updatedAt: '2026-11-10T11:00:00.000Z' })
+  ];
+  const remote = [
+    Object.assign(task('shared', 'Remote edit'), { updatedAt: '2026-11-10T13:00:00.000Z' }),
+    Object.assign(task('only-remote', 'Only remote'), { updatedAt: '2026-11-10T10:00:00.000Z' })
+  ];
+  const merged = logic.mergeTaskListsByUpdatedAt(local, remote);
+  const byId = Object.fromEntries(merged.map((item) => [item.id, item]));
+  assert.equal(merged.length, 3);
+  assert.equal(byId.shared.title, 'Remote edit');
+  assert.equal(byId['only-local'].title, 'Only local');
+  assert.equal(byId['only-remote'].title, 'Only remote');
+});
+
+test('mergeTaskListsByUpdatedAt prefers local when updatedAt ties or remote is invalid', () => {
+  const stamp = '2026-11-10T12:00:00.000Z';
+  const local = [task('shared', 'Local', { updatedAt: stamp })];
+  const remote = [task('shared', 'Remote', { updatedAt: stamp })];
+  assert.equal(logic.mergeTaskListsByUpdatedAt(local, remote)[0].title, 'Local');
+
+  const remoteBad = [{ ...task('shared', 'Remote bad'), updatedAt: 'not-a-date' }];
+  assert.equal(logic.mergeTaskListsByUpdatedAt(local, remoteBad)[0].title, 'Local');
+});
+
+test('mergeTaskListsByUpdatedAt fails closed on non-array inputs', () => {
+  assert.deepEqual(logic.mergeTaskListsByUpdatedAt(null, undefined), []);
+  assert.equal(logic.mergeTaskListsByUpdatedAt([task('a', 'A')], null).length, 1);
+  assert.equal(logic.mergeTaskListsByUpdatedAt(null, [task('b', 'B')]).length, 1);
 });
