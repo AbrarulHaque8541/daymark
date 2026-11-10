@@ -1,3 +1,22 @@
+## Latest repo-wide engineering handoff — 2026-11-10T02:18:05Z
+
+Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; main Android CI and cross-platform contracts PASS. 11 open PRs and 21 open issues.
+
+**Delivered:** Focus merged-snapshot adoption/conflict preservation in #675 (code head `ae4edcce`; current docs head `f776bdc`; Node 831/831, Android/contracts/device artifact PASS). Desktop remote-download path containment and injectable cancellation handler in #692 (head `d6c3dbf`; Desktop 42/42 on Ubuntu/Windows/macOS, contracts PASS, Android CI Node 696/696, device APK verification PASS). Release publishing was skipped.
+
+**Still open:** API 36 Focus failures #648/#677; cross-tab task/import/recovery/undo races #683; governance #646; physical acceptance #160; Android secure downloads #671; desktop local-process TOCTOU boundary #691/#692; signing/provenance #665/#84; extension recovery UI #659/#687; Service Worker compatibility #685/#686; recurrence parity #684/#476. No independent PR approval found. Main protection remains disabled; detailed protection read returns 403. #675 is 176 commits ahead and requires scope review before merge consideration.
+
+**Safety:** no merge, release, tag, version, signing-key, application identity or destructive migration change; no physical-device test. Run-level identity directive conflicts with owner-approved AGENTS/Gradle identity; no migration was performed.
+
+See [full dated evidence snapshot](CURRENT_STATUS_20261110T021805Z.md) for exact heads, workflow IDs, blockers and next priorities.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live source, PR/issue, branch and exact-head Actions review
+Timestamp (UTC): 2026-11-10T02:18:05Z
+
+---
+
 ## Latest repo-wide engineering handoff — 2026-11-10T02:08:52Z
 
 **Main:** `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; exact main push Android CI and Ubuntu/Windows contracts PASS. 11 open PRs, 21 open issues.

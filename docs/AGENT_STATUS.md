@@ -1,3 +1,20 @@
+## Latest verified whole-project handoff — 2026-11-10T02:18:05Z
+
+- [Full dated evidence snapshot](CURRENT_STATUS_20261110T021805Z.md)
+- Main `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`; 11 open PRs, 21 open issues.
+- Main exact push checks: Android CI #42737255404 PASS; cross-platform contracts #42737255215 PASS.
+- PR #675 current head `f776bdc`: Android CI, Node 831/831, contracts and device-test APK PASS; release publishing skipped. PR is draft, 176 commits ahead, no independent approval.
+- PR #692 current head `d6c3dbf`: Desktop 42/42 on three OS, contracts PASS, Android CI Node 696/696, device APK signature verification PASS; release publishing skipped.
+- #648/#677 API 36 Focus failures remain. #646 governance and #160 physical-device acceptance remain open.
+- No merge, release, tag, version, signing, package-identity or destructive migration change; no physical-device testing.
+
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live source, PR/issue, branch and exact-head Actions review
+Timestamp (UTC): 2026-11-10T02:18:05Z
+
+---
+
 ## Latest verified repository-wide run — 2026-11-10T02:08:52Z
 
 - [Current engineering snapshot](CURRENT_STATUS_20261110T020852Z.md)
