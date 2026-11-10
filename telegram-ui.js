@@ -16,6 +16,10 @@
     const formEl = element('telegram-form');
     const testEl = element('telegram-test');
     const clearEl = element('telegram-clear');
+    const lifecycleWindow = env.window || doc.defaultView || null;
+    const observesPageLifecycle = lifecycleWindow
+      && typeof lifecycleWindow.addEventListener === 'function'
+      && typeof lifecycleWindow.removeEventListener === 'function';
     let busy = false;
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -149,9 +153,18 @@
       const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE);
       status(result.ok ? 'Test message sent to Telegram.' : (result.reason || 'The test message could not be delivered.'));
     }
-    function onClear() {
+    function clearTokenField() {
       if (tokenEl && typeof tokenEl.value === 'string') tokenEl.value = '';
+    }
+    function onPageHide() { clearTokenField(); }
+    function onPageShow() { clearTokenField(); }
+    function onClear() {
+      clearTokenField();
       status('Cleared. The token field is emptied; nothing was ever saved on this device.');
+    }
+    if (observesPageLifecycle) {
+      lifecycleWindow.addEventListener('pagehide', onPageHide);
+      lifecycleWindow.addEventListener('pageshow', onPageShow);
     }
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
@@ -165,7 +178,14 @@
       send: onSend,
       test: onTest,
       clear: onClear,
-      detach() { status(''); }
+      detach() {
+        clearTokenField();
+        if (observesPageLifecycle) {
+          lifecycleWindow.removeEventListener('pagehide', onPageHide);
+          lifecycleWindow.removeEventListener('pageshow', onPageShow);
+        }
+        status('');
+      }
     };
   }
   const api = { attachTelegramUi };
