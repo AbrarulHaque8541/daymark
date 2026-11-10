@@ -94,7 +94,7 @@ No independent APPROVED review was found in the inspected PR review records. Sev
 7. **Downloads:** #678 validates redirect policy but #671 still needs a complete pinned-address, TLS-verified, bounded, cancellable transport and partial-file cleanup.
 8. **Security/reviews:** #665 signing/provenance, #659 extension recovery, #656 import/export and #676 injection still need independent review.
 9. **Service Workers:** #686 remains a fail-closed compatibility restriction; exact current head has no returned Actions runs.
-10. **Application identity:** root AGENTS.md/Gradle specify `com.abrar.daymark`; the run-level directive specifies `com.cue.daymark`. Issue #679 remains unresolved. No applicationId/namespace change was made.
+10. **Application identity:** root AGENTS.md and Gradle define the repository's current approved application identity; the run-level instruction conflicts with that source of truth. Issue #679 remains unresolved. No applicationId/namespace change was made.
 
 ## Next prioritized engineering queue
 
