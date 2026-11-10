@@ -145,6 +145,10 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
       localDateString: (date) => date === undefined ? fixedToday : logic.localDateString(date)
     })
     : logic;
+  const windowListeners = new Map();
+  class MockStorageEvent {
+    constructor(type, init) { this.type = type; this.key = init && init.key; this.newValue = init && init.newValue; }
+  }
   const window = {
     DaymarkTaskMutation: mutation,
     navigator: effectiveLocks ? { locks: effectiveLocks } : {},
@@ -153,12 +157,21 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     DaymarkFocus: focus,
     DaymarkFocusMutation: focusMutation,
     DaymarkRepeat: repeat,
+    StorageEvent: MockStorageEvent,
     confirm(message) {
       confirmMessages.push(String(message));
       if (confirmThrows) throw new Error('confirmation unavailable');
       return confirmResult;
     },
-    addEventListener() {}
+    addEventListener(type, handler) {
+      const current = windowListeners.get(type) || [];
+      current.push(handler);
+      windowListeners.set(type, current);
+    },
+    dispatchEvent(event) {
+      (windowListeners.get(event.type) || []).forEach((handler) => handler(event));
+      return true;
+    }
   };
   class TestFileReader {
     readAsText(file) {
