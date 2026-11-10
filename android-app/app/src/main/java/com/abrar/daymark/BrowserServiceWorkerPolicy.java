@@ -3,15 +3,16 @@ package com.abrar.daymark;
 import java.util.Locale;
 
 /**
- * Deliberately fail-closed policy for the process-wide WebView Service Worker network path.
+ * User-controlled Online/Offline policy for the process-wide WebView Service Worker path.
  *
- * <p>Daymark does not yet have a reviewed origin-scoped Service Worker grant model. An
- * Online toggle or an explicit top-level navigation therefore never grants a worker
- * permission to make its own network requests. Local responses may still be used.</p>
+ * <p>Online is a browser-wide consent state. Once the user explicitly navigates while
+ * Online, HTTP/HTTPS worker requests follow that same state. Offline blocks remote worker
+ * requests process-wide; local and cached responses remain usable.</p>
  */
 final class BrowserServiceWorkerPolicy {
     enum Decision {
         ALLOW_LOCAL,
+        ALLOW_NETWORK,
         BLOCK
     }
 
@@ -19,20 +20,21 @@ final class BrowserServiceWorkerPolicy {
 
     private BrowserServiceWorkerPolicy() { }
 
-    static Decision decide(boolean onlineEnabled, boolean explicitNavigation, String scheme) {
-        // These inputs are intentionally not grants. Service Worker network access remains
-        // disabled even after an explicit site navigation while normal page loads are Online.
+    static Decision decide(boolean onlineEnabled, String scheme) {
         if (scheme == null) return Decision.BLOCK;
         String normalized = scheme.trim().toLowerCase(Locale.ROOT);
         if ("data".equals(normalized) || "blob".equals(normalized)
                 || "about".equals(normalized)) {
             return Decision.ALLOW_LOCAL;
         }
+        if (onlineEnabled && ("http".equals(normalized) || "https".equals(normalized))) {
+            return Decision.ALLOW_NETWORK;
+        }
         return Decision.BLOCK;
     }
 
-    static boolean blocksNetworkLoads() {
-        return true;
+    static boolean blocksNetworkLoads(boolean onlineEnabled) {
+        return !onlineEnabled;
     }
 
     static synchronized boolean shouldShowCompatibilityNotice() {
@@ -42,6 +44,6 @@ final class BrowserServiceWorkerPolicy {
     }
 
     static String compatibilityDisclosure() {
-        return "Daymark blocks Service Worker network requests, even while Online. Cached responses may still work; sites that rely on worker updates or background network sync may be limited.";
+        return "Service Worker network requests follow Daymark's Online/Offline mode. Remote worker requests are blocked while Offline; cached responses may still work. If this WebView cannot change its process-wide worker setting, worker network access remains blocked even while Online.";
     }
 }
