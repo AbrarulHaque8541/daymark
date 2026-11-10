@@ -25,7 +25,7 @@ function makeLockManager() {
   };
 }
 
-function bootApp({ savedFocusValue, failFocusSave = false }) {
+function bootApp({ savedFocusValue, failFocusSave = false, beforeGetItem }) {
   const elements = new Map();
   const listeners = new Map();
   const windowListeners = new Map();
@@ -71,6 +71,7 @@ function bootApp({ savedFocusValue, failFocusSave = false }) {
 
   const localStorage = {
     getItem(key) {
+      if (typeof beforeGetItem === 'function') beforeGetItem(key, storedValues);
       return storedValues.has(key) ? storedValues.get(key) : null;
     },
     setItem(key, value) {
@@ -342,6 +343,33 @@ test('a stale Focus completion cannot recreate history after clear before its st
     'the stale in-memory session is rebased to the cleared state');
   assert.match(app.elements.get('#storage-status span').textContent,
     /changed or was cleared in another tab/i);
+});
+
+test('Focus load rejects a snapshot when the clear generation changes during its primary read', async () => {
+  const session = focus.createSession({
+    id: 'focus-clear-during-load',
+    kind: 'focus',
+    durationMinutes: 25
+  }, Date.now());
+  let clearedDuringRead = false;
+  const app = bootApp({
+    savedFocusValue: rawFocusPayload(session),
+    beforeGetItem(key, values) {
+      if (key !== FOCUS_KEY || clearedDuringRead) return;
+      clearedDuringRead = true;
+      values.set(focusMutation.FOCUS_GENERATION_KEY, '1');
+      values.delete(FOCUS_KEY);
+    }
+  });
+  await app.settle();
+
+  assert.equal(clearedDuringRead, true);
+  assert.equal(app.storedValues.has(FOCUS_KEY), false,
+    'a torn Focus read must not recreate the key');
+  assert.equal(app.elements.get('#focus-state-label').textContent, 'Ready',
+    'a snapshot spanning a clear must not be rendered as current');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /changed while it was being loaded/i);
 });
 
 test('quota failure preserves original focus payload and recovery backup', async () => {
