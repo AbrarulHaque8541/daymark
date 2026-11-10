@@ -1,9 +1,9 @@
 # Daymark multi-device architecture and support matrix
 
-**Status:** Architecture proposal with one CI-tested Java 17 capability-policy slice; no non-Android Daymark app shell is shipped. This document is not a compatibility claim.
-**Baseline inspected:** `main` at `555ca0745a5a7ddf3ae443c64859fea9ee2a737a`.
+**Status:** Architecture proposal with one CI-tested Java 17 capability-policy slice and a separate experimental Electron desktop-browser prototype; no non-Android full Daymark task-workspace app is shipped. This document is not a compatibility claim.
+**Baseline inspected:** `main` at `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`.
 **Owner direction:** Make Daymark useful across device classes and operating systems, including constrained and display-less companions, while preserving the current Android product.
-**Last updated:** 2026-11-08T11:39:41Z
+**Last updated:** 2026-11-10T04:04:26.726Z
 
 ## 1. Product principle
 
@@ -27,8 +27,9 @@ The full product should adapt to:
 | Android range | minSdk 26 (Android 8.0+), targetSdk 36 in inspected source |
 | Storage | Local encrypted task/attachment stores and encrypted portable backup; no account or mandatory cloud sync |
 | Browser | Android System WebView adapter with explicit network consent and platform-specific policy; not a universal browser engine |
+| Desktop browser | Separate Electron/Chromium prototype under `apps/desktop`; experimental, not the Android app or a full task workspace |
 | UI | Programmatic native Android views; no shared cross-platform UI module in current baseline |
-| Other OS/device apps | Not implemented by this baseline; see matrix below |
+| Other OS/device apps | No non-Android full Daymark task workspace is shipped; see the separate desktop-browser rows below |
 
 Source inspection does not prove current APK publication, physical-device compatibility, or release readiness. Preserve the production signer pin, encrypted formats, backup compatibility, existing feature behavior and release gates.
 
@@ -51,9 +52,12 @@ Status meanings:
 | Apple Watch | Short task actions, timer, complications/widgets and notifications | UNSUPPORTED | watchOS/SwiftUI/WidgetKit implementation and real watch testing |
 | Smart ring | Haptic/LED/button acknowledgements and a few companion-triggered actions | EXPERIMENTAL (API survey only) | Per-vendor public SDK/API, supported commands, radio/battery limits and paired-device tests |
 | Display-less BLE device / button | Explicit start/pause/finish or acknowledge/snooze commands | EXPERIMENTAL (design only) | Authenticated pairing, replay protection, debounce, feedback and lost-connection behavior |
-| Windows desktop/laptop | Keyboard-first task workspace, tray/menu, multi-window and local data | UNSUPPORTED | Installer/signing, secure storage, accessibility, update and GUI smoke tests |
-| macOS desktop/laptop | Native desktop workspace, menu bar, shortcuts and local data | UNSUPPORTED | Hardened/notarized distribution, Keychain, sandbox and GUI tests |
-| Linux desktop/laptop | Desktop workspace, keyboard shortcuts and local data | UNSUPPORTED | Distro/package/ABI matrix, secret storage and desktop integration |
+| Windows desktop/laptop — full task workspace | Keyboard-first task workspace, tray/menu, multi-window and local data | UNSUPPORTED | Installer/signing, secure storage, accessibility, update and GUI smoke tests |
+| macOS desktop/laptop — full task workspace | Native desktop workspace, menu bar, shortcuts and local data | UNSUPPORTED | Hardened/notarized distribution, Keychain, sandbox and GUI tests |
+| Linux desktop/laptop — full task workspace | Desktop workspace, keyboard shortcuts and local data | UNSUPPORTED | Distro/package/ABI matrix, secret storage and desktop integration |
+| Windows — Electron browser prototype | Tabbed mini-browser, address/navigation policy and downloads; no Daymark task workspace | EXPERIMENTAL; CI-TESTED on PR #692 head only | GUI/installer acceptance, keyboard/screen-reader checks, secure download publication and OS integration |
+| macOS — Electron browser prototype | Tabbed mini-browser, address/navigation policy and downloads; no Daymark task workspace | EXPERIMENTAL; CI-TESTED on PR #692 head only | GUI/installer acceptance, keyboard/screen-reader checks, secure download publication and OS integration |
+| Linux — Electron browser prototype | Tabbed mini-browser, address/navigation policy and downloads; no Daymark task workspace | EXPERIMENTAL; CI-TESTED on PR #692 head only | GUI/installer acceptance, keyboard/screen-reader checks, secure download publication and OS integration |
 | Web / installable PWA | Responsive companion for task capture and review | UNSUPPORTED | Browser storage/security limits, offline tests, installability and sync contract |
 | ChromeOS | Android app or desktop/web experience depending on device | EXPERIMENTAL | Windowing/input/storage and actual Chromebook testing |
 | Android Auto | Restricted glanceable/voice-first actions where app category is allowed | UNSUPPORTED | Google-supported category/template eligibility and policy review |
@@ -241,3 +245,48 @@ Timestamp (UTC): 2026-11-08T10:29:23.921Z
 - The Android CI and Ubuntu/Windows contract runs listed in section 13 were executed against `05de9c927843d32586c24a478653e9caab097c72`; they are historical and do **not** validate the current `78524e9f` tree. Fresh current-main CI evidence was not yet observed at this refresh.
 - Android remains the only shipped product target. Windows/Linux have only the shared Java 17 contract slice; no desktop app shell is shipped.
 - Physical Android/WebView and AlarmManager acceptance remain **NOT TESTED** under #160.
+
+
+## 15. Live desktop/browser qualification refresh — 2026-11-10T04:04:26.726Z
+
+This section distinguishes the experimental Electron browser from a full cross-platform Daymark task application. It supersedes the earlier blanket statement that no desktop shell exists, but it does **not** upgrade Windows, macOS, or Linux task-workspace support.
+
+### Current main source boundary
+
+- Current main: `557af3160d16463a6a8a9c3031f5ef887fdb5ef9`.
+- `apps/desktop/README.md` describes **Daymark Browser** as an experimental Electron/Chromium prototype. Its current features include tabs, an address bar, HTTPS-only navigation with a localhost development exception, starter tracker blocking, privacy headers, and find-in-page.
+- `apps/desktop/package.json` declares the Electron dependency range as `^33.4.0` and Node `>=20`.
+- `.github/workflows/desktop-browser-ci.yml` runs Node unit/policy tests on Ubuntu, Windows, and macOS. It does not launch the GUI, build/sign installers, or prove desktop OS integration.
+- The prototype is separate from the Android native app. It does not provide the full Daymark task workspace, an encrypted task-storage adapter, account/device sync, or a production updater. Therefore the full Windows/macOS/Linux task-workspace rows above remain **UNSUPPORTED**.
+
+### Current-main download limitation
+
+At this main SHA, `apps/desktop/main.js` joins Electron's remote `item.getFilename()` directly to the OS Downloads directory. If destination setup throws, the catch path leaves Electron's default download behavior in place. The current README also states that per-download consent and redirect auditing are not production-grade.
+
+This is not represented as fixed on main. PR [#692](https://github.com/AbrarulHaque8541/daymark/pull/692) proposes a sanitized/collision-aware filename policy and fail-closed cancellation, but remains OPEN and unmerged. Its exact head is `33d5bf95b2d3c25a717f96b172c509f553b07a8b`, based on this main SHA.
+
+### PR #692 evidence — not mainline evidence
+
+Exact-head workflows for PR #692 completed successfully:
+
+- [Desktop browser CI — run 42751675537](https://github.com/AbrarulHaque8541/daymark/actions/runs/42751675537): **PASS**, 43/43 on Ubuntu, Windows, and macOS.
+- [Cross-platform contracts — run 42751675450](https://github.com/AbrarulHaque8541/daymark/actions/runs/42751675450): **PASS** on Ubuntu and Windows.
+- [Android CI — run 42751675524](https://github.com/AbrarulHaque8541/daymark/actions/runs/42751675524): **PASS**, Node 697/697, source guards and Gradle build successful.
+- [Device-test APK — run 42751675799](https://github.com/AbrarulHaque8541/daymark/actions/runs/42751675799): **PASS**; release-publication step **SKIPPED**.
+
+These are PR-head automated tests, not a mainline merge, GUI launch, installer acceptance, or physical desktop test. PR #692 explicitly leaves a hostile external local-process pathname race outside its current guarantee; private temporary staging plus atomic/no-replace publication remains future work. No independent APPROVED review was present at this refresh.
+
+### Conservative status
+
+- Android phone: remains the only shipped full Daymark product target; physical device acceptance remains **NOT TESTED** under #160.
+- Electron desktop browser: **EXPERIMENTAL**; its policy/unit tests are **CI-TESTED on PR #692's head only**.
+- Windows/macOS/Linux full Daymark task workspace: **UNSUPPORTED**.
+- No installer, signed desktop release, GUI smoke suite, physical desktop acceptance, encrypted desktop task store, or production updater is claimed.
+- The shared Java 17 capability-policy slice remains a separate contract proof; it is not a desktop app implementation.
+
+Next qualification gates: integrate and independently review #692; add GUI launch/navigation/download smoke tests on each desktop OS; design private staging and no-replace publication if external local-process races are in scope; then evaluate a full task workspace separately.
+
+**Work by:** ChatGPT (OpenAI)  
+**Model:** GPT-6  
+**Tooling:** GitHub connector via Code Mode; live main source/docs/workflow inspection; PR #692 exact-head Actions metadata  
+**Timestamp (UTC):** 2026-11-10T03:00:00Z
