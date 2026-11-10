@@ -76,6 +76,7 @@ jobs:
     # Manual dispatch is build-only. Signed provenance and release-asset upload
     # are permitted only for a tag push whose commit was verified on main above.
     if: github.event_name == 'push' && github.ref_type == 'tag' && github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'
+    environment: production-signing
     needs: [build]
     permissions:
       actions: read   # To read the workflow path.
