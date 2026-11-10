@@ -12,9 +12,9 @@ import java.util.Locale;
  * <p>The caller must validate the redirect chain and response destination before calling this
  * helper. It must also close the active network connection when cancellation is requested or
  * the user switches the browser to Offline.
- * This class never publishes a destination itself: {@link StagingTarget#commit(long)} is called
- * only after the complete body has been copied, length-checked, flushed, and closed. A target
- * implementation must make commit atomic and make abort idempotently remove unpublished data.
+ * Publication is delegated to {@link PublicationGate}, which must atomically serialize the final
+ * cancellation/Online check and target commit with changes to those states. The target commit must
+ * be atomic, and abort must idempotently remove unpublished data.
  *
  * <p>Do not log response headers, URLs, cookies, or exception causes from the surrounding
  * transport. TransferException deliberately exposes only a bounded failure category.
@@ -59,6 +59,18 @@ final class BrowserDownloadBodyTransfer {
         void onProgress(long copiedBytes, long expectedBytes);
     }
 
+    /**
+     * Atomically checks cancellation and Online state and publishes the staged file.
+     * Implementations must share synchronization with the state transitions that can cancel this
+     * transfer or switch browsing Offline. A separate check followed by an unlocked commit is not
+     * sufficient because it leaves a publication race.
+     */
+    interface PublicationGate {
+        void commitIfAllowed(Cancellation cancellation, NetworkPolicy networkPolicy,
+                             StagingTarget target, long copiedBytes)
+                throws IOException, TransferException;
+    }
+
     interface StagingTarget {
         OutputStream openStream() throws IOException;
         void commit(long copiedBytes) throws IOException;
@@ -80,15 +92,15 @@ final class BrowserDownloadBodyTransfer {
     static long copy(int statusCode, List<String> contentLengthValues,
                      List<String> contentEncodingValues, InputStream input,
                      long configuredMaxBytes, Cancellation cancellation,
-                     NetworkPolicy networkPolicy, ProgressListener progress,
-                     StagingTarget target) throws TransferException {
+                     NetworkPolicy networkPolicy, PublicationGate publicationGate,
+                     ProgressListener progress, StagingTarget target) throws TransferException {
         boolean committed = false;
         long copied = 0L;
         // The transfer takes ownership of the response stream, including early validation failures.
         try (InputStream source = input) {
             if (statusCode != 200) throw failure(Failure.HTTP_STATUS);
-            if (source == null || cancellation == null || networkPolicy == null || target == null
-                    || configuredMaxBytes <= 0L) {
+            if (source == null || cancellation == null || networkPolicy == null
+                    || publicationGate == null || target == null || configuredMaxBytes <= 0L) {
                 throw failure(Failure.INVALID_ARGUMENT);
             }
             long maxBytes = Math.min(configuredMaxBytes, HARD_MAX_BYTES);
@@ -136,10 +148,16 @@ final class BrowserDownloadBodyTransfer {
         } catch (IOException | RuntimeException failure) {
             abortAfterFailure(target, committed);
             throw failure(Failure.IO_ERROR);
+        } catch (Error fatal) {
+            try {
+                abortAfterFailure(target, committed);
+            } catch (TransferException cleanup) {
+                fatal.addSuppressed(cleanup);
+            }
+            throw fatal;
         }
         try {
-            checkState(cancellation, networkPolicy);
-            target.commit(copied);
+            publicationGate.commitIfAllowed(cancellation, networkPolicy, target, copied);
             committed = true;
             return copied;
         } catch (TransferException failure) {
@@ -148,6 +166,13 @@ final class BrowserDownloadBodyTransfer {
         } catch (IOException | RuntimeException failure) {
             abortAfterFailure(target, committed);
             throw failure(Failure.IO_ERROR);
+        } catch (Error fatal) {
+            try {
+                abortAfterFailure(target, committed);
+            } catch (TransferException cleanup) {
+                fatal.addSuppressed(cleanup);
+            }
+            throw fatal;
         }
     }
 
