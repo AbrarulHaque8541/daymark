@@ -98,7 +98,7 @@ test('a writer queued before Clear Focus cannot recreate the removed key', async
     desiredSnapshot: desired,
     expectedGeneration: 0
   });
-  assert.deepEqual(result, { ok: false, reason: 'stale-generation' });
+  assert.deepEqual(result, { ok: false, reason: 'stale-generation', conflicts: [] });
   assert.equal(storage.getItem('daymark.focus.v1'), null);
 });
 
