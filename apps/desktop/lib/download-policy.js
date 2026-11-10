@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const MAX_FILENAME_BYTES = 180;
 const MAX_NAME_ATTEMPTS = 10000;
-const RESERVED_WINDOWS_BASE = /^(?:CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|COM[1-9¹²³]|LPT[1-9¹²³])$/i;
+const RESERVED_WINDOWS_BASE = /^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³])$/i;
 
 function utf8Length(value) {
   return Buffer.byteLength(value, 'utf8');
