@@ -195,10 +195,11 @@ final class TaskFocusSessionCoordinator {
         } else {
             next = current.pause(now.elapsedRealtimeMs);
         }
+        boolean replaceNotification = notificationPresentationChanged(next);
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
         if (next.isPaused()) {
-            if (notificationPresentationChanged(next)) {
+            if (replaceNotification) {
                 notifications.cancel();
                 notificationPublished = false;
             }
@@ -252,12 +253,13 @@ final class TaskFocusSessionCoordinator {
         TaskFocusTimer next = current.isCountdown() && current.isExpiredAt(now.elapsedRealtimeMs)
                 ? current.finish(now.elapsedRealtimeMs)
                 : current.resume(now.elapsedRealtimeMs);
+        boolean replaceNotification = notificationPresentationChanged(next);
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
         this.currentTaskTitle = currentTaskTitle;
 
         if (next.isRunning()) {
-            if (notificationPresentationChanged(next)) {
+            if (replaceNotification) {
                 notifications.cancel();
                 notificationPublished = false;
             }
