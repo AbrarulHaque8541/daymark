@@ -119,7 +119,7 @@ PR #656 currently changes `task-logic.js` and its tests. No overlapping edits we
 ## Governance and safety
 
 - Main branch protection remains disabled; no repository rulesets were returned; detailed protection endpoint is HTTP 403. No protection settings changed.
-- Root AGENTS/Gradle currently specify `com.abrar.daymark`, while the run-level directive requires `com.cue.daymark`. This owner-level identity conflict remains unresolved; no applicationId/namespace change was made.
+- The live Gradle/root AGENTS application identity conflicts with the run-level required identity. This owner-level conflict remains unresolved; no applicationId/namespace change was made.
 - No version bump, signing-key change, destructive migration, user-data action, release or tag was performed.
 - No physical Android or desktop GUI test was performed.
 - PR #694 remains unmerged and awaiting independent review.
