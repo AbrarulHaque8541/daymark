@@ -155,3 +155,36 @@ assert "if (widthDp >= 840)" in layout_policy
 assert "new Layout(1040, 24, 2, 16, 12)" in layout_policy
 assert "new Layout(720, 24, 1, 0, 12)" in layout_policy
 print("PASS responsive Tasks Home: centered max-width content and two-column expanded task grid")
+
+mode_start = panel.index("    private final class ModeSelector extends LinearLayout {")
+mode_end = panel.index("    private void chooseDisplayUnit(", mode_start)
+mode_selector = panel[mode_start:mode_end]
+assert "public void requestDisallowInterceptTouchEvent(boolean disallow)" in mode_selector, (
+    "mode selector must neutralize child disallow-intercept requests so it can classify MOVE"
+)
+assert "disallowParentIntercept(false);" in mode_selector, (
+    "mode selector must release parent interception on taps, vertical drags and terminal paths"
+)
+assert "disallowParentIntercept(true);" in mode_selector, (
+    "only a classified horizontal mode swipe may temporarily block the parent"
+)
+assert "getParent().requestDisallowInterceptTouchEvent(disallow);" in mode_selector, (
+    "gesture ownership must be forwarded to the parent without setting the selector's own disallow flag"
+)
+assert "if (verticalGesture)" in mode_selector and "return false;" in mode_selector, (
+    "vertical movement must be released to the parent Tasks ScrollView"
+)
+assert "if (result == TaskFocusTimerModeGesturePolicy.Result.VERTICAL)" in mode_selector, (
+    "the selector must classify vertical movement before intercepting horizontal swipes"
+)
+assert "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_STOPWATCH" in mode_selector, (
+    "rightward horizontal movement must be explicitly classified for Stopwatch"
+)
+assert "if (result == TaskFocusTimerModeGesturePolicy.Result.TO_COUNTDOWN)" in mode_selector, (
+    "leftward horizontal movement must be explicitly classified for Countdown"
+)
+assert mode_selector.count("requestDisallowInterceptTouchEvent(") == 2, (
+    "the selector must not call its own requestDisallowInterceptTouchEvent and block its next MOVE"
+)
+print("PASS Focus Timer gesture arbitration: horizontal mode swipes and parent vertical scrolling")
+
