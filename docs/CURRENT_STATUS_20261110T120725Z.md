@@ -4,7 +4,7 @@
 
 - Repository: `AbrarulHaque8541/daymark`; default branch: `main`.
 - Current main: `41fda91fbb15d2bf9634fd7576cf842fe9bdacbc`.
-- Root `AGENTS.md` blob: `492ed21e2219a8d1b80c7d6e63575525c98a5a91`; read in full. Repository search found no nested `AGENTS.md` under the touched workflow, Android tools, tests, or docs paths.
+- Root `AGENTS.md` blob: `7747504267d7330a4a51bf04fde494dd750a6023`; read in full. Repository search found no nested `AGENTS.md` under the touched workflow, Android tools, tests, or docs paths.
 - Main Android CI #42784930733 PASS; Ubuntu/Windows contracts #42784930716 PASS; nightly main audit #42807418062 PASS.
 - Main branch metadata: `protected=false`; repository rulesets API returns `[]`; detailed branch-protection endpoint returns HTTP 403 to the connected integration.
 - Open PRs: 7 — #675, #656, #706, #648, #676, #704, #705.
@@ -13,7 +13,7 @@
 - Latest main merge: #659, commit `41fda91`, requiring imported extension opt-in and preserving existing packs on import failures. Post-merge Android CI, contracts, and nightly audit pass.
 - #701 is closed unmerged and superseded by clean main-based documentation PR #706.
 - Latest published release is v1.5; v1.4 remains draft. Source Gradle identity/version: namespace/applicationId `com.abrar.daymark`, versionName 1.6, versionCode 13. No release or tag was created.
-- The run-level `com.cue.daymark` constraint conflicts with root AGENTS/Gradle. No applicationId/namespace change was made; owner reconciliation remains required.
+- The run-level package-identity constraint conflicts with root AGENTS/Gradle's owner-approved identity. No applicationId/namespace change was made; owner reconciliation remains required.
 
 ## Exact open-PR matrix
 
