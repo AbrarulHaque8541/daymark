@@ -14,7 +14,7 @@
   const focus = window.DaymarkFocus || null;
   const focusMutation = window.DaymarkFocusMutation || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], persistedTasks: null, taskSaveQueue: Promise.resolve(), filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusPersistedRaw: undefined, focusPresetPersistedRaw: undefined, focusPrimaryUnreadable: false, focusRecoveryBackupReady: false, focusRecoveryBackupPendingPayload: null, focusRecoveryBackupBasePrimaryRaw: undefined, focusRecoveryBackupBaseRaw: undefined, focusRecoveryBackupGeneration: null, focusStorageEventEpoch: 0, focusSaveQueue: Promise.resolve(), focusPresetSaveQueue: Promise.resolve(), focusBackupMaintenancePromise: Promise.resolve(), focusAutoFinalizePending: false, focusFinalizingExpiredSession: false, recoveryBackupPendingPayload: null, recoveryBackupCleanupPending: false, recoveryBackupMaintenancePromise: Promise.resolve(), recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -1905,6 +1905,8 @@
 
       const completedSession = restoreResult.completedSession;
       if (completedSession) {
+        // Preserve the exact pre-finalization bytes before the expiry log is committed.
+        queueFocusRecoveryBackup(saved, saved);
         const entry = focus.makeLogEntry(completedSession);
         const alreadyLogged = entry && log.entries.some((item) => item.id === entry.id);
         const entries = entry && !alreadyLogged
@@ -1990,7 +1992,11 @@
         setStorageStatus('Focus data changed or was cleared in another tab; this tab did not overwrite it.', true);
         reconcileFocusStateFromStorage(FOCUS_KEY, false);
       } else {
-        setStorageStatus('Focus data could not be saved safely; existing stored data was left unchanged.', true);
+        if (state.focusFinalizingExpiredSession && result.reason === 'storage-write-failed') {
+          setStorageStatus('A Focus session completed while Daymark was closed, but its history could not be saved. The original session is preserved in the recovery backup.', true);
+        } else {
+          setStorageStatus('Focus data could not be saved safely; existing stored data was left unchanged.', true);
+        }
       }
       return false;
     }, async () => false);
@@ -2424,7 +2430,8 @@
       if (state.focusSession) ensureFocusTimer();
       if (state.focusAutoFinalizePending) {
         state.focusAutoFinalizePending = false;
-        void persistFocusState();
+        state.focusFinalizingExpiredSession = true;
+        void persistFocusState().finally(() => { state.focusFinalizingExpiredSession = false; });
       } else if (state.focusRecoveryBackupPendingPayload !== null) {
         void scheduleFocusRecoveryBackupMaintenance();
       }
@@ -2611,7 +2618,8 @@
     scheduleRecoveryBackupMaintenance();
     if (state.focusAutoFinalizePending) {
       state.focusAutoFinalizePending = false;
-      void persistFocusState();
+      state.focusFinalizingExpiredSession = true;
+      void persistFocusState().finally(() => { state.focusFinalizingExpiredSession = false; });
     } else {
       void scheduleFocusRecoveryBackupMaintenance();
     }
