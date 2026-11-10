@@ -26,6 +26,7 @@
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
 
     function status(message) {
+      // Prefer the visible glass status element shipped in the page; fall back to an sr-only announcement.
       let el = typeof doc.getElementById === 'function' ? doc.getElementById('export-status') : null;
       if (!el && typeof doc.createElement === 'function') {
         el = doc.createElement('span');
@@ -35,7 +36,10 @@
         const parent = doc.body || doc.documentElement;
         if (parent && typeof parent.appendChild === 'function') parent.appendChild(el);
       }
-      if (el) el.textContent = message;
+      if (el) {
+        el.textContent = message;
+        if (typeof el.setAttribute === 'function' && typeof el.getAttribute === 'function' && !el.getAttribute('role')) el.setAttribute('role', 'status');
+      }
       return el;
     }
 
@@ -66,6 +70,8 @@
       if (!exportApi || !exportApi.isFormat(format)) return; // JSON backup stays with app.js
       if (typeof event.preventDefault === 'function') event.preventDefault();
       if (typeof event.stopPropagation === 'function') event.stopPropagation();
+      const button = exportButtonOf(event && event.target);
+      if (button && typeof button.setAttribute === 'function') button.setAttribute('aria-busy', 'true');
       try {
         if (!logic || typeof logic.validateStoredTasks !== 'function') {
           throw new Error('task logic is unavailable');
@@ -83,6 +89,8 @@
         status(`Exported ${validated.tasks.length} task${validated.tasks.length === 1 ? '' : 's'} as ${format.toUpperCase()}${skipped}.`);
       } catch (error) {
         status('Export failed: ' + (error && error.message ? error.message : 'unknown error'));
+      } finally {
+        if (button && typeof button.removeAttribute === 'function') button.removeAttribute('aria-busy');
       }
     }
 
