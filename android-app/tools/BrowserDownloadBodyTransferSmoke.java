@@ -67,6 +67,13 @@ public final class BrowserDownloadBodyTransferSmoke {
             check(target.opens == 0 && target.commits == 0 && target.aborts == 1,
                     "invalid Content-Length is rejected before opening and aborts the unpublished target");
         }
+        Target earlyFailure = new Target();
+        TrackingInputStream earlyInput = new TrackingInputStream(new byte[]{1});
+        expect(BrowserDownloadBodyTransfer.Failure.INVALID_CONTENT_LENGTH, () -> transfer(200,
+                Collections.singletonList("not-a-length"), null, earlyInput, 1024,
+                () -> false, () -> true, earlyFailure, null));
+        check(earlyInput.closed && earlyFailure.opens == 0,
+                "response stream is closed even when headers fail before staging begins");
         Target oversized = new Target();
         expect(BrowserDownloadBodyTransfer.Failure.CONTENT_TOO_LARGE, () -> transfer(200, Collections.singletonList("2049"), null,
                 new ByteArrayInputStream(new byte[0]), 1024, () -> false, () -> true, oversized, null));
@@ -241,6 +248,12 @@ public final class BrowserDownloadBodyTransferSmoke {
         private static final long serialVersionUID = 1L;
         final BrowserDownloadBodyTransfer.Failure failure;
         TransferFailure(BrowserDownloadBodyTransfer.Failure failure) { this.failure = failure; }
+    }
+
+    private static final class TrackingInputStream extends ByteArrayInputStream {
+        boolean closed;
+        TrackingInputStream(byte[] bytes) { super(bytes); }
+        @Override public void close() throws IOException { closed = true; super.close(); }
     }
 
     private static final class Target implements BrowserDownloadBodyTransfer.StagingTarget {
