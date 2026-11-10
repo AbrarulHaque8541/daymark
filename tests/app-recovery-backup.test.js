@@ -189,7 +189,8 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
       timers.set(id, { callback, delay });
       return id;
     },
-    setInterval: () => 1
+    setInterval: () => 1,
+    clearInterval() {}
   }, { filename: 'app.js' });
 
   return {
