@@ -1,1 +1,180 @@
-PLACEHOLDER_AGAIN
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daymark — local-first tasks</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-motion-efficiency.css">
+  <link rel="stylesheet" href="motion-accessibility.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Daymark">
+      <a class="brand" href="#top">
+        <span class="brand-name">Daymark</span>
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+      </a>
+    </aside>
+    <main class="main-content" id="top">
+      <header class="topbar">
+        <div class="topbar-date" id="today-label">Today</div>
+        <div class="storage-status" id="storage-status" role="status"><span>Local storage</span></div>
+      </header>
+      <div class="page-heading">
+        <p class="eyebrow">Your day, your device</p>
+        <h1>Tasks that stay with you</h1>
+        <p class="lede">Encrypted on-device storage, portable backups, and an offline-first browser. No account. No cloud task sync.</p>
+      </div>
+      <form class="add-form" id="add-form">
+        <input id="task-title" type="text" placeholder="What needs doing?" required maxlength="240" aria-label="Task title">
+        <input id="task-due-date" type="date" aria-label="Due date">
+        <input id="task-due-time" type="time" aria-label="Due time">
+        <select id="task-priority" aria-label="Priority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <select id="task-repeat" aria-label="Repeat">
+          <option value="">No repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+        <button class="add-button" type="submit">Add</button>
+      </form>
+      <div class="content-grid">
+        <section class="task-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Tasks</p>
+              <h2>What you decided</h2>
+            </div>
+            <div class="section-heading-tools">
+              <span class="task-total" id="task-total">0 tasks</span>
+              <button class="clear-completed" id="clear-completed" type="button" hidden>Clear completed</button>
+            </div>
+          </div>
+          <div class="stats" id="stats">
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-open">0</span><span class="stat-cell-label">open</span></div>
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-today">0</span><span class="stat-cell-label">today</span></div>
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-streak">0</span><span class="stat-cell-label">day streak</span></div>
+          </div>
+          <div class="task-tools">
+            <label class="sr-only" for="task-search">Search tasks by title</label>
+            <input id="task-search" type="search" placeholder="Search your tasks…" autocomplete="off" aria-describedby="visible-count">
+            <p class="sr-only" id="search-result-status" role="status" aria-live="polite"></p>
+            <button class="tool-button clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
+            <button class="tool-button" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart</button>
+            <label class="sr-only" for="export-format">Export format</label>
+            <select id="export-format" class="sort-select" aria-label="Choose export format">
+              <option value="json" selected>Backup (JSON)</option>
+              <option value="markdown">Markdown (.md)</option>
+              <option value="csv">CSV (.csv)</option>
+              <option value="ics">Calendar (.ics)</option>
+            </select>
+            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
+            <p id="export-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
+            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
+            <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
+            <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          </div>
+          <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
+            <div class="task-list-skeleton" aria-hidden="true">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+          <div class="empty-state" id="empty-state" hidden>
+            <div class="empty-illustration" aria-hidden="true"><span class="empty-sun"></span><span class="empty-line line-one"></span><span class="empty-line line-two"></span><span class="empty-check">✓</span></div>
+            <h3 id="empty-title">A clear start</h3>
+            <p id="empty-copy">Add your first task above. Small steps count.</p>
+            <button class="button button-quiet empty-clear-search" id="empty-clear-search" type="button" hidden>Clear search</button>
+          </div>
+        </section>
+
+        <div class="side-column">
+        <aside class="suggestion-card" aria-labelledby="suggestion-title">
+          <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span></div>
+          <h2 id="suggestion-title">A good place to begin</h2>
+          <p class="suggestion-description">Local rules pick your next tasks — no AI service.</p>
+          <div class="suggestion-list" id="suggestion-list" aria-live="polite"></div>
+        </aside>
+
+        <aside class="focus-card" id="focus-card" aria-labelledby="focus-heading">
+          <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span></div>
+          <h2 id="focus-heading">One thing at a time</h2>
+          <p class="focus-description">No network, no account.</p>
+          <div class="focus-time-wrap">
+            <span class="focus-time" id="focus-time" role="timer">25:00</span>
+            <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite" aria-atomic="true">Ready</span>
+          </div>
+          <div class="focus-progress" id="focus-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Focus session progress"><div class="focus-progress-fill" id="focus-progress-fill"></div></div>
+          <div class="focus-presets" role="group" aria-label="Timer length">
+            <button class="date-chip focus-preset is-active" type="button" data-focus-preset="focus">Focus · 25 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
+          </div>
+          <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
+          <select id="focus-task"><option value="">No task</option></select>
+          <div class="focus-actions">
+            <button class="button button-primary" id="focus-start" type="button">Start</button>
+            <button class="button button-quiet" id="focus-pause" type="button" hidden>Pause</button>
+            <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
+          </div>
+          <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
+        </aside>
+
+        <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="briefing-heading">RSS / Atom briefing</h2>
+          <p class="briefing-description">Local feed cache. No account.</p>
+          <div class="briefing-list" id="briefing-list" aria-live="polite"></div>
+        </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+  <script src="task-logic.js" defer></script>
+  <script src="export-logic.js" defer></script>
+  <script src="repeat-logic.js" defer></script>
+  <script src="focus-logic.js" defer></script>
+  <script src="feed-logic.js" defer></script>
+  <script src="response-body-logic.js" defer></script>
+  <script src="weather-logic.js" defer></script>
+  <script src="weather-ui.js" defer></script>
+  <script src="holidays-logic.js" defer></script>
+  <script src="holidays-ui.js" defer></script>
+  <script src="currency-logic.js" defer></script>
+  <script src="currency-ui.js" defer></script>
+  <script src="zones-logic.js" defer></script>
+  <script src="zones-ui.js" defer></script>
+  <script src="wiki-logic.js" defer></script>
+  <script src="wiki-ui.js" defer></script>
+  <script src="browser-address-logic.js" defer></script>
+  <script src="browser-address-ui.js" defer></script>
+  <script src="browser-error-logic.js" defer></script>
+  <script src="browser-error-ui.js" defer></script>
+  <script src="browser-download-logic.js" defer></script>
+  <script src="browser-download-ui.js" defer></script>
+  <script src="browser-proxy-logic.js" defer></script>
+  <script src="browser-proxy-ui.js" defer></script>
+  <script src="browser-data-logic.js" defer></script>
+  <script src="browser-data-ui.js" defer></script>
+  <script src="browser-intent-logic.js" defer></script>
+  <script src="browser-intent-ui.js" defer></script>
+  <script src="telegram-logic.js" defer></script>
+  <script src="telegram-ui.js" defer></script>
+  <script src="webhook-logic.js" defer></script>
+  <script src="webhook-ui.js" defer></script>
+  <script src="storage-logic.js" defer></script>
+  <script src="storage-ui.js" defer></script>
+  <script src="motion-policy.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="export-ui.js" defer></script>
+  <script src="import-logic.js" defer></script>
+  <script src="import-ui.js" defer></script>
+</body>
+</html>
