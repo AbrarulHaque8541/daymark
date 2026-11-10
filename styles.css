@@ -863,3 +863,45 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Cycle B: professional glass busy/press feedback for app-link planner (accent #16705f). */
+#browser-intent-form.is-busy {
+  opacity: 0.92;
+}
+#browser-intent-status {
+  margin: 8px 0 4px;
+  padding: 7px 11px;
+  border-radius: 12px;
+  background: rgba(226, 240, 235, .72);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(22, 112, 95, .22);
+  color: var(--accent-dark);
+  font-size: 11px;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgba(22, 112, 95, .06);
+  transition: opacity .18s ease, transform .18s ease;
+}
+#browser-intent-status:empty { display: none; }
+#browser-intent-result.is-updating {
+  animation: rise-in .18s ease both;
+}
+.button.is-pressed,
+#browser-intent-plan.is-pressed,
+#browser-intent-clear.is-pressed {
+  transform: translateY(1px) scale(.985);
+  transition: transform .08s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  #browser-intent-result.is-updating { animation: none; }
+  .button.is-pressed,
+  #browser-intent-plan.is-pressed,
+  #browser-intent-clear.is-pressed { transform: none; }
+}
+@media (prefers-color-scheme: dark) {
+  #browser-intent-status {
+    background: rgba(26, 40, 36, .72);
+    border-color: rgba(42, 143, 122, .35);
+    color: #b8e0d4;
+  }
+}
