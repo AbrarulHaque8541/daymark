@@ -44,6 +44,15 @@ require("BrowserServiceWorkerPolicy.decide(onlineAllowed, scheme)" in enforcemen
         "allow HTTP/HTTPS worker requests only in the explicit Online mode and block remote/unknown requests Offline")
 require("new WebResourceResponse(" in enforcement and "403" in enforcement,
         "return a synthetic blocked response instead of allowing network pass-through")
+consent_gate = "if (!BrowserServiceWorkerPolicy.canEnableNetworkAfterConsent(clientInstalled))"
+platform_unblock = ".setBlockNetworkLoads(false)"
+require(consent_gate in enforcement
+        and enforcement.index(consent_gate) < enforcement.index("onlineAllowed = true;")
+        and enforcement.index(consent_gate) < enforcement.index(platform_unblock),
+        "do not grant Online worker networking or remove the platform block before proving the independent request client is installed")
+consent_failure = enforcement.split(consent_gate, 1)[1].split("onlineAllowed = true;", 1)[0]
+require("onlineAllowed = false;" in consent_failure and "return false;" in consent_failure,
+        "a missing request client must retain the fail-closed worker state")
 require("allowNetworkAfterExplicitConsent()" in enforcement
         and ".setBlockNetworkLoads(false)" in enforcement
         and "return settingsBlocked || clientInstalled;" in enforcement
@@ -61,6 +70,8 @@ require("Service Worker network requests follow Daymark's Online/Offline mode" i
 require("static Decision decide(boolean onlineEnabled, String scheme)" in policy
         and "ALLOW_NETWORK" in policy,
         "allow HTTP/HTTPS Service Worker requests only while Online")
+require("static boolean canEnableNetworkAfterConsent(boolean requestClientInstalled)" in policy,
+        "make the independent request-client prerequisite explicit and testable")
 require('flavorDimensions += "distribution"' in test_module
         and 'create("githubSideload")' in test_module
         and 'create("play")' in test_module
