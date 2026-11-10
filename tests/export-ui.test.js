@@ -252,7 +252,7 @@ test('index loads task mutation and export logic before their UI consumers', () 
   const fs = require('node:fs');
   const path = require('node:path');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const scripts = [...html.matchAll(/<script\\s+src=["']([^"']+)["'][^>]*>/g)].map((match) => match[1]);
+  const scripts = [...html.matchAll(/<script\s+src=["']([^"']+)["'][^>]*>/g)].map((match) => match[1]);
   const at = (name) => scripts.indexOf(name);
   assert.ok(at('task-logic.js') >= 0, 'task logic is loaded');
   assert.ok(at('task-mutation-logic.js') > at('task-logic.js'),
