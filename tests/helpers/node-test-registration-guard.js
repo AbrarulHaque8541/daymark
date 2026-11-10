@@ -7,7 +7,7 @@ const path = require('node:path');
 const NODE_TEST_FILE_RE = /^(?:test(?:-.*)?|.*-test|.*\.test)\.(?:js|mjs|cjs)$/i;
 const NODE_TEST_MUTATOR_METHODS = {
   Object: ['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf'],
-  Reflect: ['set', 'defineProperty', 'deleteProperty', 'setPrototypeOf']
+  Reflect: ['set', 'defineProperty', 'deleteProperty', 'setPrototypeOf', 'apply']
 };
 const GENERATED_TEST_SCAN_EXCLUSIONS = new Set([
   '.git', '.gradle', '.idea', '.cache', 'node_modules',
@@ -128,6 +128,13 @@ function markNodeTestMutatorBinding(scope, localName, rootName, methodName) {
   if (!binding) return;
   binding.kind = 'node-test-mutator';
   binding.importedName = `${rootName}.${methodName}`;
+}
+
+function markNodeTestMutatorInvokerBinding(scope, localName, mutatorName, invocationName) {
+  const binding = scope && scope.bindings.get(localName);
+  if (!binding) return;
+  binding.kind = 'node-test-mutator-invoker';
+  binding.importedName = `${mutatorName}.${invocationName}`;
 }
 
 function markNodeTestMutatorPattern(pattern, scope, rootName) {
@@ -306,6 +313,14 @@ function buildScopes(ast) {
         markNodeTestMutatorBinding(scope, declarator.id.name, rootName, methodName);
         continue;
       }
+      const invocationName = staticPropertyName(init);
+      if (declarator.id.type === 'Identifier' && ['call', 'apply', 'bind'].includes(invocationName)) {
+        const baseMutator = resolveMutationIntrinsic(init.object, scope);
+        if (baseMutator) {
+          markNodeTestMutatorInvokerBinding(scope, declarator.id.name, baseMutator, invocationName);
+          continue;
+        }
+      }
       const mutatorRoot = mutationIntrinsicNamespaceRoot(init);
       if (declarator.id.type === 'ObjectPattern' && mutatorRoot) {
         markNodeTestMutatorPattern(declarator.id, scope, mutatorRoot);
@@ -374,10 +389,27 @@ function mutationIntrinsicName(expression) {
 function resolveMutationIntrinsic(callee, scope) {
   if (callee && callee.type === 'Identifier') {
     const binding = resolveBinding(scope, callee.name);
-    if (binding && binding.kind === 'node-test-mutator') return binding.importedName;
+    if (binding && ['node-test-mutator', 'node-test-mutator-invoker'].includes(binding.kind)) return binding.importedName;
     return null;
   }
   return mutationIntrinsicName(callee);
+}
+
+function mutationTargetForInvocation(mutatorName, args, scope, depth = 0) {
+  if (!mutatorName || depth > 3) return null;
+  if (mutatorName === 'Reflect.apply') {
+    const targetMutator = resolveMutationIntrinsic(args[0], scope);
+    const argumentList = args[2];
+    if (!targetMutator || !argumentList || argumentList.type !== 'ArrayExpression') return null;
+    return mutationTargetForInvocation(targetMutator, argumentList.elements, scope, depth + 1);
+  }
+  if (mutatorName.endsWith('.call')) return args[1] || null;
+  if (mutatorName.endsWith('.apply')) {
+    const argumentList = args[1];
+    return argumentList && argumentList.type === 'ArrayExpression' ? (argumentList.elements[0] || null) : null;
+  }
+  if (mutatorName.endsWith('.bind')) return args[1] || null;
+  return args[0] || null;
 }
 
 function nodeTestBindingForTarget(target, scope) {
@@ -403,9 +435,17 @@ function markBindingObjectMutated(binding) {
 
 function markReflectiveMutation(node, scope) {
   if (!node || node.type !== 'CallExpression' || !node.callee) return;
-  const mutator = resolveMutationIntrinsic(node.callee, scope);
+  let mutator = resolveMutationIntrinsic(node.callee, scope);
+  if (!mutator && node.callee.type === 'MemberExpression') {
+    const invocationName = staticPropertyName(node.callee);
+    if (['call', 'apply', 'bind'].includes(invocationName)) {
+      const baseMutator = resolveMutationIntrinsic(node.callee.object, scope);
+      if (baseMutator) mutator = `${baseMutator}.${invocationName}`;
+    }
+  }
   if (!mutator) return;
-  const binding = nodeTestBindingForTarget(node.arguments[0], scope);
+  const target = mutationTargetForInvocation(mutator, node.arguments, scope);
+  const binding = nodeTestBindingForTarget(target, scope);
   if (binding) markBindingObjectMutated(binding);
 }
 
