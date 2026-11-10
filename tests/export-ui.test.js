@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../export-ui.js');
@@ -190,4 +192,17 @@ test('auto-boot stays inert under Node (no window) and the module exposes its AP
   assert.equal(typeof ui.attachExportUi, 'function');
   assert.equal(ui.STORAGE_KEY, 'daymark.tasks.v1');
   assert.equal(typeof globalThis.DaymarkExportUi, 'object');
+});
+
+
+test('page loads the open-format renderer before the export UI', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script\\s+src=["']([^"']+)["'][^>]*>/g)]
+    .map((match) => match[1]);
+  const taskLogic = scripts.indexOf('task-logic.js');
+  const exportLogic = scripts.indexOf('export-logic.js');
+  const exportUi = scripts.indexOf('export-ui.js');
+  assert.ok(taskLogic >= 0, 'task validation loads');
+  assert.ok(exportLogic > taskLogic, 'open-format renderer loads after task logic');
+  assert.ok(exportUi > exportLogic, 'export UI loads after its renderer');
 });
