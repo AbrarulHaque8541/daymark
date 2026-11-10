@@ -9,7 +9,7 @@
 - #675 carries the task/webhook/Focus lock and generation implementation (Node 831/831 on its code head; not merged; physical multi-tab testing pending).
 - P0: main governance #646, physical Android acceptance #160, API 36 Focus/Task Editor #613/#648/#677. P1: cross-tab task/webhook/Focus #683/#689/#690, Android downloads #671/#678, signing/provenance #84/#665, extension recovery #659/#687, Service Worker #685/#686, recurrence #684/#476, data recovery #640/#603, webhook privacy/concurrency #636/#639.
 - No release/tag/version/applicationId/signer/data migration changes. Package identity discrepancy remains tracked in #679.
-- Full exact-head inventory and blockers: [CURRENT_STATUS_20261110T033916Z.md](CURRENT_STATUS_20261110T033916Z.md).
+- Full exact-head inventory and blockers: [CURRENT_STATUS_20261110T033916Z.md](docs/CURRENT_STATUS_20261110T033916Z.md).
 
 This queue supersedes the older current-priority summaries below; historical evidence remains intact.
 
