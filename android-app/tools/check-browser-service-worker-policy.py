@@ -34,27 +34,31 @@ require("ServiceWorkerController.getInstance()" in enforcement,
         "use the process-wide ServiceWorkerController")
 require("getServiceWorkerWebSettings()" in enforcement
         and ".setBlockNetworkLoads(" in enforcement
-        and "BrowserServiceWorkerPolicy.blocksNetworkLoads()" in enforcement,
-        "set the platform ServiceWorkerWebSettings network block")
+        and "BrowserServiceWorkerPolicy.blocksNetworkLoads(onlineAllowed)" in enforcement,
+        "initialize the platform ServiceWorkerWebSettings from the fail-closed mode state")
 require("controller.setServiceWorkerClient(new ServiceWorkerClient()" in enforcement
         and "shouldInterceptRequest(WebResourceRequest request)" in enforcement,
         "install request-level ServiceWorkerClient enforcement")
-require("BrowserServiceWorkerPolicy.decide(true, true, scheme)" in enforcement
+require("BrowserServiceWorkerPolicy.decide(onlineAllowed, scheme)" in enforcement
         and "return blockedResponse();" in enforcement,
-        "block remote/unknown Service Worker requests without forwarding request data")
+        "allow HTTP/HTTPS worker requests only in the explicit Online mode and block remote/unknown requests Offline")
 require("new WebResourceResponse(" in enforcement and "403" in enforcement,
         "return a synthetic blocked response instead of allowing network pass-through")
-require(".setBlockNetworkLoads(false)" not in enforcement,
-        "never unblock the process-wide Service Worker network setting")
+require("allowNetworkAfterExplicitConsent()" in enforcement
+        and ".setBlockNetworkLoads(false)" in enforcement,
+        "only the explicit Online consent path may unblock the process-wide Service Worker setting")
 require("BrowserServiceWorkerEnforcement.enforceBlocked();" in workspace
+        and "BrowserServiceWorkerEnforcement.allowNetworkAfterExplicitConsent();" in workspace
         and "if (policy != null && !policy.allowsRemoteLoads())" in workspace,
-        "reassert the process-wide block in the Android workspace controller on Offline transition")
+        "synchronize the process-wide worker policy on explicit Online navigation and Offline transition")
 require("DaymarkWebView.isServiceWorkerNetworkPolicyReady()" in workspace,
         "do not unblock page loads if global Service Worker enforcement could not be installed")
-require("Service Worker network requests remain blocked even while ordinary page navigation is Online" in docs_flat,
-        "document the fail-closed behavior and compatibility trade-off")
-require("static Decision decide(boolean onlineEnabled, boolean explicitNavigation, String scheme)" in policy,
-        "keep Online toggle and explicit navigation distinct from Service Worker network grants")
+require("Service Worker network requests follow Daymark's Online/Offline mode" in docs_flat
+        and "blocked while Offline" in docs_flat,
+        "document that worker network access follows the user-controlled Online/Offline mode")
+require("static Decision decide(boolean onlineEnabled, String scheme)" in policy
+        and "ALLOW_NETWORK" in policy,
+        "allow HTTP/HTTPS Service Worker requests only while Online")
 require('flavorDimensions += "distribution"' in test_module
         and 'create("githubSideload")' in test_module
         and 'create("play")' in test_module
