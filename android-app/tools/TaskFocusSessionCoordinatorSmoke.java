@@ -244,7 +244,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
                         && "task-a".equals(stale.timer.taskId()),
                 "the stale runtime first adopts the original paused task");
 
-        writer.events().clear();
+        writer.store.events.clear();
         TaskFocusSessionCoordinator.Snapshot switched =
                 writer.coordinator.switchTaskWhilePausedFromUserAction("task-b", "Task B");
         check(switched != null && switched.isPaused()
@@ -255,7 +255,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 writer.clock.elapsed, writer.clock.wall, writer.clock.boot);
         check(latest != null && "task-b".equals(latest.taskId()),
                 "the caller resolves the latest stored task identity before reconciliation");
-        writer.events().clear();
+        writer.store.events.clear();
 
         TaskFocusSessionCoordinator.Snapshot adopted = staleRuntime.coordinator
                 .restoreLoadedSnapshot(latest, "task-b", "Task B");
