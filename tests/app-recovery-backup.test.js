@@ -684,7 +684,7 @@ test('an empty primary Focus value does not overwrite an older opaque recovery s
 test('empty strings are malformed recovery payloads, not absent recovery sources', () => {
   const taskStart = APP_SOURCE.indexOf('function readTaskRecoveryPayloads(raw) {');
   const focusStart = APP_SOURCE.indexOf('function readFocusRecoveryStates(raw) {');
-  const importStart = APP_SOURCE.indexOf('function applyImportedRecovery(recovery, rawText) {');
+  const importStart = APP_SOURCE.indexOf('async function applyImportedRecovery(');
   assert.ok(taskStart >= 0 && focusStart > taskStart && importStart > focusStart,
     'task and Focus recovery parser sections must exist');
   const taskParser = APP_SOURCE.slice(taskStart, focusStart);
