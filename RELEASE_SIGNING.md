@@ -55,7 +55,7 @@ After a clean install, a later build can update in place only when it has the sa
 
 ## Workflow authorization guard — 2026-11-10
 
-The signed device-test release workflow now requires both `github.actor` and `github.triggering_actor` to equal the repository owner before the job that reads production signing secrets or the job that writes the prerelease can run. A matching tag that points to `main` is necessary, but is not by itself release authorization.
+Both the production release and signed device-test release workflows now require the repository to be `AbrarulHaque8541/daymark` and require `github.actor` plus `github.triggering_actor` to equal the repository owner before the job that reads production signing secrets or writes a release can run. A matching tag that points to `main` is necessary, but is not by itself release authorization.
 
 The SLSA workflow permits manual dispatch for build-only validation. Its tag-triggered APK build and provenance-signing/release-upload job are owner-triggered only; the provenance job additionally requires a tag push whose commit is verified on `main`.
 

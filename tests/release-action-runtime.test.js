@@ -434,5 +434,12 @@ test('production release signing is tag-push-only and cannot be manually dispatc
   assert.match(content, /^on:\s*\n\s+push:/m);
   assert.match(content, /tags:\s*\['v\*'\]/);
   assert.doesNotMatch(content, /^\s+workflow_dispatch:/m);
-  assert.match(content, /if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  const jobStart = content.indexOf('  build-verify-draft:');
+  const runnerStart = content.indexOf('    runs-on:', jobStart);
+  assert.ok(jobStart >= 0 && runnerStart > jobStart, 'missing production release job');
+  const guard = content.slice(jobStart, runnerStart);
+  assert.match(guard, /github\.repository == 'AbrarulHaque8541\/daymark'/);
+  assert.match(guard, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  assert.match(guard, /github\.actor == 'AbrarulHaque8541'/);
+  assert.match(guard, /github\.triggering_actor == 'AbrarulHaque8541'/);
 });

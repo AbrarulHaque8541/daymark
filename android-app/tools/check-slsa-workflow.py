@@ -43,6 +43,7 @@ SIGNED_RELEASE_WORKFLOW = (ROOT / ".github/workflows/android-signed-device-test-
 PRIVATE_MAIN_WORKFLOW = " ".join(
     (ROOT / ".github/workflows/android-private-main-test-apk.yml").read_text().split()
 )
+PRODUCTION_RELEASE_WORKFLOW = (ROOT / ".github/workflows/android-production-release.yml").read_text()
 OWNER_GATE = "github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'"
 
 signed_build = SIGNED_RELEASE_WORKFLOW.split("  build-and-verify:", 1)[1].split("  publish-release:", 1)[0]
@@ -63,5 +64,14 @@ check("github.event_name == 'push' && github.ref_type == 'tag'" in slsa_provenan
       "SLSA provenance signing and release upload must be owner-triggered tag-only")
 check(OWNER_GATE in PRIVATE_MAIN_WORKFLOW,
       "the private main test APK workflow must retain its owner-only manual-dispatch gate")
+production_job = PRODUCTION_RELEASE_WORKFLOW.split("  build-verify-draft:", 1)[1]
+production_guard = production_job.split("    runs-on:", 1)[0]
+check("github.repository == 'AbrarulHaque8541/daymark'" in production_guard
+      and "startsWith(github.ref, 'refs/tags/v')" in production_guard
+      and OWNER_GATE in production_guard,
+      "production release signing must be restricted to owner-triggered version tags in this repository")
+check("pull_request:" not in PRODUCTION_RELEASE_WORKFLOW
+      and "workflow_dispatch:" not in PRODUCTION_RELEASE_WORKFLOW,
+      "production release signing must remain push-tag-only")
 
 print(f"PASS SLSA workflow source checks: {checks} assertions")
