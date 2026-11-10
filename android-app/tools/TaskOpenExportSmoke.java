@@ -112,6 +112,17 @@ public final class TaskOpenExportSmoke {
                                 "2026-11-10T10:00:00.1234567890Z", null,
                                 Collections.<Subtask>emptyList()))),
                 "invalid reminderShownFire is rejected by export");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("local-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00", "2026-10-01T00:00:00Z"))),
+                "createdAt without an explicit offset is rejected");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("bad-reminder-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00Z", "2026-10-01T00:00:00Z",
+                                Collections.<AttachmentRef>emptyList(), "", null, null,
+                                "2026-11-10T10:00:00.1234567890Z", null,
+                                Collections.<Subtask>emptyList()))),
+                "invalid reminderShownFire is rejected by export");
 
         expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
                         new Task("bad-repeat", "T", "2026-11-30", "low", false,

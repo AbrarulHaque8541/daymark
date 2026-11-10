@@ -225,6 +225,15 @@ test('createdAt, updatedAt, and reminderShownFire use the same strict instant co
   }), true);
 });
 
+test('instant comparison matches Java nanosecond, offset, and leap-second ordering', () => {
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00+05:30', '2026-11-10T04:30:00Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00.000000001Z',
+    '2026-11-10T10:00:00.000000002Z'), -1);
+  assert.equal(logic.compareInstants('2016-12-31T23:59:60Z', '2016-12-31T23:59:59Z'), 0);
+  assert.equal(logic.compareInstants('0000-01-01T00:00:00Z', '0001-01-01T00:00:00Z'), -1);
+  assert.throws(() => logic.compareInstants('invalid', '2026-11-10T10:00:00Z'), /invalid task instants/);
+});
+
 test('duplicate JSON object keys are detected recursively without scanning string contents', () => {
   assert.equal(logic.hasDuplicateJsonKeys('{"title":"first","title":"last"}'), true);
   assert.equal(logic.hasDuplicateJsonKeys('[{"nested":{"id":1,"id":2}}]'), true);

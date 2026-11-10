@@ -100,6 +100,9 @@ public final class TaskOpenExport {
         if (task.reminderShownFire != null && !TaskLogic.isValidInstant(task.reminderShownFire)) {
             throw new IllegalArgumentException("Export task reminderShownFire is not a valid task instant.");
         }
+        if (task.reminderShownFire != null && !TaskLogic.isValidInstant(task.reminderShownFire)) {
+            throw new IllegalArgumentException("Export task reminderShownFire is not a valid task instant.");
+        }
         requireCleanText(task.notes == null ? "" : task.notes, "notes");
         if (task.repeatRule != null) {
             requireCleanText(task.repeatRule, "repeat");
