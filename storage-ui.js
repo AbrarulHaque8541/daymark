@@ -211,7 +211,7 @@
       if (result.failed.length > 0) {
         const message = result.removed.length === 0
           ? 'Could not clear ' + category.label + ': ' + result.failed.length
-            + ' item(s) could not be checked or removed. Nothing was cleared.'
+            + ' item(s) could not be checked. No item could be removed by the browser; nothing was cleared.'
           : 'Cleared ' + category.label + ', but ' + result.failed.length
             + ' item(s) could not be checked or removed by the browser.';
         render();
@@ -254,7 +254,7 @@
       if (result.failedKeys.length > 0) {
         const message = result.removedKeys.length === 0
           ? 'Could not clear all data: ' + result.failedKeys.length
-            + ' item(s) could not be checked or removed. Nothing was cleared.'
+            + ' item(s) could not be checked. No item could be removed by the browser; nothing was cleared.'
           : 'Cleared ' + result.removedKeys.length + ' item(s), but '
             + result.failedKeys.length + ' item(s) could not be checked or removed by the browser.';
         render();
