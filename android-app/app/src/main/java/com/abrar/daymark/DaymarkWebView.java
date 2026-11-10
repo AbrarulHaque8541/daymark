@@ -276,7 +276,14 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 String scheme = request.getUrl().getScheme();
                 // Android intent:// links are parsed into a fresh, allowlisted ACTION_VIEW intent.
                 // Component names, selectors, arbitrary extras and launch flags are never forwarded.
-                if ("intent".equalsIgnoreCase(scheme)) return handleIntentLink(view, url);
+                if ("intent".equalsIgnoreCase(scheme)) {
+                    // Subframes and script-driven navigations must not promote an intent URI
+                    // into a top-level WebView load or open the system app chooser.
+                    if (!BrowserIntentHandoffPolicy.allows(request.isForMainFrame(), request.hasGesture())) {
+                        return true;
+                    }
+                    return handleIntentLink(view, url);
+                }
                 // Verified HTTP(S) App Links may open in their owning app after a top-level
                 // user gesture. Generic browser handlers remain inside Daymark.
                 if (request.isForMainFrame() && request.hasGesture()

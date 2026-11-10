@@ -54,6 +54,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadProgress.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadEnqueueGate.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentLinkPolicy.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentHandoffPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHistory.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLogPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserNetworkPolicy.java" \
@@ -104,6 +105,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/UpdaterSmoke.java" \
   "$ROOT/tools/GitHubTransportSmoke.java" \
   "$ROOT/tools/BrowserIntentLinkPolicySmoke.java" \
+  "$ROOT/tools/BrowserIntentHandoffPolicySmoke.java" \
   "$ROOT/tools/BrowserAddressSmoke.java" \
   "$ROOT/tools/BrowserDownloadFilenamePolicySmoke.java" \
   "$ROOT/tools/BrowserDownloadProgressSmoke.java" \
