@@ -96,6 +96,16 @@ state_tests = (root / "tools/TaskFocusTimerNotificationStateSmoke.java").read_te
 timer_tests = (root / "tools/TaskFocusTimerSmoke.java").read_text(encoding="utf-8")
 coordinator_tests = (root / "tools/TaskFocusSessionCoordinatorSmoke.java").read_text(encoding="utf-8")
 test_runner = (root / "tools/run-focus-timer-tests.sh").read_text(encoding="utf-8")
+switch_start = coordinator.index("synchronized Snapshot switchTaskWhilePausedFromUserAction")
+switch_end = coordinator.index("synchronized Snapshot resumeFromUserAction", switch_start)
+switch_block = coordinator[switch_start:switch_end]
+restore_start = coordinator.index("private Snapshot restoreLoadedSnapshot(TaskFocusTimer restored")
+restore_end = coordinator.index("return snapshot(true);", restore_start)
+restore_block = coordinator[restore_start:restore_end]
+refresh_start = coordinator.index("synchronized Snapshot refreshNotification(String currentTaskTitle)")
+refresh_end = coordinator.index("synchronized boolean clearIfTaskDeleted", refresh_start)
+refresh_block = coordinator[refresh_start:refresh_end]
+
 checks.extend([
     ("TaskFocusTimerNotificationState.java" in test_runner
      and "TaskFocusTimerNotificationStateSmoke.java" in test_runner
@@ -136,8 +146,18 @@ checks.extend([
      and "pauseFocusSession();" in activity and "resumeFocusSession();" in activity
      and "finishFocusSession();" in activity,
      "MainActivity routes all notification actions to the existing focus runtime"),
+    ("notificationIdentityChanged(next, currentTaskTitle)" in switch_block
+     and switch_block.index("store.save(next") < switch_block.index("notifications.cancel();")
+     < switch_block.index("publishOrCancel("),
+     "paused task switch persists, cancels the old notification identity, then publishes the new task title"),
+    ("notificationIdentityChanged(restored, currentTaskTitle)" in restore_block
+     and restore_block.index("notifications.cancel();") < restore_block.index("publishOrCancel("),
+     "restoring a different persisted task/title removes stale notification content before replacement"),
+    ("sameTaskTitle(this.currentTaskTitle, currentTaskTitle)" in refresh_block
+     and refresh_block.index("notifications.cancel();") < refresh_block.index("publishOrCancel("),
+     "a changed task title cancels stale content before the refreshed notification is published"),
 ])
-for ok, message in checks[-11:]:
+for ok, message in checks[-14:]:
     if not ok:
         raise AssertionError(message)
 print(f"PASS focus timer notification source checks: {len(checks)} assertions")
