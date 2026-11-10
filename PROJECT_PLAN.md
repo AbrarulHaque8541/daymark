@@ -10,6 +10,11 @@
 
 See [full dated evidence snapshot](docs/CURRENT_STATUS_20261110T020852Z.md) for exact PR heads, workflow IDs, blockers and next priorities.
 
+Work by: ChatGPT (OpenAI)
+Model: GPT-6
+Tooling: GitHub connector via Code Mode; live repository, PR, issue and Actions evidence review
+Timestamp (UTC): 2026-11-10T02:08:52Z
+
 ---
 
 ## Latest repo-wide engineering handoff — 2026-11-09T23:26:56Z
