@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-10T04:42:00Z (main 91f57d7; #694 AST skip/todo hardening; #648 Focus stale-runtime reconciliation; #665 signing workflow boundary; #656/#675 integration)](./CURRENT_STATUS_20261110T044200Z.md)
 ## Latest verified whole-project handoff — 2026-11-10T02:18:05Z
 
 - [Full dated evidence snapshot](CURRENT_STATUS_20261110T021805Z.md)
