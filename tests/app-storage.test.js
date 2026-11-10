@@ -795,6 +795,30 @@ test('partially valid startup tasks are backed up byte-for-byte under the shared
     [{ key: BACKUP_KEY, lockHeld: true }]);
 });
 
+test('clearing the task recovery backup does not let queued maintenance recreate it', async () => {
+  const malformedPrimary = '{opaque original task bytes';
+  const app = bootApp({ savedValue: malformedPrimary });
+  await app.settle();
+  assert.equal(typeof app.storedValues.get(BACKUP_KEY), 'string',
+    'startup recovery maintenance first preserves the unreadable primary bytes');
+
+  await mutation.withTaskMutationLock(app.window.navigator.locks, () => {
+    const generation = mutation.incrementTaskGeneration(app.localStorage, 'task-backup');
+    assert.deepEqual(generation, { ok: true, value: 1 });
+    app.localStorage.removeItem(BACKUP_KEY);
+  });
+  app.window.dispatchEvent(new app.window.StorageEvent('storage', {
+    key: mutation.TASK_GENERATION_KEY
+  }));
+  await app.settle();
+
+  assert.equal(app.storedValues.get(STORAGE_KEY), malformedPrimary,
+    'clearing the backup never overwrites the unreadable primary bytes');
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'the explicit recovery-backup clear is not undone by automatic maintenance');
+  assert.equal(app.storedValues.get(mutation.TASK_GENERATION_KEY), '1:task-backup');
+});
+
 test('startup recovery backup fails closed when Web Locks are unavailable', async () => {
   const corruptData = '{not valid JSON';
   const app = bootApp({ savedValue: corruptData, lockManager: false });
