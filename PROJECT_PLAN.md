@@ -1,16 +1,19 @@
-## Current execution queue — 2026-11-10T12:07:25.537Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
+## Current execution queue — 2026-11-10T13:53:03Z (main 41fda91fbb15d2bf9634fd7576cf842fe9bdacbc)
 
-Latest live snapshot: [CURRENT_STATUS_20261110T120725Z.md](docs/CURRENT_STATUS_20261110T120725Z.md). Live inventory: 7 open PRs / 25 open issues. Main Android CI, contracts and nightly audit PASS. Main protection remains disabled; rulesets are empty.
+Latest snapshot: [CURRENT_STATUS_20261110T135303Z.md](docs/CURRENT_STATUS_20261110T135303Z.md). Inventory: **8 open PRs / 25 open issues**. Main Android CI/contracts/nightly audit PASS; main protection disabled, rulesets empty.
 
-1. P0 — #705 signing security: exact head `d0312cb` is 21 ahead / 0 behind; all four exact-head workflows PASS (Android CI, contracts, device artifact, unsigned device-test). Owner/admin must still configure and verify the `production-signing` environment with independent required reviewers and restricted refs before any signed workflow.
-2. P0 — #648 Focus lifecycle: current head `239b180` is 202 ahead / 9 behind and diverged; no exact-head run returned. Latest known older-head API 36 ten-run gate failed. Resolve notification ownership and finish 10/10 before integration.
-3. P0 — #675/#656 task, import, Focus, webhook and timestamp integrity: both are synchronized with main and all seven exact-head workflows pass (#675 Node 938/938, API 29/36 372/375; #656 Node 842/842, API 29/36 372/375). #656 now preserves explicit malformed import timestamps and requires the shared validator. Keep both draft pending independent data/security review and integration. #656 now has the import timestamp regression fix and all seven exact-head workflows PASS.
-4. P0 — #683/#689/#690: complete independent review of cross-tab task/import/recovery, webhook queue and Focus clear/write locking; deterministic race coverage is present on the integration branches but not merged.
-5. P0 — #646/#160: owner/admin main protection and independent review configuration; physical Android/WebView/OEM acceptance remains NOT TESTED.
-6. P1 — #704 Service Worker (6/6 workflows PASS) and #676 extension SPA (6/6 PASS): obtain independent review and complete physical/runtime compatibility acceptance; extension recovery UI #687 remains.
-7. P1 — #671/#678 secure Android download transport; #684/#476 recurrence parity; #700 Telegram CORS/live delivery; #691/#692/#696 desktop race/reproducibility; #84 action deprecation audit.
+1. **P0 #675 Focus discrepancy:** head `6b0c3eeb`, 239 ahead / 0 behind. Node 949/949, Gradle, contracts, Focus UI/Live Update, device artifact and unsigned validation PASS. API29 PASS; API36 Stopwatch tap failed twice. #656 passes API36 on matching MainActivity/instrumentation blobs. Add hit-path/scroll-state diagnostics; do not weaken assertions.
+2. **P0 #656 import/export:** head `a47ba7b4`, 90 ahead / 0 behind; 7/7 PASS, Node 849/849, API29/36 372/375. Independent RFC5545/import review remains.
+3. **P0 governance/device acceptance (#646/#160):** main unprotected; required checks/rulesets/independent approvals absent. Physical Android/WebView/OEM acceptance NOT TESTED.
+4. **P0 #648 Focus:** 202 ahead / 9 behind, mergeable=false, no current-head runs; synchronize owner-aware without overlapping MainActivity edits.
+5. **P1 storage integrity (#683/#689/#690/#640/#603):** #675 contains task generation fencing and ordered task → delivery → queue → Focus locks; independent review and API36 gate remain.
+6. **P1 secure downloads (#671/#708):** #708 5/5 PASS, 53 body-transfer assertions; no DNS-pinned TLS/manual redirects/atomic Downloads or SAF publication. Keep fail-closed.
+7. **P1 signing (#705/#84):** four workflows PASS; protected production environment reviewer/ref controls and provenance runtime remain unverified.
+8. **P1 extensions (#676/#702/#687):** six workflows PASS; physical WebView SPA/OEM acceptance and recovery UI acceptance remain.
+9. **P1 Service Worker (#704/#685):** six workflows PASS; retain Offline fail-closed and verify Online compatibility.
+10. **P1/P2 recurrence/Telegram/desktop/architecture (#684/#476/#700/#696/#691/#348/#325):** complete parity, real CORS/browser, desktop reproducibility/download race and architecture work.
 
-No PR merged by this run; #659 was merged by prior/concurrent automation and post-merge main checks pass. No release/tag/version/signer/applicationId change or destructive migration. Current source identity remains com.abrar.daymark; conflicting run-level package wording remains an owner-reconciliation issue without identity change.
+No release/tag/version/signer/applicationId change or destructive migration. Source identity remains `com.abrar.daymark`; run-level `com.cue.daymark` conflicts with AGENTS and #679, so no identity change pending explicit owner reconciliation.
 
 ---
 
