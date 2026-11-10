@@ -51,7 +51,9 @@ final class ExtensionRuntime {
      * No match rules, disabled-site preferences, or nonmatching pack metadata are sent to the page.
      */
     void onSameDocumentNavigation(WebView webView, String url) {
-        if (!isCurrentWebPage(webView, url) || url.equals(lastAppliedUrl)) return;
+        if (!userscriptsAppliedForCurrentDocument
+                || !isCurrentWebPage(webView, url)
+                || url.equals(lastAppliedUrl)) return;
         List<BrowserExtension> matching = matchingPacks(url);
         if (ExtensionInjector.applyStyles(webView, url, matching)) {
             lastAppliedUrl = url;
