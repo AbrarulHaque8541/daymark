@@ -11,6 +11,7 @@
   'use strict';
 
   const TASK_MUTATION_LOCK = 'daymark.tasks.mutation.v1';
+  const TASK_GENERATION_KEY = 'daymark.tasks.mutation.generation.v1';
   const WEBHOOK_DELIVERY_LOCK = 'daymark.webhook.delivery.v1';
   const WEBHOOK_QUEUE_LOCK = 'daymark.webhook.queue.v1';
   const FOCUS_MUTATION_LOCK = 'daymark.focus.mutation.v1';
@@ -20,6 +21,29 @@
   const CLEAR_ALL_LOCK_ORDER = Object.freeze([
     TASK_MUTATION_LOCK, WEBHOOK_DELIVERY_LOCK, WEBHOOK_QUEUE_LOCK, FOCUS_MUTATION_LOCK
   ]);
+
+  function readTaskGeneration(storage) {
+    if (!storage || typeof storage.getItem !== 'function') return { ok: false, reason: 'storage-unavailable' };
+    try {
+      const raw = storage.getItem(TASK_GENERATION_KEY);
+      if (raw === null) return { ok: true, value: 0 };
+      if (typeof raw !== 'string' || !/^(0|[1-9][0-9]*)$/.test(raw)) return { ok: false, reason: 'generation-invalid' };
+      const value = Number(raw);
+      return Number.isSafeInteger(value) ? { ok: true, value } : { ok: false, reason: 'generation-invalid' };
+    } catch (error) { return { ok: false, reason: 'generation-unreadable' }; }
+  }
+
+  // Call only while TASK_MUTATION_LOCK is held. This non-personal fence is
+  // intentionally retained when user-data categories are cleared.
+  function incrementTaskGeneration(storage) {
+    if (!storage || typeof storage.setItem !== 'function') return { ok: false, reason: 'storage-unavailable' };
+    const current = readTaskGeneration(storage);
+    if (!current.ok) return current;
+    if (current.value >= Number.MAX_SAFE_INTEGER) return { ok: false, reason: 'generation-exhausted' };
+    const value = current.value + 1;
+    try { storage.setItem(TASK_GENERATION_KEY, String(value)); return { ok: true, value }; }
+    catch (error) { return { ok: false, reason: 'generation-write-failed' }; }
+  }
 
   function cloneTaskList(tasks) {
     if (!Array.isArray(tasks)) return [];
@@ -201,9 +225,15 @@
         || typeof storage.setItem !== 'function' || !key) {
       return { ok: false, reason: 'storage-unavailable', conflicts: [] };
     }
+    if (!Number.isSafeInteger(opts.expectedGeneration) || opts.expectedGeneration < 0) {
+      return { ok: false, reason: 'invalid-generation', conflicts: [] };
+    }
 
     try {
       return await locks.request(lockName, { mode: 'exclusive' }, async () => {
+        const generation = readTaskGeneration(storage);
+        if (!generation.ok) return { ok: false, reason: generation.reason, conflicts: [] };
+        if (generation.value !== opts.expectedGeneration) return { ok: false, reason: 'stale-generation', conflicts: [] };
         if (typeof opts.beforeWrite === 'function') {
           let prepared;
           try {
@@ -301,6 +331,9 @@
 
   const api = {
     TASK_MUTATION_LOCK,
+    TASK_GENERATION_KEY,
+    readTaskGeneration,
+    incrementTaskGeneration,
     WEBHOOK_DELIVERY_LOCK,
     WEBHOOK_QUEUE_LOCK,
     FOCUS_MUTATION_LOCK,
