@@ -228,7 +228,7 @@ test('destructive data actions fail closed when the shared task lock is unavaila
   assert.equal(called, false);
 });
 
-test('ordered domain locks acquire task, delivery, then queue before running a destructive callback', async () => {
+test('ordered domain locks acquire task, delivery, queue, then Focus before destructive work', async () => {
   const calls = [];
   const locks = {
     request(name, options, callback) {
@@ -242,7 +242,7 @@ test('ordered domain locks acquire task, delivery, then queue before running a d
     return 'cleared';
   });
   assert.deepEqual(calls, [mutation.TASK_MUTATION_LOCK, mutation.WEBHOOK_DELIVERY_LOCK,
-    mutation.WEBHOOK_QUEUE_LOCK, 'callback']);
+    mutation.WEBHOOK_QUEUE_LOCK, mutation.FOCUS_MUTATION_LOCK, 'callback']);
   assert.deepEqual(result, { ok: true, value: 'cleared' });
 });
 
