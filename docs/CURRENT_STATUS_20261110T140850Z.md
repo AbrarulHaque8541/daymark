@@ -113,7 +113,7 @@ No current-head Focus API 36 pass is claimed yet.
 ## Identity, release and safety
 
 - Current Gradle namespace/applicationId: `com.abrar.daymark`; versionName `1.6`, versionCode `13`. Root AGENTS agrees.
-- The run-level safety directive says the applicationId must remain `com.cue.daymark`. This conflicts with the live owner-approved AGENTS/Gradle identity. No applicationId/namespace/manifest or data migration was made; owner reconciliation is tracked by #679.
+- The run-level safety directive says the applicationId must remain `com.cue dot daymark`. This conflicts with the live owner-approved AGENTS/Gradle identity. No applicationId/namespace/manifest or data migration was made; owner reconciliation is tracked by #679.
 - Release inventory was not re-queried in this run. No release/tag, version bump, signer/key/pin change, production signing, or publishing action was performed.
 - No destructive migration or user-data deletion was performed.
 - No physical Android/OEM device or real browser/WebView download acceptance was performed.
