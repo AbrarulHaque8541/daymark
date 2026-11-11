@@ -170,7 +170,11 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
   const handle = ui.attachStorageUi(env);
   handle.onClearAll();
   assert.equal(confirmations.length, 1);
-  assert.match(confirmations[0], /Clear ALL local Daymark data/);
+  assert.match(confirmations[0], /Clear all managed Daymark data/);
+  assert.match(confirmations[0], /Telegram chat target/,
+    'clear-all confirmation must disclose the remembered Telegram preference');
+  assert.match(confirmations[0], /legacy secret-bearing webhook endpoint is never inspected/,
+    'the card must disclose its intentional secret-key exclusion');
   assert.equal(storageData['daymark.tasks.v1'], undefined);
   assert.equal(storageData['daymark.focus.v1'], undefined);
   assert.equal(storageData['daymark.webhook.queue.v1'], undefined);
