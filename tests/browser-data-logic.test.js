@@ -10,6 +10,7 @@ test('catalog ids are stable and in card order', () => {
     'clear-search',
     'webhook-clear-queue',
     'storage-clear-status',
+    'storage-clear-all',
     'import-merge',
     'export-backup'
   ]);
@@ -70,7 +71,13 @@ test('listClearActions exposes honest delete flags', () => {
   assert.equal(clearCompleted.undoWindowSeconds, 7);
   assert.equal(clearCompleted.exportable, true);
   assert.equal(actions.find((action) => action.id === 'webhook-clear-queue').exportable, false);
-  assert.equal(actions.find((action) => action.id === 'storage-clear-status').available, false);
+  assert.equal(actions.find((action) => action.id === 'storage-clear-status').available, true);
+  const clearAllAction = actions.find((action) => action.id === 'storage-clear-all');
+  assert.ok(clearAllAction, 'storage-clear-all must be listed');
+  assert.equal(clearAllAction.deletesData, true);
+  assert.equal(clearAllAction.available, true);
+  assert.equal(clearAllAction.undoWindowSeconds, 0);
+  assert.equal(clearAllAction.exportable, false);
   assert.equal(actions.find((action) => action.id === 'clear-search').deletesData, false);
 });
 
@@ -153,12 +160,26 @@ test('clear-completed explanation matches the real temporary Undo and save behav
   assert.match(entry.summary, /If saving fails, the removal is only for this session/);
 });
 
-test('storage status is not advertised as an available action until its controls are wired', () => {
-  const entry = engine.explainClearAction('storage-clear-status');
-  assert.equal(entry.available, false);
-  assert.match(entry.summary, /controls are not connected/);
-  assert.match(entry.summary, /neither operation currently runs/);
-  assert.equal(engine.planClearSequence(['storage-clear-status']).ok, false);
+test('storage status controls are wired, read-only, and clear-all is destructive', () => {
+  const statusEntry = engine.explainClearAction('storage-clear-status');
+  assert.equal(statusEntry.available, true);
+  assert.equal(statusEntry.deletesData, false);
+  assert.match(statusEntry.summary, /Check re-runs the local storage scan/);
+  assert.match(statusEntry.summary, /empties only the status message/);
+  assert.equal(engine.planClearSequence(['storage-clear-status']).ok, true);
+
+  const clearAllEntry = engine.explainClearAction('storage-clear-all');
+  assert.equal(clearAllEntry.available, true);
+  assert.equal(clearAllEntry.deletesData, true);
+  assert.equal(clearAllEntry.recoverable, false);
+  assert.match(clearAllEntry.summary, /explicit, confirmed action/);
+  assert.match(clearAllEntry.summary, /recovery backups/);
+  assert.match(clearAllEntry.summary, /never touched/);
+  assert.ok(clearAllEntry.keeps.some((line) => /does not manage/.test(line)));
+  const plan = engine.planClearSequence(['export-backup', 'storage-clear-all']);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.warnings.length, 1);
+  assert.match(plan.warnings[0], /not included in task exports or Export recovery/);
 });
 
 test('export explanation distinguishes in-memory JSON, saved-store open formats and plaintext privacy', () => {
