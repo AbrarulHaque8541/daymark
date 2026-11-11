@@ -39,7 +39,8 @@
 
     const description = doc.createElement('p');
     description.className = 'briefing-description';
-    description.textContent = 'Open-Meteo air quality — no account, no API key. Fetched on Check; not saved on this device.';
+    description.id = 'air-description';
+    description.textContent = 'Before Check: the typed place is sent to Open-Meteo Geocoding. The resolved coordinates are then sent to Open-Meteo Air Quality. This happens only after you tap Check. No place or result is saved on this device. No account or API key.';
     aside.appendChild(description);
 
     const form = doc.createElement('form');
@@ -61,6 +62,7 @@
       input.setAttribute('maxlength', '80');
       input.setAttribute('placeholder', 'City, e.g. Delhi');
       input.setAttribute('autocomplete', 'off');
+      input.setAttribute('aria-describedby', 'air-description');
     }
     form.appendChild(input);
 
