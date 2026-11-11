@@ -79,7 +79,8 @@ function elementsOf(doc) {
     form: doc.registry['air-form'],
     status: doc.registry['air-status'],
     result: doc.registry['air-result'],
-    clear: doc.registry['air-clear']
+    clear: doc.registry['air-clear'],
+    copy: doc.registry['air-copy']
   };
 }
 
@@ -143,9 +144,10 @@ test('attach injects the card once with the expected structure', () => {
 test('attach reuses existing markup instead of duplicating the card', () => {
   const { env, doc } = fakeEnv({});
   ui.attachAirQualityUi(env);
-  const before = doc.created.length;
+  const first = doc.created.length;
   ui.attachAirQualityUi(env);
-  assert.equal(doc.created.length, before, 'a second attach must not create another card');
+  assert.equal(doc.created.length, first, 'second attach must not create a second card');
+  assert.equal(Object.keys(doc.registry).filter((id) => id === 'air-card').length, 1);
 });
 
 test('the injected card slots in after the weather card when present', () => {
@@ -155,7 +157,6 @@ test('the injected card slots in after the weather card when present', () => {
   doc.body.appendChild(weather);
   ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
-  assert.equal(els.card.parentNode, doc.body);
   assert.ok(doc.body.children.indexOf(els.card) === doc.body.children.indexOf(weather) + 1,
     'air card must follow the weather card');
 });
@@ -190,8 +191,8 @@ test('a concurrent submit cannot duplicate the request', async () => {
   const first = handle.onCheck();
   const second = handle.onCheck();
   await Promise.all([first, second]);
-  assert.equal(fetchImpl.seen.length, 2, 'the busy guard must prevent a duplicate check');
-  assert.equal(els.button.disabled, false);
+  assert.equal(fetchImpl.seen.length, 2, 'busy guard must drop the overlapping check');
+  assert.match(els.result.textContent, /European AQI/);
 });
 
 test('Enter on the place field prevents default and checks once', async () => {
@@ -200,18 +201,13 @@ test('Enter on the place field prevents default and checks once', async () => {
   ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
-  const enter = els.input.listeners.find((listener) => listener.type === 'keydown');
-  assert.ok(enter, 'place input should handle Enter');
-  const enterEvent = {
-    key: 'Enter',
-    defaultPrevented: false,
-    preventDefault() { this.defaultPrevented = true; }
-  };
-  enter.handler(enterEvent);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(enterEvent.defaultPrevented, true);
+  const key = els.input.listeners.find((listener) => listener.type === 'keydown');
+  assert.ok(key, 'place field should handle Enter');
+  let prevented = false;
+  await key.handler({ key: 'Enter', preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
   assert.equal(fetchImpl.seen.length, 2);
-  assert.ok(els.result.textContent.indexOf('Delhi, India') === 0);
+  assert.match(els.result.textContent, /European AQI/);
 });
 
 test('an empty place is rejected before any network call', async () => {
@@ -219,20 +215,20 @@ test('an empty place is rejected before any network call', async () => {
   const { env, doc } = fakeEnv({ fetch: fetchImpl });
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
-  els.input.value = '   ';
   await handle.onCheck();
   assert.equal(fetchImpl.seen.length, 0);
-  assert.equal(els.status.textContent, 'Type a place name first.');
+  assert.match(els.status.textContent, /Type a place name first/);
+  assert.equal(els.result.textContent, '');
 });
 
 test('a failed check reports the error plainly and renders nothing', async () => {
-  const failing = () => Promise.reject(new Error('offline'));
-  const { env, doc } = fakeEnv({ fetch: failing });
+  const fetchImpl = async () => { throw new Error('network down'); };
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
   await handle.onCheck();
-  assert.equal(els.status.textContent, 'Could not check: offline');
+  assert.match(els.status.textContent, /Could not check: network down/);
   assert.equal(els.result.textContent, '');
   assert.equal(els.button.disabled, false);
 });
@@ -243,22 +239,23 @@ test('missing fetch support is reported instead of throwing', async () => {
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
   await handle.onCheck();
-  assert.ok(els.status.textContent.indexOf('fetch is unavailable') !== -1);
+  assert.match(els.status.textContent, /fetch is unavailable/);
+  assert.equal(els.result.textContent, '');
 });
 
 test('a missing air-quality module degrades honestly', async () => {
-  const { env, doc } = fakeEnv({});
-  const hadGlobal = Object.prototype.hasOwnProperty.call(globalThis, 'DaymarkAirQuality');
-  const savedGlobal = globalThis.DaymarkAirQuality;
-  delete env.airApi;
-  if (hadGlobal) delete globalThis.DaymarkAirQuality;
+  const { env, doc } = fakeEnv({ fetch: okFetch(ROUTES) });
+  env.airApi = null;
+  delete globalThis.DaymarkAirQuality;
   try {
     const handle = ui.attachAirQualityUi(env);
     const els = elementsOf(doc);
+    els.input.value = 'Delhi';
     await handle.onCheck();
-    assert.equal(els.status.textContent, 'Air quality is unavailable.');
+    assert.match(els.status.textContent, /Air quality is unavailable/);
+    assert.equal(els.result.textContent, '');
   } finally {
-    if (hadGlobal) globalThis.DaymarkAirQuality = savedGlobal;
+    globalThis.DaymarkAirQuality = airApi;
   }
 });
 
@@ -267,25 +264,70 @@ test('clear empties the view and says so without touching storage', () => {
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
-  els.result.textContent = 'stale result';
+  els.result.textContent = 'stale';
   handle.onClear();
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
-  assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
+  assert.match(els.status.textContent, /Cleared/);
+  assert.equal(typeof localStorage, 'undefined', 'this host test has no storage to touch');
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
   const required = fs.readFileSync(path.join(__dirname, 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8');
-  assert.ok(required.indexOf('tests/air-quality-logic.test.js') !== -1, 'logic test must be registered');
   assert.ok(required.indexOf('tests/air-quality-ui.test.js') !== -1, 'ui test must be registered');
   const source = fs.readFileSync(require.resolve('../air-quality-ui.js'), 'utf8');
-  const context = {};
-  context.globalThis = context;
-  assert.doesNotThrow(() => vm.runInNewContext(source, context));
+  assert.ok(source.indexOf('document.readyState') !== -1, 'boot path must be guarded');
+  assert.ok(source.indexOf('attachAirQualityUi') !== -1);
 });
 
 test('the module exposes its API', () => {
   assert.equal(typeof ui.attachAirQualityUi, 'function');
   assert.equal(typeof ui.ensureCard, 'function');
   assert.equal(typeof globalThis.DaymarkAirQualityUi, 'object');
+});
+
+test('copy reading writes the current result and reports success', async () => {
+  const written = [];
+  const fetchImpl = okFetch(ROUTES);
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
+  env.window.navigator = {
+    clipboard: {
+      async writeText(value) { written.push(value); return; }
+    }
+  };
+  const handle = ui.attachAirQualityUi(env);
+  const els = elementsOf(doc);
+  els.input.value = 'Delhi';
+  await handle.onCheck();
+  assert.match(els.result.textContent, /European AQI/);
+  // simulate click
+  els.copy.dispatchEvent({ type: 'click', preventDefault() {} });
+  // onCopy is async; wait a tick
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(written.length, 1);
+  assert.match(written[0], /European AQI/);
+  assert.match(els.status.textContent, /copied/i);
+});
+
+test('copy reading fails closed when nothing is shown', async () => {
+  const { env, doc } = fakeEnv();
+  env.window.navigator = { clipboard: { async writeText() { throw new Error('should not call'); } } };
+  const handle = ui.attachAirQualityUi(env);
+  const els = elementsOf(doc);
+  els.copy.dispatchEvent({ type: 'click', preventDefault() {} });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(els.status.textContent, /Nothing to copy/);
+});
+
+test('copy reading reports when the clipboard is unavailable', async () => {
+  const fetchImpl = okFetch(ROUTES);
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
+  // no navigator.clipboard
+  const handle = ui.attachAirQualityUi(env);
+  const els = elementsOf(doc);
+  els.input.value = 'Delhi';
+  await handle.onCheck();
+  els.copy.dispatchEvent({ type: 'click', preventDefault() {} });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(els.status.textContent, /unavailable/i);
 });

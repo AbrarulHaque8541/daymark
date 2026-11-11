@@ -78,6 +78,13 @@
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
+    const copyButton = doc.createElement('button');
+    copyButton.id = 'air-copy';
+    copyButton.className = 'button button-quiet';
+    if (copyButton.setAttribute) copyButton.setAttribute('type', 'button');
+    copyButton.textContent = 'Copy reading';
+    form.appendChild(copyButton);
+
     aside.appendChild(form);
 
     const statusLine = doc.createElement('p');
@@ -120,6 +127,7 @@
     const statusEl = element('air-status');
     const resultEl = element('air-result');
     const clearEl = element('air-clear');
+    const copyEl = element('air-copy');
 
     let busy = false;
 
@@ -181,6 +189,31 @@
       }
     }
 
+    async function onCopy() {
+      if (busy) return;
+      const text = resultEl && typeof resultEl.textContent === 'string' ? resultEl.textContent.trim() : '';
+      if (!text) {
+        status('Nothing to copy yet. Check a place first.');
+        return;
+      }
+      const nav = win && win.navigator;
+      const clipboard = nav && nav.clipboard;
+      if (!clipboard || typeof clipboard.writeText !== 'function') {
+        status('Copy is unavailable in this browser.');
+        return;
+      }
+      setBusy(true);
+      try {
+        await clipboard.writeText(text);
+        status('Reading copied. Not saved on this device.');
+      } catch (error) {
+        const message = error && error.message ? error.message : 'clipboard error';
+        status('Could not copy: ' + message);
+      } finally {
+        setBusy(false);
+      }
+    }
+
     function onClear() {
       if (busy) return;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
@@ -201,6 +234,9 @@
     }
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
+    }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
     }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
