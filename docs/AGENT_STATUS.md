@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./CURRENT_STATUS_20261111T013656Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
@@ -87,6 +88,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
+- [CURRENT_STATUS_20261111T013656Z.md](CURRENT_STATUS_20261111T013656Z.md) — current main `5148232a7165f840fa895707890b829bcdc1657b`; 13 open PRs / 24 open issues; storage-health and task-instant branches synchronized; snapshot UTC 2026-11-11T01:36:56.051Z.
+- Previous snapshot: [CURRENT_STATUS_20261110T225419Z.md](CURRENT_STATUS_20261110T225419Z.md) — historical PR #724 baseline at main `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`.
 - [Daymark engineering status — 20261110T164211Z (offline app-link and intent handoff planner card)](./CURRENT_STATUS_20261110T164211Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)

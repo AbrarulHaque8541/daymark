@@ -1,3 +1,90 @@
+## Current execution queue — 2026-11-11T01:36:56.051Z (main 5148232a)
+
+This queue supersedes older execution queues below; historical planning is retained. PRs are delivery mechanisms, not completion boundaries.
+
+### P0 — user-data integrity, security and runtime
+1. Cross-tab task mutation/generation fencing; stale tabs must not restore deleted tasks or overwrite another tab's committed mutation (#683, #675).
+2. Focus API 29/36 touch/lifecycle reliability; retain real touch and vertical-scroll assertions and complete the ten-run API 36 gate (#613, #727, #648).
+3. DNS-pinned, hostname-verified, redirect-validating download transport and atomic MediaStore/SAF publication; remain fail-closed until complete (#671, #708).
+4. Ordered Clear All/task/Focus/webhook synchronization and generation rollback (#689, #690, #675).
+5. Main required checks and independent review protection (#646); main is currently unprotected and rulesets are empty.
+6. Physical Android/System WebView acceptance with device/API/provider/build SHA (#160).
+
+### P1 — storage, cross-platform contracts and security
+7. Storage-health unreadable-state review and exact inventory of all non-secret keys, including Telegram destination (#603, #725).
+8. 58-case expanded-year Java Instant-compatible timestamp contract and exact-head checks (#707, #722).
+9. RFC 5545/import/export and malformed/duplicate data preservation (#656).
+10. Intent URI parity and actual WebView main-frame/user-gesture acceptance (#712, #715, #723, #726).
+11. Extension SPA scope reevaluation and metadata privacy on real System WebView (#680, #702, #676).
+12. Production-signing environment approvals and action-runtime/provenance review (#705, #84).
+13. Telegram CORS/live delivery acceptance (#700); repeat-task completion/scheduling parity (#684, #476).
+
+### P2 — maintainability and platform qualification
+14. Reproducible Electron installation and committed lockfile (#696).
+15. Measured desktop/browser architecture qualification (#325, #348).
+
+---
+
+
+### Current exact-head execution evidence — 2026-11-11T01:47:18.620Z
+
+- Main `5148232a7165f840fa895707890b829bcdc1657b`: Android CI #42933214990 PASS; cross-platform contracts #42933214965 PASS. Main branch metadata reports `protected=false`; rulesets are empty.
+- #725 storage health: head `6a1a410ff5093d262d60ce08f4f0a0ef6d45caa9`, 6 ahead / 0 behind, 4/4 exact-head workflows PASS. Includes the non-secret Telegram destination category, exact inventory fixture, per-category clear and Clear All regressions. Independent data-integrity review and physical acceptance remain outstanding.
+- #722 task Instant contract: head `a0a93db83c80854a006e14b6d1ffb499ff3bfee8`, 10 ahead / 0 behind. Six workflows PASS; API 29 Focus lifecycle PASS; API 36 Focus lifecycle FAIL at the post-vertical-drag real tap (parent ScrollView receives DOWN/UP, selector/button receive neither). Exact production V8 fixture: 58/58 PASS. Keep draft; do not weaken the Focus or PortableBackupSmoke tests.
+- #727 Focus instrumentation: head `05ae41c340226affd8b4083781779578e7ba07a9`, 4 ahead / 0 behind. Cross-platform contracts and Focus UI/Sound PASS; Android CI, API 29/36 lifecycle, device artifact and unsigned validation are IN PROGRESS. The scroll-settle window now requires eight 50 ms stable samples plus main-looper idle; this remains a hypothesis until the real API 36 test completes.
+- #726 Intent handoff: head `00b8c10822bc8aac05bf8beebf614b895001f002`, 2 ahead / 0 behind. Nine exact-head workflows are IN PROGRESS. It is the canonical focused main-frame/user-gesture Intent gate; #676 must reconcile its duplicate gate while retaining extension-specific changes.
+- #724 documentation: previous head `9704cdd5e6a17040c25c4cd7480526b08a13c02b` passed Android CI, contracts and unsigned validation 3/3. Current head after restoring all main historical index links and recording the post-snapshot evidence is `b99ff0007a8d73c35816700c7ebd6dc05e4076fa`, 8 ahead / 0 behind; exact-head workflows had not yet appeared at last poll. PR is ready for review, not merged. The 2026-11-05T04:29:30 historical snapshot link is retained.
+- #728 Telegram preference correction is merged; current main includes the saved-destination accessibility announcement. #719 export wiring and #721 webhook endpoint session-only privacy are also on main.
+- No PR was merged by this run. Main was not modified. No physical-device acceptance, release/tag, version/signer/package change, or destructive migration was performed.
+
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; Git Data API; GitHub Actions API; V8 exact-source storage and timestamp harnesses  
+**Timestamp (UTC):** 2026-11-11T01:47:18.620Z
+
+---
+## Current execution queue — 2026-11-10T22:54:19.523Z (main 39b1047a)
+
+This queue supersedes the historical queue below. Do not treat an open PR or green CI as project completion.
+
+### P0 — correctness, security and release blockers
+1. Focus API 29/36 touch/lifecycle reliability; retain real touch assertions and complete ten-consecutive-run acceptance (#613, #648, #675).
+2. Extract task generation fencing, three-way merge and destructive-clear ordering from the divergent integration branch into a focused current-main change (#683).
+3. Complete DNS-pinned, hostname-verified, redirect-validating browser download transport and atomic MediaStore/SAF publication (#671, #708).
+4. Configure main required checks, independent review, stale-review dismissal and push restrictions (#646).
+5. Complete physical Android/WebView acceptance across API 26/29/36 (#160).
+6. Finish independent review for strict timestamp contract #722 (all 7 exact-head workflows PASS) and Intent URI contract #723 (Focus API 36 retry pending) (#707, #712).
+7. Complete Focus clear/write and Clear All/webhook lock ordering (#690, #689).
+
+### P1 — cross-platform integrity and security
+8. Complete storage health and recovery review (#603, #640).
+9. Finish iCalendar/import/export parity and malformed-data validation (#656).
+10. Complete extension SPA scope, metadata privacy and actual System WebView acceptance (#680, #702, #676).
+11. Configure production-signing environment approvals and finish action-runtime/provenance maintenance (#705, #84).
+12. Align repeat-task completion and scheduling semantics (#684, #476).
+13. Verify Telegram browser/WebView CORS and real delivery (#700).
+
+### P2 — maintainability and compatibility
+14. Restore reproducible Electron installs and lockfile generation (#696).
+15. Continue browser UX and cross-platform architecture work (#348, #325).
+
+### Active focused deliveries
+- #722: 58-case Java Instant-compatible task timestamp contract; exact production V8 and JDK fixture harnesses pass; API 29 Focus workflow retry pending.
+- #723: 48-case strict Intent URI parity contract; exact production V8 fixture passes; Focus lifecycle and unsigned device validation pending.
+- #719: export selector script-order correction is merged and mainline CI passed.
+- #721: webhook endpoint session-only privacy and endpoint-bound queue are merged.
+- #704/#708: Service Worker enforcement and bounded download body-transfer foundation are merged; full download transport remains incomplete.
+
+### Governance and safety
+- Main currently reports `protected=false` and no repository rulesets; owner-side governance is required.
+- No independent approved reviews were found on the nine open PRs.
+- Do not change `applicationId`, namespace, version, signing, tags/releases or stored data without explicit authorization. Current Gradle identity is `com.abrar.daymark`; the explicit `the alternate package identifier named in the run-level safety instruction` instruction conflict remains unresolved.
+- Do not weaken tests to obtain green CI. Separate unrelated Focus failures from the focused PRs, but keep the full required gate.
+
+**Last reviewed:** 2026-11-10T22:54:19.523Z  
+**Main SHA:** `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`  
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; Node 22/V8 and JDK 21 validation harnesses
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
@@ -451,3 +538,7 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6  
 Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
 Timestamp (UTC): 2026-11-09T02:36:57.068Z
+
+
+### Documentation refresh
+- #724 contains the current-main snapshot and queue update. Its first Android CI/device validation attempt was rejected by the retired-identity source guard because the snapshot repeated a forbidden literal. That literal has been removed; exact-head reruns are required.
