@@ -46,8 +46,14 @@ function renderTabs() {
   document.querySelectorAll('.tab').forEach((el) => {
     const tab = tabs.find((t) => String(t.id) === el.dataset.tabId);
     if (!tab) return;
-    el.querySelector('.tab-title').textContent = tab.title || 'Loading...';
-    el.classList.toggle('active', isActive(tab));
+    const title = tab.title || 'Loading...';
+    const active = isActive(tab);
+    const select = el.querySelector('.tab-select');
+    el.querySelector('.tab-title').textContent = title;
+    el.classList.toggle('active', active);
+    select.setAttribute('aria-label', 'Switch to ' + title);
+    select.setAttribute('aria-pressed', String(active));
+    el.querySelector('.tab-close').setAttribute('aria-label', 'Close ' + title);
   });
 }
 
@@ -120,10 +126,11 @@ function createTab(url = HOME) {
   const el = document.createElement('div');
   el.className = 'tab';
   el.dataset.tabId = String(id);
-  el.innerHTML = '<span class="tab-title">New tab</span><span class="tab-close" title="Close tab">&times;</span>';
-  el.addEventListener('click', (e) => {
-    if (e.target.classList.contains('tab-close')) closeTab(id);
-    else activateTab(id);
+  el.innerHTML = '<button class="tab-select" type="button" aria-pressed="false"><span class="tab-title">New tab</span></button><button class="tab-close" type="button" title="Close tab" aria-label="Close tab">&times;</button>';
+  el.querySelector('.tab-select').addEventListener('click', () => activateTab(id));
+  el.querySelector('.tab-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeTab(id);
   });
   $('tabs').appendChild(el);
 
@@ -144,6 +151,10 @@ function closeTab(id) {
     if (next) activateTab(next.id);
     else createTab();
   }
+  const select = document.querySelector(
+    '.tab[data-tab-id="' + activeTabId + '"] .tab-select',
+  );
+  if (select) select.focus();
 }
 
 function navigate(raw) {
@@ -248,6 +259,7 @@ window.addEventListener('keydown', (e) => {
 const newTabBtn = document.createElement('button');
 newTabBtn.id = 'newtab';
 newTabBtn.title = 'New tab (Ctrl+T)';
+newTabBtn.setAttribute('aria-label', 'New tab');
 newTabBtn.textContent = '+';
 newTabBtn.onclick = () => createTab();
 $('tabs').appendChild(newTabBtn);
@@ -262,9 +274,23 @@ if (window.daymark) {
     }
   });
   window.daymark.onDownloadStarted((name) => toast('Downloading: ' + name));
+  window.daymark.onDownloadProgress((name, percent) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    const safePercent = Number.isInteger(percent) ? Math.max(0, Math.min(100, percent)) : null;
+    const progress = safePercent === null ? '' : ' (' + safePercent + '%)';
+    toast('Downloading: ' + safeName + progress);
+  });
   window.daymark.onDownloadFailed((name) => {
     const safeName = typeof name === 'string' && name ? name : 'download';
     toast('Could not safely save ' + safeName + '; no file was published.');
+  });
+  window.daymark.onDownloadCompleted((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Saved to Downloads: ' + safeName);
+  });
+  window.daymark.onDownloadCancelled((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Download cancelled: ' + safeName);
   });
 }
 
