@@ -12,6 +12,7 @@
   // attachAirQualityUi(env) is fully injectable for unit tests.
 
   const CARD_ID = 'air-card';
+  const STYLE_ID = 'air-band-styles';
 
   function bandClass(band) {
     if (!band || typeof band !== 'string') return 'air-band-unknown';
@@ -23,6 +24,19 @@
       return 'air-band-poor';
     }
     return 'air-band-unknown';
+  }
+
+  function ensureStyles(doc) {
+    if (typeof doc.getElementById === 'function' && doc.getElementById(STYLE_ID)) return;
+    if (typeof doc.createElement !== 'function') return;
+    const style = doc.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = '.air-band-good { color: #16705f; font-weight: 600; }'
+      + '.air-band-moderate { color: #94581e; font-weight: 600; }'
+      + '.air-band-poor { color: #a3281f; font-weight: 600; }'
+      + '.air-band-unknown { color: #565f68; }';
+    const head = doc.head || doc.documentElement || doc.body;
+    if (head && typeof head.appendChild === 'function') head.appendChild(style);
   }
 
   function ensureCard(doc) {
@@ -125,6 +139,7 @@
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
 
+    ensureStyles(doc);
     ensureCard(doc);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
@@ -160,7 +175,6 @@
       const place = record.place;
       const air = record.air;
       const placeLine = place.country ? place.name + ', ' + place.country : place.name;
-      // Clear previous content
       while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       const placeSpan = doc.createElement('span');
       placeSpan.textContent = placeLine + ' · ';
