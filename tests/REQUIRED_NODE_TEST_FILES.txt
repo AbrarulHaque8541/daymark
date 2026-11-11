@@ -1,6 +1,7 @@
 apps/desktop/test/download-handler.test.js
 apps/desktop/test/download-policy.test.js
 apps/desktop/test/download-publish.test.js
+apps/desktop/test/electron-runtime.test.js
 apps/desktop/test/renderer-address-policy.test.js
 apps/desktop/test/request-policy.test.js
 apps/desktop/test/rules.test.js
@@ -10,6 +11,8 @@ desktop-spike/task-core.test.js
 test/ci-test-honesty.test.js
 test/task-focus-session-coordinator.test.js
 test/task-focus-timer.test.js
+tests/air-quality-logic.test.js
+tests/air-quality-ui.test.js
 tests/app-focus.test.js
 tests/app-markup-contract.test.js
 tests/app-recovery-backup.test.js
@@ -69,5 +72,3 @@ tests/wiki-logic.test.js
 tests/wiki-ui.test.js
 tests/zones-logic.test.js
 tests/zones-ui.test.js
-tests/air-quality-logic.test.js
-tests/air-quality-ui.test.js

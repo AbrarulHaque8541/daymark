@@ -7,12 +7,12 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/rules.test.js test/request-policy.test.js test/renderer-address-policy.test.js test/webview-popup-policy.test.js test/download-handler.test.js test/download-policy.test.js test/download-publish.test.js test/workflow-contract.test.js"
+    "test": "node --test test/rules.test.js test/request-policy.test.js test/renderer-address-policy.test.js test/webview-popup-policy.test.js test/download-handler.test.js test/download-policy.test.js test/download-publish.test.js test/workflow-contract.test.js test/electron-runtime.test.js"
   },
   "devDependencies": {
-    "electron": "^33.4.0"
+    "electron": "^45.3.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   }
 }

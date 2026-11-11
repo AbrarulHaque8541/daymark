@@ -7,12 +7,21 @@ Daymark ka desktop browser abhi **experimental prototype** hai. Electron Chromiu
 ```bash
 git clone https://github.com/AbrarulHaque8541/daymark.git
 cd daymark/apps/desktop
-npm install
+npm ci
 npm start
 npm test
 ```
 
+The desktop dependency graph is pinned by `package-lock.json`. Use `npm ci` for clean/reproducible installs. Use `npm install` only when intentionally changing dependencies, and commit the regenerated lockfile with that change.
+
 Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS par unit tests chalata hai. Yeh GUI launch, installer packaging, screenshot capture ya real-device compatibility prove nahi karta.
+
+## Runtime compatibility
+
+- Supported stable runtime baseline: Electron **45.3.0**, embedding Chromium **156.0.8078.96** and Node.js **24.22.2**.
+- The CI unit-test harness runs under Node 24.22.2, matching Electron's embedded Node runtime; `npm test` also launches the installed Electron binary and verifies its exact version.
+- Electron 45 publishes 64-bit x64/arm64 builds only; 32-bit Windows ia32 and Linux armv7l are not supported.
+- Electron 45's planned end-of-support date is 2027-04-27; re-check the official release schedule before any desktop distribution decision.
 
 ## Features (prototype)
 
@@ -27,8 +36,8 @@ Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS 
 
 ## Security boundary
 
-- Host renderer: sandbox, contextIsolation aur webSecurity enabled; nodeIntegration disabled.
-- Guest webviews: preload aur custom session/partition overrides remove hote hain; Node integration, plugins aur nested webview disabled; sandbox/security preferences force hoti hain.
+- Host renderer: sandbox, contextIsolation aur webSecurity enabled; nodeIntegration aur nodeIntegrationInWorker disabled.
+- Guest webviews: preload aur custom session/partition overrides remove hote hain; Node integration, Node worker integration, plugins aur nested webview disabled; sandbox/security preferences force hoti hain.
 - Initial URL, in-page navigation, redirects aur popup targets HTTPS/localhost policy se validate hote hain; credential-bearing URLs are rejected before address/navigation/request admission.
 - file: access exact packaged renderer files tak limited hai. data:/blob: sirf subresources ke liye, aur about:blank/about:srcdoc sirf child frames ke liye allowed hain. Top-level file:, data:, chrome:, devtools:, javascript: aur unknown schemes blocked hain.
 - HTTPS/WSS allowed; remote HTTP/WS blocked; localhost HTTP/WS development exception hai.

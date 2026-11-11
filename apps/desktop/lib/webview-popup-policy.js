@@ -37,6 +37,7 @@ function installWebviewPopupPolicy(hostWebContents, requestTab, isAllowedNavigat
     delete webPreferences.partition;
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.nodeIntegrationInWorker = false;
     webPreferences.contextIsolation = true;
     webPreferences.sandbox = true;
     webPreferences.webSecurity = true;
