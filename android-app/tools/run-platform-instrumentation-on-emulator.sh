@@ -28,14 +28,32 @@ echo "Running Android instrumentation component: $instrumentation"
 instrumentation_output="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/platform-instrumentation-output.log"
 mkdir -p "$(dirname "$instrumentation_output")"
 
+run_bounded_diagnostic() {
+  label="$1"
+  shift
+  echo "::group::$label"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --signal=TERM --kill-after=2s 8s "$@" 2>&1 || true
+  else
+    echo "timeout utility unavailable; skipped bounded diagnostic"
+  fi | tail -n 120
+  echo "::endgroup::"
+}
+
 report_failure() {
   body="$1"
   echo "::group::instrumentation output"
   printf '%s\n' "$body" | tail -n 100
   echo "::endgroup::"
-  echo "::group::Daymark instrumentation logcat"
-  adb logcat -d -t 500 -s DaymarkInstr:I 2>/dev/null | tail -n 100 || true
-  echo "::endgroup::"
+  # A timeout before the first DaymarkInstr marker can be an instrumentation
+  # process-start failure, not an in-test hang. Include framework crash and
+  # activity-manager tags so that pre-onCreate failures are diagnosable.
+  run_bounded_diagnostic "Android runtime and instrumentation logcat" \
+    adb logcat -d -t 1000 -s AndroidRuntime:E ActivityManager:E ActivityTaskManager:E Instrumentation:I DaymarkInstr:I System.err:W
+  run_bounded_diagnostic "Registered instrumentation state" \
+    adb shell dumpsys activity instrumentation
+  run_bounded_diagnostic "Daymark app and instrumentation processes" \
+    sh -c 'adb shell ps -A | grep -E "com\\.abrar\\.daymark(\\.test)?|instrumentation"'
 }
 
 run_instrumentation_once() {
