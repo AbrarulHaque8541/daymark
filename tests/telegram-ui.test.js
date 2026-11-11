@@ -316,6 +316,7 @@ test('boot restores only the non-secret chat preference and never reads task dat
   ui.attachTelegramUi(okEnv(doc, { storage: storage }));
   assert.equal(doc.elements['telegram-chat'].value, '987654321');
   assert.deepEqual(storage.readKeys(), ['daymark.telegram.lastChat.v1']);
+  assert.match(doc.elements['telegram-status'].textContent, /Last chat target restored/);
 });
 test('a throwing or malformed task validator fails closed without exposing its error', async () => {
   for (const validator of [

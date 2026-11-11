@@ -63,6 +63,7 @@
         const saved = storage.getItem(CHAT_STORAGE_KEY);
         if (typeof saved === 'string' && saved && logicApi.isChatTarget(saved)) {
           chatEl.value = saved;
+          status('Last chat target restored. Token is still session-only.');
         }
       } catch (error) { /* Ignore unreadable preference. */ }
     }
