@@ -523,11 +523,46 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         android.graphics.Rect bounds = stableVisibleBounds(view);
         check(bounds.width() > 0 && bounds.height() > 0, "tap target has stable visible screen bounds");
         String target = describeTouchTarget(view, bounds);
+        StringBuilder touchTrace = new StringBuilder();
+        java.util.ArrayList<android.view.View> tracedViews = new java.util.ArrayList<>();
+        java.util.ArrayList<android.view.View> tracedAncestors = new java.util.ArrayList<>();
+        runOnMainSync(() -> {
+            attachTouchTraceListeners(view, "tap-target", touchTrace, tracedViews);
+            android.view.ViewParent parent = view.getParent();
+            int ancestorIndex = 0;
+            while (parent instanceof android.view.View) {
+                android.view.View ancestor = (android.view.View) parent;
+                String label = "tap-ancestor-" + ancestorIndex + "-" + ancestor.getClass().getSimpleName();
+                ancestor.setOnTouchListener((targetView, event) -> {
+                    appendTouchTrace(touchTrace, label, targetView, event);
+                    return false;
+                });
+                tracedAncestors.add(ancestor);
+                parent = ancestor.getParent();
+                ancestorIndex += 1;
+            }
+        });
         float x = bounds.centerX();
         float y = bounds.centerY();
         long downTime = android.os.SystemClock.uptimeMillis();
-        injectTouchSequence(PlatformTouchSequence.tap(x, y, downTime), downTime);
-        return target + " tapCenter=(" + x + "," + y + ") source=UiAutomation/finger";
+        try {
+            injectTouchSequence(PlatformTouchSequence.tap(x, y, downTime), downTime);
+        } finally {
+            runOnMainSync(() -> {
+                for (android.view.View tracedView : tracedViews) tracedView.setOnTouchListener(null);
+                for (android.view.View tracedAncestor : tracedAncestors) tracedAncestor.setOnTouchListener(null);
+            });
+        }
+        String[] capturedTouchTrace = new String[1];
+        runOnMainSync(() -> capturedTouchTrace[0] = touchTrace.toString());
+        check(capturedTouchTrace[0] != null && capturedTouchTrace[0].contains("ACTION_DOWN"),
+                "tap ACTION_DOWN reaches the target or an ancestor (" + target
+                        + ", events=[" + capturedTouchTrace[0] + "])");
+        check(capturedTouchTrace[0].contains("ACTION_UP"),
+                "tap ACTION_UP reaches the target or an ancestor (" + target
+                        + ", events=[" + capturedTouchTrace[0] + "])");
+        return target + " tapCenter=(" + x + "," + y + ") source=UiAutomation/finger"
+                + " events=[" + capturedTouchTrace[0] + "]";
     }
 
     private String dispatchSwipe(android.view.View view, boolean left) throws Exception {
