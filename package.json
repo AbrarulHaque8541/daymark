@@ -1,1 +1,13 @@
-PLACEHOLDER_PKG
+{
+  "name": "daymark-web-prototype",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Daymark — personal task manager, reference web prototype. Task and Focus data are stored in browser localStorage (not encrypted by the prototype).",
+  "scripts": {
+    "pretest": "node scripts/ensure-test-dependencies.js",
+    "test": "node --test --test-concurrency=1"
+  },
+  "devDependencies": {
+    "acorn": "8.19.0"
+  }
+}
