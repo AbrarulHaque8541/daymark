@@ -465,7 +465,7 @@
         <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="telegram-heading">Telegram task digest</h2>
-          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your token stays in this tab; nothing is saved on this device.</p>
+          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your bot token stays in this tab and is cleared when you leave. After a successful send, only the non-secret chat target is remembered on this device; clear the Telegram preference in the Local data card to forget it.</p>
           <form id="telegram-form" class="feed-form" novalidate>
             <label class="sr-only" for="telegram-token">Bot token from @BotFather</label>
             <input id="telegram-token" name="token" type="password" maxlength="120" placeholder="Bot token from @BotFather" autocomplete="off" spellcheck="false">
@@ -473,7 +473,7 @@
             <input id="telegram-chat" name="chat" type="text" maxlength="64" placeholder="Chat id or @username" autocomplete="off" spellcheck="false">
             <button class="button button-primary" id="telegram-send" type="submit">Send digest</button>
             <button class="button button-quiet" id="telegram-test" type="button">Test</button>
-            <button class="button button-quiet" id="telegram-clear" type="button">Clear</button>
+            <button class="button button-quiet" id="telegram-clear" type="button">Clear token</button>
           </form>
           <p class="feed-status" id="telegram-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
