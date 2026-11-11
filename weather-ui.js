@@ -1,7 +1,7 @@
 /*
  * Daymark weather glance UI wiring for the web prototype.
  *
- * A small offline-first card: the user types a place name and taps Refresh;
+ * A small network-on-demand card: the user types a place name and taps Refresh;
  * the current conditions come from the keyless Open-Meteo public API and the
  * last successful result stays cached on this device, so the card keeps
  * working offline with a "cached" note. Nothing ever refreshes on its own —

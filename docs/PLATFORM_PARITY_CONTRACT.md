@@ -116,7 +116,7 @@ The intended resource saving is to write scenarios once, reuse fixtures and asse
 
 - Preserve Android application ID and namespace `com.abrar.daymark`.
 - Preserve the production signer pin, signing secrets, monotonic versioning, and release gates.
-- Keep task data local-first and encrypted at rest; migration/export must be explicit and tested.
+- Keep task data on the device and encrypted at rest; migration/export must be explicit and tested.
 - No analytics/ad SDKs and no task-content upload to CI or cloud services.
 - Preserve HTTP+HTTPS browsing with visible **Not encrypted** labelling, explicit online consent, and safe untrusted-page boundaries.
 - Do not close browser blank-viewport issue #221 until its required runtime/device evidence is recorded.
