@@ -5,7 +5,11 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 
-test('the installed Electron binary starts and reports the exact supported stable version', () => {
+const desktopWorkspace = path.resolve(process.cwd()) === path.resolve(__dirname, '..');
+
+test('the installed Electron binary starts and reports the exact supported stable version', {
+  skip: !desktopWorkspace && 'Electron binary smoke runs in apps/desktop CI after its npm ci',
+}, () => {
   const electronBinary = require('electron');
   assert.equal(typeof electronBinary, 'string', 'Node must resolve the installed Electron executable path');
   assert.ok(path.isAbsolute(electronBinary), 'Electron executable path must be absolute');
