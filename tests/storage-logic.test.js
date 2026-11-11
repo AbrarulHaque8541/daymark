@@ -47,6 +47,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.browser-address.prefs.v1',
     'daymark.browser-download.last-scenario',
     'daymark.webhook.queue.v1',
+    'daymark.telegram.lastChat.v1',
     'daymark.webhook.lock.v1'
   ];
   assert.deepEqual(storage.categoryIds().length, storage.CATEGORIES.length);
@@ -101,6 +102,7 @@ test('planClear returns the exact keys and rejects unknown categories', () => {
   assert.deepEqual(storage.planClear('focus-preset'), ['daymark.focus.preset.v1']);
   assert.deepEqual(storage.planClear('browser-proxy'), ['daymark.browser-proxy.last-profile']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
+  assert.deepEqual(storage.planClear('telegram-preference'), ['daymark.telegram.lastChat.v1']);
   assert.deepEqual(storage.planClear('webhook-lock'), ['daymark.webhook.lock.v1']);
   assert.deepEqual(storage.planClear('wiki'), ['daymark.wiki.v1']);
   assert.deepEqual(storage.planClear('wiki-preferences'), ['daymark.wiki.prefs.v1']);
@@ -388,4 +390,28 @@ test('Focus preset is inventoried and cleared without touching the active sessio
   assert.equal(store.snapshot['daymark.focus.preset.v1'], undefined);
   assert.equal(store.snapshot['daymark.focus.v1'], focusState,
     'clearing the preset must not stop or erase the active Focus session or history');
+});
+
+
+test('remembered Telegram chat preference is inventoried and included in category and Clear All plans', () => {
+  const key = 'daymark.telegram.lastChat.v1';
+  const destination = '@daymark_updates';
+  const store = fakeStorage({ [key]: destination });
+  const scan = storage.scanStorage(store);
+  const category = scan.categories.find((entry) => entry.id === 'telegram-preference');
+  assert.ok(category, 'the non-secret Telegram destination has its own category');
+  assert.deepEqual(category.keys, [key]);
+  assert.equal(category.present, true);
+  assert.equal(category.bytes, storage.estimateBytes(destination));
+  assert.deepEqual(storage.planClear('telegram-preference'), [key]);
+
+  const categoryClear = storage.clearCategory(store, 'telegram-preference');
+  assert.deepEqual(categoryClear.removed, [key]);
+  assert.deepEqual(categoryClear.failed, []);
+  assert.equal(store.snapshot[key], undefined);
+
+  const allStore = fakeStorage({ [key]: destination });
+  const clearAll = storage.clearAll(allStore);
+  assert.ok(clearAll.removedKeys.includes(key), 'Clear All includes the remembered destination');
+  assert.equal(allStore.snapshot[key], undefined);
 });

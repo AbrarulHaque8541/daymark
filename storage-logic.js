@@ -125,6 +125,12 @@
       keys: ['daymark.webhook.queue.v1']
     },
     {
+      id: 'telegram-preference',
+      label: 'Telegram chat preference',
+      description: 'The last chat destination remembered for your Telegram digest. The bot token is session-only and is never stored.',
+      keys: ['daymark.telegram.lastChat.v1']
+    },
+    {
       id: 'webhook-lock',
       label: 'Legacy webhook coordination lock',
       description: 'A short-lived localStorage marker from older webhook versions. Newer versions use browser Web Locks; any leftover marker is safe to clear.',
