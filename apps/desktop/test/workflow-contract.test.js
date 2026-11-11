@@ -7,22 +7,44 @@ const path = require('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '../../..');
 const workflowPath = path.join(repositoryRoot, '.github', 'workflows', 'desktop-browser-ci.yml');
+const packagePath = path.join(repositoryRoot, 'apps', 'desktop', 'package.json');
+const lockPath = path.join(repositoryRoot, 'apps', 'desktop', 'package-lock.json');
 
-test('desktop CI pins Node 24 action runtimes and installs Electron dependencies before tests', () => {
+test('desktop CI installs the committed npm lockfile before the cross-platform test suite', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
 
-  assert.match(workflow, /uses: actions\/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7\.0\.0/);
-  assert.match(workflow, /uses: actions\/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6\.0\.0/);
+  assert.match(workflow, /uses: actions\\/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7\\.0\\.0/);
+  assert.match(workflow, /uses: actions\\/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6\\.0\\.0/);
   assert.match(workflow, /node-version: '20'/,
     'Electron unit tests continue to use the supported Node 20 application runtime');
-  assert.match(workflow, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
+  assert.match(workflow, /os: \\[ubuntu-latest, windows-latest, macos-latest\\]/);
 
-  const install = workflow.indexOf('npm install --no-audit --no-fund');
+  assert.equal(lock.lockfileVersion, 3, 'the desktop lockfile must use npm lockfile v3');
+  assert.equal(lock.packages?.['']?.devDependencies?.electron, manifest.devDependencies.electron,
+    'the lockfile root must match the declared Electron dependency range');
+  const electron = lock.packages?.['node_modules/electron'];
+  assert.ok(electron && /^\\d+\\.\\d+\\.\\d+$/.test(electron.version),
+    'the lockfile must resolve Electron to an exact version');
+  assert.ok(electron.integrity && electron.resolved?.startsWith('https://registry.npmjs.org/'),
+    'the Electron tarball must have a registry URL and integrity hash');
+  assert.ok(lock.packages?.['node_modules/@electron/get'],
+    'the Electron binary downloader dependency must be locked');
+  for (const [name, entry] of Object.entries(lock.packages)) {
+    if (entry.resolved?.startsWith('https://registry.npmjs.org/')) {
+      assert.ok(entry.integrity, `registry package ${name} must have an integrity hash`);
+    }
+  }
+
+  const install = workflow.indexOf('npm ci --no-audit --no-fund');
+  const stable = workflow.indexOf('git diff --exit-code -- package-lock.json');
   const tests = workflow.indexOf('npm test');
-  assert.ok(install >= 0 && tests > install,
-    'desktop dependencies must be installed before the cross-platform unit suite');
+  assert.ok(install >= 0 && stable > install && tests > stable,
+    'CI must install from the lockfile, verify it is unchanged, then run tests');
+  assert.ok(!workflow.includes('npm install --no-audit --no-fund'),
+    'CI must not silently resolve a new dependency tree');
 });
-
 
 test('download publication failures reach the renderer through a URL-free IPC contract', () => {
   const Module = require('node:module');

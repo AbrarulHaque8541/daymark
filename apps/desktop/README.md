@@ -7,7 +7,7 @@ Daymark ka desktop browser abhi **experimental prototype** hai. Electron Chromiu
 ```bash
 git clone https://github.com/AbrarulHaque8541/daymark.git
 cd daymark/apps/desktop
-npm install
+npm ci
 npm start
 npm test
 ```

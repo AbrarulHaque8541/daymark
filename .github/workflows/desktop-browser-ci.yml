@@ -19,58 +19,6 @@ permissions:
   contents: read
 
 jobs:
-  # One-time bootstrap for the Electron lockfile. This guarded job runs only
-  # on this same-repository PR branch, generates the lock with npm (never by
-  # hand), and pushes only package-lock.json back to the PR branch. It is
-  # removed after the generated lock is committed and npm ci is verified.
-  bootstrap-desktop-lockfile:
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'fix/desktop-lockfile-20261111'
-    name: Generate the real desktop npm lockfile
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    defaults:
-      run:
-        working-directory: apps/desktop
-    steps:
-      - name: Check out the PR head (not the synthetic merge ref)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Set up Node 20
-        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
-        with:
-          node-version: '20'
-
-      - name: Generate lockfile from the exact desktop manifest
-        run: |
-          set -euo pipefail
-          test ! -e package-lock.json
-          node --version
-          npm --version
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          test -s package-lock.json
-          node -e "const l=require('./package-lock.json'); if (l.lockfileVersion !== 3 || l.packages?.['']?.devDependencies?.electron !== require('./package.json').devDependencies.electron) process.exit(1); console.log('lockfileVersion='+l.lockfileVersion+' electron='+l.packages['node_modules/electron'].version)"
-          sha256sum package-lock.json
-
-      - name: Commit the generated lockfile to this PR branch
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore(desktop): add npm-generated lockfile" -m "Work by: ChatGPT (OpenAI)
-          Model: GPT-6
-          Tooling: GitHub Actions ubuntu-24.04; Node 20/npm; exact apps/desktop/package.json
-          Timestamp (UTC): 2026-11-11T11:10:00Z"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
-
   test:
     name: Unit tests (${{ matrix.os }})
     strategy:
@@ -92,7 +40,10 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify npm ci leaves the committed lockfile unchanged
+        run: git diff --exit-code -- package-lock.json
 
       - name: Run unit tests
         run: npm test
