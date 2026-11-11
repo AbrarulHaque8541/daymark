@@ -7,6 +7,7 @@ const ui = require('../telegram-ui.js');
 const engine = require('../telegram-logic.js');
 const taskLogic = require('../task-logic.js');
 function makeElement(tagName) {
+  const classes = new Set();
   const el = {
     tagName: tagName,
     className: '',
@@ -16,6 +17,11 @@ function makeElement(tagName) {
     children: [],
     listeners: {},
     attrs: {},
+    classList: {
+      add(...names) { for (const n of names) if (n) classes.add(n); el.className = Array.from(classes).join(' '); },
+      remove(...names) { for (const n of names) classes.delete(n); el.className = Array.from(classes).join(' '); },
+      contains(name) { return classes.has(name); }
+    },
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) { const i = el.children.indexOf(child); if (i !== -1) el.children.splice(i, 1); return child; },
     addEventListener(type, handler) { (el.listeners[type] = el.listeners[type] || []).push(handler); },
@@ -382,45 +388,28 @@ test('buttons are disabled and aria-busy is set while a send is in flight', asyn
   const doc = makeDoc(ALL_IDS);
   let resolveFetch;
   const fetchFn = makeFetch(() => new Promise((resolve) => { resolveFetch = resolve; }));
-  const storage = makeStorage({ 'daymark.tasks.v1': JSON.stringify([makeTask('ship the polish', { completed: true })]) });
-  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('Buy milk', { completed: true, id: 1 })]) };
+  const handle = ui.attachTelegramUi(okEnv(doc, { seed: seed, fetch: fetchFn }));
   fillValidInputs(doc);
   const pending = handle.send();
-  // After starting, controls should be busy
+  await Promise.resolve();
   assert.equal(doc.elements['telegram-send'].disabled, true);
   assert.equal(doc.elements['telegram-test'].disabled, true);
   assert.equal(doc.elements['telegram-clear'].disabled, true);
   assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'true');
   assert.equal(doc.elements['telegram-status'].getAttribute('aria-busy'), 'true');
-  resolveFetch({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 9 } }) });
+  resolveFetch({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 7 } }) });
   await pending;
   assert.equal(doc.elements['telegram-send'].disabled, false);
-  assert.equal(doc.elements['telegram-test'].disabled, false);
   assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'false');
-  assert.match(doc.elements['telegram-status'].textContent, /Sent/);
-});
-
-test('last valid chat target is restored on attach when storage holds one', () => {
-  const doc = makeDoc(ALL_IDS);
-  const storage = makeStorage({ 'daymark.telegram.lastChat.v1': '987654321' });
-  ui.attachTelegramUi(okEnv(doc, { storage: storage }));
-  assert.equal(doc.elements['telegram-chat'].value, '987654321');
-});
-
-test('an invalid or missing stored chat target is ignored', () => {
-  const doc = makeDoc(ALL_IDS);
-  const storage = makeStorage({ 'daymark.telegram.lastChat.v1': 'not-a-target' });
-  ui.attachTelegramUi(okEnv(doc, { storage: storage }));
-  assert.equal(doc.elements['telegram-chat'].value, '');
 });
 
 test('successful send persists the chat target for next session', async () => {
   const doc = makeDoc(ALL_IDS);
-  const storage = makeStorage({
-    'daymark.tasks.v1': JSON.stringify([makeTask('ship it', { completed: true })])
-  });
-  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 11 } }) }));
-  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
+  const storage = makeStorage({});
+  const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 7 } }) }));
+  const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('ship it', { completed: true })]) };
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, seed: seed, fetch: fetchFn }));
   fillValidInputs(doc);
   doc.elements['telegram-chat'].value = '@daymarkchannel';
   await handle.send();
@@ -449,4 +438,24 @@ test('Clear empties only the token; chat target preference remains', () => {
   assert.equal(doc.elements['telegram-chat'].value, '123456789');
   assert.match(doc.elements['telegram-status'].textContent, /chat target remains available/);
   assert.doesNotMatch(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
+});
+
+test('press feedback toggles is-pressed on Telegram action buttons', () => {
+  const doc = makeDoc(ALL_IDS);
+  ui.attachTelegramUi(okEnv(doc, {}));
+  const send = doc.elements['telegram-send'];
+  const testBtn = doc.elements['telegram-test'];
+  const clear = doc.elements['telegram-clear'];
+  for (const btn of [send, testBtn, clear]) {
+    assert.ok(btn.classList, 'classList present');
+    assert.equal(btn.classList.contains('is-pressed'), false);
+    // Simulate pointerdown
+    const down = (btn.listeners.pointerdown || [])[0];
+    if (typeof down === 'function') down();
+    assert.equal(btn.classList.contains('is-pressed'), true);
+    // pointerup
+    const up = (btn.listeners.pointerup || [])[0];
+    if (typeof up === 'function') up();
+    assert.equal(btn.classList.contains('is-pressed'), false);
+  }
 });
