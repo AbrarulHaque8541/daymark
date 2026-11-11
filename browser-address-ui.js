@@ -1,7 +1,7 @@
 /*
  * Daymark browser address-bar preview UI wiring for the web prototype.
  *
- * A small offline-first card: the user types address-bar text and this card
+ * A small network-on-demand card: the user types address-bar text and this card
  * shows, locally, how Daymark's browser would read it — an http(s) page
  * (with an honest Encrypted / Not encrypted label), a search with the
  * chosen provider, a safe external handoff (mailto/tel/sms), or a blocked

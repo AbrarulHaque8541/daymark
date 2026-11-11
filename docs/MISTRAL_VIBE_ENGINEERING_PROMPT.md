@@ -22,7 +22,7 @@ Optimize the complete outcome: correctness, real-world speed, responsiveness, me
 
 - Keep application ID/namespace `com.abrar.daymark` unchanged.
 - Preserve production signing identity/pin and GitHub signing secrets. Never request, expose, print, or commit keystore/password/token material.
-- Preserve task data, attachments, encryption/key lifecycle, portable backup compatibility, existing product features, local-first privacy, explicit network consent, browser security boundaries, and monotonic versioning.
+- Preserve task data, attachments, encryption/key lifecycle, portable backup compatibility, existing product features, on-device privacy, browser security boundaries, and monotonic versioning. Do not weaken or replace working network features with offline-only substitutes.
 - Do not implement custom cryptography or weaken security checks/tests to get green CI.
 - No analytics/ad SDKs, broad JS bridge, hidden background downloads/inference, arbitrary downloaded executable code, permission bypasses, or unsupported platform claims.
 - Do not merge, tag, bump version, publish APK/AAB, or change signing/release state unless the repository rules and explicit owner authorization permit it.
