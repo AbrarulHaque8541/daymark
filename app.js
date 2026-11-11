@@ -1,1 +1,1 @@
-PLACEHOLDER_WILL_FAIL_BUT_TEST
+$(cat /tmp/app.js)
