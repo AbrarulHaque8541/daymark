@@ -15,6 +15,9 @@ concurrency:
 jobs:
   build-and-verify:
     name: Build and verify device-test APK
+    # Signing secrets and release artifacts are owner-triggered only.
+    if: github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'
+    environment: production-signing
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -289,7 +292,8 @@ jobs:
 
   publish-release:
     name: Publish and verify GitHub Release APK asset
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'
+    environment: production-signing
     needs: build-and-verify
     runs-on: ubuntu-24.04
     timeout-minutes: 15

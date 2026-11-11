@@ -24,6 +24,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       github.actor == 'AbrarulHaque8541' &&
       github.triggering_actor == 'AbrarulHaque8541'
+    environment: production-signing
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     defaults:

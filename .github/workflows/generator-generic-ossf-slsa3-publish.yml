@@ -23,6 +23,8 @@ permissions:
 jobs:
   build:
     name: Build the real APK and hash it
+    # Manual dispatch remains build-only; only the owner may trigger tag builds.
+    if: github.event_name != 'push' || (github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -70,11 +72,25 @@ jobs:
           # The provenance subject is the exact APK that ships, not a placeholder.
           echo "hashes=$(sha256sum "$apk" | base64 -w0)" >> "${GITHUB_OUTPUT}"
 
+  authorize-provenance:
+    name: Require production-signing approval before provenance publication
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'
+    needs: [build]
+    environment: production-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm the protected production environment was approved
+        run: echo "Production provenance authorization approved."
+
   provenance:
     # Manual dispatch is build-only. Signed provenance and release-asset upload
-    # are permitted only for a tag push whose commit was verified on main above.
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: [build]
+    # are permitted only after the owner-triggered tag build and protected
+    # production-signing environment approval have succeeded.
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.actor == 'AbrarulHaque8541' && github.triggering_actor == 'AbrarulHaque8541'
+    needs: [build, authorize-provenance]
     permissions:
       actions: read   # To read the workflow path.
       id-token: write # To sign the provenance.

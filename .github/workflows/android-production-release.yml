@@ -13,7 +13,12 @@ concurrency:
 
 jobs:
   build-verify-draft:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      github.repository == 'AbrarulHaque8541/daymark' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.actor == 'AbrarulHaque8541' &&
+      github.triggering_actor == 'AbrarulHaque8541'
+    environment: production-signing
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:

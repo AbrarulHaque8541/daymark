@@ -393,6 +393,19 @@ test('SLSA provenance uploads are restricted to mainline device-test tag pushes'
   assert.match(provenance, /upload-assets: true/);
 });
 
+test('SLSA reusable provenance publishing depends on the protected approval job', () => {
+  const content = fs.readFileSync(path.join(root,
+    '.github/workflows/generator-generic-ossf-slsa3-publish.yml'), 'utf8');
+  const provenanceStart = content.indexOf('  provenance:');
+  assert.ok(provenanceStart >= 0, 'missing reusable provenance job');
+  const provenance = content.slice(provenanceStart);
+  assert.match(provenance, /needs: \[build, authorize-provenance\]/);
+  assert.doesNotMatch(provenance, /^\s+environment:/m,
+    'the reusable workflow-call job must rely on the separate environment approval gate');
+  assert.match(provenance, /id-token: write/);
+  assert.match(provenance, /contents: write/);
+});
+
 test('private main test APK remains owner-gated and ciphertext-only', () => {
   const workflowPath = '.github/workflows/android-private-main-test-apk.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
@@ -428,11 +441,41 @@ test('private main test APK remains owner-gated and ciphertext-only', () => {
     'private APK transfer does not need an OIDC provenance token');
 });
 
+test('every privileged signing and provenance job requires the production-signing environment', () => {
+  const cases = [
+    ['.github/workflows/android-production-release.yml', 'build-verify-draft'],
+    ['.github/workflows/android-signed-device-test-release.yml', 'build-and-verify'],
+    ['.github/workflows/android-signed-device-test-release.yml', 'publish-release'],
+    ['.github/workflows/android-private-main-test-apk.yml', 'private-main-test'],
+    ['.github/workflows/generator-generic-ossf-slsa3-publish.yml', 'authorize-provenance']
+  ];
+
+  for (const [workflowPath, jobName] of cases) {
+    const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+    const header = `  ${jobName}:`;
+    const start = content.indexOf(header);
+    assert.ok(start >= 0, workflowPath + ' is missing job ' + jobName);
+    const nextJobPattern = /^  [a-z][a-z0-9-]*:/gm;
+    nextJobPattern.lastIndex = start + header.length;
+    const nextJob = nextJobPattern.exec(content);
+    const block = content.slice(start, nextJob ? nextJob.index : content.length);
+    assert.match(block, /^    environment: production-signing$/m,
+      workflowPath + ' job ' + jobName + ' must wait for the protected environment');
+  }
+});
+
 test('production release signing is tag-push-only and cannot be manually dispatched', () => {
   const workflowPath = '.github/workflows/android-production-release.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
   assert.match(content, /^on:\s*\n\s+push:/m);
   assert.match(content, /tags:\s*\['v\*'\]/);
   assert.doesNotMatch(content, /^\s+workflow_dispatch:/m);
-  assert.match(content, /if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  const jobStart = content.indexOf('  build-verify-draft:');
+  const runnerStart = content.indexOf('    runs-on:', jobStart);
+  assert.ok(jobStart >= 0 && runnerStart > jobStart, 'missing production release job');
+  const guard = content.slice(jobStart, runnerStart);
+  assert.match(guard, /github\.repository == 'AbrarulHaque8541\/daymark'/);
+  assert.match(guard, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  assert.match(guard, /github\.actor == 'AbrarulHaque8541'/);
+  assert.match(guard, /github\.triggering_actor == 'AbrarulHaque8541'/);
 });
