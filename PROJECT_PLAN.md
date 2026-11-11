@@ -26,6 +26,22 @@ This queue supersedes older execution queues below; historical planning is retai
 ---
 
 
+### Current exact-head execution evidence — 2026-11-11T01:47:18.620Z
+
+- Main `5148232a7165f840fa895707890b829bcdc1657b`: Android CI #42933214990 PASS; cross-platform contracts #42933214965 PASS. Main branch metadata reports `protected=false`; rulesets are empty.
+- #725 storage health: head `6a1a410ff5093d262d60ce08f4f0a0ef6d45caa9`, 6 ahead / 0 behind, 4/4 exact-head workflows PASS. Includes the non-secret Telegram destination category, exact inventory fixture, per-category clear and Clear All regressions. Independent data-integrity review and physical acceptance remain outstanding.
+- #722 task Instant contract: head `a0a93db83c80854a006e14b6d1ffb499ff3bfee8`, 10 ahead / 0 behind. Six workflows PASS; API 29 Focus lifecycle PASS; API 36 Focus lifecycle FAIL at the post-vertical-drag real tap (parent ScrollView receives DOWN/UP, selector/button receive neither). Exact production V8 fixture: 58/58 PASS. Keep draft; do not weaken the Focus or PortableBackupSmoke tests.
+- #727 Focus instrumentation: head `05ae41c340226affd8b4083781779578e7ba07a9`, 4 ahead / 0 behind. Cross-platform contracts and Focus UI/Sound PASS; Android CI, API 29/36 lifecycle, device artifact and unsigned validation are IN PROGRESS. The scroll-settle window now requires eight 50 ms stable samples plus main-looper idle; this remains a hypothesis until the real API 36 test completes.
+- #726 Intent handoff: head `00b8c10822bc8aac05bf8beebf614b895001f002`, 2 ahead / 0 behind. Nine exact-head workflows are IN PROGRESS. It is the canonical focused main-frame/user-gesture Intent gate; #676 must reconcile its duplicate gate while retaining extension-specific changes.
+- #724 documentation: previous head `9704cdd5e6a17040c25c4cd7480526b08a13c02b` passed Android CI, contracts and unsigned validation 3/3. Current head after restoring all main historical index links is `40a363b1356670c75dc8bf3ac1ab169ff8db0eee`, 7 ahead / 0 behind; exact-head workflows had not yet appeared at last poll. PR is ready for review, not merged. The 2026-11-05T04:29:30 historical snapshot link is retained.
+- #728 Telegram preference correction is merged; current main includes the saved-destination accessibility announcement. #719 export wiring and #721 webhook endpoint session-only privacy are also on main.
+- No PR was merged by this run. Main was not modified. No physical-device acceptance, release/tag, version/signer/package change, or destructive migration was performed.
+
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; Git Data API; GitHub Actions API; V8 exact-source storage and timestamp harnesses  
+**Timestamp (UTC):** 2026-11-11T01:47:18.620Z
+
+---
 ## Current execution queue — 2026-11-10T22:54:19.523Z (main 39b1047a)
 
 This queue supersedes the historical queue below. Do not treat an open PR or green CI as project completion.
