@@ -1,0 +1,52 @@
+# Manual debug APK validation only. Release provenance is generated from the
+# exact production-signed APK by android-signed-device-test-release.yml.
+name: Manual device-test APK build
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the non-publishing githubSideload APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the selected commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
+          cache-dependency-path: android-app/**/*.gradle*
+
+      - name: Build the githubSideload debug APK
+        working-directory: android-app
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleGithubSideloadDebug
+
+      - name: Verify the local build only
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="android-app/app/build/outputs/apk/githubSideload/debug/app-githubSideload-debug.apk"
+          test -s "$apk" || { echo "Built APK is missing or empty: $apk" >&2; exit 1; }
+          unzip -t "$apk" >/dev/null
+          sha256sum "$apk"
+          {
+            echo '### Non-publishing APK build'
+            echo
+            echo '- Debug APK archive validation: PASS'
+            echo '- Release asset upload: NOT RUN'
+            echo '- Provenance generation: NOT RUN'
+          } >> "$GITHUB_STEP_SUMMARY"
