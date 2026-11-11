@@ -30,7 +30,7 @@ function makeItem(filename, options = {}) {
 
 function makeStaging(options = {}) {
   let sequence = 0;
-  const calls = { created: [], published: [], cleaned: [], failed: [], completed: [], cancelled: [], progress: [], cleanupErrors: [], order: [] };
+  const calls = { created: [], published: [], cleaned: [], failed: [], failureDetails: [], completed: [], cancelled: [], progress: [], cleanupErrors: [], order: [] };
   return {
     calls,
     createStagingPath(finalPath) {
@@ -51,7 +51,11 @@ function makeStaging(options = {}) {
       if (options.cleanupThrows) throw new Error('staging cleanup failed');
     },
     onProgress(filename, percent) { calls.progress.push({ filename, percent }); },
-    onFailed(filename) { calls.order.push('failed'); calls.failed.push(filename); },
+    onFailed(filename, details) {
+      calls.order.push('failed');
+      calls.failed.push(filename);
+      calls.failureDetails.push(details ?? null);
+    },
     onCompleted(filename) { calls.order.push('completed'); calls.completed.push(filename); },
     onCancelled(filename) { calls.order.push('cancelled'); calls.cancelled.push(filename); },
     onCleanupError() { calls.order.push('cleanup-error'); calls.cleanupErrors.push(true); },
@@ -184,6 +188,7 @@ test('setSavePath failure cleans staging, releases reservation and falls back to
   assert.equal(staging.calls.created.length, 1);
   assert.deepEqual(staging.calls.cleaned, staging.calls.created);
   assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: true }]);
   assert.deepEqual(staging.calls.cancelled, []);
   assert.deepEqual(staging.calls.order, ['cleanup', 'failed']);
   assert.equal(reservedPaths.size, 0);
@@ -206,6 +211,7 @@ test('preflight cleanup failure is reported while the unsafe download is failed'
   assert.equal(result.cancelled, true);
   assert.deepEqual(staging.calls.cleanupErrors, [true]);
   assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: true }]);
   assert.deepEqual(staging.calls.cancelled, []);
   assert.deepEqual(staging.calls.order, ['cleanup', 'cleanup-error', 'failed']);
   assert.equal(reservedPaths.size, 0);
@@ -228,6 +234,7 @@ test('preflight failure reports a sanitized filename even when cancellation cann
   assert.equal(result.cancelled, false);
   assert.equal(result.filename, '_secret.txt');
   assert.deepEqual(staging.calls.failed, ['_secret.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: false }]);
   assert.deepEqual(staging.calls.cancelled, []);
   assert.equal(reservedPaths.size, 0);
 });
