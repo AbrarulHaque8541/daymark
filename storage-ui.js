@@ -34,8 +34,6 @@
       }
     }
 
-    // The browser boot adapter may already have observed a throwing getter.
-    // Keep the initial state unknown until the user explicitly retries.
     if (!storageAccessFailed) acquireStorage();
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
@@ -43,10 +41,11 @@
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     // Production index.html uses storage-* ids; unit tests use data-* ids. Prefer production.
+    // storage-clear is the legacy secondary control id still present on main.
     const listEl = element('storage-list') || element('data-list');
     const statusEl = element('storage-status-line') || element('data-status');
     const refreshEl = element('storage-check') || element('data-refresh');
-    const clearAllEl = element('storage-clear-all') || element('data-clear-all');
+    const clearAllEl = element('storage-clear-all') || element('storage-clear') || element('data-clear-all');
 
     function status(message) {
       if (statusEl) {
@@ -307,6 +306,10 @@
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
       clearAllEl.addEventListener('click', () => { onClearAll(); });
+      if (typeof clearAllEl.setAttribute === 'function') {
+        clearAllEl.setAttribute('aria-label', 'Clear all managed Daymark data in this browser');
+      }
+      if (clearAllEl.textContent === 'Clear status') clearAllEl.textContent = 'Clear all';
     }
 
     render();
