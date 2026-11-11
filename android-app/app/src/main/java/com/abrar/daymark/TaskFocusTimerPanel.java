@@ -464,7 +464,14 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                     }
                     return false;
                 case MotionEvent.ACTION_UP:
-                    if (horizontalGesture || verticalGesture) return true;
+                    if (horizontalGesture) return true;
+                    if (verticalGesture) {
+                        // The parent ScrollView owns a vertical drag, including its terminal UP.
+                        // Release the gesture state and let the parent finish the stream so the
+                        // next real child tap is not swallowed by a stale selector target.
+                        resetGesture();
+                        return false;
+                    }
                     resetGesture();
                     return false;
                 case MotionEvent.ACTION_CANCEL:
