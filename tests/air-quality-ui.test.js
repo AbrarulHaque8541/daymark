@@ -168,7 +168,7 @@ test('the injected card slots in after the weather card when present', () => {
     'air card must follow the weather card');
 });
 
-test('form submission prevents navigation and renders the result once', async () => {
+test('form submission prevents navigation and renders the result once with color-coded bands', async () => {
   const fetchImpl = okFetch(ROUTES);
   const { env, doc } = fakeEnv({ fetch: fetchImpl });
   ui.attachAirQualityUi(env);
@@ -185,6 +185,12 @@ test('form submission prevents navigation and renders the result once', async ()
   assert.equal(els.status.textContent,
     'Updated · 2026-11-11 05:00 UTC · not saved on this device');
   assert.equal(els.button.disabled, false);
+  const eu = els.result.children.find((c) => c.className && c.className.indexOf('air-band') === 0 && c.textContent.indexOf('European') === 0);
+  const us = els.result.children.find((c) => c.className && c.className.indexOf('air-band') === 0 && c.textContent.indexOf('US') === 0);
+  assert.ok(eu, 'European band span must exist');
+  assert.equal(eu.className, 'air-band-good');
+  assert.ok(us, 'US band span must exist');
+  assert.equal(us.className, 'air-band-moderate');
 });
 
 test('a concurrent submit cannot duplicate the request', async () => {
@@ -193,8 +199,6 @@ test('a concurrent submit cannot duplicate the request', async () => {
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
-  // Fire both checks without awaiting the first one: only a genuinely
-  // concurrent second call proves the busy guard rejects it in flight.
   const first = handle.onCheck();
   const second = handle.onCheck();
   await Promise.all([first, second]);
