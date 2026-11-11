@@ -69,3 +69,5 @@ tests/wiki-logic.test.js
 tests/wiki-ui.test.js
 tests/zones-logic.test.js
 tests/zones-ui.test.js
+tests/air-quality-logic.test.js
+tests/air-quality-ui.test.js
