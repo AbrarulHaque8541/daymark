@@ -445,6 +445,28 @@ test('native attestation binds the signed APK and publishes a verified non-overw
     'an existing bundle must be downloaded and verified, not replaced');
 });
 
+test('final release APK is re-downloaded and digest-checked after provenance verification', () => {
+  const workflowPath = '.github/workflows/android-signed-device-test-release.yml';
+  const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+  const publish = content.slice(content.indexOf('  publish-release:'));
+  const finalCheckStart = publish.indexOf('      - name: Re-download and verify the final release APK after provenance');
+  assert.ok(finalCheckStart > publish.indexOf('api_verified=true'),
+    'the final release APK check must run after bundle and hosted-attestation verification');
+  const finalCheck = publish.slice(finalCheckStart);
+  assert.match(finalCheck, /gh api "repos\/\$GITHUB_REPOSITORY\/releases\/tags\/\$TAG"/);
+  assert.match(finalCheck, /\.prerelease == true/);
+  assert.match(finalCheck, /asset_state.*uploaded/);
+  assert.match(finalCheck, /"\$asset_size" == "\$EXPECTED_SIZE"/);
+  assert.match(finalCheck, /\[\[ "\$asset_url" == "\$expected_asset_url" \]\]/);
+  assert.match(finalCheck, /curl --fail --location --retry 3 --retry-delay 2/,
+    'the check must download the public release asset again after provenance publication');
+  assert.match(finalCheck, /downloaded_size.*EXPECTED_SIZE/);
+  assert.match(finalCheck, /sha256sum "\$final_apk"/);
+  assert.match(finalCheck, /\[\[ "\$downloaded_sha256" == "\$EXPECTED_SHA256" \]\]/);
+  assert.match(finalCheck, /cmp -s "\$APK_PATH" "\$final_apk"/,
+    'the final downloaded release asset must be identical to the attested subject');
+});
+
 test('private main test APK remains owner-gated and ciphertext-only', () => {
   const workflowPath = '.github/workflows/android-private-main-test-apk.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');

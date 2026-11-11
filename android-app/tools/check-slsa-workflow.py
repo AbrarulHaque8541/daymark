@@ -104,6 +104,20 @@ check(".prerelease == true" in signed_publish
       and "--prerelease --verify-tag" in signed_publish
       and "--rawfile notes" in signed_publish,
       "provenance attachment must preserve the existing published-prerelease and exact-release-metadata contract")
+FINAL_APK_CHECK = "      - name: Re-download and verify the final release APK after provenance"
+check(FINAL_APK_CHECK in signed_publish
+      and signed_publish.index(FINAL_APK_CHECK) > signed_publish.index("api_verified=true"),
+      "the final release APK must be checked after bundle and hosted-attestation verification")
+final_apk_check = signed_publish.split(FINAL_APK_CHECK, 1)[1]
+check('gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG"' in final_apk_check
+      and '"$asset_size" == "$EXPECTED_SIZE"' in final_apk_check
+      and '"$asset_url" == "$expected_asset_url"' in final_apk_check
+      and "curl --fail --location --retry 3" in final_apk_check
+      and '"$downloaded_size" == "$EXPECTED_SIZE"' in final_apk_check
+      and 'sha256sum "$final_apk"' in final_apk_check
+      and '"$downloaded_sha256" == "$EXPECTED_SHA256"' in final_apk_check
+      and 'cmp -s "$APK_PATH" "$final_apk"' in final_apk_check,
+      "the final public release APK must be re-downloaded and match release metadata, expected size/digest and attested bytes")
 
 # Other privileged workflows retain their existing actor and environment guards.
 check(OWNER_GATE in PRIVATE_MAIN_WORKFLOW,

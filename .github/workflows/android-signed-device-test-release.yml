@@ -685,3 +685,78 @@ jobs:
             echo '- Release bundle verification: PASS'
             echo '- GitHub Attestations API verification: PASS'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Re-download and verify the final release APK after provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.payload.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.payload.outputs.title }}
+          APK_NAME: ${{ steps.payload.outputs.apk_name }}
+          APK_PATH: ${{ steps.payload.outputs.apk_path }}
+          EXPECTED_SHA256: ${{ steps.payload.outputs.sha256 }}
+          EXPECTED_SIZE: ${{ steps.payload.outputs.size_bytes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]] || {
+            echo 'Expected APK SHA-256 is not a lowercase 64-character digest.' >&2
+            exit 1
+          }
+          [[ "$EXPECTED_SIZE" =~ ^[1-9][0-9]*$ ]] || {
+            echo 'Expected APK size is not a positive decimal byte count.' >&2
+            exit 1
+          }
+
+          release_json="$RUNNER_TEMP/daymark-release-final-apk-check.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$release_json"
+          jq -e --arg tag "$TAG" --arg title "$RELEASE_TITLE" --arg apk "$APK_NAME" '
+            .tag_name == $tag
+            and .name == $title
+            and .draft == false
+            and .prerelease == true
+            and any(.assets[]?; .name == $apk and .state == "uploaded")
+          ' "$release_json" >/dev/null || {
+            echo 'Expected device-test prerelease or uploaded APK asset is missing or inconsistent.' >&2
+            exit 1
+          }
+
+          asset="$(jq -c --arg name "$APK_NAME" '[(.assets // [])[] | select(.name == $name)] | .[0] // empty' "$release_json")"
+          [[ -n "$asset" ]] || { echo "Final release APK asset $APK_NAME is missing." >&2; exit 1; }
+          asset_size="$(jq -r '.size // empty' <<< "$asset")"
+          asset_state="$(jq -r '.state // empty' <<< "$asset")"
+          asset_url="$(jq -r '.browser_download_url // empty' <<< "$asset")"
+          expected_asset_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME"
+          [[ "$asset_state" == "uploaded" && "$asset_size" == "$EXPECTED_SIZE" ]] || {
+            echo 'Final APK release metadata size or upload state differs from the verified payload.' >&2
+            exit 1
+          }
+          [[ "$asset_url" == "$expected_asset_url" ]] || {
+            echo 'Final APK asset URL does not match the expected GitHub Release download.' >&2
+            exit 1
+          }
+
+          download_dir="$RUNNER_TEMP/final-release-apk"
+          mkdir -p "$download_dir"
+          final_apk="$download_dir/$APK_NAME"
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error \
+            --output "$final_apk" "$asset_url"
+          test -s "$final_apk" || { echo 'Final browser-downloaded APK is missing or empty.' >&2; exit 1; }
+          downloaded_size="$(stat -c '%s' "$final_apk")"
+          [[ "$downloaded_size" == "$EXPECTED_SIZE" ]] || {
+            echo 'Final browser-downloaded APK size differs from the verified payload.' >&2
+            exit 1
+          }
+          downloaded_sha256="$(sha256sum "$final_apk" | awk '{print $1}')"
+          [[ "$downloaded_sha256" == "$EXPECTED_SHA256" ]] || {
+            echo 'Final browser-downloaded APK SHA-256 differs from the verified payload.' >&2
+            exit 1
+          }
+          cmp -s "$APK_PATH" "$final_apk" || {
+            echo 'Final browser-downloaded APK bytes differ from the attested subject.' >&2
+            exit 1
+          }
+          {
+            printf -- '- Final post-provenance release download: `%s` (%s bytes, SHA-256 `%s`)\n' \
+              "$APK_NAME" "$downloaded_size" "$downloaded_sha256"
+            echo '- Release metadata, browser download, digest, size and subject bytes: PASS'
+          } >> "$GITHUB_STEP_SUMMARY"
