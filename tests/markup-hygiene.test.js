@@ -31,8 +31,17 @@ test('web metadata and task controls accurately disclose unencrypted browser sto
   const taskControls = markup.slice(taskToolsStart, taskListStart);
   const disclosure = taskControls.match(/<p\b[^>]*id="browser-storage-disclosure"[^>]*>([^<]+)<\/p>/);
   assert.ok(disclosure, 'a visible browser-storage disclosure must sit by task-data controls');
+  assert.match(disclosure[1], /task data/i);
+  assert.match(disclosure[1], /Focus sessions and history/i);
+  assert.match(disclosure[1], /recovery backups/i);
+  assert.match(disclosure[1], /saved preferences/i);
+  assert.match(disclosure[1], /remembered Telegram chat destination/i);
+  assert.match(disclosure[1], /caches/i);
+  assert.match(disclosure[1], /queued webhook events/i);
   assert.match(disclosure[1], /stored in this browser's localStorage/i);
   assert.match(disclosure[1], /not encrypted by the prototype/i);
+  assert.match(disclosure[1], /Telegram bot token and current webhook endpoint are session-only/i);
+  assert.match(disclosure[1], /legacy secret-bearing webhook value is never read or displayed/i);
 
   for (const id of ['export-tasks', 'import-tasks']) {
     const button = taskControls.match(new RegExp('<button\\b[^>]*id="' + id + '"[^>]*>'));
