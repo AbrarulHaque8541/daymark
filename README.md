@@ -1,10 +1,11 @@
 # Daymark
 
-**Daymark** is a local-first Android task assistant with an embedded browser, encrypted local task storage, attachments, portable encrypted backups, and a lightweight page-local extension system.
+**Daymark** is a privacy-respecting Android task assistant with an embedded full browser, encrypted on-device task storage, attachments, portable encrypted backups, and a lightweight page-local extension system. Task data stays on your phone; anything that needs the internet — browsing, search, optional glance cards — uses the network directly and at full speed.
 
 - **Android application ID:** `com.abrar.daymark` (owner-approved fresh identity; previous app installations remain separate)
 - **Current implementation:** Java-based Android Activity + Android System WebView; no third-party runtime dependencies in the current baseline. This describes the code today, not a restriction on future engineering choices.
 - **Task data:** encrypted on-device; no account, cloud task sync, analytics, or telemetry
+- **Network:** used directly whenever a feature needs it — the browser is a real browser (HTTP + HTTPS, Online by default), with no proxy, local mirror, or offline-first detour in the path
 - **Source version:** see `android-app/app/build.gradle.kts` (`versionName` / `versionCode`)
 
 ## Download

@@ -1,7 +1,7 @@
 /*
  * Daymark local-data controls UI wiring for the web prototype.
  *
- * A small offline-first card that lists every category this prototype stores in
+ * A small network-on-demand card that lists every category this prototype stores in
  * this browser, explains what each clear action removes, and clears exactly the
  * listed keys after an explicit confirmation. No network, no polling, no timers:
  * the scan runs on attach, on the Refresh button, and after each clear. Mirrors

@@ -1,7 +1,7 @@
 /*
  * Daymark browser error explanation card UI wiring for the web prototype.
  *
- * A small offline-first card next to the address-bar preview: the user
+ * A small network-on-demand card next to the address-bar preview: the user
  * picks a failure scenario (offline, DNS, timeout, TLS, HTTP 4xx/5xx,
  * blocked link, download failure, unknown) and this card shows, locally,
  * how Daymark's browser will explain that failure in plain words — a calm
