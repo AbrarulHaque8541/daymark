@@ -15,25 +15,28 @@ test('desktop CI installs the committed npm lockfile before the cross-platform t
   const manifest = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
   const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
 
-  assert.match(workflow, /uses: actions\\/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7\\.0\\.0/);
-  assert.match(workflow, /uses: actions\\/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6\\.0\\.0/);
-  assert.match(workflow, /node-version: '20'/,
+  assert.ok(workflow.includes('uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0'));
+  assert.ok(workflow.includes('uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0'));
+  assert.ok(workflow.includes("node-version: '20'"),
     'Electron unit tests continue to use the supported Node 20 application runtime');
-  assert.match(workflow, /os: \\[ubuntu-latest, windows-latest, macos-latest\\]/);
+  assert.ok(workflow.includes('os: [ubuntu-latest, windows-latest, macos-latest]'));
 
   assert.equal(lock.lockfileVersion, 3, 'the desktop lockfile must use npm lockfile v3');
   assert.equal(lock.packages?.['']?.devDependencies?.electron, manifest.devDependencies.electron,
     'the lockfile root must match the declared Electron dependency range');
   const electron = lock.packages?.['node_modules/electron'];
-  assert.ok(electron && /^\\d+\\.\\d+\\.\\d+$/.test(electron.version),
-    'the lockfile must resolve Electron to an exact version');
-  assert.ok(electron.integrity && electron.resolved?.startsWith('https://registry.npmjs.org/'),
+  assert.ok(electron && typeof electron.version === 'string'
+      && electron.version.split('.').length === 3
+      && electron.version.split('.').every(part => Number.isInteger(Number(part))),
+    'the lockfile must resolve Electron to an exact semantic version');
+  assert.ok(electron.integrity?.startsWith('sha512-')
+      && electron.resolved?.startsWith('https://registry.npmjs.org/electron/-/electron-'),
     'the Electron tarball must have a registry URL and integrity hash');
   assert.ok(lock.packages?.['node_modules/@electron/get'],
     'the Electron binary downloader dependency must be locked');
   for (const [name, entry] of Object.entries(lock.packages)) {
     if (entry.resolved?.startsWith('https://registry.npmjs.org/')) {
-      assert.ok(entry.integrity, `registry package ${name} must have an integrity hash`);
+      assert.ok(entry.integrity, 'registry package ' + name + ' must have an integrity hash');
     }
   }
 
