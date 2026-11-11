@@ -172,8 +172,9 @@ test('form submission prevents navigation and renders the result once', async ()
   await submit.handler({ preventDefault() { prevented = true; } });
   assert.equal(prevented, true, 'native form navigation should be prevented');
   assert.equal(fetchImpl.seen.length, 2);
-  assert.equal(els.result.textContent,
+  assert.equal(els.result.getAttribute('data-summary'),
     'Delhi, India · European AQI 35 (Fair) · US AQI 62 (Moderate) · PM2.5 18.4 µg/m³');
+  assert.ok(els.result.children && els.result.children.length >= 4, 'structured result should contain place + metrics');
   assert.equal(els.status.textContent,
     'Updated · 2026-11-11 05:00 UTC · not saved on this device');
   assert.equal(els.button.disabled, false);
@@ -211,7 +212,7 @@ test('Enter on the place field prevents default and checks once', async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(enterEvent.defaultPrevented, true);
   assert.equal(fetchImpl.seen.length, 2);
-  assert.ok(els.result.textContent.indexOf('Delhi, India') === 0);
+  assert.ok(els.result.getAttribute('data-summary').indexOf('Delhi, India') === 0);
 });
 
 test('an empty place is rejected before any network call', async () => {
