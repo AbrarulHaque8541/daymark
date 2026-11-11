@@ -17,8 +17,10 @@ test('desktop CI installs the committed npm lockfile before the cross-platform t
 
   assert.ok(workflow.includes('uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0'));
   assert.ok(workflow.includes('uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0'));
-  assert.ok(workflow.includes("node-version: '20'"),
-    'Node 20 is the host test harness; Electron embeds its separately pinned Node runtime');
+  assert.ok(workflow.includes("node-version: '24.22.2'"),
+    'the desktop CI host runtime must satisfy Electron 45 and its dependency engine requirements');
+  assert.equal(manifest.engines.node, '>=22.12.0',
+    'the package engine range must match Electron 45 and its downloader dependencies');
   assert.equal(manifest.devDependencies.electron, '^45.3.0',
     'the desktop manifest must stay on the approved supported Electron 45 line');
   assert.equal(manifest.scripts.test.includes('test/electron-runtime.test.js'), true,

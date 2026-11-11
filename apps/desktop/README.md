@@ -19,7 +19,7 @@ Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS 
 ## Runtime compatibility
 
 - Supported stable runtime baseline: Electron **45.3.0**, embedding Chromium **156.0.8078.96** and Node.js **24.22.2**.
-- The CI unit-test harness itself runs under Node 20; `npm test` also launches the installed Electron binary and verifies its exact version.
+- The CI unit-test harness runs under Node 24.22.2, matching Electron's embedded Node runtime; `npm test` also launches the installed Electron binary and verifies its exact version.
 - Electron 45 publishes 64-bit x64/arm64 builds only; 32-bit Windows ia32 and Linux armv7l are not supported.
 - Electron 45's planned end-of-support date is 2027-04-27; re-check the official release schedule before any desktop distribution decision.
 

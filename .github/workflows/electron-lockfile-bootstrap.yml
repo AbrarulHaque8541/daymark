@@ -34,7 +34,7 @@ jobs:
           persist-credentials: true
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: '20.20.2'
+          node-version: '24.22.2'
       - name: Generate and validate npm lockfile
         shell: bash
         run: |
@@ -70,6 +70,6 @@ jobs:
           fi
           git -C "$GITHUB_WORKSPACE" commit -m "build(desktop): regenerate lockfile for Electron 45.3.0" -m "Work by: ChatGPT (OpenAI)
           Model: GPT-6
-          Tooling: GitHub Actions ubuntu-24.04; Node 20.20.2; npm 10.8.2
+          Tooling: GitHub Actions ubuntu-24.04; Node 24.22.2; bundled npm version
           Timestamp (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git -C "$GITHUB_WORKSPACE" push origin "HEAD:${GITHUB_REF_NAME}"
