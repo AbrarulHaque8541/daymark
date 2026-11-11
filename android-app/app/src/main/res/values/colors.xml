@@ -2,4 +2,6 @@
 <resources>
     <color name="daymark_splash_background">#0E2A21</color>
     <color name="daymark_icon_background">#315B46</color>
+    <color name="daymark_browser_notice_warning">#8A4F00</color>
+    <color name="daymark_browser_notice_critical">#B3261E</color>
 </resources>
