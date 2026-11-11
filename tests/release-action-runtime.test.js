@@ -475,6 +475,14 @@ test('final release APK is re-downloaded and digest-checked after provenance ver
     'the final downloaded release asset must be identical to the attested subject');
 });
 
+
+test('release source guard enforces HTTPS-only redirects for both public APK downloads', () => {
+  const guard = fs.readFileSync(path.join(root, 'android-app/tools/check-slsa-workflow.py'), 'utf8');
+  assert.ok(guard.includes('release_download_curl_lines = ['));
+  assert.ok(guard.includes("--proto '=https' --proto-redir '=https' --tlsv1.2"));
+  assert.ok(guard.includes('both public release APK downloads must restrict initial and redirected protocols to HTTPS'));
+});
+
 test('private main test APK remains owner-gated and ciphertext-only', () => {
   const workflowPath = '.github/workflows/android-private-main-test-apk.yml';
   const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
