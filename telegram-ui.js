@@ -17,6 +17,22 @@
     const testEl = element('telegram-test');
     const clearEl = element('telegram-clear');
     const sendEl = element('telegram-send');
+    function attachPressFeedback(el) {
+      if (!el || typeof el.addEventListener !== "function") return;
+      el.addEventListener("pointerdown", () => {
+        if (el.classList && typeof el.classList.add === "function") el.classList.add("is-pressed");
+      });
+      el.addEventListener("pointerup", () => {
+        if (el.classList && typeof el.classList.remove === "function") el.classList.remove("is-pressed");
+      });
+      el.addEventListener("pointercancel", () => {
+        if (el.classList && typeof el.classList.remove === "function") el.classList.remove("is-pressed");
+      });
+    }
+    attachPressFeedback(sendEl);
+    attachPressFeedback(testEl);
+    attachPressFeedback(clearEl);
+
     const lifecycleWindow = env.window || doc.defaultView || null;
     const observesPageLifecycle = lifecycleWindow
       && typeof lifecycleWindow.addEventListener === 'function'
