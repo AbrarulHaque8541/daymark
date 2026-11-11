@@ -183,6 +183,8 @@ test('download publication failures reach the renderer through a URL-free IPC co
     'main forwards the sanitized basename and explicit cancellation certainty');
   assert.ok(!/url/i.test(failureHandler),
     'failure IPC must not include a remote URL');
+  assert.ok(main.includes('if (!result.ok && !result.cancelled && !result.cancellationRequested)'),
+    'the fallback item.cancel request must not be logged as though no cancellation request was issued');
   const completedHandlerStart = main.indexOf('onCompleted: (filename) => {');
   const cancelledHandlerStart = main.indexOf('onCancelled: (filename) => {');
   assert.ok(completedHandlerStart >= 0 && cancelledHandlerStart > completedHandlerStart);

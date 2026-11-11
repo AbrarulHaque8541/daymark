@@ -126,7 +126,7 @@ app.whenReady().then(() => {
         if (mainWindow) mainWindow.webContents.send('download-started', filename);
       },
     });
-    if (!result.ok && !result.cancelled) {
+    if (!result.ok && !result.cancelled && !result.cancellationRequested) {
       console.error('Daymark could not cancel an unsafe download destination.');
     }
   });
