@@ -56,12 +56,12 @@
       try { storage.setItem(CHAT_STORAGE_KEY, target); } catch (error) { /* Fail closed; chat convenience is optional. */ }
     }
     function restoreChatTarget() {
-      if (!chatEl) return;
+      if (!chatEl || !logicApi || typeof logicApi.isChatTarget !== 'function') return;
       const storage = resolveStorage();
       if (!storage || typeof storage.getItem !== 'function') return;
       try {
         const saved = storage.getItem(CHAT_STORAGE_KEY);
-        if (typeof saved === 'string' && saved && logicApi && typeof logicApi.isChatTarget === 'function' && logicApi.isChatTarget(saved)) {
+        if (typeof saved === 'string' && saved && logicApi.isChatTarget(saved)) {
           chatEl.value = saved;
         }
       } catch (error) { /* Ignore unreadable preference. */ }
@@ -198,7 +198,7 @@
     function onPageShow() { clearTokenField(); }
     function onClear() {
       clearTokenField();
-      status('Cleared. The token field is emptied; nothing was ever saved on this device.');
+      status('Cleared. The bot token is emptied; the chat target remains available.');
     }
     if (observesPageLifecycle) {
       lifecycleWindow.addEventListener('pagehide', onPageHide);
