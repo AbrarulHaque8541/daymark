@@ -1,4 +1,4 @@
-- [Daymark whole-project engineering status — 2026-11-11T17:22:41Z (main 9f1c0451; 751 branches / 6 open PRs / 24 open issues; #744 desktop lifecycle/shell 4/4 exact-head workflows; P0 task/Clear All/Android download/governance remain)](./CURRENT_STATUS_20261111T172241Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T17:32:03Z (main 9f1c0451; 753 branches / 8 open PRs / 24 open issues; main Node 916/916; #744 desktop CI 4/4; #747 web disclosure/copy fix 4/4)](./CURRENT_STATUS_20261111T173203Z.md)
 - [Daymark engineering status — 20261111T170455Z (storage card dedicated Clear all binding, issue #740)](./CURRENT_STATUS_20261111T170455Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T13:11:35Z (main 0e268420; 746 branches / 6 open PRs / 23 open issues; main audit 910/910; task/Clear All/download P0 blockers)](./CURRENT_STATUS_20261111T131135Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T12:20:00Z (main 0e268420; 746 branches / 6 open PRs / 22 open issues; main CI green; Electron 45.3.0 upgrade PR 5/5 checks pass; download/Clear All remain P0)](./CURRENT_STATUS_20261111T122000Z.md)
@@ -93,7 +93,7 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261111T172241Z.md](CURRENT_STATUS_20261111T172241Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 751 branches / 6 open PRs / 24 open issues; main Android/contracts CI green; combined desktop PR #744 has 4/4 exact-head workflows PASS and is ready for independent review; P0 task/Clear All/Android download/governance blockers remain.
+- [CURRENT_STATUS_20261111T173203Z.md](CURRENT_STATUS_20261111T173203Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 24 open issues; main Android/contracts CI green (916/916 repository Node tests); combined desktop PR #744 and web copy/disclosure PR #747 each have 4/4 exact-head workflows PASS; P0 task/Clear All/Android download/governance blockers remain.
 - Previous reviewed snapshot: [CURRENT_STATUS_20261111T170455Z.md](CURRENT_STATUS_20261111T170455Z.md) — pre-#746 merge snapshot documenting the dedicated storage Clear All control and its exact-head verification.
 - Previous reviewed snapshot: [CURRENT_STATUS_20261111T131135Z.md](CURRENT_STATUS_20261111T131135Z.md) — earlier main `0e268420` whole-project backlog and CI baseline.
 
