@@ -126,11 +126,19 @@ test('download publication failures reach the renderer through a URL-free IPC co
   });
   listener({}, { filename: '', preflight: true, cancellationConfirmed: false });
   listener({}, { filename: 'report-safe.txt', preflight: false, cancellationConfirmed: false });
-  assert.deepEqual(received, [{
-    filename: 'report-safe.txt',
-    preflight: true,
-    cancellationConfirmed: false,
-  }], 'preload exposes only validated URL-free cancellation state');
+  listener({}, { filename: 'report-safe.txt', preflight: false, cancellationConfirmed: null });
+  assert.deepEqual(received, [
+    {
+      filename: 'report-safe.txt',
+      preflight: true,
+      cancellationConfirmed: false,
+    },
+    {
+      filename: 'report-safe.txt',
+      preflight: false,
+      cancellationConfirmed: null,
+    },
+  ], 'preload exposes only validated URL-free cancellation state for preflight and terminal failures');
   unsubscribe();
   assert.equal(listeners.has('download-failed'), false,
     'the renderer can release its IPC listener');
