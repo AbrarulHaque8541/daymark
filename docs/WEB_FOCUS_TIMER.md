@@ -1,6 +1,6 @@
 # Daymark web prototype — Focus timer
 
-A local-first focus timer (Pomodoro-style) for the root web prototype, mirroring the Android app's `TaskFocusTimer` so the plan item "focus mode" works end to end on the web too. Everything runs in the page: no network, no account, no analytics.
+The root web prototype implements a page-local Pomodoro-style focus timer, mirroring the Android app's `TaskFocusTimer` so the plan item "focus mode" works end to end on the web too. Timer sessions run in the page; this feature makes no network requests and uses no account or analytics.
 
 ## What it does
 

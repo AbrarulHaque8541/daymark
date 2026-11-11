@@ -20,6 +20,28 @@ test('index.html aligns the export format select with its task-tools siblings', 
   assert.match(markup, /\n            <select id="export-format"/);
 });
 
+test('web metadata and task controls accurately disclose unencrypted browser storage', () => {
+  const description = markup.match(/<meta\s+name="description"\s+content="([^"]*)">/i);
+  assert.ok(description, 'the web prototype must keep its page description');
+  assert.doesNotMatch(description[1], /encrypted on-device storage/i);
+
+  const taskToolsStart = markup.indexOf('<div class="task-tools">');
+  const taskListStart = markup.indexOf('<div class="task-list"', taskToolsStart);
+  assert.ok(taskToolsStart >= 0 && taskListStart > taskToolsStart, 'task-data controls must remain in the task panel');
+  const taskControls = markup.slice(taskToolsStart, taskListStart);
+  const disclosure = taskControls.match(/<p\b[^>]*id="browser-storage-disclosure"[^>]*>([^<]+)<\/p>/);
+  assert.ok(disclosure, 'a visible browser-storage disclosure must sit by task-data controls');
+  assert.match(disclosure[1], /stored in this browser's localStorage/i);
+  assert.match(disclosure[1], /not encrypted by the prototype/i);
+
+  for (const id of ['export-tasks', 'import-tasks']) {
+    const button = taskControls.match(new RegExp('<button\\b[^>]*id="' + id + '"[^>]*>'));
+    assert.ok(button, id + ' control must be present');
+    assert.match(button[0], /aria-describedby="browser-storage-disclosure"/,
+      id + ' must expose the disclosure to assistive technology');
+  }
+});
+
 test('index.html keeps the de-cluttered chrome lean (owner decision 2026-11-05)', () => {
   assert.doesNotMatch(markup, /class="rail-label"/, 'the upside-down rail label must stay removed');
   assert.doesNotMatch(markup, /demo-label/, 'redundant card topline labels must stay removed');
