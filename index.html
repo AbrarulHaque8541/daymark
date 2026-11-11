@@ -424,6 +424,7 @@
               <option value="clear-search">Clear task search</option>
               <option value="webhook-clear-queue">Clear webhook queue</option>
               <option value="storage-clear-status">Clear storage status</option>
+              <option value="storage-clear-all">Clear all local data</option>
               <option value="import-merge">Import a backup</option>
               <option value="export-backup">Export a backup</option>
             </select>
@@ -484,6 +485,7 @@
           <form id="storage-form" class="feed-form" novalidate>
             <button class="button button-primary" id="storage-check" type="button">Check</button>
             <button class="button button-quiet" id="storage-clear" type="button">Clear status</button>
+            <button class="button button-quiet" id="storage-clear-all" type="button" aria-label="Clear all managed Daymark data stored in this browser">Clear all local data</button>
           </form>
           <p class="feed-status" id="storage-status-line" role="status" aria-live="polite"></p>
           <div class="feed-list" id="storage-list" aria-live="polite"></div>

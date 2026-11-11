@@ -42,10 +42,15 @@
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
-    const listEl = element('data-list');
-    const statusEl = element('data-status');
-    const refreshEl = element('data-refresh');
-    const clearAllEl = element('data-clear-all');
+    // The live page uses the storage-* ids; the data-* ids remain supported for
+    // the unit tests and any legacy host markup. The destructive control is
+    // resolved ONLY from the dedicated clear-all ids: a visible "Clear status"
+    // button must never fall back to the destructive handler (issue #740).
+    const listEl = element('storage-list') || element('data-list');
+    const statusEl = element('storage-status-line') || element('data-status');
+    const refreshEl = element('storage-check') || element('data-refresh');
+    const clearStatusEl = element('storage-clear');
+    const clearAllEl = element('storage-clear-all') || element('data-clear-all');
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -169,6 +174,12 @@
     }
 
     function setBusy(busy) {
+      if (clearStatusEl) {
+        clearStatusEl.disabled = busy;
+        if (typeof clearStatusEl.classList !== 'undefined') {
+          clearStatusEl.classList.toggle('is-busy', busy);
+        }
+      }
       if (clearAllEl) {
         clearAllEl.disabled = busy;
         if (typeof clearAllEl.classList !== 'undefined') {
@@ -298,6 +309,13 @@
       refreshEl.addEventListener('click', () => {
         if (storageAccessFailed || !storage) acquireStorage();
         render();
+      });
+    }
+    if (clearStatusEl && typeof clearStatusEl.addEventListener === 'function') {
+      // Read-only by design: empties the status line only. It is deliberately
+      // never a fallback for the destructive clear-all handler (issue #740).
+      clearStatusEl.addEventListener('click', () => {
+        if (statusEl) statusEl.textContent = '';
       });
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {

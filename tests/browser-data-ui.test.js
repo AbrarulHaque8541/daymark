@@ -241,14 +241,27 @@ test('DOMContentLoaded boot also avoids a throwing localStorage getter', () => {
 });
 
 
-test('unavailable storage controls are disclosed without claiming an action ran', () => {
+test('an unknown action is disclosed as unavailable without claiming an action ran', () => {
+  const doc = makeDoc(ALL_IDS);
+  doc.elements['browser-data-action'].value = 'definitely-not-an-action';
+  ui.attachBrowserDataUi({ document: doc, dataApi: engine });
+  assert.match(doc.elements['browser-data-status'].textContent,
+    /^Unavailable · Unknown action · no action was run/);
+  assert.match(doc.elements['browser-data-result'].children[0].children[1].textContent,
+    /no honest description/);
+});
+
+test('the wired storage status controls explain as delete-free and clear-all as destructive', () => {
   const doc = makeDoc(ALL_IDS);
   doc.elements['browser-data-action'].value = 'storage-clear-status';
   ui.attachBrowserDataUi({ document: doc, dataApi: engine });
   assert.match(doc.elements['browser-data-status'].textContent,
-    /^Unavailable · Clear storage status · no action was run/);
-  assert.match(doc.elements['browser-data-result'].children[0].children[1].textContent,
-    /neither operation currently runs/);
+    /^Explained · Clear storage status · deletes nothing/);
+
+  doc.elements['browser-data-action'].value = 'storage-clear-all';
+  doc.elements['browser-data-action'].listeners.change[0]();
+  assert.match(doc.elements['browser-data-status'].textContent,
+    /^Explained · Clear all local data · deletes data/);
 });
 
 test('the card clear button is explicitly scoped to the explanation only', () => {
