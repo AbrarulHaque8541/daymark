@@ -481,7 +481,7 @@ jobs:
             exit 1
           }
           downloaded="$RUNNER_TEMP/$APK_NAME"
-          curl --fail --location --retry 3 --silent --show-error "$download_url" --output "$downloaded"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 3 --silent --show-error "$download_url" --output "$downloaded"
           downloaded_size="$(stat -c '%s' "$downloaded")"
           downloaded_sha="$(sha256sum "$downloaded" | awk '{print $1}')"
           [[ "$downloaded_size" == "$EXPECTED_SIZE" ]] || { echo "FAIL: downloaded asset size mismatch" >&2; exit 1; }
@@ -738,7 +738,7 @@ jobs:
           download_dir="$RUNNER_TEMP/final-release-apk"
           mkdir -p "$download_dir"
           final_apk="$download_dir/$APK_NAME"
-          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error \
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 3 --retry-delay 2 --silent --show-error \
             --output "$final_apk" "$asset_url"
           test -s "$final_apk" || { echo 'Final browser-downloaded APK is missing or empty.' >&2; exit 1; }
           downloaded_size="$(stat -c '%s' "$final_apk")"
