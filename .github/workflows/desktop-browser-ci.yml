@@ -60,8 +60,6 @@ jobs:
           sha256sum package-lock.json
 
       - name: Commit the generated lockfile to this PR branch
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -73,7 +71,6 @@ jobs:
           Timestamp (UTC): 2026-11-11T11:10:00Z"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
 
-  test:
   test:
     name: Unit tests (${{ matrix.os }})
     strategy:
