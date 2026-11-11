@@ -10,8 +10,22 @@
   // If a host page already provides the elements, they are reused as-is and
   // nothing is duplicated. Mirrors the weather-ui.js module style:
   // attachAirQualityUi(env) is fully injectable for unit tests.
+  //
+  // Polish: color-coded AQI bands (accent #16705f family) and structured
+  // result for better a11y and visual hierarchy. Glass and press states
+  // come from shared briefing-card / button styles.
 
   const CARD_ID = 'air-card';
+
+  function bandClass(band) {
+    if (!band || typeof band !== 'string') return '';
+    const lower = band.toLowerCase();
+    if (lower.includes('good') || lower.includes('low')) return 'aqi-good';
+    if (lower.includes('fair') || lower.includes('moderate')) return 'aqi-fair';
+    if (lower.includes('poor') || lower.includes('unhealthy') || lower.includes('high')) return 'aqi-poor';
+    if (lower.includes('very') || lower.includes('hazardous')) return 'aqi-bad';
+    return 'aqi-unknown';
+  }
 
   function ensureCard(doc) {
     const existing = typeof doc.getElementById === 'function' ? doc.getElementById(CARD_ID) : null;
@@ -89,7 +103,7 @@
 
     const result = doc.createElement('div');
     result.id = 'air-result';
-    result.className = 'feed-list';
+    result.className = 'feed-list air-result';
     if (typeof result.setAttribute === 'function') result.setAttribute('aria-live', 'polite');
     aside.appendChild(result);
 
@@ -146,10 +160,35 @@
       const place = record.place;
       const air = record.air;
       const placeLine = place.country ? place.name + ', ' + place.country : place.name;
-      resultEl.textContent = placeLine
-        + ' · European AQI ' + air.europeanAqi + ' (' + air.europeanBand + ')'
-        + ' · US AQI ' + air.usAqi + ' (' + air.usBand + ')'
-        + ' · PM2.5 ' + air.pm25 + ' µg/m³';
+
+      resultEl.innerHTML = '';
+      const placeEl = doc.createElement('div');
+      placeEl.className = 'air-place';
+      placeEl.textContent = placeLine;
+      resultEl.appendChild(placeEl);
+
+      const metrics = doc.createElement('div');
+      metrics.className = 'air-metrics';
+
+      function addMetric(label, value, band) {
+        const item = doc.createElement('span');
+        item.className = 'air-metric ' + bandClass(band);
+        const lab = doc.createElement('span');
+        lab.className = 'air-metric-label';
+        lab.textContent = label;
+        const val = doc.createElement('span');
+        val.className = 'air-metric-value';
+        val.textContent = value + (band ? ' (' + band + ')' : '');
+        item.appendChild(lab);
+        item.appendChild(val);
+        metrics.appendChild(item);
+      }
+
+      addMetric('European AQI', String(air.europeanAqi), air.europeanBand);
+      addMetric('US AQI', String(air.usAqi), air.usBand);
+      addMetric('PM2.5', String(air.pm25) + ' \u00b5g/m\u00b3', null);
+
+      resultEl.appendChild(metrics);
     }
 
     async function onCheck() {
