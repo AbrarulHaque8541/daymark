@@ -1,7 +1,7 @@
 /*
  * Daymark local-data controls UI wiring for the web prototype.
  *
- * A small offline-first card that lists every category this prototype stores in
+ * A small network-on-demand card that lists every category this prototype stores in
  * this browser, explains what each clear action removes, and clears exactly the
  * listed keys after an explicit confirmation. No network, no polling, no timers:
  * the scan runs on attach, on the Refresh button, and after each clear. Mirrors
@@ -15,7 +15,28 @@
     if (!env || !env.document) throw new Error('attachStorageUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    const injectedStorage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+      && env.storageAccessFailed !== true;
+    let storage = null;
+    let storageAccessFailed = env.storageAccessFailed === true;
+
+    function acquireStorage() {
+      try {
+        storage = injectedStorage
+          ? env.localStorage : (win && win.localStorage) || null;
+        storageAccessFailed = false;
+        return Boolean(storage && typeof storage.getItem === 'function'
+          && typeof storage.removeItem === 'function');
+      } catch (error) {
+        storage = null;
+        storageAccessFailed = true;
+        return false;
+      }
+    }
+
+    // The browser boot adapter may already have observed a throwing getter.
+    // Keep the initial state unknown until the user explicitly retries.
+    if (!storageAccessFailed) acquireStorage();
     const storageApi = env.storageApi || root.DaymarkStorage || null;
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
@@ -31,6 +52,7 @@
     }
 
     function storageAvailable() {
+      if (storageAccessFailed) return false;
       if (!storage || typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
         return false;
       }
@@ -38,6 +60,7 @@
         storage.getItem('daymark.data.probe.v1');
         return true;
       } catch (error) {
+        storageAccessFailed = true;
         return false;
       }
     }
@@ -48,12 +71,21 @@
         return;
       }
       if (!listEl || typeof listEl.appendChild !== 'function') return;
+      if (storageAccessFailed) {
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
+        status('Browser storage could not be accessed. Local data status is unknown; nothing was changed.');
+        return;
+      }
       let scan = null;
       try {
         scan = storageApi.scanStorage(storage);
       } catch (error) {
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+        if (clearAllEl) clearAllEl.disabled = true;
         status('Could not read local data: '
-          + (error && error.message ? error.message : 'storage is unavailable.'));
+          + (error && error.message ? error.message : 'storage is unavailable.')
+          + ' Local data status is unknown; nothing was changed.');
         return;
       }
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
@@ -63,11 +95,20 @@
         const row = make('div');
         if (!row) break;
         if (typeof row.setAttribute === 'function') row.setAttribute('class', 'feed-item');
+        const unreadableCount = Array.isArray(category.unreadableKeys)
+          ? category.unreadableKeys.length : 0;
         const title = make('span');
         if (title) {
           if (typeof title.setAttribute === 'function') title.setAttribute('class', 'feed-item-title');
-          title.textContent = category.label
-            + (category.present ? ' — about ' + storageApi.formatBytes(category.bytes) : ' — not present');
+          let categoryState = ' — not present';
+          if (unreadableCount > 0) {
+            categoryState = category.present
+              ? ' — partially readable (about ' + storageApi.formatBytes(category.bytes) + ')'
+              : ' — status unknown (could not read)';
+          } else if (category.present) {
+            categoryState = ' — about ' + storageApi.formatBytes(category.bytes);
+          }
+          title.textContent = category.label + categoryState;
           row.appendChild(title);
         }
         const summary = make('p');
@@ -85,7 +126,7 @@
             button.setAttribute('aria-label', 'Clear ' + category.label + ' from this browser');
           }
           button.textContent = 'Clear';
-          button.disabled = !category.present;
+          button.disabled = !category.present && unreadableCount === 0;
           if (typeof button.addEventListener === 'function') {
             button.addEventListener('click', () => { onClearCategory(category.id); });
           }
@@ -93,12 +134,23 @@
         }
         listEl.appendChild(row);
       }
-      status(scan.presentCount === 0
-        ? 'No local data is stored yet. Add a task or use a card to see it here.'
-        : scan.presentCount + ' of ' + scan.categories.length
+      const unreadableCount = Number.isInteger(scan.unreadableCount) ? scan.unreadableCount : 0;
+      if (unreadableCount > 0) {
+        const known = scan.presentCount === 0
+          ? 'No readable local data was found'
+          : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
+            + storageApi.formatBytes(scan.totalBytes) + ' total)';
+        const noun = unreadableCount === 1 ? 'category could not be checked' : 'categories could not be checked';
+        status(known + '; ' + unreadableCount + ' ' + noun
+          + '. Reported sizes exclude unreadable entries.');
+      } else if (scan.presentCount === 0) {
+        status('No local data is stored yet. Add a task or use a card to see it here.');
+      } else {
+        status(scan.presentCount + ' of ' + scan.categories.length
           + ' categories hold data on this device (about '
           + storageApi.formatBytes(scan.totalBytes) + ' total).');
-      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0;
+      }
+      if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0 || unreadableCount > 0;
     }
 
     // Returns 'accepted', 'declined', or 'failed'. A failed confirmation prompt
@@ -174,8 +226,15 @@
       }
       setBusy(false);
       if (result.failed.length > 0) {
-        const message = 'Cleared ' + category.label + ', but ' + result.failed.length
-          + ' item(s) could not be removed by the browser.';
+        const unreadable = Array.isArray(result.unreadable) && result.unreadable.length > 0;
+        const message = result.removed.length === 0
+          ? unreadable
+            ? 'Could not clear ' + category.label + ': ' + result.unreadable.length
+              + ' item(s) could not be read. Nothing was cleared.'
+            : 'Could not clear ' + category.label + ': ' + result.failed.length
+              + ' item(s) could not be removed by the browser. Nothing was cleared.'
+          : 'Cleared ' + category.label + ', but ' + result.failed.length
+            + ' item(s) could not be removed by the browser.';
         render();
         status(message);
       } else {
@@ -191,8 +250,10 @@
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
       }
-      const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, caches, webhook settings, and queued events will be removed. '
+      const outcome = confirmOrReport('Clear all managed Daymark data in this browser? '
+        + 'Tasks and recovery backups, Focus sessions and history, saved card and browser preferences '
+        + '(including the Telegram chat target), caches, browser download state, and queued webhook events '
+        + 'will be removed. The legacy secret-bearing webhook endpoint is never inspected by this card. '
         + 'This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
@@ -214,8 +275,15 @@
       }
       setBusy(false);
       if (result.failedKeys.length > 0) {
-        const message = 'Cleared ' + result.removedKeys.length + ' item(s), but '
-          + result.failedKeys.length + ' item(s) could not be removed by the browser.';
+        const unreadableKeys = Array.isArray(result.unreadableKeys) ? result.unreadableKeys : [];
+        const message = result.removedKeys.length === 0
+          ? unreadableKeys.length > 0
+            ? 'Could not clear all data: ' + unreadableKeys.length
+              + ' item(s) could not be read. Nothing was cleared.'
+            : 'Could not clear all data: ' + result.failedKeys.length
+              + ' item(s) could not be removed by the browser. Nothing was cleared.'
+          : 'Cleared ' + result.removedKeys.length + ' item(s), but '
+            + result.failedKeys.length + ' item(s) could not be removed by the browser.';
         render();
         status(message);
       } else {
@@ -227,7 +295,10 @@
     }
 
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
-      refreshEl.addEventListener('click', () => { render(); });
+      refreshEl.addEventListener('click', () => {
+        if (storageAccessFailed || !storage) acquireStorage();
+        render();
+      });
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
       clearAllEl.addEventListener('click', () => { onClearAll(); });
@@ -252,7 +323,7 @@
   root.DaymarkStorageUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachStorageUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachStorageUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

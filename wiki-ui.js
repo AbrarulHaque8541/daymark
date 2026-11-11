@@ -1,7 +1,7 @@
 /*
  * Daymark Wikipedia glance UI wiring for the web prototype.
  *
- * A small offline-first card: the user types a topic and taps Search; the top
+ * A small network-on-demand card: the user types a topic and taps Search; the top
  * encyclopedia matches come from the keyless public Wikipedia API and the last
  * successful results stay cached on this device, so the card keeps working
  * offline with a "cached" note. Nothing ever refreshes on its own — no

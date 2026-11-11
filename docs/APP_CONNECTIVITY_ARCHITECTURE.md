@@ -6,7 +6,7 @@
 
 Daymark should be able to participate in as many legitimate app, service, device, and automation ecosystems as their owners permit. A connection is supported only when there is a documented platform mechanism, public/partner API, user-authorized protocol, or OS-mediated handoff. No app can make itself appear in every company's "Connect an app" directory automatically.
 
-The design goal is broad interoperability without turning Daymark into a cloud-dependent app, weakening local-first privacy, or pretending that a share target is a full API integration.
+The design goal is broad interoperability without turning Daymark into a cloud-dependent app, weakening on-device privacy, or pretending that a share target is a full API integration. Integrations that need the network call their provider directly.
 
 ## What "connect" means
 
@@ -75,7 +75,7 @@ A provider can have multiple capability rows (for example, share-out at L1 and a
 - Some providers require app review, verified domains, privacy policy, security assessment, paid/partner approval or production allowlisting. Mark these as external blockers, not engineering failures.
 - OAuth does not mean Daymark receives unrestricted access: the provider's scopes, API quotas, user consent and policies remain authoritative.
 
-## Local-first and privacy boundaries
+## On-device data and privacy boundaries
 
 - Core tasks and focus sessions continue to work with no connected account and no network.
 - Every integration is opt-in, independently disconnectable, and off by default unless the user explicitly starts a one-time share.

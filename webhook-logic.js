@@ -1,7 +1,7 @@
 /*
  * Daymark task-completion webhook logic for the web prototype.
  *
- * Offline-first automation parity with the Android app's TaskWebhook contract:
+ * Network-on-demand automation parity with the Android app's TaskWebhook contract:
  * a user-chosen https:// endpoint receives a minimal JSON "task completed"
  * event. Delivery is POST-only, HTTPS-only, refuses redirects, is bounded in
  * size, and never exports internal task IDs. Failed deliveries queue on this
