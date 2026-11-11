@@ -36,7 +36,7 @@ function handleWillDownload(options) {
   let stagingPath = null;
   let doneListener = null;
   let progressListener = null;
-  let lastProgressPercent = -1;
+  let lastProgressPercent = null;
 
   try {
     if (!item || typeof item.getFilename !== 'function'
@@ -72,6 +72,8 @@ function handleWillDownload(options) {
             || !Number.isFinite(totalBytes) || totalBytes <= 0) return;
           const percent = Math.max(0, Math.min(100, Math.floor((receivedBytes / totalBytes) * 100)));
           if (percent === lastProgressPercent) return;
+          if (lastProgressPercent !== null && percent > lastProgressPercent
+            && percent - lastProgressPercent < 10 && percent < 100) return;
           lastProgressPercent = percent;
           opts.onProgress(filename, percent);
         } catch {
@@ -81,6 +83,9 @@ function handleWillDownload(options) {
     }
     doneListener = (_event, state) => {
       const finalize = async () => {
+        if (progressListener && typeof item.removeListener === 'function') {
+          try { item.removeListener('updated', progressListener); } catch { /* Best effort. */ }
+        }
         let outcome = state === 'cancelled' ? 'cancelled' : 'failed';
         try {
           if (state === 'completed') {
@@ -90,9 +95,6 @@ function handleWillDownload(options) {
         } catch {
           outcome = 'failed';
         } finally {
-          if (progressListener && typeof item.removeListener === 'function') {
-            try { item.removeListener('updated', progressListener); } catch { /* Best effort. */ }
-          }
           try {
             await opts.cleanupStaging(stagingPath, directory);
           } catch {

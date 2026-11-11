@@ -40,6 +40,7 @@ function makeStaging(options = {}) {
       return staged;
     },
     publishFile(staged, finalPath) {
+      if (options.beforePublish) options.beforePublish();
       calls.order.push('publish');
       calls.published.push({ staged, finalPath });
       if (options.publishThrows) throw new Error('atomic publication failed');
@@ -95,10 +96,15 @@ test('safe destination is staged privately and published only after completion',
   assert.equal(reservedPaths.size, 0);
 });
 
-test('download progress is bounded, URL-free and emitted only when the integer percentage changes', async () => {
+test('download progress is URL-free, bounded and announced at accessible ten-point intervals', async () => {
   const item = makeItem('../../report.txt');
   const reservedPaths = new Set();
-  const staging = makeStaging();
+  const staging = makeStaging({
+    beforePublish() {
+      assert.equal(item.listenerCount('updated'), 0,
+        'the progress listener is removed as soon as the terminal done event arrives');
+    },
+  });
   const result = handleWillDownload({
     event: {},
     item,
@@ -108,21 +114,31 @@ test('download progress is bounded, URL-free and emitted only when the integer p
     ...staging,
   });
   assert.equal(result.ok, true);
+  assert.equal(result.filename.includes('/'), false);
+  assert.equal(result.filename.includes('\\'), false);
   item.totalBytes = 200;
   item.receivedBytes = 50;
   item.emit('updated');
   item.receivedBytes = 51;
+  item.emit('updated');
+  item.receivedBytes = 68;
+  item.emit('updated');
+  item.receivedBytes = 70;
+  item.emit('updated');
+  item.receivedBytes = 200;
   item.emit('updated');
   item.receivedBytes = 300;
   item.emit('updated');
   item.totalBytes = 0;
   item.emit('updated');
   assert.deepEqual(staging.calls.progress, [
-    { filename: 'report.txt', percent: 25 },
-    { filename: 'report.txt', percent: 100 },
+    { filename: result.filename, percent: 25 },
+    { filename: result.filename, percent: 35 },
+    { filename: result.filename, percent: 100 },
   ]);
-  item.emit('done', null, 'cancelled');
+  item.emit('done', null, 'completed');
   await flushDone();
+  assert.equal(item.listenerCount('updated'), 0);
   assert.equal(reservedPaths.size, 0);
 });
 
