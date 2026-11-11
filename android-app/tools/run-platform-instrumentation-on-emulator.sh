@@ -48,12 +48,16 @@ report_failure() {
   # A timeout before the first DaymarkInstr marker can be an instrumentation
   # process-start failure, not an in-test hang. Include framework crash and
   # activity-manager tags so that pre-onCreate failures are diagnosable.
-  run_bounded_diagnostic "Android runtime and instrumentation logcat" \
-    adb logcat -d -t 1000 -s AndroidRuntime:E ActivityManager:E ActivityTaskManager:E Instrumentation:I DaymarkInstr:I System.err:W
-  run_bounded_diagnostic "Registered instrumentation state" \
-    adb shell dumpsys activity instrumentation
+  run_bounded_diagnostic "Android warning/error logcat" \
+    adb logcat -d -t 1200 '*:W'
+  run_bounded_diagnostic "Registered Daymark instrumentation" \
+    sh -c 'adb shell pm list instrumentation | grep -F "com.abrar.daymark"'
+  run_bounded_diagnostic "Installed Daymark test package" \
+    adb shell dumpsys package com.abrar.daymark.test
   run_bounded_diagnostic "Daymark app and instrumentation processes" \
     sh -c 'adb shell ps -A | grep -E "com\\.abrar\\.daymark(\\.test)?|instrumentation"'
+  run_bounded_diagnostic "Activity manager Daymark state" \
+    sh -c 'adb shell dumpsys activity | grep -i -E "instrumentation|com\\.abrar\\.daymark" | tail -n 80'
 }
 
 run_instrumentation_once() {
