@@ -162,7 +162,7 @@ test('the injected card slots in after the weather card when present', () => {
 
 test('form submission prevents navigation and renders the result once', async () => {
   const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({});
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
   ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
@@ -181,7 +181,7 @@ test('form submission prevents navigation and renders the result once', async ()
 
 test('a concurrent submit cannot duplicate the request', async () => {
   const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({});
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
@@ -193,7 +193,7 @@ test('a concurrent submit cannot duplicate the request', async () => {
 
 test('Enter on the place field prevents default and checks once', async () => {
   const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({});
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
   ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
@@ -213,7 +213,7 @@ test('Enter on the place field prevents default and checks once', async () => {
 
 test('an empty place is rejected before any network call', async () => {
   const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({});
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = '   ';
@@ -224,7 +224,7 @@ test('an empty place is rejected before any network call', async () => {
 
 test('a failed check reports the error plainly and renders nothing', async () => {
   const failing = () => Promise.reject(new Error('offline'));
-  const { env, doc } = fakeEnv({});
+  const { env, doc } = fakeEnv({ fetch: failing });
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
@@ -243,12 +243,20 @@ test('missing fetch support is reported instead of throwing', async () => {
   assert.ok(els.status.textContent.indexOf('fetch is unavailable') !== -1);
 });
 
-test('a missing air-quality module degrades honestly', () => {
+test('a missing air-quality module degrades honestly', async () => {
   const { env, doc } = fakeEnv({});
+  const hadGlobal = Object.prototype.hasOwnProperty.call(globalThis, 'DaymarkAirQuality');
+  const savedGlobal = globalThis.DaymarkAirQuality;
   delete env.airApi;
-  ui.attachAirQualityUi(env);
-  const els = elementsOf(doc);
-  assert.equal(els.status.textContent, 'Air quality is unavailable.');
+  if (hadGlobal) delete globalThis.DaymarkAirQuality;
+  try {
+    const handle = ui.attachAirQualityUi(env);
+    const els = elementsOf(doc);
+    await handle.onCheck();
+    assert.equal(els.status.textContent, 'Air quality is unavailable.');
+  } finally {
+    if (hadGlobal) globalThis.DaymarkAirQuality = savedGlobal;
+  }
 });
 
 test('clear empties the view and says so without touching storage', () => {
@@ -264,7 +272,7 @@ test('clear empties the view and says so without touching storage', () => {
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
-  const required = fs.readFileSync(path.join(__dirname, '..', 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8');
+  const required = fs.readFileSync(path.join(__dirname, 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8');
   assert.ok(required.indexOf('tests/air-quality-logic.test.js') !== -1, 'logic test must be registered');
   assert.ok(required.indexOf('tests/air-quality-ui.test.js') !== -1, 'ui test must be registered');
   const source = fs.readFileSync(require.resolve('../air-quality-ui.js'), 'utf8');
