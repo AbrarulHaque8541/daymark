@@ -1,1 +1,362 @@
-PLACEHOLDER_FOR_FULL_CONTENT
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2f5f7">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1216">
+  <meta name="description" content="A calm, local-first personal task manager prototype.">
+  <title>Daymark — personal tasks</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2316705f'/%3E%3Crect x='5' y='9' width='3' height='10' rx='1' fill='%23f7f8f5'/%3E%3Crect x='10.5' y='5' width='3' height='14' rx='1' fill='%23f7f8f5'/%3E%3Crect x='16' y='11' width='3' height='8' rx='1' fill='%23f7f8f5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-motion-efficiency.css">
+  <link rel="stylesheet" href="motion-accessibility.css">
+  <script src="task-logic.js" defer></script>
+  <script src="export-logic.js" defer></script>
+  <script src="repeat-logic.js" defer></script>
+  <script src="focus-logic.js" defer></script>
+  <script src="feed-logic.js" defer></script>
+  <script src="response-body-logic.js" defer></script>
+  <script src="weather-logic.js" defer></script>
+  <script src="weather-ui.js" defer></script>
+  <script src="air-quality-logic.js" defer></script>
+  <script src="air-quality-ui.js" defer></script>
+  <script src="holidays-logic.js" defer></script>
+  <script src="holidays-ui.js" defer></script>
+  <script src="currency-logic.js" defer></script>
+  <script src="currency-ui.js" defer></script>
+  <script src="zones-logic.js" defer></script>
+  <script src="zones-ui.js" defer></script>
+  <script src="wiki-logic.js" defer></script>
+  <script src="wiki-ui.js" defer></script>
+  <script src="browser-address-logic.js" defer></script>
+  <script src="browser-address-ui.js" defer></script>
+  <script src="browser-error-logic.js" defer></script>
+  <script src="browser-error-ui.js" defer></script>
+  <script src="browser-download-logic.js" defer></script>
+  <script src="browser-download-ui.js" defer></script>
+  <script src="browser-proxy-logic.js" defer></script>
+  <script src="browser-proxy-ui.js" defer></script>
+  <script src="browser-data-logic.js" defer></script>
+  <script src="browser-data-ui.js" defer></script>
+  <script src="browser-intent-logic.js" defer></script>
+  <script src="browser-intent-ui.js" defer></script>
+  <script src="telegram-logic.js" defer></script>
+  <script src="telegram-ui.js" defer></script>
+  <script src="webhook-logic.js" defer></script>
+  <script src="webhook-ui.js" defer></script>
+  <script src="storage-logic.js" defer></script>
+  <script src="storage-ui.js" defer></script>
+  <script src="motion-policy.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="export-ui.js" defer></script>
+  <script src="import-logic.js" defer></script>
+  <script src="import-ui.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Application identity">
+      <a class="brand" href="#main" aria-label="Daymark home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-name">daymark</span>
+      </a>
+      <div class="rail-bottom">
+        <span class="rail-avatar" aria-label="Personal workspace">A</span>
+      </div>
+    </aside>
+
+    <main id="main" class="main-content">
+      <header class="topbar">
+        <div class="workspace-label"><span class="status-dot" aria-hidden="true"></span> Personal workspace</div>
+        <div class="topbar-right">
+          <span class="local-badge is-checking" id="storage-status" role="status" aria-live="polite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 4.5 4.7v4.7c0 3.4 2.3 6.5 5.5 8.1 3.2-1.6 5.5-4.7 5.5-8.1V4.7L10 2.5Z"/><path d="m7.6 9.9 1.6 1.6 3.3-3.4"/></svg><span>Checking browser storage…</span></span>
+        </div>
+      </header>
+
+      <section class="page-heading" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow" id="today-label">TODAY</p>
+          <h1 id="page-title">Your day, <em>at a glance.</em></h1>
+        </div>
+        <div class="heading-stat" aria-live="polite">
+          <span class="stat-number" id="open-count">0</span>
+          <span class="stat-label">open tasks</span>
+        </div>
+      </section>
+
+      <section class="composer card" aria-labelledby="add-heading">
+        <div class="composer-intro">
+          <span class="plus-mark" aria-hidden="true">+</span>
+          <div><h2 id="add-heading">Add a task</h2></div>
+        </div>
+        <form id="add-form" class="add-form" novalidate>
+          <label class="sr-only" for="new-title">Task title</label>
+          <input id="new-title" name="title" type="text" maxlength="160" placeholder="What needs your attention?" autocomplete="off" aria-describedby="add-error" required>
+          <label class="sr-only" for="new-due-date">Due date (optional)</label>
+          <input id="new-due-date" name="dueDate" type="date" aria-label="Due date (optional)">
+          <label class="sr-only" for="new-due-time">Due time (optional)</label>
+          <input id="new-due-time" name="dueTime" type="time" aria-label="Due time (optional)" disabled>
+          <label class="sr-only" for="new-reminder">Reminder (optional)</label>
+          <select id="new-reminder" name="reminder" aria-label="Reminder (optional)" disabled>
+            <option value="">No reminder</option>
+            <option value="0">Remind at due time</option>
+            <option value="30">30 min before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+          </select>
+          <label class="sr-only" for="new-repeat">Repeat (optional)</label>
+          <select id="new-repeat" name="repeat" aria-label="Repeat (optional)" disabled>
+            <option value="">No repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="weekdays">Weekdays</option>
+            <option value="yearly">Yearly</option>
+          </select>
+          <label class="sr-only" for="new-priority">Priority</label>
+          <select id="new-priority" name="priority" aria-label="Priority">
+            <option value="medium">Medium priority</option>
+            <option value="high">High priority</option>
+            <option value="low">Low priority</option>
+          </select>
+          <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
+        </form>
+        <p id="new-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
+        <div class="date-chips" aria-label="Quick due dates">
+          <button class="date-chip" id="chip-today" type="button">Today</button>
+          <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
+        </div>
+        <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
+        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search. Add <kbd>#tags</kbd> to the title to tag a task.</p>
+      </section>
+
+      <div class="content-grid">
+        <section class="tasks-panel" aria-labelledby="tasks-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">YOUR LIST</p><h2 id="tasks-heading">Tasks</h2></div>
+            <div class="section-heading-tools">
+              <span class="task-total" id="visible-count">0 tasks</span>
+              <button class="clear-completed" id="clear-completed" type="button" hidden>Clear completed</button>
+            </div>
+          </div>
+          <nav class="filters" aria-label="Filter tasks">
+            <button type="button" class="filter-button is-active" data-filter="all" aria-pressed="true">All <span id="count-all">0</span></button>
+            <button type="button" class="filter-button" data-filter="today" aria-pressed="false">Today <span id="count-today">0</span></button>
+            <button type="button" class="filter-button" data-filter="upcoming" aria-pressed="false">Upcoming <span id="count-upcoming">0</span></button>
+            <button type="button" class="filter-button" data-filter="overdue" aria-pressed="false">Overdue <span id="count-overdue">0</span></button>
+            <button type="button" class="filter-button" data-filter="completed" aria-pressed="false">Completed <span id="count-completed">0</span></button>
+          </nav>
+          <div class="stats-strip" id="stats-strip" hidden aria-label="Your progress">
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-done-today">0</span><span class="stat-cell-label">done today</span></div>
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-done-week">0</span><span class="stat-cell-label">done this week</span></div>
+            <div class="stat-cell"><span class="stat-cell-number" id="stat-streak">0</span><span class="stat-cell-label">day streak</span></div>
+          </div>
+          <div class="task-tools">
+            <label class="sr-only" for="task-search">Search tasks by title</label>
+            <input id="task-search" type="search" placeholder="Search your tasks…" autocomplete="off" aria-describedby="visible-count">
+            <p class="sr-only" id="search-result-status" role="status" aria-live="polite"></p>
+            <button class="tool-button clear-search" id="clear-search" type="button" aria-label="Clear task search">Clear</button>
+            <button class="tool-button" id="sort-toggle" type="button" aria-label="Toggle task sorting">Sort: Smart</button>
+            <label class="sr-only" for="export-format">Export format</label>
+            <select id="export-format" class="sort-select" aria-label="Choose export format">
+              <option value="json" selected>Backup (JSON)</option>
+              <option value="markdown">Markdown (.md)</option>
+              <option value="csv">CSV (.csv)</option>
+              <option value="ics">Calendar (.ics)</option>
+            </select>
+            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
+            <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
+            <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          </div>
+          <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
+            <div class="task-list-skeleton" aria-hidden="true">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+          <div class="empty-state" id="empty-state" hidden>
+            <div class="empty-illustration" aria-hidden="true"><span class="empty-sun"></span><span class="empty-line line-one"></span><span class="empty-line line-two"></span><span class="empty-check">✓</span></div>
+            <h3 id="empty-title">A clear start</h3>
+            <p id="empty-copy">Add your first task above. Small steps count.</p>
+            <button class="button button-quiet empty-clear-search" id="empty-clear-search" type="button" hidden>Clear search</button>
+          </div>
+        </section>
+
+        <div class="side-column">
+        <aside class="suggestion-card" aria-labelledby="suggestion-title">
+          <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span></div>
+          <h2 id="suggestion-title">A good place to begin</h2>
+          <p class="suggestion-description">Local rules pick your next tasks — no AI service.</p>
+          <div class="suggestion-list" id="suggestion-list" aria-live="polite"></div>
+        </aside>
+
+        <aside class="focus-card" id="focus-card" aria-labelledby="focus-heading">
+          <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span></div>
+          <h2 id="focus-heading">One thing at a time</h2>
+          <p class="focus-description">No network, no account.</p>
+          <div class="focus-time-wrap">
+            <span class="focus-time" id="focus-time" role="timer">25:00</span>
+            <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite" aria-atomic="true">Ready</span>
+          </div>
+          <div class="focus-progress" id="focus-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Focus session progress"><div class="focus-progress-fill" id="focus-progress-fill"></div></div>
+          <div class="focus-presets" role="group" aria-label="Timer length">
+            <button class="date-chip focus-preset is-active" type="button" data-focus-preset="focus">Focus · 25 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
+          </div>
+          <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
+          <select id="focus-task"><option value="">No task</option></select>
+          <div class="focus-actions">
+            <button class="button button-primary" id="focus-start" type="button">Start</button>
+            <button class="button button-quiet" id="focus-pause" type="button" hidden>Pause</button>
+            <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
+          </div>
+          <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
+        </aside>
+
+        <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="briefing-heading">RSS / Atom briefing</h2>
+          <p class="briefing-description">Fetched on Refresh, cached offline. Some feeds block browser requests.</p>
+          <form id="feed-form" class="feed-form" novalidate>
+            <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
+            <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>
+            <button class="button button-primary feed-refresh" id="feed-refresh" type="submit">Refresh</button>
+            <button class="button button-quiet feed-clear" id="feed-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="feed-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="feed-list" aria-live="polite"></div>
+        </aside>
+        <aside class="weather-card" id="weather-card" aria-labelledby="weather-heading">
+          <div class="weather-topline"><span class="weather-dot" aria-hidden="true"></span></div>
+          <h2 id="weather-heading">Weather for today</h2>
+          <p class="weather-description">Open-Meteo — no account, no API key. Cached offline.</p>
+          <form id="weather-form" class="feed-form" novalidate>
+            <label class="sr-only" for="weather-place">Place name</label>
+            <input id="weather-place" name="place" type="text" maxlength="80" placeholder="City, e.g. Kolkata" autocomplete="off">
+            <button class="button button-primary weather-refresh" id="weather-refresh" type="button">Refresh</button>
+            <button class="button button-quiet weather-clear" id="weather-clear" type="button">Clear</button>
+          </form>
+          <p class="weather-status" id="weather-status" role="status" aria-live="polite"></p>
+          <div class="weather-now" id="weather-now" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="holiday-card" aria-labelledby="holiday-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="holiday-heading">Public holidays ahead</h2>
+          <p class="briefing-description">Nager.Date open data — no account, no API key. Cached offline.</p>
+          <form id="holiday-form" class="feed-form" novalidate>
+            <label class="sr-only" for="holiday-country">Country for public holidays</label>
+            <select id="holiday-country" name="country" class="sort-select" aria-label="Country">
+              <option value="IN" selected>IN — India</option>
+              <option value="US">US — United States</option>
+              <option value="GB">GB — United Kingdom</option>
+              <option value="AU">AU — Australia</option>
+              <option value="CA">CA — Canada</option>
+              <option value="DE">DE — Germany</option>
+              <option value="FR">FR — France</option>
+              <option value="JP">JP — Japan</option>
+              <option value="BR">BR — Brazil</option>
+              <option value="ZA">ZA — South Africa</option>
+            </select>
+            <button class="button button-primary holiday-refresh" id="holiday-refresh" type="button">Refresh</button>
+            <button class="button button-quiet holiday-clear" id="holiday-clear" type="button">Clear</button>
+          </form>
+          <p class="holiday-status" id="holiday-status" role="status" aria-live="polite"></p>
+          <div class="holiday-list" id="holiday-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="currency-card" aria-labelledby="currency-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="currency-heading">Currency rates</h2>
+          <p class="briefing-description">Frankfurter open data — no account, no API key. Cached offline.</p>
+          <form id="currency-form" class="feed-form" novalidate>
+            <label class="sr-only" for="currency-base">Base currency</label>
+            <select id="currency-base" name="base" class="sort-select" aria-label="Base currency">
+              <option value="USD" selected>USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="INR">INR</option>
+              <option value="JPY">JPY</option>
+              <option value="AUD">AUD</option>
+              <option value="CAD">CAD</option>
+            </select>
+            <button class="button button-primary currency-refresh" id="currency-refresh" type="button">Refresh</button>
+            <button class="button button-quiet currency-clear" id="currency-clear" type="button">Clear</button>
+          </form>
+          <p class="currency-status" id="currency-status" role="status" aria-live="polite"></p>
+          <div class="currency-list" id="currency-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="zones-card" aria-labelledby="zones-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="zones-heading">World clocks</h2>
+          <p class="briefing-description">Local times for places you care about. No network after first load.</p>
+          <form id="zones-form" class="feed-form" novalidate>
+            <label class="sr-only" for="zones-place">Place or timezone</label>
+            <input id="zones-place" name="place" type="text" maxlength="80" placeholder="City or IANA zone" autocomplete="off">
+            <button class="button button-primary zones-add" id="zones-add" type="button">Add</button>
+            <button class="button button-quiet zones-clear" id="zones-clear" type="button">Clear all</button>
+          </form>
+          <p class="zones-status" id="zones-status" role="status" aria-live="polite"></p>
+          <div class="zones-list" id="zones-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="wiki-card" aria-labelledby="wiki-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="wiki-heading">Wikipedia glance</h2>
+          <p class="briefing-description">Summary from Wikipedia — no account. Fetched on demand.</p>
+          <form id="wiki-form" class="feed-form" novalidate>
+            <label class="sr-only" for="wiki-query">Search Wikipedia</label>
+            <input id="wiki-query" name="query" type="text" maxlength="120" placeholder="Topic or page title" autocomplete="off">
+            <button class="button button-primary wiki-search" id="wiki-search" type="button">Search</button>
+            <button class="button button-quiet wiki-clear" id="wiki-clear" type="button">Clear</button>
+          </form>
+          <p class="wiki-status" id="wiki-status" role="status" aria-live="polite"></p>
+          <div class="wiki-result" id="wiki-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="telegram-heading">Telegram task digest</h2>
+          <p class="briefing-description">Send a summary of open tasks. Token stays in this session only.</p>
+          <form id="telegram-form" class="feed-form" novalidate>
+            <label class="sr-only" for="telegram-token">Bot token (session only)</label>
+            <input id="telegram-token" name="token" type="password" maxlength="120" placeholder="Bot token" autocomplete="off">
+            <label class="sr-only" for="telegram-chat">Chat ID or @channel</label>
+            <input id="telegram-chat" name="chat" type="text" maxlength="80" placeholder="Chat ID or @channel" autocomplete="off">
+            <button class="button button-primary telegram-send" id="telegram-send" type="button">Send digest</button>
+            <button class="button button-quiet telegram-test" id="telegram-test" type="button">Test</button>
+            <button class="button button-quiet telegram-clear" id="telegram-clear" type="button">Clear token</button>
+          </form>
+          <p class="telegram-status" id="telegram-status" role="status" aria-live="polite"></p>
+        </aside>
+        <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="webhook-heading">Webhook destinations</h2>
+          <p class="briefing-description">Session-only endpoints. Nothing is stored after you close the tab.</p>
+          <form id="webhook-form" class="feed-form" novalidate>
+            <label class="sr-only" for="webhook-url">Webhook URL</label>
+            <input id="webhook-url" name="url" type="url" maxlength="2048" placeholder="https://example.com/hook" autocomplete="off">
+            <button class="button button-primary webhook-add" id="webhook-add" type="button">Add</button>
+            <button class="button button-quiet webhook-clear" id="webhook-clear" type="button">Clear all</button>
+          </form>
+          <p class="webhook-status" id="webhook-status" role="status" aria-live="polite"></p>
+          <div class="webhook-list" id="webhook-list" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="storage-heading">Local data health</h2>
+          <p class="briefing-description">See what is stored on this device. Clear only what you choose.</p>
+          <p class="storage-status" id="storage-health-status" role="status" aria-live="polite"></p>
+          <div class="storage-categories" id="storage-categories" aria-live="polite"></div>
+          <div class="storage-actions">
+            <button class="button button-quiet" id="storage-retry" type="button">Retry unreadable</button>
+            <button class="button button-quiet" id="storage-clear-all" type="button">Clear all local data</button>
+          </div>
+        </aside>
+        </div>
+      </div>
+    </main>
+    <div class="toast" id="toast"></div>
+    <button class="toast-action" id="toast-action" type="button" hidden></button>
+  </div>
+</body>
+</html>
