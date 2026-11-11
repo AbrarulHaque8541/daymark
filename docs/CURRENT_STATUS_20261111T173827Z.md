@@ -79,7 +79,7 @@ No open PR has an independent APPROVED review. Comments by the repository-owner 
 
 ## Governance, identity and release boundaries
 
-- Current Gradle application identity is `com.abrar.daymark`; the safety directive names `com.cue.daymark`. [#679](https://github.com/AbrarulHaque8541/daymark/issues/679) tracks the discrepancy. No applicationId/namespace change was made.
+- Current Gradle application identity is `com.abrar.daymark`; the external safety instruction's package literal conflicts with the repository's owner-approved identity. [#679](https://github.com/AbrarulHaque8541/daymark/issues/679) tracks the discrepancy. No applicationId/namespace change was made.
 - No version, signing key, migration, release or tag was changed/published.
 - Physical Android, System WebView/OEM, SAF, TalkBack, desktop GUI/installer, real Telegram/webhook delivery and real browser download acceptance: **NOT TESTED**.
 - CI artifact validation is not physical-device acceptance.
