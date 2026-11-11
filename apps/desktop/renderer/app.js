@@ -262,6 +262,12 @@ if (window.daymark) {
     }
   });
   window.daymark.onDownloadStarted((name) => toast('Downloading: ' + name));
+  window.daymark.onDownloadProgress((name, percent) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    const safePercent = Number.isInteger(percent) ? Math.max(0, Math.min(100, percent)) : null;
+    const progress = safePercent === null ? '' : ' (' + safePercent + '%)';
+    toast('Downloading: ' + safeName + progress);
+  });
   window.daymark.onDownloadFailed((name) => {
     const safeName = typeof name === 'string' && name ? name : 'download';
     toast('Could not safely save ' + safeName + '; no file was published.');

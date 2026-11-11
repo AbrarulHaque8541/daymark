@@ -79,6 +79,11 @@ app.whenReady().then(() => {
       createStagingPath: (finalPath, directory) => createStagingPath(directory, finalPath, fs),
       publishFile: (stagingPath, finalPath, directory) => publishStagedFile(directory, stagingPath, finalPath, fs),
       cleanupStaging: (stagingPath, directory) => cleanupStaging(directory, stagingPath, fs),
+      onProgress: (filename, percent) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-progress', { filename, percent });
+        }
+      },
       onFailed: (filename) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('download-failed', filename);

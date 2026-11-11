@@ -35,6 +35,8 @@ function handleWillDownload(options) {
   let finalPath = null;
   let stagingPath = null;
   let doneListener = null;
+  let progressListener = null;
+  let lastProgressPercent = -1;
 
   try {
     if (!item || typeof item.getFilename !== 'function'
@@ -57,9 +59,28 @@ function handleWillDownload(options) {
     }
 
     const reservation = reservationKey(finalPath);
+    const filename = path.basename(finalPath);
+    if (typeof opts.onProgress === 'function' && typeof item.on === 'function'
+      && typeof item.removeListener === 'function'
+      && typeof item.getReceivedBytes === 'function'
+      && typeof item.getTotalBytes === 'function') {
+      progressListener = () => {
+        try {
+          const receivedBytes = Number(item.getReceivedBytes());
+          const totalBytes = Number(item.getTotalBytes());
+          if (!Number.isFinite(receivedBytes) || receivedBytes < 0
+            || !Number.isFinite(totalBytes) || totalBytes <= 0) return;
+          const percent = Math.max(0, Math.min(100, Math.floor((receivedBytes / totalBytes) * 100)));
+          if (percent === lastProgressPercent) return;
+          lastProgressPercent = percent;
+          opts.onProgress(filename, percent);
+        } catch {
+          // Progress is optional; a renderer/IPC failure must not interrupt the download.
+        }
+      };
+    }
     doneListener = (_event, state) => {
       const finalize = async () => {
-        const filename = path.basename(finalPath);
         let outcome = state === 'cancelled' ? 'cancelled' : 'failed';
         try {
           if (state === 'completed') {
@@ -69,6 +90,9 @@ function handleWillDownload(options) {
         } catch {
           outcome = 'failed';
         } finally {
+          if (progressListener && typeof item.removeListener === 'function') {
+            try { item.removeListener('updated', progressListener); } catch { /* Best effort. */ }
+          }
           try {
             await opts.cleanupStaging(stagingPath, directory);
           } catch {
@@ -90,6 +114,7 @@ function handleWillDownload(options) {
     };
 
     item.once('done', doneListener);
+    if (progressListener) item.on('updated', progressListener);
     item.setSavePath(stagingPath);
     if (typeof opts.onStarted === 'function') {
       try { opts.onStarted(path.basename(finalPath)); } catch {
@@ -101,6 +126,9 @@ function handleWillDownload(options) {
   } catch {
     if (doneListener && item && typeof item.removeListener === 'function') {
       try { item.removeListener('done', doneListener); } catch { /* Best effort. */ }
+    }
+    if (progressListener && item && typeof item.removeListener === 'function') {
+      try { item.removeListener('updated', progressListener); } catch { /* Best effort. */ }
     }
     if (stagingPath && typeof opts.cleanupStaging === 'function') {
       try { opts.cleanupStaging(stagingPath, directory); } catch { /* Best effort. */ }

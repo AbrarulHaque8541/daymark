@@ -13,6 +13,10 @@ const downloads = path.resolve(path.join(os.tmpdir(), 'daymark-download-handler'
 function makeItem(filename, options = {}) {
   const item = new EventEmitter();
   item.getFilename = () => filename;
+  item.receivedBytes = 0;
+  item.totalBytes = 0;
+  item.getReceivedBytes = () => item.receivedBytes;
+  item.getTotalBytes = () => item.totalBytes;
   item.setSavePath = (savePath) => {
     if (options.setSavePathThrows) throw new Error('setSavePath failed');
     item.savePath = savePath;
@@ -26,7 +30,7 @@ function makeItem(filename, options = {}) {
 
 function makeStaging(options = {}) {
   let sequence = 0;
-  const calls = { created: [], published: [], cleaned: [], failed: [], completed: [], cancelled: [], cleanupErrors: [], order: [] };
+  const calls = { created: [], published: [], cleaned: [], failed: [], completed: [], cancelled: [], progress: [], cleanupErrors: [], order: [] };
   return {
     calls,
     createStagingPath(finalPath) {
@@ -45,6 +49,7 @@ function makeStaging(options = {}) {
       calls.cleaned.push(staged);
       if (options.cleanupThrows) throw new Error('staging cleanup failed');
     },
+    onProgress(filename, percent) { calls.progress.push({ filename, percent }); },
     onFailed(filename) { calls.order.push('failed'); calls.failed.push(filename); },
     onCompleted(filename) { calls.order.push('completed'); calls.completed.push(filename); },
     onCancelled(filename) { calls.order.push('cancelled'); calls.cancelled.push(filename); },
@@ -87,6 +92,37 @@ test('safe destination is staged privately and published only after completion',
   assert.deepEqual(staging.calls.cancelled, []);
   assert.deepEqual(staging.calls.failed, []);
   assert.deepEqual(staging.calls.order, ['publish', 'cleanup', 'completed']);
+  assert.equal(reservedPaths.size, 0);
+});
+
+test('download progress is bounded, URL-free and emitted only when the integer percentage changes', async () => {
+  const item = makeItem('../../report.txt');
+  const reservedPaths = new Set();
+  const staging = makeStaging();
+  const result = handleWillDownload({
+    event: {},
+    item,
+    downloadDirectory: downloads,
+    exists: () => false,
+    reservedPaths,
+    ...staging,
+  });
+  assert.equal(result.ok, true);
+  item.totalBytes = 200;
+  item.receivedBytes = 50;
+  item.emit('updated');
+  item.receivedBytes = 51;
+  item.emit('updated');
+  item.receivedBytes = 300;
+  item.emit('updated');
+  item.totalBytes = 0;
+  item.emit('updated');
+  assert.deepEqual(staging.calls.progress, [
+    { filename: 'report.txt', percent: 25 },
+    { filename: 'report.txt', percent: 100 },
+  ]);
+  item.emit('done', null, 'cancelled');
+  await flushDone();
   assert.equal(reservedPaths.size, 0);
 });
 
@@ -147,6 +183,7 @@ test('renderer notification failure does not cancel a staged download', async ()
     reservedPaths,
     ...staging,
     onStarted() { throw new Error('renderer closed'); },
+    onProgress() { throw new Error('renderer closed'); },
     onCompleted(filename) {
       staging.calls.completed.push(filename);
       throw new Error('renderer closed');
@@ -156,6 +193,9 @@ test('renderer notification failure does not cancel a staged download', async ()
   assert.equal(result.ok, true);
   assert.equal(prevented, false);
   assert.equal(item.cancelled, undefined);
+  item.totalBytes = 100;
+  item.receivedBytes = 50;
+  item.emit('updated');
   item.emit('done', null, 'completed');
   await flushDone();
   assert.equal(staging.calls.published.length, 1);
