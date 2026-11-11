@@ -183,6 +183,52 @@ test('setSavePath failure cleans staging, releases reservation and falls back to
   assert.equal(item.cancelled, true);
   assert.equal(staging.calls.created.length, 1);
   assert.deepEqual(staging.calls.cleaned, staging.calls.created);
+  assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.order, ['cleanup', 'failed']);
+  assert.equal(reservedPaths.size, 0);
+});
+
+test('preflight cleanup failure is reported while the unsafe download is failed', () => {
+  const item = makeItem('report.txt', { setSavePathThrows: true });
+  const reservedPaths = new Set();
+  const staging = makeStaging({ cleanupThrows: true });
+  const result = handleWillDownload({
+    event: { preventDefault() { throw new Error('event already invalidated'); } },
+    item,
+    downloadDirectory: downloads,
+    exists: () => false,
+    reservedPaths,
+    ...staging,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.cancelled, true);
+  assert.deepEqual(staging.calls.cleanupErrors, [true]);
+  assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.order, ['cleanup', 'cleanup-error', 'failed']);
+  assert.equal(reservedPaths.size, 0);
+});
+
+test('preflight failure reports a sanitized filename even when cancellation cannot be confirmed', () => {
+  const item = makeItem('../secret.txt', { setSavePathThrows: true, cancelThrows: true });
+  const reservedPaths = new Set();
+  const staging = makeStaging();
+  const result = handleWillDownload({
+    event: { preventDefault() { throw new Error('event already invalidated'); } },
+    item,
+    downloadDirectory: downloads,
+    exists: () => false,
+    reservedPaths,
+    ...staging,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.cancelled, false);
+  assert.equal(result.filename, '_secret.txt');
+  assert.deepEqual(staging.calls.failed, ['_secret.txt']);
+  assert.deepEqual(staging.calls.cancelled, []);
   assert.equal(reservedPaths.size, 0);
 });
 
@@ -238,6 +284,9 @@ test('directory lookup failure cancels before creating staging', () => {
   assert.equal(result.cancelled, true);
   assert.equal(item.cancelled, true);
   assert.equal(staging.calls.created.length, 0);
+  assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.order, ['failed']);
   assert.equal(reservedPaths.size, 0);
 });
 
@@ -335,5 +384,8 @@ test('staging allocation failure cancels and releases the final-name reservation
   assert.equal(result.ok, false);
   assert.equal(result.cancelled, true);
   assert.equal(prevented, true);
+  assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.order, ['failed']);
   assert.equal(reservedPaths.size, 0);
-});
+}

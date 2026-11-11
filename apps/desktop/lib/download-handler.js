@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { createDownloadPath, reservationKey } = require('./download-policy');
+const { createDownloadPath, reservationKey, sanitizeDownloadFilename } = require('./download-policy');
 
 function cancelUnsafeDownload(event, item) {
   try {
@@ -34,6 +34,7 @@ function handleWillDownload(options) {
   let directory = null;
   let finalPath = null;
   let stagingPath = null;
+  let filename = 'download';
   let doneListener = null;
   let progressListener = null;
   let lastProgressPercent = null;
@@ -49,9 +50,15 @@ function handleWillDownload(options) {
       throw new TypeError('download-staging-contract-required');
     }
 
+    try {
+      filename = sanitizeDownloadFilename(item.getFilename());
+    } catch {
+      filename = 'download';
+    }
     directory = typeof opts.downloadDirectory === 'function'
       ? opts.downloadDirectory() : opts.downloadDirectory;
-    finalPath = createDownloadPath(directory, item.getFilename(), opts.exists, opts.reservedPaths);
+    finalPath = createDownloadPath(directory, filename, opts.exists, opts.reservedPaths);
+    filename = path.basename(finalPath);
     stagingPath = opts.createStagingPath(finalPath, directory);
     if (typeof stagingPath !== 'string' || !path.isAbsolute(stagingPath)
       || path.resolve(stagingPath) === path.resolve(finalPath)) {
@@ -59,7 +66,6 @@ function handleWillDownload(options) {
     }
 
     const reservation = reservationKey(finalPath);
-    const filename = path.basename(finalPath);
     if (typeof opts.onProgress === 'function' && typeof item.on === 'function'
       && typeof item.removeListener === 'function'
       && typeof item.getReceivedBytes === 'function'
@@ -126,6 +132,7 @@ function handleWillDownload(options) {
 
     return { ok: true, path: finalPath, stagingPath, filename: path.basename(finalPath) };
   } catch {
+    const cancelled = cancelUnsafeDownload(opts.event, item);
     if (doneListener && item && typeof item.removeListener === 'function') {
       try { item.removeListener('done', doneListener); } catch { /* Best effort. */ }
     }
@@ -133,15 +140,25 @@ function handleWillDownload(options) {
       try { item.removeListener('updated', progressListener); } catch { /* Best effort. */ }
     }
     if (stagingPath && typeof opts.cleanupStaging === 'function') {
-      try { opts.cleanupStaging(stagingPath, directory); } catch { /* Best effort. */ }
+      try {
+        opts.cleanupStaging(stagingPath, directory);
+      } catch {
+        if (typeof opts.onCleanupError === 'function') {
+          try { opts.onCleanupError(); } catch { /* Best-effort cleanup reporting. */ }
+        }
+      }
     }
     if (finalPath && opts.reservedPaths instanceof Set) {
       opts.reservedPaths.delete(reservationKey(finalPath));
     }
+    if (typeof opts.onFailed === 'function') {
+      try { opts.onFailed(filename); } catch { /* Renderer notification must not change the download outcome. */ }
+    }
     return {
       ok: false,
       reason: 'unsafe-download-destination',
-      cancelled: cancelUnsafeDownload(opts.event, item),
+      cancelled,
+      filename,
     };
   }
 }
