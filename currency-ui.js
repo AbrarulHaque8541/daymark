@@ -1,7 +1,7 @@
 /*
  * Daymark currency glance UI wiring for the web prototype.
  *
- * A small offline-first card: the user picks an amount and two currencies and
+ * A small network-on-demand card: the user picks an amount and two currencies and
  * taps Refresh; the reference rate comes from the keyless Frankfurter API
  * (European Central Bank data) and the last successful result stays cached on
  * this device, so the card keeps working offline with a "cached" note. Nothing

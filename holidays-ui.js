@@ -1,7 +1,7 @@
 /*
  * Daymark public-holidays UI wiring for the web prototype.
  *
- * A small offline-first card: the user picks a country and taps Refresh; the
+ * A small network-on-demand card: the user picks a country and taps Refresh; the
  * year's public holidays come from the keyless Nager.Date open API and the last
  * successful result stays cached on this device, so the card keeps working
  * offline with a "cached" note. Nothing ever refreshes on its own — no polling,

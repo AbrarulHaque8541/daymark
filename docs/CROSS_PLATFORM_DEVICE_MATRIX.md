@@ -156,7 +156,7 @@ Engineering rules:
 
 ## 9. Privacy, storage and synchronization
 
-Daymark remains local-first and useful offline. Cross-platform support must not force an account or central cloud database.
+Daymark keeps task data on the device and stays useful without an account. Cross-platform support must not force an account or central cloud database, and must not degrade the direct network path on platforms where the network is available.
 
 First establish:
 - a versioned encrypted portable format;

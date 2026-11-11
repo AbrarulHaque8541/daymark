@@ -35,7 +35,7 @@ These are examples, not an instruction to add all of them. A multi-language impl
 Technology freedom does not grant permission to change product or release invariants:
 - Preserve the owner-approved application ID and namespace `com.abrar.daymark`, production signer pin and existing signing secrets, monotonic versioning, and established release process. No signer/package identity change without explicit owner approval.
 - Preserve user tasks, attachments, encrypted storage, backup formats, migrations, and existing features. No silent destructive migration or data reset. Maintain backward compatibility or provide a reviewed, tested migration and recovery path.
-- Preserve local-first/privacy boundaries, no analytics/ad SDKs, explicit user consent for network activity, HTTPS-only updater and non-browser network clients, and the existing browser policy documented in `AGENTS.md`.
+- Preserve the on-device encryption and privacy boundaries, no analytics/ad SDKs, HTTPS-only updater and non-browser network clients, and the existing browser policy documented in `AGENTS.md`. A feature that needs the network calls it directly; do not trade away working network behaviour for an offline-first story.
 - Do not introduce custom cryptography. Prefer established, audited platform or well-maintained cryptographic implementations and preserve existing key-management boundaries.
 - Do not add broad JavaScript/native bridges, arbitrary downloaded executable code, unbounded shell access, hidden background work, or permission/policy bypasses.
 - Keep Android System WebView platform-managed; a native wrapper or alternate language does not replace Chromium/WebView or magically accelerate page rendering.
