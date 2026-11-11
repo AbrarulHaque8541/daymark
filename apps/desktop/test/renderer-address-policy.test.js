@@ -7,6 +7,51 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const rendererSource = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+const closeTabStart = rendererSource.indexOf('function closeTab(id) {');
+const closeTabEnd = rendererSource.indexOf('\n\nfunction navigate(', closeTabStart);
+assert.notEqual(closeTabStart, -1, 'renderer tab close handler should exist');
+assert.notEqual(closeTabEnd, -1, 'renderer tab close handler should end before navigate');
+const closeTabSource = rendererSource.slice(closeTabStart, closeTabEnd);
+
+function makeCloseTabHarness(tabIds, activeId, replacementId) {
+  const tabs = tabIds.map((id) => ({ id, view: { remove() {} } }));
+  const tabElements = new Map();
+  const selects = new Map();
+  let focusedId = null;
+  const addTabElement = (id) => {
+    const key = String(id);
+    tabElements.set(key, { remove: () => tabElements.delete(key) });
+    selects.set(key, { focus: () => { focusedId = id; } });
+  };
+  tabIds.forEach(addTabElement);
+  const context = {
+    tabs,
+    activeTabId: activeId,
+    document: {
+      querySelector(selector) {
+        const match = selector.match(/data-tab-id="([^"]+)"/);
+        if (!match) return null;
+        const key = match[1];
+        return selector.endsWith('.tab-select')
+          ? selects.get(key) || null
+          : tabElements.get(key) || null;
+      },
+    },
+    activateTab(id) { context.activeTabId = id; },
+    createTab() {
+      tabs.push({ id: replacementId, view: { remove() {} } });
+      addTabElement(replacementId);
+      context.activeTabId = replacementId;
+    },
+  };
+  const closeTab = vm.runInNewContext(`${closeTabSource}; closeTab;`, context);
+  return {
+    closeTab,
+    get activeId() { return context.activeTabId; },
+    get focusedId() { return focusedId; },
+  };
+}
+
 const start = rendererSource.indexOf('function isLocal(');
 const end = rendererSource.indexOf('\n\nfunction activeTab()', start);
 assert.notEqual(start, -1, 'renderer local-host policy should exist');
@@ -16,6 +61,29 @@ const { isLocal, httpsUpgrade } = vm.runInNewContext(
   `(() => { ${addressHelpers}; return { isLocal, httpsUpgrade }; })()`,
   { URL },
 );
+
+test('closing an active tab focuses the selected surviving tab', () => {
+  const state = makeCloseTabHarness([1, 2, 3], 1, 4);
+
+  state.closeTab(1);
+
+  assert.equal(state.activeId, 2);
+  assert.equal(state.focusedId, 2);
+});
+
+test('closing the last tab focuses the replacement tab', () => {
+  const state = makeCloseTabHarness([1], 1, 2);
+
+  state.closeTab(1);
+
+  assert.equal(state.activeId, 2);
+  assert.equal(state.focusedId, 2);
+});
+
+test('tab close button and Ctrl+W share the tab close handler', () => {
+  assert.match(rendererSource, /el\.querySelector\('\.tab-close'\)\.addEventListener\('click', \(e\) => \{\s*e\.stopPropagation\(\);\s*closeTab\(id\);/);
+  assert.match(rendererSource, /else if \(mod && e\.key === 'w'\) \{\s*e\.preventDefault\(\);\s*const tab = activeTab\(\);\s*if \(tab\) closeTab\(tab\.id\);/);
+});
 
 test('renderer recognizes bracketed IPv6 loopback as local', () => {
   assert.equal(isLocal('[::1]'), true);

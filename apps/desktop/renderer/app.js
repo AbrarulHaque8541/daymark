@@ -150,6 +150,10 @@ function closeTab(id) {
     const next = tabs[i] || tabs[i - 1];
     if (next) activateTab(next.id);
     else createTab();
+    const select = document.querySelector(
+      '.tab[data-tab-id="' + activeTabId + '"] .tab-select',
+    );
+    if (select) select.focus();
   }
 }
 
