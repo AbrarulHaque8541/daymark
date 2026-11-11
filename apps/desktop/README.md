@@ -12,6 +12,8 @@ npm start
 npm test
 ```
 
+The desktop dependency graph is pinned by `package-lock.json`. Use `npm ci` for clean/reproducible installs. Use `npm install` only when intentionally changing dependencies, and commit the regenerated lockfile with that change.
+
 Desktop CI (.github/workflows/desktop-browser-ci.yml) Ubuntu, Windows aur macOS par unit tests chalata hai. Yeh GUI launch, installer packaging, screenshot capture ya real-device compatibility prove nahi karta.
 
 ## Features (prototype)
