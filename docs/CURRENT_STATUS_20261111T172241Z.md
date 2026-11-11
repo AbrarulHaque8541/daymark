@@ -75,7 +75,7 @@ PR #744 combines the shell refresh and URL-free download progress/completion/can
 
 ## Governance, identity and release safety
 
-- Current Gradle identity is `com.abrar.daymark`, versionName `1.6`, versionCode `13`. The safety instruction names `com.cue.daymark`, which conflicts with the live repository identity; no identity or version change was made.
+- Current Gradle identity is `com.abrar.daymark`, versionName `1.6`, versionCode `13`. An external safety note names a different legacy package identity; the live repository identity remains `com.abrar.daymark`. No identity or version change was made.
 - Latest published Android release remains v1.5; v1.4 is draft. No release or tag was published in this cycle.
 - No signing keys, production secrets, destructive migrations or user data were touched.
 - Main is not protected; the detailed branch-protection endpoint is unavailable to the connected integration. Owner/admin action is required.
