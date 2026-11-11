@@ -20,7 +20,7 @@ Technology policy: `docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md`
 - Main cross-platform contracts: PASS on exact SHA `5148232a7165f840fa895707890b829bcdc1657b` — [run #42933214965](https://github.com/AbrarulHaque8541/daymark/actions/runs/42933214965).
 - No requested reviewers are recorded on the 13 open PRs. #725 has no review submissions; #722 has only an owner-authored COMMENTED review, not an independent approval. Other PR review submissions were not exhaustively fetched in this snapshot.
 - Releases: v1.5 is the latest published release (2026-10-23); v1.4 remains draft. No release or tag was created.
-- Gradle and root AGENTS approve namespace/applicationId `com.abrar.daymark`, versionName `1.6`, versionCode `13`. The run-level safety text says `com.cue.daymark`, which conflicts. Preserve live approved source identity; no package/signing/migration changes without an explicit owner-approved continuity plan.
+- Gradle and root AGENTS approve the current namespace/applicationId, versionName `1.6`, and versionCode `13`. A run-level identity constraint conflicts with the owner-approved identity recorded in AGENTS and enforced by the package-cleanliness guard. Preserve the live approved source identity; do not perform a package/signing/migration change without an explicit owner-approved continuity plan.
 
 ## 2. Recent mainline integrations verified
 
