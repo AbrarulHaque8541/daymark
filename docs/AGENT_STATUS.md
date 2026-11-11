@@ -93,7 +93,10 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261111T174430Z.md](./CURRENT_STATUS_20261111T174430Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 current head 922/922 with 4/4 workflows; #747 919/919 with 4/4 workflows; #648 exact workflow_dispatch run #43061555620 failed (API29 211 assertions; API36 timeout at run 1/10); #748 checks pending on its docs branch; P0 task/Clear All/Android download/Focus/governance blockers remain.
+- [CURRENT_STATUS_20261111T191142Z.md](./CURRENT_STATUS_20261111T191142Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 754 branches / 8 open PRs / 23 open issues; main Android CI 916/916 and cross-platform contracts PASS; #648 API 29 PASS / API 36 still running with bounded startup diagnostics; #747 complete localStorage disclosure expanded, four exact-head workflows running; task/Clear All/download/governance P0 blockers remain. Snapshot UTC 2026-11-11T19:11:42.986Z.
+- Previous reviewed snapshot: [CURRENT_STATUS_20261111T174430Z.md](./CURRENT_STATUS_20261111T174430Z.md) — 17:44Z main `9f1c0451` baseline.
+
+Z.md](./CURRENT_STATUS_20261111T174430Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 current head 922/922 with 4/4 workflows; #747 919/919 with 4/4 workflows; #648 exact workflow_dispatch run #43061555620 failed (API29 211 assertions; API36 timeout at run 1/10); #748 checks pending on its docs branch; P0 task/Clear All/Android download/Focus/governance blockers remain.
 - Previous mainline snapshot: [CURRENT_STATUS_20261111T170455Z.md](./CURRENT_STATUS_20261111T170455Z.md) — 17:04Z pre-#746 baseline.
 - Previous mainline snapshot: [CURRENT_STATUS_20261111T131135Z.md](./CURRENT_STATUS_20261111T131135Z.md) — earlier baseline.
 
