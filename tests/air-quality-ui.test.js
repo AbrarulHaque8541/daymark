@@ -123,7 +123,7 @@ const ROUTES = [
   { prefix: airApi.AIR_QUALITY_ENDPOINT, body: AIR_BODY }
 ];
 
-test('attach injects the card once with the expected structure', () => {
+test('attach injects the card once with the expected structure and privacy disclosure', () => {
   const { env, doc } = fakeEnv({});
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
@@ -136,6 +136,14 @@ test('attach injects the card once with the expected structure', () => {
   assert.equal(els.result.textContent, '');
   assert.ok(doc.created.indexOf(els.card) !== -1, 'card was created by the module');
   assert.ok(els.card.parentNode !== null, 'card must be attached to the document');
+  const description = doc.registry['air-description'];
+  assert.ok(description, 'privacy disclosure element must exist');
+  const disclosure = description.textContent || '';
+  assert.ok(disclosure.indexOf('Open-Meteo Geocoding') !== -1, 'must name geocoding recipient');
+  assert.ok(disclosure.indexOf('Open-Meteo Air Quality') !== -1, 'must name air-quality recipient');
+  assert.ok(disclosure.indexOf('only after you tap Check') !== -1, 'must state send is only after Check');
+  assert.ok(disclosure.indexOf('No place or result is saved') !== -1, 'must reaffirm nothing is persisted');
+  assert.equal(els.input.getAttribute('aria-describedby'), 'air-description', 'input must be described by the disclosure');
   assert.equal(typeof handle.onCheck, 'function');
   assert.equal(typeof handle.onClear, 'function');
 });
