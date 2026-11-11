@@ -281,12 +281,15 @@ tap_end = instrumentation.index("private String dispatchSwipe", tap_start)
 tap_method = instrumentation[tap_start:tap_end]
 assert "waitForScrollPositionToSettle(parentScroll);" in tap_method
 assert tap_method.index("waitForScrollPositionToSettle(parentScroll);") < tap_method.index("stableVisibleBounds(view)"), (
-    "child tap coordinates must be computed only after the parent ScrollView has stopped moving"
+    "child tap coordinates must be computed only after the parent ScrollView and any fling have settled"
 )
 settle_start = instrumentation.index("private void waitForScrollPositionToSettle(")
 settle_end = instrumentation.index("private void scrollViewIntoFocus(", settle_start)
 settle_method = instrumentation[settle_start:settle_end]
-assert "stableSamples >= 3" in settle_method and "SystemClock.sleep(50L)" in settle_method
+assert "stableSamples >= 8" in settle_method and "SystemClock.sleep(50L)" in settle_method
+assert settle_method.index("stableSamples >= 8") < settle_method.index("waitForIdleSync();") < settle_method.index("return;"), (
+    "a child tap must wait for the extended stable window and main-looper idle after a possible ScrollView fling"
+)
 assert "uptimeMillis() + 2000L" in settle_method, (
     "ScrollView settling must be bounded and require repeated stable samples"
 )

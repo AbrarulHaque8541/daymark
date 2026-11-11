@@ -233,8 +233,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             while (android.os.SystemClock.uptimeMillis() < deadline) {
                 runOnMainSync(() -> {
                     android.view.View root = mainActivity.getWindow().getDecorView();
-                    controls[0] = findViewByText(root, "Stopwatch");
-                    controls[1] = findViewByText(root, "Countdown");
+                    android.view.View selector = findFocusModeSelectorInRoot(root);
+                    controls[0] = selector == null ? null : findViewByText(selector, "Stopwatch");
+                    controls[1] = selector == null ? null : findViewByText(selector, "Countdown");
                     controls[2] = findViewByContentDescription(root, "Start focus timer");
                     controls[3] = findViewByText(root, "READY WHEN YOU ARE");
                 });
@@ -284,11 +285,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "a real tap selects Stopwatch (" + stopwatchTap + ")");
 
             modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
             parentScroll = findParentScrollView(modeSelector);
             String leftSwipe = dispatchSwipe(modeSelector, true);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a leftward horizontal swipe selects Countdown (" + leftSwipe + ")");
             modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
             parentScroll = findParentScrollView(modeSelector);
             String rightSwipe = dispatchSwipe(modeSelector, false);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
@@ -296,6 +301,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             // The selector may have moved during horizontal gestures; re-center it
             // before injecting the parent-scroll gesture.
             modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
             parentScroll = findParentScrollView(modeSelector);
             scrollDescendantIntoScrollView(parentScroll, modeSelector);
             boolean[] canScroll = new boolean[2];
@@ -323,20 +330,36 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                             + ", verticalScrollTrace=" + verticalScrollTrace + ")");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical workspace scroll does not change the selected Focus mode");
+            modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
+            parentScroll = findParentScrollView(modeSelector);
             scrollDescendantIntoScrollView(parentScroll, countdown);
             dispatchVerticalSwipe(countdown);
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag inside Countdown cancels the child click");
+            modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
+            parentScroll = findParentScrollView(modeSelector);
             scrollDescendantIntoScrollView(parentScroll, countdown);
-            String countdownAfterVerticalDrag = dispatchTap(countdown);
+            String countdownAfterVerticalDrag = dispatchTap(mainActivity, "Countdown");
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a tap still works after a rejected vertical drag (" + countdownAfterVerticalDrag + ")");
+            modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
+            parentScroll = findParentScrollView(modeSelector);
             scrollDescendantIntoScrollView(parentScroll, stopwatch);
             dispatchVerticalSwipe(stopwatch);
             checkFocusModeState(mainActivity, stopwatch, countdown, true,
                     "a vertical drag inside Stopwatch cancels the child click");
+            modeSelector = findFocusModeSelector(mainActivity);
+            stopwatch = findFocusModeButton(modeSelector, "Stopwatch");
+            countdown = findFocusModeButton(modeSelector, "Countdown");
+            parentScroll = findParentScrollView(modeSelector);
             scrollDescendantIntoScrollView(parentScroll, stopwatch);
-            String stopwatchAfterVerticalDrag = dispatchTap(stopwatch);
+            String stopwatchAfterVerticalDrag = dispatchTap(mainActivity, "Stopwatch");
             checkFocusModeState(mainActivity, stopwatch, countdown, false,
                     "a vertical drag does not disable subsequent taps (" + stopwatchAfterVerticalDrag + ")");
         } finally {
@@ -363,16 +386,46 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private android.view.View findFocusModeSelector(Activity activity) throws Exception {
         android.view.View[] selector = new android.view.View[1];
-        runOnMainSync(() -> {
-            android.view.View root = activity.getWindow().getDecorView();
-            android.view.View currentStopwatch = findVisibleTextView(root, "Stopwatch");
-            android.view.View row = currentStopwatch == null
-                    || !(currentStopwatch.getParent() instanceof android.view.View)
-                    ? null : (android.view.View) currentStopwatch.getParent();
-            selector[0] = row == null ? null : findAncestorWithSimpleName(row, "ModeSelector");
-        });
-        check(selector[0] != null, "current visible Focus controls resolve to the real ModeSelector");
+        runOnMainSync(() -> selector[0] = findFocusModeSelectorInRoot(
+                activity.getWindow().getDecorView()));
+        check(selector[0] != null,
+                "current visible Stopwatch and Countdown resolve from one active ModeSelector");
         return selector[0];
+    }
+
+    private android.view.View findFocusModeSelectorInRoot(android.view.View root) {
+        if (root == null) return null;
+        if ("ModeSelector".equals(root.getClass().getSimpleName())) {
+            android.view.View stopwatch = findViewByText(root, "Stopwatch");
+            android.view.View countdown = findViewByText(root, "Countdown");
+            if (isReadyFocusModeButton(stopwatch) && isReadyFocusModeButton(countdown)
+                    && stopwatch.getParent() == countdown.getParent()
+                    && findAncestorWithSimpleName(stopwatch, "ModeSelector") == root
+                    && findAncestorWithSimpleName(countdown, "ModeSelector") == root) {
+                return root;
+            }
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = group.getChildCount() - 1; index >= 0; index--) {
+                android.view.View match = findFocusModeSelectorInRoot(group.getChildAt(index));
+                if (match != null) return match;
+            }
+        }
+        return null;
+    }
+
+    private boolean isReadyFocusModeButton(android.view.View view) {
+        return view != null && view.isShown() && view.isAttachedToWindow()
+                && view.isEnabled() && view.isClickable() && view.hasOnClickListeners();
+    }
+
+    private android.view.View findFocusModeButton(android.view.View selector, String label) {
+        android.view.View button = selector == null ? null : findViewByText(selector, label);
+        check(isReadyFocusModeButton(button)
+                        && findAncestorWithSimpleName(button, "ModeSelector") == selector,
+                "current " + label + " button belongs to the active ModeSelector");
+        return button;
     }
 
     private android.view.View findVisibleTextView(android.view.View root, String expected) {
@@ -448,14 +501,20 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             lastScrollY = currentScrollY[0];
             if (lastScrollY == previousScrollY) {
                 stableSamples++;
-                if (stableSamples >= 3) return;
+                // A ScrollView can reach a pixel-stable edge while its OverScroller
+                // is still finishing a fling/springback. Keep the window long enough
+                // that the next independent DOWN is not mistaken for that old drag.
+                if (stableSamples >= 8) {
+                    waitForIdleSync();
+                    return;
+                }
             } else {
                 stableSamples = 0;
             }
             previousScrollY = lastScrollY;
             android.os.SystemClock.sleep(50L);
         }
-        check(stableSamples >= 3,
+        check(stableSamples >= 8,
                 "parent Tasks ScrollView settles before child tap injection"
                         + " (lastScrollY=" + lastScrollY + ", stableSamples=" + stableSamples + ")");
     }
@@ -521,8 +580,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         String[] startText = new String[1];
         runOnMainSync(() -> {
             android.view.View root = activity.getWindow().getDecorView();
-            android.view.View currentStopwatch = findVisibleTextView(root, "Stopwatch");
-            android.view.View currentCountdown = findVisibleTextView(root, "Countdown");
+            android.view.View selector = findFocusModeSelectorInRoot(root);
+            android.view.View currentStopwatch = selector == null ? null : findViewByText(selector, "Stopwatch");
+            android.view.View currentCountdown = selector == null ? null : findViewByText(selector, "Countdown");
             selected[0] = currentStopwatch != null && currentStopwatch.isSelected();
             selected[1] = currentCountdown != null && currentCountdown.isSelected();
             android.view.View start = findViewByContentDescription(root, "Start focus timer");
@@ -544,11 +604,14 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
     private String dispatchTap(Activity activity, String label) throws Exception {
         android.view.View[] target = new android.view.View[1];
-        runOnMainSync(() -> target[0] = findVisibleTextView(
-                activity.getWindow().getDecorView(), label));
-        check(target[0] != null && target[0].isAttachedToWindow()
-                        && target[0].isEnabled() && target[0].isClickable(),
-                "current visible " + label + " mode button is attached, enabled and clickable");
+        runOnMainSync(() -> {
+            android.view.View selector = findFocusModeSelectorInRoot(
+                    activity.getWindow().getDecorView());
+            target[0] = selector == null ? null : findViewByText(selector, label);
+        });
+        check(isReadyFocusModeButton(target[0])
+                        && findAncestorWithSimpleName(target[0], "ModeSelector") != null,
+                "current visible " + label + " button belongs to an active ModeSelector");
         return dispatchTap(target[0]);
     }
 
