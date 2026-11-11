@@ -9,8 +9,8 @@
 </head>
 <body>
   <div id="browser">
-    <div id="tabs" role="toolbar" aria-label="Open tabs"></div>
-    <div id="toolbar" role="toolbar" aria-label="Browser navigation">
+    <div id="tabs" role="group" aria-label="Open tabs"></div>
+    <div id="toolbar" role="group" aria-label="Browser navigation">
       <button class="navbtn" id="btn-back" title="Back" aria-label="Back">&#8592;</button>
       <button class="navbtn" id="btn-fwd" title="Forward" aria-label="Forward">&#8594;</button>
       <button class="navbtn" id="btn-reload" title="Reload" aria-label="Reload page">&#10227;</button>
@@ -36,7 +36,7 @@
       </div>
     </div>
   </div>
-  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="app.js"></script>
 </body>
 </html>

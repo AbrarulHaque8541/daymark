@@ -34,14 +34,14 @@ test('desktop browser shell exposes accessible controls and compact styling', ()
   const markup = fs.readFileSync(path.join(rendererDir, 'index.html'), 'utf8');
   const styles = fs.readFileSync(path.join(rendererDir, 'style.css'), 'utf8');
 
-  assert.match(markup, /id="tabs" role="toolbar" aria-label="Open tabs"/);
-  assert.match(markup, /id="toolbar" role="toolbar" aria-label="Browser navigation"/);
+  assert.match(markup, /id="tabs" role="group" aria-label="Open tabs"/);
+  assert.match(markup, /id="toolbar" role="group" aria-label="Browser navigation"/);
   assert.match(markup, /id="urlbar"[^>]*aria-label="Search or enter address"/);
   for (const id of ['btn-back', 'btn-fwd', 'btn-reload', 'btn-home', 'btn-find', 'find-prev', 'find-next', 'find-close']) {
     assert.match(markup, new RegExp(`id="${id}"[^>]*aria-label="[^"]+"`));
   }
   assert.match(markup, /id="find-count" role="status" aria-live="polite"/);
-  assert.match(markup, /id="toast" role="status" aria-live="polite"/);
+  assert.match(markup, /id="toast" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(rendererSource, /class="tab-select" type="button"/);
   assert.match(rendererSource, /class="tab-close" type="button"/);
   assert.match(rendererSource, /newTabBtn\.setAttribute\('aria-label', 'New tab'\)/);

@@ -380,3 +380,98 @@ test('a throwing localStorage getter leaves every category unknown and destructi
   assert.equal(confirmations.length, 0, 'no destructive confirmation is offered without storage access');
   assert.equal(storageData['daymark.tasks.v1'], '[]', 'a throwing storage getter never clears data');
 });
+
+// --- Issue #740: the live storage card binds a dedicated destructive control ---
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+function fakePageEnv(options) {
+  const opts = options || {};
+  const pageElements = {
+    'storage-list': Object.assign(fakeElement('div'), { id: 'storage-list' }),
+    'storage-status-line': Object.assign(fakeElement('p'), { id: 'storage-status-line' }),
+    'storage-check': Object.assign(fakeElement('button'), { id: 'storage-check' }),
+    'storage-clear': Object.assign(fakeElement('button'), { id: 'storage-clear' }),
+    'storage-clear-all': Object.assign(fakeElement('button'), { id: 'storage-clear-all' })
+  };
+  const pageStorage = Object.assign({}, opts.data || {});
+  const pageConfirmations = [];
+  const pageEnv = {
+    document: {
+      readyState: 'complete',
+      getElementById(id) { return pageElements[id] || null; },
+      createElement(tag) { return fakeElement(tag); }
+    },
+    window: { addEventListener() {} },
+    localStorage: {
+      getItem(key) { return Object.prototype.hasOwnProperty.call(pageStorage, key) ? pageStorage[key] : null; },
+      setItem(key, value) { pageStorage[key] = String(value); },
+      removeItem(key) { delete pageStorage[key]; }
+    },
+    storageApi,
+    confirm(message) { pageConfirmations.push(String(message)); return true; }
+  };
+  return { env: pageEnv, elements: pageElements, storageData: pageStorage, confirmations: pageConfirmations };
+}
+
+test('the live storage card renders through the page ids and keeps Clear status read-only', () => {
+  const { env, elements, storageData, confirmations } = fakePageEnv({
+    data: { 'daymark.tasks.v1': '[]', 'daymark.weather.v1': '{}' }
+  });
+  const handle = ui.attachStorageUi(env);
+  assert.match(elements['storage-status-line'].textContent, /2 of .* categories hold data/);
+  assert.equal(elements['storage-clear-all'].disabled, false,
+    'the dedicated Clear all control is enabled when readable data exists');
+
+  const clearStatus = elements['storage-clear'].listeners.find((entry) => entry.type === 'click');
+  assert.ok(clearStatus, 'Clear status is wired');
+  clearStatus.handler();
+  assert.equal(confirmations.length, 0, 'Clear status never raises the destructive confirmation');
+  assert.equal(elements['storage-status-line'].textContent, '', 'Clear status empties only the status line');
+  assert.equal(storageData['daymark.tasks.v1'], '[]', 'Clear status never removes stored data');
+  assert.equal(storageData['daymark.weather.v1'], '{}', 'Clear status never removes stored data');
+
+  const clearAll = elements['storage-clear-all'].listeners.find((entry) => entry.type === 'click');
+  assert.ok(clearAll, 'Clear all local data is wired');
+  clearAll.handler();
+  assert.equal(confirmations.length, 1, 'Clear all still requires the explicit confirmation');
+  assert.equal(storageData['daymark.tasks.v1'], undefined, 'the dedicated control clears managed data');
+  assert.equal(storageData['daymark.weather.v1'], undefined, 'the dedicated control clears managed data');
+  assert.equal(typeof handle.onClearAll, 'function');
+});
+
+test('the storage card Check control rescans through the page ids without confirmation', () => {
+  const { env, elements, storageData, confirmations } = fakePageEnv({
+    data: { 'daymark.feed.v1': '{}' }
+  });
+  ui.attachStorageUi(env);
+  env.localStorage.setItem('daymark.weather.v1', '{}');
+  const check = elements['storage-check'].listeners.find((entry) => entry.type === 'click');
+  assert.ok(check, 'Check is wired as the rescan control');
+  check.handler();
+  assert.match(elements['storage-status-line'].textContent, /2 of .* categories hold data/);
+  assert.equal(confirmations.length, 0, 'a read-only scan never asks for confirmation');
+  assert.equal(storageData['daymark.feed.v1'], '{}');
+});
+
+test('markup and source pins: destructive label and handler agree, no Clear status fallback', () => {
+  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const formStart = indexSource.indexOf('id="storage-form"');
+  const formEnd = indexSource.indexOf('id="storage-status-line"');
+  assert.ok(formStart >= 0 && formEnd > formStart, 'the storage card form must exist');
+  const storageForm = indexSource.slice(formStart, formEnd);
+  assert.ok(storageForm.includes('id="storage-clear-all"'), 'the card has a dedicated Clear all control');
+  assert.ok(storageForm.includes('Clear all local data'), 'the destructive control is clearly labeled');
+  assert.ok(storageForm.includes('id="storage-clear"'), 'Clear status remains available');
+  assert.ok(storageForm.includes('>Clear status<'), 'Clear status keeps its non-destructive label');
+  assert.ok(storageForm.includes('id="storage-check"'), 'Check remains available');
+
+  const uiSource = fs.readFileSync(path.join(__dirname, '..', 'storage-ui.js'), 'utf8');
+  const resolutionStart = uiSource.indexOf('const clearAllEl');
+  const resolutionEnd = uiSource.indexOf('function status(');
+  assert.ok(resolutionStart >= 0 && resolutionEnd > resolutionStart, 'the destructive resolution must exist');
+  const resolution = uiSource.slice(resolutionStart, resolutionEnd);
+  assert.ok(resolution.includes("element('storage-clear-all')"), 'the destructive handler binds the dedicated control');
+  assert.ok(!resolution.includes("element('storage-clear')"), 'Clear status is never a destructive fallback');
+});

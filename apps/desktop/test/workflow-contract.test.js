@@ -63,6 +63,7 @@ test('download publication failures reach the renderer through a URL-free IPC co
   const preloadPath = path.join(__dirname, '..', 'preload.js');
   const mainPath = path.join(__dirname, '..', 'main.js');
   const rendererPath = path.join(__dirname, '..', 'renderer', 'app.js');
+  const rendererHtmlPath = path.join(__dirname, '..', 'renderer', 'index.html');
   const originalLoad = Module._load;
   const listeners = new Map();
   let exposedName = null;
@@ -97,7 +98,22 @@ test('download publication failures reach the renderer through a URL-free IPC co
   }
 
   assert.equal(exposedName, 'daymark');
+  assert.equal(typeof exposedApi.onDownloadProgress, 'function');
   assert.equal(typeof exposedApi.onDownloadFailed, 'function');
+  assert.equal(typeof exposedApi.onDownloadCompleted, 'function');
+  assert.equal(typeof exposedApi.onDownloadCancelled, 'function');
+  const progress = [];
+  const unsubscribeProgress = exposedApi.onDownloadProgress((filename, percent) => progress.push({ filename, percent }));
+  const progressListener = listeners.get('download-progress');
+  assert.equal(typeof progressListener, 'function');
+  progressListener({}, { filename: 'report-safe.txt', percent: 55 });
+  progressListener({}, { filename: 'report-safe.txt', percent: 101 });
+  progressListener({}, { filename: '', percent: 50 });
+  assert.deepEqual(progress, [{ filename: 'report-safe.txt', percent: 55 }]);
+  unsubscribeProgress();
+  assert.equal(listeners.has('download-progress'), false,
+    'the renderer can release its progress IPC listener');
+
   const received = [];
   const unsubscribe = exposedApi.onDownloadFailed((filename) => received.push(filename));
   const listener = listeners.get('download-failed');
@@ -108,9 +124,36 @@ test('download publication failures reach the renderer through a URL-free IPC co
   assert.equal(listeners.has('download-failed'), false,
     'the renderer can release its IPC listener');
 
+  const completed = [];
+  const unsubscribeCompleted = exposedApi.onDownloadCompleted((filename) => completed.push(filename));
+  const completedListener = listeners.get('download-completed');
+  assert.equal(typeof completedListener, 'function');
+  completedListener({}, 'report-safe.txt');
+  assert.deepEqual(completed, ['report-safe.txt']);
+  unsubscribeCompleted();
+  assert.equal(listeners.has('download-completed'), false,
+    'the renderer can release its completion IPC listener');
+
+  const cancelled = [];
+  const unsubscribeCancelled = exposedApi.onDownloadCancelled((filename) => cancelled.push(filename));
+  const cancelledListener = listeners.get('download-cancelled');
+  assert.equal(typeof cancelledListener, 'function');
+  cancelledListener({}, 'report-safe.txt');
+  assert.deepEqual(cancelled, ['report-safe.txt']);
+  unsubscribeCancelled();
+  assert.equal(listeners.has('download-cancelled'), false,
+    'the renderer can release its cancellation IPC listener');
+
   const main = fs.readFileSync(mainPath, 'utf8');
   const renderer = fs.readFileSync(rendererPath, 'utf8');
+  const rendererHtml = fs.readFileSync(rendererHtmlPath, 'utf8');
+  const progressHandlerStart = main.indexOf('onProgress: (filename, percent) => {');
   const failureHandlerStart = main.indexOf('onFailed: (filename) => {');
+  assert.ok(progressHandlerStart >= 0 && failureHandlerStart > progressHandlerStart);
+  const progressHandler = main.slice(progressHandlerStart, failureHandlerStart);
+  assert.ok(progressHandler.includes("webContents.send('download-progress', { filename, percent })"));
+  assert.ok(!/url/i.test(progressHandler),
+    'progress IPC must expose only the sanitized filename and bounded percentage');
   const cleanupHandlerStart = main.indexOf('onCleanupError:', failureHandlerStart);
   assert.ok(failureHandlerStart >= 0 && cleanupHandlerStart > failureHandlerStart);
   const failureHandler = main.slice(failureHandlerStart, cleanupHandlerStart);
@@ -118,9 +161,29 @@ test('download publication failures reach the renderer through a URL-free IPC co
     'main forwards only the sanitized basename on the dedicated failure channel');
   assert.ok(!/url/i.test(failureHandler),
     'failure IPC must not include a remote URL');
+  const completedHandlerStart = main.indexOf('onCompleted: (filename) => {');
+  const cancelledHandlerStart = main.indexOf('onCancelled: (filename) => {');
+  assert.ok(completedHandlerStart >= 0 && cancelledHandlerStart > completedHandlerStart);
+  const completedHandler = main.slice(completedHandlerStart, cancelledHandlerStart);
+  const cancelledHandler = main.slice(cancelledHandlerStart, main.indexOf('onCleanupError:', cancelledHandlerStart));
+  assert.ok(completedHandler.includes("webContents.send('download-completed', filename)"));
+  assert.ok(cancelledHandler.includes("webContents.send('download-cancelled', filename)"));
+  assert.ok(!/url/i.test(completedHandler) && !/url/i.test(cancelledHandler),
+    'completion and cancellation IPC must expose only the sanitized filename');
+  assert.ok(renderer.includes('window.daymark.onDownloadProgress((name, percent) => {')
+      && renderer.includes("toast('Downloading: ' + safeName + progress);"),
+    'renderer shows URL-free progress in the existing status toast');
+  assert.ok(rendererHtml.includes('id="toast" role="status" aria-live="polite" aria-atomic="true"'),
+    'download lifecycle updates are announced through an accessible polite status region');
   assert.ok(renderer.includes('window.daymark.onDownloadFailed((name) => {')
       && renderer.includes("toast('Could not safely save ' + safeName + '; no file was published.')"),
     'renderer gives the user a visible, URL-free failure status');
+  assert.ok(renderer.includes('window.daymark.onDownloadCompleted((name) => {')
+      && renderer.includes("toast('Saved to Downloads: ' + safeName);"),
+    'renderer confirms only a successfully published file');
+  assert.ok(renderer.includes('window.daymark.onDownloadCancelled((name) => {')
+      && renderer.includes("toast('Download cancelled: ' + safeName);"),
+    'renderer distinguishes user cancellation from a failed/interrupted download');
 });
 
 
