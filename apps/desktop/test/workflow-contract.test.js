@@ -132,10 +132,11 @@ test('Electron 45 sandbox and worker integration remains explicitly hardened', (
   const popupPolicy = fs.readFileSync(popupPolicyPath, 'utf8');
   const preload = fs.readFileSync(preloadPath, 'utf8');
 
-  assert.match(main, /nodeIntegrationInWorker:\\s*false/,
+  assert.ok(main.includes('nodeIntegrationInWorker: false'),
     'the trusted host renderer must not grant Node integration to workers');
-  assert.match(popupPolicy, /webPreferences\\.nodeIntegrationInWorker\\s*=\\s*false/,
+  assert.ok(popupPolicy.includes('webPreferences.nodeIntegrationInWorker = false'),
     'guest webviews must not inherit Node worker integration');
-  assert.doesNotMatch(preload, /require\\(['"](?:events|timers|url)['"]\\)|\\b(?:Buffer|setImmediate|clearImmediate)\\b/,
-    'sandboxed preload must not depend on globals/modules removed by Electron 45');
+  for (const forbidden of ["require('events')", "require('timers')", "require('url')", 'Buffer', 'setImmediate', 'clearImmediate']) {
+    assert.ok(!preload.includes(forbidden), 'sandboxed preload must not use Electron 45 removed dependency: ' + forbidden);
+  }
 });
