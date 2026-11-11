@@ -169,7 +169,7 @@
             <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
             <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
           </div>
-          <p class="briefing-description" id="browser-storage-disclosure">Task data in the web prototype is stored in this browser's localStorage; it is not encrypted by the prototype.</p>
+          <p class="briefing-description" id="browser-storage-disclosure">Task data, Focus sessions and history, recovery backups, saved preferences (including the remembered Telegram chat destination), caches, and queued webhook events in the web prototype are stored in this browser's localStorage and are not encrypted by the prototype. The Telegram bot token and current webhook endpoint are session-only; a legacy secret-bearing webhook value is never read or displayed.</p>
           <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
             <div class="task-list-skeleton" aria-hidden="true">
               <div class="skeleton-row"></div>
