@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-11T11:05:00Z (main 0e268420; 4 open PRs / 21 open issues; main CI green; download/Clear All blockers)](./CURRENT_STATUS_20261111T110500Z.md)
 - [Daymark engineering status — 2026-11-11T05:01:52.466Z (branch feat/air-quality-card-v2-vibe-20261111; keyless air-quality glance card, self-injected markup, pending CI)](./CURRENT_STATUS_20261111T050400Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./CURRENT_STATUS_20261111T013656Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
@@ -89,7 +90,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261111T013656Z.md](CURRENT_STATUS_20261111T013656Z.md) — current main `5148232a7165f840fa895707890b829bcdc1657b`; 13 open PRs / 24 open issues; storage-health and task-instant branches synchronized; snapshot UTC 2026-11-11T01:36:56.051Z.
+- [CURRENT_STATUS_20261111T110500Z.md](CURRENT_STATUS_20261111T110500Z.md) — current main `0e268420b45c23732ff57f18f7307a0df5084a3a`; 4 open PRs / 21 open issues; main Android/contracts CI green; download, Clear All, import and governance blockers; snapshot UTC 2026-11-11T11:05:00Z.
+- Previous reviewed snapshot: [CURRENT_STATUS_20261111T013656Z.md](CURRENT_STATUS_20261111T013656Z.md) — historical main `5148232a7165f840fa895707890b829bcdc1657b`; 13 open PRs / 24 open issues; snapshot UTC 2026-11-11T01:36:56.051Z.
 - Previous snapshot: [CURRENT_STATUS_20261110T225419Z.md](CURRENT_STATUS_20261110T225419Z.md) — historical PR #724 baseline at main `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`.
 - [Daymark engineering status — 20261110T164211Z (offline app-link and intent handoff planner card)](./CURRENT_STATUS_20261110T164211Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
