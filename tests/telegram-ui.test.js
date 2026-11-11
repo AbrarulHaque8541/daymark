@@ -53,9 +53,12 @@ function makeStorage(seed) {
   const data = new Map();
   for (const key of Object.keys(seed || {})) data.set(key, seed[key]);
   let reads = 0;
+  const readKeys = [];
   return {
     readCount() { return reads; },
-    getItem(key) { reads += 1; return data.has(key) ? data.get(key) : null; }
+    readKeys() { return readKeys.slice(); },
+    getItem(key) { reads += 1; readKeys.push(key); return data.has(key) ? data.get(key) : null; },
+    setItem(key, value) { data.set(key, String(value)); }
   };
 }
 function makeFetch(handler) {
@@ -109,7 +112,7 @@ test('a missing engine degrades honestly instead of guessing', async () => {
   await handle.send();
   assert.equal(doc.elements['telegram-status'].textContent, 'Telegram digest is unavailable.');
 });
-test('an invalid token reports honestly, reads no storage, sends nothing', async () => {
+test('an invalid token reports honestly, does not read task storage, sends nothing', async () => {
   const doc = makeDoc(ALL_IDS);
   const storage = makeStorage({});
   const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true }) }));
@@ -118,7 +121,8 @@ test('an invalid token reports honestly, reads no storage, sends nothing', async
   doc.elements['telegram-chat'].value = '123456789';
   await handle.send();
   assert.match(doc.elements['telegram-status'].textContent, /bot token from @BotFather first/);
-  assert.equal(storage.readCount(), 0, 'storage is only read after inputs validate');
+  assert.deepEqual(storage.readKeys(), ['daymark.telegram.lastChat.v1'], 'only the non-secret chat preference may be restored at attach');
+  assert.equal(storage.readKeys().includes('daymark.tasks.v1'), false, 'invalid input must never read task data');
   assert.equal(fetchFn.calls.length, 0);
 });
 test('an invalid chat target reports honestly and sends nothing', async () => {
@@ -300,10 +304,15 @@ test('pagehide and pageshow clear the token so navigation and bfcache cannot ret
   view.dispatch('pagehide');
   assert.equal(doc.elements['telegram-token'].value, VALID_TOKEN, 'detached handlers no longer run');
 });
-test('boot never reads storage', () => {
-  const storage = makeStorage({ 'daymark.tasks.v1': '[]' });
-  ui.attachTelegramUi(okEnv(makeDoc(ALL_IDS), { storage: storage }));
-  assert.equal(storage.readCount(), 0, 'attaching the card must not read storage');
+test('boot restores only the non-secret chat preference and never reads task data', () => {
+  const storage = makeStorage({
+    'daymark.tasks.v1': '[]',
+    'daymark.telegram.lastChat.v1': '987654321'
+  });
+  const doc = makeDoc(ALL_IDS);
+  ui.attachTelegramUi(okEnv(doc, { storage: storage }));
+  assert.equal(doc.elements['telegram-chat'].value, '987654321');
+  assert.deepEqual(storage.readKeys(), ['daymark.telegram.lastChat.v1']);
 });
 test('a throwing or malformed task validator fails closed without exposing its error', async () => {
   for (const validator of [
@@ -403,12 +412,11 @@ test('an invalid or missing stored chat target is ignored', () => {
 
 test('successful send persists the chat target for next session', async () => {
   const doc = makeDoc(ALL_IDS);
-  const storage = makeStorage({});
-  storage.setItem = (key, value) => { storage._data = storage._data || {}; storage._data[key] = value; };
-  storage.getItem = (key) => (storage._data && storage._data[key]) || null;
+  const storage = makeStorage({
+    'daymark.tasks.v1': JSON.stringify([makeTask('ship it', { completed: true })])
+  });
   const fetchFn = makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 11 } }) }));
-  const seed = { 'daymark.tasks.v1': JSON.stringify([makeTask('ship it', { completed: true })]) };
-  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, seed: seed, fetch: fetchFn }));
+  const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
   fillValidInputs(doc);
   doc.elements['telegram-chat'].value = '@daymarkchannel';
   await handle.send();
@@ -435,4 +443,6 @@ test('Clear empties only the token; chat target preference remains', () => {
   handle.clear();
   assert.equal(doc.elements['telegram-token'].value, '');
   assert.equal(doc.elements['telegram-chat'].value, '123456789');
+  assert.match(doc.elements['telegram-status'].textContent, /chat target remains available/);
+  assert.doesNotMatch(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
 });
