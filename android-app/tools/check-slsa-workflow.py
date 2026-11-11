@@ -109,10 +109,17 @@ check(FINAL_APK_CHECK in signed_publish
       and signed_publish.index(FINAL_APK_CHECK) > signed_publish.index("api_verified=true"),
       "the final release APK must be checked after bundle and hosted-attestation verification")
 final_apk_check = signed_publish.split(FINAL_APK_CHECK, 1)[1]
+release_download_curl_lines = [
+    line for line in SIGNED_RELEASE_WORKFLOW.splitlines() if "curl " in line
+]
+check(len(release_download_curl_lines) == 2
+      and all("--proto '=https' --proto-redir '=https' --tlsv1.2" in line
+              for line in release_download_curl_lines),
+      "both public release APK downloads must restrict initial and redirected protocols to HTTPS")
 check('gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG"' in final_apk_check
       and '"$asset_size" == "$EXPECTED_SIZE"' in final_apk_check
       and '"$asset_url" == "$expected_asset_url"' in final_apk_check
-      and "curl --fail --location --retry 3" in final_apk_check
+      and "curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 3" in final_apk_check
       and '"$downloaded_size" == "$EXPECTED_SIZE"' in final_apk_check
       and 'sha256sum "$final_apk"' in final_apk_check
       and '"$downloaded_sha256" == "$EXPECTED_SHA256"' in final_apk_check
