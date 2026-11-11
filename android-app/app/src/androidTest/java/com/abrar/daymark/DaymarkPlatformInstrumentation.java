@@ -501,14 +501,20 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             lastScrollY = currentScrollY[0];
             if (lastScrollY == previousScrollY) {
                 stableSamples++;
-                if (stableSamples >= 3) return;
+                // A ScrollView can reach a pixel-stable edge while its OverScroller
+                // is still finishing a fling/springback. Keep the window long enough
+                // that the next independent DOWN is not mistaken for that old drag.
+                if (stableSamples >= 8) {
+                    waitForIdleSync();
+                    return;
+                }
             } else {
                 stableSamples = 0;
             }
             previousScrollY = lastScrollY;
             android.os.SystemClock.sleep(50L);
         }
-        check(stableSamples >= 3,
+        check(stableSamples >= 8,
                 "parent Tasks ScrollView settles before child tap injection"
                         + " (lastScrollY=" + lastScrollY + ", stableSamples=" + stableSamples + ")");
     }
