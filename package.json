@@ -1,13 +1,1 @@
-{
-  "name": "daymark-web-prototype",
-  "version": "1.3.0",
-  "private": true,
-  "description": "Daymark — personal task manager with encrypted on-device storage, reference web prototype.",
-  "scripts": {
-    "pretest": "node scripts/ensure-test-dependencies.js",
-    "test": "node --test --test-concurrency=1"
-  },
-  "devDependencies": {
-    "acorn": "8.19.0"
-  }
-}
+PLACEHOLDER_PKG
