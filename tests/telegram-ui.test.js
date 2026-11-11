@@ -274,13 +274,16 @@ test('the Test button sends only the fixed test message', async () => {
   assert.equal(payload.text, engine.TEST_MESSAGE);
   assert.equal(doc.elements['telegram-status'].textContent, 'Test message sent to Telegram.');
 });
-test('Clear empties the token field and says nothing was saved', () => {
+test('Clear empties the token field and accurately retains the chat target', () => {
   const doc = makeDoc(ALL_IDS);
   const handle = ui.attachTelegramUi(okEnv(doc, {}));
   doc.elements['telegram-token'].value = VALID_TOKEN;
+  doc.elements['telegram-chat'].value = '123456789';
   handle.clear();
   assert.equal(doc.elements['telegram-token'].value, '');
-  assert.match(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
+  assert.equal(doc.elements['telegram-chat'].value, '123456789');
+  assert.match(doc.elements['telegram-status'].textContent, /chat target remains available/);
+  assert.doesNotMatch(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
 });
 test('pagehide and pageshow clear the token so navigation and bfcache cannot retain it', () => {
   const doc = makeDoc(ALL_IDS);
