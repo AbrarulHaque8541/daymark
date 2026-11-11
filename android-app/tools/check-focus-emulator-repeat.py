@@ -56,7 +56,7 @@ assert "DaymarkPlatformInstrumentation" in helper
 assert "parse_platform_instrumentation_component" in test_runner
 assert "run_bounded_diagnostic" in runner
 assert "timeout --signal=TERM --kill-after=2s 8s" in runner, "failure diagnostics must be bounded"
-assert "adb logcat -d -t 1200 '*:W'" in runner, "capture framework warnings/errors, not only the app tag"
+assert "adb logcat -d -t 1200 '*:W' 'DaymarkInstr:I'" in runner, "capture framework warnings/errors and app phase markers"
 assert "pm list instrumentation" in runner
 assert "dumpsys package com.abrar.daymark.test" in runner
 assert "dumpsys activity" in runner
