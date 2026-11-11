@@ -7,9 +7,15 @@ const path = require('node:path');
 
 const desktopWorkspace = path.resolve(process.cwd()) === path.resolve(__dirname, '..');
 
-test('the installed Electron binary starts and reports the exact supported stable version', {
-  skip: !desktopWorkspace && 'Electron binary smoke runs in apps/desktop CI after its npm ci',
-}, () => {
+test('the installed Electron binary starts and reports the exact supported stable version', () => {
+  // The repository-wide suite does not install apps/desktop dependencies. The
+  // same named test executes the real binary in desktop CI after its own npm ci.
+  if (!desktopWorkspace) {
+    assert.notEqual(path.resolve(process.cwd()), path.resolve(__dirname, '..'),
+      'the root suite must not pretend it has installed the desktop runtime');
+    return;
+  }
+
   const electronBinary = require('electron');
   assert.equal(typeof electronBinary, 'string', 'Node must resolve the installed Electron executable path');
   assert.ok(path.isAbsolute(electronBinary), 'Electron executable path must be absolute');
