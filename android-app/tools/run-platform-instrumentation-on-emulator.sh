@@ -49,7 +49,7 @@ report_failure() {
   # process-start failure, not an in-test hang. Include framework crash and
   # activity-manager tags so that pre-onCreate failures are diagnosable.
   run_bounded_diagnostic "Android warning/error logcat" \
-    adb logcat -d -t 1200 '*:W'
+    adb logcat -d -t 1200 '*:W' 'DaymarkInstr:I'
   run_bounded_diagnostic "Registered Daymark instrumentation" \
     sh -c 'adb shell pm list instrumentation | grep -F "com.abrar.daymark"'
   run_bounded_diagnostic "Installed Daymark test package" \
