@@ -1,3 +1,4 @@
+- [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./20261111T013656Z.md)
 # Daymark Agent Status Index
 
 ## Latest reviewed snapshot

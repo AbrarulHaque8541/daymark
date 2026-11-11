@@ -1,3 +1,29 @@
+## Current execution queue — 2026-11-11T01:36:56.051Z (main 5148232a)
+
+This queue supersedes older execution queues below; historical planning is retained. PRs are delivery mechanisms, not completion boundaries.
+
+### P0 — user-data integrity, security and runtime
+1. Cross-tab task mutation/generation fencing; stale tabs must not restore deleted tasks or overwrite another tab's committed mutation (#683, #675).
+2. Focus API 29/36 touch/lifecycle reliability; retain real touch and vertical-scroll assertions and complete the ten-run API 36 gate (#613, #727, #648).
+3. DNS-pinned, hostname-verified, redirect-validating download transport and atomic MediaStore/SAF publication; remain fail-closed until complete (#671, #708).
+4. Ordered Clear All/task/Focus/webhook synchronization and generation rollback (#689, #690, #675).
+5. Main required checks and independent review protection (#646); main is currently unprotected and rulesets are empty.
+6. Physical Android/System WebView acceptance with device/API/provider/build SHA (#160).
+
+### P1 — storage, cross-platform contracts and security
+7. Storage-health unreadable-state review and exact inventory of all non-secret keys, including Telegram destination (#603, #725).
+8. 58-case expanded-year Java Instant-compatible timestamp contract and exact-head checks (#707, #722).
+9. RFC 5545/import/export and malformed/duplicate data preservation (#656).
+10. Intent URI parity and actual WebView main-frame/user-gesture acceptance (#712, #715, #723, #726).
+11. Extension SPA scope reevaluation and metadata privacy on real System WebView (#680, #702, #676).
+12. Production-signing environment approvals and action-runtime/provenance review (#705, #84).
+13. Telegram CORS/live delivery acceptance (#700); repeat-task completion/scheduling parity (#684, #476).
+
+### P2 — maintainability and platform qualification
+14. Reproducible Electron installation and committed lockfile (#696).
+15. Measured desktop/browser architecture qualification (#325, #348).
+
+---
 
 
 ## Current execution queue — 2026-11-10T22:54:19.523Z (main 39b1047a)
