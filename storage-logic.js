@@ -29,6 +29,12 @@
       keys: ['daymark.focus.v1']
     },
     {
+      id: 'focus-preset',
+      label: 'Focus timer preset',
+      description: 'The preset selected for a new Focus session. The active session and completed-session history are stored separately.',
+      keys: ['daymark.focus.preset.v1']
+    },
+    {
       id: 'focus-backup',
       label: 'Focus recovery backup',
       description: 'A safety copy kept on this device when Focus data could not be read.',
@@ -41,10 +47,28 @@
       keys: ['daymark.feed.v1']
     },
     {
+      id: 'wiki',
+      label: 'Wikipedia cache',
+      description: 'The last successful Wikipedia results, cached here so they stay readable offline.',
+      keys: ['daymark.wiki.v1']
+    },
+    {
+      id: 'wiki-preferences',
+      label: 'Wikipedia search preference',
+      description: 'The last search term remembered for the next Wikipedia visit.',
+      keys: ['daymark.wiki.prefs.v1']
+    },
+    {
       id: 'weather',
       label: 'Weather cache',
       description: 'The last weather result for the place you last checked.',
       keys: ['daymark.weather.v1']
+    },
+    {
+      id: 'weather-preferences',
+      label: 'Weather place preference',
+      description: 'The last place name entered for the weather card.',
+      keys: ['daymark.weather.prefs.v1']
     },
     {
       id: 'holidays',
@@ -53,10 +77,22 @@
       keys: ['daymark.holidays.v1']
     },
     {
+      id: 'holiday-preferences',
+      label: 'Holiday country preference',
+      description: 'The last country selected for the public-holidays card.',
+      keys: ['daymark.holidays.prefs.v1']
+    },
+    {
       id: 'currency',
       label: 'Currency cache',
       description: 'The last exchange-rate pair you looked up.',
       keys: ['daymark.currency.v1']
+    },
+    {
+      id: 'currency-preferences',
+      label: 'Currency preferences',
+      description: 'The last amount and currency pair selected for conversion.',
+      keys: ['daymark.currency.prefs.v1']
     },
     {
       id: 'zones',
@@ -65,16 +101,40 @@
       keys: ['daymark.zones.v1']
     },
     {
-      id: 'webhook',
-      label: 'Webhook settings',
-      description: 'The https:// endpoint you saved for task-completion events.',
-      keys: ['daymark.webhook.v1']
+      id: 'browser-proxy',
+      label: 'Saved browser proxy profile',
+      description: 'The last proxy address entered in the offline planner. Saving this plan does not route browser traffic.',
+      keys: ['daymark.browser-proxy.last-profile']
+    },
+    {
+      id: 'browser-address',
+      label: 'Browser search provider preference',
+      description: 'The search provider selected for the browser address bar.',
+      keys: ['daymark.browser-address.prefs.v1']
+    },
+    {
+      id: 'browser-download',
+      label: 'Browser download journey preference',
+      description: 'The last offline download scenario selected in the safety planner; no downloaded files or URLs are stored here.',
+      keys: ['daymark.browser-download.last-scenario']
     },
     {
       id: 'webhook-queue',
       label: 'Queued webhook events',
       description: 'Completed-task events waiting on this device for an explicit retry.',
       keys: ['daymark.webhook.queue.v1']
+    },
+    {
+      id: 'telegram-preference',
+      label: 'Telegram chat preference',
+      description: 'The last chat destination remembered for your Telegram digest. The bot token is session-only and is never stored.',
+      keys: ['daymark.telegram.lastChat.v1']
+    },
+    {
+      id: 'webhook-lock',
+      label: 'Legacy webhook coordination lock',
+      description: 'A short-lived localStorage marker from older webhook versions. Newer versions use browser Web Locks; any leftover marker is safe to clear.',
+      keys: ['daymark.webhook.lock.v1']
     }
   ];
 
@@ -89,8 +149,6 @@
     return CATEGORIES.find((category) => category.id === id) || null;
   }
 
-  // Every daymark.* storage key must belong to exactly one category, so the card
-  // can honestly claim it covers everything the prototype stores.
   function isManagedKey(key) {
     return ALL_KEY_SET.has(key);
   }
@@ -123,12 +181,14 @@
     const categories = CATEGORIES.map((category) => {
       let bytes = 0;
       let present = false;
+      const unreadableKeys = [];
       for (const key of category.keys) {
         let raw = null;
         try {
           raw = storage.getItem(key);
         } catch (error) {
-          raw = null;
+          unreadableKeys.push(key);
+          continue;
         }
         if (raw !== null && raw !== undefined) {
           present = true;
@@ -141,44 +201,94 @@
         description: category.description,
         keys: category.keys.slice(),
         bytes,
-        present
+        present,
+        unreadableKeys,
+        complete: unreadableKeys.length === 0
       };
     });
     const presentCount = categories.filter((category) => category.present).length;
+    const unreadableCategories = categories.filter((category) => category.unreadableKeys.length > 0);
+    const unreadableKeys = unreadableCategories.reduce(
+      (all, category) => all.concat(category.unreadableKeys), []
+    );
     return {
       categories,
       presentCount,
+      unreadableCount: unreadableCategories.length,
+      unreadableKeys,
+      complete: unreadableCategories.length === 0,
       totalBytes: categories.reduce((sum, category) => sum + category.bytes, 0)
     };
   }
 
-  // clearCategory removes exactly the keys the category declares and reports
-  // per-key outcomes honestly. A key that fails to be removed is never reported
-  // as cleared.
   function clearCategory(storage, categoryId) {
     requireUsableStorage(storage);
     const keys = planClear(categoryId);
-    const removed = [];
+    const existing = [];
     const failed = [];
+    const unreadable = [];
     for (const key of keys) {
       try {
-        const existed = storage.getItem(key) !== null;
+        if (storage.getItem(key) !== null) existing.push(key);
+      } catch (error) {
+        failed.push(key);
+        unreadable.push(key);
+      }
+    }
+    if (failed.length > 0) return { id: categoryId, removed: [], failed, unreadable };
+    const removed = [];
+    for (const key of existing) {
+      try {
         storage.removeItem(key);
-        if (existed) removed.push(key);
+        removed.push(key);
       } catch (error) {
         failed.push(key);
       }
     }
-    return { id: categoryId, removed, failed };
+    return { id: categoryId, removed, failed, unreadable };
   }
 
   function clearAll(storage) {
     requireUsableStorage(storage);
-    const results = CATEGORIES.map((category) => clearCategory(storage, category.id));
+    const existing = new Set();
+    const unreadable = new Set();
+    for (const category of CATEGORIES) {
+      for (const key of category.keys) {
+        try {
+          if (storage.getItem(key) !== null) existing.add(key);
+        } catch (error) {
+          unreadable.add(key);
+        }
+      }
+    }
+    if (unreadable.size > 0) {
+      const failedKeys = Array.from(unreadable);
+      const results = CATEGORIES.map((category) => ({
+        id: category.id,
+        removed: [],
+        failed: category.keys.filter((key) => unreadable.has(key))
+      }));
+      return { results, removedKeys: [], failedKeys, unreadableKeys: failedKeys };
+    }
+    const results = CATEGORIES.map((category) => {
+      const removed = [];
+      const failed = [];
+      for (const key of category.keys) {
+        if (!existing.has(key)) continue;
+        try {
+          storage.removeItem(key);
+          removed.push(key);
+        } catch (error) {
+          failed.push(key);
+        }
+      }
+      return { id: category.id, removed, failed };
+    });
     return {
       results,
       removedKeys: results.reduce((all, result) => all.concat(result.removed), []),
-      failedKeys: results.reduce((all, result) => all.concat(result.failed), [])
+      failedKeys: results.reduce((all, result) => all.concat(result.failed), []),
+      unreadableKeys: []
     };
   }
 
