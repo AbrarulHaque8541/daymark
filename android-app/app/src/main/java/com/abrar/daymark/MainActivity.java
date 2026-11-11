@@ -2170,7 +2170,12 @@ public final class MainActivity extends Activity {
         // page load showed one status line and then silence until the watchdog hint, which
         // read as a frozen browser on slow networks. The strip mirrors WebView.getProgress().
         browserLoadProgressBar = new View(this);
-        browserLoadProgressBar.setBackgroundColor(palette.accent);
+        GradientDrawable progressDrawable = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{palette.accent, Color.argb(180, Color.red(palette.accent), Color.green(palette.accent), Color.blue(palette.accent))});
+        progressDrawable.setCornerRadius(dp(1.5f));
+        browserLoadProgressBar.setBackground(progressDrawable);
+        browserLoadProgressBar.setElevation(dp(2));
         browserLoadProgressBar.setVisibility(View.GONE);
         browserViewport.addView(browserLoadProgressBar, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(3), Gravity.TOP));
@@ -2819,7 +2824,8 @@ public final class MainActivity extends Activity {
         browserLoadProgressBar.setScaleX(0.05f);
         browserLoadProgressBar.setPivotX(0f);
         browserLoadProgressBar.bringToFront();
-        browserLoadProgressBar.setVisibility(View.VISIBLE);
+        browserLoadProgressBar.setAlpha(1f);
+browserLoadProgressBar.setVisibility(View.VISIBLE);
         browserLoadProgressRunnable = new Runnable() {
             @Override public void run() {
                 if (browserWebView == null || browserLoadProgressBar == null || !browserPageLoading) {
@@ -2843,7 +2849,15 @@ public final class MainActivity extends Activity {
             mainHandler.removeCallbacks(browserLoadProgressRunnable);
             browserLoadProgressRunnable = null;
         }
-        if (browserLoadProgressBar != null) browserLoadProgressBar.setVisibility(View.GONE);
+        if (browserLoadProgressBar != null) {
+            browserLoadProgressBar.animate().alpha(0f).setDuration(180L).withEndAction(() -> {
+                if (browserLoadProgressBar != null) {
+                    browserLoadProgressBar.setVisibility(View.GONE);
+                    browserLoadProgressBar.setAlpha(1f);
+                    browserLoadProgressBar.setScaleX(0.05f);
+                }
+            }).start();
+        }
     }
 
     private void setBrowserChromeHidden(boolean hidden) {
