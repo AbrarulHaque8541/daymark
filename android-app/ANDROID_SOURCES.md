@@ -183,7 +183,7 @@ The rules now exclude `path="."` in all nine documented domains for cloud backup
 
 ## Official-source refresh (2026-10-26)
 
-Checked against live `main` at `cac2d7524491a3fce488e57b5cf810dc7b5c5017`. This review found no reason to add a runtime dependency, model, downloader, shell/Termux bridge, native-code loader, or new permission. The app remains local-first; deterministic suggestions are not AI; no cloud fallback is implemented.
+Checked against live `main` at `cac2d7524491a3fce488e57b5cf810dc7b5c5017`. This review found no reason to add a runtime dependency, model, downloader, shell/Termux bridge, native-code loader, or new permission. Task data stays on the device; deterministic suggestions are not AI; network-backed features call their providers directly and no cloud task sync is implemented.
 
 ### Android, Jetpack, and future code delivery
 
