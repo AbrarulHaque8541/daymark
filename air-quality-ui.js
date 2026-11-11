@@ -146,10 +146,44 @@
       const place = record.place;
       const air = record.air;
       const placeLine = place.country ? place.name + ', ' + place.country : place.name;
-      resultEl.textContent = placeLine
+
+      // Clear previous structured content.
+      if (resultEl.replaceChildren) resultEl.replaceChildren();
+      else while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+
+      const placeEl = doc.createElement('div');
+      placeEl.className = 'air-place';
+      placeEl.textContent = placeLine;
+      resultEl.appendChild(placeEl);
+
+      function bandClass(band) {
+        if (!band || band === 'Unknown') return '';
+        return 'band-' + String(band).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      }
+
+      function addMetric(label, valueText, band) {
+        const row = doc.createElement('div');
+        row.className = 'air-metric';
+        const lab = doc.createElement('span');
+        lab.className = 'air-label';
+        lab.textContent = label;
+        const val = doc.createElement('span');
+        val.className = 'air-value' + (band ? ' ' + bandClass(band) : '');
+        val.textContent = valueText + (band ? ' (' + band + ')' : '');
+        row.appendChild(lab);
+        row.appendChild(val);
+        resultEl.appendChild(row);
+      }
+
+      addMetric('European AQI', String(air.europeanAqi), air.europeanBand);
+      addMetric('US AQI', String(air.usAqi), air.usBand);
+      addMetric('PM2.5', String(air.pm25) + ' µg/m³', '');
+
+      // Plain-text fallback for tests and simple consumers.
+      resultEl.setAttribute('data-summary', placeLine
         + ' · European AQI ' + air.europeanAqi + ' (' + air.europeanBand + ')'
         + ' · US AQI ' + air.usAqi + ' (' + air.usBand + ')'
-        + ' · PM2.5 ' + air.pm25 + ' µg/m³';
+        + ' · PM2.5 ' + air.pm25 + ' µg/m³');
     }
 
     async function onCheck() {
@@ -168,6 +202,7 @@
         return;
       }
       setBusy(true);
+      status('Checking air quality…');
       try {
         const record = await airApi.fetchAirQualityByPlace(typed, fetchImpl, { now: now });
         render(record);
