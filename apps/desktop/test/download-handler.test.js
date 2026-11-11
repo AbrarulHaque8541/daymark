@@ -388,4 +388,4 @@ test('staging allocation failure cancels and releases the final-name reservation
   assert.deepEqual(staging.calls.cancelled, []);
   assert.deepEqual(staging.calls.order, ['failed']);
   assert.equal(reservedPaths.size, 0);
-}
+});
