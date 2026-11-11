@@ -186,10 +186,10 @@
       if (busy) return;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) resultEl.textContent = '';
-      status('Cleared. Type a place name and tap Check. Place is sent only after Check.');
+      status('Cleared. Type a place name and tap Check.');
     }
 
-    status('Type a place name and tap Check. Place is sent to Open-Meteo only after Check.');
+    status('Type a place name and tap Check.');
 
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
