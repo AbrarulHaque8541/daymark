@@ -185,8 +185,11 @@ test('a concurrent submit cannot duplicate the request', async () => {
   const handle = ui.attachAirQualityUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Delhi';
-  await handle.onCheck();
-  await handle.onCheck();
+  // Fire both checks without awaiting the first one: only a genuinely
+  // concurrent second call proves the busy guard rejects it in flight.
+  const first = handle.onCheck();
+  const second = handle.onCheck();
+  await Promise.all([first, second]);
   assert.equal(fetchImpl.seen.length, 2, 'the busy guard must prevent a duplicate check');
   assert.equal(els.button.disabled, false);
 });
