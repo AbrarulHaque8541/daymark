@@ -17,7 +17,7 @@ test('workflow lint uses a version-pinned actionlint release and verified Linux 
   assert.match(script, /ACTIONLINT_VERSION='1\.7\.12'/);
   assert.match(script, /ACTIONLINT_ARCHIVE="actionlint_\$\{ACTIONLINT_VERSION\}_linux_amd64\.tar\.gz"/);
   assert.match(script, /ACTIONLINT_SHA256='8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'/);
-  assert.match(script, /curl --proto '=https' --tlsv1\.2/);
+  assert.match(script, /curl --proto '=https' --proto-redir '=https' --tlsv1\.2/);
   assert.match(script, /sha256sum --check --status/);
   assert.ok(script.indexOf('sha256sum --check --status') < script.indexOf('tar -xzf'),
     'the archive digest must be checked before extraction');
