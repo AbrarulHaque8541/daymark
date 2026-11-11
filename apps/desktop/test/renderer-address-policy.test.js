@@ -7,27 +7,42 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const rendererSource = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+const activeTabStart = rendererSource.indexOf('function activeTab() {');
+const activeTabEnd = rendererSource.indexOf('\n\nfunction isActive(', activeTabStart);
 const closeTabStart = rendererSource.indexOf('function closeTab(id) {');
 const closeTabEnd = rendererSource.indexOf('\n\nfunction navigate(', closeTabStart);
+assert.notEqual(activeTabStart, -1, 'renderer activeTab helper should exist');
+assert.notEqual(activeTabEnd, -1, 'renderer activeTab helper should end before isActive');
 assert.notEqual(closeTabStart, -1, 'renderer tab close handler should exist');
 assert.notEqual(closeTabEnd, -1, 'renderer tab close handler should end before navigate');
+const activeTabSource = rendererSource.slice(activeTabStart, activeTabEnd);
 const closeTabSource = rendererSource.slice(closeTabStart, closeTabEnd);
+
+const closeClickStart = rendererSource.indexOf("el.querySelector('.tab-close').addEventListener('click', (e) => {");
+const closeClickEndMarker = '\n  });';
+const closeClickEnd = rendererSource.indexOf(closeClickEndMarker, closeClickStart);
+assert.notEqual(closeClickStart, -1, 'renderer tab close button handler should exist');
+assert.notEqual(closeClickEnd, -1, 'renderer tab close button handler should end');
+const closeClickSource = rendererSource.slice(closeClickStart, closeClickEnd + closeClickEndMarker.length);
+
+const keydownStart = rendererSource.indexOf("window.addEventListener('keydown', (e) => {");
+const keydownEnd = rendererSource.indexOf('\n\n// new tab button', keydownStart);
+assert.notEqual(keydownStart, -1, 'renderer keyboard handler should exist');
+assert.notEqual(keydownEnd, -1, 'renderer keyboard handler should end before new-tab button setup');
+const keydownSource = rendererSource.slice(keydownStart, keydownEnd);
 
 function makeCloseTabHarness(tabIds, activeId, replacementId) {
   const tabs = tabIds.map((id) => ({ id, view: { remove() {} } }));
   const tabElements = new Map();
   const selects = new Map();
-  let focusedId = null;
-  const addTabElement = (id) => {
-    const key = String(id);
-    tabElements.set(key, { remove: () => tabElements.delete(key) });
-    selects.set(key, { focus: () => { focusedId = id; } });
-  };
-  tabIds.forEach(addTabElement);
+  const closeButtons = new Map();
+  const body = {};
   const context = {
     tabs,
     activeTabId: activeId,
     document: {
+      body,
+      activeElement: body,
       querySelector(selector) {
         const match = selector.match(/data-tab-id="([^"]+)"/);
         if (!match) return null;
@@ -37,18 +52,81 @@ function makeCloseTabHarness(tabIds, activeId, replacementId) {
           : tabElements.get(key) || null;
       },
     },
-    activateTab(id) { context.activeTabId = id; },
-    createTab() {
-      tabs.push({ id: replacementId, view: { remove() {} } });
-      addTabElement(replacementId);
-      context.activeTabId = replacementId;
+    window: {
+      addEventListener(type, handler) {
+        assert.equal(type, 'keydown');
+        context.keydownHandler = handler;
+      },
     },
+    activateTab(id) { context.activeTabId = id; },
   };
-  const closeTab = vm.runInNewContext(`${closeTabSource}; closeTab;`, context);
+  const vmContext = vm.createContext(context);
+
+  const addTabElement = (id) => {
+    const key = String(id);
+    const select = { focus: () => { context.document.activeElement = select; } };
+    const closeButton = {
+      listeners: new Map(),
+      addEventListener(type, handler) { this.listeners.set(type, handler); },
+      dispatchClick(event) { this.listeners.get('click')(event); },
+    };
+    const element = {
+      querySelector(selector) {
+        if (selector === '.tab-select') return select;
+        if (selector === '.tab-close') return closeButton;
+        return null;
+      },
+      remove() {
+        tabElements.delete(key);
+        selects.delete(key);
+        closeButtons.delete(key);
+      },
+    };
+    tabElements.set(key, element);
+    selects.set(key, select);
+    closeButtons.set(key, closeButton);
+
+    context.closeBindingElement = element;
+    context.closeBindingId = id;
+    vm.runInContext(`(() => {
+      const el = closeBindingElement;
+      const id = closeBindingId;
+      ${closeClickSource}
+    })()`, vmContext);
+  };
+
+  tabIds.forEach(addTabElement);
+  context.createTab = () => {
+    tabs.push({ id: replacementId, view: { remove() {} } });
+    addTabElement(replacementId);
+    context.activeTabId = replacementId;
+  };
+  vm.runInContext(`${activeTabSource}\n${closeTabSource}`, vmContext);
+  vm.runInContext(keydownSource, vmContext);
+
   return {
-    closeTab,
+    clickClose(id) {
+      let propagationStopped = false;
+      closeButtons.get(String(id)).dispatchClick({
+        stopPropagation() { propagationStopped = true; },
+      });
+      return propagationStopped;
+    },
+    dispatchCtrlW() {
+      const event = {
+        key: 'w',
+        ctrlKey: true,
+        metaKey: false,
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; },
+      };
+      context.keydownHandler(event);
+      return event;
+    },
     get activeId() { return context.activeTabId; },
-    get focusedId() { return focusedId; },
+    get activeElement() { return context.document.activeElement; },
+    get body() { return body; },
+    selectFor(id) { return selects.get(String(id)); },
   };
 }
 
@@ -62,27 +140,35 @@ const { isLocal, httpsUpgrade } = vm.runInNewContext(
   { URL },
 );
 
-test('closing an active tab focuses the selected surviving tab', () => {
+test('clicking an active tab close button focuses the exact surviving tab select', () => {
   const state = makeCloseTabHarness([1, 2, 3], 1, 4);
 
-  state.closeTab(1);
+  assert.equal(state.clickClose(1), true, 'close click should stop propagation');
 
   assert.equal(state.activeId, 2);
-  assert.equal(state.focusedId, 2);
+  assert.strictEqual(state.activeElement, state.selectFor(2));
+  assert.notStrictEqual(state.activeElement, state.body);
 });
 
-test('closing the last tab focuses the replacement tab', () => {
+test('Ctrl+W focuses the exact surviving active tab select', () => {
+  const state = makeCloseTabHarness([1, 2, 3], 2, 4);
+
+  const event = state.dispatchCtrlW();
+
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(state.activeId, 3);
+  assert.strictEqual(state.activeElement, state.selectFor(3));
+  assert.notStrictEqual(state.activeElement, state.body);
+});
+
+test('closing the last tab through its close button focuses the replacement tab select', () => {
   const state = makeCloseTabHarness([1], 1, 2);
 
-  state.closeTab(1);
+  state.clickClose(1);
 
   assert.equal(state.activeId, 2);
-  assert.equal(state.focusedId, 2);
-});
-
-test('tab close button and Ctrl+W share the tab close handler', () => {
-  assert.match(rendererSource, /el\.querySelector\('\.tab-close'\)\.addEventListener\('click', \(e\) => \{\s*e\.stopPropagation\(\);\s*closeTab\(id\);/);
-  assert.match(rendererSource, /else if \(mod && e\.key === 'w'\) \{\s*e\.preventDefault\(\);\s*const tab = activeTab\(\);\s*if \(tab\) closeTab\(tab\.id\);/);
+  assert.strictEqual(state.activeElement, state.selectFor(2));
+  assert.notStrictEqual(state.activeElement, state.body);
 });
 
 test('renderer recognizes bracketed IPv6 loopback as local', () => {
