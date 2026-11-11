@@ -13,6 +13,18 @@
 
   const CARD_ID = 'air-card';
 
+  function bandClass(band) {
+    if (!band || typeof band !== 'string') return 'air-band-unknown';
+    const lower = band.toLowerCase();
+    if (lower === 'good' || lower === 'fair') return 'air-band-good';
+    if (lower === 'moderate') return 'air-band-moderate';
+    if (lower.indexOf('poor') !== -1 || lower.indexOf('unhealthy') !== -1
+        || lower === 'hazardous' || lower === 'extremely poor' || lower === 'very poor') {
+      return 'air-band-poor';
+    }
+    return 'air-band-unknown';
+  }
+
   function ensureCard(doc) {
     const existing = typeof doc.getElementById === 'function' ? doc.getElementById(CARD_ID) : null;
     if (existing) return existing;
@@ -148,10 +160,28 @@
       const place = record.place;
       const air = record.air;
       const placeLine = place.country ? place.name + ', ' + place.country : place.name;
-      resultEl.textContent = placeLine
-        + ' · European AQI ' + air.europeanAqi + ' (' + air.europeanBand + ')'
-        + ' · US AQI ' + air.usAqi + ' (' + air.usBand + ')'
-        + ' · PM2.5 ' + air.pm25 + ' µg/m³';
+      // Clear previous content
+      while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+      const placeSpan = doc.createElement('span');
+      placeSpan.textContent = placeLine + ' · ';
+      resultEl.appendChild(placeSpan);
+      const euSpan = doc.createElement('span');
+      euSpan.className = bandClass(air.europeanBand);
+      euSpan.textContent = 'European AQI ' + air.europeanAqi + ' (' + air.europeanBand + ')';
+      resultEl.appendChild(euSpan);
+      const sep1 = doc.createElement('span');
+      sep1.textContent = ' · ';
+      resultEl.appendChild(sep1);
+      const usSpan = doc.createElement('span');
+      usSpan.className = bandClass(air.usBand);
+      usSpan.textContent = 'US AQI ' + air.usAqi + ' (' + air.usBand + ')';
+      resultEl.appendChild(usSpan);
+      const sep2 = doc.createElement('span');
+      sep2.textContent = ' · ';
+      resultEl.appendChild(sep2);
+      const pmSpan = doc.createElement('span');
+      pmSpan.textContent = 'PM2.5 ' + air.pm25 + ' µg/m³';
+      resultEl.appendChild(pmSpan);
     }
 
     async function onCheck() {
@@ -186,7 +216,9 @@
     function onClear() {
       if (busy) return;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
-      if (resultEl) resultEl.textContent = '';
+      if (resultEl) {
+        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+      }
       status('Cleared. Type a place name and tap Check.');
     }
 
@@ -222,7 +254,7 @@
     };
   }
 
-  const api = { attachAirQualityUi, ensureCard, CARD_ID };
+  const api = { attachAirQualityUi, ensureCard, CARD_ID, bandClass };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkAirQualityUi = api;
 
