@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-11T05:01:52.466Z (branch feat/air-quality-card-v2-vibe-20261111; keyless air-quality glance card, self-injected markup, pending CI)](./CURRENT_STATUS_20261111T050400Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./CURRENT_STATUS_20261111T013656Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
