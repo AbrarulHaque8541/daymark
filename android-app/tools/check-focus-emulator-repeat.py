@@ -56,9 +56,11 @@ assert "DaymarkPlatformInstrumentation" in helper
 assert "parse_platform_instrumentation_component" in test_runner
 assert "run_bounded_diagnostic" in runner
 assert "timeout --signal=TERM --kill-after=2s 8s" in runner, "failure diagnostics must be bounded"
-for marker in ("AndroidRuntime:E", "ActivityManager:E", "ActivityTaskManager:E", "Instrumentation:I", "DaymarkInstr:I"):
-    assert marker in runner, f"pre-onCreate failure diagnostics must include {marker}"
-assert "dumpsys activity instrumentation" in runner
+assert "adb logcat -d -t 1200 '*:W'" in runner, "capture framework warnings/errors, not only the app tag"
+assert "pm list instrumentation" in runner
+assert "dumpsys package com.abrar.daymark.test" in runner
+assert "dumpsys activity" in runner
+assert "dumpsys activity instrumentation" not in runner, "use supported dumpsys syntax"
 assert "ps -A" in runner
 assert "drive_instrumentation_input_bridge" not in runner
 assert "input_package=" not in runner
