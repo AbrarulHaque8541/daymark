@@ -18,7 +18,7 @@ function toast(msg) {
 }
 
 function isLocal(hostname) {
-  const normalized = String(hostname || '').toLowerCase().replace(/^[\[]|\]$/g, '');
+  const normalized = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
   return ['localhost', '127.0.0.1', '::1'].includes(normalized);
 }
 
