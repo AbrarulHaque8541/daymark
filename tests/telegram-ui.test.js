@@ -376,6 +376,12 @@ test('index.html wires the Telegram card with a password token field', () => {
   assert.ok(indexSource.includes('src="telegram-logic.js"'), 'the logic script tag must exist');
   assert.ok(indexSource.includes('src="telegram-ui.js"'), 'the ui script tag must exist');
   assert.match(indexSource.match(/<input[^>]*id="telegram-token"[^>]*>/)[0], /type="password"/, 'the bot token input must be masked');
+  assert.match(indexSource, /After a successful send, only the non-secret chat target is remembered on this device/,
+    'the card must disclose the persisted non-secret chat preference');
+  assert.match(indexSource, /clear the Telegram preference in the Local data card/,
+    'the card must explain where the remembered preference can be removed');
+  assert.match(indexSource, /id="telegram-clear"[^>]*>Clear token<\\/button>/,
+    'the clear action must not imply that it also forgets the saved chat target');
 });
 
 test('buttons are disabled and aria-busy is set while a send is in flight', async () => {
