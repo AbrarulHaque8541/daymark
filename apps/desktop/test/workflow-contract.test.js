@@ -18,7 +18,12 @@ test('desktop CI installs the committed npm lockfile before the cross-platform t
   assert.ok(workflow.includes('uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0'));
   assert.ok(workflow.includes('uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0'));
   assert.ok(workflow.includes("node-version: '20'"),
-    'Electron unit tests continue to use the supported Node 20 application runtime');
+    'Node 20 is the host test harness; Electron embeds its separately pinned Node runtime');
+  assert.equal(manifest.devDependencies.electron, '^45.3.0',
+    'the desktop manifest must stay on the approved supported Electron 45 line');
+  assert.equal(manifest.scripts.test.includes('test/electron-runtime.test.js'), true,
+    'the desktop suite must launch the installed Electron binary');
+
   assert.ok(workflow.includes('os: [ubuntu-latest, windows-latest, macos-latest]'));
 
   assert.equal(lock.lockfileVersion, 3, 'the desktop lockfile must use npm lockfile v3');
@@ -29,6 +34,8 @@ test('desktop CI installs the committed npm lockfile before the cross-platform t
       && electron.version.split('.').length === 3
       && electron.version.split('.').every(part => Number.isInteger(Number(part))),
     'the lockfile must resolve Electron to an exact semantic version');
+  assert.equal(electron.version, '45.3.0',
+    'the committed lockfile must resolve the supported Electron patch exactly');
   assert.ok(electron.integrity?.startsWith('sha512-')
       && electron.resolved?.startsWith('https://registry.npmjs.org/electron/-/electron-'),
     'the Electron tarball must have a registry URL and integrity hash');
@@ -112,4 +119,21 @@ test('download publication failures reach the renderer through a URL-free IPC co
   assert.ok(renderer.includes('window.daymark.onDownloadFailed((name) => {')
       && renderer.includes("toast('Could not safely save ' + safeName + '; no file was published.')"),
     'renderer gives the user a visible, URL-free failure status');
+});
+
+
+test('Electron 45 sandbox and worker integration remains explicitly hardened', () => {
+  const mainPath = path.join(repositoryRoot, 'apps', 'desktop', 'main.js');
+  const popupPolicyPath = path.join(repositoryRoot, 'apps', 'desktop', 'lib', 'webview-popup-policy.js');
+  const preloadPath = path.join(repositoryRoot, 'apps', 'desktop', 'preload.js');
+  const main = fs.readFileSync(mainPath, 'utf8');
+  const popupPolicy = fs.readFileSync(popupPolicyPath, 'utf8');
+  const preload = fs.readFileSync(preloadPath, 'utf8');
+
+  assert.match(main, /nodeIntegrationInWorker:\\s*false/,
+    'the trusted host renderer must not grant Node integration to workers');
+  assert.match(popupPolicy, /webPreferences\\.nodeIntegrationInWorker\\s*=\\s*false/,
+    'guest webviews must not inherit Node worker integration');
+  assert.doesNotMatch(preload, /require\\(['"](?:events|timers|url)['"]\\)|\\b(?:Buffer|setImmediate|clearImmediate)\\b/,
+    'sandboxed preload must not depend on globals/modules removed by Electron 45');
 });

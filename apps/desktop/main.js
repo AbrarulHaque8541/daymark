@@ -28,6 +28,7 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,

@@ -1,0 +1,75 @@
+name: Temporary Electron lockfile generation for PR 737
+
+on:
+  push:
+    branches:
+      - fix/desktop-lockfile-20261111
+    paths:
+      - .github/workflows/electron-lockfile-bootstrap.yml
+      - apps/desktop/package.json
+      - apps/desktop/package-lock.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: electron-lockfile-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: >-
+      github.repository == 'AbrarulHaque8541/daymark' &&
+      github.ref == 'refs/heads/fix/desktop-lockfile-20261111' &&
+      github.actor == 'AbrarulHaque8541' &&
+      github.triggering_actor == 'AbrarulHaque8541'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: '20.20.2'
+      - name: Generate and validate npm lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          node <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const electron = lock.packages && lock.packages['node_modules/electron'];
+          if (manifest.devDependencies.electron !== '^45.3.0') throw new Error('Unexpected Electron manifest range');
+          if (!electron || electron.version !== '45.3.0' || !electron.integrity || !electron.resolved) {
+            throw new Error('Electron 45.3.0 lock entry is missing exact version, URL, or integrity');
+          }
+          if (lock.packages[''].devDependencies.electron !== manifest.devDependencies.electron) {
+            throw new Error('Lockfile root does not match package.json');
+          }
+          for (const [name, entry] of Object.entries(lock.packages)) {
+            if (entry.resolved && entry.resolved.startsWith('https://registry.npmjs.org/') && !entry.integrity) {
+              throw new Error('Missing registry integrity for ' + name);
+            }
+          }
+          console.log('Validated Electron', electron.version, 'with', Object.keys(lock.packages).length, 'lockfile entries');
+          NODE
+          git -C "$GITHUB_WORKSPACE" config user.name "github-actions[bot]"
+          git -C "$GITHUB_WORKSPACE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$GITHUB_WORKSPACE" add apps/desktop/package-lock.json
+          if git -C "$GITHUB_WORKSPACE" diff --cached --quiet; then
+            echo "Lockfile is already current."
+            exit 0
+          fi
+          git -C "$GITHUB_WORKSPACE" commit -m "build(desktop): regenerate lockfile for Electron 45.3.0" -m "Work by: ChatGPT (OpenAI)
+          Model: GPT-6
+          Tooling: GitHub Actions ubuntu-24.04; Node 20.20.2; npm 10.8.2
+          Timestamp (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git -C "$GITHUB_WORKSPACE" push origin "HEAD:${GITHUB_REF_NAME}"
