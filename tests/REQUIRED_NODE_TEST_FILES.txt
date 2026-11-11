@@ -72,3 +72,4 @@ tests/wiki-logic.test.js
 tests/wiki-ui.test.js
 tests/zones-logic.test.js
 tests/zones-ui.test.js
+tests/network-first-terminology.test.js
