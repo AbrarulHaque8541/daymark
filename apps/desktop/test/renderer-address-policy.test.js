@@ -67,6 +67,7 @@ function makeCloseTabHarness(tabIds, activeId, replacementId) {
     const select = { focus: () => { context.document.activeElement = select; } };
     const closeButton = {
       listeners: new Map(),
+      focus() { context.document.activeElement = closeButton; },
       addEventListener(type, handler) { this.listeners.set(type, handler); },
       dispatchClick(event) { this.listeners.get('click')(event); },
     };
@@ -77,6 +78,9 @@ function makeCloseTabHarness(tabIds, activeId, replacementId) {
         return null;
       },
       remove() {
+        if (context.document.activeElement === select || context.document.activeElement === closeButton) {
+          context.document.activeElement = body;
+        }
         tabElements.delete(key);
         selects.delete(key);
         closeButtons.delete(key);
@@ -107,7 +111,9 @@ function makeCloseTabHarness(tabIds, activeId, replacementId) {
   return {
     clickClose(id) {
       let propagationStopped = false;
-      closeButtons.get(String(id)).dispatchClick({
+      const closeButton = closeButtons.get(String(id));
+      closeButton.focus();
+      closeButton.dispatchClick({
         stopPropagation() { propagationStopped = true; },
       });
       return propagationStopped;
@@ -142,6 +148,16 @@ const { isLocal, httpsUpgrade } = vm.runInNewContext(
 
 test('clicking an active tab close button focuses the exact surviving tab select', () => {
   const state = makeCloseTabHarness([1, 2, 3], 1, 4);
+
+  assert.equal(state.clickClose(1), true, 'close click should stop propagation');
+
+  assert.equal(state.activeId, 2);
+  assert.strictEqual(state.activeElement, state.selectFor(2));
+  assert.notStrictEqual(state.activeElement, state.body);
+});
+
+test('clicking an inactive tab close button keeps the active tab selected and focuses its exact select', () => {
+  const state = makeCloseTabHarness([1, 2, 3], 2, 4);
 
   assert.equal(state.clickClose(1), true, 'close click should stop propagation');
 
