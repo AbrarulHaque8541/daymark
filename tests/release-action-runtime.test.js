@@ -353,11 +353,12 @@ test('Android PR validation is debug-only and signed device-test assets are tag-
   assert.match(tagWorkflow, /assembleGithubSideloadRelease/);
   assert.match(tagWorkflow, /assemblePlayRelease/);
   assert.match(tagWorkflow, /publish-release:/);
-  const releaseDownloadCurlLines = tagWorkflow.split('\\n').filter(line => /\\bcurl\\b/.test(line));
+  const releaseDownloadCurlLines = tagWorkflow.split(String.fromCharCode(10))
+    .filter(line => line.includes('curl '));
   assert.equal(releaseDownloadCurlLines.length, 2,
     'the signed release workflow must keep exactly its two public-asset download verification calls');
   for (const line of releaseDownloadCurlLines) {
-    assert.match(line, /--proto '=https' --proto-redir '=https' --tlsv1\\.2/,
+    assert.ok(line.includes("--proto '=https' --proto-redir '=https' --tlsv1.2"),
       'every release asset download must constrain initial and redirected protocols to HTTPS');
   }
   assert.match(tagWorkflow, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/'\)/);
@@ -465,8 +466,8 @@ test('final release APK is re-downloaded and digest-checked after provenance ver
   assert.match(finalCheck, /asset_state.*uploaded/);
   assert.match(finalCheck, /"\$asset_size" == "\$EXPECTED_SIZE"/);
   assert.match(finalCheck, /\[\[ "\$asset_url" == "\$expected_asset_url" \]\]/);
-  assert.match(finalCheck, /curl --proto '=https' --proto-redir '=https' --tlsv1\\.2 --fail --location --retry 3 --retry-delay 2/,
-    'the check must download the public release asset again after provenance publication');
+  assert.ok(finalCheck.includes("curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 3 --retry-delay 2"),
+    'the check must download the public release asset again after provenance publication with HTTPS-only redirects');
   assert.match(finalCheck, /downloaded_size.*EXPECTED_SIZE/);
   assert.match(finalCheck, /sha256sum "\$final_apk"/);
   assert.match(finalCheck, /\[\[ "\$downloaded_sha256" == "\$EXPECTED_SHA256" \]\]/);
