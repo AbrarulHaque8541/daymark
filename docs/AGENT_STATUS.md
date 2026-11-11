@@ -1,4 +1,4 @@
-- [Daymark whole-project engineering status — 2026-11-11T17:38:27.740Z (main 9f1c0451; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 922/922; #747 919/919)](./CURRENT_STATUS_20261111T173827Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T17:44:30.987Z (main 9f1c0451; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 922/922; #747 919/919)](./CURRENT_STATUS_20261111T174430Z.md)
 - [Daymark engineering status — 20261111T170455Z (storage card dedicated Clear all binding, issue #740)](./CURRENT_STATUS_20261111T170455Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T13:11:35Z (main 0e268420; 746 branches / 6 open PRs / 23 open issues; main audit 910/910; task/Clear All/download P0 blockers)](./CURRENT_STATUS_20261111T131135Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T12:20:00Z (main 0e268420; 746 branches / 6 open PRs / 22 open issues; main CI green; Electron 45.3.0 upgrade PR 5/5 checks pass; download/Clear All remain P0)](./CURRENT_STATUS_20261111T122000Z.md)
@@ -93,10 +93,9 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261111T173827Z.md](./CURRENT_STATUS_20261111T173827Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 current head 922/922 with 4/4 workflows; #747 919/919 with 4/4 workflows; #748 exact-head device-artifact rerun pending; P0 task/Clear All/Android download/governance blockers remain.
-- Previous reviewed snapshot: [CURRENT_STATUS_20261111T173203Z.md](CURRENT_STATUS_20261111T173203Z.md) — 17:32Z inventory; superseded after #696 closure and #744 head/test-count correction.
-- Previous reviewed snapshot: [CURRENT_STATUS_20261111T170455Z.md](CURRENT_STATUS_20261111T170455Z.md) — pre-#746 merge snapshot documenting the dedicated storage Clear All control.
-- Previous reviewed snapshot: [CURRENT_STATUS_20261111T131135Z.md](CURRENT_STATUS_20261111T131135Z.md) — earlier mainline baseline.
+- [CURRENT_STATUS_20261111T174430Z.md](./CURRENT_STATUS_20261111T174430Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 current head 922/922 with 4/4 workflows; #747 919/919 with 4/4 workflows; #648 exact workflow_dispatch run #43061555620 failed (API29 211 assertions; API36 timeout at run 1/10); #748 checks pending on its docs branch; P0 task/Clear All/Android download/Focus/governance blockers remain.
+- Previous mainline snapshot: [CURRENT_STATUS_20261111T170455Z.md](./CURRENT_STATUS_20261111T170455Z.md) — 17:04Z pre-#746 baseline.
+- Previous mainline snapshot: [CURRENT_STATUS_20261111T131135Z.md](./CURRENT_STATUS_20261111T131135Z.md) — earlier baseline.
 
 ## Before acting
 
