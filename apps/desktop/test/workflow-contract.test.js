@@ -98,6 +98,8 @@ test('download publication failures reach the renderer through a URL-free IPC co
 
   assert.equal(exposedName, 'daymark');
   assert.equal(typeof exposedApi.onDownloadFailed, 'function');
+  assert.equal(typeof exposedApi.onDownloadCompleted, 'function');
+  assert.equal(typeof exposedApi.onDownloadCancelled, 'function');
   const received = [];
   const unsubscribe = exposedApi.onDownloadFailed((filename) => received.push(filename));
   const listener = listeners.get('download-failed');
@@ -107,6 +109,26 @@ test('download publication failures reach the renderer through a URL-free IPC co
   unsubscribe();
   assert.equal(listeners.has('download-failed'), false,
     'the renderer can release its IPC listener');
+
+  const completed = [];
+  const unsubscribeCompleted = exposedApi.onDownloadCompleted((filename) => completed.push(filename));
+  const completedListener = listeners.get('download-completed');
+  assert.equal(typeof completedListener, 'function');
+  completedListener({}, 'report-safe.txt');
+  assert.deepEqual(completed, ['report-safe.txt']);
+  unsubscribeCompleted();
+  assert.equal(listeners.has('download-completed'), false,
+    'the renderer can release its completion IPC listener');
+
+  const cancelled = [];
+  const unsubscribeCancelled = exposedApi.onDownloadCancelled((filename) => cancelled.push(filename));
+  const cancelledListener = listeners.get('download-cancelled');
+  assert.equal(typeof cancelledListener, 'function');
+  cancelledListener({}, 'report-safe.txt');
+  assert.deepEqual(cancelled, ['report-safe.txt']);
+  unsubscribeCancelled();
+  assert.equal(listeners.has('download-cancelled'), false,
+    'the renderer can release its cancellation IPC listener');
 
   const main = fs.readFileSync(mainPath, 'utf8');
   const renderer = fs.readFileSync(rendererPath, 'utf8');
@@ -118,9 +140,24 @@ test('download publication failures reach the renderer through a URL-free IPC co
     'main forwards only the sanitized basename on the dedicated failure channel');
   assert.ok(!/url/i.test(failureHandler),
     'failure IPC must not include a remote URL');
+  const completedHandlerStart = main.indexOf('onCompleted: (filename) => {');
+  const cancelledHandlerStart = main.indexOf('onCancelled: (filename) => {');
+  assert.ok(completedHandlerStart >= 0 && cancelledHandlerStart > completedHandlerStart);
+  const completedHandler = main.slice(completedHandlerStart, cancelledHandlerStart);
+  const cancelledHandler = main.slice(cancelledHandlerStart, main.indexOf('onCleanupError:', cancelledHandlerStart));
+  assert.ok(completedHandler.includes("webContents.send('download-completed', filename)"));
+  assert.ok(cancelledHandler.includes("webContents.send('download-cancelled', filename)"));
+  assert.ok(!/url/i.test(completedHandler) && !/url/i.test(cancelledHandler),
+    'completion and cancellation IPC must expose only the sanitized filename');
   assert.ok(renderer.includes('window.daymark.onDownloadFailed((name) => {')
       && renderer.includes("toast('Could not safely save ' + safeName + '; no file was published.')"),
     'renderer gives the user a visible, URL-free failure status');
+  assert.ok(renderer.includes('window.daymark.onDownloadCompleted((name) => {')
+      && renderer.includes("toast('Saved to Downloads: ' + safeName);"),
+    'renderer confirms only a successfully published file');
+  assert.ok(renderer.includes('window.daymark.onDownloadCancelled((name) => {')
+      && renderer.includes("toast('Download cancelled: ' + safeName);"),
+    'renderer distinguishes user cancellation from a failed/interrupted download');
 });
 
 

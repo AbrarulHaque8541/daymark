@@ -57,14 +57,17 @@ function handleWillDownload(options) {
     }
 
     const reservation = reservationKey(finalPath);
-    doneListener = (event, state) => {
+    doneListener = (_event, state) => {
       const finalize = async () => {
+        const filename = path.basename(finalPath);
+        let outcome = state === 'cancelled' ? 'cancelled' : 'failed';
         try {
-          if (state === 'completed') await opts.publishFile(stagingPath, finalPath, directory);
-        } catch {
-          if (typeof opts.onFailed === 'function') {
-            try { opts.onFailed(path.basename(finalPath)); } catch { /* Do not leak URL or interrupt cleanup. */ }
+          if (state === 'completed') {
+            await opts.publishFile(stagingPath, finalPath, directory);
+            outcome = 'completed';
           }
+        } catch {
+          outcome = 'failed';
         } finally {
           try {
             await opts.cleanupStaging(stagingPath, directory);
@@ -74,6 +77,13 @@ function handleWillDownload(options) {
             }
           }
           opts.reservedPaths.delete(reservation);
+        }
+
+        const notify = outcome === 'completed' ? opts.onCompleted
+          : outcome === 'cancelled' ? opts.onCancelled
+          : opts.onFailed;
+        if (typeof notify === 'function') {
+          try { notify(filename); } catch { /* Renderer notification must not change the download outcome. */ }
         }
       };
       void finalize();

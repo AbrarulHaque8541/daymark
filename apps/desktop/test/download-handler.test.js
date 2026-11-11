@@ -26,7 +26,7 @@ function makeItem(filename, options = {}) {
 
 function makeStaging(options = {}) {
   let sequence = 0;
-  const calls = { created: [], published: [], cleaned: [], failed: [], cleanupErrors: [] };
+  const calls = { created: [], published: [], cleaned: [], failed: [], completed: [], cancelled: [], cleanupErrors: [], order: [] };
   return {
     calls,
     createStagingPath(finalPath) {
@@ -36,15 +36,19 @@ function makeStaging(options = {}) {
       return staged;
     },
     publishFile(staged, finalPath) {
+      calls.order.push('publish');
       calls.published.push({ staged, finalPath });
       if (options.publishThrows) throw new Error('atomic publication failed');
     },
     cleanupStaging(staged) {
+      calls.order.push('cleanup');
       calls.cleaned.push(staged);
       if (options.cleanupThrows) throw new Error('staging cleanup failed');
     },
-    onFailed(filename) { calls.failed.push(filename); },
-    onCleanupError() { calls.cleanupErrors.push(true); },
+    onFailed(filename) { calls.order.push('failed'); calls.failed.push(filename); },
+    onCompleted(filename) { calls.order.push('completed'); calls.completed.push(filename); },
+    onCancelled(filename) { calls.order.push('cancelled'); calls.cancelled.push(filename); },
+    onCleanupError() { calls.order.push('cleanup-error'); calls.cleanupErrors.push(true); },
   };
 }
 
@@ -79,6 +83,10 @@ test('safe destination is staged privately and published only after completion',
   await flushDone();
   assert.deepEqual(staging.calls.published, [{ staged: result.stagingPath, finalPath: result.path }]);
   assert.deepEqual(staging.calls.cleaned, [result.stagingPath]);
+  assert.deepEqual(staging.calls.completed, [result.filename]);
+  assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.failed, []);
+  assert.deepEqual(staging.calls.order, ['publish', 'cleanup', 'completed']);
   assert.equal(reservedPaths.size, 0);
 });
 
@@ -139,6 +147,10 @@ test('renderer notification failure does not cancel a staged download', async ()
     reservedPaths,
     ...staging,
     onStarted() { throw new Error('renderer closed'); },
+    onCompleted(filename) {
+      staging.calls.completed.push(filename);
+      throw new Error('renderer closed');
+    },
   });
 
   assert.equal(result.ok, true);
@@ -148,6 +160,8 @@ test('renderer notification failure does not cancel a staged download', async ()
   await flushDone();
   assert.equal(staging.calls.published.length, 1);
   assert.equal(staging.calls.cleaned.length, 1);
+  assert.deepEqual(staging.calls.completed, [result.filename]);
+  assert.deepEqual(staging.calls.failed, []);
   assert.equal(reservedPaths.size, 0);
 });
 
@@ -171,24 +185,36 @@ test('directory lookup failure cancels before creating staging', () => {
   assert.equal(reservedPaths.size, 0);
 });
 
-test('cancelled or interrupted downloads are never published', async () => {
-  const item = makeItem('report.txt');
-  const reservedPaths = new Set();
-  const staging = makeStaging();
-  const result = handleWillDownload({
-    event: {},
-    item,
-    downloadDirectory: downloads,
-    exists: () => false,
-    reservedPaths,
-    ...staging,
-  });
-  assert.equal(result.ok, true);
-  item.emit('done', null, 'cancelled');
-  await flushDone();
-  assert.equal(staging.calls.published.length, 0);
-  assert.deepEqual(staging.calls.cleaned, [result.stagingPath]);
-  assert.equal(reservedPaths.size, 0);
+test('cancelled and interrupted downloads are never published and report their final state', async () => {
+  for (const state of ['cancelled', 'interrupted']) {
+    const item = makeItem('report.txt');
+    const reservedPaths = new Set();
+    const staging = makeStaging();
+    const result = handleWillDownload({
+      event: {},
+      item,
+      downloadDirectory: downloads,
+      exists: () => false,
+      reservedPaths,
+      ...staging,
+    });
+    assert.equal(result.ok, true);
+    item.emit('done', null, state);
+    await flushDone();
+    assert.equal(staging.calls.published.length, 0);
+    assert.deepEqual(staging.calls.cleaned, [result.stagingPath]);
+    assert.deepEqual(staging.calls.completed, []);
+    if (state === 'cancelled') {
+      assert.deepEqual(staging.calls.cancelled, [result.filename]);
+      assert.deepEqual(staging.calls.failed, []);
+      assert.deepEqual(staging.calls.order, ['cleanup', 'cancelled']);
+    } else {
+      assert.deepEqual(staging.calls.cancelled, []);
+      assert.deepEqual(staging.calls.failed, [result.filename]);
+      assert.deepEqual(staging.calls.order, ['cleanup', 'failed']);
+    }
+    assert.equal(reservedPaths.size, 0);
+  }
 });
 
 test('publication failure is fail-closed, reported and cleaned without retaining reservation', async () => {
@@ -207,7 +233,33 @@ test('publication failure is fail-closed, reported and cleaned without retaining
   item.emit('done', null, 'completed');
   await flushDone();
   assert.deepEqual(staging.calls.failed, [result.filename]);
+  assert.deepEqual(staging.calls.completed, []);
+  assert.deepEqual(staging.calls.cancelled, []);
   assert.deepEqual(staging.calls.cleaned, [result.stagingPath]);
+  assert.deepEqual(staging.calls.order, ['publish', 'cleanup', 'failed']);
+  assert.equal(reservedPaths.size, 0);
+});
+
+test('cleanup failure does not hide an already-published download completion', async () => {
+  const item = makeItem('report.txt');
+  const reservedPaths = new Set();
+  const staging = makeStaging({ cleanupThrows: true });
+  const result = handleWillDownload({
+    event: {},
+    item,
+    downloadDirectory: downloads,
+    exists: () => false,
+    reservedPaths,
+    ...staging,
+  });
+  assert.equal(result.ok, true);
+  item.emit('done', null, 'completed');
+  await flushDone();
+  assert.deepEqual(staging.calls.published, [{ staged: result.stagingPath, finalPath: result.path }]);
+  assert.deepEqual(staging.calls.completed, [result.filename]);
+  assert.deepEqual(staging.calls.failed, []);
+  assert.deepEqual(staging.calls.cleanupErrors, [true]);
+  assert.deepEqual(staging.calls.order, ['publish', 'cleanup', 'cleanup-error', 'completed']);
   assert.equal(reservedPaths.size, 0);
 });
 

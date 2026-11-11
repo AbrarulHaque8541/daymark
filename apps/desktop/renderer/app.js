@@ -266,6 +266,14 @@ if (window.daymark) {
     const safeName = typeof name === 'string' && name ? name : 'download';
     toast('Could not safely save ' + safeName + '; no file was published.');
   });
+  window.daymark.onDownloadCompleted((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Saved to Downloads: ' + safeName);
+  });
+  window.daymark.onDownloadCancelled((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Download cancelled: ' + safeName);
+  });
 }
 
 createTab();
