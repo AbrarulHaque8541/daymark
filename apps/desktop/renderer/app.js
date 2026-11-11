@@ -280,9 +280,18 @@ if (window.daymark) {
     const progress = safePercent === null ? '' : ' (' + safePercent + '%)';
     toast('Downloading: ' + safeName + progress);
   });
-  window.daymark.onDownloadFailed((name) => {
-    const safeName = typeof name === 'string' && name ? name : 'download';
-    toast('Could not safely save ' + safeName + '; no file was published.');
+  window.daymark.onDownloadFailed((failure) => {
+    const safeName = failure && typeof failure.filename === 'string' && failure.filename
+      ? failure.filename : 'download';
+    if (failure && failure.preflight === true && failure.cancellationConfirmed === false) {
+      toast('Could not safely prepare ' + safeName
+        + '; cancellation could not be confirmed. Check Downloads before retrying.');
+    } else if (failure && failure.preflight === true && failure.cancellationConfirmed === true) {
+      toast('Could not safely save ' + safeName
+        + '; the download was cancelled and no file was published.');
+    } else {
+      toast('Could not safely save ' + safeName + '; no file was published.');
+    }
   });
   window.daymark.onDownloadCompleted((name) => {
     const safeName = typeof name === 'string' && name ? name : 'download';

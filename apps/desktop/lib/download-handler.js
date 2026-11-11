@@ -152,7 +152,12 @@ function handleWillDownload(options) {
       opts.reservedPaths.delete(reservationKey(finalPath));
     }
     if (typeof opts.onFailed === 'function') {
-      try { opts.onFailed(filename); } catch { /* Renderer notification must not change the download outcome. */ }
+      try {
+        opts.onFailed(filename, {
+          preflight: true,
+          cancellationConfirmed: cancelled,
+        });
+      } catch { /* Renderer notification must not change the download outcome. */ }
     }
     return {
       ok: false,

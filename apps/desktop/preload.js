@@ -17,7 +17,20 @@ contextBridge.exposeInMainWorld('daymark', {
     return () => ipcRenderer.removeListener('download-progress', listener);
   },
   onDownloadFailed: (cb) => {
-    const listener = (_e, filename) => cb(filename);
+    const listener = (_e, failure) => {
+      if (!failure || typeof failure !== 'object'
+        || typeof failure.filename !== 'string' || !failure.filename
+        || typeof failure.preflight !== 'boolean'
+        || (failure.preflight
+          ? typeof failure.cancellationConfirmed !== 'boolean'
+          : failure.cancellationConfirmed !== null)) return;
+      // Rebuild the payload instead of forwarding arbitrary IPC properties.
+      cb({
+        filename: failure.filename,
+        preflight: failure.preflight,
+        cancellationConfirmed: failure.cancellationConfirmed,
+      });
+    };
     ipcRenderer.on('download-failed', listener);
     return () => ipcRenderer.removeListener('download-failed', listener);
   },
