@@ -1,9 +1,10 @@
-- [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./20261111T013656Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./CURRENT_STATUS_20261111T013656Z.md)
 # Daymark Agent Status Index
 
 ## Latest reviewed snapshot
 
-- [CURRENT_STATUS_20261110T225419Z.md](CURRENT_STATUS_20261110T225419Z.md) — current main `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`; whole-project PR/issue inventory, exact-head checks, data-integrity/security findings and prioritized backlog. Snapshot UTC: 2026-11-10T22:54:19.523Z.
+- [CURRENT_STATUS_20261111T013656Z.md](CURRENT_STATUS_20261111T013656Z.md) — current main `5148232a7165f840fa895707890b829bcdc1657b`; 13 open PRs / 24 open issues; storage-health and task-instant branches synchronized; exact-head checks pending. Snapshot UTC: 2026-11-11T01:36:56.051Z
+- Previous reviewed snapshot: [CURRENT_STATUS_20261110T225419Z.md](CURRENT_STATUS_20261110T225419Z.md) — historical baseline at main `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`..
 
 ## Historical snapshots
 
