@@ -380,7 +380,7 @@ test('index.html wires the Telegram card with a password token field', () => {
     'the card must disclose the persisted non-secret chat preference');
   assert.match(indexSource, /clear the Telegram preference in the Local data card/,
     'the card must explain where the remembered preference can be removed');
-  assert.match(indexSource, /id="telegram-clear"[^>]*>Clear token<\\/button>/,
+  assert.ok(indexSource.includes('id="telegram-clear" type="button">Clear token</button>'),
     'the clear action must not imply that it also forgets the saved chat target');
 });
 
