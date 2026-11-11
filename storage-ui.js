@@ -182,6 +182,9 @@
       }
       if (clearAllEl) {
         clearAllEl.disabled = busy;
+        if (typeof clearAllEl.setAttribute === "function") {
+          clearAllEl.setAttribute("aria-busy", busy ? "true" : "false");
+        }
         if (typeof clearAllEl.classList !== 'undefined') {
           clearAllEl.classList.toggle('is-busy', busy);
         }
