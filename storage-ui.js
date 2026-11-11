@@ -250,8 +250,10 @@
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
       }
-      const outcome = confirmOrReport('Clear ALL local Daymark data in this browser? '
-        + 'Tasks, Focus history, caches, webhook settings, and queued events will be removed. '
+      const outcome = confirmOrReport('Clear all managed Daymark data in this browser? '
+        + 'Tasks and recovery backups, Focus sessions and history, saved card and browser preferences '
+        + '(including the Telegram chat target), caches, browser download state, and queued webhook events '
+        + 'will be removed. The legacy secret-bearing webhook endpoint is never inspected by this card. '
         + 'This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
