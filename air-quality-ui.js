@@ -39,7 +39,7 @@
 
     const description = doc.createElement('p');
     description.className = 'briefing-description';
-    description.textContent = 'Open-Meteo air quality — no account, no API key. Fetched on Check; not saved on this device.';
+    description.textContent = 'Type a place and tap Check. The place name is sent to Open-Meteo Geocoding and the resulting coordinates to Open-Meteo Air Quality. Nothing is saved on this device. No account or API key needed.';
     aside.appendChild(description);
 
     const form = doc.createElement('form');
@@ -168,6 +168,7 @@
         return;
       }
       setBusy(true);
+      status('Checking Open-Meteo…');
       try {
         const record = await airApi.fetchAirQualityByPlace(typed, fetchImpl, { now: now });
         render(record);
@@ -185,10 +186,10 @@
       if (busy) return;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) resultEl.textContent = '';
-      status('Cleared. Type a place name and tap Check.');
+      status('Cleared. Type a place name and tap Check. Place is sent only after Check.');
     }
 
-    status('Type a place name and tap Check.');
+    status('Type a place name and tap Check. Place is sent to Open-Meteo only after Check.');
 
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
