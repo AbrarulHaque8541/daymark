@@ -18,7 +18,7 @@ function toast(msg) {
 }
 
 function isLocal(hostname) {
-  const normalized = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  const normalized = String(hostname || '').toLowerCase().replace(/^[\[]|\]$/g, '');
   return ['localhost', '127.0.0.1', '::1'].includes(normalized);
 }
 
@@ -46,7 +46,7 @@ function renderTabs() {
   document.querySelectorAll('.tab').forEach((el) => {
     const tab = tabs.find((t) => String(t.id) === el.dataset.tabId);
     if (!tab) return;
-    const title = tab.title || 'Loading...';
+    const title = tab.loading ? 'Loading…' : (tab.title || 'New tab');
     const active = isActive(tab);
     const select = el.querySelector('.tab-select');
     el.querySelector('.tab-title').textContent = title;
@@ -81,6 +81,15 @@ function wireEvents(tab) {
   const v = tab.view;
   v.addEventListener('page-title-updated', (e) => {
     tab.title = e.title;
+    tab.loading = false;
+    renderTabs();
+  });
+  v.addEventListener('did-start-loading', () => {
+    tab.loading = true;
+    renderTabs();
+  });
+  v.addEventListener('did-stop-loading', () => {
+    tab.loading = false;
     renderTabs();
   });
   v.addEventListener('did-navigate', (e) => {
@@ -100,6 +109,7 @@ function wireEvents(tab) {
   v.addEventListener('did-fail-load', (e) => {
     if (!e.isMainFrame || e.errorCode === -3) return; // -3 = aborted
     if (!isActive(tab)) return;
+    tab.loading = false;
     const blocked = e.errorCode === -20 || e.errorCode === -501;
     showError(
       blocked ? 'Blocked by HTTPS-only policy' : "Can't open this page",
@@ -107,6 +117,7 @@ function wireEvents(tab) {
         ? e.validatedURL + ' was refused because it is not HTTPS.'
         : (e.errorDescription || '') + ' (' + e.errorCode + ')',
     );
+    renderTabs();
   });
 }
 
@@ -120,13 +131,13 @@ function createTab(url = HOME) {
   view.dataset.tabId = String(id);
   $('views').appendChild(view);
 
-  const tab = { id, view, title: 'New tab' };
+  const tab = { id, view, title: 'New tab', loading: true };
   tabs.push(tab);
 
   const el = document.createElement('div');
   el.className = 'tab';
   el.dataset.tabId = String(id);
-  el.innerHTML = '<button class="tab-select" type="button" aria-pressed="false"><span class="tab-title">New tab</span></button><button class="tab-close" type="button" title="Close tab" aria-label="Close tab">&times;</button>';
+  el.innerHTML = '<button class="tab-select" type="button" aria-pressed="false"><span class="tab-title">Loading…</span></button><button class="tab-close" type="button" title="Close tab" aria-label="Close tab">&times;</button>';
   el.querySelector('.tab-select').addEventListener('click', () => activateTab(id));
   el.querySelector('.tab-close').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -169,9 +180,15 @@ function navigate(raw) {
   }
   if (!url) return;
   hideError();
+  tab.loading = true;
+  renderTabs();
   const p = tab.view.loadURL(url);
   if (p && p.catch) {
-    p.catch(() => toast('Blocked by HTTPS-only policy or navigation failed'));
+    p.catch(() => {
+      tab.loading = false;
+      renderTabs();
+      toast('Blocked by HTTPS-only policy or navigation failed');
+    });
   }
 }
 
@@ -213,7 +230,14 @@ function doFind(forward) {
 // --- toolbar wiring ---
 $('btn-back').onclick = () => activeTab() && activeTab().view.goBack();
 $('btn-fwd').onclick = () => activeTab() && activeTab().view.goForward();
-$('btn-reload').onclick = () => activeTab() && activeTab().view.reload();
+$('btn-reload').onclick = () => {
+  const tab = activeTab();
+  if (tab) {
+    tab.loading = true;
+    renderTabs();
+    tab.view.reload();
+  }
+};
 $('btn-home').onclick = () => navigate(HOME);
 $('btn-find').onclick = openFind;
 $('find-prev').onclick = () => doFind(false);
