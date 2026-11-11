@@ -1,4 +1,4 @@
-# Daymark whole-project engineering status — 2026-11-11T17:32:03Z
+# Daymark whole-project engineering status — 2026-11-11T17:35:28Z
 
 **Verified main:** `9f1c0451e767f97ef4ed5edf4340c34895b14c22`  
 **Repository:** [AbrarulHaque8541/daymark](https://github.com/AbrarulHaque8541/daymark)  
@@ -15,7 +15,7 @@
 | Main branch protection | `protected=false` |
 | Repository rulesets | `[]` |
 
-Root [AGENTS.md](../AGENTS.md) and [technology policy](TECHNOLOGY_AGNOSTIC_ENGINEERING.md) were read completely. The current execution queue in `PROJECT_PLAN.md` is stale at 13:11Z and is also edited by open PR #675; it was not changed here to avoid a shared-file collision.
+Root [AGENTS.md](../AGENTS.md) and [technology policy](TECHNOLOGY_AGNOSTIC_ENGINEERING.md) were read completely. `PROJECT_PLAN.md` remains stale at 13:11Z and is also edited by open PR #675; it was not changed here to avoid a shared-file collision.
 
 ## Mainline verification
 
@@ -28,14 +28,14 @@ The 919/919 Node-test count belongs to PR #744/#747 heads, not main; the mainlin
 
 | PR | Head | Compare to current main | Exact-head status / blocker |
 |---|---|---:|---|
-| [#648](https://github.com/AbrarulHaque8541/daymark/pull/648) | `239b180d398f50d5f06812e706220b5367e7afbd` | 202 ahead / 121 behind | Diverged, draft, no current exact-head runs; canonical Android MainActivity/download owner |
+| [#648](https://github.com/AbrarulHaque8541/daymark/pull/648) | `239b180d398f50d5f06812e706220b5367e7afbd` | 202 ahead / 121 behind | Diverged, draft, no current exact-head runs; canonical Android MainActivity/Focus/download owner; branch contains API36 repeat-count-10 workflow but has not run on this exact head |
 | [#656](https://github.com/AbrarulHaque8541/daymark/pull/656) | `e2f20d84eab17ac0f6ed55a024666298cf493680` | 95 ahead / 98 behind | Diverged; 6/7 old exact-head workflows pass, Focus lifecycle failed |
 | [#675](https://github.com/AbrarulHaque8541/daymark/pull/675) | `6a16b291fea7b27de9c4868feb01cba86ca8c50d` | 263 ahead / 98 behind | Ready for review but diverged/non-mergeable; no current exact-head runs; canonical task-generation/Clear All owner |
 | [#676](https://github.com/AbrarulHaque8541/daymark/pull/676) | `546695a168c340666677558efafd77a6bbbf25e0` | 59 ahead / 98 behind | Diverged; 8/9 old exact-head workflows pass, Focus lifecycle failed |
 | [#743](https://github.com/AbrarulHaque8541/daymark/pull/743) | `52daab73dc49a7382e68684f4c05dab171958899` | 1 ahead / 1 behind | 4/4 workflows pass; draft; focused Android address-notice polish; physical/TalkBack QA NOT TESTED |
 | [#744](https://github.com/AbrarulHaque8541/daymark/pull/744) | `4cd564a86d8dd3594fbed9d3f2fda818ab601bd3` | 5 ahead / 0 behind | Ready for review; 4/4 exact-head workflows pass; no independent APPROVED review; not merged |
 | [#747](https://github.com/AbrarulHaque8541/daymark/pull/747) | `c086ef7d3def2e26cd9262bd5a30067b8f138643` | 1 ahead / 0 behind | Ready for review; 4/4 exact-head workflows pass; 919/919 Node tests; no independent APPROVED review; overlaps #675 on `index.html`/`webhook-ui.js` |
-| #748 | Documentation status refresh | — | This status index/snapshot PR; pre-correction head `6e3db20896ec294d765ad17129549c68b55ffe0c` had 3/3 workflows pass; corrected snapshot commit will rerun CI |
+| #748 | Documentation status refresh | — | This status index/snapshot PR; prior candidate head `9fbd89e5b841757570805ecdf8656c614b03f424` has cross-platform contracts PASS; Android CI and artifact build still running; this corrected Focus repeatability snapshot will rerun CI |
 
 PR #745 was closed as superseded after all three source commits were preserved as a parent of the combined PR #744 head. PR #746 merged at `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; issue #740 is closed. PR #737 (Electron 45.3.0/lockfile), PR #736 (prior status snapshot), and PR #704 (Service Worker enforcement) are merged.
 
@@ -55,7 +55,7 @@ PR #744 combines the shell refresh and URL-free download progress/completion/can
 - [Android PR artifact validation #43067500537](https://github.com/AbrarulHaque8541/daymark/actions/runs/43067500537): PASS.
 - [Non-publishing device artifact #43067500479](https://github.com/AbrarulHaque8541/daymark/actions/runs/43067500479): PASS. This is CI artifact validation, not physical-device testing.
 
-PR #747 removes the web page's inaccurate encrypted-storage metadata claim, adds a visible localStorage/no-prototype-encryption disclosure linked to Export/Import, updates the Focus timer documentation, and describes direct HTTPS webhook delivery with bounded retry behavior. It does not change Android encryption or runtime delivery/storage logic. It overlaps #675 on `index.html` and `webhook-ui.js`; merge #747 only after independent review, then rebase #675 and preserve these changes.
+PR #747 removes the web page's inaccurate encrypted-storage metadata claim, adds a visible localStorage/no-prototype-encryption disclosure linked to Export/Import, updates the Focus timer documentation, and describes direct HTTPS webhook delivery with bounded retry behavior. It does not change Android encryption or runtime delivery/storage logic. Review suggested including Focus session history in the visible disclosure because it also lives in localStorage. The PR overlaps #675 on `index.html` and `webhook-ui.js`; merge #747 only after independent review, then rebase #675 and preserve these changes.
 
 ## Prioritized engineering backlog
 
@@ -64,13 +64,13 @@ PR #747 removes the web page's inaccurate encrypted-storage metadata claim, adds
 1. **Stale task resurrection — [#683](https://github.com/AbrarulHaque8541/daymark/issues/683):** current `app.js` blob `8f00089188bb6647c1efaaaedec363d9ff567c91` still writes the full in-memory task array directly to `localStorage`; no generation fence or origin-wide mutation lock is integrated on main. A stale tab can restore tasks after Clear All. PR #675 is the shared coordinator owner; do not create a competing coordinator.
 2. **Atomic Clear All — [#689](https://github.com/AbrarulHaque8541/daymark/issues/689):** PR #746 fixes the visible dedicated Clear All button and keeps Clear status non-destructive, but the current handler calls only `storageApi.clearAll(storage)`. It does not coordinate task-generation, active webhook config/fingerprint/input, memory-only queue, in-flight flush/delivery, Telegram post-await preference writes, or legacy cleanup failure reporting. Preserve lock order: task mutation → webhook delivery → webhook queue → Focus mutation. Do not report full success if a managed subsystem fails.
 3. **Android browser downloads — [#671](https://github.com/AbrarulHaque8541/daymark/issues/671):** current main `MainActivity.java` blob `ca1f440c766836e3bb8e6a8d31d00d41730d1ae8` still uses DownloadManager with original URL/User-Agent/cookies. PR #648 is 202/121 diverged. Keep new downloads fail-closed until DNS-pinned transport, TLS/hostname verification, per-hop redirect validation, origin-scoped credentials, bounded transfer, cancellation/cleanup and atomic SAF/MediaStore publication are integrated. Preserve ordinary HTTP/HTTPS browsing.
-4. **Focus/TaskEditor acceptance — [#613](https://github.com/AbrarulHaque8541/daymark/issues/613):** one API 29/36 lifecycle run passed, but ten consecutive API 36 passes and physical-device acceptance remain incomplete. The connected GitHub integration has no new workflow-dispatch action; owner/maintainer must trigger repeatability runs or approve a repeat matrix.
+4. **Focus/TaskEditor acceptance — [#613](https://github.com/AbrarulHaque8541/daymark/issues/613):** current main has one successful API 29/36 lifecycle run, but ten real API 36 instrumentation runs have not passed on an exact current head. PR #648 already contains `focus-timer-emulator.yml` with `DAYMARK_FOCUS_EMULATOR_REPEAT_COUNT=10` for API 36, a helper that clears only the disposable app data between runs and fails fast without retries, and tests for that policy. The branch is 202/121 diverged and has no exact-head run; its owner must synchronize and push to the `integration/focus-*` trigger to execute the actual ten runs. The helper-policy test alone is not acceptance. Physical-device acceptance remains separate and NOT TESTED.
 5. **Main governance — [#646](https://github.com/AbrarulHaque8541/daymark/issues/646):** main still reports `protected=false`, rulesets `[]`; owner/admin must configure required CI, independent approval, stale-review dismissal and no bypass. No protection bypass was attempted.
 
 ### P1 — platform security and data compatibility
 
 6. **Desktop download provenance/user gesture — [#739](https://github.com/AbrarulHaque8541/daymark/issues/739):** PR #744 covers URL-free progress/completion/cancellation/failure feedback. URL-chain/provenance and user-gesture audit remain open; no consent gate was added.
-7. **Web storage disclosure — [#742](https://github.com/AbrarulHaque8541/daymark/issues/742):** PR #747 supplies the visible disclosure and removes the inaccurate metadata claim; keep #742 open until independently reviewed/merged.
+7. **Web storage disclosure — [#742](https://github.com/AbrarulHaque8541/daymark/issues/742):** PR #747 supplies a visible task-data disclosure and removes the inaccurate metadata claim; review suggested also naming Focus session history. Keep #742 open until independently reviewed/merged.
 8. **iCalendar/import integrity — [#656](https://github.com/AbrarulHaque8541/daymark/pull/656):** preserve repeated CATEGORIES and duplicate-singleton protections while rebasing without stale Focus history.
 9. **Extension SPA/privacy — [#676](https://github.com/AbrarulHaque8541/daymark/pull/676):** complete page-scoped injection, SPA reevaluation and metadata privacy; validate in System WebView.
 10. **Telegram delivery/CORS — [#700](https://github.com/AbrarulHaque8541/daymark/issues/700):** real browser/WebView delivery remains NOT TESTED.
@@ -110,6 +110,6 @@ PR #747 removes the web page's inaccurate encrypted-storage metadata claim, adds
 **Work by:** ChatGPT (OpenAI)  
 **Model:** GPT-6  
 **Tooling:** GitHub connector via Code Mode; GitHub Git Data/Actions APIs; exact-head source/diff/job/log review  
-**Timestamp (UTC):** 2026-11-11T17:32:03Z
+**Timestamp (UTC):** 2026-11-11T17:35:28Z
 
 The GitHub connector records the authenticated repository account in commit metadata; this snapshot identifies the engineering agent and does not claim human authorship.
