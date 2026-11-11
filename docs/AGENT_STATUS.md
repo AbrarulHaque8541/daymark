@@ -1,5 +1,4 @@
 - [Daymark whole-project engineering status — 2026-11-11T17:38:27.740Z (main 9f1c0451; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 922/922; #747 919/919)](./CURRENT_STATUS_20261111T173827Z.md)
-- Superseded intermediate snapshot: [CURRENT_STATUS_20261111T173528Z.md](./CURRENT_STATUS_20261111T173528Z.md) — preserved as historical evidence; its #744 head/test count and open-issue inventory were stale at creation; use the 17:38Z reviewed snapshot above instead.
 - [Daymark engineering status — 20261111T170455Z (storage card dedicated Clear all binding, issue #740)](./CURRENT_STATUS_20261111T170455Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T13:11:35Z (main 0e268420; 746 branches / 6 open PRs / 23 open issues; main audit 910/910; task/Clear All/download P0 blockers)](./CURRENT_STATUS_20261111T131135Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T12:20:00Z (main 0e268420; 746 branches / 6 open PRs / 22 open issues; main CI green; Electron 45.3.0 upgrade PR 5/5 checks pass; download/Clear All remain P0)](./CURRENT_STATUS_20261111T122000Z.md)
