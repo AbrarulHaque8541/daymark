@@ -1,6 +1,7 @@
 apps/desktop/test/download-handler.test.js
 apps/desktop/test/download-policy.test.js
 apps/desktop/test/download-publish.test.js
+apps/desktop/test/electron-runtime.test.js
 apps/desktop/test/renderer-address-policy.test.js
 apps/desktop/test/request-policy.test.js
 apps/desktop/test/rules.test.js
@@ -10,6 +11,8 @@ desktop-spike/task-core.test.js
 test/ci-test-honesty.test.js
 test/task-focus-session-coordinator.test.js
 test/task-focus-timer.test.js
+tests/air-quality-logic.test.js
+tests/air-quality-ui.test.js
 tests/app-focus.test.js
 tests/app-markup-contract.test.js
 tests/app-recovery-backup.test.js
@@ -30,6 +33,8 @@ tests/browser-proxy-logic.test.js
 tests/browser-proxy-ui.test.js
 tests/currency-logic.test.js
 tests/currency-ui.test.js
+tests/daylight-logic.test.js
+tests/daylight-ui.test.js
 tests/device-acceptance-workflow.test.js
 tests/device-adapter.test.js
 tests/device-capability-policy.test.js
@@ -49,6 +54,7 @@ tests/markup-hygiene.test.js
 tests/nightly-placeholder-guard.test.js
 tests/node-test-registration-guard.test.js
 tests/press-feedback-css.test.js
+tests/product-language-contract.test.js
 tests/reduced-motion.test.js
 tests/release-action-runtime.test.js
 tests/repeat-contract.test.js
@@ -66,6 +72,7 @@ tests/weather-ui.test.js
 tests/web-accessibility.test.js
 tests/webhook-logic.test.js
 tests/webhook-ui.test.js
+tests/workflow-lint-contract.test.js
 tests/wiki-logic.test.js
 tests/wiki-ui.test.js
 tests/zones-logic.test.js

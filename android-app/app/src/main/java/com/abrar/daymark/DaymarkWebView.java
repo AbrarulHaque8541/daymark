@@ -27,7 +27,6 @@ import android.util.Log;
  * WebView instance is constructed.
  */
 final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.Tab {
-
     // Java initializes this class before invoking the first constructor, so the global
     // ServiceWorkerController client is installed before super(activity) creates a WebView.
     private static final boolean SERVICE_WORKER_NETWORK_POLICY_READY =
@@ -186,11 +185,11 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
 
     private final ExtensionRuntime extensionRuntime;
     private final BrowserNetworkPolicy networkPolicy;
+    private final Listener listener;
+
     static boolean isServiceWorkerNetworkPolicyReady() {
         return SERVICE_WORKER_NETWORK_POLICY_READY;
     }
-
-    private final Listener listener;
 
     boolean isShowingCustomView() {
         return fullscreenView != null;
@@ -212,6 +211,8 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                    boolean safeBrowsingEnabled, Listener listener) {
         super(activity);
         this.networkPolicy = networkPolicy;
+        this.listener = listener;
+        this.extensionRuntime = ExtensionRuntime.create(activity);
         if (BrowserServiceWorkerPolicy.shouldShowCompatibilityNotice()) {
             String disclosure = BrowserServiceWorkerPolicy.compatibilityDisclosure();
             if (!SERVICE_WORKER_NETWORK_POLICY_READY) {
@@ -219,8 +220,6 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             }
             android.widget.Toast.makeText(activity, disclosure, android.widget.Toast.LENGTH_LONG).show();
         }
-        this.listener = listener;
-        this.extensionRuntime = ExtensionRuntime.create(activity);
         try {
             android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
             cookieManager.setAcceptCookie(true);
@@ -277,8 +276,8 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 // Android intent:// links are parsed into a fresh, allowlisted ACTION_VIEW intent.
                 // Component names, selectors, arbitrary extras and launch flags are never forwarded.
                 if ("intent".equalsIgnoreCase(scheme)) {
-                    // Subframes and script-driven navigations must not promote an intent URI
-                    // into a top-level WebView load or open the system app chooser.
+                    // Untrusted subframes and script-driven navigations must never trigger
+                    // a top-level load or an external app chooser.
                     if (!BrowserIntentHandoffPolicy.allows(request.isForMainFrame(), request.hasGesture())) {
                         return true;
                     }
