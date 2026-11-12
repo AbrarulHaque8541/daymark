@@ -456,3 +456,9 @@ test('Clear empties only the token; chat target preference remains', () => {
   assert.match(doc.elements['telegram-status'].textContent, /chat target remains available/);
   assert.doesNotMatch(doc.elements['telegram-status'].textContent, /nothing was ever saved/);
 });
+
+
+test('index.html edit-repeat empty option says No repeat and telegram status is atomic live region', () => {
+  assert.match(indexSource, /<select id="edit-repeat"[^>]*>[\s\S]*?<option value="">No repeat<\/option>/, 'edit repeat empty option must say No repeat');
+  assert.match(indexSource, /id="telegram-status"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/, 'telegram status must be an atomic live region');
+});
