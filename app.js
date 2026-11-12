@@ -2053,9 +2053,24 @@
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
     const feedClear = $('#feed-clear');
     if (feedClear) feedClear.addEventListener('click', clearFeed);
-    $('#focus-start').addEventListener('click', () => startFocus(null));
-    $('#focus-pause').addEventListener('click', toggleFocusPause);
-    $('#focus-stop').addEventListener('click', () => endFocusSession(false));
+    function withBriefBusy(button, handler) {
+      if (!button) return;
+      button.addEventListener('click', (event) => {
+        button.classList.add('is-busy');
+        try {
+          handler(event);
+        } finally {
+          if (typeof setTimeout === 'function') {
+            setTimeout(() => button.classList.remove('is-busy'), 160);
+          } else {
+            button.classList.remove('is-busy');
+          }
+        }
+      });
+    }
+    withBriefBusy($('#focus-start'), () => startFocus(null));
+    withBriefBusy($('#focus-pause'), toggleFocusPause);
+    withBriefBusy($('#focus-stop'), () => endFocusSession(false));
     $('#focus-task').addEventListener('change', (event) => {
       state.focusTaskId = event.currentTarget.value;
     });
