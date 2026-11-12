@@ -479,7 +479,7 @@
             <button class="button button-quiet" id="telegram-test" type="button">Test</button>
             <button class="button button-quiet" id="telegram-clear" type="button">Clear token</button>
           </form>
-          <p class="feed-status" id="telegram-status" role="status" aria-live="polite"></p>
+          <p class="feed-status" id="telegram-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
         <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
@@ -518,7 +518,7 @@
       </select>
       <label class="sr-only" for="edit-repeat">Repeat</label>
       <select id="edit-repeat" name="repeat">
-        <option value="">No reminder</option>
+        <option value="">No repeat</option>
         <option value="daily">Daily</option>
         <option value="weekly">Weekly</option>
         <option value="monthly">Monthly</option>
@@ -557,3 +557,4 @@
   </div>
 </body>
 </html>
+
