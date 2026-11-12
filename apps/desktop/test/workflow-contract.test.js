@@ -115,11 +115,30 @@ test('download publication failures reach the renderer through a URL-free IPC co
     'the renderer can release its progress IPC listener');
 
   const received = [];
-  const unsubscribe = exposedApi.onDownloadFailed((filename) => received.push(filename));
+  const unsubscribe = exposedApi.onDownloadFailed((failure) => received.push(failure));
   const listener = listeners.get('download-failed');
   assert.equal(typeof listener, 'function');
-  listener({}, 'report-safe.txt');
-  assert.deepEqual(received, ['report-safe.txt']);
+  listener({}, {
+    filename: 'report-safe.txt',
+    preflight: true,
+    cancellationConfirmed: false,
+    url: 'https://private.invalid/path?token=secret',
+  });
+  listener({}, { filename: '', preflight: true, cancellationConfirmed: false });
+  listener({}, { filename: 'report-safe.txt', preflight: false, cancellationConfirmed: false });
+  listener({}, { filename: 'report-safe.txt', preflight: false, cancellationConfirmed: null });
+  assert.deepEqual(received, [
+    {
+      filename: 'report-safe.txt',
+      preflight: true,
+      cancellationConfirmed: false,
+    },
+    {
+      filename: 'report-safe.txt',
+      preflight: false,
+      cancellationConfirmed: null,
+    },
+  ], 'preload exposes only validated URL-free cancellation state for preflight and terminal failures');
   unsubscribe();
   assert.equal(listeners.has('download-failed'), false,
     'the renderer can release its IPC listener');
@@ -148,7 +167,7 @@ test('download publication failures reach the renderer through a URL-free IPC co
   const renderer = fs.readFileSync(rendererPath, 'utf8');
   const rendererHtml = fs.readFileSync(rendererHtmlPath, 'utf8');
   const progressHandlerStart = main.indexOf('onProgress: (filename, percent) => {');
-  const failureHandlerStart = main.indexOf('onFailed: (filename) => {');
+  const failureHandlerStart = main.indexOf('onFailed: (filename, details) => {');
   assert.ok(progressHandlerStart >= 0 && failureHandlerStart > progressHandlerStart);
   const progressHandler = main.slice(progressHandlerStart, failureHandlerStart);
   assert.ok(progressHandler.includes("webContents.send('download-progress', { filename, percent })"));
@@ -157,10 +176,15 @@ test('download publication failures reach the renderer through a URL-free IPC co
   const cleanupHandlerStart = main.indexOf('onCleanupError:', failureHandlerStart);
   assert.ok(failureHandlerStart >= 0 && cleanupHandlerStart > failureHandlerStart);
   const failureHandler = main.slice(failureHandlerStart, cleanupHandlerStart);
-  assert.ok(failureHandler.includes("webContents.send('download-failed', filename)"),
-    'main forwards only the sanitized basename on the dedicated failure channel');
+  assert.ok(failureHandler.includes("webContents.send('download-failed', {")
+      && failureHandler.includes('filename,')
+      && failureHandler.includes('preflight,')
+      && failureHandler.includes('cancellationConfirmed,' ),
+    'main forwards the sanitized basename and explicit cancellation certainty');
   assert.ok(!/url/i.test(failureHandler),
     'failure IPC must not include a remote URL');
+  assert.ok(main.includes('if (!result.ok && !result.cancelled && !result.cancellationRequested)'),
+    'the fallback item.cancel request must not be logged as though no cancellation request was issued');
   const completedHandlerStart = main.indexOf('onCompleted: (filename) => {');
   const cancelledHandlerStart = main.indexOf('onCancelled: (filename) => {');
   assert.ok(completedHandlerStart >= 0 && cancelledHandlerStart > completedHandlerStart);
@@ -175,9 +199,12 @@ test('download publication failures reach the renderer through a URL-free IPC co
     'renderer shows URL-free progress in the existing status toast');
   assert.ok(rendererHtml.includes('id="toast" role="status" aria-live="polite" aria-atomic="true"'),
     'download lifecycle updates are announced through an accessible polite status region');
-  assert.ok(renderer.includes('window.daymark.onDownloadFailed((name) => {')
+  assert.ok(renderer.includes('window.daymark.onDownloadFailed((failure) => {')
+      && renderer.includes('failure.preflight === true && failure.cancellationConfirmed === false')
+      && renderer.includes('cancellation could not be confirmed. Check Downloads before retrying.')
+      && renderer.includes('the download was cancelled and no file was published.')
       && renderer.includes("toast('Could not safely save ' + safeName + '; no file was published.')"),
-    'renderer gives the user a visible, URL-free failure status');
+    'renderer distinguishes confirmed cancellation from an unconfirmed preflight failure without exposing URLs');
   assert.ok(renderer.includes('window.daymark.onDownloadCompleted((name) => {')
       && renderer.includes("toast('Saved to Downloads: ' + safeName);"),
     'renderer confirms only a successfully published file');

@@ -30,7 +30,7 @@ function makeItem(filename, options = {}) {
 
 function makeStaging(options = {}) {
   let sequence = 0;
-  const calls = { created: [], published: [], cleaned: [], failed: [], completed: [], cancelled: [], progress: [], cleanupErrors: [], order: [] };
+  const calls = { created: [], published: [], cleaned: [], failed: [], failureDetails: [], completed: [], cancelled: [], progress: [], cleanupErrors: [], order: [] };
   return {
     calls,
     createStagingPath(finalPath) {
@@ -51,7 +51,11 @@ function makeStaging(options = {}) {
       if (options.cleanupThrows) throw new Error('staging cleanup failed');
     },
     onProgress(filename, percent) { calls.progress.push({ filename, percent }); },
-    onFailed(filename) { calls.order.push('failed'); calls.failed.push(filename); },
+    onFailed(filename, details) {
+      calls.order.push('failed');
+      calls.failed.push(filename);
+      calls.failureDetails.push(details ?? null);
+    },
     onCompleted(filename) { calls.order.push('completed'); calls.completed.push(filename); },
     onCancelled(filename) { calls.order.push('cancelled'); calls.cancelled.push(filename); },
     onCleanupError() { calls.order.push('cleanup-error'); calls.cleanupErrors.push(true); },
@@ -165,7 +169,7 @@ test('allocation failure prevents the Electron default destination', () => {
   assert.equal(reservedPaths.size, 0);
 });
 
-test('setSavePath failure cleans staging, releases reservation and falls back to item.cancel', () => {
+test('setSavePath failure requests item.cancel without claiming terminal cancellation', () => {
   const item = makeItem('report.txt', { setSavePathThrows: true });
   const reservedPaths = new Set();
   const staging = makeStaging();
@@ -179,12 +183,42 @@ test('setSavePath failure cleans staging, releases reservation and falls back to
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.cancelled, true);
-  assert.equal(item.cancelled, true);
+  assert.equal(result.cancelled, false, 'item.cancel() returning is not terminal confirmation');
+  assert.equal(result.cancellationRequested, true);
+  assert.equal(item.cancelled, true, 'the cancellation request was issued');
   assert.equal(staging.calls.created.length, 1);
   assert.deepEqual(staging.calls.cleaned, staging.calls.created);
   assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: false }]);
   assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.order, ['cleanup', 'failed']);
+  assert.equal(reservedPaths.size, 0);
+});
+
+test('a synchronous done event from fallback cancellation cannot enter staged publication after preflight failure', () => {
+  const item = makeItem('report.txt', { setSavePathThrows: true });
+  item.cancel = () => {
+    item.cancelled = true;
+    item.emit('done', null, 'cancelled');
+  };
+  const reservedPaths = new Set();
+  const staging = makeStaging();
+  const result = handleWillDownload({
+    event: { preventDefault() { throw new Error('event already invalidated'); } },
+    item,
+    downloadDirectory: downloads,
+    exists: () => false,
+    reservedPaths,
+    ...staging,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.cancelled, false);
+  assert.equal(result.cancellationRequested, true);
+  assert.deepEqual(staging.calls.published, []);
+  assert.deepEqual(staging.calls.cancelled, []);
+  assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: false }]);
   assert.deepEqual(staging.calls.order, ['cleanup', 'failed']);
   assert.equal(reservedPaths.size, 0);
 });
@@ -203,9 +237,11 @@ test('preflight cleanup failure is reported while the unsafe download is failed'
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.cancelled, true);
+  assert.equal(result.cancelled, false, 'the fallback cancellation request is not yet confirmed');
+  assert.equal(result.cancellationRequested, true);
   assert.deepEqual(staging.calls.cleanupErrors, [true]);
   assert.deepEqual(staging.calls.failed, ['report.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: false }]);
   assert.deepEqual(staging.calls.cancelled, []);
   assert.deepEqual(staging.calls.order, ['cleanup', 'cleanup-error', 'failed']);
   assert.equal(reservedPaths.size, 0);
@@ -226,8 +262,10 @@ test('preflight failure reports a sanitized filename even when cancellation cann
 
   assert.equal(result.ok, false);
   assert.equal(result.cancelled, false);
+  assert.equal(result.cancellationRequested, false);
   assert.equal(result.filename, '_secret.txt');
   assert.deepEqual(staging.calls.failed, ['_secret.txt']);
+  assert.deepEqual(staging.calls.failureDetails, [{ preflight: true, cancellationConfirmed: false }]);
   assert.deepEqual(staging.calls.cancelled, []);
   assert.equal(reservedPaths.size, 0);
 });
@@ -267,7 +305,7 @@ test('renderer notification failure does not cancel a staged download', async ()
   assert.equal(reservedPaths.size, 0);
 });
 
-test('directory lookup failure cancels before creating staging', () => {
+test('directory lookup failure requests cancellation before creating staging', () => {
   const item = makeItem('report.txt');
   const reservedPaths = new Set();
   const staging = makeStaging();
@@ -281,7 +319,8 @@ test('directory lookup failure cancels before creating staging', () => {
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.cancelled, true);
+  assert.equal(result.cancelled, false, 'item.cancel() request is not terminal confirmation');
+  assert.equal(result.cancellationRequested, true);
   assert.equal(item.cancelled, true);
   assert.equal(staging.calls.created.length, 0);
   assert.deepEqual(staging.calls.failed, ['report.txt']);

@@ -7,7 +7,9 @@ function cancelUnsafeDownload(event, item) {
   try {
     if (event && typeof event.preventDefault === 'function') {
       event.preventDefault();
-      return true;
+      // Electron documents preventDefault() in will-download as an immediate
+      // cancellation: the DownloadItem is unavailable on the next tick.
+      return { requested: true, confirmed: true };
     }
   } catch {
     // Electron may have invalidated the will-download event; try the item API.
@@ -15,12 +17,13 @@ function cancelUnsafeDownload(event, item) {
   try {
     if (item && typeof item.cancel === 'function') {
       item.cancel();
-      return true;
+      // cancel() requests cancellation; only the terminal done event confirms it.
+      return { requested: true, confirmed: false };
     }
   } catch {
-    // The caller receives cancelled=false and must not assume the download stopped.
+    // The caller receives an unconfirmed result and must not assume the download stopped.
   }
-  return false;
+  return { requested: false, confirmed: false };
 }
 
 /**
@@ -132,13 +135,16 @@ function handleWillDownload(options) {
 
     return { ok: true, path: finalPath, stagingPath, filename: path.basename(finalPath) };
   } catch {
-    const cancelled = cancelUnsafeDownload(opts.event, item);
+    // Retire normal publication listeners before asking Electron to cancel. A
+    // synchronous/late done event after a failed preflight must never enter the
+    // normal staged-file publication path.
     if (doneListener && item && typeof item.removeListener === 'function') {
       try { item.removeListener('done', doneListener); } catch { /* Best effort. */ }
     }
     if (progressListener && item && typeof item.removeListener === 'function') {
       try { item.removeListener('updated', progressListener); } catch { /* Best effort. */ }
     }
+    const cancellation = cancelUnsafeDownload(opts.event, item);
     if (stagingPath && typeof opts.cleanupStaging === 'function') {
       try {
         opts.cleanupStaging(stagingPath, directory);
@@ -152,12 +158,18 @@ function handleWillDownload(options) {
       opts.reservedPaths.delete(reservationKey(finalPath));
     }
     if (typeof opts.onFailed === 'function') {
-      try { opts.onFailed(filename); } catch { /* Renderer notification must not change the download outcome. */ }
+      try {
+        opts.onFailed(filename, {
+          preflight: true,
+          cancellationConfirmed: cancellation.confirmed,
+        });
+      } catch { /* Renderer notification must not change the download outcome. */ }
     }
     return {
       ok: false,
       reason: 'unsafe-download-destination',
-      cancelled,
+      cancelled: cancellation.confirmed,
+      cancellationRequested: cancellation.requested,
       filename,
     };
   }
