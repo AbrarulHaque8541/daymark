@@ -1719,6 +1719,15 @@
     if (entry) state.focusLog = focus.appendLogEntry(state.focusLog, entry);
     const task = state.focusSession.taskId ? state.tasks.find((item) => item.id === state.focusSession.taskId) : null;
     state.focusSession = null;
+    if (completed) {
+      const card = $("#focus-card");
+      if (card) {
+        card.classList.add("is-complete");
+        if (typeof setTimeout === "function") {
+          setTimeout(() => card.classList.remove("is-complete"), 1600);
+        }
+      }
+    }
     const saved = persistFocusState();
     stopFocusTimer();
     renderFocus();
