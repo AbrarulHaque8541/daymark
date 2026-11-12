@@ -31,6 +31,7 @@ function frozenDate(nowMs) {
 function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null, savedPreset = null, failWrites = new Set(), withFocus = true, now = null } = {}) {
   const elements = new Map();
   const storedValues = new Map();
+  const timeouts = [];
   if (savedValue !== null) storedValues.set(STORAGE_KEY, savedValue);
   if (savedFocus !== null) storedValues.set(FOCUS_KEY, savedFocus);
   if (savedFocusBackup !== null) storedValues.set(FOCUS_BACKUP_KEY, savedFocusBackup);
@@ -53,6 +54,7 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
         classList: {
           add: (name) => classes.add(name),
           remove: (name) => classes.delete(name),
+          contains: (name) => classes.has(name),
           toggle: (name, force) => {
             const enabled = force === undefined ? !classes.has(name) : force;
             if (enabled) classes.add(name);
@@ -65,7 +67,8 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
           const listener = listeners.get(type);
           if (listener) listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
         },
-        setAttribute: (name, value) => attributes.set(name, value),
+        setAttribute: (name, value) => attributes.set(name, String(value)),
+        getAttribute: (name) => attributes.has(name) ? attributes.get(name) : null,
         removeAttribute: (name) => attributes.delete(name),
         querySelector: (childSelector) => element(`${selector} ${childSelector}`),
         focus() {},
@@ -123,11 +126,18 @@ function bootApp({ savedValue = null, savedFocus = null, savedFocusBackup = null
     localStorage,
     window,
     clearTimeout() {},
-    setTimeout: () => 1,
+    setTimeout: (callback, delay) => { timeouts.push({ callback, delay }); return timeouts.length; },
     setInterval: () => 1
   }, { filename: 'app.js' });
 
-  return { elements, storedValues };
+  function runTimeouts(delay) {
+    const ready = timeouts.filter((timer) => delay === undefined || timer.delay === delay);
+    const pending = timeouts.filter((timer) => delay !== undefined && timer.delay !== delay);
+    timeouts.splice(0, timeouts.length, ...pending);
+    ready.forEach((timer) => timer.callback());
+  }
+
+  return { elements, storedValues, runTimeouts };
 }
 
 test('a persisted running focus session is revived and shows the remaining time', () => {
@@ -341,4 +351,34 @@ test('choosing a focus preset persists it for the next visit', () => {
     savedPreset: storedValues.get(FOCUS_PRESET_KEY)
   });
   assert.equal(reloaded.elements.get('#focus-time').textContent, '05:00');
+});
+
+test('Focus pause rejects repeated keyboard-equivalent activation while busy and releases the guard', () => {
+  const now = Date.now();
+  const session = focus.createSession({ kind: 'focus', durationMinutes: 25, taskId: null }, now);
+  const { elements, runTimeouts } = bootApp({
+    savedFocus: JSON.stringify({ session: focus.serialize(session), log: [] }),
+    now
+  });
+  const pause = elements.get('#focus-pause');
+
+  assert.equal(pause.textContent, 'Pause');
+  pause.dispatch('click', { detail: 0 }); // Keyboard-generated clicks have detail 0.
+  assert.equal(pause.textContent, 'Resume', 'the first activation pauses the session');
+  assert.equal(pause.getAttribute('aria-busy'), 'true', 'busy state is exposed to assistive technology');
+  assert.equal(pause.classList.contains('is-busy'), true);
+  assert.equal(pause.disabled, false, 'the guard does not overwrite state-driven disabled state');
+  assert.equal(pause.hidden, false, 'the guard does not overwrite state-driven visibility');
+
+  let prevented = false;
+  pause.dispatch('click', { detail: 0, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true, 'a repeated keyboard-equivalent activation is consumed');
+  assert.equal(pause.textContent, 'Resume', 'the second activation cannot immediately resume the session');
+
+  runTimeouts(160);
+  assert.equal(pause.getAttribute('aria-busy'), null, 'aria-busy is cleared when the visual busy interval ends');
+  assert.equal(pause.classList.contains('is-busy'), false);
+
+  pause.dispatch('click', { detail: 0 });
+  assert.equal(pause.textContent, 'Pause', 'the control accepts a new activation after the guard is released');
 });
