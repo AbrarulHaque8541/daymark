@@ -1,3 +1,4 @@
+- [Daymark engineering status — 20261112T023000Z (Cycle A: merged web copy/storage disclosure fixes)](./CURRENT_STATUS_20261112T023000Z.md)
 - [Daymark engineering status — 20261111T170455Z (storage card dedicated Clear all binding, issue #740)](./CURRENT_STATUS_20261111T170455Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T13:11:35Z (main 0e268420; 746 branches / 6 open PRs / 23 open issues; main audit 910/910; task/Clear All/download P0 blockers)](./CURRENT_STATUS_20261111T131135Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T12:20:00Z (main 0e268420; 746 branches / 6 open PRs / 22 open issues; main CI green; Electron 45.3.0 upgrade PR 5/5 checks pass; download/Clear All remain P0)](./CURRENT_STATUS_20261111T122000Z.md)
@@ -92,7 +93,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261111T110500Z.md](CURRENT_STATUS_20261111T110500Z.md) — current main `0e268420b45c23732ff57f18f7307a0df5084a3a`; 4 open PRs / 21 open issues; main Android/contracts CI green; download, Clear All, import and governance blockers; snapshot UTC 2026-11-11T11:05:00Z.
+- [CURRENT_STATUS_20261112T023000Z.md](CURRENT_STATUS_20261112T023000Z.md) — Cycle A merged #747; current main `0ec4c6aae4c33e9257be30fb61a5377518e1db42`; physical device NOT TESTED.
+- Previous reviewed snapshot: [CURRENT_STATUS_20261111T110500Z.md](CURRENT_STATUS_20261111T110500Z.md) — historical.
 - Previous reviewed snapshot: [CURRENT_STATUS_20261111T013656Z.md](CURRENT_STATUS_20261111T013656Z.md) — historical main `5148232a7165f840fa895707890b829bcdc1657b`; 13 open PRs / 24 open issues; snapshot UTC 2026-11-11T01:36:56.051Z.
 - Previous snapshot: [CURRENT_STATUS_20261110T225419Z.md](CURRENT_STATUS_20261110T225419Z.md) — historical PR #724 baseline at main `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`.
 - [Daymark engineering status — 20261110T164211Z (offline app-link and intent handoff planner card)](./CURRENT_STATUS_20261110T164211Z.md)
