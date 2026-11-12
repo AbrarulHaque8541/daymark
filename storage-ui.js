@@ -38,12 +38,6 @@
     // Keep the initial state unknown until the user explicitly retries.
     if (!storageAccessFailed) acquireStorage();
     const storageApi = env.storageApi || root.DaymarkStorage || null;
-    // Optional coordinated modules. Prefer an injected handle for tests; fall
-    // back to the live page module so Clear All cannot leave memory-only
-    // webhook events deliverable after a successful durable clear (issue #689).
-    const webhookUi = Object.prototype.hasOwnProperty.call(env, 'webhookUi')
-      ? env.webhookUi
-      : (root.DaymarkWebhookUi || null);
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
 
@@ -84,85 +78,90 @@
       if (!listEl || typeof listEl.appendChild !== 'function') return;
       if (storageAccessFailed) {
         while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
-        status('Could not read local data: Browser storage is unavailable.');
         if (clearAllEl) clearAllEl.disabled = true;
-        if (clearStatusEl) clearStatusEl.disabled = true;
-        if (refreshEl) refreshEl.disabled = false;
+        status('Browser storage could not be accessed. Local data status is unknown; nothing was changed.');
         return;
       }
-      if (!storageAvailable()) {
+      let scan = null;
+      try {
+        scan = storageApi.scanStorage(storage);
+      } catch (error) {
         while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
-        status('Could not read local data: Browser storage is unavailable.');
         if (clearAllEl) clearAllEl.disabled = true;
-        if (clearStatusEl) clearStatusEl.disabled = true;
+        status('Could not read local data: '
+          + (error && error.message ? error.message : 'storage is unavailable.')
+          + ' Local data status is unknown; nothing was changed.');
         return;
       }
-      const scan = storageApi.scanStorage(storage);
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
-      let unreadableCount = 0;
-      for (const row of scan.rows) {
-        const li = doc.createElement('li');
-        li.className = 'storage-row';
-        const label = doc.createElement('div');
-        label.className = 'storage-row-label';
-        const title = doc.createElement('strong');
-        title.textContent = row.label;
-        label.appendChild(title);
-        const desc = doc.createElement('span');
-        desc.textContent = row.description;
-        label.appendChild(desc);
-        li.appendChild(label);
-        const meta = doc.createElement('div');
-        meta.className = 'storage-row-meta';
-        if (row.unreadable) {
-          unreadableCount += 1;
-          meta.textContent = 'Unreadable';
-          meta.classList.add('is-warning');
-        } else if (row.present) {
-          meta.textContent = storageApi.formatBytes(row.bytes) + ' · present';
-        } else {
-          meta.textContent = 'Empty';
+      const make = typeof doc.createElement === 'function'
+        ? (tag) => doc.createElement(tag) : () => null;
+      for (const category of scan.categories) {
+        const row = make('div');
+        if (!row) break;
+        if (typeof row.setAttribute === 'function') row.setAttribute('class', 'feed-item');
+        const unreadableCount = Array.isArray(category.unreadableKeys)
+          ? category.unreadableKeys.length : 0;
+        const title = make('span');
+        if (title) {
+          if (typeof title.setAttribute === 'function') title.setAttribute('class', 'feed-item-title');
+          let categoryState = ' — not present';
+          if (unreadableCount > 0) {
+            categoryState = category.present
+              ? ' — partially readable (about ' + storageApi.formatBytes(category.bytes) + ')'
+              : ' — status unknown (could not read)';
+          } else if (category.present) {
+            categoryState = ' — about ' + storageApi.formatBytes(category.bytes);
+          }
+          title.textContent = category.label + categoryState;
+          row.appendChild(title);
         }
-        li.appendChild(meta);
-        const clearBtn = doc.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'storage-clear-category';
-        clearBtn.dataset.category = row.id;
-        clearBtn.textContent = 'Clear';
-        clearBtn.disabled = !row.present || row.unreadable;
-        clearBtn.addEventListener('click', () => { onClearCategory(row.id); });
-        li.appendChild(clearBtn);
-        listEl.appendChild(li);
+        const summary = make('p');
+        if (summary) {
+          if (typeof summary.setAttribute === 'function') summary.setAttribute('class', 'feed-item-summary');
+          summary.textContent = category.description;
+          row.appendChild(summary);
+        }
+        const button = make('button');
+        if (button) {
+          if (typeof button.setAttribute === 'function') {
+            button.setAttribute('class', 'tool-button');
+            button.setAttribute('type', 'button');
+            button.setAttribute('data-clear-category', category.id);
+            button.setAttribute('aria-label', 'Clear ' + category.label + ' from this browser');
+          }
+          button.textContent = 'Clear';
+          button.disabled = !category.present && unreadableCount === 0;
+          if (typeof button.addEventListener === 'function') {
+            button.addEventListener('click', () => { onClearCategory(category.id); });
+          }
+          row.appendChild(button);
+        }
+        listEl.appendChild(row);
+      }
+      const unreadableCount = Number.isInteger(scan.unreadableCount) ? scan.unreadableCount : 0;
+      if (unreadableCount > 0) {
+        const known = scan.presentCount === 0
+          ? 'No readable local data was found'
+          : scan.presentCount + ' of ' + scan.categories.length + ' categories hold readable data (about '
+            + storageApi.formatBytes(scan.totalBytes) + ' total)';
+        const noun = unreadableCount === 1 ? 'category could not be checked' : 'categories could not be checked';
+        status(known + '; ' + unreadableCount + ' ' + noun
+          + '. Reported sizes exclude unreadable entries.');
+      } else if (scan.presentCount === 0) {
+        status('No local data is stored yet. Add a task or use a card to see it here.');
+      } else {
+        status(scan.presentCount + ' of ' + scan.categories.length
+          + ' categories hold data on this device (about '
+          + storageApi.formatBytes(scan.totalBytes) + ' total).');
       }
       if (clearAllEl) clearAllEl.disabled = scan.presentCount === 0 || unreadableCount > 0;
-      if (clearStatusEl) clearStatusEl.disabled = false;
-      if (unreadableCount > 0) {
-        status('Some items could not be read. Clear is blocked until storage is readable.');
-      } else if (scan.presentCount === 0) {
-        status('No managed Daymark data is stored in this browser.');
-      } else {
-        status(scan.presentCount + ' category group(s) hold data on this device (' +
-          storageApi.formatBytes(scan.totalBytes) + ').');
-      }
     }
 
-    function setBusy(busy) {
-      if (refreshEl) refreshEl.disabled = busy;
-      if (clearStatusEl) clearStatusEl.disabled = busy;
-      if (clearAllEl) {
-        clearAllEl.disabled = busy;
-        if (typeof clearAllEl.classList !== 'undefined') {
-          clearAllEl.classList.toggle('is-busy', busy);
-        }
-      }
-      if (listEl) {
-        const buttons = listEl.querySelectorAll('button');
-        for (const button of buttons) button.disabled = busy;
-      }
-    }
-
+    // Returns 'accepted', 'declined', or 'failed'. A failed confirmation prompt
+    // must never be reported back to the user as a plain cancellation.
     function confirmOrReport(message) {
-      if (typeof confirmImpl !== 'function') return 'failed';
+      if (!confirmImpl) return 'failed';
       try {
         return confirmImpl(message) ? 'accepted' : 'declined';
       } catch (error) {
@@ -171,7 +170,39 @@
     }
 
     function reportFailedConfirmation() {
-      status('Could not confirm the clear action in this browser. Nothing was cleared.');
+      status('Could not ask for confirmation. Nothing was cleared.');
+    }
+
+    function setBusy(busy) {
+      if (clearStatusEl) {
+        clearStatusEl.disabled = busy;
+        if (typeof clearStatusEl.classList !== 'undefined') {
+          clearStatusEl.classList.toggle('is-busy', busy);
+        }
+      }
+      if (clearAllEl) {
+        clearAllEl.disabled = busy;
+        if (typeof clearAllEl.classList !== 'undefined') {
+          clearAllEl.classList.toggle('is-busy', busy);
+        }
+      }
+      if (refreshEl) {
+        refreshEl.disabled = busy;
+        if (typeof refreshEl.classList !== 'undefined') {
+          refreshEl.classList.toggle('is-busy', busy);
+        }
+      }
+      if (listEl) listEl.setAttribute('aria-busy', busy ? 'true' : 'false');
+      if (typeof doc.querySelectorAll === 'function') {
+        doc.querySelectorAll('#data-list .tool-button').forEach(btn => {
+          if (btn) {
+            btn.disabled = busy;
+            if (typeof btn.classList !== 'undefined') {
+              btn.classList.toggle('is-busy', busy);
+            }
+          }
+        });
+      }
     }
 
     function onClearCategory(categoryId) {
@@ -181,11 +212,11 @@
       }
       const category = storageApi.categoryById(categoryId);
       if (!category) {
-        status('Unknown data category.');
+        status('Unknown data category. Nothing was cleared.');
         return;
       }
-      const outcome = confirmOrReport('Clear ' + category.label + '? ' + category.description +
-        ' This cannot be undone.');
+      const outcome = confirmOrReport('Clear ' + category.label + '? '
+        + category.description + ' This cannot be undone.');
       if (outcome === 'failed') {
         reportFailedConfirmation();
         return;
@@ -206,10 +237,15 @@
       }
       setBusy(false);
       if (result.failed.length > 0) {
+        const unreadable = Array.isArray(result.unreadable) && result.unreadable.length > 0;
         const message = result.removed.length === 0
-          ? 'Could not clear ' + category.label + ': the browser blocked removal.'
-          : 'Cleared part of ' + category.label + ' (' + result.removed.length
-            + ' item(s) removed). Nothing else was touched.';
+          ? unreadable
+            ? 'Could not clear ' + category.label + ': ' + result.unreadable.length
+              + ' item(s) could not be read. Nothing was cleared.'
+            : 'Could not clear ' + category.label + ': ' + result.failed.length
+              + ' item(s) could not be removed by the browser. Nothing was cleared.'
+          : 'Cleared ' + category.label + ', but ' + result.failed.length
+            + ' item(s) could not be removed by the browser.';
         render();
         status(message);
       } else {
@@ -248,29 +284,6 @@
           + (error && error.message ? error.message : 'storage is unavailable.'));
         return;
       }
-
-      // After durable keys are cleared, invalidate in-memory webhook state so a
-      // later online/Retry path cannot deliver pre-clear memory-only events
-      // (issue #689). Also advance the task generation fence so a stale tab
-      // cannot resurrect cleared tasks (issue #683).
-      let legacyCleanupFailed = false;
-      if (result && result.failedKeys.length === 0) {
-        try {
-          if (webhookUi && typeof webhookUi.resetQueueAfterExternalClear === 'function') {
-            const reset = webhookUi.resetQueueAfterExternalClear();
-            if (reset && reset.legacyCleanupFailed === true) legacyCleanupFailed = true;
-          }
-        } catch (error) {
-          // Webhook reset must not undo a successful durable clear; surface it.
-          legacyCleanupFailed = true;
-        }
-        try {
-          bumpTaskGeneration(storage);
-        } catch (error) {
-          // Generation fence is best-effort coordination metadata.
-        }
-      }
-
       setBusy(false);
       if (result.failedKeys.length > 0) {
         const unreadableKeys = Array.isArray(result.unreadableKeys) ? result.unreadableKeys : [];
@@ -284,35 +297,12 @@
             + result.failedKeys.length + ' item(s) could not be removed by the browser.';
         render();
         status(message);
-      } else if (legacyCleanupFailed) {
-        const message = 'Cleared all ' + result.removedKeys.length
-          + ' stored item(s), but a legacy secret-bearing webhook endpoint could not be removed. '
-          + 'Clear this site\'s browser data to finish cleanup. Nothing outside this browser was affected.';
-        render();
-        status(message);
       } else {
         const message = 'Cleared all ' + result.removedKeys.length
           + ' stored item(s). Nothing outside this browser was affected.';
         render();
         status(message);
       }
-    }
-
-    function bumpTaskGeneration(targetStorage) {
-      // Non-personal coordination marker. Excluded from CATEGORIES inventory so
-      // it is never counted as user data and is not itself cleared by clearAll.
-      const key = 'daymark.tasks.generation.v1';
-      if (!targetStorage || typeof targetStorage.getItem !== 'function'
-          || typeof targetStorage.setItem !== 'function') return;
-      let next = 1;
-      try {
-        const raw = targetStorage.getItem(key);
-        const parsed = raw == null ? 0 : Number(raw);
-        if (Number.isFinite(parsed) && parsed >= 0) next = Math.floor(parsed) + 1;
-      } catch (error) {
-        next = 1;
-      }
-      targetStorage.setItem(key, String(next));
     }
 
     if (refreshEl && typeof refreshEl.addEventListener === 'function') {
@@ -322,8 +312,10 @@
       });
     }
     if (clearStatusEl && typeof clearStatusEl.addEventListener === 'function') {
+      // Read-only by design: empties the status line only. It is deliberately
+      // never a fallback for the destructive clear-all handler (issue #740).
       clearStatusEl.addEventListener('click', () => {
-        status('Status cleared.');
+        if (statusEl) statusEl.textContent = '';
       });
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
@@ -333,10 +325,12 @@
     render();
 
     return {
+      render,
+      onClearCategory,
       onClearAll,
       detach() {
-        setBusy(false);
-        // Leave listeners; the attached handle goes out of scope.
+        // No document-level listener is registered; element references are
+        // dropped when the returned handle goes out of scope.
         if (clearAllEl) clearAllEl.disabled = false;
       }
     };
