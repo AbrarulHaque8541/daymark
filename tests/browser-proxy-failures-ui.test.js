@@ -25,6 +25,17 @@ function fakeElement(tag, doc) {
     getAttribute(name) { return el.attrs ? el.attrs[name] : null; },
     addEventListener(type, handler) { el.listeners.push({ type, handler }); }
   };
+  el.classList = {
+    add(name) {
+      const parts = el.className.split(/\s+/).filter(Boolean);
+      if (parts.indexOf(name) === -1) parts.push(name);
+      el.className = parts.join(' ');
+    },
+    remove(name) {
+      el.className = el.className.split(/\s+/).filter((part) => part && part !== name).join(' ');
+    },
+    contains(name) { return el.className.split(/\s+/).indexOf(name) !== -1; }
+  };
   Object.defineProperty(el, 'firstChild', { get() { return el.children[0] || null; } });
   el.removeChild = (child) => {
     const index = el.children.indexOf(child);
@@ -200,6 +211,33 @@ test('clear empties the view and the card never touches storage', () => {
   assert.equal(els.status.textContent, 'Cleared. Pick a scenario and tap Show.');
   const source = fs.readFileSync(path.join(__dirname, '..', 'browser-proxy-failures-ui.js'), 'utf8');
   assert.equal(source.indexOf('localStorage'), -1, 'the card must be stateless');
+});
+
+test('show and clear flash the shared brief busy feedback', () => {
+  const { env, doc } = fakeEnv();
+  const pending = [];
+  env.schedule = (fn) => { pending.push(fn); return 1; };
+  const handle = ui.attachBrowserProxyFailuresUi(env);
+  const els = elementsOf(doc);
+  assert.equal(els.show.getAttribute('aria-busy'), null);
+  assert.equal(els.show.classList.contains('is-busy'), false);
+  handle.onShow();
+  assert.equal(els.show.getAttribute('aria-busy'), 'true');
+  assert.equal(els.show.classList.contains('is-busy'), true);
+  assert.equal(els.clear.classList.contains('is-busy'), true);
+  assert.equal(els.clear.getAttribute('aria-busy'), null, 'quiet control gets visual feedback only');
+  assert.equal(pending.length, 1);
+  pending[0]();
+  assert.equal(els.show.getAttribute('aria-busy'), null);
+  assert.equal(els.show.classList.contains('is-busy'), false);
+  assert.equal(els.clear.classList.contains('is-busy'), false);
+  pending.length = 0;
+  handle.onClear();
+  assert.equal(els.show.getAttribute('aria-busy'), 'true');
+  assert.equal(els.clear.classList.contains('is-busy'), true);
+  pending[0]();
+  assert.equal(els.show.getAttribute('aria-busy'), null);
+  assert.equal(els.clear.classList.contains('is-busy'), false);
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
