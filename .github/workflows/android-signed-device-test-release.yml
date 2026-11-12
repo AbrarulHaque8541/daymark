@@ -299,6 +299,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Download the verified workflow payload
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
@@ -479,7 +481,7 @@ jobs:
             exit 1
           }
           downloaded="$RUNNER_TEMP/$APK_NAME"
-          curl --fail --location --retry 3 --silent --show-error "$download_url" --output "$downloaded"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 3 --silent --show-error "$download_url" --output "$downloaded"
           downloaded_size="$(stat -c '%s' "$downloaded")"
           downloaded_sha="$(sha256sum "$downloaded" | awk '{print $1}')"
           [[ "$downloaded_size" == "$EXPECTED_SIZE" ]] || { echo "FAIL: downloaded asset size mismatch" >&2; exit 1; }
@@ -494,4 +496,267 @@ jobs:
             echo "- API state: $state"
             echo "- Downloaded SHA-256: $downloaded_sha"
             echo '- Release API and browser download verification: PASS'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preflight an existing release provenance bundle
+        id: provenance-preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.payload.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.payload.outputs.title }}
+          APK_NAME: ${{ steps.payload.outputs.apk_name }}
+          APK_PATH: ${{ steps.payload.outputs.apk_path }}
+          EXPECTED_SHA256: ${{ steps.payload.outputs.sha256 }}
+          EXPECTED_SIZE: ${{ steps.payload.outputs.size_bytes }}
+          SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/android-signed-device-test-release.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_name="${APK_NAME}.sigstore.json"
+          release_json="$RUNNER_TEMP/daymark-provenance-preflight.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$release_json"
+          jq -e --arg tag "$TAG" --arg title "$RELEASE_TITLE" --arg apk "$APK_NAME" '
+            .tag_name == $tag
+            and .name == $title
+            and .draft == false
+            and .prerelease == true
+            and any(.assets[]?; .name == $apk and .state == "uploaded")
+          ' "$release_json" >/dev/null || {
+            echo "Expected verified device-test prerelease is missing or inconsistent; refusing provenance upload." >&2
+            exit 1
+          }
+
+          asset="$(jq -c --arg name "$bundle_name" '[(.assets // [])[] | select(.name == $name)] | .[0] // empty' "$release_json")"
+          if [[ -z "$asset" ]]; then
+            echo 'existing_bundle=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          asset_name="$(jq -r '.name // empty' <<< "$asset")"
+          asset_size="$(jq -r '.size // empty' <<< "$asset")"
+          asset_state="$(jq -r '.state // empty' <<< "$asset")"
+          asset_content_type="$(jq -r '.content_type // empty' <<< "$asset")"
+          asset_download_url="$(jq -r '.browser_download_url // empty' <<< "$asset")"
+          [[ "$asset_name" == "$bundle_name" && "$asset_state" == "uploaded" ]] || {
+            echo "Existing provenance asset metadata is invalid; refusing to overwrite it." >&2
+            exit 1
+          }
+          [[ "$asset_size" =~ ^[0-9]+$ ]] && (( asset_size > 0 )) && [[ -n "$asset_content_type" ]] || {
+            echo "Existing provenance asset size or content type is invalid; refusing to overwrite it." >&2
+            exit 1
+          }
+          [[ "$asset_download_url" == "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$bundle_name" ]] || {
+            echo "Existing provenance asset download URL is invalid; refusing to overwrite it." >&2
+            exit 1
+          }
+
+          download_dir="$RUNNER_TEMP/existing-release-provenance"
+          mkdir -p "$download_dir"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$bundle_name" --dir "$download_dir"
+          existing_bundle="$download_dir/$bundle_name"
+          test -s "$existing_bundle" || { echo "Existing provenance bundle is missing or empty." >&2; exit 1; }
+          [[ "$(stat -c '%s' "$existing_bundle")" == "$asset_size" ]] || {
+            echo "Existing provenance bundle size differs from GitHub Release metadata." >&2
+            exit 1
+          }
+          gh attestation verify "$APK_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "$existing_bundle" \
+            --signer-workflow "$SIGNER_WORKFLOW" \
+            --source-ref "$GITHUB_REF"
+          {
+            echo 'existing_bundle=true' >> "$GITHUB_OUTPUT"
+            echo "bundle_path=$existing_bundle" >> "$GITHUB_OUTPUT"
+          }
+
+      - name: Generate provenance for the exact signed APK
+        id: attest
+        if: steps.provenance-preflight.outputs.existing_bundle != 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2 (Node 24)
+        with:
+          subject-path: ${{ steps.payload.outputs.apk_path }}
+
+      - name: Publish and independently verify the provenance bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.payload.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.payload.outputs.title }}
+          APK_NAME: ${{ steps.payload.outputs.apk_name }}
+          APK_PATH: ${{ steps.payload.outputs.apk_path }}
+          EXPECTED_SHA256: ${{ steps.payload.outputs.sha256 }}
+          EXPECTED_SIZE: ${{ steps.payload.outputs.size_bytes }}
+          EXISTING_BUNDLE: ${{ steps.provenance-preflight.outputs.bundle_path }}
+          GENERATED_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/android-signed-device-test-release.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_name="${APK_NAME}.sigstore.json"
+          apk_sha256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
+          [[ "$apk_sha256" == "$EXPECTED_SHA256" ]] || {
+            echo "APK changed after payload verification; refusing to attest it." >&2
+            exit 1
+          }
+
+          if [[ -n "$EXISTING_BUNDLE" ]]; then
+            bundle_source="$EXISTING_BUNDLE"
+            echo "A valid same-tag provenance bundle already exists; it will not be overwritten."
+          else
+            test -s "$GENERATED_BUNDLE" || { echo "Generated provenance bundle is missing or empty." >&2; exit 1; }
+            bundle_source="$RUNNER_TEMP/$bundle_name"
+            cp "$GENERATED_BUNDLE" "$bundle_source"
+            gh attestation verify "$APK_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --bundle "$bundle_source" \
+              --signer-workflow "$SIGNER_WORKFLOW" \
+              --source-ref "$GITHUB_REF"
+            # Do not clobber an existing release asset; the preflight above fails closed on bad assets.
+            gh release upload "$TAG" "$bundle_source" --repo "$GITHUB_REPOSITORY"
+          fi
+
+          release_json="$RUNNER_TEMP/daymark-release-with-provenance.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$release_json"
+          jq -e --arg tag "$TAG" --arg title "$RELEASE_TITLE" '
+            .tag_name == $tag and .name == $title and .draft == false and .prerelease == true
+          ' "$release_json" >/dev/null || {
+            echo "Release metadata changed while publishing provenance; refusing further writes." >&2
+            exit 1
+          }
+          asset="$(jq -c --arg name "$bundle_name" '[(.assets // [])[] | select(.name == $name)] | .[0] // empty' "$release_json")"
+          [[ -n "$asset" ]] || { echo "Provenance release asset $bundle_name is missing." >&2; exit 1; }
+          asset_size="$(jq -r '.size // empty' <<< "$asset")"
+          asset_state="$(jq -r '.state // empty' <<< "$asset")"
+          asset_content_type="$(jq -r '.content_type // empty' <<< "$asset")"
+          asset_download_url="$(jq -r '.browser_download_url // empty' <<< "$asset")"
+          [[ "$(jq -r '.name // empty' <<< "$asset")" == "$bundle_name" && "$asset_state" == "uploaded" ]] || {
+            echo "Uploaded provenance asset metadata is invalid." >&2
+            exit 1
+          }
+          [[ "$asset_size" =~ ^[0-9]+$ ]] && (( asset_size > 0 )) && [[ -n "$asset_content_type" ]] || {
+            echo "Uploaded provenance asset size or content type is invalid." >&2
+            exit 1
+          }
+          [[ "$asset_download_url" == "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$bundle_name" ]] || {
+            echo "Uploaded provenance asset URL does not match the expected release download." >&2
+            exit 1
+          }
+
+          download_dir="$RUNNER_TEMP/verified-release-provenance"
+          mkdir -p "$download_dir"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$bundle_name" --dir "$download_dir"
+          downloaded_bundle="$download_dir/$bundle_name"
+          test -s "$downloaded_bundle" || { echo "Downloaded provenance asset is missing or empty." >&2; exit 1; }
+          [[ "$(stat -c '%s' "$downloaded_bundle")" == "$asset_size" ]] || {
+            echo "Downloaded provenance size differs from GitHub Release metadata." >&2
+            exit 1
+          }
+          cmp -s "$bundle_source" "$downloaded_bundle" || {
+            echo "Downloaded provenance bundle differs from the generated or preflight bundle." >&2
+            exit 1
+          }
+          gh attestation verify "$APK_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "$downloaded_bundle" \
+            --signer-workflow "$SIGNER_WORKFLOW" \
+            --source-ref "$GITHUB_REF"
+
+          api_verified=false
+          for attempt in 1 2 3 4 5; do
+            if gh attestation verify "$APK_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$SIGNER_WORKFLOW" \
+              --source-ref "$GITHUB_REF"; then
+              api_verified=true
+              break
+            fi
+            sleep 5
+          done
+          [[ "$api_verified" == "true" ]] || {
+            echo "GitHub Attestations API did not return a matching provenance record." >&2
+            exit 1
+          }
+          {
+            echo '### Device-test APK provenance'
+            echo
+            printf -- '- Subject: `%s` (SHA-256 `%s`)\n' "$APK_NAME" "$apk_sha256"
+            printf -- '- Release bundle: `%s`\n' "$bundle_name"
+            printf -- '- Signer workflow: `%s`\n' "$SIGNER_WORKFLOW"
+            printf -- '- Source ref: `%s`\n' "$GITHUB_REF"
+            echo '- Release bundle verification: PASS'
+            echo '- GitHub Attestations API verification: PASS'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Re-download and verify the final release APK after provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.payload.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.payload.outputs.title }}
+          APK_NAME: ${{ steps.payload.outputs.apk_name }}
+          APK_PATH: ${{ steps.payload.outputs.apk_path }}
+          EXPECTED_SHA256: ${{ steps.payload.outputs.sha256 }}
+          EXPECTED_SIZE: ${{ steps.payload.outputs.size_bytes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]] || {
+            echo 'Expected APK SHA-256 is not a lowercase 64-character digest.' >&2
+            exit 1
+          }
+          [[ "$EXPECTED_SIZE" =~ ^[1-9][0-9]*$ ]] || {
+            echo 'Expected APK size is not a positive decimal byte count.' >&2
+            exit 1
+          }
+
+          release_json="$RUNNER_TEMP/daymark-release-final-apk-check.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$release_json"
+          jq -e --arg tag "$TAG" --arg title "$RELEASE_TITLE" --arg apk "$APK_NAME" '
+            .tag_name == $tag
+            and .name == $title
+            and .draft == false
+            and .prerelease == true
+            and any(.assets[]?; .name == $apk and .state == "uploaded")
+          ' "$release_json" >/dev/null || {
+            echo 'Expected device-test prerelease or uploaded APK asset is missing or inconsistent.' >&2
+            exit 1
+          }
+
+          asset="$(jq -c --arg name "$APK_NAME" '[(.assets // [])[] | select(.name == $name)] | .[0] // empty' "$release_json")"
+          [[ -n "$asset" ]] || { echo "Final release APK asset $APK_NAME is missing." >&2; exit 1; }
+          asset_size="$(jq -r '.size // empty' <<< "$asset")"
+          asset_state="$(jq -r '.state // empty' <<< "$asset")"
+          asset_url="$(jq -r '.browser_download_url // empty' <<< "$asset")"
+          expected_asset_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$APK_NAME"
+          [[ "$asset_state" == "uploaded" && "$asset_size" == "$EXPECTED_SIZE" ]] || {
+            echo 'Final APK release metadata size or upload state differs from the verified payload.' >&2
+            exit 1
+          }
+          [[ "$asset_url" == "$expected_asset_url" ]] || {
+            echo 'Final APK asset URL does not match the expected GitHub Release download.' >&2
+            exit 1
+          }
+
+          download_dir="$RUNNER_TEMP/final-release-apk"
+          mkdir -p "$download_dir"
+          final_apk="$download_dir/$APK_NAME"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 3 --retry-delay 2 --silent --show-error \
+            --output "$final_apk" "$asset_url"
+          test -s "$final_apk" || { echo 'Final browser-downloaded APK is missing or empty.' >&2; exit 1; }
+          downloaded_size="$(stat -c '%s' "$final_apk")"
+          [[ "$downloaded_size" == "$EXPECTED_SIZE" ]] || {
+            echo 'Final browser-downloaded APK size differs from the verified payload.' >&2
+            exit 1
+          }
+          downloaded_sha256="$(sha256sum "$final_apk" | awk '{print $1}')"
+          [[ "$downloaded_sha256" == "$EXPECTED_SHA256" ]] || {
+            echo 'Final browser-downloaded APK SHA-256 differs from the verified payload.' >&2
+            exit 1
+          }
+          cmp -s "$APK_PATH" "$final_apk" || {
+            echo 'Final browser-downloaded APK bytes differ from the attested subject.' >&2
+            exit 1
+          }
+          {
+            printf -- '- Final post-provenance release download: `%s` (%s bytes, SHA-256 `%s`)\n' \
+              "$APK_NAME" "$downloaded_size" "$downloaded_sha256"
+            echo '- Release metadata, browser download, digest, size and subject bytes: PASS'
           } >> "$GITHUB_STEP_SUMMARY"
