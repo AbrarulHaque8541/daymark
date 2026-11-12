@@ -3,6 +3,7 @@ package com.abrar.daymark;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.provider.Settings;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Interpolator;
 
@@ -43,6 +44,28 @@ public final class WorkspaceMotion {
             if (current.getColor() == GLASS_COLOR) return;
         }
         view.setBackgroundColor(GLASS_COLOR);
+    }
+
+    /**
+     * Professional press feedback: subtle scale down on press, restore on release/cancel.
+     * Respects reduced motion. Hardware-accelerated, low battery impact.
+     * Call once per interactive view (e.g. buttons, cards).
+     */
+    public static void applyPressFeedback(View view) {
+        if (view == null) return;
+        view.setOnTouchListener((v, event) -> {
+            if (isReducedMotion(v)) return false;
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(80).start();
+                    return false;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                    return false;
+            }
+            return false;
+        });
     }
 
     /** Tasks ↔ Web content transition with subtle horizontal slide. */
