@@ -2053,18 +2053,34 @@
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
     const feedClear = $('#feed-clear');
     if (feedClear) feedClear.addEventListener('click', clearFeed);
+    const busyFocusButtons = new WeakSet();
     function withBriefBusy(button, handler) {
-      if (!button) return;
+      if (!button || typeof handler !== 'function') return;
       button.addEventListener('click', (event) => {
+        // pointer-events only blocks pointer input; keyboard-generated click
+        // events still arrive. Guard every activation at the handler boundary.
+        if (button.disabled || button.hidden || busyFocusButtons.has(button)) {
+          if (event && typeof event.preventDefault === 'function') event.preventDefault();
+          return;
+        }
+        busyFocusButtons.add(button);
+        const previousAriaBusy = typeof button.getAttribute === 'function'
+          ? button.getAttribute('aria-busy') : null;
+        if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', 'true');
         button.classList.add('is-busy');
+        const releaseBusy = () => {
+          busyFocusButtons.delete(button);
+          button.classList.remove('is-busy');
+          if (typeof button.removeAttribute === 'function') {
+            if (previousAriaBusy === null) button.removeAttribute('aria-busy');
+            else if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', previousAriaBusy);
+          }
+        };
         try {
           handler(event);
         } finally {
-          if (typeof setTimeout === 'function') {
-            setTimeout(() => button.classList.remove('is-busy'), 160);
-          } else {
-            button.classList.remove('is-busy');
-          }
+          if (typeof setTimeout === 'function') setTimeout(releaseBusy, 160);
+          else releaseBusy();
         }
       });
     }
