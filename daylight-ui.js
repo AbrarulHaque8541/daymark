@@ -80,6 +80,13 @@
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
+    const copyButton = doc.createElement('button');
+    copyButton.id = 'daylight-copy';
+    copyButton.className = 'button button-quiet';
+    if (copyButton.setAttribute) copyButton.setAttribute('type', 'button');
+    copyButton.textContent = 'Copy';
+    form.appendChild(copyButton);
+
     aside.appendChild(form);
 
     const statusLine = doc.createElement('p');
@@ -114,6 +121,7 @@
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
+    const clipboard = env.clipboard || (win && win.navigator && win.navigator.clipboard) || null;
 
     ensureCard(doc);
 
@@ -124,6 +132,7 @@
     const statusEl = element('daylight-status');
     const resultEl = element('daylight-result');
     const clearEl = element('daylight-clear');
+    const copyEl = element('daylight-copy');
 
     let busy = false;
 
@@ -131,19 +140,21 @@
       if (statusEl) statusEl.textContent = message;
     }
 
-    function setBusy(isBusy) {
+    function setBusy(isBusy, which) {
       busy = isBusy;
-      if (buttonEl) {
-        buttonEl.disabled = isBusy;
-        if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
-          buttonEl.classList.toggle('is-busy', isBusy);
-          if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
+      const targets = [buttonEl, clearEl, copyEl].filter(Boolean);
+      targets.forEach((el) => {
+        if (el === which || !which) {
+          el.disabled = isBusy;
+          if (el.classList && typeof el.classList.toggle === 'function') {
+            el.classList.toggle('is-busy', isBusy);
+          }
+          if (typeof el.setAttribute === 'function') {
+            if (isBusy) el.setAttribute('aria-busy', 'true');
+            else el.removeAttribute('aria-busy');
+          }
         }
-        if (typeof buttonEl.setAttribute === 'function') {
-          if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
-          else buttonEl.removeAttribute('aria-busy');
-        }
-      }
+      });
     }
 
     function render(record) {
@@ -175,7 +186,7 @@
         status('Type a place name first.');
         return;
       }
-      setBusy(true);
+      setBusy(true, buttonEl);
       try {
         const record = await daylightApi.fetchDaylightByPlace(typed, fetchImpl, { now: now });
         render(record);
@@ -196,6 +207,29 @@
       status('Cleared. Type a place name and tap Check.');
     }
 
+    async function onCopy() {
+      if (busy) return;
+      const summary = resultEl && typeof resultEl.textContent === 'string' ? resultEl.textContent.trim() : '';
+      if (!summary) {
+        status('Nothing to copy. Check a place first.');
+        return;
+      }
+      if (!clipboard || typeof clipboard.writeText !== 'function') {
+        status('Copy is unavailable in this browser.');
+        return;
+      }
+      setBusy(true, copyEl);
+      try {
+        await clipboard.writeText(summary);
+        status('Copied the daylight summary. Nothing was saved on this device.');
+      } catch (error) {
+        const message = error && error.message ? error.message : 'unknown error';
+        status('Could not copy: ' + message);
+      } finally {
+        setBusy(false);
+      }
+    }
+
     status('Type a place name and tap Check.');
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -210,6 +244,9 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -222,6 +259,7 @@
     return {
       onCheck,
       onClear,
+      onCopy,
       detach() {
         setBusy(false);
       }
