@@ -29,6 +29,8 @@ tests/browser-error-ui.test.js
 tests/browser-intent-logic.test.js
 tests/browser-intent-ui.test.js
 tests/browser-network-policy-contract.test.js
+tests/browser-proxy-failures-logic.test.js
+tests/browser-proxy-failures-ui.test.js
 tests/browser-proxy-logic.test.js
 tests/browser-proxy-ui.test.js
 tests/currency-logic.test.js
