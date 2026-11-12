@@ -73,6 +73,7 @@ function fakeEnv(options) {
     window: {},
     daylightApi,
     fetch: opts.fetch,
+    clipboard: opts.clipboard,
     now: () => '2026-11-12T05:00:00.000Z'
   };
   return { env, doc };
@@ -86,7 +87,8 @@ function elementsOf(doc) {
     form: doc.registry['daylight-form'],
     status: doc.registry['daylight-status'],
     result: doc.registry['daylight-result'],
-    clear: doc.registry['daylight-clear']
+    clear: doc.registry['daylight-clear'],
+    copy: doc.registry['daylight-copy']
   };
 }
 
@@ -137,7 +139,7 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.ok(els.card, 'card must be created');
   assert.equal(els.card.className, 'briefing-card');
   assert.equal(els.card.getAttribute('aria-labelledby'), 'daylight-heading');
-  assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear);
+  assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear && els.copy);
   assert.equal(els.form.getAttribute('novalidate'), 'novalidate');
   assert.equal(els.status.textContent, 'Type a place name and tap Check.');
   assert.equal(els.result.textContent, '');
@@ -153,6 +155,7 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.equal(els.input.getAttribute('aria-describedby'), 'daylight-description', 'input must be described by the disclosure');
   assert.equal(typeof handle.onCheck, 'function');
   assert.equal(typeof handle.onClear, 'function');
+  assert.equal(typeof handle.onCopy, 'function');
 });
 
 test('attach reuses existing markup instead of duplicating the card', () => {
@@ -301,6 +304,38 @@ test('clear empties the view and says so without touching storage', () => {
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
   assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
+});
+
+test('copy does nothing when the result is empty', async () => {
+  const { env, doc } = fakeEnv({});
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  await handle.onCopy();
+  assert.equal(els.status.textContent, 'Nothing to copy. Check a place first.');
+});
+
+test('copy reports unavailable clipboard honestly', async () => {
+  const { env, doc } = fakeEnv({});
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = 'some summary';
+  await handle.onCopy();
+  assert.equal(els.status.textContent, 'Copy is unavailable in this browser.');
+});
+
+test('copy writes the summary and reports success', async () => {
+  let written = '';
+  const clipboard = {
+    writeText: async (text) => { written = text; }
+  };
+  const { env, doc } = fakeEnv({ clipboard });
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = 'Kanyakumari summary';
+  await handle.onCopy();
+  assert.equal(written, 'Kanyakumari summary');
+  assert.equal(els.status.textContent, 'Copied the daylight summary. Nothing was saved on this device.');
+  assert.equal(els.copy.disabled, false);
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
