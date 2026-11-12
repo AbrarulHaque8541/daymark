@@ -1,7 +1,7 @@
 /*
  * Daymark task-completion webhook UI wiring for the web prototype.
  *
- * A small offline-first automation card: save an https:// webhook URL and every
+ * A small direct-HTTPS automation card: save an https:// webhook URL and every
  * task completed in this prototype announces a minimal JSON event to it.
  * Offline, failures, and a missing fetch all degrade gracefully - events queue
  * on this device (bounded) and are sent only on an explicit Retry, an 'online'
