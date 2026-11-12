@@ -13,6 +13,10 @@ const downloads = path.resolve(path.join(os.tmpdir(), 'daymark-download-handler'
 function makeItem(filename, options = {}) {
   const item = new EventEmitter();
   item.getFilename = () => filename;
+  item.getURLChain = () => {
+    if (options.getURLChainThrows) throw new Error('URL chain unavailable');
+    return options.urlChain ?? ['https://downloads.example.test/report.txt'];
+  };
   item.receivedBytes = 0;
   item.totalBytes = 0;
   item.getReceivedBytes = () => item.receivedBytes;
@@ -98,6 +102,120 @@ test('safe destination is staged privately and published only after completion',
   assert.deepEqual(staging.calls.failed, []);
   assert.deepEqual(staging.calls.order, ['publish', 'cleanup', 'completed']);
   assert.equal(reservedPaths.size, 0);
+});
+
+test('safe HTTPS redirects may cross origins and localhost HTTP retains its request-policy exception', async () => {
+  const chains = [
+    ['https://source.example.test/start', 'https://cdn.other.example.test/report.txt'],
+    ['http://localhost:3000/report.txt'],
+  ];
+  for (const urlChain of chains) {
+    const item = makeItem('report.txt', { urlChain });
+    const reservedPaths = new Set();
+    const staging = makeStaging();
+    let prevented = false;
+    const result = handleWillDownload({
+      event: { preventDefault() { prevented = true; } },
+      item,
+      downloadDirectory: downloads,
+      exists: () => false,
+      reservedPaths,
+      ...staging,
+    });
+
+    assert.equal(result.ok, true, urlChain.join(' -> '));
+    assert.equal(prevented, false);
+    assert.equal(item.savePath, result.stagingPath);
+    assert.equal(staging.calls.created.length, 1);
+    item.emit('done', null, 'completed');
+    await flushDone();
+    assert.equal(staging.calls.published.length, 1);
+    assert.equal(reservedPaths.size, 0);
+  }
+});
+
+test('unsafe URL-chain hops are cancelled before staging and never leak URL data', () => {
+  const unsafeChains = [
+    ['http://remote.example.test/report?token=private-query-token'],
+    ['https://source.example.test/start', 'http://remote.example.test/report?token=private-query-token'],
+    ['https://source.example.test/start', 'http://localhost:3000/report'],
+    ['https://user:secret@source.example.test/start'],
+    ['https://source.example.test/start', 'https://user:secret@cdn.example.test/report'],
+    ['https://source.example.test/start', 'https://@cdn.example.test/report'],
+    ['https://source.example.test/start', 'file:///etc/passwd'],
+    ['https://source.example.test/start', 'javascript:alert(1)'],
+    ['https://source.example.test/start', 'chrome://settings'],
+    ['https://source.example.test/start', 'devtools://devtools'],
+    ['https://source.example.test/start', 'blob:https://source.example.test/id'],
+    ['https://source.example.test/start', 'ftp://cdn.example.test/report'],
+    ['https://source.example.test/start', 'data:text/plain,private-query-token'],
+  ];
+
+  for (const urlChain of unsafeChains) {
+    const item = makeItem('report.txt', { urlChain });
+    const reservedPaths = new Set();
+    const staging = makeStaging();
+    let prevented = false;
+    let started = false;
+    const result = handleWillDownload({
+      event: { preventDefault() { prevented = true; } },
+      item,
+      downloadDirectory: downloads,
+      exists: () => false,
+      reservedPaths,
+      ...staging,
+      onStarted() { started = true; },
+    });
+
+    assert.equal(result.ok, false, urlChain.join(' -> '));
+    assert.equal(result.cancelled, true);
+    assert.equal(prevented, true);
+    assert.equal(item.savePath, undefined);
+    assert.equal(staging.calls.created.length, 0);
+    assert.deepEqual(staging.calls.published, []);
+    assert.deepEqual(staging.calls.failed, ['report.txt']);
+    assert.equal(started, false);
+    assert.equal(reservedPaths.size, 0);
+    const failurePayload = JSON.stringify({ result, failed: staging.calls.failed, details: staging.calls.failureDetails });
+    assert.equal(failurePayload.includes('source.example.test'), false);
+    assert.equal(failurePayload.includes('private-query-token'), false);
+    assert.equal(failurePayload.includes('user:secret'), false);
+  }
+});
+
+test('missing, empty, or unreadable URL chains fail closed before staging', () => {
+  const itemCases = [
+    (item) => { delete item.getURLChain; },
+    (item) => { item.getURLChain = () => []; },
+    (item) => { item.getURLChain = () => null; },
+    (item) => { item.getURLChain = () => ['not a URL']; },
+    (item) => { item.getURLChain = () => [null]; },
+    (item) => { item.getURLChain = () => { throw new Error('URL chain unavailable'); }; },
+  ];
+
+  for (const configureItem of itemCases) {
+    const item = makeItem('report.txt');
+    configureItem(item);
+    const reservedPaths = new Set();
+    const staging = makeStaging();
+    let prevented = false;
+    const result = handleWillDownload({
+      event: { preventDefault() { prevented = true; } },
+      item,
+      downloadDirectory: downloads,
+      exists: () => false,
+      reservedPaths,
+      ...staging,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.cancelled, true);
+    assert.equal(prevented, true);
+    assert.equal(item.savePath, undefined);
+    assert.equal(staging.calls.created.length, 0);
+    assert.deepEqual(staging.calls.published, []);
+    assert.equal(reservedPaths.size, 0);
+  }
 });
 
 test('download progress is URL-free, bounded and announced at accessible ten-point intervals', async () => {
