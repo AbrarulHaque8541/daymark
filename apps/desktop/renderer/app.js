@@ -18,7 +18,7 @@ function toast(msg) {
 }
 
 function isLocal(hostname) {
-  const normalized = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  const normalized = String(hostname || '').toLowerCase().replace(/^[\[]|\]$/g, '');
   return ['localhost', '127.0.0.1', '::1'].includes(normalized);
 }
 
@@ -46,15 +46,27 @@ function renderTabs() {
   document.querySelectorAll('.tab').forEach((el) => {
     const tab = tabs.find((t) => String(t.id) === el.dataset.tabId);
     if (!tab) return;
-    const title = tab.title || 'Loading...';
+    const title = tab.title || (tab.loading ? 'Loading…' : 'New tab');
     const active = isActive(tab);
     const select = el.querySelector('.tab-select');
     el.querySelector('.tab-title').textContent = title;
     el.classList.toggle('active', active);
+    el.classList.toggle('loading', !!tab.loading);
     select.setAttribute('aria-label', 'Switch to ' + title);
     select.setAttribute('aria-pressed', String(active));
     el.querySelector('.tab-close').setAttribute('aria-label', 'Close ' + title);
   });
+}
+
+function updateNavButtons(tab) {
+  if (!tab || !isActive(tab)) return;
+  const v = tab.view;
+  try {
+    $('btn-back').disabled = !v.canGoBack();
+    $('btn-fwd').disabled = !v.canGoForward();
+  } catch {
+    /* webview not ready */
+  }
 }
 
 function activateTab(id) {
@@ -63,6 +75,7 @@ function activateTab(id) {
   const tab = activeTab();
   if (tab) {
     try { $('urlbar').value = tab.view.getURL() || HOME; } catch { /* noop */ }
+    updateNavButtons(tab);
   }
   renderTabs();
 }
@@ -85,12 +98,26 @@ function wireEvents(tab) {
   });
   v.addEventListener('did-navigate', (e) => {
     if (isActive(tab)) $('urlbar').value = e.url;
+    updateNavButtons(tab);
     renderTabs();
   });
   v.addEventListener('did-navigate-in-page', (e) => {
     if (isActive(tab)) $('urlbar').value = e.url;
+    updateNavButtons(tab);
   });
-  v.addEventListener('dom-ready', () => renderTabs());
+  v.addEventListener('did-start-loading', () => {
+    tab.loading = true;
+    renderTabs();
+  });
+  v.addEventListener('did-stop-loading', () => {
+    tab.loading = false;
+    updateNavButtons(tab);
+    renderTabs();
+  });
+  v.addEventListener('dom-ready', () => {
+    updateNavButtons(tab);
+    renderTabs();
+  });
   v.addEventListener('found-in-page', (e) => {
     const r = e.result || {};
     $('find-count').textContent = r.matches
@@ -99,6 +126,7 @@ function wireEvents(tab) {
   });
   v.addEventListener('did-fail-load', (e) => {
     if (!e.isMainFrame || e.errorCode === -3) return; // -3 = aborted
+    tab.loading = false;
     if (!isActive(tab)) return;
     const blocked = e.errorCode === -20 || e.errorCode === -501;
     showError(
@@ -120,7 +148,7 @@ function createTab(url = HOME) {
   view.dataset.tabId = String(id);
   $('views').appendChild(view);
 
-  const tab = { id, view, title: 'New tab' };
+  const tab = { id, view, title: 'New tab', loading: true };
   tabs.push(tab);
 
   const el = document.createElement('div');
