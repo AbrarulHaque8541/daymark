@@ -31,8 +31,8 @@ tests/browser-intent-ui.test.js
 tests/browser-network-policy-contract.test.js
 tests/browser-proxy-logic.test.js
 tests/browser-proxy-ui.test.js
-tests/currency-logic.test.js
-tests/currency-ui.test.js
+tests/daylight-logic.test.js
+tests/daylight-ui.test.js
 tests/device-acceptance-workflow.test.js
 tests/device-adapter.test.js
 tests/device-capability-policy.test.js
