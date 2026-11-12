@@ -4,7 +4,7 @@
  * Pure, dependency-free catalog behind the "What each Clear button really
  * does" card: for every destructive or storage-touching action the web
  * prototype offers (Clear completed, Clear search, Clear webhook queue,
- * Clear storage status, Import, Export) it states, in plain words, exactly
+ * Clear storage status, Clear all local data, Import, Export) it states, in plain words, exactly
  * what the action removes, what it keeps, whether the data can come back,
  * what scope it has (this device only) and whether any network is involved.
  *
@@ -23,6 +23,7 @@
     'clear-search',
     'webhook-clear-queue',
     'storage-clear-status',
+    'storage-clear-all',
     'import-merge',
     'export-backup'
   ];
@@ -79,17 +80,36 @@
     },
     'storage-clear-status': {
       label: 'Clear storage status',
-      title: 'Storage status controls are unavailable',
-      summary: 'The visible Check and Clear status controls are not connected to the storage UI module in this build, so neither operation currently runs. No storage data is changed.',
+      title: 'Clear storage status',
+      summary: 'The storage card has two read-only controls: Check re-runs the local storage scan, and Clear status empties only the status message under the card. Neither deletes any stored data.',
       removes: [],
       keeps: ['All stored tasks and settings; no storage operation runs'],
-      available: false,
+      available: true,
       recoverable: true,
-      recovery: 'Unavailable until the storage card wiring is repaired. This explanation does not inspect or clear storage.',
+      recovery: 'Nothing is deleted, so nothing needs recovering. Use either control again any time.',
       deletesData: false,
       exportable: false,
-      scope: 'Not available in this build',
-      network: 'None'
+      scope: 'The storage card status message only',
+      network: 'None — the scan and the status reset are local only'
+    },
+
+    'storage-clear-all': {
+      label: 'Clear all local data',
+      title: 'Clear all local data',
+      summary: 'One explicit, confirmed action on the storage card removes every managed Daymark key in this browser: tasks, recovery backups, Focus history and preferences, saved card preferences (including the remembered Telegram chat target), caches, browser download state, and queued webhook events. Keys this prototype does not manage are never touched.',
+      removes: [
+        'All managed Daymark keys in this browser, including recovery backups and queued webhook events'
+      ],
+      keeps: [
+        'Keys this prototype does not manage',
+        'The legacy secret-bearing webhook endpoint, which this card never inspects'
+      ],
+      recoverable: false,
+      recovery: 'There is no built-in undo. Export a backup first; note that a task export cannot restore Focus history, card preferences or the webhook queue.',
+      deletesData: true,
+      exportable: false,
+      scope: 'This device only',
+      network: 'None — clearing happens locally'
     },
 
     'import-merge': {

@@ -108,6 +108,14 @@ final class BrowserServiceWorkerEnforcement {
      */
     static synchronized boolean allowNetworkAfterExplicitConsent() {
         if (!installAttempted && !installBeforeFirstWebView()) return false;
+        // Without the request client, the initial platform block is the only remaining
+        // barrier. Do not remove it: a later Offline transition could fail to reassert it,
+        // leaving service-worker requests with no independent fail-closed enforcement.
+        if (!BrowserServiceWorkerPolicy.canEnableNetworkAfterConsent(clientInstalled)) {
+            onlineAllowed = false;
+            Log.w(TAG, "Service Worker request client unavailable; worker network remains blocked even while Online");
+            return false;
+        }
         // The user has already passed Daymark's explicit Online gate. The client may
         // allow HTTP/HTTPS now; the platform setting is separately unblocked when supported.
         onlineAllowed = true;

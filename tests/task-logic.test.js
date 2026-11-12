@@ -191,3 +191,81 @@ test('shared task date contract matches the Java host implementation fixture', (
   }
   assert.equal(cases, 9, 'shared date contract must include all nine cases');
 });
+
+test('shared task instant contract matches Android strict instant validation', () => {
+  const fixturePath = path.join(__dirname, '..', 'contracts', 'task-instant-validation.tsv');
+  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
+  let cases = 0;
+  for (const [index, line] of lines.entries()) {
+    if (!line || line.startsWith('#')) continue;
+    const columns = line.split('\t');
+    assert.equal(columns.length, 2, 'instant fixture line ' + (index + 1) + ' must have two columns');
+    assert.ok(columns[1] === 'true' || columns[1] === 'false',
+      'instant fixture line ' + (index + 1) + ' must use a strict boolean');
+    const value = columns[0] === '~' ? '' : columns[0];
+    assert.equal(logic.isValidInstant(value), columns[1] === 'true',
+      'JavaScript instant validation must match shared fixture line ' + (index + 1));
+    cases += 1;
+  }
+  assert.equal(cases, 58, 'shared instant contract must include all fifty-eight cases');
+});
+
+test('createdAt, updatedAt, and reminderShownFire use the same strict instant contract', () => {
+  const valid = task('instant-fields', 'Instant fields');
+  assert.equal(logic.isValidTask(valid), true);
+  assert.equal(logic.isValidTask({ ...valid, createdAt: '2026-02-30T00:00:00Z' }), false);
+  assert.equal(logic.isValidTask({ ...valid, updatedAt: '2026-11-10T10:00:00' }), false);
+  assert.equal(logic.isValidTask({
+    ...valid,
+    reminderShownFire: '2026-11-10T10:00:00.1234567890Z'
+  }), false);
+  assert.equal(logic.isValidTask({
+    ...valid,
+    reminderShownFire: '2016-12-31T23:59:60Z'
+  }), true);
+});
+
+test('instant comparison matches Java nanosecond, offset, and leap-second ordering', () => {
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00+05:30', '2026-11-10T04:30:00Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00+01:30:15', '2026-11-10T08:29:45Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00-00:00:30', '2026-11-10T10:00:30Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00+18:00:00', '2026-11-09T16:00:00Z'), 0);
+  assert.equal(logic.compareInstants('2026-11-10T10:00:00.000000001Z',
+    '2026-11-10T10:00:00.000000002Z'), -1);
+  assert.equal(logic.compareInstants('2016-12-31T23:59:60Z', '2016-12-31T23:59:59Z'), 0);
+  assert.equal(logic.compareInstants('0000-01-01T00:00:00Z', '0001-01-01T00:00:00Z'), -1);
+  assert.throws(() => logic.compareInstants('invalid', '2026-11-10T10:00:00Z'), /invalid task instants/);
+});
+
+test('task ordering compares createdAt instants rather than their offset-bearing strings', () => {
+  const earlier = task('earlier', 'Earlier instant', { createdAt: '2026-11-10T10:00:00+01:00' });
+  const later = task('later', 'Later instant', { createdAt: '2026-11-10T09:30:00Z' });
+  assert.deepEqual(logic.getFilteredTasks([later, earlier], 'all', '', TODAY).map((item) => item.id),
+    ['earlier', 'later']);
+});
+
+
+
+test('expanded Java Instant years remain valid and sort without Date range loss', () => {
+  const archiveMaximum = '+999999999-12-31T23:59:59.999999999+18:00';
+  const sameLocalUtc = '+999999999-12-31T23:59:59.999999999Z';
+  assert.equal(logic.isValidInstant(archiveMaximum), true);
+  assert.equal(logic.isValidInstant('+1000000000-12-31T23:59:59.999999999Z'), true);
+  assert.equal(logic.isValidInstant('+1000000001-01-01T00:00:00+18:00'), true);
+  assert.equal(logic.isValidInstant('+1000000001-01-01T23:59:59+18:00'), false);
+  assert.equal(logic.compareInstants(archiveMaximum, sameLocalUtc), -1);
+  assert.equal(logic.compareInstants(
+    '+1000000001-01-01T00:00:00+18:00',
+    '+1000000000-12-31T06:00:00Z'), 0);
+  assert.equal(logic.compareInstants(
+    '-1000000001-12-31T23:59:59-18:00',
+    '-1000000000-01-01T17:59:59Z'), 0);
+
+  const tasks = [
+    task('later-expanded', 'Later expanded year', { createdAt: sameLocalUtc }),
+    task('archive-maximum', 'Portable backup maximum', { createdAt: archiveMaximum })
+  ];
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'all', '', TODAY).map((item) => item.id),
+    ['archive-maximum', 'later-expanded']);
+  assert.equal(logic.isValidTask(tasks[1]), true);
+});

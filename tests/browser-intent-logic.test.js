@@ -2,6 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const address = require('../browser-address-logic.js');
+globalThis.DaymarkBrowserAddress = address;
 const engine = require('../browser-intent-logic.js');
 
 test('a plain https link stays in the browser with no handoff', () => {
@@ -63,26 +67,27 @@ test('a full intent:// URI parses package, scheme and encoded fallback', () => {
   assert.equal(plan.kind, 'android-intent');
   assert.equal(plan.verdict, 'handoff');
   assert.ok(plan.lines.some((line) => line.indexOf('com.example.scan (pinned by the link)') !== -1));
-  assert.ok(plan.lines.some((line) => line.indexOf('https://example.com/product') !== -1));
+  assert.ok(plan.lines.some((line) => line.indexOf('fallback origin is https://example.com') !== -1));
+  assert.ok(!plan.lines.some((line) => line.indexOf('/product') !== -1), 'fallback path is not echoed');
 });
 
 test('an intent without a pinned package discloses the chooser', () => {
-  const link = 'intent://share/#Intent;scheme=https;action=android.intent.action.SEND;end';
+  const link = 'intent://share/#Intent;scheme=https;end';
   const parsed = engine.parseIntentUri(link);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.packageName, null);
-  assert.deepEqual(parsed.extraKeys, ['action']);
+  assert.equal(parsed.action, null);
   const plan = engine.planIntentHandoff(link);
   assert.ok(plan.lines.some((line) => line.indexOf('app chooser') !== -1));
 });
 
-test('a non-http fallback URL is disclosed as ignored, not silently dropped', () => {
-  const link = 'intent://x/#Intent;package=com.example.app;S.browser_fallback_url=javascript%3Aalert(1);end';
+test('a non-http fallback URL rejects the entire intent without echoing it', () => {
+  const link = 'intent://x/#Intent;scheme=zxing;S.browser_fallback_url=javascript%3Aalert(1);end';
   const parsed = engine.parseIntentUri(link);
-  assert.equal(parsed.fallbackHonored, false);
+  assert.equal(parsed.ok, false);
   const plan = engine.planIntentHandoff(link);
-  assert.ok(plan.lines.some((line) => line.indexOf('ignored') !== -1));
-  assert.ok(!plan.lines.some((line) => line.indexOf('javascript') !== -1 && line.indexOf('open') !== -1));
+  assert.equal(plan.verdict, 'refused');
+  assert.ok(!JSON.stringify(plan).includes('javascript'));
 });
 
 test('malformed intent URIs fail closed with a reason', () => {
@@ -145,4 +150,50 @@ test('the card never claims anything ran automatically', () => {
   const plan = engine.planIntentHandoff('tg://resolve?domain=example');
   assert.ok(plan.network.indexOf('explicit user action') !== -1);
   assert.ok(plan.network.indexOf('None') === 0);
+});
+
+test('shared Android/web Intent URI contract fixture stays in parity', () => {
+  const fixturePath = path.join(__dirname, '..', 'contracts', 'intent-uri-validation.tsv');
+  const rows = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/).filter((line) => line && !line.startsWith('#'));
+  assert.equal(rows.length, 48, 'the shared Intent URI fixture must retain all forty-eight cases');
+  let acceptedCount = 0;
+  let rejectedCount = 0;
+  for (const row of rows) {
+    const [name, expected, input, expectedTarget, expectedFallback] = row.split('\t');
+    assert.ok(name && input && (expected === 'accept' || expected === 'reject'), row);
+    const parsed = engine.parseIntentUri(input);
+    if (expected === 'accept') {
+      acceptedCount += 1;
+      assert.equal(parsed.ok, true, name);
+      assert.equal(parsed.targetUri, expectedTarget, name + ' target');
+      assert.equal(parsed.fallbackUrl || '', expectedFallback, name + ' fallback');
+      const plan = engine.planIntentHandoff(input);
+      assert.equal(plan.verdict, 'handoff', name + ' plan');
+      if (expectedFallback) {
+        const origin = /^(https?:\/\/[^/?#]+)/i.exec(expectedFallback);
+        assert.ok(origin, name + ' fallback origin');
+        assert.ok(JSON.stringify(plan).includes(origin[1]), name + ' discloses only the fallback origin');
+        assert.ok(!JSON.stringify(plan).includes(expectedFallback.slice(origin[1].length)),
+          name + ' does not echo fallback path or query');
+      }
+    } else {
+      rejectedCount += 1;
+      assert.equal(parsed.ok, false, name);
+      const plan = engine.planIntentHandoff(input);
+      assert.equal(plan.verdict, 'refused', name + ' plan');
+      assert.equal(plan.kind, 'malformed', name + ' classification');
+      assert.ok(!JSON.stringify(plan).includes('secret'), name + ' does not echo secret-bearing input');
+    }
+  }
+  assert.equal(acceptedCount, 12, 'all twelve accepted contract cases remain present');
+  assert.equal(rejectedCount, 36, 'all thirty-six rejected contract cases remain present');
+});
+
+test('non-ASCII fullwidth hex digits are rejected in percent escapes', () => {
+  const input = 'intent://scan/#Intent;scheme=%７Ａ;end';
+  const parsed = engine.parseIntentUri(input);
+  assert.equal(parsed.ok, false);
+  const plan = engine.planIntentHandoff(input);
+  assert.equal(plan.verdict, 'refused');
+  assert.equal(plan.kind, 'malformed');
 });

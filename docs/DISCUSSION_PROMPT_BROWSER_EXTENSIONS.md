@@ -6,7 +6,7 @@ Copy/paste to ChatGPT / Claude / Gemini / etc.
 
 ## Context
 
-We build **Daymark**, a privacy-first Android app (`com.abrar.daymark`).  
+We build **Daymark**, a privacy-respecting Android app (`com.abrar.daymark`).  
 The in-app browser is **Android System WebView**, not a Chromium embed (not Kiwi-sized).
 
 Security policy forbids:
@@ -36,7 +36,7 @@ Make “add extension” as useful as possible **without** embedding full Chromi
 ## Constraints
 
 - Stay WebView-based; no multi-MB browser engine.  
-- Offline-first task app; browser Online is opt-in.  
+- Task data stays on the device; the browser is Online by default and loads pages directly.  
 - Prefer pure Java, no new heavy dependencies.  
 
 ## Deliverable

@@ -28,6 +28,7 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
@@ -78,11 +79,37 @@ app.whenReady().then(() => {
       createStagingPath: (finalPath, directory) => createStagingPath(directory, finalPath, fs),
       publishFile: (stagingPath, finalPath, directory) => publishStagedFile(directory, stagingPath, finalPath, fs),
       cleanupStaging: (stagingPath, directory) => cleanupStaging(directory, stagingPath, fs),
-      onFailed: (filename) => {
+      onProgress: (filename, percent) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('download-failed', filename);
+          mainWindow.webContents.send('download-progress', { filename, percent });
         }
-        console.error('Daymark could not safely publish a completed download.');
+      },
+      onFailed: (filename, details) => {
+        const preflight = Boolean(details && details.preflight === true);
+        const cancellationConfirmed = preflight && typeof details.cancellationConfirmed === 'boolean'
+          ? details.cancellationConfirmed : null;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-failed', {
+            filename,
+            preflight,
+            cancellationConfirmed,
+          });
+        }
+        if (preflight && cancellationConfirmed === false) {
+          console.error('Daymark could not confirm cancellation of an unsafe preflight download.');
+        } else {
+          console.error('Daymark download did not complete or could not be safely published.');
+        }
+      },
+      onCompleted: (filename) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-completed', filename);
+        }
+      },
+      onCancelled: (filename) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('download-cancelled', filename);
+        }
       },
       onCleanupError: () => console.error('Daymark could not clean a private download staging directory.'),
       exists: (candidate) => {
@@ -99,7 +126,7 @@ app.whenReady().then(() => {
         if (mainWindow) mainWindow.webContents.send('download-started', filename);
       },
     });
-    if (!result.ok && !result.cancelled) {
+    if (!result.ok && !result.cancelled && !result.cancellationRequested) {
       console.error('Daymark could not cancel an unsafe download destination.');
     }
   });

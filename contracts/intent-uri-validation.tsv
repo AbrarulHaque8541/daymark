@@ -1,0 +1,49 @@
+# case	expect	input	expected-target	expected-fallback
+valid-zxing-package	accept	intent://scan/#Intent;scheme=zxing;package=com.example.scan;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end	zxing://scan/	
+valid-https-fallback	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end	https://example.com/	https://example.com/product
+valid-http-fallback-port	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=http%3A%2F%2Fexample.com%3A8080%2Ffallback;end	https://example.com/	http://example.com:8080/fallback
+valid-literal-plus	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fa+b%3Fq%3Done+two;end	https://example.com/	https://example.com/a+b?q=one+two
+valid-encoded-plus	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fa%252Bb%3Fq%3Done%252Btwo;end	https://example.com/	https://example.com/a%2Bb?q=one%2Btwo
+valid-chooser	accept	intent://share/#Intent;scheme=https;end	https://share/	
+valid-custom-port	accept	intent://scan.example:8443/path#Intent;scheme=zxing;end	zxing://scan.example:8443/path	
+reject-javascript-target	reject	intent://scan/#Intent;scheme=javascript;end		
+reject-vbscript-target	reject	intent://scan/#Intent;scheme=vbscript;end		
+reject-file-target	reject	intent://scan/#Intent;scheme=file;end		
+reject-content-target	reject	intent://scan/#Intent;scheme=content;end		
+reject-component	reject	intent://scan/#Intent;scheme=zxing;component=com.evil/.Launch;end		
+reject-selector	reject	intent://scan/#Intent;scheme=zxing;SEL;end		
+reject-launch-flags	reject	intent://scan/#Intent;scheme=zxing;launchFlags=0x10000000;end		
+reject-arbitrary-extra	reject	intent://scan/#Intent;scheme=zxing;S.extra=secret;end		
+reject-duplicate-scheme	reject	intent://scan/#Intent;scheme=zxing;scheme=evil;end		
+reject-invalid-package	reject	intent://scan/#Intent;scheme=zxing;package=bad;end		
+reject-send-action	reject	intent://scan/#Intent;scheme=zxing;action=android.intent.action.SEND;end		
+reject-default-category	reject	intent://scan/#Intent;scheme=zxing;category=android.intent.category.DEFAULT;end		
+reject-missing-scheme	reject	intent://scan/#Intent;package=com.example.app;end		
+reject-base-userinfo	reject	intent://user@scan/#Intent;scheme=zxing;end		
+reject-fallback-userinfo	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fuser%3Asecret%40example.com%2Freset%3Ftoken%3Dfixture-secret;end		
+reject-fallback-invalid-port	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%3A99999%2Ffallback;end		
+reject-fallback-zero-port	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%3A0%2Ffallback;end		
+reject-fallback-non-web	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=javascript%3Aalert(1);end		
+reject-custom-target-invalid-port	reject	intent://scan.example:99999/#Intent;scheme=zxing;end		
+reject-custom-target-zero-port	reject	intent://scan.example:0/#Intent;scheme=zxing;end		
+reject-custom-target-empty-port	reject	intent://scan.example:/#Intent;scheme=zxing;end		
+reject-http-target-invalid-port	reject	intent://example.com:99999/#Intent;scheme=https;end		
+reject-unsupported-key	reject	intent://scan/#Intent;scheme=zxing;launchFlags=0x1;end		
+reject-invalid-percent	reject	intent://scan/#Intent;scheme=zxing;package=com.example%ZZ;end		
+reject-base-fragment	reject	intent://scan/#part#Intent;scheme=zxing;end		
+reject-trailing-fragment	reject	intent://scan/#Intent;scheme=zxing;end#fragment		
+reject-missing-host	reject	intent:///path#Intent;scheme=zxing;end		
+reject-underscore-host	reject	intent://bad_host.example/#Intent;scheme=zxing;end		
+reject-empty-host-label	reject	intent://bad..example/#Intent;scheme=zxing;end		
+reject-numeric-final-label	reject	intent://example.123/#Intent;scheme=zxing;end		
+reject-non-ascii-base-host	reject	intent://münchen.de/#Intent;scheme=zxing;end		
+reject-uppercase-prefix	reject	INTENT://scan/#Intent;scheme=zxing;end		
+reject-whitespace-in-base	reject	intent://scan.example/path with space#Intent;scheme=zxing;end		
+valid-fallback-secret-query	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Freset%3Ftoken%3Dfixture-secret;end	https://example.com/	https://example.com/reset?token=fixture-secret
+reject-invalid-utf8-fallback	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2F%C3%28;end		
+reject-oversized-input	reject	intent://scan/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#Intent;scheme=zxing;end		
+valid-http-target-dot-segments	accept	intent://example.com/a/../b#Intent;scheme=https;end	https://example.com/b	
+valid-custom-unicode-path	accept	intent://scan.example/straße#Intent;scheme=zxing;end	zxing://scan.example/stra%C3%9Fe	
+valid-http-default-port	accept	intent://example.com:443/#Intent;scheme=https;end	https://example.com:443/	
+valid-idn-fallback	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fm%C3%BCnchen.de%2Fstra%C3%9Fe;end	https://example.com/	https://xn--mnchen-3ya.de/stra%C3%9Fe
+reject-non-ascii-percent-hex	reject	intent://scan/#Intent;scheme=%７Ａ;end		

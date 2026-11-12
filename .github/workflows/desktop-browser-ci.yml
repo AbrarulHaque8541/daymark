@@ -15,6 +15,9 @@ concurrency:
   group: desktop-browser-ci-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Unit tests (${{ matrix.os }})
@@ -31,13 +34,16 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Set up Node 20
+      - name: Set up Node 24.22.2
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: '20'
+          node-version: '24.22.2'
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify npm ci leaves the committed lockfile unchanged
+        run: git diff --exit-code -- package-lock.json
 
       - name: Run unit tests
         run: npm test

@@ -1,0 +1,68 @@
+name: Extension import and recovery hardening
+
+on:
+  push:
+    branches:
+      - main
+      - ci/extension-import-recovery-guard-*
+    paths:
+      - ".github/workflows/extension-import-recovery.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserExtension.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BuiltInExtensions.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionStore.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/StrictJsonParser.java"
+      - "android-app/tools/ExtensionPackageParserSmoke.java"
+      - "android-app/tools/ExtensionStoreSmoke.java"
+      - "android-app/tools/check-extension-import-hardening.py"
+      - "android-app/tools/extension-store-stubs/**"
+      - "android-app/tools/host-stubs/org/json/**"
+      - "android-app/tools/run-extension-store-tests.sh"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/extension-import-recovery.yml"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserExtension.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BuiltInExtensions.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionStore.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/StrictJsonParser.java"
+      - "android-app/tools/ExtensionPackageParserSmoke.java"
+      - "android-app/tools/ExtensionStoreSmoke.java"
+      - "android-app/tools/check-extension-import-hardening.py"
+      - "android-app/tools/extension-store-stubs/**"
+      - "android-app/tools/host-stubs/org/json/**"
+      - "android-app/tools/run-extension-store-tests.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-import-hardening-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-regressions:
+    name: Extension import and recovery host regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v5
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Run source, UI mutation, and exact-byte recovery regressions
+        run: python3 android-app/tools/check-extension-import-hardening.py "$GITHUB_WORKSPACE/android-app"

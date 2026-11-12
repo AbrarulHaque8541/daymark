@@ -20,7 +20,12 @@ public final class BrowserServiceWorkerPolicySmoke {
         check(BrowserServiceWorkerPolicy.blocksNetworkLoads(false),
                 "Service Worker network loads must start blocked before explicit Online navigation");
         check(!BrowserServiceWorkerPolicy.blocksNetworkLoads(true),
-                "Online consent must allow the process-wide Service Worker network setting");
+                "Online consent may remove the process-wide Service Worker setting block");
+
+        check(!BrowserServiceWorkerPolicy.canEnableNetworkAfterConsent(false),
+                "without the independent request client, Online must retain the initial platform block");
+        check(BrowserServiceWorkerPolicy.canEnableNetworkAfterConsent(true),
+                "Online may enable worker requests only when the independent request client is installed");
 
         for (boolean online : new boolean[]{false, true}) {
             expect(BrowserServiceWorkerPolicy.Decision.BLOCK, online, null);
@@ -43,9 +48,10 @@ public final class BrowserServiceWorkerPolicySmoke {
         String disclosure = BrowserServiceWorkerPolicy.compatibilityDisclosure();
         check(disclosure.contains("Online/Offline mode")
                         && disclosure.contains("blocked while Offline")
+                        && disclosure.contains("request guard")
                         && disclosure.contains("remains blocked even while Online"),
-                "the user disclosure must explain normal mode behavior and the degraded fallback");
+                "the user disclosure must explain normal mode behavior and both fail-closed fallbacks");
 
-        System.out.println("PASS Service Worker policy: 18 state/scheme decisions, Online/Offline block, one-time disclosure");
+        System.out.println("PASS Service Worker policy: 20 state/scheme decisions, request-client prerequisite, one-time disclosure");
     }
 }

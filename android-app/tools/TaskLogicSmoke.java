@@ -24,6 +24,8 @@ public final class TaskLogicSmoke {
         datesAreStrictAndDateOnly();
         if (args.length > 0) sharedDateContract(Path.of(args[0]));
         if (args.length > 1) sharedRecurrenceContract(Path.of(args[1]));
+        if (args.length > 2) sharedInstantContract(Path.of(args[2]));
+        taskInstantFieldsUseStrictContract();
         CRUDKeepsStableIdentityAndTimestamps();
         templatesValidateAndCreateFreshTasks();
         templateListsRejectDuplicatesAndExcess();
@@ -66,6 +68,49 @@ public final class TaskLogicSmoke {
             }
         }
         check(cases == 9, "shared date contract fixture contains all nine cases");
+    }
+
+    private static void sharedInstantContract(Path fixture) throws IOException {
+        int cases = 0;
+        try (BufferedReader reader = Files.newBufferedReader(fixture, StandardCharsets.UTF_8)) {
+            String line;
+            int lineNumber = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\\t", -1);
+                check(fields.length == 2, "instant contract fixture line " + lineNumber + " has two columns");
+                boolean expected;
+                if ("true".equals(fields[1])) expected = true;
+                else if ("false".equals(fields[1])) expected = false;
+                else throw new AssertionError("invalid expected boolean at instant contract fixture line " + lineNumber);
+                String value = "~".equals(fields[0]) ? "" : fields[0];
+                check(TaskLogic.isValidInstant(value) == expected,
+                        "Android instant validation matches shared fixture line " + lineNumber);
+                cases++;
+            }
+        }
+        check(cases == 58, "shared instant contract fixture contains all fifty-eight cases");
+    }
+
+    private static void taskInstantFieldsUseStrictContract() {
+        Task valid = TaskLogic.create("Instant fields", null, "medium");
+        check(TaskLogic.isValid(valid), "generated task timestamps satisfy the strict instant contract");
+        check(TaskLogic.isValidInstant("+999999999-12-31T23:59:59.999999999+18:00"),
+                "maximum portable-backup task instant remains valid");
+        check(!TaskLogic.isValidInstant("2026-11-10T24:00:00Z"),
+                "hour 24 remains invalid despite permissive Instant parser normalization");
+        check(!TaskLogic.isValid(new Task(valid.id, valid.title, valid.dueDate, valid.priority, valid.completed,
+                        "2026-02-30T00:00:00Z", valid.updatedAt)),
+                "invalid createdAt is rejected by task validation");
+        check(!TaskLogic.isValid(new Task(valid.id, valid.title, valid.dueDate, valid.priority, valid.completed,
+                        valid.createdAt, "2026-11-10T10:00:00")),
+                "updatedAt without an offset is rejected by task validation");
+        Task invalidReminder = new Task("invalid-reminder-instant", "Reminder", null, "medium", false,
+                valid.createdAt, valid.updatedAt, Collections.<AttachmentRef>emptyList(), "", null, null,
+                "2026-11-10T10:00:00.1234567890Z", Collections.<Subtask>emptyList());
+        check(!TaskLogic.isValid(invalidReminder),
+                "reminderShownFire uses the same strict instant contract");
     }
 
     private static void CRUDKeepsStableIdentityAndTimestamps() {

@@ -1656,21 +1656,19 @@ public final class MainActivity extends Activity {
     }
 
     private void addDashboardHeading(LinearLayout content) {
-        dateHeading = text("YOUR DAY", 10, palette.muted, Typeface.BOLD);
-        dateHeading.setLetterSpacing(0.14f);
-        content.addView(dateHeading, bottomMargin(dp(7)));
+        // Compact heading: maximize task-list viewport (owner feedback).
+        dateHeading = text("YOUR DAY", 9, palette.muted, Typeface.BOLD);
+        dateHeading.setLetterSpacing(0.12f);
+        content.addView(dateHeading, bottomMargin(dp(4)));
 
-        TextView heading = text("What do you want\nto get done?", 29, palette.text, Typeface.BOLD);
-        heading.setLineSpacing(0, 0.96f);
-        content.addView(heading, bottomMargin(dp(5)));
-
-        TextView subtitle = text("Add one task at a time. You can change it later.", 15, palette.muted, Typeface.NORMAL);
-        content.addView(subtitle, bottomMargin(dp(17)));
+        TextView heading = text("What do you want to get done?", 22, palette.text, Typeface.BOLD);
+        heading.setLineSpacing(0, 1.0f);
+        content.addView(heading, bottomMargin(dp(8)));
 
         LinearLayout stats = horizontalCard(palette.surface);
-        addStat(stats, "Open tasks", openCount = text("0", 23, palette.accent, Typeface.BOLD));
-        addStat(stats, "Due today", dueTodayCount = text("0", 23, palette.text, Typeface.BOLD));
-        content.addView(stats, bottomMargin(dp(14)));
+        addStat(stats, "Open", openCount = text("0", 18, palette.accent, Typeface.BOLD));
+        addStat(stats, "Today", dueTodayCount = text("0", 18, palette.text, Typeface.BOLD));
+        content.addView(stats, bottomMargin(dp(10)));
     }
 
     private void addStat(LinearLayout parent, String label, TextView value) {
@@ -2461,14 +2459,6 @@ public final class MainActivity extends Activity {
                 new int[] { palette.background, palette.accentSoft, palette.background });
     }
 
-    private TextView browserHomeSectionLabel(String value) {
-        TextView label = text(value, 10, palette.muted, Typeface.BOLD);
-        label.setAllCaps(true);
-        label.setLetterSpacing(0.12f);
-        label.setGravity(Gravity.CENTER);
-        return label;
-    }
-
     /**
      * The UC-style search pill. One tap focuses the real address bar (not a fake input) and
      * opens the keyboard, so the pill and the toolbar can never hold different text.
@@ -2534,19 +2524,32 @@ public final class MainActivity extends Activity {
         return tile;
     }
 
+    /**
+     * Browser start page, deliberately quiet: a wordmark, one search pill, one compact
+     * quick-access row and a single horizontally scrolling provider rail.
+     *
+     * <p>Owner feedback 2026-11-10: the previous start page stacked three captioned sections
+     * ("QUICK ACCESS", "SEARCH", "AI") over two tile grids, so the middle of a blank tab was a
+     * wall of labels. A browser start page should look like a browser: the capability belongs in
+     * the engine, not in the caption. Nothing here is a fake control — the pill focuses the real
+     * address bar and every tile or chip runs the same handler as its bottom-bar counterpart.</p>
+     */
     private View buildBrowserHomeView() {
         LinearLayout home = new LinearLayout(this);
         home.setOrientation(LinearLayout.VERTICAL);
         home.setGravity(Gravity.CENTER_HORIZONTAL);
-        home.setPadding(dp(14), dp(14), dp(14), dp(12));
+        home.setPadding(dp(16), dp(20), dp(16), dp(14));
         home.setBackground(browserHomeScenicBackdrop());
 
-        home.addView(browserHomeSearchPill(), bottomMargin(dp(10)));
+        TextView wordmark = text("daymark", 19, palette.text, Typeface.BOLD);
+        wordmark.setLetterSpacing(0.01f);
+        home.addView(wordmark, bottomMargin(dp(12)));
 
-        home.addView(browserHomeSectionLabel("QUICK ACCESS"), bottomMargin(dp(6)));
+        home.addView(browserHomeSearchPill(), bottomMargin(dp(12)));
+
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
-        quickRow.addView(browserHomeTile("H", "Site history", "Open saved site history",
+        quickRow.addView(browserHomeTile("H", "History", "Open saved site history",
                 this::showBrowserHistoryDialog), tileParams());
         quickRow.addView(browserHomeTile("B", "Bookmarks", "Open saved bookmarks",
                 this::showBrowserBookmarksDialog), tileParams());
@@ -2554,54 +2557,62 @@ public final class MainActivity extends Activity {
                 this::showBrowserDownloadsDialog), tileParams());
         quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
                 this::showBrowserExtensionsManager), tileParams());
-        home.addView(quickRow, bottomMargin(dp(12)));
+        home.addView(quickRow, bottomMargin(dp(8)));
 
-        home.addView(browserHomeSectionLabel("SEARCH"), bottomMargin(dp(6)));
-        List<LinearLayout> gridRows = new ArrayList<>();
-        LinearLayout row = null;
-        int column = 0;
-        for (BrowserAddress.SearchEngine engine : BrowserAddress.SearchEngine.values()) {
-            if (!isBottomShortcutProvider(engine)) continue;
-            if (column == 0) {
-                row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                gridRows.add(row);
-            }
-            String monogram = engine.label.substring(0, 1);
-            row.addView(browserHomeTile(monogram, engine.label,
-                    "Search the current query with " + engine.label,
-                    () -> handleBrowserEngineShortcutTap(engine)), tileParams());
-            column = (column + 1) % 4;
-        }
-        for (LinearLayout gridRow : gridRows) {
-            home.addView(gridRow, bottomMargin(dp(2)));
-        }
-
-        home.addView(browserHomeSectionLabel("AI"), bottomMargin(dp(6)));
-        List<LinearLayout> aiRows = new ArrayList<>();
-        row = null;
-        column = 0;
-        for (AiSiteCatalog.Entry entry : AiSiteCatalog.entries()) {
-            if (column == 0) {
-                row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                aiRows.add(row);
-            }
-            String monogram = entry.label.substring(0, 1);
-            row.addView(browserHomeTile(monogram, entry.label,
-                    "Ask " + entry.label + " with the current search",
-                    () -> handleBrowserSiteShortcutTap(entry)), tileParams());
-            column = (column + 1) % 4;
-        }
-        for (LinearLayout aiRow : aiRows) {
-            home.addView(aiRow, bottomMargin(dp(2)));
-        }
+        home.addView(browserHomeProviderRail(), bottomMargin(dp(2)));
 
         ScrollView homeScroll = new ScrollView(this);
         homeScroll.setFillViewport(true);
         homeScroll.addView(home, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return homeScroll;
+    }
+
+    /**
+     * One scrollable rail of search engines followed by AI sites. It replaces the two captioned
+     * four-column grids: same catalog, same tap handlers, one row instead of six.
+     */
+    private HorizontalScrollView browserHomeProviderRail() {
+        HorizontalScrollView rail = new HorizontalScrollView(this);
+        rail.setHorizontalScrollBarEnabled(false);
+        rail.setClipToPadding(false);
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        for (BrowserAddress.SearchEngine engine : BrowserAddress.SearchEngine.values()) {
+            if (!isBottomShortcutProvider(engine)) continue;
+            chips.addView(browserHomeChip(engine.label, "Search the current query with " + engine.label,
+                    () -> handleBrowserEngineShortcutTap(engine)));
+        }
+        for (AiSiteCatalog.Entry entry : AiSiteCatalog.entries()) {
+            chips.addView(browserHomeChip(entry.label, "Ask " + entry.label + " with the current search",
+                    () -> handleBrowserSiteShortcutTap(entry)));
+        }
+        rail.addView(chips, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return rail;
+    }
+
+    /** A compact provider chip: label only, one shared tap handler per provider kind. */
+    private LinearLayout browserHomeChip(String label, String description, Runnable tap) {
+        LinearLayout chip = new LinearLayout(this);
+        chip.setOrientation(LinearLayout.HORIZONTAL);
+        chip.setGravity(Gravity.CENTER_VERTICAL);
+        chip.setMinimumHeight(dp(40));
+        chip.setPadding(dp(14), 0, dp(14), 0);
+        chip.setFocusable(true);
+        chip.setClickable(true);
+        chip.setContentDescription(description);
+        chip.setBackground(pressable(palette.surface, 20, palette.line, palette.text, palette.muted));
+        chip.addView(text(label, 12, palette.text, Typeface.NORMAL));
+        chip.setOnClickListener(view -> {
+            haptic(view, HapticFeedbackConstants.CONFIRM);
+            tap.run();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(40));
+        params.rightMargin = dp(8);
+        chip.setLayoutParams(params);
+        return chip;
     }
 
     private void navigateFromInput() {
