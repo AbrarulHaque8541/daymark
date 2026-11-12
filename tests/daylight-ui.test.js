@@ -86,7 +86,8 @@ function elementsOf(doc) {
     form: doc.registry['daylight-form'],
     status: doc.registry['daylight-status'],
     result: doc.registry['daylight-result'],
-    clear: doc.registry['daylight-clear']
+    clear: doc.registry['daylight-clear'],
+    copy: doc.registry['daylight-copy']
   };
 }
 
@@ -137,7 +138,7 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.ok(els.card, 'card must be created');
   assert.equal(els.card.className, 'briefing-card');
   assert.equal(els.card.getAttribute('aria-labelledby'), 'daylight-heading');
-  assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear);
+  assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear && els.copy);
   assert.equal(els.form.getAttribute('novalidate'), 'novalidate');
   assert.equal(els.status.textContent, 'Type a place name and tap Check.');
   assert.equal(els.result.textContent, '');
@@ -301,6 +302,43 @@ test('clear empties the view and says so without touching storage', () => {
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
   assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
+});
+
+test('copy writes the current summary when clipboard is available', async () => {
+  const { env, doc } = fakeEnv({});
+  env.window = {
+    navigator: {
+      clipboard: {
+        writeText: async (text) => { env._copied = text; }
+      }
+    }
+  };
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = 'Kanyakumari, India · Today sunrise 06:14';
+  await handle.onCopy();
+  assert.equal(env._copied, 'Kanyakumari, India · Today sunrise 06:14');
+  assert.equal(els.status.textContent, 'Copied the daylight summary to the clipboard.');
+  assert.equal(els.copy.disabled, false);
+});
+
+test('copy reports when there is nothing to copy', async () => {
+  const { env, doc } = fakeEnv({});
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = '   ';
+  await handle.onCopy();
+  assert.equal(els.status.textContent, 'Nothing to copy yet. Check a place first.');
+});
+
+test('copy degrades when clipboard is unavailable', async () => {
+  const { env, doc } = fakeEnv({});
+  env.window = { navigator: {} };
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = 'summary';
+  await handle.onCopy();
+  assert.equal(els.status.textContent, 'Clipboard is unavailable in this browser.');
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
