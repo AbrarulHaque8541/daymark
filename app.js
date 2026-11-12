@@ -456,6 +456,7 @@
     taskList.innerHTML = filteredTasks.map((task) => taskMarkup(task, today)).join('');
     // The first render is the reliable completion signal for the initial skeleton.
     taskList.classList.add('is-ready');
+    taskList.setAttribute('aria-busy', 'false');
     const empty = filteredTasks.length === 0;
     $('#empty-state').hidden = !empty;
     taskList.hidden = empty;
