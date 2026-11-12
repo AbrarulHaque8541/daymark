@@ -32,6 +32,10 @@ function fakeElement(tag, doc) {
     children: [],
     listeners: [],
     parentNode: null,
+    classList: {
+      toggle(cls, force) { el._classes = el._classes || {}; el._classes[cls] = force !== false; },
+      contains(cls) { return !!(el._classes && el._classes[cls]); }
+    },
     appendChild(child) { child.parentNode = el; el.children.push(child); return child; },
     insertBefore(child, ref) { child.parentNode = el; el.children.push(child); return child; },
     setAttribute(name, value) { el.attrs = el.attrs || {}; el.attrs[name] = String(value); },
@@ -73,7 +77,8 @@ function fakeEnv(options) {
     window: {},
     daylightApi,
     fetch: opts.fetch,
-    now: () => '2026-11-12T05:00:00.000Z'
+    now: () => '2026-11-12T05:00:00.000Z',
+    navigator: opts.navigator || null
   };
   return { env, doc };
 }
@@ -86,7 +91,8 @@ function elementsOf(doc) {
     form: doc.registry['daylight-form'],
     status: doc.registry['daylight-status'],
     result: doc.registry['daylight-result'],
-    clear: doc.registry['daylight-clear']
+    clear: doc.registry['daylight-clear'],
+    copy: doc.registry['daylight-copy']
   };
 }
 
@@ -137,7 +143,7 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.ok(els.card, 'card must be created');
   assert.equal(els.card.className, 'briefing-card');
   assert.equal(els.card.getAttribute('aria-labelledby'), 'daylight-heading');
-  assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear);
+  assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear && els.copy);
   assert.equal(els.form.getAttribute('novalidate'), 'novalidate');
   assert.equal(els.status.textContent, 'Type a place name and tap Check.');
   assert.equal(els.result.textContent, '');
@@ -153,6 +159,7 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.equal(els.input.getAttribute('aria-describedby'), 'daylight-description', 'input must be described by the disclosure');
   assert.equal(typeof handle.onCheck, 'function');
   assert.equal(typeof handle.onClear, 'function');
+  assert.equal(typeof handle.onCopy, 'function');
 });
 
 test('attach reuses existing markup instead of duplicating the card', () => {
@@ -214,8 +221,6 @@ test('a concurrent submit cannot duplicate the request', async () => {
   const handle = ui.attachDaylightUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Kanyakumari';
-  // Fire both checks without awaiting the first one: only a genuinely
-  // concurrent second call proves the busy guard rejects it in flight.
   const first = handle.onCheck();
   const second = handle.onCheck();
   await Promise.all([first, second]);
@@ -301,6 +306,44 @@ test('clear empties the view and says so without touching storage', () => {
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
   assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
+});
+
+test('copy writes the result summary when clipboard is available', async () => {
+  const written = [];
+  const navigator = {
+    clipboard: {
+      writeText(text) {
+        written.push(text);
+        return Promise.resolve();
+      }
+    }
+  };
+  const { env, doc } = fakeEnv({ navigator });
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = 'Kanyakumari, India · Today sunrise 06:14';
+  handle.onCopy();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(written.length, 1);
+  assert.equal(written[0], 'Kanyakumari, India · Today sunrise 06:14');
+  assert.equal(els.status.textContent, 'Copied daylight summary to clipboard.');
+});
+
+test('copy fails closed when there is nothing to copy', () => {
+  const { env, doc } = fakeEnv({});
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  handle.onCopy();
+  assert.equal(els.status.textContent, 'Nothing to copy yet. Check a place first.');
+});
+
+test('copy fails closed when clipboard is unavailable', () => {
+  const { env, doc } = fakeEnv({});
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  els.result.textContent = 'some summary';
+  handle.onCopy();
+  assert.equal(els.status.textContent, 'Clipboard is unavailable.');
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {

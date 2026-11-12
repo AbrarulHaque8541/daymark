@@ -80,6 +80,13 @@
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
+    const copyButton = doc.createElement('button');
+    copyButton.id = 'daylight-copy';
+    copyButton.className = 'button button-quiet';
+    if (copyButton.setAttribute) copyButton.setAttribute('type', 'button');
+    copyButton.textContent = 'Copy';
+    form.appendChild(copyButton);
+
     aside.appendChild(form);
 
     const statusLine = doc.createElement('p');
@@ -124,6 +131,7 @@
     const statusEl = element('daylight-status');
     const resultEl = element('daylight-result');
     const clearEl = element('daylight-clear');
+    const copyEl = element('daylight-copy');
 
     let busy = false;
 
@@ -138,11 +146,23 @@
         if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
           buttonEl.classList.toggle('is-busy', isBusy);
           if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
+          if (copyEl && copyEl.classList) copyEl.classList.toggle('is-busy', isBusy);
         }
         if (typeof buttonEl.setAttribute === 'function') {
           if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
           else buttonEl.removeAttribute('aria-busy');
         }
+      }
+    }
+
+    function setCopyBusy(isBusy) {
+      if (!copyEl) return;
+      if (copyEl.classList && typeof copyEl.classList.toggle === 'function') {
+        copyEl.classList.toggle('is-busy', isBusy);
+      }
+      if (typeof copyEl.setAttribute === 'function') {
+        if (isBusy) copyEl.setAttribute('aria-busy', 'true');
+        else copyEl.removeAttribute('aria-busy');
       }
     }
 
@@ -196,6 +216,29 @@
       status('Cleared. Type a place name and tap Check.');
     }
 
+    function onCopy() {
+      if (busy) return;
+      const text = resultEl && typeof resultEl.textContent === 'string' ? resultEl.textContent.trim() : '';
+      if (!text) {
+        status('Nothing to copy yet. Check a place first.');
+        return;
+      }
+      const nav = env.navigator || (win && win.navigator) || null;
+      setCopyBusy(true);
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        Promise.resolve(nav.clipboard.writeText(text)).then(() => {
+          status('Copied daylight summary to clipboard.');
+          setCopyBusy(false);
+        }).catch(() => {
+          status('Could not copy the summary.');
+          setCopyBusy(false);
+        });
+      } else {
+        status('Clipboard is unavailable.');
+        setCopyBusy(false);
+      }
+    }
+
     status('Type a place name and tap Check.');
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -210,6 +253,9 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -222,8 +268,10 @@
     return {
       onCheck,
       onClear,
+      onCopy,
       detach() {
         setBusy(false);
+        setCopyBusy(false);
       }
     };
   }
