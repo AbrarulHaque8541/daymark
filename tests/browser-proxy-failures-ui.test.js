@@ -102,9 +102,13 @@ test('attach injects the card once with the expected structure', () => {
 test('attach reuses existing markup instead of duplicating the card', () => {
   const { env, doc } = fakeEnv();
   ui.attachBrowserProxyFailuresUi(env);
-  const before = doc.created.length;
+  const cardBefore = doc.registry['proxy-failures-card'];
+  const createdBefore = doc.created.filter((el) => el.tagName === 'aside').length;
   ui.attachBrowserProxyFailuresUi(env);
-  assert.equal(doc.created.length, before, 'a second attach must not create another card');
+  const createdAfter = doc.created.filter((el) => el.tagName === 'aside').length;
+  assert.equal(createdBefore, 1, 'the first attach creates exactly one card');
+  assert.equal(createdAfter, createdBefore, 'a second attach must not create another card');
+  assert.equal(doc.registry['proxy-failures-card'], cardBefore, 'the card element itself must be reused');
 });
 
 test('the injected card slots in after the proxy planner card when present', () => {
@@ -202,7 +206,7 @@ test('the module registers its tests and stays inert when loaded without a DOM',
   const required = fs.readFileSync(path.join(__dirname, 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8');
   assert.ok(required.indexOf('tests/browser-proxy-failures-logic.test.js') !== -1, 'logic test must be registered');
   assert.ok(required.indexOf('tests/browser-proxy-failures-ui.test.js') !== -1, 'ui test must be registered');
-  const source = fs.readFileSync(require.resolve('../browser-proxy-failures-ui.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'browser-proxy-failures-ui.js'), 'utf8');
   const context = {};
   context.globalThis = context;
   assert.doesNotThrow(() => vm.runInNewContext(source, context));
