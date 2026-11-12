@@ -111,6 +111,8 @@
     const resultEl = element('proxy-failures-result');
     const clearEl = element('proxy-failures-clear');
 
+    const schedule = typeof env.schedule === 'function' ? env.schedule : (fn, ms) => setTimeout(fn, ms);
+
     function status(message) {
       if (statusEl) statusEl.textContent = message || '';
     }
@@ -154,7 +156,24 @@
       }
     }
 
+    function flashBusy() {
+      const buttons = [showEl, clearEl].filter(Boolean);
+      buttons.forEach((btn) => {
+        if (btn.classList && typeof btn.classList.add === 'function') btn.classList.add('is-busy');
+        else if (typeof btn.className === 'string' && btn.className.indexOf('is-busy') === -1) btn.className += ' is-busy';
+      });
+      if (showEl && typeof showEl.setAttribute === 'function') showEl.setAttribute('aria-busy', 'true');
+      schedule(() => {
+        buttons.forEach((btn) => {
+          if (btn.classList && typeof btn.classList.remove === 'function') btn.classList.remove('is-busy');
+          else if (typeof btn.className === 'string') btn.className = btn.className.replace(/\s*is-busy/g, '').trim();
+        });
+        if (showEl && typeof showEl.removeAttribute === 'function') showEl.removeAttribute('aria-busy');
+      }, 160);
+    }
+
     function onShow() {
+      flashBusy();
       if (!logic || typeof logic.explainScenario !== 'function') {
         clearResult();
         status('The proxy failure playbook is unavailable.');
@@ -174,6 +193,7 @@
     }
 
     function onClear() {
+      flashBusy();
       clearResult();
       status('Cleared. Pick a scenario and tap Show.');
     }
