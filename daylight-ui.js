@@ -80,6 +80,13 @@
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
+    const copyButton = doc.createElement('button');
+    copyButton.id = 'daylight-copy';
+    copyButton.className = 'button button-quiet';
+    if (copyButton.setAttribute) copyButton.setAttribute('type', 'button');
+    copyButton.textContent = 'Copy';
+    form.appendChild(copyButton);
+
     aside.appendChild(form);
 
     const statusLine = doc.createElement('p');
@@ -124,6 +131,7 @@
     const statusEl = element('daylight-status');
     const resultEl = element('daylight-result');
     const clearEl = element('daylight-clear');
+    const copyEl = element('daylight-copy');
 
     let busy = false;
 
@@ -156,8 +164,8 @@
         return dayLabel + ' sunrise ' + day.sunriseClock + ', sunset ' + day.sunsetClock
           + ' (' + day.durationLabel + '), UV max ' + day.uvMax + ' (' + day.uvBand + ')';
       });
-      const suffix = daylight.timezone ? ' · local time (' + daylight.timezone + ')' : ' · local time';
-      resultEl.textContent = placeLine + ' · ' + lines.join(' · ') + suffix;
+      const suffix = daylight.timezone ? ' \u00b7 local time (' + daylight.timezone + ')' : ' \u00b7 local time';
+      resultEl.textContent = placeLine + ' \u00b7 ' + lines.join(' \u00b7 ') + suffix;
     }
 
     async function onCheck() {
@@ -179,13 +187,45 @@
       try {
         const record = await daylightApi.fetchDaylightByPlace(typed, fetchImpl, { now: now });
         render(record);
-        status('Updated · ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC · not saved on this device');
+        status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
+          + ' UTC \u00b7 not saved on this device');
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         status('Could not check: ' + message);
       } finally {
         setBusy(false);
+      }
+    }
+
+    async function onCopy() {
+      if (busy) return;
+      const summary = resultEl && typeof resultEl.textContent === 'string' ? resultEl.textContent.trim() : '';
+      if (!summary) {
+        status('Nothing to copy yet. Check a place first.');
+        return;
+      }
+      const nav = win && win.navigator;
+      const clipboard = nav && nav.clipboard && typeof nav.clipboard.writeText === 'function' ? nav.clipboard : null;
+      if (!clipboard) {
+        status('Clipboard is unavailable in this browser.');
+        return;
+      }
+      if (copyEl) {
+        copyEl.disabled = true;
+        if (copyEl.classList && typeof copyEl.classList.add === 'function') copyEl.classList.add('is-busy');
+        if (typeof copyEl.setAttribute === 'function') copyEl.setAttribute('aria-busy', 'true');
+      }
+      try {
+        await clipboard.writeText(summary);
+        status('Copied the daylight summary to the clipboard.');
+      } catch (err) {
+        status('Could not copy: ' + (err && err.message ? err.message : 'clipboard rejected'));
+      } finally {
+        if (copyEl) {
+          copyEl.disabled = false;
+          if (copyEl.classList && typeof copyEl.classList.remove === 'function') copyEl.classList.remove('is-busy');
+          if (typeof copyEl.removeAttribute === 'function') copyEl.removeAttribute('aria-busy');
+        }
       }
     }
 
@@ -210,6 +250,9 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -222,6 +265,7 @@
     return {
       onCheck,
       onClear,
+      onCopy,
       detach() {
         setBusy(false);
       }
