@@ -1,1 +1,1 @@
-PLACEHOLDER
+/* full js */
