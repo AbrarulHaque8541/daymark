@@ -21,6 +21,8 @@
   <script src="weather-ui.js" defer></script>
   <script src="air-quality-logic.js" defer></script>
   <script src="air-quality-ui.js" defer></script>
+  <script src="daylight-logic.js" defer></script>
+  <script src="daylight-ui.js" defer></script>
   <script src="holidays-logic.js" defer></script>
   <script src="holidays-ui.js" defer></script>
   <script src="currency-logic.js" defer></script>
@@ -477,7 +479,7 @@
             <button class="button button-quiet" id="telegram-test" type="button">Test</button>
             <button class="button button-quiet" id="telegram-clear" type="button">Clear token</button>
           </form>
-          <p class="feed-status" id="telegram-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="feed-status" id="telegram-status" role="status" aria-live="polite"></p>
         </aside>
         <aside class="briefing-card" id="storage-card" aria-labelledby="storage-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
@@ -516,7 +518,7 @@
       </select>
       <label class="sr-only" for="edit-repeat">Repeat</label>
       <select id="edit-repeat" name="repeat">
-        <option value="">No repeat</option>
+        <option value="">No reminder</option>
         <option value="daily">Daily</option>
         <option value="weekly">Weekly</option>
         <option value="monthly">Monthly</option>
