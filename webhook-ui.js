@@ -1,13 +1,14 @@
 /*
  * Daymark task-completion webhook UI wiring for the web prototype.
  *
- * A small offline-first automation card: save an https:// webhook URL and every
- * task completed in this prototype announces a minimal JSON event to it.
- * Offline, failures, and a missing fetch all degrade gracefully - events queue
- * on this device (bounded) and are sent only on an explicit Retry, an 'online'
- * event, or the next completed task. Nothing polls and nothing wakes the radio
- * on a timer: zero battery drain by design. Mirrors the weather/currency
- * module style: attachWebhookUi(env) is fully injectable for unit tests.
+ * A small HTTPS webhook delivery card: save an https:// endpoint and completed
+ * tasks send a minimal JSON event directly to it.
+ * Temporary offline states, request failures, and a missing fetch all degrade
+ * gracefully: events are queued on this device (bounded) and delivery resumes
+ * on an explicit Retry, an 'online' event, or the next completed task. Nothing
+ * polls and nothing wakes the radio on a timer: zero battery drain by design.
+ * Mirrors the weather/currency module style: attachWebhookUi(env) is fully
+ * injectable for unit tests.
  *
  * Origin-wide Web Locks serialize queue mutations and hold one exclusive lock
  * across delivery. If that coordinator is unavailable, task events are not

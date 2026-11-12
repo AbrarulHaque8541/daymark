@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f2f5f7">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1216">
-  <meta name="description" content="Daymark — a calm personal task manager with encrypted on-device storage.">
+  <meta name="description" content="Daymark — a calm personal task manager for the web.">
   <title>Daymark — personal tasks</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2316705f'/%3E%3Crect x='5' y='9' width='3' height='10' rx='1' fill='%23f7f8f5'/%3E%3Crect x='10.5' y='5' width='3' height='14' rx='1' fill='%23f7f8f5'/%3E%3Crect x='16' y='11' width='3' height='8' rx='1' fill='%23f7f8f5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
@@ -164,11 +164,12 @@
               <option value="csv">CSV (.csv)</option>
               <option value="ics">Calendar (.ics)</option>
             </select>
-            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
-            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
+            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks" aria-describedby="browser-storage-disclosure">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file" aria-describedby="browser-storage-disclosure">Import</button>
             <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
             <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
           </div>
+          <p class="briefing-description" id="browser-storage-disclosure">Task data, Focus sessions and history, recovery backups, saved preferences (including the remembered Telegram chat destination), caches, and queued webhook events in the web prototype are stored in this browser's localStorage and are not encrypted by the prototype. The Telegram bot token and current webhook endpoint are session-only; a legacy secret-bearing webhook value is never read or displayed.</p>
           <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
             <div class="task-list-skeleton" aria-hidden="true">
               <div class="skeleton-row"></div>
