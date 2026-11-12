@@ -2,11 +2,13 @@ package com.abrar.daymark;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
@@ -83,11 +85,12 @@ final class BrowserAddressNoticeView extends LinearLayout {
 
         indicatorGlyph = new TextView(context);
         indicatorGlyph.setGravity(Gravity.CENTER);
-        indicatorGlyph.setText("•");
+        indicatorGlyph.setText("i");
         indicatorGlyph.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         indicatorGlyph.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        indicatorGlyph.setTextColor(themeColor(android.R.attr.colorAccent, 0xFF16705F));
-        indicatorGlyph.setBackground(circleBackground());
+        int infoColor = severityColor(BrowserAddressNotice.Severity.INFO);
+        indicatorGlyph.setTextColor(infoColor);
+        indicatorGlyph.setBackground(circleBackground(infoColor));
         indicatorTarget.addView(indicatorGlyph, new FrameLayout.LayoutParams(
                 dp(32), dp(32), Gravity.CENTER));
 
@@ -96,11 +99,11 @@ final class BrowserAddressNoticeView extends LinearLayout {
         inlineLabel.setSingleLine(true);
         inlineLabel.setEllipsize(TextUtils.TruncateAt.END);
         inlineLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        inlineLabel.setTextColor(themeColor(android.R.attr.textColorPrimary, Color.BLACK));
+        inlineLabel.setTextColor(infoColor);
         inlineLabel.setPadding(dp(9), 0, dp(9), 0);
         inlineLabel.setMinHeight(dp(48));
         inlineLabel.setMaxWidth(maxInlineWidthPx);
-        inlineLabel.setBackground(capsuleBackground());
+        inlineLabel.setBackground(capsuleBackground(infoColor));
         inlineLabel.setVisibility(GONE);
         inlineLabel.setFocusable(true);
         inlineLabel.setClickable(true);
@@ -250,16 +253,30 @@ final class BrowserAddressNoticeView extends LinearLayout {
     }
 
     private LinearLayout buildPanelContent(BrowserAddressNotice.Notice notice) {
+        int noticeColor = severityColor(notice.severity);
         LinearLayout content = new LinearLayout(getContext());
         content.setOrientation(VERTICAL);
-        content.setPadding(dp(16), dp(14), dp(16), dp(14));
-        content.setBackground(panelBackground());
+        content.setPadding(dp(18), dp(16), dp(18), dp(16));
+        content.setBackground(panelBackground(noticeColor));
+
+        TextView severity = new TextView(getContext());
+        severity.setText(severityLabel(notice.severity));
+        severity.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        severity.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        severity.setLetterSpacing(0.04f);
+        severity.setTextColor(noticeColor);
+        severity.setGravity(Gravity.CENTER);
+        severity.setPadding(dp(10), 0, dp(10), 0);
+        severity.setBackground(tintedBackground(noticeColor, dp(10), 0.10f, 0.28f));
+        content.addView(severity, new LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(28)));
 
         TextView title = new TextView(getContext());
         title.setText(notice.title);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setTextColor(themeColor(android.R.attr.textColorPrimary, Color.BLACK));
+        title.setPadding(0, dp(10), 0, 0);
         content.addView(title, new LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -267,51 +284,86 @@ final class BrowserAddressNoticeView extends LinearLayout {
         message.setText(notice.message);
         message.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         message.setTextColor(themeColor(android.R.attr.textColorSecondary, 0xFF555555));
-        message.setPadding(0, dp(7), 0, dp(5));
+        message.setLineSpacing(dp(2), 1f);
+        message.setPadding(0, dp(7), 0, dp(8));
         content.addView(message, new LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         for (BrowserAddressNotice.Action action : notice.actions) {
-            Button actionButton = new Button(getContext());
-            actionButton.setText(action.label);
-            actionButton.setAllCaps(false);
-            actionButton.setMinHeight(dp(44));
+            Button actionButton = createPanelButton(action.label, noticeColor, false);
             actionButton.setOnClickListener(view -> {
                 ActionListener listener = actionListener;
                 if (panel != null && panel.isShowing()) panel.dismiss();
                 if (listener != null) listener.onAction(notice.id, action.id);
             });
-            content.addView(actionButton, new LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            LayoutParams actionParams = new LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            actionParams.topMargin = dp(6);
+            content.addView(actionButton, actionParams);
         }
 
         if (notice.dismissible) {
-            Button dismissButton = new Button(getContext());
-            dismissButton.setText("Dismiss notice");
-            dismissButton.setAllCaps(false);
-            dismissButton.setMinHeight(dp(44));
+            Button dismissButton = createPanelButton("Dismiss notice", noticeColor, true);
             dismissButton.setOnClickListener(view -> dismissNotice());
-            content.addView(dismissButton, new LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            LayoutParams dismissParams = new LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dismissParams.topMargin = dp(2);
+            content.addView(dismissButton, dismissParams);
         }
         return content;
+    }
+
+    private Button createPanelButton(String label, int noticeColor, boolean quiet) {
+        Button button = new Button(getContext());
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        button.setTypeface(Typeface.DEFAULT, quiet ? Typeface.NORMAL : Typeface.BOLD);
+        button.setTextColor(quiet
+                ? themeColor(android.R.attr.textColorSecondary, 0xFF555555) : noticeColor);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(dp(48));
+        button.setMinimumHeight(dp(48));
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setPadding(dp(14), 0, dp(14), 0);
+
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.RECTANGLE);
+        shape.setCornerRadius(dp(12));
+        int surface = themeColor(android.R.attr.colorBackground, Color.WHITE);
+        shape.setColor(quiet ? Color.TRANSPARENT : blendColor(noticeColor, surface, 0.08f));
+        if (!quiet) shape.setStroke(dp(1), blendColor(noticeColor, surface, 0.34f));
+        button.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(alphaColor(noticeColor, 0.18f)), shape, null));
+        return button;
     }
 
     private void renderInline(boolean animate) {
         BrowserAddressNotice.Notice notice = state.current();
         if (notice == null) {
-            indicatorGlyph.setText("•");
+            int infoColor = severityColor(BrowserAddressNotice.Severity.INFO);
+            indicatorGlyph.setText("i");
+            indicatorGlyph.setTextColor(infoColor);
+            indicatorGlyph.setBackground(circleBackground(infoColor));
+            inlineLabel.setTextColor(infoColor);
+            inlineLabel.setBackground(capsuleBackground(infoColor));
             indicatorTarget.setContentDescription("Site information");
             hideInlineLabel(animate);
             return;
         }
 
+        int noticeColor = severityColor(notice.severity);
         boolean informational = notice.severity == BrowserAddressNotice.Severity.INFO;
         indicatorGlyph.setText(informational ? "i" : "!");
+        indicatorGlyph.setTextColor(noticeColor);
+        indicatorGlyph.setBackground(circleBackground(noticeColor));
         String severity = notice.severity.name().toLowerCase(Locale.ROOT);
         String description = severity + " notice: " + notice.title + ". Tap for details.";
         indicatorTarget.setContentDescription(description);
         inlineLabel.setText(notice.title);
+        inlineLabel.setTextColor(noticeColor);
+        inlineLabel.setBackground(capsuleBackground(noticeColor));
         inlineLabel.setContentDescription(description);
         showInlineLabel(animate);
     }
@@ -415,28 +467,70 @@ final class BrowserAddressNoticeView extends LinearLayout {
                 indicatorTarget.getHeight(), dp(4), dp(8));
     }
 
-    private GradientDrawable circleBackground() {
+    private String severityLabel(BrowserAddressNotice.Severity severity) {
+        switch (severity) {
+            case WARNING:
+                return "WARNING";
+            case CRITICAL:
+                return "SECURITY ALERT";
+            case INFO:
+            default:
+                return "INFO";
+        }
+    }
+
+    private int severityColor(BrowserAddressNotice.Severity severity) {
+        if (severity == BrowserAddressNotice.Severity.WARNING) {
+            return getResources().getColor(R.color.daymark_browser_notice_warning,
+                    getContext().getTheme());
+        }
+        if (severity == BrowserAddressNotice.Severity.CRITICAL) {
+            return getResources().getColor(R.color.daymark_browser_notice_critical,
+                    getContext().getTheme());
+        }
+        return themeColor(android.R.attr.colorAccent, 0xFF16705F);
+    }
+
+    private GradientDrawable circleBackground(int color) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(themeColor(android.R.attr.colorBackground, Color.WHITE));
-        drawable.setStroke(dp(1), themeColor(android.R.attr.colorAccent, 0xFF16705F));
+        drawable.setStroke(dp(1), color);
         return drawable;
     }
 
-    private GradientDrawable capsuleBackground() {
-        return roundedBackground(dp(24));
+    private GradientDrawable capsuleBackground(int color) {
+        return tintedBackground(color, dp(24), 0.08f, 0.34f);
     }
 
-    private GradientDrawable panelBackground() {
-        return roundedBackground(dp(16));
+    private GradientDrawable panelBackground(int color) {
+        return tintedBackground(color, dp(18), 0.04f, 0.22f);
     }
 
-    private GradientDrawable roundedBackground(int radiusPx) {
+    private GradientDrawable tintedBackground(int color, int radiusPx,
+                                              float fillMix, float strokeMix) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(themeColor(android.R.attr.colorBackground, Color.WHITE));
+        int surface = themeColor(android.R.attr.colorBackground, Color.WHITE);
+        drawable.setColor(blendColor(color, surface, fillMix));
         drawable.setCornerRadius(radiusPx);
-        drawable.setStroke(dp(1), themeColor(android.R.attr.textColorSecondary, 0xFF777777));
+        if (strokeMix > 0f) drawable.setStroke(dp(1), blendColor(color, surface, strokeMix));
         return drawable;
+    }
+
+    private int blendColor(int foreground, int background, float amount) {
+        float fraction = Math.max(0f, Math.min(1f, amount));
+        return Color.rgb(
+                Math.round(Color.red(background) * (1f - fraction)
+                        + Color.red(foreground) * fraction),
+                Math.round(Color.green(background) * (1f - fraction)
+                        + Color.green(foreground) * fraction),
+                Math.round(Color.blue(background) * (1f - fraction)
+                        + Color.blue(foreground) * fraction));
+    }
+
+    private int alphaColor(int color, float alpha) {
+        return Color.argb(Math.round(255f * Math.max(0f, Math.min(1f, alpha))),
+                Color.red(color), Color.green(color), Color.blue(color));
     }
 
     private int themeColor(int attribute, int fallback) {
