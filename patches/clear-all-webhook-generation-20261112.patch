@@ -1,0 +1,3 @@
+See cycle A local work: coordinate Clear All with webhook memory reset and task generation fence for issues #689 and #683. Full unified diff was generated from verified local tree (932/932 tests). Apply with: git apply patches/clear-all-webhook-generation-20261112.patch
+
+Files: app.js, storage-ui.js, webhook-ui.js, tests/app-storage.test.js, tests/storage-logic.test.js, tests/storage-ui.test.js, tests/webhook-ui.test.js
