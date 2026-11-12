@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { createDownloadPath, reservationKey, sanitizeDownloadFilename } = require('./download-policy');
+const { isAllowedRequest } = require('./request-policy');
 
 function cancelUnsafeDownload(event, item) {
   try {
@@ -24,6 +25,39 @@ function cancelUnsafeDownload(event, item) {
     // The caller receives an unconfirmed result and must not assume the download stopped.
   }
   return { requested: false, confirmed: false };
+}
+
+function hasUrlCredentials(value, url) {
+  const authorityMatch = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/([^/?#]*)/.exec(value.trim());
+  const authority = authorityMatch ? authorityMatch[1] : '';
+  return url.username !== '' || url.password !== '' || authority.includes('@');
+}
+
+function validateDownloadUrlChain(item) {
+  if (!item || typeof item.getURLChain !== 'function') {
+    throw new TypeError('download-url-chain-required');
+  }
+  const chain = item.getURLChain();
+  if (!Array.isArray(chain) || chain.length === 0) {
+    throw new TypeError('download-url-chain-required');
+  }
+
+  let previousScheme = null;
+  for (const value of chain) {
+    if (typeof value !== 'string') throw new TypeError('invalid-download-url-chain');
+    let url;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new TypeError('invalid-download-url-chain');
+    }
+    if (hasUrlCredentials(value, url)
+      || (previousScheme === 'https:' && url.protocol === 'http:')
+      || !isAllowedRequest({ url: value, resourceType: 'mainFrame' })) {
+      throw new TypeError('unsafe-download-url-chain');
+    }
+    previousScheme = url.protocol;
+  }
 }
 
 /**
@@ -58,6 +92,7 @@ function handleWillDownload(options) {
     } catch {
       filename = 'download';
     }
+    validateDownloadUrlChain(item);
     directory = typeof opts.downloadDirectory === 'function'
       ? opts.downloadDirectory() : opts.downloadDirectory;
     finalPath = createDownloadPath(directory, filename, opts.exists, opts.reservedPaths);
