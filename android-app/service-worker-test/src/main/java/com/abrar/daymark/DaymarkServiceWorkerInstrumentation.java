@@ -289,7 +289,7 @@ public final class DaymarkServiceWorkerInstrumentation {
                     + "if(registration) await registration.unregister();"
                     + "await caches.delete('daymark-service-worker-runtime');"
                     + "document.title='cleanup-done';"
-                    + "});");
+                    + "})();");
             awaitBoolean(recreated, "document.title === 'cleanup-done'", WAIT_MS,
                     "the instrumentation must clean up its Service Worker and cache");
 
@@ -980,3 +980,4 @@ public final class DaymarkServiceWorkerInstrumentation {
         }
     }
 }
+
