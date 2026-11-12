@@ -141,6 +141,9 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (clearEl && clearEl.classList && typeof clearEl.classList.toggle === 'function') {
+        clearEl.classList.toggle('is-busy', isBusy);
+      }
     }
 
     function render(record) {
