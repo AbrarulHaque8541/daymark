@@ -43,6 +43,7 @@ tests/device-capability-policy.test.js
 tests/export-logic.test.js
 tests/export-ui.test.js
 tests/extension-network.test.mjs
+tests/extension-spa-navigation.test.js
 tests/feed-logic.test.js
 tests/focus-logic.test.js
 tests/focus-storage.test.js
