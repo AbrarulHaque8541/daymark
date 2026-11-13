@@ -19,6 +19,7 @@ function makeElement(tag) {
     textContent: '',
     disabled: false,
     value: '',
+    hidden: false,
     classList: {
       set: new Set(),
       toggle(name, force) {
@@ -27,8 +28,8 @@ function makeElement(tag) {
       },
       contains(name) { return this.set.has(name); }
     },
-    setAttribute(name, value) { element.attributes[name] = String(value); },
-    removeAttribute(name) { delete element.attributes[name]; },
+    setAttribute(name, value) { element.attributes[name] = String(value); if (name === 'hidden') element.hidden = true; },
+    removeAttribute(name) { delete element.attributes[name]; if (name === 'hidden') element.hidden = false; },
     getAttribute(name) { return element.attributes[name]; },
     appendChild(child) {
       child.parentNode = element;
@@ -68,6 +69,7 @@ function makeDoc() {
   };
   doc.createElement = (tag) => makeElement(tag);
   doc.getElementById = (id) => doc[id] || null;
+  doc.createTextNode = (text) => ({ textContent: text, nodeType: 3 });
   currentDoc = doc;
   return doc;
 }
@@ -142,11 +144,12 @@ test('card heading and description are set', () => {
   assert.ok(doc.getElementById('releases-description').textContent.includes('api.github.com'));
 });
 
-test('status line exposes role and aria-live', () => {
+test('status line exposes role and aria-live and atomic', () => {
   const doc = makeDoc();
   attach(doc);
   assert.strictEqual(doc.getElementById('releases-status').getAttribute('role'), 'status');
   assert.strictEqual(doc.getElementById('releases-status').getAttribute('aria-live'), 'polite');
+  assert.strictEqual(doc.getElementById('releases-status').getAttribute('aria-atomic'), 'true');
 });
 
 test('initial status invites a repository name', () => {
@@ -173,13 +176,19 @@ test('empty input is blocked with guidance', () => {
   assert.ok(doc.getElementById('releases-status').textContent.includes('Type a repository'));
 });
 
-test('a successful check renders the latest release', async () => {
+test('a successful check renders the latest release and link', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('releases-repo').value = 'octocat/Hello-World';
   doc.getElementById('releases-check').dispatch('click', {});
   await drain();
-  assert.ok(doc.getElementById('releases-result').textContent.includes('v1.2.3'));
+  const result = doc.getElementById('releases-result');
+  assert.ok(result.textContent.includes('v1.2.3'));
+  const links = result.children.filter((c) => c.tagName === 'a');
+  assert.strictEqual(links.length, 1);
+  assert.strictEqual(links[0].href, payload.html_url);
+  assert.strictEqual(links[0].getAttribute('target'), '_blank');
+  assert.ok(links[0].getAttribute('rel').includes('noopener'));
 });
 
 test('status reports the update time and that nothing is saved', async () => {
@@ -221,7 +230,7 @@ test('a failed check clears any previous result', async () => {
   assert.strictEqual(doc.getElementById('releases-result').textContent, '');
 });
 
-test('clear empties the input and the result', () => {
+test('clear empties the input and the result and hides copy', () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('releases-repo').value = 'octocat/Hello-World';
@@ -229,6 +238,7 @@ test('clear empties the input and the result', () => {
   doc.getElementById('releases-clear').dispatch('click', {});
   assert.strictEqual(doc.getElementById('releases-repo').value, '');
   assert.strictEqual(doc.getElementById('releases-result').textContent, '');
+  assert.ok(doc.getElementById('releases-copy').hidden);
 });
 
 test('form submit is prevented and runs the check', async () => {
@@ -272,4 +282,26 @@ test('missing releases API degrades with an honest message', async () => {
     if (savedApi) globalThis.DaymarkReleases = savedApi;
   }
   assert.ok(doc.getElementById('releases-status').textContent.includes('unavailable'));
+});
+
+test('copy summary uses clipboard and reports success', async () => {
+  const doc = makeDoc();
+  let copied = '';
+  attach(doc, {
+    fetch: async () => okResponse(JSON.stringify(payload)),
+    clipboard: { writeText: async (text) => { copied = text; } }
+  });
+  doc.getElementById('releases-repo').value = 'octocat/Hello-World';
+  doc.getElementById('releases-check').dispatch('click', {});
+  await drain();
+  doc.getElementById('releases-copy').dispatch('click', {});
+  await drain();
+  assert.ok(copied.includes('v1.2.3'));
+  assert.ok(doc.getElementById('releases-status').textContent.includes('copied'));
+});
+
+test('copy hides when there is nothing to copy', () => {
+  const doc = makeDoc();
+  attach(doc);
+  assert.ok(doc.getElementById('releases-copy').hidden);
 });

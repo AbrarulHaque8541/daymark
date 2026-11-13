@@ -87,6 +87,7 @@
     statusLine.className = 'feed-status';
     if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('role', 'status');
     if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('aria-live', 'polite');
+    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('aria-atomic', 'true');
     aside.appendChild(statusLine);
 
     const result = doc.createElement('div');
@@ -94,6 +95,16 @@
     result.className = 'feed-list';
     if (typeof result.setAttribute === 'function') result.setAttribute('aria-live', 'polite');
     aside.appendChild(result);
+
+    const copyButton = doc.createElement('button');
+    copyButton.id = 'releases-copy';
+    copyButton.className = 'button button-quiet';
+    if (copyButton.setAttribute) {
+      copyButton.setAttribute('type', 'button');
+      copyButton.setAttribute('hidden', 'hidden');
+    }
+    copyButton.textContent = 'Copy summary';
+    aside.appendChild(copyButton);
 
     const anchor = typeof doc.getElementById === 'function'
       ? (doc.getElementById('wiki-card') || doc.getElementById('currency-card'))
@@ -114,6 +125,7 @@
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
+    const clipboard = env.clipboard || (win && win.navigator && win.navigator.clipboard) || null;
 
     ensureCard(doc);
 
@@ -124,26 +136,29 @@
     const statusEl = element('releases-status');
     const resultEl = element('releases-result');
     const clearEl = element('releases-clear');
+    const copyEl = element('releases-copy');
 
     let busy = false;
+    let lastSummary = '';
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
     }
 
-    function setBusy(isBusy) {
+    function setBusy(isBusy, which) {
       busy = isBusy;
-      if (buttonEl) {
-        buttonEl.disabled = isBusy;
-        if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
-          buttonEl.classList.toggle('is-busy', isBusy);
-          if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
+      const targets = which === 'copy' ? [copyEl] : [buttonEl, clearEl];
+      targets.forEach((el) => {
+        if (!el) return;
+        if (which !== 'copy') el.disabled = isBusy;
+        if (el.classList && typeof el.classList.toggle === 'function') {
+          el.classList.toggle('is-busy', isBusy);
         }
-        if (typeof buttonEl.setAttribute === 'function') {
-          if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
-          else buttonEl.removeAttribute('aria-busy');
+        if (typeof el.setAttribute === 'function') {
+          if (isBusy) el.setAttribute('aria-busy', 'true');
+          else el.removeAttribute('aria-busy');
         }
-      }
+      });
     }
 
     function render(record) {
@@ -156,8 +171,24 @@
       if (release.notes) {
         parts.push('notes: ' + release.notes + (release.notesTruncated ? ' (notes truncated)' : ''));
       }
-      parts.push(release.url);
-      resultEl.textContent = parts.join(' \u00b7 ');
+      lastSummary = parts.join(' \u00b7 ');
+      resultEl.textContent = lastSummary;
+      // Accessible external link; keeps plain text for screen readers and tests.
+      if (release.url && typeof resultEl.appendChild === 'function') {
+        const link = doc.createElement('a');
+        link.href = release.url;
+        link.textContent = 'Open release';
+        if (link.setAttribute) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+        resultEl.appendChild(doc.createTextNode(' \u00b7 '));
+        resultEl.appendChild(link);
+      }
+      if (copyEl) {
+        if (copyEl.removeAttribute) copyEl.removeAttribute('hidden');
+        else copyEl.hidden = false;
+      }
     }
 
     async function onCheck() {
@@ -188,6 +219,8 @@
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
         if (resultEl) resultEl.textContent = '';
+        lastSummary = '';
+        if (copyEl && copyEl.setAttribute) copyEl.setAttribute('hidden', 'hidden');
       } finally {
         setBusy(false);
       }
@@ -197,7 +230,26 @@
       if (busy) return;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) resultEl.textContent = '';
+      lastSummary = '';
+      if (copyEl && copyEl.setAttribute) copyEl.setAttribute('hidden', 'hidden');
       status('Cleared. Type a repository as owner/repo and tap Check.');
+    }
+
+    async function onCopy() {
+      if (busy || !lastSummary) return;
+      setBusy(true, 'copy');
+      try {
+        if (clipboard && typeof clipboard.writeText === 'function') {
+          await clipboard.writeText(lastSummary);
+          status('Summary copied. Nothing is saved on this device.');
+        } else {
+          status('Copy is unavailable in this browser. Select the text above.');
+        }
+      } catch (error) {
+        status('Could not copy the summary. Select the text above.');
+      } finally {
+        setTimeout(() => setBusy(false, 'copy'), 600);
+      }
     }
 
     status('Type a repository as owner/repo and tap Check.');
@@ -214,6 +266,9 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -226,6 +281,7 @@
     return {
       onCheck,
       onClear,
+      onCopy,
       detach() {
         setBusy(false);
       }
