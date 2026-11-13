@@ -154,7 +154,21 @@
       }
     }
 
+    function flashBusy(button) {
+      if (!button) return;
+      const hasClassList = button.classList && typeof button.classList.add === 'function';
+      if (hasClassList) button.classList.add('is-busy');
+      if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', 'true');
+      const release = () => {
+        if (hasClassList && typeof button.classList.remove === 'function') button.classList.remove('is-busy');
+        if (typeof button.removeAttribute === 'function') button.removeAttribute('aria-busy');
+      };
+      if (typeof setTimeout === 'function') setTimeout(release, 280);
+      else release();
+    }
+
     function onShow() {
+      flashBusy(showEl);
       if (!logic || typeof logic.explainScenario !== 'function') {
         clearResult();
         status('The proxy failure playbook is unavailable.');
@@ -174,6 +188,7 @@
     }
 
     function onClear() {
+      flashBusy(clearEl);
       clearResult();
       status('Cleared. Pick a scenario and tap Show.');
     }
