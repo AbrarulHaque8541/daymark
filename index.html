@@ -47,6 +47,8 @@
   <script src="browser-data-ui.js" defer></script>
   <script src="browser-intent-logic.js" defer></script>
   <script src="browser-intent-ui.js" defer></script>
+  <script src="url-insights-logic.js" defer></script>
+  <script src="url-insights-ui.js" defer></script>
   <script src="telegram-logic.js" defer></script>
   <script src="telegram-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
@@ -453,6 +455,19 @@
           </form>
           <p class="feed-status" id="browser-intent-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="browser-intent-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="url-insights-card" aria-labelledby="url-insights-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="url-insights-heading">Address bar, explained</h2>
+          <p class="briefing-description">Paste an address or search words to see how the browser reads it. Nothing is fetched and nothing opens.</p>
+          <form id="url-insights-form" class="feed-form" novalidate>
+            <label class="sr-only" for="url-insights-input">Address or search words</label>
+            <input id="url-insights-input" name="address" type="text" maxlength="2048" placeholder="https://example.com:8443/path or plain words" autocomplete="off" spellcheck="false">
+            <button class="button button-primary" id="url-insights-explain" type="submit">Explain</button>
+            <button class="button button-quiet" id="url-insights-clear" type="button">Clear plan</button>
+          </form>
+          <p class="feed-status" id="url-insights-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="url-insights-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>

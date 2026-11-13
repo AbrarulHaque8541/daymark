@@ -70,6 +70,8 @@ tests/style-coverage.test.js
 tests/task-logic.test.js
 tests/telegram-logic.test.js
 tests/telegram-ui.test.js
+tests/url-insights-logic.test.js
+tests/url-insights-ui.test.js
 tests/weather-logic.test.js
 tests/weather-ui.test.js
 tests/web-accessibility.test.js
