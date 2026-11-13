@@ -34,6 +34,7 @@ function makeElement(tag) {
     appendChild(child) {
       child.parentNode = element;
       element.children.push(child);
+      if (child.textContent) element.textContent += child.textContent;
       registerTree(child);
       return child;
     },
@@ -41,12 +42,14 @@ function makeElement(tag) {
       node.parentNode = element;
       const index = ref ? element.children.indexOf(ref) : element.children.length;
       element.children.splice(index < 0 ? element.children.length : index, 0, node);
+      if (node.textContent) element.textContent += node.textContent;
       registerTree(node);
       return node;
     },
     removeChild(child) {
       const index = element.children.indexOf(child);
       if (index >= 0) element.children.splice(index, 1);
+      element.textContent = element.children.map(c => c.textContent || '').join('');
       return child;
     },
     addEventListener(type, handler) {
