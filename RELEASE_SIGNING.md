@@ -53,6 +53,48 @@ After a clean install, a later build can update in place only when it has the sa
 5. Wait for the workflow to create a draft; verify exact commit, package/version/target-SDK/signer assertions and the APK SHA-256. Test the exact draft APK on the owner device before manually publishing the draft. Never treat a successful workflow alone as release approval.
 6. Describe an update as in-place only for a compatible same-application-ID installation. For the current separate identity, do not promise replacement of the older app or automatic data transfer.
 
+## Workflow authorization and provenance guard — 2026-11-12
+
+Both the production release and signed device-test release workflows now require the repository to be `AbrarulHaque8541/daymark` and require `github.actor` plus `github.triggering_actor` to equal the repository owner before the job that reads production signing secrets or writes a release can run. A matching tag that points to `main` is necessary, but is not by itself release authorization.
+
+Manual device-test APK dispatch remains build-only. Provenance is generated only by the signed tag-release workflow, after its owner/triggering-actor gate, exact tag-on-`main` verification, and protected `production-signing` environment. It attests the verified production-signed APK that is attached to the device-test prerelease, not a separately rebuilt debug APK. The Sigstore bundle is attached to that same release and is not overwritten on retries; `workflow_dispatch` does not publish provenance.
+
+This workflow-level actor gate does not replace repository tag protection or a protected production environment with required reviewers. The latest live repository inventory found no repository rulesets and main branch protection disabled; a repository administrator should configure tag-creation restrictions and any required production-environment reviewers in GitHub settings. No repository settings were changed by this engineering work.
+
+## Required GitHub environment protection — 2026-11-10
+
+Every privileged signing job references the GitHub Actions environment **`production-signing`**:
+- production APK/AAB signing and draft creation;
+- signed device-test APK signing and release-asset upload;
+- the owner-only private main test APK workflow.
+
+The `actions/attest` action is pinned to immutable commit `1e69f48acb82d1966a394da916b4c1698aa569d6` (v4.2.2, Node 24) and runs inside the protected release-publishing job. Verification is through GitHub's native artifact-attestation flow, not the retired generic-generator `slsa-verifier` builder identity. This migration does **not** claim SLSA Build Level 3: GitHub's documented Level 3 path requires a trusted reusable workflow to contain the build itself.
+
+**The workflow reference is not proof that the environment is protected.** GitHub can automatically create an environment the first time a workflow references it; an automatically created environment has no required reviewers or deployment restrictions by default. Before any signed tag, release, provenance upload, or private signed test run, a repository administrator must explicitly create/configure `production-signing` in Settings → Environments.
+
+Required owner-side configuration:
+1. Add at least one independent required reviewer and enable **Prevent self-review** where available.
+2. Restrict deployment refs to the intended `main` dispatch and approved version/device-test tag patterns; do not allow arbitrary branches or tags.
+3. Verify the environment's protection rules are saved and active before any privileged workflow is triggered.
+4. Keep signing credentials in the existing protected repository secrets; this change does not move, rotate, print, or replace them.
+
+Until that configuration is independently verified, treat all signed workflows as **blocked for release use**, even though their source guards and ordinary PR CI may pass. The workflow code now references the environment, but no GitHub environment settings were changed or verified by this engineering run.
+
+## Device-test APK provenance verification — 2026-11-12
+
+After downloading the APK from a `v*-device-test.*` prerelease, verify its GitHub-hosted attestation and constrain both the signing workflow and source tag:
+
+```sh
+TAG=v1.6-device-test.1
+APK="Daymark-device-test-${TAG}.apk"
+gh attestation verify "$APK" \
+  --repo AbrarulHaque8541/daymark \
+  --signer-workflow AbrarulHaque8541/daymark/.github/workflows/android-signed-device-test-release.yml \
+  --source-ref "refs/tags/$TAG"
+```
+
+The same release includes `${APK}.sigstore.json`. To verify using the downloaded bundle, add `--bundle "${APK}.sigstore.json"`; for air-gapped checks, follow GitHub's [offline attestation verification guide](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/verify-attestations-offline) for trusted-root setup. The workflow checks the bundle against the exact APK digest, signer workflow, and pushed tag before and after attaching it, and separately confirms that GitHub's Attestations API returns a matching record.
+
 ## Debug vs. production
 
 | Build | Signature | Can update a production install? |
@@ -71,3 +113,9 @@ Work by: Vibe
 Model: GLM (glm-5-latest-short)
 Tooling: GitHub MCP tools
 Timestamp (UTC): 2026-10-16T15:15:06Z
+
+---
+Work by: Cue
+Model: not disclosed by runtime
+Tooling: local Git repository, actionlint, repository tests, official GitHub documentation
+Timestamp (UTC): 2026-11-11T19:29:36Z

@@ -152,6 +152,13 @@ public final class DaymarkServiceWorkerInstrumentation {
             check(secondServer.count("/page-egress") == 1,
                     "the second controlled server must receive its explicitly enabled page request");
 
+            // Take the baseline only after all seed/active/second-tab navigations and page
+            // requests. Chromium may perform a normal Service Worker update check while a
+            // new client is loaded; that setup traffic is not caused by an Online/Offline
+            // mode transition and must not be attributed to one.
+            int firstWorkerScriptsBeforeOnline = server.count("/sw.js");
+            int secondWorkerScriptsBeforeOnline = secondServer.count("/sw.js");
+
             // The user's explicit Online navigation consent must enable worker egress on
             // both origins and all retained tabs, not just ordinary page fetches.
             Class<?> enforcementType = Class.forName(
@@ -181,10 +188,14 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "the first origin's cached Service Worker response must not require a network request");
             check(secondServer.count("/cached") == 0,
                     "the second origin's cached Service Worker response must not require a network request");
-            check(server.count("/sw.js") == initialWorkerScripts,
-                    "the first origin must not refetch its worker script during mode changes");
-            check(secondServer.count("/sw.js") == secondInitialWorkerScripts,
-                    "the second origin must not refetch its worker script during mode changes");
+            check(server.count("/sw.js") == firstWorkerScriptsBeforeOnline,
+                    "the first origin must not refetch its worker script during Online mode change"
+                    + " (before=" + firstWorkerScriptsBeforeOnline
+                    + ", after=" + server.count("/sw.js") + ")");
+            check(secondServer.count("/sw.js") == secondWorkerScriptsBeforeOnline,
+                    "the second origin must not refetch its worker script during Online mode change"
+                    + " (before=" + secondWorkerScriptsBeforeOnline
+                    + ", after=" + secondServer.count("/sw.js") + ")");
 
             // Exercise the page-level Offline transition independently of the global worker
             // policy. A page request must fail while the same worker remains network-blocked.
@@ -197,6 +208,11 @@ public final class DaymarkServiceWorkerInstrumentation {
                     "page-level Offline mode must block ordinary network fetches");
             check(server.count("/page-egress-offline") == 0,
                     "Offline page traffic must not reach the controlled server");
+
+            // Snapshot immediately before the process-wide Offline reassertion. This isolates
+            // the policy transition from the earlier page-navigation/update-check setup.
+            int firstWorkerScriptsBeforeOffline = server.count("/sw.js");
+            int secondWorkerScriptsBeforeOffline = secondServer.count("/sw.js");
 
             // Simulate a settings reset and exercise Daymark's actual Offline reassertion method.
             // No request is issued during the temporary test reset.
@@ -217,6 +233,10 @@ public final class DaymarkServiceWorkerInstrumentation {
             enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
             check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "Offline reassertion must restore the process-wide Service Worker block");
+            check(server.count("/sw.js") == firstWorkerScriptsBeforeOffline,
+                    "Offline reassertion must not refetch the first origin's worker script");
+            check(secondServer.count("/sw.js") == secondWorkerScriptsBeforeOffline,
+                    "Offline reassertion must not refetch the second origin's worker script");
 
             setPageNetworkBlocked(active, false);
             setPageNetworkBlocked(secondActive, false);
@@ -250,6 +270,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             check(secondServer.count("/trigger") == 0,
                     "the recreated tab's worker must continue to intercept its second-origin trigger");
 
+            int secondOriginScriptsBeforeReenable = secondServer.count("/sw.js");
             check(Boolean.TRUE.equals(allowOnline.invoke(null)),
                     "a later explicit Online consent must re-enable worker network access");
             check(!controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
@@ -257,6 +278,8 @@ public final class DaymarkServiceWorkerInstrumentation {
             requestWorkerEgressAllowed(recreated);
             check(secondServer.count("/worker-egress") == 2,
                     "the recreated tab's worker must reach its origin after explicit Online consent");
+            check(secondServer.count("/sw.js") == secondOriginScriptsBeforeReenable,
+                    "the recreated tab's Online transition must not refetch its worker script");
             enforceOffline.invoke(null, offlinePolicy, Collections.emptyList());
             check(controller.getServiceWorkerWebSettings().getBlockNetworkLoads(),
                     "the instrumentation must leave the worker policy Offline before cleanup");
@@ -270,6 +293,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             awaitBoolean(recreated, "document.title === 'cleanup-done'", WAIT_MS,
                     "the instrumentation must clean up its Service Worker and cache");
 
+            verifyExtensionSpaNavigation();
             marker("all Service Worker runtime phases passed; " + assertions + " assertions");
         } catch (Throwable failure) {
             Log.e(TAG, "runtime acceptance failed after " + assertions + " assertions", failure);
@@ -291,6 +315,273 @@ public final class DaymarkServiceWorkerInstrumentation {
                 try { server.close(); }
                 catch (IOException error) { Log.w(TAG, "could not close controlled server", error); }
             }
+        }
+    }
+
+    /**
+     * Exercises the production DaymarkWebView callback with a real System WebView. This verifies
+     * pushState/replaceState/back/forward route changes, per-page pack scope, and the absence of
+     * page-readable extension catalogs. It deliberately uses a separate Activity/WebView so it
+     * does not touch MainActivity's task, Focus, or browser-tab state.
+     */
+    private void verifyExtensionSpaNavigation() throws Exception {
+        marker("starting Daymark WebView extension SPA route acceptance");
+        ControlledServer server = new ControlledServer();
+        android.app.Activity activity = null;
+        WebView view = null;
+        Object extensionStore = null;
+        String suffix = java.util.UUID.randomUUID().toString().replace("-", "");
+        String matchingPackId = "daymark.test.spa." + suffix;
+        String unrelatedPackId = "daymark.test.other." + suffix;
+        String matchingCss = "body{--daymark-spa-probe:1}";
+        String unrelatedCss = "body{--daymark-unrelated-probe:1}";
+        boolean previousGlobalEnabled = true;
+        boolean globalStateCaptured = false;
+        try {
+            android.content.Intent launch = new android.content.Intent(
+                    instrumentation.getTargetContext(),
+                    Class.forName("com.abrar.daymark.MainActivity",
+                            true, instrumentation.getTargetContext().getClassLoader()));
+            launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity = instrumentation.startActivitySync(launch);
+            check(activity != null, "the real Daymark Activity is available for WebView construction");
+            final android.app.Activity hostActivity = activity;
+            final ClassLoader targetLoader = instrumentation.getTargetContext().getClassLoader();
+            AtomicReference<WebView> viewRef = new AtomicReference<>();
+            AtomicReference<Object> storeRef = new AtomicReference<>();
+            AtomicReference<Object> policyRef = new AtomicReference<>();
+            AtomicReference<Throwable> setupFailure = new AtomicReference<>();
+            instrumentation.runOnMainSync(() -> {
+                try {
+                    Class<?> policyType = Class.forName(
+                            "com.abrar.daymark.BrowserNetworkPolicy", true, targetLoader);
+                    java.lang.reflect.Constructor<?> policyConstructor =
+                            policyType.getDeclaredConstructor();
+                    policyConstructor.setAccessible(true);
+                    Object policy = policyConstructor.newInstance();
+
+                    Class<?> listenerType = Class.forName(
+                            "com.abrar.daymark.DaymarkWebView$Listener", true, targetLoader);
+                    Object listener = java.lang.reflect.Proxy.newProxyInstance(
+                            targetLoader, new Class<?>[]{listenerType}, (proxy, method, args) -> {
+                                if (method.getDeclaringClass() == Object.class) {
+                                    if ("toString".equals(method.getName())) return "Daymark SPA acceptance listener";
+                                    if ("hashCode".equals(method.getName())) {
+                                        return System.identityHashCode(proxy);
+                                    }
+                                    if ("equals".equals(method.getName())) {
+                                        return args != null && args.length == 1 && proxy == args[0];
+                                    }
+                                }
+                                return null;
+                            });
+
+                    Class<?> webViewType = Class.forName(
+                            "com.abrar.daymark.DaymarkWebView", true, targetLoader);
+                    java.lang.reflect.Constructor<?> webViewConstructor =
+                            webViewType.getDeclaredConstructor(
+                                    android.app.Activity.class, policyType,
+                                    boolean.class, listenerType);
+                    webViewConstructor.setAccessible(true);
+                    WebView testView = (WebView) webViewConstructor.newInstance(
+                            hostActivity, policy, true, listener);
+
+                    java.lang.reflect.Field runtimeField =
+                            webViewType.getDeclaredField("extensionRuntime");
+                    runtimeField.setAccessible(true);
+                    Object runtime = runtimeField.get(testView);
+                    java.lang.reflect.Method storeMethod =
+                            runtime.getClass().getDeclaredMethod("store");
+                    storeMethod.setAccessible(true);
+                    Object store = storeMethod.invoke(runtime);
+
+                    hostActivity.setContentView(testView, new android.widget.FrameLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+                    testView.onResume();
+                    testView.resumeTimers();
+                    viewRef.set(testView);
+                    storeRef.set(store);
+                    policyRef.set(policy);
+                } catch (Throwable failure) {
+                    setupFailure.set(failure);
+                }
+            });
+            if (setupFailure.get() != null) {
+                throw new AssertionError("could not construct the production DaymarkWebView",
+                        setupFailure.get());
+            }
+            view = viewRef.get();
+            extensionStore = storeRef.get();
+            Object networkPolicy = policyRef.get();
+            check(view != null && extensionStore != null && networkPolicy != null,
+                    "the production DaymarkWebView and its native ExtensionStore are available");
+
+            Class<?> storeType = extensionStore.getClass();
+            java.lang.reflect.Method getGlobalEnabled =
+                    storeType.getDeclaredMethod("isGloballyEnabled");
+            getGlobalEnabled.setAccessible(true);
+            previousGlobalEnabled = (Boolean) getGlobalEnabled.invoke(extensionStore);
+            globalStateCaptured = true;
+            java.lang.reflect.Method setGlobalEnabled =
+                    storeType.getDeclaredMethod("setGloballyEnabled", boolean.class);
+            setGlobalEnabled.setAccessible(true);
+            setGlobalEnabled.invoke(extensionStore, true);
+
+            Class<?> parserType = Class.forName(
+                    "com.abrar.daymark.ExtensionPackageParser", true, targetLoader);
+            java.lang.reflect.Method parsePack = parserType.getDeclaredMethod(
+                    "parseDaymarkJson", String.class, boolean.class);
+            parsePack.setAccessible(true);
+            Class<?> extensionType = Class.forName(
+                    "com.abrar.daymark.BrowserExtension", true, targetLoader);
+            java.lang.reflect.Method installPack = storeType.getDeclaredMethod(
+                    "installUserPack", extensionType);
+            installPack.setAccessible(true);
+
+            String matchingJson = "{\"id\":\"" + matchingPackId
+                    + "\",\"name\":\"SPA route probe\",\"version\":\"1.0.0\",\"enabled\":true,"
+                    + "\"matches\":[\"*://127.0.0.1/private/*\"],\"excludes\":[],"
+                    + "\"css\":\"" + matchingCss + "\"}";
+            String unrelatedJson = "{\"id\":\"" + unrelatedPackId
+                    + "\",\"name\":\"Unrelated scope probe\",\"version\":\"1.0.0\",\"enabled\":true,"
+                    + "\"matches\":[\"*://example.invalid/*\"],\"excludes\":[],"
+                    + "\"css\":\"" + unrelatedCss + "\"}";
+            installPack.invoke(extensionStore, parsePack.invoke(null, matchingJson, false));
+            installPack.invoke(extensionStore, parsePack.invoke(null, unrelatedJson, false));
+            // Imported user packs are intentionally disabled until the user enables them in the
+            // manager. The runtime fixture must exercise that explicit opt-in transition.
+            java.lang.reflect.Method setUserPackEnabled = storeType.getDeclaredMethod(
+                    "setUserPackEnabled", String.class, boolean.class);
+            setUserPackEnabled.setAccessible(true);
+            setUserPackEnabled.invoke(extensionStore, matchingPackId, true);
+            setUserPackEnabled.invoke(extensionStore, unrelatedPackId, true);
+
+            Class<?> workspaceController = Class.forName(
+                    "com.abrar.daymark.BrowserWorkspaceController", true, targetLoader);
+            java.lang.reflect.Method prepareNavigation = workspaceController.getDeclaredMethod(
+                    "prepareForExplicitNavigation",
+                    Class.forName("com.abrar.daymark.BrowserNetworkPolicy", true, targetLoader),
+                    Class.forName("com.abrar.daymark.DaymarkWebView", true, targetLoader));
+            prepareNavigation.setAccessible(true);
+            final java.lang.reflect.Method prepareNavigationMethod = prepareNavigation;
+            final Object prepareNavigationPolicy = networkPolicy;
+            final WebView prepareNavigationView = view;
+            AtomicReference<Throwable> prepareFailure = new AtomicReference<>();
+            instrumentation.runOnMainSync(() -> {
+                try {
+                    prepareNavigationMethod.invoke(null, prepareNavigationPolicy, prepareNavigationView);
+                } catch (Throwable navigationPrepareError) {
+                    prepareFailure.set(navigationPrepareError);
+                }
+            });
+            if (prepareFailure.get() != null) {
+                throw new AssertionError("could not prepare the production DaymarkWebView for explicit navigation",
+                        prepareFailure.get());
+            }
+            load(view, server.url("/private/start"));
+            String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
+                    + matchingPackId + "\"]";
+            String unrelatedSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
+                    + unrelatedPackId + "\"]";
+            String matchingCount = "document.querySelectorAll('" + matchingSelector + "').length";
+            String unrelatedCount = "document.querySelectorAll('" + unrelatedSelector + "').length";
+            awaitSpa(view, matchingCount + " === 1", WAIT_MS,
+                    "a matching localhost route receives its pack CSS through production injection",
+                    extensionStore);
+            check(evaluateBoolean(view, unrelatedCount + " === 0"),
+                    "a nonmatching installed pack is not injected into the current page");
+            check(evaluateBoolean(view,
+                            "typeof window.__daymarkSpaConfig === 'undefined'"
+                            + " && typeof window.__daymarkSpaState === 'undefined'"
+                            + " && typeof window.__daymarkLastCss === 'undefined'"),
+                    "the page cannot read a global extension catalog or SPA state object");
+            check(evaluateBoolean(view,
+                            "document.documentElement.outerHTML.indexOf('" + unrelatedCss + "') === -1"),
+                    "the page DOM does not contain CSS from a nonmatching installed pack");
+
+            execute(view, "history.pushState({}, '', '/public/one');");
+            awaitSpa(view, "location.pathname === '/public/one' && "
+                            + matchingCount + " === 0", WAIT_MS,
+                    "pushState to a nonmatching route removes the previously injected pack CSS",
+                    extensionStore);
+
+            execute(view, "history.pushState({}, '', '/private/again');");
+            awaitSpa(view, "location.pathname === '/private/again' && "
+                            + matchingCount + " === 1", WAIT_MS,
+                    "pushState back into the matching scope restores only that pack's CSS",
+                    extensionStore);
+
+            execute(view, "history.replaceState({}, '', '/public/replace');");
+            awaitSpa(view, "location.pathname === '/public/replace' && "
+                            + matchingCount + " === 0", WAIT_MS,
+                    "replaceState re-evaluates the current route and removes out-of-scope CSS",
+                    extensionStore);
+
+            execute(view, "history.pushState({}, '', '/private/back');");
+            awaitSpa(view, "location.pathname === '/private/back' && "
+                            + matchingCount + " === 1", WAIT_MS,
+                    "a new matching history entry restores the scoped CSS",
+                    extensionStore);
+            execute(view, "history.back();");
+            awaitSpa(view, "location.pathname === '/public/replace' && "
+                            + matchingCount + " === 0", WAIT_MS,
+                    "history.back re-evaluates extension scope and removes CSS",
+                    extensionStore);
+            execute(view, "history.forward();");
+            awaitSpa(view, "location.pathname === '/private/back' && "
+                            + matchingCount + " === 1", WAIT_MS,
+                    "history.forward re-evaluates extension scope and restores CSS",
+                    extensionStore);
+
+            execute(view, "location.hash = '#fragment';");
+            awaitSpa(view, "location.hash === '#fragment' && "
+                            + matchingCount + " === 1", WAIT_MS,
+                    "fragment navigation preserves CSS while the path remains in scope",
+                    extensionStore);
+            check(evaluateBoolean(view,
+                            "typeof window.__daymarkSpaConfig === 'undefined'"
+                            + " && typeof window.__daymarkSpaState === 'undefined'"
+                            + " && document.documentElement.outerHTML.indexOf('" + unrelatedCss + "') === -1"),
+                    "same-document transitions still expose no unrelated pack metadata");
+            marker("Daymark WebView extension SPA route acceptance passed");
+        } finally {
+            if (view != null) destroyQuietly(view);
+            try {
+                Class<?> enforcement = Class.forName(
+                        "com.abrar.daymark.BrowserServiceWorkerEnforcement", true,
+                        instrumentation.getTargetContext().getClassLoader());
+                java.lang.reflect.Method blockWorkers = enforcement.getDeclaredMethod("enforceBlocked");
+                blockWorkers.setAccessible(true);
+                blockWorkers.invoke(null);
+            } catch (Throwable policyCleanupFailure) {
+                Log.w(TAG, "could not restore the fail-closed Service Worker policy", policyCleanupFailure);
+            }
+            if (extensionStore != null) {
+                try {
+                    Class<?> storeType = extensionStore.getClass();
+                    java.lang.reflect.Method uninstall =
+                            storeType.getDeclaredMethod("uninstallUserPack", String.class);
+                    uninstall.setAccessible(true);
+                    uninstall.invoke(extensionStore, matchingPackId);
+                    uninstall.invoke(extensionStore, unrelatedPackId);
+                    if (globalStateCaptured) {
+                        java.lang.reflect.Method setGlobalEnabled =
+                                storeType.getDeclaredMethod("setGloballyEnabled", boolean.class);
+                        setGlobalEnabled.setAccessible(true);
+                        setGlobalEnabled.invoke(extensionStore, previousGlobalEnabled);
+                    }
+                } catch (Throwable cleanupFailure) {
+                    Log.w(TAG, "extension SPA test pack cleanup failed", cleanupFailure);
+                }
+            }
+            if (activity != null) {
+                android.app.Activity finishedActivity = activity;
+                instrumentation.runOnMainSync(finishedActivity::finish);
+            }
+            try { server.close(); }
+            catch (IOException error) { Log.w(TAG, "could not close extension SPA server", error); }
         }
     }
 
@@ -372,6 +663,95 @@ public final class DaymarkServiceWorkerInstrumentation {
                 + ".catch(()=>document.title='cache-error');");
         awaitBoolean(view, "document.title === 'cache-cached-ok'", WAIT_MS,
                 "a previously cached Service Worker response must remain available");
+    }
+
+    /**
+     * Diagnostic-only wrapper around {@link #awaitBoolean} used by the extension SPA phase.
+     * On timeout it appends the observed WebView/page/store/runtime state to the failure so
+     * the anonymous annotation can show why production injection did not satisfy the wait.
+     * It never changes pass/fail semantics; the same condition is polled for the same time.
+     */
+    private void awaitSpa(WebView view, String expression, long timeoutMs, String message,
+                          Object extensionStore) throws Exception {
+        try {
+            awaitBoolean(view, expression, timeoutMs, message);
+        } catch (AssertionError timeout) {
+            throw new AssertionError(message + " | spa-diag " + spaDiagnostics(view, extensionStore), timeout);
+        }
+    }
+
+    private String spaDiagnostics(WebView view, Object extensionStore) {
+        StringBuilder diag = new StringBuilder();
+        final AtomicReference<String> viewUrl = new AtomicReference<>();
+        try {
+            instrumentation.runOnMainSync(() -> viewUrl.set(String.valueOf(view.getUrl())));
+            diag.append("viewUrl=").append(viewUrl.get());
+        } catch (Throwable error) {
+            diag.append("viewUrlError=").append(error);
+        }
+        try {
+            diag.append(" page=").append(evaluateString(view,
+                    "JSON.stringify({"
+                    + "href: String(window.location.href),"
+                    + "ready: document.readyState,"
+                    + "managed: Array.prototype.map.call("
+                    + "document.querySelectorAll('style[data-daymark-managed=\"true\"]'),"
+                    + "function(s){return String(s.getAttribute('data-daymark-pack-id')) + '/'"
+                    + " + String(s.getAttribute('data-daymark-pack-css'));})"
+                    + "})"));
+        } catch (Throwable error) {
+            diag.append(" pageError=").append(error);
+        }
+        try {
+            Class<?> storeType = extensionStore.getClass();
+            java.lang.reflect.Method listAll = storeType.getDeclaredMethod("listAll");
+            listAll.setAccessible(true);
+            java.util.List<?> packs = (java.util.List<?>) listAll.invoke(extensionStore);
+            diag.append(" packs=[");
+            for (Object pack : packs) {
+                Class<?> packType = pack.getClass();
+                java.lang.reflect.Field idField = packType.getDeclaredField("id");
+                idField.setAccessible(true);
+                java.lang.reflect.Field enabledField = packType.getDeclaredField("enabled");
+                enabledField.setAccessible(true);
+                java.lang.reflect.Field matchesField = packType.getDeclaredField("matches");
+                matchesField.setAccessible(true);
+                diag.append(String.valueOf(idField.get(pack))).append('|')
+                        .append(enabledField.get(pack)).append('|')
+                        .append(matchesField.get(pack)).append(';');
+            }
+            diag.append(']');
+        } catch (Throwable error) {
+            diag.append(" packsError=").append(error);
+        }
+        try {
+            java.lang.reflect.Field runtimeField = view.getClass().getDeclaredField("extensionRuntime");
+            runtimeField.setAccessible(true);
+            Object runtime = runtimeField.get(view);
+            java.lang.reflect.Field lastApplied = runtime.getClass().getDeclaredField("lastAppliedUrl");
+            lastApplied.setAccessible(true);
+            java.lang.reflect.Field scriptsApplied =
+                    runtime.getClass().getDeclaredField("userscriptsAppliedForCurrentDocument");
+            scriptsApplied.setAccessible(true);
+            diag.append(" runtimeLastUrl=").append(lastApplied.get(runtime))
+                    .append(" runtimeScriptsApplied=").append(scriptsApplied.get(runtime));
+        } catch (Throwable error) {
+            diag.append(" runtimeError=").append(error);
+        }
+        return diag.toString();
+    }
+
+    private String evaluateString(WebView view, String expression) throws Exception {
+        AtomicReference<String> value = new AtomicReference<>();
+        CountDownLatch completed = new CountDownLatch(1);
+        instrumentation.runOnMainSync(() -> view.evaluateJavascript(expression, result -> {
+            value.set(result);
+            completed.countDown();
+        }));
+        if (!completed.await(5, TimeUnit.SECONDS)) {
+            throw new AssertionError("WebView JavaScript evaluation timed out");
+        }
+        return String.valueOf(value.get());
     }
 
     private void destroy(WebView view) throws Exception {
@@ -459,6 +839,11 @@ public final class DaymarkServiceWorkerInstrumentation {
                         break;
                     case "/controlled":
                         body = controlledPage();
+                        contentType = "text/html; charset=utf-8";
+                        break;
+                    case "/private/start":
+                        body = "<!doctype html><html><head><meta charset=\"utf-8\"><title>extension-spa</title></head>"
+                                + "<body><main id=\"daymark-spa-probe\">Extension SPA acceptance</main></body></html>";
                         contentType = "text/html; charset=utf-8";
                         break;
                     case "/sw.js":
@@ -595,3 +980,4 @@ public final class DaymarkServiceWorkerInstrumentation {
         }
     }
 }
+

@@ -1,7 +1,7 @@
 /*
  * Daymark weather glance UI wiring for the web prototype.
  *
- * A small offline-first card: the user types a place name and taps Refresh;
+ * A small network-on-demand card: the user types a place name and taps Refresh;
  * the current conditions come from the keyless Open-Meteo public API and the
  * last successful result stays cached on this device, so the card keeps
  * working offline with a "cached" note. Nothing ever refreshes on its own —
@@ -63,6 +63,7 @@
         buttonEl.disabled = isBusy;
         if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
           buttonEl.classList.toggle('is-busy', isBusy);
+          if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
         }
         if (typeof buttonEl.setAttribute === 'function') {
           if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
@@ -232,6 +233,7 @@
     }
 
     function onClear() {
+      if (busy) return;
       // Clearing is explicit, but never report success unless both owned keys
       // were verified and removed. A partial failure attempts to restore both.
       if (!storageRequested) {

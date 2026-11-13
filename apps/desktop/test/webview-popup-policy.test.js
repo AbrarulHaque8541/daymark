@@ -30,7 +30,7 @@ test('webview attachment strips preload/session overrides and forces isolated sa
   installWebviewPopupPolicy(host, () => {}, isAllowedUrl);
   const preferences = {
     preload: '/attacker/preload.js', partition: 'persist:attacker',
-    nodeIntegration: true, nodeIntegrationInSubFrames: true,
+    nodeIntegration: true, nodeIntegrationInSubFrames: true, nodeIntegrationInWorker: true,
     contextIsolation: false, sandbox: false, webSecurity: false,
     allowRunningInsecureContent: true, plugins: true,
     experimentalFeatures: true, webviewTag: true,
@@ -45,7 +45,7 @@ test('webview attachment strips preload/session overrides and forces isolated sa
     preventDefault() { assert.fail('valid HTTPS source was blocked'); },
   }, preferences, params);
   for (const [key, value] of Object.entries({
-    nodeIntegration: false, nodeIntegrationInSubFrames: false,
+    nodeIntegration: false, nodeIntegrationInSubFrames: false, nodeIntegrationInWorker: false,
     contextIsolation: true, sandbox: true, webSecurity: true,
     allowRunningInsecureContent: false, plugins: false,
     experimentalFeatures: false, webviewTag: false,

@@ -275,7 +275,14 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 String scheme = request.getUrl().getScheme();
                 // Android intent:// links are parsed into a fresh, allowlisted ACTION_VIEW intent.
                 // Component names, selectors, arbitrary extras and launch flags are never forwarded.
-                if ("intent".equalsIgnoreCase(scheme)) return handleIntentLink(view, url);
+                if ("intent".equalsIgnoreCase(scheme)) {
+                    // Untrusted subframes and script-driven navigations must never trigger
+                    // a top-level load or an external app chooser.
+                    if (!BrowserIntentHandoffPolicy.allows(request.isForMainFrame(), request.hasGesture())) {
+                        return true;
+                    }
+                    return handleIntentLink(view, url);
+                }
                 // Verified HTTP(S) App Links may open in their owning app after a top-level
                 // user gesture. Generic browser handlers remain inside Daymark.
                 if (request.isForMainFrame() && request.hasGesture()
@@ -328,6 +335,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 Log.i("DaymarkWebView", "page started origin=" + BrowserLogPolicy.redactedOrigin(url));
+                if (extensionRuntime != null) extensionRuntime.onPageStarted(url);
                 if (!networkPolicy.allowsRemoteLoads()) {
                     listener.onOfflineNavigationBlocked();
                     return;
@@ -339,6 +347,16 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             public void onPageCommitVisible(WebView view, String url) {
                 Log.i("DaymarkWebView", "page commit visible origin="
                         + BrowserLogPolicy.redactedOrigin(url));
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                super.doUpdateVisitedHistory(view, url, isReload);
+                // WebView reports pushState/replaceState and back/forward through this callback.
+                // The runtime ignores updates until initial document injection has completed, so
+                // a progress==100 gate here would incorrectly drop same-document route changes.
+                if (extensionRuntime == null || !networkPolicy.allowsRemoteLoads() || view == null) return;
+                extensionRuntime.onSameDocumentNavigation(view, url);
             }
 
             @Override

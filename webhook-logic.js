@@ -1,7 +1,7 @@
 /*
  * Daymark task-completion webhook logic for the web prototype.
  *
- * Offline-first automation parity with the Android app's TaskWebhook contract:
+ * Network-on-demand automation parity with the Android app's TaskWebhook contract:
  * a user-chosen https:// endpoint receives a minimal JSON "task completed"
  * event. Delivery is POST-only, HTTPS-only, refuses redirects, is bounded in
  * size, and never exports internal task IDs. Failed deliveries queue on this
@@ -33,6 +33,30 @@
     if (url.username || url.password) return false;
     const host = url.hostname;
     return Boolean(host) && (host.includes('.') || host === 'localhost');
+  }
+
+  const ENDPOINT_FINGERPRINT_RE = /^[a-f0-9]{64}$/;
+
+  function isValidEndpointFingerprint(value) {
+    return typeof value === 'string' && ENDPOINT_FINGERPRINT_RE.test(value);
+  }
+
+  async function fingerprintWebhookUrl(value, cryptoImpl, textEncoderImpl) {
+    if (!isValidWebhookUrl(value)) {
+      throw new Error('A valid https:// webhook URL is required to isolate its queue.');
+    }
+    const cryptoApi = cryptoImpl || root.crypto;
+    const Encoder = textEncoderImpl || root.TextEncoder;
+    if (!cryptoApi || !cryptoApi.subtle || typeof cryptoApi.subtle.digest !== 'function'
+        || typeof Encoder !== 'function') {
+      throw new Error('Web Crypto SHA-256 is unavailable; endpoint-isolated webhook queueing is disabled.');
+    }
+    const normalized = new URL(value.trim());
+    // Fragments are not sent in HTTP requests and must not split one endpoint's queue.
+    normalized.hash = '';
+    const digest = await cryptoApi.subtle.digest('SHA-256', new Encoder().encode(normalized.href));
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 
   function clipText(value, max) {
@@ -74,26 +98,38 @@
     return payload;
   }
 
-  function makeQueueEvent(payload, now) {
+  function makeQueueEvent(payload, now, endpointFingerprint) {
     const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
     if (typeof body !== 'string' || !body) throw new Error('A webhook payload is required.');
     if (body.length > MAX_PAYLOAD_CHARS) throw new Error('The webhook payload is too large to queue.');
+    if (!isValidEndpointFingerprint(endpointFingerprint)) {
+      throw new Error('A verified webhook endpoint fingerprint is required to queue an event.');
+    }
     const queuedAt = isIsoTimestamp(now) ? now : new Date().toISOString();
     const id = 'wh-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
-    return { id, payload: body, queuedAt, attempts: 0 };
+    return { id, payload: body, queuedAt, attempts: 0, endpointFingerprint };
   }
 
   function isValidQueueEvent(event) {
+    const fingerprint = event && event.endpointFingerprint;
+    const legacyUnassigned = fingerprint === undefined || fingerprint === null;
     return Boolean(event && typeof event === 'object'
       && typeof event.id === 'string' && event.id.length > 0 && event.id.length <= 64
       && typeof event.payload === 'string' && event.payload.length > 0
       && event.payload.length <= MAX_PAYLOAD_CHARS
       && isIsoTimestamp(event.queuedAt)
-      && Number.isInteger(event.attempts) && event.attempts >= 0 && event.attempts <= MAX_ATTEMPTS);
+      && Number.isInteger(event.attempts) && event.attempts >= 0 && event.attempts <= MAX_ATTEMPTS
+      && (legacyUnassigned || isValidEndpointFingerprint(fingerprint)));
   }
 
   function validateQueue(value) {
-    return Array.isArray(value) && value.length <= MAX_QUEUE_EVENTS && value.every(isValidQueueEvent);
+    if (!Array.isArray(value) || value.length > MAX_QUEUE_EVENTS) return false;
+    const ids = new Set();
+    for (const event of value) {
+      if (!isValidQueueEvent(event) || ids.has(event.id)) return false;
+      ids.add(event.id);
+    }
+    return true;
   }
 
   function validateWebhookConfig(value) {
@@ -104,11 +140,35 @@
 
   function enqueueEvent(queue, event) {
     if (!isValidQueueEvent(event)) throw new Error('Only well-formed webhook events can be queued.');
-    const list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    const list = Array.isArray(queue) ? queue.slice() : [];
+    if (!validateQueue(list)) {
+      throw new Error('The existing webhook queue is invalid; no events were changed.');
+    }
+    if (list.some((item) => item.id === event.id)) {
+      const error = new Error('Webhook event IDs must be unique.');
+      error.code = 'duplicate-event-id';
+      throw error;
+    }
+    if (list.length >= MAX_QUEUE_EVENTS) {
+      const error = new Error('The webhook queue is full; existing events were preserved.');
+      error.code = 'queue-full';
+      throw error;
+    }
     list.push(event);
-    // Bounded storage: when the queue is full the oldest events are dropped first.
-    while (list.length > MAX_QUEUE_EVENTS) list.shift();
     return list;
+  }
+
+  function cancelResponseBody(response) {
+    const body = response && response.body;
+    if (!body || typeof body.cancel !== 'function') return;
+    try {
+      const cancellation = body.cancel();
+      if (cancellation && typeof cancellation.catch === 'function') {
+        cancellation.catch(() => {});
+      }
+    } catch (error) {
+      // Response cleanup must not turn a completed webhook POST into a failure.
+    }
   }
 
   async function deliverWebhook(url, payload, fetchImpl, timeoutMs) {
@@ -134,16 +194,23 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
           body,
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
           redirect: 'error',
           cache: 'no-store',
           signal: controller ? controller.signal : undefined
         });
       } catch (error) {
         if (timedOut) throw new Error(TIMEOUT_MESSAGE);
-        throw new Error('Webhook delivery failed: '
-          + (error && error.message ? error.message : 'network error')
-          + '. No automatic retry was attempted.');
+        // Fetch implementations may include the full endpoint in their
+        // error text. Never surface arbitrary network errors: webhook URLs may
+        // contain bearer tokens in their path or query string.
+        throw new Error('Webhook delivery failed due to a network error. No automatic retry was attempted.');
       }
+      // Webhook responses are not needed. Cancel their bodies on both
+      // success and HTTP failure so a hostile endpoint cannot make Daymark
+      // download an unbounded response after the POST has completed.
+      cancelResponseBody(response);
       if (!response || !response.ok) {
         throw new Error('Webhook endpoint returned HTTP '
           + (response ? response.status : 'unknown')
@@ -161,7 +228,20 @@
   async function flushQueue(queue, url, fetchImpl, options) {
     const opts = options && typeof options === 'object' ? options : {};
     const maxAttempts = Number.isInteger(opts.maxAttempts) && opts.maxAttempts > 0 ? opts.maxAttempts : MAX_ATTEMPTS;
-    let list = (Array.isArray(queue) ? queue : []).filter(isValidQueueEvent);
+    if (!Array.isArray(queue) || !validateQueue(queue)) {
+      throw new Error('The webhook queue is invalid; no events were changed.');
+    }
+    if (!isValidEndpointFingerprint(opts.endpointFingerprint)) {
+      throw new Error('A verified webhook endpoint fingerprint is required before delivery.');
+    }
+    const actualFingerprint = await fingerprintWebhookUrl(url, opts.crypto, opts.TextEncoder);
+    if (actualFingerprint !== opts.endpointFingerprint) {
+      throw new Error('The supplied endpoint fingerprint does not match the webhook URL.');
+    }
+    if (queue.some((event) => event.endpointFingerprint !== opts.endpointFingerprint)) {
+      throw new Error('The webhook queue contains an event for a different or unassigned endpoint; no delivery was attempted.');
+    }
+    let list = queue.slice();
     let deliveredCount = 0;
     let droppedCount = 0;
     let failure = null;
@@ -202,6 +282,8 @@
     DEFAULT_TIMEOUT_MS,
     TIMEOUT_MESSAGE,
     isValidWebhookUrl,
+    isValidEndpointFingerprint,
+    fingerprintWebhookUrl,
     buildTaskCompletedPayload,
     makeQueueEvent,
     isValidQueueEvent,

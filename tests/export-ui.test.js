@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../export-ui.js');

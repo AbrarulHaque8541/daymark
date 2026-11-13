@@ -916,13 +916,14 @@
     syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
   }
 
-  function notifyWebhookTaskCompleted(task) {
+  async function notifyWebhookTaskCompleted(task, options) {
     const webhookUi = window.DaymarkWebhookUi;
     if (!webhookUi || typeof webhookUi.notifyTaskCompleted !== 'function') return;
     try {
-      webhookUi.notifyTaskCompleted(task);
+      return await webhookUi.notifyTaskCompleted(task, options);
     } catch (error) {
       console.warn('Could not queue the Daymark task-completed webhook:', error);
+      return { queued: false, reason: 'error' };
     }
   }
 
@@ -935,9 +936,9 @@
     if (button.dataset.action === 'toggle') {
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
-      if (task.completed) notifyWebhookTaskCompleted(task);
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
       const saved = persistTasks();
+      if (saved && task.completed) void notifyWebhookTaskCompleted(task);
       render();
       showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
     } else if (button.dataset.action === 'edit') {
@@ -2052,9 +2053,40 @@
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
     const feedClear = $('#feed-clear');
     if (feedClear) feedClear.addEventListener('click', clearFeed);
-    $('#focus-start').addEventListener('click', () => startFocus(null));
-    $('#focus-pause').addEventListener('click', toggleFocusPause);
-    $('#focus-stop').addEventListener('click', () => endFocusSession(false));
+    const busyFocusButtons = new WeakSet();
+    function withBriefBusy(button, handler) {
+      if (!button || typeof handler !== 'function') return;
+      button.addEventListener('click', (event) => {
+        // pointer-events only blocks pointer input; keyboard-generated click
+        // events still arrive. Guard every activation at the handler boundary.
+        if (button.disabled || button.hidden || busyFocusButtons.has(button)) {
+          if (event && typeof event.preventDefault === 'function') event.preventDefault();
+          return;
+        }
+        busyFocusButtons.add(button);
+        const previousAriaBusy = typeof button.getAttribute === 'function'
+          ? button.getAttribute('aria-busy') : null;
+        if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', 'true');
+        button.classList.add('is-busy');
+        const releaseBusy = () => {
+          busyFocusButtons.delete(button);
+          button.classList.remove('is-busy');
+          if (typeof button.removeAttribute === 'function') {
+            if (previousAriaBusy === null) button.removeAttribute('aria-busy');
+            else if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', previousAriaBusy);
+          }
+        };
+        try {
+          handler(event);
+        } finally {
+          if (typeof setTimeout === 'function') setTimeout(releaseBusy, 160);
+          else releaseBusy();
+        }
+      });
+    }
+    withBriefBusy($('#focus-start'), () => startFocus(null));
+    withBriefBusy($('#focus-pause'), toggleFocusPause);
+    withBriefBusy($('#focus-stop'), () => endFocusSession(false));
     $('#focus-task').addEventListener('change', (event) => {
       state.focusTaskId = event.currentTarget.value;
     });

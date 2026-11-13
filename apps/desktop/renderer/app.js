@@ -41,13 +41,24 @@ function activeTab() {
 function isActive(tab) {
   return tab.id === activeTabId;
 }
+function syncPageLoadingUi() {
+  const isLoading = Boolean(activeTab()?.isLoading);
+  $('page-loading-indicator').classList.toggle('is-loading', isLoading);
+  $('page-loading-status').textContent = isLoading ? 'Loading page' : '';
+}
 
 function renderTabs() {
   document.querySelectorAll('.tab').forEach((el) => {
     const tab = tabs.find((t) => String(t.id) === el.dataset.tabId);
     if (!tab) return;
-    el.querySelector('.tab-title').textContent = tab.title || 'Loading...';
-    el.classList.toggle('active', isActive(tab));
+    const title = tab.title || 'Loading...';
+    const active = isActive(tab);
+    const select = el.querySelector('.tab-select');
+    el.querySelector('.tab-title').textContent = title;
+    el.classList.toggle('active', active);
+    select.setAttribute('aria-label', 'Switch to ' + title);
+    select.setAttribute('aria-pressed', String(active));
+    el.querySelector('.tab-close').setAttribute('aria-label', 'Close ' + title);
   });
 }
 
@@ -58,6 +69,7 @@ function activateTab(id) {
   if (tab) {
     try { $('urlbar').value = tab.view.getURL() || HOME; } catch { /* noop */ }
   }
+  syncPageLoadingUi();
   renderTabs();
 }
 
@@ -73,6 +85,12 @@ function hideError() {
 
 function wireEvents(tab) {
   const v = tab.view;
+  const setLoading = (loading) => {
+    tab.isLoading = loading;
+    if (isActive(tab)) syncPageLoadingUi();
+  };
+  v.addEventListener('did-start-loading', () => setLoading(true));
+  v.addEventListener('did-stop-loading', () => setLoading(false));
   v.addEventListener('page-title-updated', (e) => {
     tab.title = e.title;
     renderTabs();
@@ -93,6 +111,7 @@ function wireEvents(tab) {
   });
   v.addEventListener('did-fail-load', (e) => {
     if (!e.isMainFrame || e.errorCode === -3) return; // -3 = aborted
+    setLoading(false);
     if (!isActive(tab)) return;
     const blocked = e.errorCode === -20 || e.errorCode === -501;
     showError(
@@ -109,25 +128,26 @@ function createTab(url = HOME) {
   const id = ++tabSeq;
   const view = document.createElement('webview');
   view.setAttribute('allowpopups', '');
-  view.setAttribute('src', url);
   view.classList.add('view');
   view.dataset.tabId = String(id);
   $('views').appendChild(view);
 
-  const tab = { id, view, title: 'New tab' };
+  const tab = { id, view, title: 'New tab', isLoading: Boolean(url) };
   tabs.push(tab);
 
   const el = document.createElement('div');
   el.className = 'tab';
   el.dataset.tabId = String(id);
-  el.innerHTML = '<span class="tab-title">New tab</span><span class="tab-close" title="Close tab">&times;</span>';
-  el.addEventListener('click', (e) => {
-    if (e.target.classList.contains('tab-close')) closeTab(id);
-    else activateTab(id);
+  el.innerHTML = '<button class="tab-select" type="button" aria-pressed="false"><span class="tab-title">New tab</span></button><button class="tab-close" type="button" title="Close tab" aria-label="Close tab">&times;</button>';
+  el.querySelector('.tab-select').addEventListener('click', () => activateTab(id));
+  el.querySelector('.tab-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeTab(id);
   });
   $('tabs').appendChild(el);
 
   wireEvents(tab);
+  view.setAttribute('src', url);
   activateTab(id);
   return tab;
 }
@@ -144,6 +164,10 @@ function closeTab(id) {
     if (next) activateTab(next.id);
     else createTab();
   }
+  const select = document.querySelector(
+    '.tab[data-tab-id="' + activeTabId + '"] .tab-select',
+  );
+  if (select) select.focus();
 }
 
 function navigate(raw) {
@@ -248,6 +272,7 @@ window.addEventListener('keydown', (e) => {
 const newTabBtn = document.createElement('button');
 newTabBtn.id = 'newtab';
 newTabBtn.title = 'New tab (Ctrl+T)';
+newTabBtn.setAttribute('aria-label', 'New tab');
 newTabBtn.textContent = '+';
 newTabBtn.onclick = () => createTab();
 $('tabs').appendChild(newTabBtn);
@@ -262,9 +287,32 @@ if (window.daymark) {
     }
   });
   window.daymark.onDownloadStarted((name) => toast('Downloading: ' + name));
-  window.daymark.onDownloadFailed((name) => {
+  window.daymark.onDownloadProgress((name, percent) => {
     const safeName = typeof name === 'string' && name ? name : 'download';
-    toast('Could not safely save ' + safeName + '; no file was published.');
+    const safePercent = Number.isInteger(percent) ? Math.max(0, Math.min(100, percent)) : null;
+    const progress = safePercent === null ? '' : ' (' + safePercent + '%)';
+    toast('Downloading: ' + safeName + progress);
+  });
+  window.daymark.onDownloadFailed((failure) => {
+    const safeName = failure && typeof failure.filename === 'string' && failure.filename
+      ? failure.filename : 'download';
+    if (failure && failure.preflight === true && failure.cancellationConfirmed === false) {
+      toast('Could not safely prepare ' + safeName
+        + '; cancellation could not be confirmed. Check Downloads before retrying.');
+    } else if (failure && failure.preflight === true && failure.cancellationConfirmed === true) {
+      toast('Could not safely save ' + safeName
+        + '; the download was cancelled and no file was published.');
+    } else {
+      toast('Could not safely save ' + safeName + '; no file was published.');
+    }
+  });
+  window.daymark.onDownloadCompleted((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Saved to Downloads: ' + safeName);
+  });
+  window.daymark.onDownloadCancelled((name) => {
+    const safeName = typeof name === 'string' && name ? name : 'download';
+    toast('Download cancelled: ' + safeName);
   });
 }
 

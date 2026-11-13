@@ -91,12 +91,16 @@ public final class TaskLogicSmoke {
                 cases++;
             }
         }
-        check(cases == 43, "shared instant contract fixture contains all forty-three cases");
+        check(cases == 58, "shared instant contract fixture contains all fifty-eight cases");
     }
 
     private static void taskInstantFieldsUseStrictContract() {
         Task valid = TaskLogic.create("Instant fields", null, "medium");
         check(TaskLogic.isValid(valid), "generated task timestamps satisfy the strict instant contract");
+        check(TaskLogic.isValidInstant("+999999999-12-31T23:59:59.999999999+18:00"),
+                "maximum portable-backup task instant remains valid");
+        check(!TaskLogic.isValidInstant("2026-11-10T24:00:00Z"),
+                "hour 24 remains invalid despite permissive Instant parser normalization");
         check(!TaskLogic.isValid(new Task(valid.id, valid.title, valid.dueDate, valid.priority, valid.completed,
                         "2026-02-30T00:00:00Z", valid.updatedAt)),
                 "invalid createdAt is rejected by task validation");

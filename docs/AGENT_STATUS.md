@@ -1,3 +1,12 @@
+- [Daymark engineering status — 2026-11-13T16:23:00Z (address-bar insights card, branch feat/url-insights-vibe-20261113)](./CURRENT_STATUS_20261113T162300Z.md)
+- [Daymark engineering status — 2026-11-13T04:39:18Z (keyless GitHub release radar card, branch feat/release-radar-vibe-20261113)](./CURRENT_STATUS_20261113T043900Z.md)
+- [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T17:44:30.987Z (main 9f1c0451; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 922/922; #747 919/919)](./CURRENT_STATUS_20261111T174430Z.md)
+- [Daymark engineering status — 2026-11-11T17:04:55Z (storage card dedicated Clear all binding, issue #740)](./CURRENT_STATUS_20261111T170455Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T13:11:35Z (main 0e268420; 746 branches / 6 open PRs / 23 open issues; main audit 910/910; task/Clear All/download P0 blockers)](./CURRENT_STATUS_20261111T131135Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T12:20:00Z (main 0e268420; 746 branches / 6 open PRs / 22 open issues; main CI green; Electron 45.3.0 upgrade PR 5/5 checks pass; download/Clear All remain P0)](./CURRENT_STATUS_20261111T122000Z.md)
+- [Daymark engineering status — 2026-11-11T05:01:52.466Z (branch feat/air-quality-card-v2-vibe-20261111; keyless air-quality glance card, self-injected markup, pending CI)](./CURRENT_STATUS_20261111T050400Z.md)
+- [Daymark whole-project engineering status — 2026-11-11T01:36:56.051Z (main 5148232a; storage-health and timestamp branches synchronized)](./CURRENT_STATUS_20261111T013656Z.md)
 - [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
 - [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
 - [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
@@ -68,13 +77,13 @@
 - [Daymark whole-project engineering status — 2026-11-04T07:15:00Z (Cycle B)](./CURRENT_STATUS_20261104T071500Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T05:10:00Z (Cycle B)](./CURRENT_STATUS_20261104T051000Z.md)
 - [Daymark whole-project engineering status — 2026-11-04T00:45:00Z (Cycle B)](./CURRENT_STATUS_20261104T004500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T07:45:00Z (midday audit)](./CURRENT_STATUS_20261103T074500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T06:00:00Z](./CURRENT_STATUS_20261103T060000Z.md)
+- [Daymark engineering status — 2026-11-03T07:45:00Z (midday audit)](./CURRENT_STATUS_20261103T074500Z.md)
+- [Daymark engineering status — 2026-11-03T06:00:00Z](./CURRENT_STATUS_20261103T060000Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T08:45:00Z](./CURRENT_STATUS_20261103T084500Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T08:30:00Z](./CURRENT_STATUS_20261103T083000Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T07:15:00Z](./CURRENT_STATUS_20261103T071500Z.md)
 - [Daymark whole-project engineering status — 2026-11-03T00:15:00Z](./CURRENT_STATUS_20261103T001500Z.md)
-- [Daymark whole-project engineering status — 2026-11-03T00:45:00Z](./CURRENT_STATUS_20261103T004500Z.md)
+- [Daymark whole-project engineering status — 2026-11-03T00:45:00Z](./CURRENT_STATUS_20261103T000450Z.md)
 
 # Agent status index
 
@@ -87,12 +96,16 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [Daymark engineering status — 20261110T164211Z (offline app-link and intent handoff planner card)](./CURRENT_STATUS_20261110T164211Z.md)
-- [Daymark engineering status — 2026-11-10T05:15:00Z (user-owned Telegram task-digest card)](./CURRENT_STATUS_20261110T051500Z.md)
-- [Daymark engineering status — 2026-11-09T16:17:03Z (browser clear-action lifecycle card + error-card id fix)](./CURRENT_STATUS_20261109T162000Z.md)
-- [Daymark whole-project engineering status — 2026-11-09T12:34:39.477Z (main 8d76584bc07e; #673 merged; Focus/recovery/storage/security backlog re-audited)](./CURRENT_STATUS_20261109T123439Z.md)
-- Previous reviewed snapshot: [2026-11-09T12:00:49Z — current main 1d29085](./CURRENT_STATUS_20261109T120049Z.md)
-- Previous reviewed snapshot: [2026-11-09T11:39:14Z](./CURRENT_STATUS_20261109T113914Z.md)
+- [CURRENT_STATUS_20261112T045000Z.md](./CURRENT_STATUS_20261112T045000Z.md) — branch `feat/daylight-card-vibe-20261112` cut from main `df9cb64e`; keyless daylight and UV planner card (web-only, self-injecting markup, index.html untouched); sandbox harness 18/18 logic + 14/15 UI checks PASS (one harness await artifact); npm test/Gradle locally NOT RUN (no toolchain); CI is the authoritative gate. Snapshot UTC 2026-11-12T04:50:00Z.
+- Previous reviewed snapshot: [CURRENT_STATUS_20261111T192431Z.md](./CURRENT_STATUS_20261111T192431Z.md) — current main `0145b03db05abd9ca4554431f9a9f690f13f497c`; 755 branches / 8 open PRs / 23 open issues; Android, Ubuntu/Windows contracts and desktop CI PASS after #744; #648 API 36 instrumentation process-start still unresolved with new diagnostics queued; #747 disclosure CI 4/4 PASS; #749 desktop cancellation follow-up Desktop CI PASS and remaining checks running. Snapshot UTC 2026-11-11T19:24:31.951Z.
+- Previous reviewed snapshot: [CURRENT_STATUS_20261111T191142Z.md](./CURRENT_STATUS_20261111T191142Z.md) — 19:11Z main `9f1c0451` pre-desktop-merge baseline.
+
+Z.md](./CURRENT_STATUS_20261111T191142Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 754 branches / 8 open PRs / 23 open issues; main Android CI 916/916 and cross-platform contracts PASS; #648 API 29 PASS / API 36 still running with bounded startup diagnostics; #747 complete localStorage disclosure expanded, four exact-head workflows running; task/Clear All/download/governance P0 blockers remain. Snapshot UTC 2026-11-11T19:11:42.986Z.
+- Previous reviewed snapshot: [CURRENT_STATUS_20261111T174430Z.md](./CURRENT_STATUS_20261111T174430Z.md) — 17:44Z main `9f1c0451` baseline.
+
+Z.md](./CURRENT_STATUS_20261111T174430Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 current head 922/922 with 4/4 workflows; #747 919/919 with 4/4 workflows; #648 exact workflow_dispatch run #43061555620 failed (API29 211 assertions; API36 timeout at run 1/10); #748 checks pending on its docs branch; P0 task/Clear All/Android download/Focus/governance blockers remain.
+- Previous mainline snapshot: [CURRENT_STATUS_20261111T170455Z.md](./CURRENT_STATUS_20261111T170455Z.md) — 17:04Z pre-#746 baseline.
+- Previous mainline snapshot: [CURRENT_STATUS_20261111T131135Z.md](./CURRENT_STATUS_20261111T131135Z.md) — earlier baseline.
 
 ## Before acting
 

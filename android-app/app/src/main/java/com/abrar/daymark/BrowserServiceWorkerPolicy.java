@@ -37,6 +37,15 @@ final class BrowserServiceWorkerPolicy {
         return !onlineEnabled;
     }
 
+    /**
+     * The process-wide platform setting is a useful first barrier, but it can fail to
+     * reassert after an Online session. Only the installed request client provides the
+     * independent fail-closed fallback required before worker networking may be enabled.
+     */
+    static boolean canEnableNetworkAfterConsent(boolean requestClientInstalled) {
+        return requestClientInstalled;
+    }
+
     static synchronized boolean shouldShowCompatibilityNotice() {
         if (compatibilityNoticeShown) return false;
         compatibilityNoticeShown = true;
@@ -44,6 +53,6 @@ final class BrowserServiceWorkerPolicy {
     }
 
     static String compatibilityDisclosure() {
-        return "Service Worker network requests follow Daymark's Online/Offline mode. Remote worker requests are blocked while Offline; cached responses may still work. If this WebView cannot change its process-wide worker setting, worker network access remains blocked even while Online.";
+        return "Service Worker network requests follow Daymark's Online/Offline mode. Remote worker requests are blocked while Offline; cached responses may still work. If Daymark cannot install its request guard or change its process-wide worker setting, worker network access remains blocked even while Online.";
     }
 }

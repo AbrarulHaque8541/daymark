@@ -66,6 +66,9 @@ jobs:
           sh ./tools/run-updater-picker-routing-tests.sh
           python3 ./tools/check-ci-test-honesty.py "$GITHUB_WORKSPACE"
 
+      - name: Run extension injection page-scope host tests
+        run: sh ./tools/run-extension-injector-tests.sh
+
       - name: Run UiMotionPolicy host regression tests
         run: sh ./tools/run-ui-motion-policy-tests.sh
 

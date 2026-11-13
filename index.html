@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f2f5f7">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1216">
-  <meta name="description" content="A calm, local-first personal task manager prototype.">
+  <meta name="description" content="Daymark — a calm personal task manager for the web.">
   <title>Daymark — personal tasks</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2316705f'/%3E%3Crect x='5' y='9' width='3' height='10' rx='1' fill='%23f7f8f5'/%3E%3Crect x='10.5' y='5' width='3' height='14' rx='1' fill='%23f7f8f5'/%3E%3Crect x='16' y='11' width='3' height='8' rx='1' fill='%23f7f8f5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
@@ -20,6 +20,10 @@
   <script src="response-body-logic.js" defer></script>
   <script src="weather-logic.js" defer></script>
   <script src="weather-ui.js" defer></script>
+  <script src="air-quality-logic.js" defer></script>
+  <script src="air-quality-ui.js" defer></script>
+  <script src="daylight-logic.js" defer></script>
+  <script src="daylight-ui.js" defer></script>
   <script src="holidays-logic.js" defer></script>
   <script src="holidays-ui.js" defer></script>
   <script src="currency-logic.js" defer></script>
@@ -28,6 +32,8 @@
   <script src="zones-ui.js" defer></script>
   <script src="wiki-logic.js" defer></script>
   <script src="wiki-ui.js" defer></script>
+  <script src="releases-logic.js" defer></script>
+  <script src="releases-ui.js" defer></script>
   <script src="browser-address-logic.js" defer></script>
   <script src="browser-address-ui.js" defer></script>
   <script src="browser-error-logic.js" defer></script>
@@ -36,10 +42,14 @@
   <script src="browser-download-ui.js" defer></script>
   <script src="browser-proxy-logic.js" defer></script>
   <script src="browser-proxy-ui.js" defer></script>
+  <script src="browser-proxy-failures-logic.js" defer></script>
+  <script src="browser-proxy-failures-ui.js" defer></script>
   <script src="browser-data-logic.js" defer></script>
   <script src="browser-data-ui.js" defer></script>
   <script src="browser-intent-logic.js" defer></script>
   <script src="browser-intent-ui.js" defer></script>
+  <script src="url-insights-logic.js" defer></script>
+  <script src="url-insights-ui.js" defer></script>
   <script src="telegram-logic.js" defer></script>
   <script src="telegram-ui.js" defer></script>
   <script src="webhook-logic.js" defer></script>
@@ -163,11 +173,12 @@
               <option value="csv">CSV (.csv)</option>
               <option value="ics">Calendar (.ics)</option>
             </select>
-            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks">Export</button>
-            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file">Import</button>
+            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks" aria-describedby="browser-storage-disclosure">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file" aria-describedby="browser-storage-disclosure">Import</button>
             <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
             <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
           </div>
+          <p class="briefing-description" id="browser-storage-disclosure">Task data, Focus sessions and history, recovery backups, saved preferences (including the remembered Telegram chat destination), caches, and queued webhook events in the web prototype are stored in this browser's localStorage and are not encrypted by the prototype. The Telegram bot token and current webhook endpoint are session-only; a legacy secret-bearing webhook value is never read or displayed.</p>
           <div class="task-list" id="task-list" aria-live="polite" aria-relevant="additions removals text">
             <div class="task-list-skeleton" aria-hidden="true">
               <div class="skeleton-row"></div>
@@ -187,14 +198,14 @@
         <aside class="suggestion-card" aria-labelledby="suggestion-title">
           <div class="suggestion-topline"><span class="sparkle" aria-hidden="true">✳</span></div>
           <h2 id="suggestion-title">A good place to begin</h2>
-          <p class="suggestion-description">Local rules pick your next tasks — no AI service.</p>
+          <p class="suggestion-description">Local rules pick your next tasks.</p>
           <div class="suggestion-list" id="suggestion-list" aria-live="polite"></div>
         </aside>
 
         <aside class="focus-card" id="focus-card" aria-labelledby="focus-heading">
           <div class="focus-topline"><span class="focus-dot" aria-hidden="true"></span></div>
           <h2 id="focus-heading">One thing at a time</h2>
-          <p class="focus-description">No network, no account.</p>
+          <p class="focus-description">Runs on this page.</p>
           <div class="focus-time-wrap">
             <span class="focus-time" id="focus-time" role="timer">25:00</span>
             <span class="focus-state-label" id="focus-state-label" role="status" aria-live="polite" aria-atomic="true">Ready</span>
@@ -218,7 +229,7 @@
         <aside class="briefing-card" id="briefing-card" aria-labelledby="briefing-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="briefing-heading">RSS / Atom briefing</h2>
-          <p class="briefing-description">Fetched on Refresh, cached offline. Some feeds block browser requests.</p>
+          <p class="briefing-description">Fetched directly on Refresh and cached for later.</p>
           <form id="feed-form" class="feed-form" novalidate>
             <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
             <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>
@@ -231,7 +242,7 @@
         <aside class="weather-card" id="weather-card" aria-labelledby="weather-heading">
           <div class="weather-topline"><span class="weather-dot" aria-hidden="true"></span></div>
           <h2 id="weather-heading">Weather for today</h2>
-          <p class="weather-description">Open-Meteo — no account, no API key. Cached offline.</p>
+          <p class="weather-description">Open-Meteo — no account, no API key.</p>
           <form id="weather-form" class="feed-form" novalidate>
             <label class="sr-only" for="weather-place">Place name</label>
             <input id="weather-place" name="place" type="text" maxlength="80" placeholder="City, e.g. Kolkata" autocomplete="off">
@@ -244,7 +255,7 @@
         <aside class="briefing-card" id="holiday-card" aria-labelledby="holiday-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="holiday-heading">Public holidays ahead</h2>
-          <p class="briefing-description">Nager.Date open data — no account, no API key. Cached offline.</p>
+          <p class="briefing-description">Nager.Date open data — no account, no API key.</p>
           <form id="holiday-form" class="feed-form" novalidate>
             <label class="sr-only" for="holiday-country">Country for public holidays</label>
             <select id="holiday-country" name="country" class="sort-select" aria-label="Country">
@@ -274,7 +285,7 @@
         <aside class="briefing-card" id="currency-card" aria-labelledby="currency-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="currency-heading">Currency glance</h2>
-          <p class="briefing-description">Frankfurter open rates — no account, no API key. Cached offline.</p>
+          <p class="briefing-description">Frankfurter open rates — no account, no API key.</p>
           <form id="currency-form" class="feed-form" novalidate>
             <label class="sr-only" for="currency-from">From currency</label>
             <select id="currency-from" name="from" class="sort-select" aria-label="From">
@@ -312,7 +323,7 @@
         <aside class="briefing-card" id="zones-card" aria-labelledby="zones-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="zones-heading">World clock and meeting overlap</h2>
-          <p class="briefing-description">Offline clocks and a shared waking window. No network, no account.</p>
+          <p class="briefing-description">Clocks and a shared waking window for your saved zones.</p>
           <form id="zones-form" class="feed-form" novalidate>
             <label class="sr-only" for="zones-pick">Time zone</label>
             <select id="zones-pick" name="zone" class="sort-select" aria-label="Time zone">
@@ -341,7 +352,7 @@
         <aside class="briefing-card" id="wiki-card" aria-labelledby="wiki-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="wiki-heading">Wikipedia search</h2>
-          <p class="briefing-description">Keyless Wikipedia API — no account. Results cached offline.</p>
+          <p class="briefing-description">Keyless Wikipedia API — no account needed.</p>
           <form id="wiki-form" class="feed-form" novalidate>
             <label class="sr-only" for="wiki-query">Search Wikipedia</label>
             <input id="wiki-query" name="query" type="search" maxlength="200" placeholder="Search Wikipedia…" autocomplete="off">
@@ -353,8 +364,8 @@
         </aside>
         <aside class="briefing-card" id="browser-error-card" aria-labelledby="browser-error-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="browser-error-heading">Browser errors, in plain language</h2>
-          <p class="briefing-description">Offline explanations for common load failures. No network.</p>
+          <h2 id="browser-error-heading">Explain a load failure</h2>
+          <p class="briefing-description">Plain words for the errors a page can hit. Nothing leaves this page.</p>
           <form id="browser-error-form" class="feed-form" novalidate>
             <label class="sr-only" for="browser-error-scenario">Error to explain</label>
             <select id="browser-error-scenario" name="error" class="sort-select" aria-label="Error">
@@ -377,8 +388,8 @@
         </aside>
         <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="browser-download-heading">Offline download safety</h2>
-          <p class="briefing-description">Plan a sample download journey locally. No network, no file is fetched.</p>
+          <h2 id="browser-download-heading">Download safety check</h2>
+          <p class="briefing-description">Plan a sample download journey. Nothing is fetched.</p>
           <form id="browser-download-form" class="feed-form" novalidate>
             <label class="sr-only" for="browser-download-scenario">Download journey</label>
             <select id="browser-download-scenario" name="scenario" class="sort-select" aria-label="Download journey">
@@ -400,8 +411,8 @@
         </aside>
         <aside class="briefing-card" id="browser-proxy-card" aria-labelledby="browser-proxy-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="browser-proxy-heading">Proxy, planned honestly</h2>
-          <p class="briefing-description">Check a proxy address offline. No network, nothing is routed.</p>
+          <h2 id="browser-proxy-heading">Proxy address check</h2>
+          <p class="briefing-description">Validate a proxy address before you configure one.</p>
           <form id="browser-proxy-form" class="feed-form" novalidate>
             <label class="sr-only" for="browser-proxy-address">Proxy address</label>
             <input id="browser-proxy-address" name="address" type="text" maxlength="512" placeholder="proxy.example.org:8080" autocomplete="off">
@@ -414,8 +425,8 @@
         </aside>
         <aside class="briefing-card" id="browser-data-card" aria-labelledby="browser-data-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
-          <h2 id="browser-data-heading">What each Clear button really does</h2>
-          <p class="briefing-description">Offline, plain-words scope of every clear action. No network, nothing runs.</p>
+          <h2 id="browser-data-heading">What each Clear button does</h2>
+          <p class="briefing-description">Plain words for the scope of every clear action. Nothing runs.</p>
           <form id="browser-data-form" class="feed-form" novalidate>
             <label class="sr-only" for="browser-data-action">Clear action to explain</label>
             <select id="browser-data-action" name="action" class="sort-select" aria-label="Clear action">
@@ -423,6 +434,7 @@
               <option value="clear-search">Clear task search</option>
               <option value="webhook-clear-queue">Clear webhook queue</option>
               <option value="storage-clear-status">Clear storage status</option>
+              <option value="storage-clear-all">Clear all local data</option>
               <option value="import-merge">Import a backup</option>
               <option value="export-backup">Export a backup</option>
             </select>
@@ -445,10 +457,23 @@
           <p class="feed-status" id="browser-intent-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="browser-intent-result" aria-live="polite"></div>
         </aside>
+        <aside class="briefing-card" id="url-insights-card" aria-labelledby="url-insights-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="url-insights-heading">Address bar, explained</h2>
+          <p class="briefing-description">Paste an address or search words to see how the browser reads it. Nothing is fetched and nothing opens.</p>
+          <form id="url-insights-form" class="feed-form" novalidate>
+            <label class="sr-only" for="url-insights-input">Address or search words</label>
+            <input id="url-insights-input" name="address" type="text" maxlength="2048" placeholder="https://example.com:8443/path or plain words" autocomplete="off" spellcheck="false">
+            <button class="button button-primary" id="url-insights-explain" type="submit">Explain</button>
+            <button class="button button-quiet" id="url-insights-clear" type="button">Clear plan</button>
+          </form>
+          <p class="feed-status" id="url-insights-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="url-insights-result" aria-live="polite"></div>
+        </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="webhook-heading">Task completion webhook</h2>
-          <p class="briefing-description">Announce completed tasks to a user-chosen HTTPS endpoint. Offline-first; events queue on this device until they can be delivered.</p>
+          <p class="briefing-description">Announce completed tasks to a user-chosen HTTPS endpoint. Events are delivered directly; anything undeliverable waits in a local queue and retries.</p>
           <form id="webhook-form" class="feed-form" novalidate>
             <label class="sr-only" for="webhook-url">Webhook URL</label>
             <input id="webhook-url" name="url" type="url" inputmode="url" placeholder="https://hooks.example.com/daymark" autocomplete="off" spellcheck="false" aria-describedby="webhook-status">
@@ -457,6 +482,7 @@
             <button class="button button-quiet" id="webhook-flush" type="button">Retry queue</button>
             <button class="button button-quiet" id="webhook-clear-queue" type="button">Clear queue</button>
           </form>
+          <p class="briefing-description">The webhook endpoint stays in this tab only and must be re-entered after reload; it is not saved on this device. Queued events store only a SHA-256 destination fingerprint. Clear all queued events below.</p>
           <p class="feed-status" id="webhook-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
 
@@ -471,7 +497,7 @@
             <input id="telegram-chat" name="chat" type="text" maxlength="64" placeholder="Chat id or @username" autocomplete="off" spellcheck="false">
             <button class="button button-primary" id="telegram-send" type="submit">Send digest</button>
             <button class="button button-quiet" id="telegram-test" type="button">Test</button>
-            <button class="button button-quiet" id="telegram-clear" type="button">Clear</button>
+            <button class="button button-quiet" id="telegram-clear" type="button">Clear token</button>
           </form>
           <p class="feed-status" id="telegram-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </aside>
@@ -482,6 +508,7 @@
           <form id="storage-form" class="feed-form" novalidate>
             <button class="button button-primary" id="storage-check" type="button">Check</button>
             <button class="button button-quiet" id="storage-clear" type="button">Clear status</button>
+            <button class="button button-quiet" id="storage-clear-all" type="button" aria-label="Clear all managed Daymark data stored in this browser">Clear all local data</button>
           </form>
           <p class="feed-status" id="storage-status-line" role="status" aria-live="polite"></p>
           <div class="feed-list" id="storage-list" aria-live="polite"></div>
@@ -550,3 +577,4 @@
   </div>
 </body>
 </html>
+

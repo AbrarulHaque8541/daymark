@@ -9,7 +9,7 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 ## Core Principles
 
 1. **Data integrity:** Treat preserving user tasks and attachment data as a design priority. Document failure boundaries, test interrupted writes/migrations and recovery paths, and never promise that all data loss or corruption is impossible.
-2. **Offline-first and privacy-conscious:** Keep core task operations designed for local/offline use without mandatory third-party accounts; distinguish this from optional browser or updater network activity and verify offline behavior on supported devices.
+2. **Network-first where the network is needed, privacy-conscious everywhere:** Task data stays encrypted on-device with no mandatory third-party account. Features that need the internet must call it directly and must not be degraded, proxied, or replaced by an offline-only path; optional network features degrade gracefully, but never at the cost of the direct path.
 3. **Strict Integrity:** Any remote feature (such as the in-app updater) must cryptographically verify downloads against expected hashes before prompting the user.
 
 ## Pull Request Guidelines

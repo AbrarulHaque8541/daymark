@@ -1,3 +1,164 @@
+## Current execution queue — 2026-11-11T13:11:35Z (main 0e268420)
+
+This queue supersedes the 12:20Z queue below; historical planning remains intact. PRs/issues are delivery vehicles, not completion boundaries.
+
+### P0 — protect user data and network trust
+1. **Stale task writes (#683/#675):** current main `persistTasks()` still writes the full in-memory array without generation fencing. Extract the generation/three-way-merge contract from #675 into a focused current-main integration, preserving the merged storage-health and Telegram preference work. Require stale-writer, concurrent-edit, lock-failure and recovery regressions.
+2. **Complete Clear All (#689/#675/#648):** one ordered transaction (task → webhook delivery → webhook queue → Focus), including active webhook endpoint/fingerprint/input, memory-only queue, Telegram post-await preference epoch, legacy secret cleanup failure propagation without reading the secret, rollback and truthful external-delivery outcome.
+3. **Android download security (#671/#648):** deliver the fail-closed mitigation through the canonical #648 MainActivity owner path; keep downloads blocked until DNS-pinned redirect-validating bounded transport and atomic SAF/MediaStore publication are complete.
+4. **Focus/TaskEditor acceptance (#613/#160):** ten consecutive API 36 lifecycle passes; physical Android/System WebView acceptance with device/API/provider/build SHA.
+5. **Main governance (#646):** owner/admin must enable independent review, required Android CI and Ubuntu/Windows contracts, current branch, stale-review dismissal and no bypass. Main currently reports `protected=false`, rulesets `[]`.
+
+### P1 — platform security and data compatibility
+6. **Desktop Electron/lockfile (#696/#738/#737):** review and safely merge the Electron 45.3.0/lockfile candidate; keep GUI/installer/physical acceptance separate.
+7. **Desktop download policy (#739):** audit initiation, URL-chain provenance and safe staging/publication. Do not add per-page/network consent gates; any download-only confirmation requires owner decision.
+8. **iCalendar/import integrity (#656/#640):** integrate repeated CATEGORIES and duplicate-singleton protections without importing stale Android history.
+9. **Extension SPA/metadata privacy (#676/#680/#702):** reconcile with current Intent/WebView policy and validate on System WebView.
+10. **Service Worker/Telegram/repeat parity (#685/#700/#684/#476):** verify Offline policy, real Telegram CORS/delivery, and cross-platform recurrence semantics.
+11. **Air Quality QA (#731):** actual browser/System WebView/TalkBack acceptance.
+
+### P2 — maintainability and qualification
+12. Reproducible desktop packaging, GUI and installer qualification (#696/#737).
+13. Measured browser/desktop architecture and performance work (#325/#348).
+
+### Current evidence
+- Main `0e268420b45c23732ff57f18f7307a0df5084a3a`: Android CI #43005441806 PASS; contracts #43005441864 PASS; nightly #43010378801 PASS (Node 910/910; Android core 401 assertions).
+- Open PRs: #648 202/100; #656 95/77; #675 263/77; #676 59/77; #736 documentation branch; #737 14/0. All draft; no independent APPROVED reviews.
+- #737 head `847b982bc5a8592be02d93f7b650a552b27fc7f9`: 5/5 exact-head workflows PASS; Electron 45.3.0 candidate is not merged.
+- Main branch protection is disabled; environment reviewer configuration not verified.
+- Physical Android, System WebView, SAF/OEM, desktop GUI/installer and live Telegram/webhook acceptance NOT TESTED.
+
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; GitHub Actions and repository APIs  
+**Timestamp (UTC):** 2026-11-11T13:11:35Z
+
+---
+
+## Current execution queue — 2026-11-11T12:20:00Z (main 0e268420)
+
+This queue supersedes older execution queues below; historical planning is retained. PRs/issues are delivery and tracking vehicles, not work boundaries.
+
+### P0 — security, data integrity and runtime acceptance
+1. **Browser download security:** current main still uses `DownloadManager.Request` with original URL/User-Agent/Cookie. Deliver the focused fail-closed mitigation through the canonical #648 owner path, then complete an app-owned DNS-pinned transport. The existing URLConnection/HttpsURLConnection candidates resolve DNS again after policy validation and are not safe to enable. (#671, #648)
+2. **Clear All transaction:** coordinate task mutation, webhook delivery/queue, active webhook endpoint, Focus, Telegram preference and in-flight Send/Test operations. Prevent stale async operations and cross-tab writes from recreating cleared data; preserve truthful external-delivery status; never read the legacy secret endpoint during cleanup. (#689, #683, #675, #648)
+3. **Focus/TaskEditor acceptance:** retain the merged #734 baseline (392 API 29 / 395 API 36 assertions passed once), but complete ten consecutive API 36 runs and physical Android/System WebView acceptance. Do not weaken touch/IME assertions. (#613, #160, #648)
+4. **Repository governance:** main currently reports `protected=false` and the rulesets endpoint is empty. Owner/admin must require independent review, Android CI, Ubuntu/Windows contracts, current branch, stale-review dismissal and no bypass/force-push. Production signing workflow guards from #705 are merged; environment reviewer configuration remains unverified. (#646, #705)
+
+### P1 — platform security and data compatibility
+5. **Desktop runtime:** main still resolves EOL Electron 33.4.11. PR #737 upgrades to Electron 45.3.0 / Node 24.22.2, has a generated integrity-backed lockfile, worker isolation hardening and 5/5 exact-head workflows PASS. It remains draft and unmerged pending independent review; GUI/installer/physical desktop acceptance is NOT TESTED. (#738, #737, #696)
+6. **iCalendar/import integrity:** current main loses repeated CATEGORIES and accepts duplicate singleton properties; #656 has focused fixes but is 95 ahead / 77 behind and Focus lifecycle checks failed. Reconcile the parser/test changes without importing stale Android history. (#656, #640)
+7. **Extension privacy/SPA:** reconcile #676 with current Intent/WebView policy; verify page-scope reevaluation and extension metadata privacy on actual System WebView. (#676, #680, #702)
+8. **Telegram delivery:** verify CORS and actual WebView delivery; retain message ID/outcome safety and the new Clear All preference epoch requirement. (#700, #689)
+9. **Repeat-task parity:** align completion and scheduling semantics across Android/web and RFC 5545 import/export. (#684, #476)
+10. **Service Worker and browser compatibility:** keep Online as the default, verify explicit Offline enforcement and network-first behavior, and test supported System WebView providers. (#685)
+
+### P2 — maintainability and platform qualification
+11. Reproducible desktop packaging, GUI and installer tests after the Electron runtime upgrade. (#696, #737)
+12. Continue measured desktop/browser architecture and performance qualification. (#325, #348)
+
+### Current exact delivery state
+- Main: `0e268420b45c23732ff57f18f7307a0df5084a3a`; Android CI #43005441806 PASS; cross-platform contracts #43005441864 PASS; nightly audit #43010378801 PASS.
+- Open PRs: #648 (202 ahead / 100 behind), #656 (95 / 77), #675 (263 / 77), #676 (59 / 77), #736 (2 / 0), #737 (14 / 0). All six are draft; the first four are non-mergeable, #736/#737 are mergeable.
+- #737 head `847b982bc5a8592be02d93f7b650a552b27fc7f9`: Desktop CI #43018673480 PASS on Ubuntu/Windows/macOS; cross-platform #43018673434 PASS; Android CI #43018673613 PASS; non-publishing artifact #43018673544 PASS; Android PR validation #43018673558 PASS. No independent approval; not merged.
+- #736 is the status-snapshot delivery branch; this snapshot refreshes its index and project plan without rewriting historical snapshots.
+- Air Quality disclosure is already on main; #731 remains browser/System WebView acceptance follow-up.
+- Production signing authorization from #705 is merged. Main branch protection remains disabled; no release/tag was created.
+- Current Gradle identity is `com.abrar.daymark`, versionName `1.6`, versionCode `13`; unchanged. No package identity, signing key, version, migration or stored user data was changed.
+- Physical Android, WebView, desktop GUI/installer and real Telegram delivery remain NOT TESTED.
+
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; GitHub Actions exact-head jobs/logs; official Electron release schedule  
+**Timestamp (UTC):** 2026-11-11T12:20:00Z
+
+---
+
+## Current execution queue — 2026-11-11T01:36:56.051Z (main 5148232a)
+
+This queue supersedes older execution queues below; historical planning is retained. PRs are delivery mechanisms, not completion boundaries.
+
+### P0 — user-data integrity, security and runtime
+1. Cross-tab task mutation/generation fencing; stale tabs must not restore deleted tasks or overwrite another tab's committed mutation (#683, #675).
+2. Focus API 29/36 touch/lifecycle reliability; retain real touch and vertical-scroll assertions and complete the ten-run API 36 gate (#613, #727, #648).
+3. DNS-pinned, hostname-verified, redirect-validating download transport and atomic MediaStore/SAF publication; remain fail-closed until complete (#671, #708).
+4. Ordered Clear All/task/Focus/webhook synchronization and generation rollback (#689, #690, #675).
+5. Main required checks and independent review protection (#646); main is currently unprotected and rulesets are empty.
+6. Physical Android/System WebView acceptance with device/API/provider/build SHA (#160).
+
+### P1 — storage, cross-platform contracts and security
+7. Storage-health unreadable-state review and exact inventory of all non-secret keys, including Telegram destination (#603, #725).
+8. 58-case expanded-year Java Instant-compatible timestamp contract and exact-head checks (#707, #722).
+9. RFC 5545/import/export and malformed/duplicate data preservation (#656).
+10. Intent URI parity and actual WebView main-frame/user-gesture acceptance (#712, #715, #723, #726).
+11. Extension SPA scope reevaluation and metadata privacy on real System WebView (#680, #702, #676).
+12. Production-signing environment approvals and action-runtime/provenance review (#705, #84).
+13. Telegram CORS/live delivery acceptance (#700); repeat-task completion/scheduling parity (#684, #476).
+
+### P2 — maintainability and platform qualification
+14. Reproducible Electron installation and committed lockfile (#696).
+15. Measured desktop/browser architecture qualification (#325, #348).
+
+---
+
+
+### Current exact-head execution evidence — 2026-11-11T01:47:18.620Z
+
+- Main `5148232a7165f840fa895707890b829bcdc1657b`: Android CI #42933214990 PASS; cross-platform contracts #42933214965 PASS. Main branch metadata reports `protected=false`; rulesets are empty.
+- #725 storage health: head `6a1a410ff5093d262d60ce08f4f0a0ef6d45caa9`, 6 ahead / 0 behind, 4/4 exact-head workflows PASS. Includes the non-secret Telegram destination category, exact inventory fixture, per-category clear and Clear All regressions. Independent data-integrity review and physical acceptance remain outstanding.
+- #722 task Instant contract: head `a0a93db83c80854a006e14b6d1ffb499ff3bfee8`, 10 ahead / 0 behind. Six workflows PASS; API 29 Focus lifecycle PASS; API 36 Focus lifecycle FAIL at the post-vertical-drag real tap (parent ScrollView receives DOWN/UP, selector/button receive neither). Exact production V8 fixture: 58/58 PASS. Keep draft; do not weaken the Focus or PortableBackupSmoke tests.
+- #727 Focus instrumentation: head `05ae41c340226affd8b4083781779578e7ba07a9`, 4 ahead / 0 behind. Cross-platform contracts and Focus UI/Sound PASS; Android CI, API 29/36 lifecycle, device artifact and unsigned validation are IN PROGRESS. The scroll-settle window now requires eight 50 ms stable samples plus main-looper idle; this remains a hypothesis until the real API 36 test completes.
+- #726 Intent handoff: head `00b8c10822bc8aac05bf8beebf614b895001f002`, 2 ahead / 0 behind. Nine exact-head workflows are IN PROGRESS. It is the canonical focused main-frame/user-gesture Intent gate; #676 must reconcile its duplicate gate while retaining extension-specific changes.
+- #724 documentation: previous head `9704cdd5e6a17040c25c4cd7480526b08a13c02b` passed Android CI, contracts and unsigned validation 3/3. Current head after restoring all main historical index links and recording the post-snapshot evidence is `b99ff0007a8d73c35816700c7ebd6dc05e4076fa`, 8 ahead / 0 behind; exact-head workflows had not yet appeared at last poll. PR is ready for review, not merged. The 2026-11-05T04:29:30 historical snapshot link is retained.
+- #728 Telegram preference correction is merged; current main includes the saved-destination accessibility announcement. #719 export wiring and #721 webhook endpoint session-only privacy are also on main.
+- No PR was merged by this run. Main was not modified. No physical-device acceptance, release/tag, version/signer/package change, or destructive migration was performed.
+
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; Git Data API; GitHub Actions API; V8 exact-source storage and timestamp harnesses  
+**Timestamp (UTC):** 2026-11-11T01:47:18.620Z
+
+---
+## Current execution queue — 2026-11-10T22:54:19.523Z (main 39b1047a)
+
+This queue supersedes the historical queue below. Do not treat an open PR or green CI as project completion.
+
+### P0 — correctness, security and release blockers
+1. Focus API 29/36 touch/lifecycle reliability; retain real touch assertions and complete ten-consecutive-run acceptance (#613, #648, #675).
+2. Extract task generation fencing, three-way merge and destructive-clear ordering from the divergent integration branch into a focused current-main change (#683).
+3. Complete DNS-pinned, hostname-verified, redirect-validating browser download transport and atomic MediaStore/SAF publication (#671, #708).
+4. Configure main required checks, independent review, stale-review dismissal and push restrictions (#646).
+5. Complete physical Android/WebView acceptance across API 26/29/36 (#160).
+6. Finish independent review for strict timestamp contract #722 (all 7 exact-head workflows PASS) and Intent URI contract #723 (Focus API 36 retry pending) (#707, #712).
+7. Complete Focus clear/write and Clear All/webhook lock ordering (#690, #689).
+
+### P1 — cross-platform integrity and security
+8. Complete storage health and recovery review (#603, #640).
+9. Finish iCalendar/import/export parity and malformed-data validation (#656).
+10. Complete extension SPA scope, metadata privacy and actual System WebView acceptance (#680, #702, #676).
+11. Configure production-signing environment approvals and finish action-runtime/provenance maintenance (#705, #84).
+12. Align repeat-task completion and scheduling semantics (#684, #476).
+13. Verify Telegram browser/WebView CORS and real delivery (#700).
+
+### P2 — maintainability and compatibility
+14. Restore reproducible Electron installs and lockfile generation (#696).
+15. Continue browser UX and cross-platform architecture work (#348, #325).
+
+### Active focused deliveries
+- #722: 58-case Java Instant-compatible task timestamp contract; exact production V8 and JDK fixture harnesses pass; API 29 Focus workflow retry pending.
+- #723: 48-case strict Intent URI parity contract; exact production V8 fixture passes; Focus lifecycle and unsigned device validation pending.
+- #719: export selector script-order correction is merged and mainline CI passed.
+- #721: webhook endpoint session-only privacy and endpoint-bound queue are merged.
+- #704/#708: Service Worker enforcement and bounded download body-transfer foundation are merged; full download transport remains incomplete.
+
+### Governance and safety
+- Main currently reports `protected=false` and no repository rulesets; owner-side governance is required.
+- No independent approved reviews were found on the nine open PRs.
+- Do not change `applicationId`, namespace, version, signing, tags/releases or stored data without explicit authorization. Current Gradle identity is `com.abrar.daymark`; the explicit `the alternate package identifier named in the run-level safety instruction` instruction conflict remains unresolved.
+- Do not weaken tests to obtain green CI. Separate unrelated Focus failures from the focused PRs, but keep the full required gate.
+
+**Last reviewed:** 2026-11-10T22:54:19.523Z  
+**Main SHA:** `39b1047a2d4888e5c1adb56b6a798e030d10f1b5`  
+**Work by:** ChatGPT (OpenAI), GPT-6  
+**Tooling:** GitHub connector via Code Mode; Node 22/V8 and JDK 21 validation harnesses
+
 ## Current execution queue — 2026-11-09T12:34:39.477Z (main 8d76584bc07e)
 
 This queue supersedes older current-priority summaries below; historical planning and evidence remain intact.
@@ -143,7 +304,7 @@ Current baseline:
 
 # Daymark Project Plan
 
-Daymark should remain a fast, simple, privacy-first task app that works offline, while letting interested users reveal more capability through task-specific workspaces. Engineering is technology-agnostic: use any language or tool that demonstrably gives the best result for a component, as defined in the [technology-agnostic engineering policy](docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md). Language examples are not a whitelist or requirement. The ordinary task flow must not require users to learn about AI, models, plugins, terminals, or Android internals. Advanced tools should be optional, visible, modular where the distribution channel permits, and bounded by user-approved scopes.
+Daymark should remain a fast, simple, privacy-respecting task app whose data lives on the device, while letting interested users reveal more capability through task-specific workspaces. Where a feature needs the internet, it uses the internet directly and at full speed. Engineering is technology-agnostic: use any language or tool that demonstrably gives the best result for a component, as defined in the [technology-agnostic engineering policy](docs/TECHNOLOGY_AGNOSTIC_ENGINEERING.md). Language examples are not a whitelist or requirement. The ordinary task flow must not require users to learn about AI, models, plugins, terminals, or Android internals. Advanced tools should be optional, visible, modular where the distribution channel permits, and bounded by user-approved scopes.
 
 **Status snapshot.** This document contains a staged roadmap, not proof that a feature is implemented. Verify live `main`, open PRs/issues, `android-app/app/build.gradle.kts`, and the [Releases page](https://github.com/AbrarulHaque8541/daymark/releases) before making implementation or publication claims. CI/build success does not establish physical-device behavior; device acceptance is tracked separately in issue #160.
 
@@ -200,7 +361,7 @@ This is the actionable priority order. A roadmap entry is not an implementation 
 ### P2 — Consider after the core browser and task flows are reliable
 
 8. **Command palette / quick actions.** Search existing tasks and invoke existing actions from one compact UI. Reuse current task APIs; do not create a second task store or duplicate commands. Acceptance: keyboard and touch access, accessible labels, deterministic ordering, and existing task regression tests.
-9. **Research-to-task workflow.** Let a user explicitly save selected page text/link as a task or note, with a preview before writing. Keep it local-first; external AI analysis is optional and clearly disclosed. Acceptance: user confirms saved content, URL sanitization, bounded text size, no silent background capture, and backup/restore compatibility.
+9. **Research-to-task workflow.** Let a user explicitly save selected page text/link as a task or note, with a preview before writing. Keep captured content on the device until the user acts on it; external AI analysis is optional and clearly disclosed, and when the user chooses it the request goes straight to the provider. Acceptance: user confirms saved content, URL sanitization, bounded text size, no silent background capture, and backup/restore compatibility.
 10. **Local model/runtime discovery — official source survey completed (2026-10-12); selection remains open.** Do not implement, bundle, or auto-download a model. The [source review](android-app/ANDROID_SOURCES.md#official-source-refresh-2026-10-12) distinguishes AICore/ML Kit, llama.cpp plus GGUF, and LiteRT-LM; no universal compatibility or current model-size claim is supported. Choose nothing until the target device matrix, exact checkpoint/runtime licenses, RAM/storage/size, performance/thermal/battery behavior, removal, and user-started transfer are verified. Decide separately whether AICore's system-managed model delivery fits explicit-download requirements. Never silently cloud-fallback.
 
 ### Delivery rules for every queue item
@@ -214,7 +375,7 @@ This is the actionable priority order. A roadmap entry is not an implementation 
 
 **Verified against live `main` on 2026-10-26:** `main` is `cac2d7524491a3fce488e57b5cf810dc7b5c5017`. Current Android source uses application ID `com.abrar.daymark`, version `1.5`/code `12`, `compileSdk = 36`, and `targetSdk = 36`; the toolchain is AGP 8.12.2 / Gradle 8.13. The latest published release is [v1.5](https://github.com/AbrarulHaque8541/daymark/releases/tag/v1.5), whose tag points at the earlier commit `ca6453374c46a1449c8bbec09a27a218d127d8e4`. v1.4 remains a draft. See the [status index](docs/AGENT_STATUS.md) and the current [API 36 readiness note](API36_MIGRATION_READINESS.md); recheck live GitHub before acting.
 
-Current `main` includes encrypted task and attachment storage, explicit encrypted portable backup/import, the HTTP+HTTPS embedded WebView, browser workspaces and page-local extensions, reminders, and local natural-language quick add. v1.5 added internationalized-domain navigation, expanded quick-add date parsing, stricter extension import caps, and reliable attachment-stream error propagation. It remains a deterministic/local-first app: there is no GGUF model, inference runtime, model downloader, Termux/CLI bridge, or cloud fallback. The model, runtime, shell/bridge, and broad plugin phases remain deferred.
+Current `main` includes encrypted task and attachment storage, explicit encrypted portable backup/import, the HTTP+HTTPS embedded WebView, browser workspaces and page-local extensions, reminders, and local natural-language quick add. v1.5 added internationalized-domain navigation, expanded quick-add date parsing, stricter extension import caps, and reliable attachment-stream error propagation. It remains a deterministic app with encrypted on-device storage and no bundled GGUF model, inference runtime, model downloader, Termux/CLI bridge, or cloud task sync. Network-backed features call their providers directly instead of routing through a local fallback. The model, runtime, shell/bridge, and broad plugin phases remain deferred.
 
 Current-main Android CI [run 39934982721](https://github.com/AbrarulHaque8541/daymark/actions/runs/39934982721) and cross-platform contract [run 39934982786](https://github.com/AbrarulHaque8541/daymark/actions/runs/39934982786) passed on `cac2d75`. The v1.5 production workflow [run 39932829832](https://github.com/AbrarulHaque8541/daymark/actions/runs/39932829832) failed only in its final draft-release lookup after creating the draft; the artifact was independently verified and published separately, and merged PR #337 corrected the lookup for future runs. Workflow/emulator evidence is not physical-device evidence.
 
@@ -264,7 +425,7 @@ Extend the task model through small, versioned, reversible migrations, preservin
 For every task-data migration, test old snapshot reading, interrupted writes, backup export/import, missing or invalid fields, undo/delete interactions, and recovery after process death. Avoid silently rewriting an 
 existing task when a template changes, a recurrence advances, or a task is restored.
 
-## Local-first data, security, and permissions
+## On-device data, security, and permissions
 
 Keep task content in app-controlled storage and encrypted at rest. Android Keystore key material is designed to remain non-exportable; treat it as device-scoped rather than as a portable backup key. For device migration, use a separate authenticated encrypted export/recovery flow that can be decrypted with user-held recovery material and re-encrypted under the destination device’s key. Test missing-key, damaged-archive, interrupted-import, and duplicate-import cases. See Android’s [Keystore guidance](https://developer.android.com/privacy-and-security/keystore), [app-specific storage guidance](https://developer.android.com/training/data-storage/app-specific), and [backup security recommendations](https://developer.android.com/privacy-and-security/risks/backup-best-practices).
 
@@ -321,7 +482,7 @@ Before any production release, verify signing/release provenance, backup restore
 
 1. **Protect the current core.** Reconcile README claims with current source and release artifacts; preserve task data, encryption, undo, backup, and the minimal UI. Recheck live issue/PR status before each implementation change.
 2. **Verify merged network-facing features.** The updater and WebView from PRs #12/#13 are in `main`; confirm the fail-closed updater gate, signer configuration, HTTPS/network controls, Safe Browsing disclosures, history handling, and device behavior before enabling or promoting them. Issue #14 is closed, but real provider/process-death recovery still needs validation. Separately recheck reminder implementation and current issues against live `main`; do not infer current status from the historical PR #15/#19 stack. Keep suggestion navigation distinct from reminder work and require device evidence before describing reminders as reliable.
-3. **Reconcile remaining capture/research proposals.** NL quick add is implemented on `main` via PR #292; do not duplicate it. Share-in, research-to-task, and widget ideas remain proposals until the owner adds them to the live queue with acceptance criteria. Keep each migration reversible and offline-first.
+3. **Reconcile remaining capture/research proposals.** NL quick add is implemented on `main` via PR #292; do not duplicate it. Share-in, research-to-task, and widget ideas remain proposals until the owner adds them to the live queue with acceptance criteria. Keep each migration reversible and keep the direct network path intact.
 4. 
 **Design the agent foundation.** Define the task-scoped workspace, capability schemas, permission broker, local audit trail, cancellation, and rollback before connecting a model.
 5. **Research optional runtimes.** Evaluate model weights, browser, OCR/speech, user-space terminal, coding tools, and any plugin mechanism against device budgets, policy, license, and maintenance cost before committing to a delivery design.
@@ -451,3 +612,7 @@ Work by: ChatGPT (OpenAI)
 Model: GPT-6  
 Tooling: GitHub connector via Code Mode; live main/PR/issue/Actions/release/source inspection  
 Timestamp (UTC): 2026-11-09T02:36:57.068Z
+
+
+### Documentation refresh
+- #724 contains the current-main snapshot and queue update. Its first Android CI/device validation attempt was rejected by the retired-identity source guard because the snapshot repeated a forbidden literal. That literal has been removed; exact-head reruns are required.
