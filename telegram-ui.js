@@ -62,23 +62,20 @@
           || !taskMutation || !lockManager) return false;
       const storage = resolveStorage();
       if (!storage || typeof storage.setItem !== 'function') return false;
-      const locked = await taskMutation.withExclusiveLock(lockManager, taskMutation.TASK_LOCK_NAME, () => {
-        const generation = taskMutation.readGeneration(storage);
-        if (!generation.ok || generation.value.clearEpoch !== expectedClearEpoch) return false;
-        try {
-          storage.setItem(CHAT_STORAGE_KEY, target);
-          return true;
-        } catch (error) {
-          return false;
-        }
-      });
+      const locked = await taskMutation.withClearEpochLock(
+        lockManager,
+        [taskMutation.TASK_LOCK_NAME],
+        storage,
+        expectedClearEpoch,
+        () => { storage.setItem(CHAT_STORAGE_KEY, target); return true; }
+      );
       return !!(locked.ok && locked.value === true);
     }
     function readClearEpoch() {
       const storage = resolveStorage();
       if (!taskMutation || !storage) return null;
       const generation = taskMutation.readGeneration(storage);
-      return generation.ok ? generation.value.clearEpoch : null;
+      return generation.ok && !generation.value.clearPending ? generation.value.clearEpoch : null;
     }
     function resetForClearAll() {
       clearTokenField();
@@ -170,14 +167,35 @@
       return inputs;
     }
     async function deliver(botToken, chatTarget, text) {
-      setControlsBusy(true);
       let result;
       try {
         result = await logicApi.sendTelegramMessage({ botToken, chatTarget, text }, networkDeps());
       } catch (error) {
         result = { ok: false, reason: 'The send attempt failed unexpectedly. Nothing was announced as sent.' };
-      } finally { setControlsBusy(false); }
+      }
       return result;
+    }
+    async function dispatchMessage(botToken, chatTarget, text, expectedClearEpoch) {
+      const storage = resolveStorage();
+      if (!taskMutation || !lockManager || !storage || !Number.isSafeInteger(expectedClearEpoch)) {
+        return { dispatched: false, reason: 'Clear All coordination is unavailable. Nothing was sent.' };
+      }
+      setControlsBusy(true);
+      const dispatched = await taskMutation.dispatchIfClearEpochUnchanged(
+        lockManager,
+        storage,
+        expectedClearEpoch,
+        () => logicApi.sendTelegramMessage({ botToken, chatTarget, text }, networkDeps())
+      );
+      if (!dispatched.ok || !dispatched.value) {
+        setControlsBusy(false);
+        return { dispatched: false, reason: 'Local data was cleared before Telegram could be contacted. Nothing was sent.' };
+      }
+      let result;
+      try { result = await dispatched.value; }
+      catch (error) { result = { ok: false, reason: 'The send attempt failed unexpectedly. Nothing was announced as sent.' }; }
+      finally { setControlsBusy(false); }
+      return { dispatched: true, result };
     }
     async function onSend() {
       if (!logicApi || typeof logicApi.sendTelegramMessage !== 'function' || typeof logicApi.buildCompletedDigest !== 'function' || typeof logicApi.isBotToken !== 'function') {
@@ -202,14 +220,25 @@
         status('No completed tasks to announce. Nothing was sent to Telegram.' + (stored.note || ''));
         return;
       }
+      if (!Number.isSafeInteger(operationClearEpoch)) {
+        status('Local data is being cleared or cannot be coordinated. Nothing was sent.');
+        return;
+      }
       status('Sending ' + digest.includedCount + ' completed task(s) to Telegram…');
-      const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text);
+      const delivery = await dispatchMessage(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text, operationClearEpoch);
+      if (!delivery.dispatched) {
+        status(delivery.reason);
+        return;
+      }
+      const result = delivery.result;
       if (result.ok) {
         const preferenceSaved = await persistChatTarget(inputs.chatTarget.trim(), operationClearEpoch);
+        const epochChanged = readClearEpoch() !== operationClearEpoch;
         status('Sent \u00b7 ' + digest.includedCount + ' completed task(s) delivered to Telegram.'
           + (digest.omittedCount > 0 ? ' ' + digest.omittedCount + ' omitted for the message limit.' : '')
           + (stored.note || '')
-          + (preferenceSaved ? '' : ' The chat target was not remembered because local data was cleared or could not be safely saved.'));
+          + (preferenceSaved ? '' : ' The chat target was not remembered because local data was cleared or could not be safely saved.')
+          + (epochChanged ? ' The request was already sent; clearing local data cannot recall a message Telegram has accepted.' : ''));
       } else {
         status(result.reason || 'The message could not be delivered.');
       }
@@ -223,12 +252,23 @@
       const inputs = validateInputs();
       if (!inputs) return;
       const operationClearEpoch = readClearEpoch();
+      if (!Number.isSafeInteger(operationClearEpoch)) {
+        status('Local data is being cleared or cannot be coordinated. Nothing was sent.');
+        return;
+      }
       status('Sending a test message to Telegram…');
-      const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE);
+      const delivery = await dispatchMessage(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE, operationClearEpoch);
+      if (!delivery.dispatched) {
+        status(delivery.reason);
+        return;
+      }
+      const result = delivery.result;
       const preferenceSaved = result.ok
         ? await persistChatTarget(inputs.chatTarget.trim(), operationClearEpoch) : false;
+      const epochChanged = readClearEpoch() !== operationClearEpoch;
       status(result.ok
         ? 'Test message sent to Telegram.' + (preferenceSaved ? '' : ' The chat target was not remembered because local data was cleared or could not be safely saved.')
+          + (epochChanged ? ' The request was already sent; clearing local data cannot recall a message Telegram has accepted.' : '')
         : (result.reason || 'The test message could not be delivered.'));
     }
     function clearTokenField() {

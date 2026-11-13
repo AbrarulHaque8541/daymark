@@ -81,13 +81,15 @@ test('a stale task save after Clear All aborts without recreating the task key',
   const storage = makeStorage();
   const locks = makeLocks();
   snapshot(storage, [original]);
-  const staleEpoch = taskMutation.readGeneration(storage).value.clearEpoch;
+  const staleTaskEpoch = taskMutation.readGeneration(storage).value.taskEpoch;
 
   const cleared = await taskMutation.withLocksInOrder(locks, taskMutation.CLEAR_ALL_LOCK_ORDER, () => {
-    const advanced = taskMutation.advanceClearEpoch(storage);
-    assert.equal(advanced.ok, true);
+    const begun = taskMutation.beginClearAll(storage, true);
+    assert.equal(begun.ok, true);
     storage.removeItem(TASK_KEY);
-    return advanced.value;
+    const finalized = taskMutation.finishClearAll(storage, true);
+    assert.equal(finalized.ok, true);
+    return finalized.value;
   });
   assert.equal(cleared.ok, true);
 
@@ -98,7 +100,7 @@ test('a stale task save after Clear All aborts without recreating the task key',
     baseTasks: [original],
     desiredTasks: [original, task('new-local', 'New task')],
     expectedGeneration: 0,
-    expectedClearEpoch: staleEpoch
+    expectedTaskEpoch: staleTaskEpoch
   });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'cleared');

@@ -13,6 +13,7 @@
     WEBHOOK_QUEUE_LOCK_NAME,
     FOCUS_LOCK_NAME
   ]);
+  const TASK_AND_FOCUS_LOCK_ORDER = Object.freeze([TASK_LOCK_NAME, FOCUS_LOCK_NAME]);
 
   function copy(value) {
     return JSON.parse(JSON.stringify(value));
@@ -41,15 +42,32 @@
     try {
       const raw = storage.getItem(GENERATION_KEY);
       if (raw === null || raw === undefined) {
-        return { ok: true, value: { version: 1, generation: 0, clearEpoch: 0 } };
+        return {
+          ok: true,
+          value: { version: 1, generation: 0, clearEpoch: 0, taskEpoch: 0, clearPending: false, taskClearPending: false }
+        };
       }
       if (typeof raw !== 'string') return { ok: false, reason: 'generation-unreadable' };
       const parsed = JSON.parse(raw);
+      const taskEpoch = parsed && parsed.taskEpoch === undefined ? 0 : parsed && parsed.taskEpoch;
+      const clearPending = parsed && parsed.clearPending === undefined ? false : parsed && parsed.clearPending;
+      const taskClearPending = parsed && parsed.taskClearPending === undefined ? false : parsed && parsed.taskClearPending;
       if (!parsed || parsed.version !== 1 || !validCounter(parsed.generation)
-          || !validCounter(parsed.clearEpoch)) {
+          || !validCounter(parsed.clearEpoch) || !validCounter(taskEpoch)
+          || typeof clearPending !== 'boolean' || typeof taskClearPending !== 'boolean') {
         return { ok: false, reason: 'generation-unreadable' };
       }
-      return { ok: true, value: { version: 1, generation: parsed.generation, clearEpoch: parsed.clearEpoch } };
+      return {
+        ok: true,
+        value: {
+          version: 1,
+          generation: parsed.generation,
+          clearEpoch: parsed.clearEpoch,
+          taskEpoch,
+          clearPending,
+          taskClearPending
+        }
+      };
     } catch (error) {
       return { ok: false, reason: 'generation-unreadable' };
     }
@@ -207,6 +225,83 @@
     return withLocksInOrder(lockManager, [lockName], operation);
   }
 
+  // A pending marker is recovered only while the task lock is held. A task
+  // clear that removed the primary key advances taskEpoch; a failed removal
+  // leaves it unchanged so unrelated task saves can rebase and proceed.
+  function resolvePendingMutations(storage) {
+    const read = readGeneration(storage);
+    if (!read.ok) return read;
+    const current = read.value;
+    if (!current.clearPending && !current.taskClearPending) return { ok: true, value: current };
+    let taskEpoch = current.taskEpoch;
+    if (current.taskClearPending) {
+      if (!storage || typeof storage.getItem !== 'function') return { ok: false, reason: 'storage-unavailable' };
+      let primary;
+      try { primary = storage.getItem(TASK_STORAGE_KEY); }
+      catch (error) { return { ok: false, reason: 'tasks-unreadable' }; }
+      if (primary === null || primary === undefined) taskEpoch += 1;
+      if (!validCounter(taskEpoch)) return { ok: false, reason: 'generation-overflow' };
+    }
+    const next = Object.assign({}, current, {
+      generation: current.generation + 1,
+      taskEpoch,
+      clearPending: false,
+      taskClearPending: false
+    });
+    if (!validCounter(next.generation) || !writeGeneration(storage, next)) {
+      return { ok: false, reason: 'generation-write-failed' };
+    }
+    return { ok: true, value: next };
+  }
+
+  function captureClearEpoch(storage) {
+    const generation = readGeneration(storage);
+    if (!generation.ok) return generation;
+    if (generation.value.clearPending) return { ok: false, reason: 'clear-in-progress' };
+    return { ok: true, value: generation.value.clearEpoch };
+  }
+
+  async function withClearEpochLock(lockManager, lockNames, storage, expectedClearEpoch, operation) {
+    if (!validCounter(expectedClearEpoch)) return { ok: false, reason: 'generation-unreadable' };
+    if (!Array.isArray(lockNames) || !lockNames.includes(TASK_LOCK_NAME)) {
+      return { ok: false, reason: 'task-lock-required' };
+    }
+    const locked = await withLocksInOrder(lockManager, lockNames, async () => {
+      const repaired = resolvePendingMutations(storage);
+      if (!repaired.ok) return repaired;
+      const generation = repaired.value;
+      if (generation.clearPending) return { ok: false, reason: 'clear-in-progress' };
+      if (generation.clearEpoch !== expectedClearEpoch) {
+        return { ok: false, reason: 'cleared', clearEpoch: generation.clearEpoch };
+      }
+      if (typeof operation !== 'function') return { ok: false, reason: 'invalid-operation' };
+      try { return { ok: true, value: await operation() }; }
+      catch (error) { return { ok: false, reason: 'operation-failed', error }; }
+    });
+    if (!locked.ok) return locked;
+    return locked.value;
+  }
+
+  // Start a request while holding the task lock, but return its promise without
+  // awaiting it. A send queued behind Clear All is rejected before dispatch.
+  async function dispatchIfClearEpochUnchanged(lockManager, storage, expectedClearEpoch, dispatch) {
+    if (!validCounter(expectedClearEpoch)) return { ok: false, reason: 'generation-unreadable' };
+    const locked = await withExclusiveLock(lockManager, TASK_LOCK_NAME, () => {
+      const repaired = resolvePendingMutations(storage);
+      if (!repaired.ok) return repaired;
+      const generation = repaired.value;
+      if (generation.clearPending) return { ok: false, reason: 'clear-in-progress' };
+      if (generation.clearEpoch !== expectedClearEpoch) {
+        return { ok: false, reason: 'cleared', clearEpoch: generation.clearEpoch };
+      }
+      if (typeof dispatch !== 'function') return { ok: false, reason: 'invalid-operation' };
+      try { return { ok: true, value: dispatch() }; }
+      catch (error) { return { ok: false, reason: 'dispatch-failed', error }; }
+    });
+    if (!locked.ok) return locked;
+    return locked.value;
+  }
+
   async function commitTaskSnapshot(options) {
     const opts = options || {};
     const storage = opts.storage;
@@ -222,16 +317,21 @@
     }
 
     const locked = await withExclusiveLock(lockManager, TASK_LOCK_NAME, async () => {
-      const generation = readGeneration(storage);
-      if (!generation.ok) return { ok: false, reason: generation.reason };
+      const repaired = resolvePendingMutations(storage);
+      if (!repaired.ok) return { ok: false, reason: repaired.reason };
+      const generation = { ok: true, value: repaired.value };
       const currentRead = readStoredTasks(storage, validateTasks);
-      if (validCounter(opts.expectedClearEpoch) && opts.expectedClearEpoch !== generation.value.clearEpoch) {
+      const expectedTaskEpoch = opts.expectedTaskEpoch === undefined
+        ? opts.expectedClearEpoch : opts.expectedTaskEpoch;
+      if (generation.value.taskClearPending) return { ok: false, reason: 'task-clear-in-progress' };
+      if (validCounter(expectedTaskEpoch) && expectedTaskEpoch !== generation.value.taskEpoch) {
         return {
           ok: false,
           reason: 'cleared',
           currentTasks: currentRead.ok ? copy(currentRead.tasks) : null,
           generation: generation.value.generation,
-          clearEpoch: generation.value.clearEpoch
+          clearEpoch: generation.value.clearEpoch,
+          taskEpoch: generation.value.taskEpoch
         };
       }
       let currentTasks;
@@ -251,7 +351,16 @@
         let ready = false;
         try { ready = await opts.beforeCommit({ currentRaw: currentRead.raw, currentTasks: copy(currentTasks) }); }
         catch (error) { ready = false; }
-        if (ready !== true) return { ok: false, reason: 'pre-commit-failed', currentTasks: copy(currentTasks), generation: generation.value.generation, clearEpoch: generation.value.clearEpoch };
+        if (ready !== true) {
+          return {
+            ok: false,
+            reason: 'pre-commit-failed',
+            currentTasks: copy(currentTasks),
+            generation: generation.value.generation,
+            clearEpoch: generation.value.clearEpoch,
+            taskEpoch: generation.value.taskEpoch
+          };
+        }
       }
 
       const merge = mergeTaskSnapshots(baseCheck.tasks, desiredCheck.tasks, currentTasks);
@@ -263,24 +372,37 @@
           currentTasks: copy(currentTasks),
           generation: generation.value.generation,
           clearEpoch: generation.value.clearEpoch,
+          taskEpoch: generation.value.taskEpoch,
           generationMismatch: validCounter(opts.expectedGeneration)
             && opts.expectedGeneration !== generation.value.generation
         };
       }
       if (!storage || typeof storage.setItem !== 'function') return { ok: false, reason: 'storage-unavailable' };
 
-      const nextGeneration = {
-        version: 1,
-        generation: generation.value.generation + 1,
-        clearEpoch: generation.value.clearEpoch
-      };
-      if (!writeGeneration(storage, nextGeneration)) {
-        return { ok: false, reason: 'generation-write-failed', currentTasks: copy(currentTasks), generation: generation.value.generation, clearEpoch: generation.value.clearEpoch };
+      const nextGeneration = Object.assign({}, generation.value, {
+        generation: generation.value.generation + 1
+      });
+      if (!validCounter(nextGeneration.generation) || !writeGeneration(storage, nextGeneration)) {
+        return {
+          ok: false,
+          reason: 'generation-write-failed',
+          currentTasks: copy(currentTasks),
+          generation: generation.value.generation,
+          clearEpoch: generation.value.clearEpoch,
+          taskEpoch: generation.value.taskEpoch
+        };
       }
       try {
         storage.setItem(TASK_STORAGE_KEY, JSON.stringify(merge.tasks));
       } catch (error) {
-        return { ok: false, reason: 'task-write-failed', currentTasks: copy(currentTasks), generation: nextGeneration.generation, clearEpoch: nextGeneration.clearEpoch };
+        return {
+          ok: false,
+          reason: 'task-write-failed',
+          currentTasks: copy(currentTasks),
+          generation: nextGeneration.generation,
+          clearEpoch: nextGeneration.clearEpoch,
+          taskEpoch: nextGeneration.taskEpoch
+        };
       }
 
       let afterCommitResult;
@@ -293,6 +415,7 @@
         tasks: copy(merge.tasks),
         generation: nextGeneration.generation,
         clearEpoch: nextGeneration.clearEpoch,
+        taskEpoch: nextGeneration.taskEpoch,
         generationMismatch: validCounter(opts.expectedGeneration)
           && opts.expectedGeneration !== generation.value.generation,
         afterCommitResult
@@ -303,15 +426,88 @@
     return locked.value;
   }
 
+  function beginClearAll(storage, taskKeyWillBeCleared) {
+    const repaired = resolvePendingMutations(storage);
+    if (!repaired.ok) return repaired;
+    const current = repaired.value;
+    if (current.clearPending || current.taskClearPending) return { ok: false, reason: 'clear-in-progress' };
+    const next = Object.assign({}, current, {
+      generation: current.generation + 1,
+      clearEpoch: current.clearEpoch + 1,
+      clearPending: true,
+      taskClearPending: taskKeyWillBeCleared === true
+    });
+    if (!validCounter(next.generation) || !validCounter(next.clearEpoch) || !writeGeneration(storage, next)) {
+      return { ok: false, reason: 'generation-write-failed' };
+    }
+    return { ok: true, value: next };
+  }
+
+  function finishClearAll(storage, primaryTaskKeyRemoved) {
+    const read = readGeneration(storage);
+    if (!read.ok) return read;
+    const current = read.value;
+    if (!current.clearPending) return { ok: false, reason: 'clear-not-pending' };
+    let taskEpoch = current.taskEpoch;
+    if (current.taskClearPending && primaryTaskKeyRemoved === true) taskEpoch += 1;
+    const next = Object.assign({}, current, {
+      generation: current.generation + 1,
+      taskEpoch,
+      clearPending: false,
+      taskClearPending: false
+    });
+    if (!validCounter(next.generation) || !validCounter(taskEpoch) || !writeGeneration(storage, next)) {
+      return { ok: false, reason: 'generation-write-failed' };
+    }
+    return { ok: true, value: next };
+  }
+
+  function beginTaskClear(storage) {
+    const repaired = resolvePendingMutations(storage);
+    if (!repaired.ok) return repaired;
+    const current = repaired.value;
+    if (current.clearPending || current.taskClearPending) return { ok: false, reason: 'clear-in-progress' };
+    const next = Object.assign({}, current, {
+      generation: current.generation + 1,
+      taskClearPending: true
+    });
+    if (!validCounter(next.generation) || !writeGeneration(storage, next)) {
+      return { ok: false, reason: 'generation-write-failed' };
+    }
+    return { ok: true, value: next };
+  }
+
+  function finishTaskClear(storage, primaryTaskKeyRemoved) {
+    const read = readGeneration(storage);
+    if (!read.ok) return read;
+    const current = read.value;
+    if (!current.taskClearPending) return { ok: false, reason: 'task-clear-not-pending' };
+    const taskEpoch = current.taskEpoch + (primaryTaskKeyRemoved === true ? 1 : 0);
+    const next = Object.assign({}, current, {
+      generation: current.generation + 1,
+      taskEpoch,
+      taskClearPending: false
+    });
+    if (!validCounter(next.generation) || !validCounter(taskEpoch) || !writeGeneration(storage, next)) {
+      return { ok: false, reason: 'generation-write-failed' };
+    }
+    return { ok: true, value: next };
+  }
+
+  // Compatibility helper for callers that need an already-completed global
+  // epoch change. Clear All itself uses beginClearAll/finishClearAll.
   function advanceClearEpoch(storage) {
-    const generation = readGeneration(storage);
-    if (!generation.ok) return { ok: false, reason: generation.reason };
-    const next = {
-      version: 1,
-      generation: generation.value.generation + 1,
-      clearEpoch: generation.value.clearEpoch + 1
-    };
-    if (!writeGeneration(storage, next)) return { ok: false, reason: 'generation-write-failed' };
+    const repaired = resolvePendingMutations(storage);
+    if (!repaired.ok) return repaired;
+    const current = repaired.value;
+    const next = Object.assign({}, current, {
+      generation: current.generation + 1,
+      clearEpoch: current.clearEpoch + 1,
+      clearPending: false
+    });
+    if (!validCounter(next.generation) || !validCounter(next.clearEpoch) || !writeGeneration(storage, next)) {
+      return { ok: false, reason: 'generation-write-failed' };
+    }
     return { ok: true, value: next };
   }
 
@@ -323,12 +519,22 @@
     WEBHOOK_QUEUE_LOCK_NAME,
     FOCUS_LOCK_NAME,
     CLEAR_ALL_LOCK_ORDER,
+    TASK_AND_FOCUS_LOCK_ORDER,
     readGeneration,
+    writeGeneration,
     readStoredTasks,
     mergeTaskSnapshots,
     withLocksInOrder,
     withExclusiveLock,
+    resolvePendingMutations,
+    captureClearEpoch,
+    withClearEpochLock,
+    dispatchIfClearEpochUnchanged,
     commitTaskSnapshot,
+    beginClearAll,
+    finishClearAll,
+    beginTaskClear,
+    finishTaskClear,
     advanceClearEpoch
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

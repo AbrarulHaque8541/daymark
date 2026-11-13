@@ -68,13 +68,17 @@ function fakeEnv(options) {
   };
   const storageData = Object.assign({}, opts.data || {});
   const readFailures = new Set(opts.readFailures || []);
+  const removeFailures = new Set(opts.removeFailures || []);
   const storage = {
     getItem(key) {
       if (readFailures.has(key)) throw new Error('Read access failure');
       return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
     },
     setItem(key, value) { storageData[key] = String(value); },
-    removeItem(key) { delete storageData[key]; }
+    removeItem(key) {
+      if (removeFailures.has(key)) throw new Error('Remove access failure');
+      delete storageData[key];
+    }
   };
   const confirmations = [];
   const lockManager = createLockManager();
@@ -114,7 +118,7 @@ function fakeEnv(options) {
     },
     now: () => '2026-11-04T12:00:00.000Z'
   };
-  return { env, elements, storageData, confirmations, confirmState };
+  return { env, elements, storageData, confirmations, confirmState, removeFailures };
 }
 
 test('the module exposes its API and stays inert under Node', () => {
@@ -176,6 +180,38 @@ test('clearing one category asks for confirmation and removes only its keys', as
   assert.match(elements['data-status'].textContent, /Nothing else was touched/);
 });
 
+test('clearing only the task recovery backup preserves the task epoch and primary task writes', async () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': JSON.stringify([{ id: 'keep-task', title: 'Keep task' }]),
+      'daymark.tasks.v1.backup': '{recovery copy'
+    }
+  });
+  const handle = ui.attachStorageUi(env);
+  const before = taskMutation.readGeneration(env.localStorage);
+  assert.equal(before.ok, true);
+
+  await handle.onClearCategory('task-backup');
+
+  assert.equal(storageData['daymark.tasks.v1.backup'], undefined);
+  const tasks = JSON.parse(storageData['daymark.tasks.v1']);
+  assert.equal(tasks[0].id, 'keep-task');
+  const after = taskMutation.readGeneration(env.localStorage);
+  assert.equal(after.value.taskEpoch, before.value.taskEpoch,
+    'removing only the backup does not invalidate the still-present primary task store');
+  const commit = await taskMutation.commitTaskSnapshot({
+    storage: env.localStorage,
+    lockManager: env.lockManager,
+    baseTasks: tasks,
+    desiredTasks: tasks.concat({ id: 'after-backup-clear', title: 'Still editable' }),
+    expectedTaskEpoch: before.value.taskEpoch
+  });
+  assert.equal(commit.ok, true, 'a normal primary task save remains possible');
+  assert.deepEqual(JSON.parse(storageData['daymark.tasks.v1']).map((task) => task.id),
+    ['keep-task', 'after-backup-clear']);
+  assert.match(elements['data-status'].textContent, /Cleared Task recovery backup/);
+});
+
 test('declining the confirmation changes nothing and says so', () => {
   const { env, elements, storageData, confirmState } = fakeEnv({ data: { 'daymark.currency.v1': '{}' } });
   const handle = ui.attachStorageUi(env);
@@ -226,6 +262,37 @@ test('a failed removal during clear-all is reported honestly', async () => {
   env.localStorage.removeItem = () => { throw new Error('blocked'); };
   await handle.onClearAll();
   assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
+});
+
+test('Clear All reports a failed primary task removal and leaves the task epoch unchanged', async () => {
+  const original = JSON.stringify([{ id: 'still-here', title: 'Still here' }]);
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': original },
+    removeFailures: ['daymark.tasks.v1']
+  });
+  const handle = ui.attachStorageUi(env);
+  const before = taskMutation.readGeneration(env.localStorage);
+  await handle.onClearAll();
+
+  assert.equal(storageData['daymark.tasks.v1'], original,
+    'a failed primary-key deletion must leave the task payload intact');
+  const after = taskMutation.readGeneration(env.localStorage);
+  assert.equal(after.value.taskEpoch, before.value.taskEpoch,
+    'taskEpoch advances only when the primary task key was actually removed');
+  assert.equal(after.value.clearEpoch, before.value.clearEpoch + 1,
+    'the separate global clear epoch still fences other managed-data writers');
+  assert.match(elements['data-status'].textContent,
+    /1 item\(s\) could not be removed by the browser\. Nothing was cleared/);
+  const tasks = JSON.parse(storageData['daymark.tasks.v1']);
+  const commit = await taskMutation.commitTaskSnapshot({
+    storage: env.localStorage,
+    lockManager: env.lockManager,
+    baseTasks: tasks,
+    desiredTasks: tasks.concat({ id: 'after-failed-clear', title: 'Still editable' }),
+    expectedTaskEpoch: before.value.taskEpoch
+  });
+  assert.equal(commit.ok, true, 'a task save may proceed because the primary key survived');
+  assert.equal(JSON.parse(storageData['daymark.tasks.v1']).length, 2);
 });
 
 test('unavailable storage keeps the card honest and never clears anything', () => {

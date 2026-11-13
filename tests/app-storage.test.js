@@ -13,6 +13,7 @@ const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
+const FEED_KEY = 'daymark.feed.v1';
 function makeLockManager() {
   const tails = new Map();
   const pending = new Set();
@@ -38,7 +39,7 @@ function makeLockManager() {
   };
 }
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, savedFeedValue = null, feedApi = null, fetchImpl = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
@@ -58,6 +59,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
   if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
   if (savedFocusBackupValue !== null) storedValues.set(FOCUS_BACKUP_KEY, savedFocusBackupValue);
+  if (savedFeedValue !== null) storedValues.set(FEED_KEY, savedFeedValue);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -150,6 +152,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     DaymarkLogic: appLogic,
     DaymarkFocus: focus,
     DaymarkRepeat: repeat,
+    DaymarkFeed: feedApi,
     DaymarkTaskMutation: taskMutation,
     StorageEvent: TestStorageEvent,
     navigator: { locks: appLockManager },
@@ -188,6 +191,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     document,
     localStorage,
     window,
+    fetch: fetchImpl,
     FileReader: TestFileReader,
     clearTimeout() {},
     setTimeout: () => 1,
@@ -305,6 +309,81 @@ test('monthly task completed on a clamped date retains its original day anchor',
   assert.equal(saved[0].completed, true);
   assert.equal(saved[1].dueDate, '2026-03-31', 'the next occurrence returns to day 31 after February');
   assert.equal(saved[1].repeatDayOfMonth, 31, 'the recurring series anchor is carried forward');
+});
+
+test('ordinary task saves remain available after Clear All fails to remove primary tasks', async () => {
+  const existing = makeImportTask('kept-after-clear-failure', 'Still here');
+  const app = bootApp({ savedValue: JSON.stringify([existing]) });
+  await app.settle();
+  const before = taskMutation.readGeneration(app.localStorage);
+  assert.equal(before.ok, true);
+
+  const clearAttempt = await taskMutation.withLocksInOrder(
+    app.window.navigator.locks,
+    taskMutation.CLEAR_ALL_LOCK_ORDER,
+    () => {
+      const begun = taskMutation.beginClearAll(app.localStorage, true);
+      if (!begun.ok) return false;
+      // Simulate a browser removeItem failure: the task key remains present.
+      const finalized = taskMutation.finishClearAll(app.localStorage, false);
+      return finalized.ok;
+    }
+  );
+  assert.equal(clearAttempt.ok && clearAttempt.value, true);
+  const after = taskMutation.readGeneration(app.localStorage);
+  assert.equal(after.value.clearEpoch, before.value.clearEpoch + 1);
+  assert.equal(after.value.taskEpoch, before.value.taskEpoch);
+
+  app.elements.get('#new-title').value = 'New work after failed clear';
+  await triggerFormSubmit(app, '#add-form');
+  await app.settle();
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.deepEqual(saved.map((task) => task.title), ['Still here', 'New work after failed clear']);
+  assert.match(app.elements.get('#toast').textContent, /Task added/);
+});
+
+test('a deferred app feed response cannot recreate its absent cache after Clear All', async () => {
+  let resolveFetch;
+  let markFetchStarted;
+  const fetchStarted = new Promise((resolve) => { markFetchStarted = resolve; });
+  const fetchImpl = () => {
+    markFetchStarted();
+    return new Promise((resolve) => { resolveFetch = resolve; });
+  };
+  const feedApi = {
+    resolveFeedTarget: (rawUrl) => rawUrl,
+    isValidFeedUrl: (url) => /^https?:\/\//.test(url),
+    validateFeedCache: () => true,
+    fetchFeed: (_url, fetcher) => fetcher()
+  };
+  const app = bootApp({ savedValue: '[]', feedApi, fetchImpl });
+  assert.equal(app.storedValues.has(FEED_KEY), false, 'the managed cache key starts absent');
+  app.elements.get('#feed-url').value = 'https://example.com/feed.xml';
+  const feedRefresh = triggerFormSubmit(app, '#feed-form');
+  await fetchStarted;
+  assert.equal(app.storedValues.has(FEED_KEY), false,
+    'starting the network request must not create a cache key');
+
+  const cleared = await taskMutation.withLocksInOrder(
+    app.window.navigator.locks,
+    taskMutation.CLEAR_ALL_LOCK_ORDER,
+    () => {
+      const begun = taskMutation.beginClearAll(app.localStorage, true);
+      if (!begun.ok) return false;
+      app.localStorage.removeItem(STORAGE_KEY);
+      app.localStorage.removeItem(FEED_KEY);
+      const finalized = taskMutation.finishClearAll(app.localStorage, true);
+      return finalized.ok;
+    }
+  );
+  assert.equal(cleared.ok && cleared.value, true);
+
+  resolveFetch({ items: [{ title: 'Late result' }] });
+  await feedRefresh;
+  await app.settle();
+  assert.equal(app.storedValues.has(FEED_KEY), false,
+    'a response from before Clear All cannot create the previously absent cache key');
+  assert.match(app.elements.get('#feed-status').textContent, /finished loading after local data was cleared/);
 });
 
 test('task import previews additions, duplicates and invalid rows before appending', async () => {

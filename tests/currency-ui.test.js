@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const currencyApi = require('../currency-logic.js');
 const ui = require('../currency-ui.js');
+const { createLockManager, deferred, clearKeys, taskMutation } = require('./task-clear-race-helpers.js');
 
 const RATES_BODY = JSON.stringify({
   amount: 1.0,
@@ -67,9 +68,11 @@ function fakeEnv(options) {
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const defaultStorage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); }
+    setItem(key, value) { storageData[key] = String(value); },
+    removeItem(key) { delete storageData[key]; }
   };
   const storage = opts.storage || defaultStorage;
+  const lockManager = createLockManager();
   const env = {
     document: {
       readyState: 'complete',
@@ -77,12 +80,14 @@ function fakeEnv(options) {
     },
     window: {},
     localStorage: storage,
-    currencyApi,
+    currencyApi: opts.currencyApi || currencyApi,
+    taskMutationApi: taskMutation,
+    lockManager,
     fetch: opts.fetch,
     now: () => '2026-11-03T12:00:00.000Z'
   };
   if (opts.omitLocalStorage) delete env.localStorage;
-  return { env, elements, storageData };
+  return { env, elements, storageData, storage, lockManager };
 }
 
 function streamResponse(body) {
@@ -227,6 +232,28 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(saved.to, 'INR');
 });
 
+test('a deferred currency response cannot recreate its absent cache or preference after Clear All', async () => {
+  const waiting = deferred();
+  const started = deferred();
+  const result = {
+    version: 1, from: 'USD', to: 'INR', rate: 94.91, asOfDate: '2026-11-02',
+    fetchedAt: '2026-11-03T12:00:00.000Z'
+  };
+  const delayedApi = Object.assign({}, currencyApi, {
+    fetchLatestRates() { started.resolve(); return waiting.promise; }
+  });
+  const { env, storage, storageData, lockManager } = fakeEnv({ amount: '1', currencyApi: delayedApi, fetch: () => Promise.resolve({}) });
+  const handle = ui.attachCurrencyUi(env);
+  assert.equal(storage.getItem(ui.STORAGE_KEY), null, 'the cache is absent before fetch begins');
+  const refreshing = handle.onRefresh();
+  await started.promise;
+  await clearKeys(storage, [ui.STORAGE_KEY, ui.PREFS_KEY], lockManager);
+  waiting.resolve(result);
+  await refreshing;
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
+});
+
 test('an invalid amount is rejected before any network call', async () => {
   const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
   const { env, elements } = fakeEnv({ amount: '-4', fetch: fetchImpl });
@@ -280,14 +307,14 @@ test('the module exposes its API and stays inert under Node', () => {
   assert.equal(typeof globalThis.DaymarkCurrencyUi, 'object');
 });
 
-test('swap shows inverse of cached reverse pair without a network call', () => {
+test('swap shows inverse of cached reverse pair without a network call', async () => {
   const { env, elements } = fakeEnv({ from: 'USD', to: 'INR', stored: STORED });
   ui.attachCurrencyUi(env);
   // Initial render is the cached USD→INR
   assert.ok(elements['currency-now'].textContent.includes('1 USD = 94.91 INR'));
   const swap = elements['currency-swap'];
   const click = { preventDefault() {}, defaultPrevented: false };
-  swap.listeners.find((l) => l.type === 'click').handler(click);
+  await swap.listeners.find((l) => l.type === 'click').handler(click);
   assert.equal(elements['currency-from'].value, 'INR');
   assert.equal(elements['currency-to'].value, 'USD');
   // Inverse of 94.91 ≈ 0.010536 — rendered offline, no fetch call.
@@ -297,13 +324,13 @@ test('swap shows inverse of cached reverse pair without a network call', () => {
   assert.ok(elements['currency-status'].textContent.includes('official ECB rate'));
 });
 
-test('swap button exchanges from/to and updates status without auto-refresh', () => {
+test('swap button exchanges from/to and updates status without auto-refresh', async () => {
   const { env, elements } = fakeEnv({ from: 'USD', to: 'INR' });
   const handle = ui.attachCurrencyUi(env);
   const swap = elements['currency-swap'];
   assert.ok(swap.listeners.some((l) => l.type === 'click'), 'swap button should listen for clicks');
   const click = { preventDefault() { click.prevented = true; }, defaultPrevented: false };
-  swap.listeners.find((l) => l.type === 'click').handler(click);
+  await swap.listeners.find((l) => l.type === 'click').handler(click);
   assert.equal(elements['currency-from'].value, 'INR');
   assert.equal(elements['currency-to'].value, 'USD');
   assert.ok(elements['currency-status'].textContent.includes('swapped'), 'status should mention swap');
@@ -334,13 +361,13 @@ test('restores last amount and currency pair from localStorage prefs', () => {
   assert.equal(elements['currency-to'].value, 'GBP');
 });
 
-test('persists prefs on swap and on input change', () => {
+test('persists prefs on swap and on input change', async () => {
   const { env, elements, storageData } = fakeEnv({ from: 'USD', to: 'INR', amount: '5' });
   ui.attachCurrencyUi(env);
   // simulate input
   elements['currency-amount'].value = '42';
   const inputListener = elements['currency-amount'].listeners.find((l) => l.type === 'input');
-  if (inputListener) inputListener.handler({});
+  if (inputListener) await inputListener.handler({});
   let saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
   assert.equal(saved.amount, '42');
   assert.equal(saved.from, 'USD');
@@ -348,7 +375,7 @@ test('persists prefs on swap and on input change', () => {
   // swap
   const swap = elements['currency-swap'];
   const click = { preventDefault() {}, defaultPrevented: false };
-  swap.listeners.find((l) => l.type === 'click').handler(click);
+  await swap.listeners.find((l) => l.type === 'click').handler(click);
   saved = JSON.parse(storageData[ui.PREFS_KEY] || '{}');
   assert.equal(saved.from, 'INR');
   assert.equal(saved.to, 'USD');
@@ -433,7 +460,7 @@ test('storage quota failure does not misreport a successful rate refresh', async
   assert.equal(elements['currency-refresh'].disabled, false);
 });
 
-test('preference write failure is contained and does not break currency swapping', () => {
+test('preference write failure is contained and does not break currency swapping', async () => {
   const storage = {
     getItem() { return null; },
     setItem() { throw new Error('quota exceeded'); }
@@ -444,11 +471,11 @@ test('preference write failure is contained and does not break currency swapping
   amountInput.value = '42';
   const input = amountInput.listeners.find((listener) => listener.type === 'input');
   assert.ok(input);
-  assert.doesNotThrow(() => input.handler());
+  await assert.doesNotReject(() => input.handler());
   assert.match(elements['currency-status'].textContent, /Currency preferences could not be saved/);
   const swap = elements['currency-swap'];
   const click = { preventDefault() {} };
-  assert.doesNotThrow(() => swap.listeners.find((listener) => listener.type === 'click').handler(click));
+  await assert.doesNotReject(() => swap.listeners.find((listener) => listener.type === 'click').handler(click));
   assert.equal(elements['currency-from'].value, 'INR');
   assert.equal(elements['currency-to'].value, 'USD');
   assert.match(elements['currency-status'].textContent, /changes could not be saved/);

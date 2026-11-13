@@ -415,7 +415,11 @@ test('index.html wires the Telegram card with a password token field', () => {
 test('buttons are disabled and aria-busy is set while a send is in flight', async () => {
   const doc = makeDoc(ALL_IDS);
   let resolveFetch;
-  const fetchFn = makeFetch(() => new Promise((resolve) => { resolveFetch = resolve; }));
+  const fetchStarted = deferred();
+  const fetchFn = makeFetch(() => {
+    fetchStarted.resolve();
+    return new Promise((resolve) => { resolveFetch = resolve; });
+  });
   const storage = makeStorage({ 'daymark.tasks.v1': JSON.stringify([makeTask('ship the polish', { completed: true })]) });
   const handle = ui.attachTelegramUi(okEnv(doc, { storage: storage, fetch: fetchFn }));
   fillValidInputs(doc);
@@ -426,6 +430,7 @@ test('buttons are disabled and aria-busy is set while a send is in flight', asyn
   assert.equal(doc.elements['telegram-clear'].disabled, true);
   assert.equal(doc.elements['telegram-form'].getAttribute('aria-busy'), 'true');
   assert.equal(doc.elements['telegram-status'].getAttribute('aria-busy'), 'true');
+  await fetchStarted.promise;
   resolveFetch({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 9 } }) });
   await pending;
   assert.equal(doc.elements['telegram-send'].disabled, false);
@@ -496,8 +501,48 @@ for (const action of ['send', 'test']) {
     assert.equal(storage.getItem('daymark.telegram.lastChat.v1'), null,
       'a network response started before Clear All cannot recreate the cleared preference');
     assert.match(doc.elements['telegram-status'].textContent, /not remembered because local data was cleared/);
+    assert.match(doc.elements['telegram-status'].textContent,
+      /already sent; clearing local data cannot recall a message Telegram has accepted/,
+      'an accepted remote request is never described as reversible by local clearing');
   });
 }
+
+test('a Telegram request queued behind Clear All is rejected before network dispatch', async () => {
+  const doc = makeDoc(ALL_IDS);
+  const storage = makeStorage({ 'daymark.tasks.v1': JSON.stringify([makeTask('finish task', { completed: true })]) });
+  const baseLocks = makeLockManager();
+  let observeQueued = false;
+  const queued = deferred();
+  const lockManager = {
+    request(name, options, callback) {
+      if (observeQueued && name === taskMutation.TASK_LOCK_NAME) queued.resolve();
+      return baseLocks.request(name, options, callback);
+    }
+  };
+  let fetchCalls = 0;
+  const handle = ui.attachTelegramUi(okEnv(doc, {
+    storage, lockManager,
+    fetch: makeFetch(() => { fetchCalls++; return { status: 200, json: () => Promise.resolve({ ok: true }) }; })
+  }));
+  fillValidInputs(doc);
+  let pendingSend;
+  const heldLock = taskMutation.withExclusiveLock(lockManager, taskMutation.TASK_LOCK_NAME, async () => {
+    observeQueued = true;
+    pendingSend = handle.send();
+    await queued.promise;
+    assert.equal(fetchCalls, 0, 'the send is queued at the task lock and has not reached fetch');
+    const epoch = taskMutation.advanceClearEpoch(storage);
+    assert.equal(epoch.ok, true);
+    storage.removeItem(taskMutation.TASK_STORAGE_KEY);
+    storage.removeItem('daymark.telegram.lastChat.v1');
+    handle.resetForClearAll();
+    return true;
+  });
+  await heldLock;
+  await pendingSend;
+  assert.equal(fetchCalls, 0, 'the pre-clear queued request must not be dispatched afterward');
+  assert.match(doc.elements['telegram-status'].textContent, /Nothing was sent/);
+});
 
 test('failed send does not persist the chat target', async () => {
   const doc = makeDoc(ALL_IDS);
