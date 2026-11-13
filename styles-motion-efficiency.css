@@ -226,3 +226,19 @@
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
+
+/* Release radar result link and copy action polish */
+.releases-link {
+  display: inline-block;
+  margin-right: 8px;
+  color: #16705f;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.releases-link:hover,
+.releases-link:focus {
+  color: #0f4d40;
+}
+.releases-copy.is-busy {
+  /* inherits .button.is-busy spinner */
+}
