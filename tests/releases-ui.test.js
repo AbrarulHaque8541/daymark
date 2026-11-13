@@ -19,6 +19,7 @@ function makeElement(tag) {
     textContent: '',
     disabled: false,
     value: '',
+    href: '',
     classList: {
       set: new Set(),
       toggle(name, force) {
@@ -42,6 +43,11 @@ function makeElement(tag) {
       element.children.splice(index < 0 ? element.children.length : index, 0, node);
       registerTree(node);
       return node;
+    },
+    removeChild(child) {
+      const index = element.children.indexOf(child);
+      if (index >= 0) element.children.splice(index, 1);
+      return child;
     },
     addEventListener(type, handler) {
       (element.listeners[type] = element.listeners[type] || []).push(handler);
@@ -68,6 +74,7 @@ function makeDoc() {
   };
   doc.createElement = (tag) => makeElement(tag);
   doc.getElementById = (id) => doc[id] || null;
+  doc.createTextNode = (text) => ({ textContent: text, nodeType: 3 });
   currentDoc = doc;
   return doc;
 }
@@ -142,11 +149,13 @@ test('card heading and description are set', () => {
   assert.ok(doc.getElementById('releases-description').textContent.includes('api.github.com'));
 });
 
-test('status line exposes role and aria-live', () => {
+test('status line exposes role, aria-live and aria-atomic', () => {
   const doc = makeDoc();
   attach(doc);
-  assert.strictEqual(doc.getElementById('releases-status').getAttribute('role'), 'status');
-  assert.strictEqual(doc.getElementById('releases-status').getAttribute('aria-live'), 'polite');
+  const status = doc.getElementById('releases-status');
+  assert.strictEqual(status.getAttribute('role'), 'status');
+  assert.strictEqual(status.getAttribute('aria-live'), 'polite');
+  assert.strictEqual(status.getAttribute('aria-atomic'), 'true');
 });
 
 test('initial status invites a repository name', () => {
@@ -173,13 +182,20 @@ test('empty input is blocked with guidance', () => {
   assert.ok(doc.getElementById('releases-status').textContent.includes('Type a repository'));
 });
 
-test('a successful check renders the latest release', async () => {
+test('a successful check renders the latest release with an accessible link', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('releases-repo').value = 'octocat/Hello-World';
   doc.getElementById('releases-check').dispatch('click', {});
   await drain();
-  assert.ok(doc.getElementById('releases-result').textContent.includes('v1.2.3'));
+  const result = doc.getElementById('releases-result');
+  assert.ok(result.textContent.includes('v1.2.3'));
+  const link = result.children.find(c => c.tagName === 'a');
+  assert.ok(link);
+  assert.strictEqual(link.href, payload.html_url);
+  assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
+  assert.strictEqual(link.getAttribute('target'), '_blank');
+  assert.ok(link.getAttribute('aria-label').includes('octocat/Hello-World'));
 });
 
 test('status reports the update time and that nothing is saved', async () => {
@@ -219,6 +235,7 @@ test('a failed check clears any previous result', async () => {
   doc.getElementById('releases-check').dispatch('click', {});
   await drain();
   assert.strictEqual(doc.getElementById('releases-result').textContent, '');
+  assert.strictEqual(doc.getElementById('releases-result').children.length, 0);
 });
 
 test('clear empties the input and the result', () => {
