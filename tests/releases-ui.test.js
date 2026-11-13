@@ -196,6 +196,7 @@ test('a successful check renders the latest release with an accessible link', as
   const link = result.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, payload.html_url);
+  assert.strictEqual(link.className, 'release-link');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
   assert.strictEqual(link.getAttribute('target'), '_blank');
   assert.ok(link.getAttribute('aria-label').includes('octocat/Hello-World'));
