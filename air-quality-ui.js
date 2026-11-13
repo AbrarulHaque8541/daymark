@@ -23,7 +23,7 @@
     aside.id = CARD_ID;
     aside.className = 'briefing-card';
     if (typeof aside.setAttribute === 'function') aside.setAttribute('aria-labelledby', 'air-heading');
-
+    
     const topline = doc.createElement('div');
     topline.className = 'briefing-topline';
     const dot = doc.createElement('span');
@@ -139,6 +139,16 @@
         if (typeof buttonEl.setAttribute === 'function') {
           if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
           else buttonEl.removeAttribute('aria-busy');
+        }
+      }
+      if (clearEl) {
+        clearEl.disabled = isBusy;
+        if (clearEl.classList && typeof clearEl.classList.toggle === 'function') {
+          clearEl.classList.toggle('is-busy', isBusy);
+        }
+        if (typeof clearEl.setAttribute === 'function') {
+          if (isBusy) clearEl.setAttribute('aria-busy', 'true');
+          else clearEl.removeAttribute('aria-busy');
         }
       }
     }
