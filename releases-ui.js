@@ -85,8 +85,11 @@
     const statusLine = doc.createElement('p');
     statusLine.id = 'releases-status';
     statusLine.className = 'feed-status';
-    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('role', 'status');
-    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('aria-live', 'polite');
+    if (typeof statusLine.setAttribute === 'function') {
+      statusLine.setAttribute('role', 'status');
+      statusLine.setAttribute('aria-live', 'polite');
+      statusLine.setAttribute('aria-atomic', 'true');
+    }
     aside.appendChild(statusLine);
 
     const result = doc.createElement('div');
@@ -148,6 +151,10 @@
 
     function render(record) {
       if (!resultEl || !record) return;
+      // Clear previous content
+      while (resultEl.firstChild) {
+        resultEl.removeChild(resultEl.firstChild);
+      }
       const release = record.release;
       const title = release.name ? release.tag + ' (' + release.name + ')' : release.tag;
       const parts = [record.slug + ' latest release: ' + title];
@@ -156,8 +163,17 @@
       if (release.notes) {
         parts.push('notes: ' + release.notes + (release.notesTruncated ? ' (notes truncated)' : ''));
       }
-      parts.push(release.url);
-      resultEl.textContent = parts.join(' \u00b7 ');
+      const text = doc.createTextNode(parts.join(' \u00b7 ') + ' \u00b7 ');
+      resultEl.appendChild(text);
+      const link = doc.createElement('a');
+      link.href = release.url;
+      link.textContent = release.url;
+      if (typeof link.setAttribute === 'function') {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        link.setAttribute('aria-label', 'Open latest release for ' + record.slug);
+      }
+      resultEl.appendChild(link);
     }
 
     async function onCheck() {
@@ -187,7 +203,10 @@
           ? releasesApi.classifyReleaseError(error)
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
-        if (resultEl) resultEl.textContent = '';
+        if (resultEl) {
+          while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+          resultEl.textContent = '';
+        }
       } finally {
         setBusy(false);
       }
@@ -196,7 +215,10 @@
     function onClear() {
       if (busy) return;
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
-      if (resultEl) resultEl.textContent = '';
+      if (resultEl) {
+        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+        resultEl.textContent = '';
+      }
       status('Cleared. Type a repository as owner/repo and tap Check.');
     }
 
