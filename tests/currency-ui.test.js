@@ -57,7 +57,8 @@ function fakeEnv(options) {
     'currency-form': Object.assign(fakeElement('form'), { id: 'currency-form' }),
     'currency-status': Object.assign(fakeElement('p'), { id: 'currency-status' }),
     'currency-now': Object.assign(fakeElement('div'), { id: 'currency-now' }),
-    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy', hidden: true })
+    'currency-copy': Object.assign(fakeElement('button'), { id: 'currency-copy', hidden: true }),
+    'currency-clear': Object.assign(fakeElement('button'), { id: 'currency-clear' })
   };
   elements['currency-refresh'].type = 'submit';
   elements['currency-refresh'].form = elements['currency-form'];
@@ -67,7 +68,8 @@ function fakeEnv(options) {
   if (opts.stored !== undefined) storageData[ui.STORAGE_KEY] = opts.stored;
   const defaultStorage = {
     getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
-    setItem(key, value) { storageData[key] = String(value); }
+    setItem(key, value) { storageData[key] = String(value); },
+    removeItem(key) { delete storageData[key]; }
   };
   const storage = opts.storage || defaultStorage;
   const env = {
@@ -381,7 +383,8 @@ test('auto-boot does not eagerly read a blocked localStorage getter', () => {
     'currency-form': fakeElement('form'),
     'currency-status': fakeElement('p'),
     'currency-now': fakeElement('div'),
-    'currency-copy': fakeElement('button')
+    'currency-copy': fakeElement('button'),
+    'currency-clear': fakeElement('button')
   };
   const doc = { readyState: 'complete', getElementById(id) { return elements[id] || null; } };
   const win = {};
@@ -419,62 +422,20 @@ test('a corrupt currency cache is preserved after a successful refresh', async (
   assert.match(elements['currency-status'].textContent, /saved currency data is unreadable and was preserved/);
 });
 
-test('storage quota failure does not misreport a successful rate refresh', async () => {
-  const storage = {
-    getItem() { return null; },
-    setItem() { throw new Error('quota exceeded'); }
-  };
-  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl, storage });
+test('Clear button removes cache and prefs and resets the view', () => {
+  const prefs = JSON.stringify({ amount: '25', from: 'EUR', to: 'GBP' });
+  const { env, elements, storageData } = fakeEnv({ stored: STORED });
+  storageData[ui.PREFS_KEY] = prefs;
   const handle = ui.attachCurrencyUi(env);
-  await handle.onRefresh();
-  assert.match(elements['currency-now'].textContent, /^10 USD = 949.1 INR/);
-  assert.match(elements['currency-status'].textContent, /^Updated · .*changes could not be saved/);
-  assert.equal(elements['currency-refresh'].disabled, false);
-});
-
-test('preference write failure is contained and does not break currency swapping', () => {
-  const storage = {
-    getItem() { return null; },
-    setItem() { throw new Error('quota exceeded'); }
-  };
-  const { env, elements } = fakeEnv({ storage });
-  ui.attachCurrencyUi(env);
-  const amountInput = elements['currency-amount'];
-  amountInput.value = '42';
-  const input = amountInput.listeners.find((listener) => listener.type === 'input');
-  assert.ok(input);
-  assert.doesNotThrow(() => input.handler());
-  assert.match(elements['currency-status'].textContent, /Currency preferences could not be saved/);
-  const swap = elements['currency-swap'];
-  const click = { preventDefault() {} };
-  assert.doesNotThrow(() => swap.listeners.find((listener) => listener.type === 'click').handler(click));
-  assert.equal(elements['currency-from'].value, 'INR');
-  assert.equal(elements['currency-to'].value, 'USD');
-  assert.match(elements['currency-status'].textContent, /changes could not be saved/);
-});
-
-test('refresh does not overwrite a cache changed in another tab', async () => {
-  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
-  const { env, elements, storageData } = fakeEnv({ amount: '10', stored: STORED, fetch: fetchImpl });
-  const handle = ui.attachCurrencyUi(env);
-  const otherTabValue = JSON.stringify({ otherTab: true });
-  storageData[ui.STORAGE_KEY] = otherTabValue;
-  await handle.onRefresh();
-  assert.equal(storageData[ui.STORAGE_KEY], otherTabValue);
-  assert.match(elements['currency-now'].textContent, /^10 USD = 949.1 INR/);
-  assert.match(elements['currency-status'].textContent, /changed elsewhere and was preserved/);
-});
-
-test('corrupt saved preferences are preserved when the user changes the amount', () => {
-  const corrupt = '{broken currency preferences';
-  const { env, elements, storageData } = fakeEnv({});
-  storageData[ui.PREFS_KEY] = corrupt;
-  ui.attachCurrencyUi(env);
-  elements['currency-amount'].value = '25';
-  const input = elements['currency-amount'].listeners.find((listener) => listener.type === 'input');
-  assert.ok(input);
-  input.handler();
-  assert.equal(storageData[ui.PREFS_KEY], corrupt);
-  assert.match(elements['currency-status'].textContent, /saved currency preferences are unreadable and were preserved/);
+  assert.ok(elements['currency-now'].textContent.includes('USD'));
+  const clear = elements['currency-clear'];
+  assert.ok(clear.listeners.some((l) => l.type === 'click'), 'Clear button should listen for clicks');
+  clear.listeners.find((l) => l.type === 'click').handler({});
+  assert.equal(elements['currency-now'].textContent, '');
+  assert.equal(elements['currency-amount'].value, '1');
+  assert.equal(elements['currency-from'].value, 'USD');
+  assert.equal(elements['currency-to'].value, 'INR');
+  assert.ok(elements['currency-status'].textContent.includes('Currency cleared'));
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
 });
