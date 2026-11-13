@@ -57,7 +57,9 @@
 .focus-card,
 .weather-card,
 .currency-card,
-.briefing-card {
+.briefing-card,
+.daylight-card,
+.releases-card {
   position: relative;
 }
 .button-primary::after,
@@ -66,7 +68,9 @@
 .focus-card::after,
 .weather-card::after,
 .currency-card::after,
-.briefing-card::after {
+.briefing-card::after,
+.daylight-card::after,
+.releases-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -82,7 +86,9 @@
 .focus-card:hover::after,
 .weather-card:hover::after,
 .currency-card:hover::after,
-.briefing-card:hover::after {
+.briefing-card:hover::after,
+.daylight-card:hover::after,
+.releases-card:hover::after {
   opacity: 1;
 }
 
@@ -148,7 +154,10 @@
 .feed-refresh.is-busy,
 .weather-refresh.is-busy,
 .currency-refresh.is-busy,
-.tool-button.is-busy {
+.tool-button.is-busy,
+.releases-check.is-busy,
+.daylight-refresh.is-busy,
+.air-refresh.is-busy {
   position: relative;
   pointer-events: none;
   opacity: 0.92;
@@ -158,7 +167,10 @@
 .feed-refresh.is-busy::before,
 .weather-refresh.is-busy::before,
 .currency-refresh.is-busy::before,
-.tool-button.is-busy::before {
+.tool-button.is-busy::before,
+.releases-check.is-busy::before,
+.daylight-refresh.is-busy::before,
+.air-refresh.is-busy::before {
   content: '';
   position: absolute;
   left: 10px;
@@ -173,7 +185,10 @@
 }
 .button-quiet.is-busy::before,
 .feed-refresh.button-quiet.is-busy::before,
-.tool-button.is-busy::before {
+.tool-button.is-busy::before,
+.releases-clear.is-busy::before,
+.daylight-clear.is-busy::before,
+.air-clear.is-busy::before {
   border-color: rgba(22, 112, 95, 0.25);
   border-top-color: #16705f;
 }
@@ -185,12 +200,18 @@
   .feed-refresh.is-busy::before,
   .weather-refresh.is-busy::before,
   .currency-refresh.is-busy::before,
-  .tool-button.is-busy::before {
+  .tool-button.is-busy::before,
+  .releases-check.is-busy::before,
+  .daylight-refresh.is-busy::before,
+  .air-refresh.is-busy::before {
     animation: none;
     border-top-color: #ffffff;
   }
   .button-quiet.is-busy::before,
-  .tool-button.is-busy::before {
+  .tool-button.is-busy::before,
+  .releases-clear.is-busy::before,
+  .daylight-clear.is-busy::before,
+  .air-clear.is-busy::before {
     border-top-color: #16705f;
     border-color: #16705f;
   }
@@ -212,7 +233,10 @@
   .button.is-busy::before,
   .weather-refresh.is-busy::before,
   .currency-refresh.is-busy::before,
-  .tool-button.is-busy::before {
+  .tool-button.is-busy::before,
+  .releases-check.is-busy::before,
+  .daylight-refresh.is-busy::before,
+  .air-refresh.is-busy::before {
     border-color: rgba(42, 143, 122, 0.35);
     border-top-color: #2a8f7a;
   }
@@ -222,7 +246,9 @@
 .focus-card:focus-within,
 .weather-card:focus-within,
 .currency-card:focus-within,
-.briefing-card:focus-within {
+.briefing-card:focus-within,
+.daylight-card:focus-within,
+.releases-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
