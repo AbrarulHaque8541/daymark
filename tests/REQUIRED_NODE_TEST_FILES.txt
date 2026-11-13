@@ -56,6 +56,8 @@ tests/markup-hygiene.test.js
 tests/nightly-placeholder-guard.test.js
 tests/node-test-registration-guard.test.js
 tests/press-feedback-css.test.js
+tests/priority-balance-logic.test.js
+tests/priority-balance-ui.test.js
 tests/product-language-contract.test.js
 tests/reduced-motion.test.js
 tests/release-action-runtime.test.js
