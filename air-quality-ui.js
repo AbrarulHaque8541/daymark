@@ -85,8 +85,11 @@
     const statusLine = doc.createElement('p');
     statusLine.id = 'air-status';
     statusLine.className = 'feed-status';
-    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('role', 'status');
-    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('aria-live', 'polite');
+    if (typeof statusLine.setAttribute === 'function') {
+      statusLine.setAttribute('role', 'status');
+      statusLine.setAttribute('aria-live', 'polite');
+      statusLine.setAttribute('aria-atomic', 'true');
+    }
     aside.appendChild(statusLine);
 
     const result = doc.createElement('div');
