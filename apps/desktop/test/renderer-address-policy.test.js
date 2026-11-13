@@ -207,6 +207,11 @@ test('desktop browser shell exposes accessible controls and compact styling', ()
   assert.match(markup, /id="tabs" role="group" aria-label="Open tabs"/);
   assert.match(markup, /id="toolbar" role="group" aria-label="Browser navigation"/);
   assert.match(markup, /id="urlbar"[^>]*aria-label="Search or enter address"/);
+  assert.match(markup, /id="page-loading-indicator" aria-hidden="true"/);
+  assert.match(markup, /id="page-loading-status" class="visually-hidden" role="status"/);
+  assert.match(styles, /#page-loading-indicator\.is-loading::before/);
+  assert.match(styles, /#page-loading-indicator\.is-loading::before \{ width: 100%; transform: none; opacity: \.72; \}/);
+  assert.match(rendererSource, /wireEvents\(tab\);\n  view\.setAttribute\('src', url\);/);
   for (const id of ['btn-back', 'btn-fwd', 'btn-reload', 'btn-home', 'btn-find', 'find-prev', 'find-next', 'find-close']) {
     assert.match(markup, new RegExp(`id="${id}"[^>]*aria-label="[^"]+"`));
   }
@@ -221,4 +226,77 @@ test('desktop browser shell exposes accessible controls and compact styling', ()
   assert.match(styles, /@media \(max-width: 640px\)/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.doesNotMatch(markup, /<(?:link|script)[^>]+(?:href|src)=["']https?:\/\//i);
+});
+
+test('page loading cue tracks the active tab and clears after stop or main-frame failure', () => {
+  const loadingStart = rendererSource.indexOf('function syncPageLoadingUi() {');
+  const loadingEnd = rendererSource.indexOf('\n\nfunction renderTabs(', loadingStart);
+  const eventsStart = rendererSource.indexOf('function wireEvents(tab) {');
+  const eventsEnd = rendererSource.indexOf('\n\nfunction createTab(', eventsStart);
+  assert.notEqual(loadingStart, -1, 'page loading UI helper should exist');
+  assert.notEqual(loadingEnd, -1, 'page loading UI helper should end before renderTabs');
+  assert.notEqual(eventsStart, -1, 'renderer event wiring should exist');
+  assert.notEqual(eventsEnd, -1, 'renderer event wiring should end before createTab');
+
+  const listeners = new Map();
+  const tabs = [1, 2].map((id) => ({
+    id,
+    isLoading: false,
+    view: {
+      addEventListener(type, listener) { listeners.set(id + ':' + type, listener); },
+    },
+  }));
+  const loadingClasses = new Set();
+  const indicator = { classList: { toggle(name, enabled) {
+    if (enabled) loadingClasses.add(name);
+    else loadingClasses.delete(name);
+  } } };
+  const status = { textContent: '' };
+  const elements = new Map([
+    ['page-loading-indicator', indicator],
+    ['page-loading-status', status],
+  ]);
+  const context = {
+    tabs,
+    activeTabId: 1,
+    lastError: null,
+    activeTab() { return tabs.find((tab) => tab.id === context.activeTabId) || null; },
+    isActive(tab) { return tab.id === context.activeTabId; },
+    $(id) { return elements.get(id); },
+    renderTabs() {},
+    showError(_title, detail) { context.lastError = detail; },
+  };
+  const source = rendererSource.slice(loadingStart, loadingEnd)
+    + '\n'
+    + rendererSource.slice(eventsStart, eventsEnd);
+  vm.runInNewContext(source, context);
+  tabs.forEach((tab) => context.wireEvents(tab));
+  const emit = (id, type, event = {}) => listeners.get(id + ':' + type)(event);
+
+  emit(2, 'did-start-loading');
+  assert.equal(tabs[1].isLoading, true);
+  assert.equal(loadingClasses.has('is-loading'), false, 'an inactive tab must not show the cue');
+  assert.equal(status.textContent, '');
+
+  context.activeTabId = 2;
+  context.syncPageLoadingUi();
+  assert.equal(loadingClasses.has('is-loading'), true, 'activating a loading tab restores the cue');
+  assert.equal(status.textContent, 'Loading page');
+
+  emit(2, 'did-stop-loading');
+  assert.equal(tabs[1].isLoading, false);
+  assert.equal(loadingClasses.has('is-loading'), false);
+  assert.equal(status.textContent, '');
+
+  emit(2, 'did-start-loading');
+  emit(2, 'did-fail-load', {
+    isMainFrame: true,
+    errorCode: -105,
+    errorDescription: 'Name not resolved',
+    validatedURL: 'https://example.test/2',
+  });
+  assert.equal(tabs[1].isLoading, false);
+  assert.equal(loadingClasses.has('is-loading'), false, 'main-frame failures clear the cue promptly');
+  assert.equal(status.textContent, '');
+  assert.equal(context.lastError, 'Name not resolved (-105)');
 });
