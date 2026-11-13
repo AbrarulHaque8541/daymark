@@ -49,6 +49,19 @@
   box-shadow: 0 2px 10px rgba(24, 40, 48, .05);
 }
 
+/* Side cards press confirmation for professional glass feel. */
+.suggestion-card:active,
+.focus-card:active,
+.weather-card:active,
+.currency-card:active,
+.briefing-card:active,
+.air-card:active,
+.daylight-card:active,
+.holiday-card:active {
+  transform: scale(.998);
+  box-shadow: 0 8px 28px rgba(24, 40, 48, .06);
+}
+
 /* Subtle accent-tinted glass edge on primary surfaces for professional depth. */
 .button-primary,
 .card,
@@ -57,7 +70,10 @@
 .focus-card,
 .weather-card,
 .currency-card,
-.briefing-card {
+.briefing-card,
+.air-card,
+.daylight-card,
+.holiday-card {
   position: relative;
 }
 .button-primary::after,
@@ -66,7 +82,10 @@
 .focus-card::after,
 .weather-card::after,
 .currency-card::after,
-.briefing-card::after {
+.briefing-card::after,
+.air-card::after,
+.daylight-card::after,
+.holiday-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -82,7 +101,10 @@
 .focus-card:hover::after,
 .weather-card:hover::after,
 .currency-card:hover::after,
-.briefing-card:hover::after {
+.briefing-card:hover::after,
+.air-card:hover::after,
+.daylight-card:hover::after,
+.holiday-card:hover::after {
   opacity: 1;
 }
 
@@ -102,7 +124,11 @@
 .filter-button,
 .date-chip,
 .complete-button,
-.task-row {
+.task-row,
+.suggestion-card,
+.focus-card,
+.weather-card,
+.briefing-card {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -148,6 +174,9 @@
 .feed-refresh.is-busy,
 .weather-refresh.is-busy,
 .currency-refresh.is-busy,
+.daylight-refresh.is-busy,
+.air-refresh.is-busy,
+.holiday-refresh.is-busy,
 .tool-button.is-busy {
   position: relative;
   pointer-events: none;
@@ -158,6 +187,9 @@
 .feed-refresh.is-busy::before,
 .weather-refresh.is-busy::before,
 .currency-refresh.is-busy::before,
+.daylight-refresh.is-busy::before,
+.air-refresh.is-busy::before,
+.holiday-refresh.is-busy::before,
 .tool-button.is-busy::before {
   content: '';
   position: absolute;
@@ -185,6 +217,9 @@
   .feed-refresh.is-busy::before,
   .weather-refresh.is-busy::before,
   .currency-refresh.is-busy::before,
+  .daylight-refresh.is-busy::before,
+  .air-refresh.is-busy::before,
+  .holiday-refresh.is-busy::before,
   .tool-button.is-busy::before {
     animation: none;
     border-top-color: #ffffff;
@@ -212,6 +247,9 @@
   .button.is-busy::before,
   .weather-refresh.is-busy::before,
   .currency-refresh.is-busy::before,
+  .daylight-refresh.is-busy::before,
+  .air-refresh.is-busy::before,
+  .holiday-refresh.is-busy::before,
   .tool-button.is-busy::before {
     border-color: rgba(42, 143, 122, 0.35);
     border-top-color: #2a8f7a;
@@ -222,7 +260,10 @@
 .focus-card:focus-within,
 .weather-card:focus-within,
 .currency-card:focus-within,
-.briefing-card:focus-within {
+.briefing-card:focus-within,
+.air-card:focus-within,
+.daylight-card:focus-within,
+.holiday-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
