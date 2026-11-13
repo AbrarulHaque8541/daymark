@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-13T16:23:00Z (address-bar insights card, branch feat/url-insights-vibe-20261113)](./CURRENT_STATUS_20261113T162300Z.md)
 - [Daymark engineering status — 2026-11-13T04:39:18Z (keyless GitHub release radar card, branch feat/release-radar-vibe-20261113)](./CURRENT_STATUS_20261113T043900Z.md)
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 - [Daymark whole-project engineering status — 2026-11-11T17:44:30.987Z (main 9f1c0451; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 922/922; #747 919/919)](./CURRENT_STATUS_20261111T174430Z.md)
