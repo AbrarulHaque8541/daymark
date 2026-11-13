@@ -273,3 +273,20 @@ test('missing releases API degrades with an honest message', async () => {
   }
   assert.ok(doc.getElementById('releases-status').textContent.includes('unavailable'));
 });
+
+test('successful check renders a safe open-release link and copy button', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  doc.getElementById('releases-repo').value = 'octocat/Hello-World';
+  doc.getElementById('releases-check').dispatch('click', {});
+  await drain();
+  const result = doc.getElementById('releases-result');
+  assert.ok(result.textContent.includes('v1.2.3'));
+  const link = result.children.find(c => c.tagName === 'a');
+  assert.ok(link);
+  assert.strictEqual(link.href, 'https://github.com/octocat/Hello-World/releases/tag/v1.2.3');
+  assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
+  const copy = result.children.find(c => c.id === 'releases-copy-link');
+  assert.ok(copy);
+  assert.strictEqual(copy.textContent, 'Copy link');
+});
