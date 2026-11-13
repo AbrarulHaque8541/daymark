@@ -138,6 +138,9 @@ test('unsafe URL-chain hops are cancelled before staging and never leak URL data
   const unsafeChains = [
     ['http://remote.example.test/report?token=private-query-token'],
     ['https://source.example.test/start', 'http://remote.example.test/report?token=private-query-token'],
+    ['https://source.example.test/start', 'http://redirect.example.test/intermediate?token=private-query-token', 'https://downloads.example.test/report.txt'],
+    ['https://source.example.test/start', 'https://user:secret@redirect.example.test/intermediate', 'https://downloads.example.test/report.txt'],
+    ['https://source.example.test/start', 'file:///etc/passwd', 'https://downloads.example.test/report.txt'],
     ['https://source.example.test/start', 'http://localhost:3000/report'],
     ['https://user:secret@source.example.test/start'],
     ['https://source.example.test/start', 'https://user:secret@cdn.example.test/report'],
