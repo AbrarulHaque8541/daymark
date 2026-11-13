@@ -1,4 +1,4 @@
-/*
+/* 
  * Daymark public-holidays UI wiring for the web prototype.
  *
  * A small network-on-demand card: the user picks a country and taps Refresh; the
@@ -71,6 +71,12 @@
         if (typeof buttonEl.setAttribute === 'function') {
           if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
           else buttonEl.removeAttribute('aria-busy');
+        }
+      }
+      if (clearEl) {
+        clearEl.disabled = isBusy;
+        if (clearEl.classList && typeof clearEl.classList.toggle === 'function') {
+          clearEl.classList.toggle('is-busy', isBusy);
         }
       }
     }
@@ -299,75 +305,81 @@
     }
 
     function onClear() {
-      // Clearing is explicit, but do not discard visible or saved data when its
-      // current value cannot be read or has changed since this card loaded.
-      if (!storageRequested) {
+      if (busy) return;
+      setBusy(true);
+      try {
+        // Clearing is explicit, but do not discard visible or saved data when its
+        // current value cannot be read or has changed since this card loaded.
+        if (!storageRequested) {
+          clearView();
+          status('Holidays cleared from this view; browser storage is unavailable.');
+          return;
+        }
+        if (!storage || storageAccessFailed || !cacheRecord || !prefsRecord
+          || cacheRecord.state === 'unreadable' || prefsRecord.state === 'unreadable') {
+          status('Could not verify saved holidays; nothing was cleared.' + storageNotice());
+          return;
+        }
+        if (typeof storage.getItem !== 'function') {
+          storageReadFailed = true;
+          status('Could not verify saved holidays; nothing was cleared.' + storageNotice());
+          return;
+        }
+
+        const records = [cacheRecord, prefsRecord];
+        const current = [];
+        try {
+          for (const record of records) current.push(storage.getItem(record.key));
+        } catch (error) {
+          storageReadFailed = true;
+          status('Could not verify saved holidays; nothing was cleared.' + storageNotice());
+          return;
+        }
+        if (records.some((record, index) => current[index] !== record.raw)) {
+          storageConflict = true;
+          status('Could not clear saved holidays because they changed elsewhere; current data was kept.' + storageNotice());
+          return;
+        }
+
+        try {
+          for (const record of records) {
+            if (record.raw !== null) {
+              if (typeof storage.removeItem !== 'function') throw new Error('removeItem is unavailable');
+              storage.removeItem(record.key);
+            }
+          }
+        } catch (error) {
+          storageRemoveFailed = true;
+          let rollbackFailed = false;
+          for (const record of records) {
+            if (record.raw === null) continue; // absent keys were not touched by the removal loop
+            try {
+              if (typeof storage.setItem !== 'function') throw new Error('setItem is unavailable');
+              storage.setItem(record.key, record.raw);
+            } catch (rollbackError) {
+              rollbackFailed = true;
+              storageWriteFailed = true;
+            }
+          }
+          status((rollbackFailed
+            ? 'Could not clear saved holidays; storage may be partially changed.'
+            : 'Could not clear saved holidays; previous saved data was restored where possible.')
+            + storageNotice());
+          return;
+        }
+
+        cacheRecord = { key: STORAGE_KEY, state: 'absent', raw: null, value: null };
+        prefsRecord = { key: PREFS_KEY, state: 'absent', raw: null, value: null };
+        storageAccessFailed = false;
+        storageReadFailed = false;
+        storageWriteFailed = false;
+        storageRemoveFailed = false;
+        storageConflict = false;
         clearView();
-        status('Holidays cleared from this view; browser storage is unavailable.');
-        return;
+        status('Holidays cleared on this device. Choose a country and tap Refresh.');
+      } finally {
+        setBusy(false);
       }
-      if (!storage || storageAccessFailed || !cacheRecord || !prefsRecord
-        || cacheRecord.state === 'unreadable' || prefsRecord.state === 'unreadable') {
-        status('Could not verify saved holidays; nothing was cleared.' + storageNotice());
-        return;
-      }
-      if (typeof storage.getItem !== 'function') {
-        storageReadFailed = true;
-        status('Could not verify saved holidays; nothing was cleared.' + storageNotice());
-        return;
-      }
-
-      const records = [cacheRecord, prefsRecord];
-      const current = [];
-      try {
-        for (const record of records) current.push(storage.getItem(record.key));
-      } catch (error) {
-        storageReadFailed = true;
-        status('Could not verify saved holidays; nothing was cleared.' + storageNotice());
-        return;
-      }
-      if (records.some((record, index) => current[index] !== record.raw)) {
-        storageConflict = true;
-        status('Could not clear saved holidays because they changed elsewhere; current data was kept.' + storageNotice());
-        return;
-      }
-
-      try {
-        for (const record of records) {
-          if (record.raw !== null) {
-            if (typeof storage.removeItem !== 'function') throw new Error('removeItem is unavailable');
-            storage.removeItem(record.key);
-          }
-        }
-      } catch (error) {
-        storageRemoveFailed = true;
-        let rollbackFailed = false;
-        for (const record of records) {
-          if (record.raw === null) continue; // absent keys were not touched by the removal loop
-          try {
-            if (typeof storage.setItem !== 'function') throw new Error('setItem is unavailable');
-            storage.setItem(record.key, record.raw);
-          } catch (rollbackError) {
-            rollbackFailed = true;
-            storageWriteFailed = true;
-          }
-        }
-        status((rollbackFailed
-          ? 'Could not clear saved holidays; storage may be partially changed.'
-          : 'Could not clear saved holidays; previous saved data was restored where possible.')
-          + storageNotice());
-        return;
-      }
-
-      cacheRecord = { key: STORAGE_KEY, state: 'absent', raw: null, value: null };
-      prefsRecord = { key: PREFS_KEY, state: 'absent', raw: null, value: null };
-      storageAccessFailed = false;
-      storageReadFailed = false;
-      storageWriteFailed = false;
-      storageRemoveFailed = false;
-      storageConflict = false;
-      clearView();
-      status('Holidays cleared on this device. Choose a country and tap Refresh.');
     }
 
     cached = readCache();
