@@ -53,6 +53,7 @@
     const statusEl = element('currency-status');
     const nowEl = element('currency-now');
     const copyEl = element('currency-copy');
+    const clearEl = element('currency-clear');
 
     let busy = false;
     let cached = null;
@@ -90,6 +91,9 @@
           if (isBusy) swapEl.setAttribute('aria-busy', 'true');
           else swapEl.removeAttribute('aria-busy');
         }
+      }
+      if (clearEl && clearEl.classList && typeof clearEl.classList.toggle === 'function') {
+        clearEl.classList.toggle('is-busy', isBusy);
       }
     }
 
@@ -233,6 +237,15 @@
       if (toEl && typeof toEl.value === 'string') toEl.value = prefs.to || DEFAULT_TO;
     }
 
+    function clearView() {
+      cached = null;
+      if (amountEl && typeof amountEl.value === 'string') amountEl.value = DEFAULT_AMOUNT;
+      if (fromEl && typeof fromEl.value === 'string') fromEl.value = DEFAULT_FROM;
+      if (toEl && typeof toEl.value === 'string') toEl.value = DEFAULT_TO;
+      if (nowEl) nowEl.textContent = '';
+      updateCopyVisibility();
+    }
+
     async function onRefresh() {
       if (busy) return;
       if (!currencyApi || typeof currencyApi.fetchLatestRates !== 'function') {
@@ -276,6 +289,71 @@
       } finally {
         setBusy(false);
       }
+    }
+
+    function onClear() {
+      if (busy) return;
+      if (!storageRequested) {
+        clearView();
+        status('Currency cleared from this view; browser storage is unavailable.');
+        return;
+      }
+      if (!storage || storageAccessFailed || !cacheRecord || !prefsRecord
+        || cacheRecord.state === 'unreadable' || prefsRecord.state === 'unreadable') {
+        status('Could not verify saved currency; nothing was cleared.' + storageNotice());
+        return;
+      }
+      if (typeof storage.getItem !== 'function') {
+        storageReadFailed = true;
+        status('Could not verify saved currency; nothing was cleared.' + storageNotice());
+        return;
+      }
+      const records = [cacheRecord, prefsRecord];
+      const current = [];
+      try {
+        for (const record of records) current.push(storage.getItem(record.key));
+      } catch (error) {
+        storageReadFailed = true;
+        status('Could not verify saved currency; nothing was cleared.' + storageNotice());
+        return;
+      }
+      if (records.some((record, index) => current[index] !== record.raw)) {
+        storageConflict = true;
+        status('Could not clear saved currency because it changed elsewhere; current data was kept.' + storageNotice());
+        return;
+      }
+      try {
+        for (const record of records) {
+          if (record.raw !== null) {
+            if (typeof storage.removeItem !== 'function') throw new Error('removeItem is unavailable');
+            storage.removeItem(record.key);
+          }
+        }
+      } catch (error) {
+        storageWriteFailed = true;
+        let rollbackFailed = false;
+        for (const record of records) {
+          try {
+            if (record.raw === null) {
+              if (typeof storage.removeItem === 'function') storage.removeItem(record.key);
+            } else {
+              if (typeof storage.setItem !== 'function') throw new Error('setItem is unavailable');
+              storage.setItem(record.key, record.raw);
+            }
+          } catch (rollbackError) {
+            rollbackFailed = true;
+          }
+        }
+        status((rollbackFailed
+          ? 'Could not clear saved currency; storage may be partially changed.'
+          : 'Could not clear saved currency; previous saved data was restored where possible.')
+          + storageNotice());
+        return;
+      }
+      cacheRecord = { key: STORAGE_KEY, state: 'absent', raw: null, value: null };
+      prefsRecord = { key: PREFS_KEY, state: 'absent', raw: null, value: null };
+      clearView();
+      status('Currency cleared on this device. Pick two currencies and tap Refresh.');
     }
 
     restorePrefs();
@@ -416,8 +494,13 @@
       });
     }
 
+    if (clearEl && typeof clearEl.addEventListener === 'function') {
+      clearEl.addEventListener('click', () => { onClear(); });
+    }
+
     return {
       onRefresh,
+      onClear,
       readCache,
       onCopy,
       detach() {
