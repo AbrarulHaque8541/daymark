@@ -140,6 +140,9 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.ok(els.input && els.button && els.form && els.status && els.result && els.clear);
   assert.equal(els.form.getAttribute('novalidate'), 'novalidate');
   assert.equal(els.status.textContent, 'Type a place name and tap Check.');
+  assert.equal(els.status.getAttribute('role'), 'status');
+  assert.equal(els.status.getAttribute('aria-live'), 'polite');
+  assert.equal(els.status.getAttribute('aria-atomic'), 'true', 'status must announce the complete message');
   assert.equal(els.result.textContent, '');
   assert.ok(doc.created.indexOf(els.card) !== -1, 'card was created by the module');
   assert.ok(els.card.parentNode !== null, 'card must be attached to the document');
