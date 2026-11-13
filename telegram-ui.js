@@ -31,8 +31,13 @@
       for (const el of controls) {
         if (!el) continue;
         el.disabled = isBusy;
+        if (el.classList && typeof el.classList.toggle === 'function') {
+          el.classList.toggle('is-busy', isBusy);
+        }
         if (typeof el.setAttribute === 'function') {
           el.setAttribute('aria-disabled', isBusy ? 'true' : 'false');
+          if (isBusy) el.setAttribute('aria-busy', 'true');
+          else el.removeAttribute('aria-busy');
         }
       }
       if (formEl && typeof formEl.setAttribute === 'function') {
@@ -172,7 +177,7 @@
       const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text);
       if (result.ok) {
         persistChatTarget(inputs.chatTarget.trim());
-        status('Sent \u00b7 ' + digest.includedCount + ' completed task(s) delivered to Telegram.'
+        status('Sent · ' + digest.includedCount + ' completed task(s) delivered to Telegram.'
           + (digest.omittedCount > 0 ? ' ' + digest.omittedCount + ' omitted for the message limit.' : '')
           + (stored.note || ''));
       } else {
@@ -198,6 +203,7 @@
     function onPageHide() { clearTokenField(); }
     function onPageShow() { clearTokenField(); }
     function onClear() {
+      if (busy) return;
       clearTokenField();
       status('Cleared. The bot token is emptied; the chat target remains available.');
     }
