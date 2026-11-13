@@ -1,16 +1,3 @@
-apps/desktop/test/download-handler.test.js
-apps/desktop/test/download-policy.test.js
-apps/desktop/test/download-publish.test.js
-apps/desktop/test/electron-runtime.test.js
-apps/desktop/test/renderer-address-policy.test.js
-apps/desktop/test/request-policy.test.js
-apps/desktop/test/rules.test.js
-apps/desktop/test/webview-popup-policy.test.js
-apps/desktop/test/workflow-contract.test.js
-desktop-spike/task-core.test.js
-test/ci-test-honesty.test.js
-test/task-focus-session-coordinator.test.js
-test/task-focus-timer.test.js
 tests/air-quality-logic.test.js
 tests/air-quality-ui.test.js
 tests/app-focus.test.js
@@ -52,6 +39,8 @@ tests/ics-import.test.js
 tests/import-logic.test.js
 tests/import-ui.test.js
 tests/markup-hygiene.test.js
+tests/moon-logic.test.js
+tests/moon-ui.test.js
 tests/nightly-placeholder-guard.test.js
 tests/node-test-registration-guard.test.js
 tests/press-feedback-css.test.js
