@@ -168,6 +168,7 @@
       const link = doc.createElement('a');
       link.href = release.url;
       link.textContent = release.url;
+      link.className = 'release-link';
       if (typeof link.setAttribute === 'function') {
         link.setAttribute('target', '_blank');
         link.setAttribute('rel', 'noopener noreferrer');
