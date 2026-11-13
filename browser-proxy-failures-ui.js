@@ -115,6 +115,24 @@
       if (statusEl) statusEl.textContent = message || '';
     }
 
+    let busy = false;
+    function setBusy(isBusy) {
+      busy = isBusy;
+      if (showEl) {
+        showEl.disabled = isBusy;
+        if (showEl.classList && typeof showEl.classList.toggle === 'function') {
+          showEl.classList.toggle('is-busy', isBusy);
+        }
+        if (typeof showEl.setAttribute === 'function') {
+          if (isBusy) showEl.setAttribute('aria-busy', 'true');
+          else showEl.removeAttribute('aria-busy');
+        }
+      }
+      if (clearEl && clearEl.classList && typeof clearEl.classList.toggle === 'function') {
+        clearEl.classList.toggle('is-busy', isBusy);
+      }
+    }
+
     function clearResult() {
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
@@ -155,11 +173,14 @@
     }
 
     function onShow() {
+      if (busy) return;
       if (!logic || typeof logic.explainScenario !== 'function') {
         clearResult();
         status('The proxy failure playbook is unavailable.');
         return;
       }
+      setBusy(true);
+      try {
       const id = selectEl && typeof selectEl.value === 'string' ? selectEl.value : '';
       const plan = logic.explainScenario(id);
       clearResult();
@@ -171,11 +192,20 @@
       renderSection('How to recover', plan.recovery);
       renderSection('Honest limits', plan.limits);
       status('Showing: ' + plan.title + ' · offline, nothing saved.');
+      } finally {
+        setBusy(false);
+      }
     }
 
     function onClear() {
-      clearResult();
-      status('Cleared. Pick a scenario and tap Show.');
+      if (busy) return;
+      setBusy(true);
+      try {
+        clearResult();
+        status('Cleared. Pick a scenario and tap Show.');
+      } finally {
+        setBusy(false);
+      }
     }
 
     fillScenarios();

@@ -18,6 +18,18 @@ function fakeElement(tag, doc) {
     children: [],
     listeners: [],
     parentNode: null,
+    classList: {
+      classes: new Set(),
+      toggle(name, force) {
+        if (force === undefined) {
+          if (this.classes.has(name)) this.classes.delete(name);
+          else this.classes.add(name);
+        } else if (force) this.classes.add(name);
+        else this.classes.delete(name);
+        return this.classes.has(name);
+      },
+      contains(name) { return this.classes.has(name); }
+    },
     appendChild(child) { child.parentNode = el; el.children.push(child); return child; },
     insertBefore(child, ref) { child.parentNode = el; el.children.push(child); return child; },
     setAttribute(name, value) { el.attrs = el.attrs || {}; el.attrs[name] = String(value); },
@@ -216,4 +228,18 @@ test('the module exposes its API', () => {
   assert.equal(typeof ui.attachBrowserProxyFailuresUi, 'function');
   assert.equal(typeof ui.ensureCard, 'function');
   assert.equal(typeof globalThis.DaymarkBrowserProxyFailuresUi, 'object');
+});
+
+test('show and clear apply brief is-busy feedback and guard re-entry', () => {
+  const { env, doc } = fakeEnv();
+  const handle = ui.attachBrowserProxyFailuresUi(env);
+  const els = elementsOf(doc);
+  els.select.value = 'proxy-unreachable';
+  assert.equal(els.show.disabled, false);
+  handle.onShow();
+  assert.equal(els.show.disabled, false, 'busy must be released after show');
+  assert.equal(els.show.classList.contains('is-busy'), false);
+  handle.onClear();
+  assert.equal(els.clear.classList.contains('is-busy'), false);
+  assert.equal(els.status.textContent, 'Cleared. Pick a scenario and tap Show.');
 });
