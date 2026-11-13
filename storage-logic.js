@@ -23,6 +23,12 @@
       keys: ['daymark.tasks.v1.backup']
     },
     {
+      id: 'task-generation',
+      label: 'Task write generation',
+      description: 'A monotonic counter that detects concurrent edits from another tab so stale writes are rejected.',
+      keys: ['daymark.tasks.generation.v1']
+    },
+    {
       id: 'focus',
       label: 'Focus timer',
       description: 'The current Focus session and its completed-session history log.',
