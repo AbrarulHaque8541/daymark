@@ -257,7 +257,7 @@
     return { id: categoryId, removed, failed, unreadable };
   }
 
-  function clearAll(storage) {
+  function planClearAll(storage) {
     requireUsableStorage(storage);
     const existing = new Set();
     const unreadable = new Set();
@@ -279,8 +279,19 @@
         removed: [],
         failed: category.keys.filter((key) => unreadable.has(key))
       }));
-      return { results, removedKeys: [], failedKeys, unreadableKeys: failedKeys };
+      return { ok: false, results, existingKeys: [], removedKeys: [], failedKeys, unreadableKeys: failedKeys };
     }
+    return { ok: true, existingKeys: Array.from(existing), results: [], removedKeys: [], failedKeys: [], unreadableKeys: [] };
+  }
+
+  function clearPlanned(storage, plan) {
+    requireUsableStorage(storage);
+    if (!plan || plan.ok !== true || !Array.isArray(plan.existingKeys)) {
+      return plan && Array.isArray(plan.results)
+        ? plan
+        : { ok: false, results: [], existingKeys: [], removedKeys: [], failedKeys: [], unreadableKeys: [] };
+    }
+    const existing = new Set(plan.existingKeys);
     const results = CATEGORIES.map((category) => {
       const removed = [];
       const failed = [];
@@ -299,8 +310,15 @@
       results,
       removedKeys: results.reduce((all, result) => all.concat(result.removed), []),
       failedKeys: results.reduce((all, result) => all.concat(result.failed), []),
-      unreadableKeys: []
+      unreadableKeys: [],
+      ok: true
     };
+  }
+
+  function clearAll(storage) {
+    const plan = planClearAll(storage);
+    if (!plan.ok) return plan;
+    return clearPlanned(storage, plan);
   }
 
   function formatBytes(bytes) {
@@ -317,6 +335,8 @@
     planClear,
     estimateBytes,
     scanStorage,
+    planClearAll,
+    clearPlanned,
     clearCategory,
     clearAll,
     formatBytes

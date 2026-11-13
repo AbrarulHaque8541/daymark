@@ -6,6 +6,7 @@ const path = require('node:path');
 const ui = require('../telegram-ui.js');
 const engine = require('../telegram-logic.js');
 const taskLogic = require('../task-logic.js');
+const taskMutation = require('../task-mutation-logic.js');
 function makeElement(tagName) {
   const el = {
     tagName: tagName,
@@ -58,7 +59,8 @@ function makeStorage(seed) {
     readCount() { return reads; },
     readKeys() { return readKeys.slice(); },
     getItem(key) { reads += 1; readKeys.push(key); return data.has(key) ? data.get(key) : null; },
-    setItem(key, value) { data.set(key, String(value)); }
+    setItem(key, value) { data.set(key, String(value)); },
+    removeItem(key) { data.delete(key); }
   };
 }
 function makeFetch(handler) {
@@ -66,6 +68,28 @@ function makeFetch(handler) {
   const fn = (url, options) => { calls.push({ url, options }); return Promise.resolve(handler(calls.length)); };
   fn.calls = calls;
   return fn;
+}
+function makeLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const tail = previous.then(() => gate);
+      tails.set(name, tail);
+      return previous.then(() => callback({ name, mode: options && options.mode || 'exclusive' }))
+        .finally(() => {
+          release();
+          if (tails.get(name) === tail) tails.delete(name);
+        });
+    }
+  };
+}
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
 }
 class FakeAbortController {
   constructor() { this.signal = { aborted: false }; }
@@ -78,6 +102,8 @@ function okEnv(doc, options) {
     logicApi: options.logicApi === undefined ? engine : options.logicApi,
     taskLogicApi: options.taskLogicApi === undefined ? taskLogic : options.taskLogicApi,
     storage: options.storage || makeStorage(options.seed || {}),
+    taskMutationApi: taskMutation,
+    lockManager: options.lockManager || makeLockManager(),
     fetch: options.fetch || makeFetch(() => ({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 7 } }) })),
     AbortController: FakeAbortController,
     setTimeout: () => 0,
@@ -121,7 +147,8 @@ test('an invalid token reports honestly, does not read task storage, sends nothi
   doc.elements['telegram-chat'].value = '123456789';
   await handle.send();
   assert.match(doc.elements['telegram-status'].textContent, /bot token from @BotFather first/);
-  assert.deepEqual(storage.readKeys(), ['daymark.telegram.lastChat.v1'], 'only the non-secret chat preference may be restored at attach');
+  assert.deepEqual(storage.readKeys(), ['daymark.tasks.generation.v1', 'daymark.telegram.lastChat.v1'],
+    'only generation metadata and the non-secret chat preference may be read at attach');
   assert.equal(storage.readKeys().includes('daymark.tasks.v1'), false, 'invalid input must never read task data');
   assert.equal(fetchFn.calls.length, 0);
 });
@@ -159,7 +186,8 @@ test('a partial Telegram engine without chat validation fails closed before read
   fillValidInputs(doc);
   await handle.send();
   assert.match(doc.elements['telegram-status'].textContent, /input validation is unavailable/);
-  assert.equal(storage.readCount(), 0);
+  assert.equal(storage.readKeys().includes('daymark.tasks.v1'), false,
+    'the generation marker may be read, but the task payload is not read before input validation');
   assert.equal(fetchFn.calls.length, 0);
 });
 test('sending a digest delivers only completed tasks to Telegram', async () => {
@@ -315,7 +343,7 @@ test('boot restores only the non-secret chat preference and never reads task dat
   const doc = makeDoc(ALL_IDS);
   ui.attachTelegramUi(okEnv(doc, { storage: storage }));
   assert.equal(doc.elements['telegram-chat'].value, '987654321');
-  assert.deepEqual(storage.readKeys(), ['daymark.telegram.lastChat.v1']);
+  assert.deepEqual(storage.readKeys(), ['daymark.tasks.generation.v1', 'daymark.telegram.lastChat.v1']);
   assert.match(doc.elements['telegram-status'].textContent, /Last chat target restored/);
 });
 test('a throwing or malformed task validator fails closed without exposing its error', async () => {
@@ -432,6 +460,44 @@ test('successful send persists the chat target for next session', async () => {
   await handle.send();
   assert.equal(storage.getItem('daymark.telegram.lastChat.v1'), '@daymarkchannel');
 });
+
+for (const action of ['send', 'test']) {
+  test('deferred Telegram ' + action.toUpperCase() + ' does not restore the chat preference after Clear All', async () => {
+    const doc = makeDoc(ALL_IDS);
+    const storage = makeStorage({
+      'daymark.tasks.v1': JSON.stringify([makeTask('finish task', { completed: true })])
+    });
+    const lockManager = makeLockManager();
+    const pendingFetch = deferred();
+    const fetchFn = () => pendingFetch.promise;
+    const handle = ui.attachTelegramUi(okEnv(doc, { storage, lockManager, fetch: fetchFn }));
+    fillValidInputs(doc);
+    doc.elements['telegram-chat'].value = '@daymarkchannel';
+
+    const pendingSend = handle[action]();
+    await new Promise((resolve) => setImmediate(resolve));
+    const generationBefore = taskMutation.readGeneration(storage);
+    assert.equal(generationBefore.ok, true);
+
+    const cleared = await taskMutation.withLocksInOrder(lockManager, taskMutation.CLEAR_ALL_LOCK_ORDER, () => {
+      const epoch = taskMutation.advanceClearEpoch(storage);
+      assert.equal(epoch.ok, true);
+      storage.removeItem('daymark.tasks.v1');
+      storage.removeItem('daymark.telegram.lastChat.v1');
+      handle.resetForClearAll();
+      return true;
+    });
+    assert.equal(cleared.ok, true);
+    assert.equal(doc.elements['telegram-token'].value, '');
+    assert.equal(doc.elements['telegram-chat'].value, '');
+
+    pendingFetch.resolve({ status: 200, json: () => Promise.resolve({ ok: true, result: { message_id: 12 } }) });
+    await pendingSend;
+    assert.equal(storage.getItem('daymark.telegram.lastChat.v1'), null,
+      'a network response started before Clear All cannot recreate the cleared preference');
+    assert.match(doc.elements['telegram-status'].textContent, /not remembered because local data was cleared/);
+  });
+}
 
 test('failed send does not persist the chat target', async () => {
   const doc = makeDoc(ALL_IDS);
