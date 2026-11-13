@@ -1,4 +1,0 @@
-<!-- Add after daylight-ui.js in index.html:
-  <script src="moon-logic.js" defer></script>
-  <script src="moon-ui.js" defer></script>
--->
