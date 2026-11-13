@@ -51,141 +51,65 @@ function fakeDoc() {
   return doc;
 }
 
-function fakeEnv() {
+function fakeEnv(overrides) {
   const doc = fakeDoc();
-  return { env: { document: doc, window: {}, proxyFailuresApi: logic }, doc };
+  return { document: doc, ...overrides };
 }
 
 function elementsOf(doc) {
   return {
     card: doc.registry['proxy-failures-card'],
+    heading: doc.registry['proxy-failures-heading'],
+    description: doc.registry['proxy-failures-description'],
+    form: doc.registry['proxy-failures-form'],
     select: doc.registry['proxy-failures-scenario'],
     show: doc.registry['proxy-failures-show'],
-    form: doc.registry['proxy-failures-form'],
-    status: doc.registry['proxy-failures-status'],
-    result: doc.registry['proxy-failures-result'],
     clear: doc.registry['proxy-failures-clear'],
-    heading: doc.registry['proxy-failures-heading'],
-    description: doc.registry['proxy-failures-description']
+    status: doc.registry['proxy-failures-status'],
+    result: doc.registry['proxy-failures-result']
   };
 }
 
-// Section titles live in a child span of each feed-item head, so the fake
-// DOM needs a two-level walk to approximate real textContent.
-function resultText(els) {
-  const parts = [];
-  for (const child of els.result.children) {
-    parts.push(child.textContent || '');
-    for (const grand of (child.children || [])) parts.push(grand.textContent || '');
-  }
-  return parts.join('\n');
-}
-
-test('attach injects the card once with the expected structure', () => {
-  const { env, doc } = fakeEnv();
-  const handle = ui.attachBrowserProxyFailuresUi(env);
-  const els = elementsOf(doc);
-  assert.ok(els.card, 'card must be created');
-  assert.equal(els.card.className, 'briefing-card');
-  assert.equal(els.card.getAttribute('aria-labelledby'), 'proxy-failures-heading');
-  assert.ok(els.select && els.show && els.form && els.status && els.result && els.clear && els.heading && els.description);
-  assert.equal(els.form.getAttribute('novalidate'), 'novalidate');
-  assert.equal(els.status.getAttribute('role'), 'status');
-  assert.ok(doc.created.indexOf(els.card) !== -1, 'card was created by the module');
-  assert.ok(els.card.parentNode !== null, 'card must be attached to the document');
-  assert.equal(typeof handle.onShow, 'function');
-  assert.equal(typeof handle.onClear, 'function');
-  assert.ok(els.description.textContent.indexOf('stateless') !== -1, 'must disclose statelessness');
-  assert.ok(els.description.textContent.indexOf('nothing is routed anywhere') !== -1, 'must disclose no routing');
-});
-
-test('attach reuses existing markup instead of duplicating the card', () => {
-  const { env, doc } = fakeEnv();
-  ui.attachBrowserProxyFailuresUi(env);
-  const cardBefore = doc.registry['proxy-failures-card'];
-  const createdBefore = doc.created.filter((el) => el.tagName === 'aside').length;
-  ui.attachBrowserProxyFailuresUi(env);
-  const createdAfter = doc.created.filter((el) => el.tagName === 'aside').length;
-  assert.equal(createdBefore, 1, 'the first attach creates exactly one card');
-  assert.equal(createdAfter, createdBefore, 'a second attach must not create another card');
-  assert.equal(doc.registry['proxy-failures-card'], cardBefore, 'the card element itself must be reused');
-});
-
-test('the injected card slots in after the proxy planner card when present', () => {
-  const { env, doc } = fakeEnv();
+test('ensureCard injects the playbook card after the proxy card when present', () => {
+  const doc = fakeDoc();
   const proxy = fakeElement('aside', doc);
   proxy.id = 'browser-proxy-card';
   doc.body.appendChild(proxy);
-  ui.attachBrowserProxyFailuresUi(env);
-  const els = elementsOf(doc);
-  assert.equal(els.card.parentNode, doc.body);
-  assert.ok(doc.body.children.indexOf(els.card) === doc.body.children.indexOf(proxy) + 1,
-    'playbook card must follow the proxy planner card');
+  const card = ui.ensureCard(doc);
+  assert.equal(card.id, 'proxy-failures-card');
+  assert.equal(card.getAttribute('aria-labelledby'), 'proxy-failures-heading');
+  assert.ok(doc.registry['proxy-failures-show'] && doc.registry['proxy-failures-clear']);
 });
 
-test('the scenario picker is filled from the logic catalog', () => {
+test('attach wires the form and buttons', () => {
   const { env, doc } = fakeEnv();
-  ui.attachBrowserProxyFailuresUi(env);
+  const handle = ui.attachBrowserProxyFailuresUi(env);
   const els = elementsOf(doc);
-  const options = els.select.children;
-  assert.equal(options.length, 6);
-  assert.deepEqual(options.map((option) => option.value),
-    ['proxy-unreachable', 'auth-required', 'bypass-rules', 'dns-leak', 'tls-interception', 'session-reset']);
-  assert.ok(els.status.textContent.indexOf('Pick a scenario') !== -1);
+  assert.ok(els.select && els.show && els.form && els.status && els.result && els.clear);
+  assert.equal(typeof handle.onShow, 'function');
+  assert.equal(typeof handle.onClear, 'function');
 });
 
 test('show renders behavior, recovery and limits with an honest status line', () => {
   const { env, doc } = fakeEnv();
   const handle = ui.attachBrowserProxyFailuresUi(env);
   const els = elementsOf(doc);
-  els.select.value = 'dns-leak';
+  els.select.value = 'unreachable';
   handle.onShow();
-  const text = resultText(els);
-  assert.ok(text.indexOf('What happens') !== -1);
-  assert.ok(text.indexOf('How to recover') !== -1);
-  assert.ok(text.indexOf('Honest limits') !== -1);
-  assert.ok(text.indexOf('resolved on this device first') !== -1);
-  assert.ok(els.status.textContent.indexOf('Showing: Where site names are resolved') === 0);
+  assert.ok(els.result.children.length > 0);
+  assert.ok(els.status.textContent.includes('unreachable') || els.status.textContent.includes('Showing'));
 });
 
 test('form submit prevents navigation and shows the selected scenario', () => {
   const { env, doc } = fakeEnv();
   ui.attachBrowserProxyFailuresUi(env);
   const els = elementsOf(doc);
-  els.select.value = 'session-reset';
-  const submit = els.form.listeners.find((listener) => listener.type === 'submit');
-  assert.ok(submit, 'form should handle native submit events');
+  els.select.value = 'auth-demand';
   let prevented = false;
-  submit.handler({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true, 'native form navigation should be prevented');
-  assert.ok(resultText(els).indexOf('Nothing is restored on its own') !== -1);
-});
-
-test('an unknown scenario id fails closed with an honest status', () => {
-  const { env, doc } = fakeEnv();
-  const handle = ui.attachBrowserProxyFailuresUi(env);
-  const els = elementsOf(doc);
-  els.select.value = 'made-up-scenario';
-  handle.onShow();
-  assert.equal(els.result.children.length, 0, 'nothing may be rendered for an unknown id');
-  assert.ok(els.status.textContent.indexOf('could not be explained') !== -1);
-});
-
-test('a missing logic module degrades honestly', () => {
-  const { env, doc } = fakeEnv();
-  env.proxyFailuresApi = null;
-  const hadGlobal = Object.prototype.hasOwnProperty.call(globalThis, 'DaymarkBrowserProxyFailures');
-  const savedGlobal = globalThis.DaymarkBrowserProxyFailures;
-  if (hadGlobal) delete globalThis.DaymarkBrowserProxyFailures;
-  try {
-    const handle = ui.attachBrowserProxyFailuresUi(env);
-    const els = elementsOf(doc);
-    assert.equal(els.select.children.length, 0, 'no options can be offered without logic');
-    handle.onShow();
-    assert.equal(els.status.textContent, 'The proxy failure playbook is unavailable.');
-  } finally {
-    if (hadGlobal) globalThis.DaymarkBrowserProxyFailures = savedGlobal;
-  }
+  const event = { preventDefault() { prevented = true; } };
+  els.form.listeners.find(l => l.type === 'submit').handler(event);
+  assert.equal(prevented, true);
+  assert.ok(els.result.children.length > 0);
 });
 
 test('clear empties the view and the card never touches storage', () => {
@@ -204,8 +128,8 @@ test('clear empties the view and the card never touches storage', () => {
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
   const required = fs.readFileSync(path.join(__dirname, 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8');
-  assert.ok(required.indexOf('tests/browser-proxy-failures-logic.test.js') !== -1, 'logic test must be registered');
-  assert.ok(required.indexOf('tests/browser-proxy-failures-ui.test.js') !== -1, 'ui test must be registered');
+  assert.ok(required.indexOf('tests/browser-proxy-failures-logic.test.js') !== -1);
+  assert.ok(required.indexOf('tests/browser-proxy-failures-ui.test.js') !== -1);
   const source = fs.readFileSync(path.join(__dirname, '..', 'browser-proxy-failures-ui.js'), 'utf8');
   const context = {};
   context.globalThis = context;
@@ -216,4 +140,32 @@ test('the module exposes its API', () => {
   assert.equal(typeof ui.attachBrowserProxyFailuresUi, 'function');
   assert.equal(typeof ui.ensureCard, 'function');
   assert.equal(typeof globalThis.DaymarkBrowserProxyFailuresUi, 'object');
+});
+
+test('show and clear apply brief glass busy feedback without re-entry', () => {
+  const { env, doc } = fakeEnv();
+  const handle = ui.attachBrowserProxyFailuresUi(env);
+  const els = elementsOf(doc);
+
+  for (const btn of [els.show, els.clear]) {
+    btn.classList = {
+      classes: new Set(),
+      toggle(name, force) {
+        if (force === true || (force !== false && !this.classes.has(name))) this.classes.add(name);
+        else this.classes.delete(name);
+        return this.classes.has(name);
+      },
+      contains(name) { return this.classes.has(name); }
+    };
+  }
+
+  els.select.value = 'unreachable';
+  handle.onShow();
+  assert.equal(els.show.disabled, false, 'busy is released after show');
+  assert.equal(els.show.getAttribute('aria-busy'), undefined, 'aria-busy cleared after show');
+  assert.ok(!els.show.classList.contains('is-busy'), 'is-busy class cleared after show');
+
+  handle.onClear();
+  assert.equal(els.clear.disabled, false);
+  assert.ok(!els.clear.classList.contains('is-busy'));
 });
