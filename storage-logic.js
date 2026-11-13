@@ -149,6 +149,8 @@
     return CATEGORIES.find((category) => category.id === id) || null;
   }
 
+  // daymark.tasks.generation.v1 is coordination metadata, not personal data;
+  // keep it outside these categories, byte counts, and user-data clear plans.
   // Every non-secret Daymark storage key managed by this card belongs to exactly
   // one category. The legacy secret-bearing webhook endpoint is deliberately
   // excluded: webhook privacy cleanup removes it without reading its value.
