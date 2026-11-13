@@ -25,6 +25,18 @@ function fakeElement(tag) {
     value: '',
     textContent: '',
     listeners: [],
+    classList: {
+      classes: new Set(),
+      toggle(name, force) {
+        if (force === undefined) {
+          if (this.classes.has(name)) this.classes.delete(name);
+          else this.classes.add(name);
+        } else if (force) this.classes.add(name);
+        else this.classes.delete(name);
+        return force === undefined ? this.classes.has(name) : force;
+      },
+      contains(name) { return this.classes.has(name); }
+    },
     addEventListener(type, handler) { this.listeners.push({ type, handler }); },
     dispatchEvent(event) {
       for (const listener of this.listeners) {
@@ -454,3 +466,28 @@ test('Clear refuses to erase a value changed in another tab', () => {
   assert.equal(elements['weather-now'].textContent, visible);
   assert.match(elements['weather-status'].textContent, /changed elsewhere/);
 });
+
+test('busy feedback is applied to both Refresh and Clear buttons during a request', async () => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const { env, elements } = fakeEnv({
+    place: 'Kolkata',
+    fetch: (url) => gate.then(() => {
+      if (String(url).includes('geocoding')) return streamResponse(GEOCODING_BODY);
+      return streamResponse(FORECAST_BODY);
+    })
+  });
+  const handle = ui.attachWeatherUi(env);
+  const refreshBtn = elements['weather-refresh'];
+  const clearBtn = elements['weather-clear'];
+  const pending = handle.onRefresh();
+  assert.equal(refreshBtn.disabled, true);
+  assert.equal(refreshBtn.classList.contains('is-busy'), true);
+  assert.equal(clearBtn.classList.contains('is-busy'), true);
+  release();
+  await pending;
+  assert.equal(refreshBtn.disabled, false);
+  assert.equal(refreshBtn.classList.contains('is-busy'), false);
+  assert.equal(clearBtn.classList.contains('is-busy'), false);
+});
+
