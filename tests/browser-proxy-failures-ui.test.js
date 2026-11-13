@@ -18,11 +18,23 @@ function fakeElement(tag, doc) {
     children: [],
     listeners: [],
     parentNode: null,
+    attrs: {},
+    classList: {
+      _classes: new Set(),
+      toggle(name, force) {
+        if (force === true) this._classes.add(name);
+        else if (force === false) this._classes.delete(name);
+        else if (this._classes.has(name)) this._classes.delete(name);
+        else this._classes.add(name);
+        return this._classes.has(name);
+      },
+      contains(name) { return this._classes.has(name); }
+    },
     appendChild(child) { child.parentNode = el; el.children.push(child); return child; },
     insertBefore(child, ref) { child.parentNode = el; el.children.push(child); return child; },
-    setAttribute(name, value) { el.attrs = el.attrs || {}; el.attrs[name] = String(value); },
-    removeAttribute(name) { if (el.attrs) delete el.attrs[name]; },
-    getAttribute(name) { return el.attrs ? el.attrs[name] : null; },
+    setAttribute(name, value) { el.attrs[name] = String(value); },
+    removeAttribute(name) { delete el.attrs[name]; },
+    getAttribute(name) { return el.attrs[name] || null; },
     addEventListener(type, handler) { el.listeners.push({ type, handler }); }
   };
   Object.defineProperty(el, 'firstChild', { get() { return el.children[0] || null; } });
@@ -70,8 +82,6 @@ function elementsOf(doc) {
   };
 }
 
-// Section titles live in a child span of each feed-item head, so the fake
-// DOM needs a two-level walk to approximate real textContent.
 function resultText(els) {
   const parts = [];
   for (const child of els.result.children) {
@@ -146,6 +156,8 @@ test('show renders behavior, recovery and limits with an honest status line', ()
   assert.ok(text.indexOf('Honest limits') !== -1);
   assert.ok(text.indexOf('resolved on this device first') !== -1);
   assert.ok(els.status.textContent.indexOf('Showing: Where site names are resolved') === 0);
+  assert.equal(els.show.classList.contains('is-busy'), false, 'busy class must be cleared after show');
+  assert.equal(els.show.getAttribute('aria-busy'), null, 'aria-busy must be cleared');
 });
 
 test('form submit prevents navigation and shows the selected scenario', () => {
@@ -198,8 +210,23 @@ test('clear empties the view and the card never touches storage', () => {
   handle.onClear();
   assert.equal(els.result.children.length, 0);
   assert.equal(els.status.textContent, 'Cleared. Pick a scenario and tap Show.');
+  assert.equal(els.show.classList.contains('is-busy'), false, 'busy class must be cleared after clear');
   const source = fs.readFileSync(path.join(__dirname, '..', 'browser-proxy-failures-ui.js'), 'utf8');
   assert.equal(source.indexOf('localStorage'), -1, 'the card must be stateless');
+});
+
+test('busy feedback is applied and released on show and clear', () => {
+  const { env, doc } = fakeEnv();
+  const handle = ui.attachBrowserProxyFailuresUi(env);
+  const els = elementsOf(doc);
+  // Force a path that sets and clears busy
+  els.select.value = 'dns-leak';
+  handle.onShow();
+  assert.equal(els.show.classList.contains('is-busy'), false);
+  assert.equal(els.clear.classList.contains('is-busy'), false);
+  handle.onClear();
+  assert.equal(els.show.classList.contains('is-busy'), false);
+  assert.equal(els.clear.classList.contains('is-busy'), false);
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {

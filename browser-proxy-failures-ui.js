@@ -111,8 +111,24 @@
     const resultEl = element('proxy-failures-result');
     const clearEl = element('proxy-failures-clear');
 
+    let busy = false;
+
     function status(message) {
       if (statusEl) statusEl.textContent = message || '';
+    }
+
+    function setBusy(isBusy) {
+      busy = isBusy;
+      if (showEl) {
+        if (showEl.classList && typeof showEl.classList.toggle === 'function') {
+          showEl.classList.toggle('is-busy', isBusy);
+          if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
+        }
+        if (typeof showEl.setAttribute === 'function') {
+          if (isBusy) showEl.setAttribute('aria-busy', 'true');
+          else showEl.removeAttribute('aria-busy');
+        }
+      }
     }
 
     function clearResult() {
@@ -154,43 +170,40 @@
       }
     }
 
-    function flashBusy(button) {
-      if (!button) return;
-      const hasClassList = button.classList && typeof button.classList.add === 'function';
-      if (hasClassList) button.classList.add('is-busy');
-      if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', 'true');
-      const release = () => {
-        if (hasClassList && typeof button.classList.remove === 'function') button.classList.remove('is-busy');
-        if (typeof button.removeAttribute === 'function') button.removeAttribute('aria-busy');
-      };
-      if (typeof setTimeout === 'function') setTimeout(release, 280);
-      else release();
-    }
-
     function onShow() {
-      flashBusy(showEl);
+      if (busy) return;
       if (!logic || typeof logic.explainScenario !== 'function') {
         clearResult();
         status('The proxy failure playbook is unavailable.');
         return;
       }
       const id = selectEl && typeof selectEl.value === 'string' ? selectEl.value : '';
-      const plan = logic.explainScenario(id);
-      clearResult();
-      if (!plan) {
-        status('That scenario could not be explained, so nothing is shown.');
-        return;
+      setBusy(true);
+      try {
+        const plan = logic.explainScenario(id);
+        clearResult();
+        if (!plan) {
+          status('That scenario could not be explained, so nothing is shown.');
+          return;
+        }
+        renderSection('What happens', plan.behavior);
+        renderSection('How to recover', plan.recovery);
+        renderSection('Honest limits', plan.limits);
+        status('Showing: ' + plan.title + ' · offline, nothing saved.');
+      } finally {
+        setBusy(false);
       }
-      renderSection('What happens', plan.behavior);
-      renderSection('How to recover', plan.recovery);
-      renderSection('Honest limits', plan.limits);
-      status('Showing: ' + plan.title + ' · offline, nothing saved.');
     }
 
     function onClear() {
-      flashBusy(clearEl);
-      clearResult();
-      status('Cleared. Pick a scenario and tap Show.');
+      if (busy) return;
+      setBusy(true);
+      try {
+        clearResult();
+        status('Cleared. Pick a scenario and tap Show.');
+      } finally {
+        setBusy(false);
+      }
     }
 
     fillScenarios();
@@ -214,6 +227,7 @@
       onShow,
       onClear,
       detach() {
+        setBusy(false);
         status('');
       }
     };
