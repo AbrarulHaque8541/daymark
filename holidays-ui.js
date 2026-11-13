@@ -67,6 +67,7 @@
         buttonEl.disabled = isBusy;
         if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
           buttonEl.classList.toggle('is-busy', isBusy);
+          if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
         }
         if (typeof buttonEl.setAttribute === 'function') {
           if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
@@ -299,6 +300,7 @@
     }
 
     function onClear() {
+      if (busy) return;
       // Clearing is explicit, but do not discard visible or saved data when its
       // current value cannot be read or has changed since this card loaded.
       if (!storageRequested) {
