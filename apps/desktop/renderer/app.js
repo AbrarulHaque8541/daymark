@@ -41,6 +41,11 @@ function activeTab() {
 function isActive(tab) {
   return tab.id === activeTabId;
 }
+function syncPageLoadingUi() {
+  const isLoading = Boolean(activeTab()?.isLoading);
+  $('page-loading-indicator').classList.toggle('is-loading', isLoading);
+  $('page-loading-status').textContent = isLoading ? 'Loading page' : '';
+}
 
 function renderTabs() {
   document.querySelectorAll('.tab').forEach((el) => {
@@ -64,6 +69,7 @@ function activateTab(id) {
   if (tab) {
     try { $('urlbar').value = tab.view.getURL() || HOME; } catch { /* noop */ }
   }
+  syncPageLoadingUi();
   renderTabs();
 }
 
@@ -79,6 +85,12 @@ function hideError() {
 
 function wireEvents(tab) {
   const v = tab.view;
+  const setLoading = (loading) => {
+    tab.isLoading = loading;
+    if (isActive(tab)) syncPageLoadingUi();
+  };
+  v.addEventListener('did-start-loading', () => setLoading(true));
+  v.addEventListener('did-stop-loading', () => setLoading(false));
   v.addEventListener('page-title-updated', (e) => {
     tab.title = e.title;
     renderTabs();
@@ -99,6 +111,7 @@ function wireEvents(tab) {
   });
   v.addEventListener('did-fail-load', (e) => {
     if (!e.isMainFrame || e.errorCode === -3) return; // -3 = aborted
+    setLoading(false);
     if (!isActive(tab)) return;
     const blocked = e.errorCode === -20 || e.errorCode === -501;
     showError(
@@ -115,12 +128,11 @@ function createTab(url = HOME) {
   const id = ++tabSeq;
   const view = document.createElement('webview');
   view.setAttribute('allowpopups', '');
-  view.setAttribute('src', url);
   view.classList.add('view');
   view.dataset.tabId = String(id);
   $('views').appendChild(view);
 
-  const tab = { id, view, title: 'New tab' };
+  const tab = { id, view, title: 'New tab', isLoading: Boolean(url) };
   tabs.push(tab);
 
   const el = document.createElement('div');
@@ -135,6 +147,7 @@ function createTab(url = HOME) {
   $('tabs').appendChild(el);
 
   wireEvents(tab);
+  view.setAttribute('src', url);
   activateTab(id);
   return tab;
 }
