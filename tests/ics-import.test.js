@@ -359,7 +359,7 @@ test('a malformed calendar envelope cannot write or partially import existing ta
   };
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
-    importApi: importer, logic, taskMutation: mutation, lockManager: locks, now: () => NOW
+    importApi: importer, logic, taskMutation, lockManager: locks, now: () => NOW
   });
   const event = {
     target: element,
@@ -526,9 +526,12 @@ test('import UI discloses invalid completion, invalid date values and ambiguous 
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
     importApi: importer,
-    taskMutation: mutation,
+    taskMutation,
     lockManager: locks,
-    logic: { validateStoredTasks: () => ({ tasks: [], rejectedCount: 0 }), isValidTask: () => true, hasDuplicateJsonKeys: () => false },
+    // The coordinator validates the base and desired snapshots through this hook, so it
+    // must return the tasks it was given; a stub returning [] would make every commit
+    // look like an empty merge and silently write nothing.
+    logic: { validateStoredTasks: (tasks) => ({ tasks: (tasks || []).slice(), rejectedCount: 0 }), isValidTask: () => true, hasDuplicateJsonKeys: () => false },
     now: () => NOW
   });
   await handle.onChange({

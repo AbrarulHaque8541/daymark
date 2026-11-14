@@ -180,11 +180,11 @@
             // A generic message here would hide whether nothing was written, the
             // store rejected the write, or another tab won the race.
             if (result.reason === 'cleared' || result.reason === 'task-clear-in-progress') {
-              throw new Error('local data was cleared while this file was being read; nothing was imported');
+              throw new Error('Tasks were cleared while this file was being read; nothing was imported');
             }
             if (result.reason === 'conflict' || result.reason === 'tasks-ambiguous'
                 || result.reason === 'invalid-snapshot') {
-              throw new Error('a task changed in another tab; nothing was imported');
+              throw new Error('the imported task conflicts with a newer task saved in another tab; nothing was imported');
             }
             if (result.reason === 'task-write-failed' || result.reason === 'generation-write-failed') {
               throw new Error('browser storage rejected the task write; nothing was imported');

@@ -109,9 +109,10 @@ function fakeEnv(options) {
     constructor(type, init) { this.type = type; this.key = init && init.key; }
   }
   const win = {
-    navigator: locks ? { locks } : {},
     StorageEvent: MockStorageEvent,
-    navigator: { locks: lockManager },
+    // One navigator, honouring opts.locks === false. The previous duplicate key
+    // made the second literal win, so the fail-closed case could never be tested.
+    navigator: locks ? { locks: lockManager } : {},
     dispatchEvent(event) { dispatched.push(event); return true; }
   };
   return {
@@ -520,7 +521,10 @@ test('import merges a non-conflicting task added by another tab while the file i
     'the newer task written by another tab is preserved');
   assert.ok(saved.some((task) => task.id === 'import-after-read'),
     'the imported task is added without replacing the newer task');
-  assert.equal(writes.length, 1, 'the merged snapshot is written once under the shared lock');
+  // The coordinator writes two keys under the lock: the generation counter, then the
+  // task snapshot. What matters is that the task store itself is written exactly once.
+  assert.equal(writes.filter((write) => write.key === ui.STORAGE_KEY).length, 1,
+    'the merged task snapshot is written once under the shared lock');
   assert.equal(dispatched.length, 1, 'the successful merge announces a same-tab refresh');
   assert.match(created.find((el) => el.id === 'import-status').textContent,
     /Imported 1 task from tasks\.csv/);
@@ -567,10 +571,13 @@ test('an import started before Clear All cannot recreate the cleared task list',
   });
   const pending = ui.attachImportUi(env).onChange(changeEvent(elements['import-file']));
   await readStarted;
-  await mutation.withTaskMutationLock(locks, () => {
-    const generation = mutation.incrementTaskGeneration(storage);
-    assert.deepEqual(generation, { ok: true, value: 1 });
+  await mutation.withExclusiveLock(locks, mutation.TASK_LOCK_NAME, () => {
+    const begun = mutation.beginTaskClear(storage);
+    assert.equal(begun.ok, true, 'the simulated Clear All claims the task clear');
     storage.removeItem(ui.STORAGE_KEY);
+    const finished = mutation.finishTaskClear(storage, true);
+    assert.equal(finished.ok, true, 'the simulated Clear All completes and advances the task epoch');
+    assert.equal(finished.value.taskEpoch, 1);
   });
   writes.length = 0;
   resolveText(csv);
@@ -578,7 +585,10 @@ test('an import started before Clear All cannot recreate the cleared task list',
 
   assert.equal(storageData[ui.STORAGE_KEY], undefined,
     'the file selected before Clear All cannot recreate the task key');
-  assert.equal(storageData[mutation.TASK_GENERATION_KEY], '1');
+  const clearedGeneration = mutation.readGeneration(storage);
+  assert.equal(clearedGeneration.ok, true);
+  assert.equal(clearedGeneration.value.taskEpoch, 1,
+    'the cleared task epoch is retained so a stale import can be rejected');
   assert.equal(writes.length, 0, 'a stale import performs no task write');
   assert.equal(dispatched.length, 0, 'a rejected import does not announce a save');
   assert.match(created.find((el) => el.id === 'import-status').textContent,

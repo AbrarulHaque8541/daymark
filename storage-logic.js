@@ -14,7 +14,7 @@
       id: 'tasks',
       label: 'Tasks',
       description: 'Your full task list with notes, steps, tags, and reminders.',
-      keys: ['daymark.tasks.v1', 'daymark.tasks.mutation.generation.v1']
+      keys: ['daymark.tasks.v1']
     },
     {
       id: 'task-backup',
