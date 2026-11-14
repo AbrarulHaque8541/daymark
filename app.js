@@ -1710,6 +1710,8 @@
   }
 
   function resetTaskViewPrefs() {
+    const alreadyDefault = state.filter === 'all' && state.sort === 'smart' && !state.query;
+    if (alreadyDefault) return;
     showToast('View reset to defaults');
     state.filter = 'all';
     state.sort = 'smart';
@@ -1717,7 +1719,10 @@
     const searchEl = $('#task-search');
     if (searchEl) searchEl.value = '';
     persistTaskViewPrefs();
+    const list = $('#task-list');
+    if (list) list.classList.add('is-resetting');
     render();
+    if (list) setTimeout(() => list.classList.remove('is-resetting'), 280);
   }
 
 
