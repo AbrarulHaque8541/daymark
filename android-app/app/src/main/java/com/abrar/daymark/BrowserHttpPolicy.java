@@ -41,7 +41,7 @@ final class BrowserHttpPolicy {
     /**
      * Returns true if this URL should be allowed in the browser.
      * HTTP and HTTPS are both allowed when ALLOW_HTTP is true.
-     * Non-web schemes (intent://, market://, etc.) are handled by app-link handoff, not here.
+     * Non-web scheme routing is handled separately by the browser URI policies, not here.
      */
     static boolean isAllowedWebScheme(String url) {
         if (url == null) return false;

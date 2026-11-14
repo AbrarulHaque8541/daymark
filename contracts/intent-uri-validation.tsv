@@ -1,50 +1,50 @@
 # case	expect	input	expected-target	expected-fallback
 # On reject rows, hyphens mark unasserted expected target and fallback values.
-valid-tg-package	accept	intent://scan/#Intent;scheme=tg;package=com.example.scan;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end	tg://scan/	-
+valid-mailto-package	accept	intent://scan/#Intent;scheme=mailto;package=com.example.scan;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end	mailto://scan/	-
 valid-https-fallback	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end	https://example.com/	https://example.com/product
 valid-http-fallback-port	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=http%3A%2F%2Fexample.com%3A8080%2Ffallback;end	https://example.com/	http://example.com:8080/fallback
 valid-literal-plus	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fa+b%3Fq%3Done+two;end	https://example.com/	https://example.com/a+b?q=one+two
 valid-encoded-plus	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fa%252Bb%3Fq%3Done%252Btwo;end	https://example.com/	https://example.com/a%2Bb?q=one%2Btwo
 valid-chooser	accept	intent://share/#Intent;scheme=https;end	https://share/	
-valid-tg-port	accept	intent://scan.example:8443/path#Intent;scheme=tg;end	tg://scan.example:8443/path	-
+valid-mailto-port	accept	intent://scan.example:8443/path#Intent;scheme=mailto;end	mailto://scan.example:8443/path	-
 reject-javascript-target	reject	intent://scan/#Intent;scheme=javascript;end		
 reject-vbscript-target	reject	intent://scan/#Intent;scheme=vbscript;end		
 reject-file-target	reject	intent://scan/#Intent;scheme=file;end		
 reject-content-target	reject	intent://scan/#Intent;scheme=content;end		
-reject-component	reject	intent://scan/#Intent;scheme=tg;component=com.evil/.Launch;end	-	-
-reject-selector	reject	intent://scan/#Intent;scheme=tg;SEL;end	-	-
-reject-launch-flags	reject	intent://scan/#Intent;scheme=tg;launchFlags=0x10000000;end	-	-
-reject-arbitrary-extra	reject	intent://scan/#Intent;scheme=tg;S.extra=secret;end	-	-
-reject-duplicate-scheme	reject	intent://scan/#Intent;scheme=tg;scheme=evil;end	-	-
-reject-invalid-package	reject	intent://scan/#Intent;scheme=tg;package=bad;end	-	-
-reject-send-action	reject	intent://scan/#Intent;scheme=tg;action=android.intent.action.SEND;end	-	-
-reject-default-category	reject	intent://scan/#Intent;scheme=tg;category=android.intent.category.DEFAULT;end	-	-
+reject-component	reject	intent://scan/#Intent;scheme=mailto;component=com.evil/.Launch;end	-	-
+reject-selector	reject	intent://scan/#Intent;scheme=mailto;SEL;end	-	-
+reject-launch-flags	reject	intent://scan/#Intent;scheme=mailto;launchFlags=0x10000000;end	-	-
+reject-arbitrary-extra	reject	intent://scan/#Intent;scheme=mailto;S.extra=secret;end	-	-
+reject-duplicate-scheme	reject	intent://scan/#Intent;scheme=mailto;scheme=evil;end	-	-
+reject-invalid-package	reject	intent://scan/#Intent;scheme=mailto;package=bad;end	-	-
+reject-send-action	reject	intent://scan/#Intent;scheme=mailto;action=android.intent.action.SEND;end	-	-
+reject-default-category	reject	intent://scan/#Intent;scheme=mailto;category=android.intent.category.DEFAULT;end	-	-
 reject-missing-scheme	reject	intent://scan/#Intent;package=com.example.app;end		
-reject-base-userinfo	reject	intent://user@scan/#Intent;scheme=tg;end	-	-
+reject-base-userinfo	reject	intent://user@scan/#Intent;scheme=mailto;end	-	-
 reject-fallback-userinfo	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fuser%3Asecret%40example.com%2Freset%3Ftoken%3Dfixture-secret;end		
 reject-fallback-invalid-port	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%3A99999%2Ffallback;end		
 reject-fallback-zero-port	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%3A0%2Ffallback;end		
 reject-fallback-non-web	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=javascript%3Aalert(1);end		
-reject-custom-target-invalid-port	reject	intent://scan.example:99999/#Intent;scheme=tg;end	-	-
-reject-custom-target-zero-port	reject	intent://scan.example:0/#Intent;scheme=tg;end	-	-
-reject-custom-target-empty-port	reject	intent://scan.example:/#Intent;scheme=tg;end	-	-
+reject-custom-target-invalid-port	reject	intent://scan.example:99999/#Intent;scheme=mailto;end	-	-
+reject-custom-target-zero-port	reject	intent://scan.example:0/#Intent;scheme=mailto;end	-	-
+reject-custom-target-empty-port	reject	intent://scan.example:/#Intent;scheme=mailto;end	-	-
 reject-http-target-invalid-port	reject	intent://example.com:99999/#Intent;scheme=https;end		
-reject-unsupported-key	reject	intent://scan/#Intent;scheme=tg;launchFlags=0x1;end	-	-
-reject-invalid-percent	reject	intent://scan/#Intent;scheme=tg;package=com.example%ZZ;end	-	-
-reject-base-fragment	reject	intent://scan/#part#Intent;scheme=tg;end	-	-
-reject-trailing-fragment	reject	intent://scan/#Intent;scheme=tg;end#fragment	-	-
-reject-missing-host	reject	intent:///path#Intent;scheme=tg;end	-	-
-reject-underscore-host	reject	intent://bad_host.example/#Intent;scheme=tg;end	-	-
-reject-empty-host-label	reject	intent://bad..example/#Intent;scheme=tg;end	-	-
-reject-numeric-final-label	reject	intent://example.123/#Intent;scheme=tg;end	-	-
-reject-non-ascii-base-host	reject	intent://münchen.de/#Intent;scheme=tg;end	-	-
-reject-uppercase-prefix	reject	INTENT://scan/#Intent;scheme=tg;end	-	-
-reject-whitespace-in-base	reject	intent://scan.example/path with space#Intent;scheme=tg;end	-	-
+reject-unsupported-key	reject	intent://scan/#Intent;scheme=mailto;launchFlags=0x1;end	-	-
+reject-invalid-percent	reject	intent://scan/#Intent;scheme=mailto;package=com.example%ZZ;end	-	-
+reject-base-fragment	reject	intent://scan/#part#Intent;scheme=mailto;end	-	-
+reject-trailing-fragment	reject	intent://scan/#Intent;scheme=mailto;end#fragment	-	-
+reject-missing-host	reject	intent:///path#Intent;scheme=mailto;end	-	-
+reject-underscore-host	reject	intent://bad_host.example/#Intent;scheme=mailto;end	-	-
+reject-empty-host-label	reject	intent://bad..example/#Intent;scheme=mailto;end	-	-
+reject-numeric-final-label	reject	intent://example.123/#Intent;scheme=mailto;end	-	-
+reject-non-ascii-base-host	reject	intent://münchen.de/#Intent;scheme=mailto;end	-	-
+reject-uppercase-prefix	reject	INTENT://scan/#Intent;scheme=mailto;end	-	-
+reject-whitespace-in-base	reject	intent://scan.example/path with space#Intent;scheme=mailto;end	-	-
 valid-fallback-secret-query	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Freset%3Ftoken%3Dfixture-secret;end	https://example.com/	https://example.com/reset?token=fixture-secret
 reject-invalid-utf8-fallback	reject	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fexample.com%2F%C3%28;end		
-reject-oversized-input	reject	intent://scan/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#Intent;scheme=tg;end	-	-
+reject-oversized-input	reject	intent://scan/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#Intent;scheme=mailto;end	-	-
 valid-http-target-dot-segments	accept	intent://example.com/a/../b#Intent;scheme=https;end	https://example.com/b	
-valid-tg-unicode-path	accept	intent://scan.example/straße#Intent;scheme=tg;end	tg://scan.example/stra%C3%9Fe	-
+valid-mailto-unicode-path	accept	intent://scan.example/straße#Intent;scheme=mailto;end	mailto://scan.example/stra%C3%9Fe	-
 valid-http-default-port	accept	intent://example.com:443/#Intent;scheme=https;end	https://example.com:443/	
 valid-idn-fallback	accept	intent://example.com/#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fm%C3%BCnchen.de%2Fstra%C3%9Fe;end	https://example.com/	https://xn--mnchen-3ya.de/stra%C3%9Fe
 reject-non-ascii-percent-hex	reject	intent://scan/#Intent;scheme=%７Ａ;end		
@@ -54,4 +54,7 @@ reject-devtools-target	reject	intent://scan/#Intent;scheme=devtools;end	-	-
 reject-view-source-target	reject	intent://scan/#Intent;scheme=view-source;end	-	-
 reject-unlisted-zxing-target	reject	intent://scan/#Intent;scheme=zxing;end	-	-
 reject-unlisted-custom-target	reject	intent://scan/#Intent;scheme=custom+scheme;end	-	-
-reject-non-web-chrome-fallback	reject	intent://example.com/#Intent;scheme=tg;S.browser_fallback_url=chrome%3A%2F%2Fsettings;end	-	-
+reject-non-web-chrome-fallback	reject	intent://example.com/#Intent;scheme=mailto;S.browser_fallback_url=chrome%3A%2F%2Fsettings;end	-	-
+reject-tg-target	reject	intent://scan/#Intent;scheme=tg;end	-	-
+reject-market-target	reject	intent://scan/#Intent;scheme=market;end	-	-
+reject-whatsapp-target	reject	intent://scan/#Intent;scheme=whatsapp;end	-	-

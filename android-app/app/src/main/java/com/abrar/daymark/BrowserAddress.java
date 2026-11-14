@@ -190,9 +190,6 @@ final class BrowserAddress {
         if (!Pattern.matches("^[a-z][a-z0-9+.-]*$", normalized)) return false;
         switch (normalized) {
             case "mailto": case "tel": case "sms": case "geo":
-            case "smsto": case "market": case "tg": case "telegram": case "whatsapp":
-            case "viber": case "spotify": case "youtube": case "chatgpt":
-            case "instagram": case "android-app":
                 return true;
             default: return false;
         }

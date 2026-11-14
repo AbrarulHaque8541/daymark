@@ -2,16 +2,24 @@ package com.abrar.daymark;
 
 public final class BrowserExternalLinkPolicySmoke {
     public static void main(String[] args) {
-        for (String scheme : new String[]{"mailto", "tel", "sms", "geo", "tg", "telegram",
-                "smsto", "market", "whatsapp", "TG", "viber", "spotify", "youtube",
-                "chatgpt", "instagram", "android-app"}) {
+        for (String scheme : new String[]{"mailto", "tel", "sms", "geo"}) {
             check(BrowserUriRoutingPolicy.routeForScheme(scheme)
                             == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION,
-                    scheme + " must remain usable through a confirmed Android handoff");
+                    scheme + " is an owner-approved Android handoff");
             check(BrowserAddress.shouldHandOffExternalScheme(true, true, scheme),
                     scheme + " main-frame user gesture may reach the confirmation dialog");
             check(BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, scheme),
                     scheme + " requires explicit handoff confirmation");
+        }
+
+        for (String scheme : new String[]{"tg", "market", "whatsapp", "telegram", "smsto",
+                "viber", "spotify", "youtube", "chatgpt", "instagram", "android-app", "TG"}) {
+            check(BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW,
+                    scheme + " is not an approved Android handoff and stays in Daymark WebView");
+            check(!BrowserAddress.shouldHandOffExternalScheme(true, true, scheme),
+                    scheme + " must not start an Android app");
+            check(!BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, scheme),
+                    scheme + " must not request Android handoff confirmation");
         }
 
         for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about",

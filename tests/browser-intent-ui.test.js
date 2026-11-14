@@ -48,27 +48,27 @@ test('attachBrowserIntentUi requires a document', () => {
   assert.throws(() => ui.attachBrowserIntentUi({}), /requires a document/);
 });
 
-test('planning a tg:// link renders an honest handoff plan', () => {
+test('planning a tg:// link renders a refusal instead of a handoff plan', () => {
   const doc = makeDoc(ALL_IDS);
   doc.elements['browser-intent-link'].value = 'tg://resolve?domain=example';
   const handle = ui.attachBrowserIntentUi({ document: doc, intentApi: engine });
   assert.equal(typeof handle.plan, 'function');
   handle.plan();
   const status = doc.elements['browser-intent-status'].textContent;
-  assert.match(status, new RegExp('Planned · Telegram deep link'));
+  assert.match(status, new RegExp('Planned · Blocked scheme'));
   assert.match(status, new RegExp('nothing was opened'));
   const result = doc.elements['browser-intent-result'];
   assert.equal(result.children[0].className, 'feed-item');
-  assert.equal(result.children[0].children[0].textContent, 'Telegram deep link');
+  assert.equal(result.children[0].children[0].textContent, 'Blocked scheme');
   const lines = result.children.slice(1).map((child) => child.textContent);
-  assert.ok(lines.some((line) => line.indexOf('no store redirect') !== -1));
+  assert.ok(lines.some((line) => line.indexOf('Action · nothing opens') !== -1));
   assert.ok(lines.some((line) => line.indexOf('Network · None here') === 0));
 });
 
 test('planning an intent:// link discloses the package and fallback', () => {
   const doc = makeDoc(ALL_IDS);
   doc.elements['browser-intent-link'].value =
-    'intent://scan/#Intent;scheme=tg;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
+    'intent://scan/#Intent;scheme=mailto;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
   ui.attachBrowserIntentUi({ document: doc, intentApi: engine });
   doc.elements['browser-intent-form'].listeners.submit[0]({ preventDefault() {} });
   const lines = doc.elements['browser-intent-result'].children.slice(1).map((child) => child.textContent);

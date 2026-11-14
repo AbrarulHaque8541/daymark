@@ -129,7 +129,8 @@ assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, scheme)
 assert "reject-component" in contract and "launchFlags=0x1" in contract
 for case in ("reject-chrome-target", "reject-chrome-extension-target", "reject-devtools-target",
              "reject-view-source-target", "reject-unlisted-zxing-target",
-             "reject-unlisted-custom-target", "reject-non-web-chrome-fallback"):
+             "reject-unlisted-custom-target", "reject-tg-target", "reject-market-target",
+             "reject-whatsapp-target", "reject-non-web-chrome-fallback"):
     assert case in contract, f"missing shared intent target/fallback regression: {case}"
 test_source = test.read_text(encoding="utf-8")
 assert 'launchFlags=0x00000001' in test_source

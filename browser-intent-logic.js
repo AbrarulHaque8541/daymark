@@ -7,7 +7,7 @@
  * BrowserExternalLinkPolicy / BrowserIntentLinkPolicy source guards)
  * and explains, in plain words, what would happen if the user followed
  * it: a normal web navigation, a user-triggered handoff to another app
- * (mailto/tel/sms), a Telegram deep link, an Android intent:// URI with
+ * (mailto/tel/sms/geo), an Android intent:// URI with
  * its package, fallback URL and chooser behavior, a blocked scheme, or
  * an honest refusal for anything this prototype cannot prove.
  *
@@ -24,14 +24,14 @@
   const MAX_ECHO_CHARS = 160;
 
   const WEB_SCHEMES = ['http', 'https'];
-  const EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms'];
-  const TELEGRAM_SCHEME = 'tg';
+  const EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms', 'geo'];
   const INTENT_SCHEME = 'intent';
   // Schemes that must never be treated as navigation or handoff targets.
   const BLOCKED_SCHEMES = [
     'javascript', 'data', 'vbscript', 'file', 'blob', 'about', 'chrome',
     'chrome-extension', 'market', 'view-source', 'ws', 'wss', 'ftp', 'ftps',
-    'gopher', 'content'
+    'gopher', 'content', 'tg', 'telegram', 'smsto', 'whatsapp', 'viber',
+    'spotify', 'youtube', 'chatgpt', 'instagram', 'android-app'
   ];
 
   // --- character helpers (code-point based, locale independent) ---------
@@ -77,10 +77,7 @@
   const INTENT_METADATA_KEYS = [
     'scheme', 'package', 'action', 'category', 'S.browser_fallback_url'
   ];
-  const INTENT_EXTERNAL_SCHEMES = [
-    'mailto', 'tel', 'sms', 'geo', 'smsto', 'market', 'tg', 'telegram',
-    'whatsapp', 'viber', 'spotify', 'youtube', 'chatgpt', 'instagram', 'android-app'
-  ];
+  const INTENT_EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms', 'geo'];
   const INTENT_SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]{0,63}$/;
   const INTENT_PACKAGE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/;
 
@@ -458,14 +455,6 @@
         reason: 'a user-triggered handoff to another app; Daymark only follows it from an explicit tap'
       };
     }
-    if (scheme === TELEGRAM_SCHEME) {
-      return {
-        kind: 'telegram-deep-link',
-        scheme: scheme,
-        target: truncateForEcho(rest),
-        reason: 'hands off to the Telegram app when it is installed; when it is not, nothing opens and Daymark stays in front'
-      };
-    }
     if (scheme === INTENT_SCHEME) {
       const parsedIntent = parseIntentUri(input);
       return parsedIntent.ok
@@ -521,18 +510,6 @@
         'Trigger · only an explicit user tap starts it',
         'If no app handles it · the handoff fails visibly and nothing else runs',
         'Return · control stays with Daymark'
-      ];
-      return base;
-    }
-    if (result.kind === 'telegram-deep-link') {
-      base.verdict = 'handoff';
-      base.title = 'Telegram deep link';
-      base.summary = result.reason;
-      base.lines = [
-        'Target · the Telegram app (' + result.target + ')',
-        'If Telegram is installed · Telegram opens on that link',
-        'If it is not installed · nothing opens; no store redirect and no web fallback',
-        'Return · Daymark stays in front either way'
       ];
       return base;
     }
@@ -601,7 +578,6 @@
     WEB_SCHEMES,
     EXTERNAL_SCHEMES,
     INTENT_EXTERNAL_SCHEMES,
-    TELEGRAM_SCHEME,
     INTENT_SCHEME,
     BLOCKED_SCHEMES,
     MAX_INPUT_CHARS,

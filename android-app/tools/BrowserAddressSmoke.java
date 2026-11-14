@@ -72,7 +72,9 @@ public final class BrowserAddressSmoke {
         }
         for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about",
                 "file", "content", "intent", "daymark-download", "ftp", "custom+scheme",
-                "vbscript", "chrome", "chrome-extension", "devtools", "view-source",
+                "vbscript", "chrome", "chrome-extension", "devtools", "view-source", "tg", "market",
+                "whatsapp", "telegram", "smsto", "viber", "spotify", "youtube", "chatgpt",
+                "instagram", "android-app",
                 "", "bad scheme", null}) {
             assert !BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
