@@ -21,7 +21,7 @@ assert "searches and sites open directly" in providers, "provider guide must exp
 assert "enabling Online alone sends no request" in providers, "provider guide must not imply that consent itself requests a page"
 assert "switch browsing Offline again from **Browser actions**" in providers
 assert "remains offline until the user enables Online" not in providers, "stale offline-mode guidance"
-assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress))" in activity
+assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in activity
 assert "BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY" in activity
 # UC-style browser home (owner request 2026-11-05): the home grid reuses the shared catalog and
 # the same tap handlers as the bottom provider chips, so tiles and chips cannot drift apart.

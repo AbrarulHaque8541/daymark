@@ -306,6 +306,8 @@ public final class MainActivity extends Activity {
     private LinearLayout browserScreen;
     private FrameLayout browserViewport;
     private View browserHomeView;
+    private LinearLayout browserHomeBookmarksSection;
+    private LinearLayout browserHomeBookmarkItems;
     private View browserAddressBarView;
     private BrowserAddressNoticeView browserAddressNoticeView;
     private HorizontalScrollView browserToolbarScroll;
@@ -351,6 +353,7 @@ public final class MainActivity extends Activity {
     private FrameLayout fullScreenWebContainer;
     private Spinner searchEngineSpinner;
     private CheckBox browserOnlineToggle;
+    private TextView browserSecurityMarker;
     private TextView browserStatus;
     private Button browserRetryButton;
     private Runnable browserStatusHideRunnable;
@@ -2134,6 +2137,10 @@ public final class MainActivity extends Activity {
         browserProviderRow = sitesScroll;
         // The provider shortcuts are placed after the weighted WebView below so they
         // remain a compact bottom strip while browsing.
+        browserSecurityMarker = text("Not encrypted", 11, palette.warning, Typeface.BOLD);
+        browserSecurityMarker.setVisibility(View.GONE);
+        browserSecurityMarker.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        panel.addView(browserSecurityMarker, bottomMargin(dp(2)));
         browserStatus = text("", 11, palette.muted, Typeface.NORMAL);
         browserStatus.setVisibility(View.GONE);
         browserStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -2208,6 +2215,15 @@ public final class MainActivity extends Activity {
             }).start();
         };
         mainHandler.postDelayed(browserStatusHideRunnable, 3500L);
+    }
+
+    private void updateBrowserSecurityMarker(String url) {
+        if (browserSecurityMarker == null) return;
+        boolean pageNotEncrypted = BrowserHttpPolicy.isHttp(url);
+        browserSecurityMarker.setText(pageNotEncrypted ? BrowserHttpPolicy.securityLabel(url) : "");
+        browserSecurityMarker.setContentDescription(pageNotEncrypted
+                ? "Not encrypted. This HTTP page has no transport security." : null);
+        browserSecurityMarker.setVisibility(pageNotEncrypted ? View.VISIBLE : View.GONE);
     }
 
     private void selectSearchEngine(BrowserAddress.SearchEngine engine) {
@@ -2523,6 +2539,62 @@ public final class MainActivity extends Activity {
         return tile;
     }
 
+    /** Optional, horizontally scrollable list of recently saved bookmark origins. */
+    private LinearLayout browserHomeBookmarksSection() {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        TextView heading = text("Saved sites", 11, palette.muted, Typeface.BOLD);
+        heading.setLetterSpacing(0.02f);
+        section.addView(heading, bottomMargin(dp(5)));
+
+        HorizontalScrollView rail = new HorizontalScrollView(this);
+        rail.setHorizontalScrollBarEnabled(false);
+        rail.setClipToPadding(false);
+        browserHomeBookmarkItems = new LinearLayout(this);
+        browserHomeBookmarkItems.setOrientation(LinearLayout.HORIZONTAL);
+        rail.addView(browserHomeBookmarkItems, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        section.addView(rail);
+        section.setVisibility(View.GONE);
+        browserHomeBookmarksSection = section;
+        return section;
+    }
+
+    /** Rebuilds the optional rail only from user-saved origins; browser history is never consulted. */
+    private void refreshBrowserHomeBookmarks() {
+        if (browserHomeBookmarksSection == null || browserHomeBookmarkItems == null) return;
+        browserHomeBookmarkItems.removeAllViews();
+        List<String> origins = BrowserBookmarkShortcuts.visibleOrigins(
+                browserPreferences.getString(BROWSER_BOOKMARKS_KEY, ""));
+        if (origins.isEmpty()) {
+            browserHomeBookmarksSection.setVisibility(View.GONE);
+            return;
+        }
+        browserHomeBookmarksSection.setVisibility(View.VISIBLE);
+        for (String origin : origins) {
+            String description = origin.startsWith("http://")
+                    ? "Open saved bookmark. HTTP sites are not encrypted: " + origin
+                    : "Open saved bookmark: " + origin;
+            browserHomeBookmarkItems.addView(browserHomeChip(
+                    browserBookmarkShortcutLabel(origin), description,
+                    () -> navigateBrowserTo(origin)));
+        }
+    }
+
+    private String browserBookmarkShortcutLabel(String origin) {
+        int separator = origin.indexOf("://");
+        if (separator < 0) return "Saved site";
+        String scheme = origin.substring(0, separator);
+        String host = origin.substring(separator + 3);
+        String prefix = "http".equalsIgnoreCase(scheme) ? "HTTP · " : "";
+        int maxHostLength = 22 - prefix.length();
+        if (host.length() > maxHostLength) {
+            host = host.substring(0, maxHostLength - 1) + "…";
+        }
+        return prefix + host;
+    }
+
+
     /**
      * Browser start page, deliberately quiet: a wordmark, one search pill, one compact
      * quick-access row and a single horizontally scrolling provider rail.
@@ -2557,6 +2629,9 @@ public final class MainActivity extends Activity {
         quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
                 this::showBrowserExtensionsManager), tileParams());
         home.addView(quickRow, bottomMargin(dp(8)));
+
+        home.addView(browserHomeBookmarksSection(), bottomMargin(dp(8)));
+        refreshBrowserHomeBookmarks();
 
         home.addView(browserHomeProviderRail(), bottomMargin(dp(2)));
 
@@ -2635,34 +2710,97 @@ public final class MainActivity extends Activity {
         browserDiagnostics.record(System.currentTimeMillis(), "navigate requested", address, null);
         final String safeAddress;
         try {
-            safeAddress = BrowserAddress.requireAllowedWebUrl(address);
+            safeAddress = BrowserAddress.requireAllowedBrowserNavigation(address);
         } catch (IllegalArgumentException exception) {
             quickCaptureInput.setError(exception.getMessage());
             return;
         }
-        browserSelfHealingPolicy.onUserNavigation(safeAddress);
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
-            confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress));
+        String scheme = Uri.parse(safeAddress).getScheme();
+        BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+        if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)
+                && browserNetworkPolicy.allowsRemoteLoads()) {
+            showToast(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE);
+        }
+        if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
+            showToast(BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE);
+        }
+        String destination = safeAddress;
+        if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
+            Intent external = BrowserUriHandoff.createBrowsableViewIntent(Uri.parse(safeAddress), null);
+            BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null);
             return;
         }
-        loadBrowserAddress(safeAddress);
+        if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
+            final BrowserIntentLinkPolicy.Decision decision;
+            try {
+                decision = BrowserIntentLinkPolicy.parse(safeAddress);
+            } catch (IllegalArgumentException invalid) {
+                showToast("This Android app link was not opened: " + invalid.getMessage());
+                return;
+            }
+            Uri target = Uri.parse(decision.targetUri);
+            if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())) {
+                showToast("This Android app link uses an unsupported target scheme. Nothing was opened.");
+                return;
+            }
+            if (BrowserUriRoutingPolicy.isWebScheme(target.getScheme())) {
+                try {
+                    // Even verified App Links and package-qualified intent fallbacks stay in Daymark.
+                    destination = BrowserAddress.requireAllowedWebUrl(decision.targetUri);
+                } catch (IllegalArgumentException invalid) {
+                    showToast("This Android app link contains an invalid web address.");
+                    return;
+                }
+            } else {
+                Intent external = BrowserUriHandoff.createBrowsableViewIntent(
+                        target, decision.packageName);
+                Runnable fallback = decision.fallbackUrl == null
+                        ? null : () -> navigateBrowserTo(decision.fallbackUrl);
+                BrowserUriHandoff.confirmAndOpen(this, external, decision.targetUri, fallback);
+                return;
+            }
+        }
+        final String webAddress = destination;
+        browserSelfHealingPolicy.onUserNavigation(webAddress);
+        if (BrowserUriRoutingPolicy.isWebScheme(Uri.parse(webAddress).getScheme())
+                && !browserNetworkPolicy.allowsRemoteLoads()) {
+            confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress));
+            return;
+        }
+        String destinationScheme = Uri.parse(webAddress).getScheme();
+        if (!browserNetworkPolicy.allowsRemoteLoads()
+            && !BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)) {
+            showToast(BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(destinationScheme)
+                    ? BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE
+                    : BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE);
+            return;
+        }
+        loadBrowserAddress(webAddress);
     }
 
     private void loadBrowserAddress(String address) {
         if (!webMode) return;
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
-            showBrowserOfflineStatus();
+        String scheme = Uri.parse(address).getScheme();
+        if (!browserNetworkPolicy.allowsRemoteLoads()
+                && !BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)) {
+            if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
+                showToast(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE);
+            } else {
+                showBrowserOfflineStatus();
+            }
             return;
         }
-        if (!ensureBrowserWebView()) {
+        if (!ensureBrowserWebView(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme))) {
             showBrowserOfflineStatus();
             return;
         }
         try {
-            BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-            // Unblock every retained tab too: enforceOffline() blocks all of them, and a
-            // background tab left blocked would silently drop loads with no callback (#221).
-            BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+            if (browserNetworkPolicy.allowsRemoteLoads()) {
+                BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
+                // Unblock every retained tab too: enforceOffline() blocks all of them, and a
+                // background tab left blocked would silently drop loads with no callback (#221).
+                BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+            }
             browserWebView.onResume();
             browserWebView.resumeTimers();
         } catch (SecurityException denied) {
@@ -2725,6 +2863,7 @@ public final class MainActivity extends Activity {
             pendingBrowserWebViewState = null;
         }
         if (restored && BrowserAddress.isAllowedWebUrl(browserWebView.getUrl())) {
+            updateBrowserSecurityMarker(browserWebView.getUrl());
             lastBrowserAddress = browserWebView.getUrl();
             browserPageLoading = true;
             browserLoadFailed = false;
@@ -2931,7 +3070,11 @@ public final class MainActivity extends Activity {
     }
 
     private boolean ensureBrowserWebView() {
-        if (!browserNetworkPolicy.allowsRemoteLoads()) return false;
+        return ensureBrowserWebView(false);
+    }
+
+    private boolean ensureBrowserWebView(boolean allowOfflineLocalNavigation) {
+        if (!browserNetworkPolicy.allowsRemoteLoads() && !allowOfflineLocalNavigation) return false;
         if (browserWebView != null) return true;
         final DaymarkWebView[] targetRef = new DaymarkWebView[1];
         browserWebView = new DaymarkWebView(this, browserNetworkPolicy,
@@ -2939,6 +3082,7 @@ public final class MainActivity extends Activity {
             @Override public void onPageStarted(String url) {
                 if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
                 resolveBrowserAddressNotice();
+                updateBrowserSecurityMarker(url);
                 cancelBrowserLoadWatchdog();
                 browserPageLoading = true;
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
@@ -2965,6 +3109,7 @@ public final class MainActivity extends Activity {
                 }
                 resolveBrowserAddressNotice();
                 browserSelfHealingPolicy.onPageLoaded(url);
+                updateBrowserSecurityMarker(url);
                 cancelBrowserLoadWatchdog();
                 if (stagedLoadWatchdog != null) stagedLoadWatchdog.onPageFinished(url);
                 browserPageLoading = false;
@@ -3088,6 +3233,7 @@ public final class MainActivity extends Activity {
                     StartupDiagnostics.record(StartupDiagnostics.BROWSER_RENDERER_RECREATE_FAILED,
                             new IllegalStateException("A replacement WebView could not be created."));
                 }
+                refreshBrowserHomeBookmarks();
                 if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
                 if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
                 if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -3227,12 +3373,14 @@ public final class MainActivity extends Activity {
         }
         if (browserWebView != null) browserWebView.setVisibility(View.GONE);
         browserWebView = null;
+        updateBrowserSecurityMarker(null);
         browserLastSearchQuery = "";
         if (!ensureBrowserWebView()) {
             showBrowserOfflineStatus();
             return;
         }
         browserWebView.setVisibility(View.GONE);
+        refreshBrowserHomeBookmarks();
         if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -3249,6 +3397,7 @@ public final class MainActivity extends Activity {
             else exitBrowserFullscreen();
         }
         browserWebView = tab;
+        updateBrowserSecurityMarker(tab.getUrl());
         // Re-assert the unblock for the shown tab: tabs blocked by an earlier Offline
         // transition must not silently drop loads after switching (#221).
         BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
@@ -3257,6 +3406,7 @@ public final class MainActivity extends Activity {
         for (DaymarkWebView openTab : browserTabs) {
             openTab.setVisibility(openTab == tab && hasPage ? View.VISIBLE : View.GONE);
         }
+        if (!hasPage) refreshBrowserHomeBookmarks();
         if (browserHomeView != null) browserHomeView.setVisibility(hasPage ? View.GONE : View.VISIBLE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(hasPage ? View.GONE : View.VISIBLE);
@@ -3282,10 +3432,12 @@ public final class MainActivity extends Activity {
         browserTabs.remove(closing);
         browserTabQueries.remove(closing);
         browserWebView = null;
+        updateBrowserSecurityMarker(null);
         if (browserFullscreenView != null) exitBrowserFullscreen();
         destroyBrowserWebView(closing, true);
         if (browserTabs.isEmpty()) {
             browserLastSearchQuery = "";
+            refreshBrowserHomeBookmarks();
             if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
             if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
             if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -3360,6 +3512,7 @@ public final class MainActivity extends Activity {
                             .setPositiveButton("Clear bookmarks", (confirm, selected) -> {
                                 browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY,
                                         BrowserHistory.clear()).apply();
+                                refreshBrowserHomeBookmarks();
                                 showToast("Bookmarks cleared.");
                             })
                             .show();
@@ -4559,6 +4712,7 @@ public final class MainActivity extends Activity {
 
     private void showBrowserHome() {
         discardBrowserWebView();
+        refreshBrowserHomeBookmarks();
         if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -5071,6 +5225,7 @@ public final class MainActivity extends Activity {
         browserTabs.clear();
         browserTabQueries.clear();
         browserWebView = null;
+        updateBrowserSecurityMarker(null);
         for (DaymarkWebView tab : openTabs) destroyBrowserWebView(tab, true);
         updateBrowserTabButton();
         syncBrowserButtons();
@@ -5079,6 +5234,7 @@ public final class MainActivity extends Activity {
     private void discardBrowserWebView(boolean stopLoading) {
         DaymarkWebView current = browserWebView;
         browserWebView = null;
+        updateBrowserSecurityMarker(null);
         if (current != null) {
             browserTabs.remove(current);
             destroyBrowserWebView(current, stopLoading);
@@ -5950,6 +6106,7 @@ public final class MainActivity extends Activity {
         // close/clear and Activity lifecycle paths own WebView disposal.
 
         webMode = enabled;
+        if (enabled) updateBrowserSecurityMarker(browserWebView == null ? null : browserWebView.getUrl());
         quickCaptureInput.setText(enabled ? "" : taskDraft);
         quickCaptureInput.setError(null);
         if (enabled && browserStatus != null) {

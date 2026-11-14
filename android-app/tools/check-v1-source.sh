@@ -306,7 +306,7 @@ assert "browserPreferences.edit().putBoolean" not in online_pref, "preference re
 assert "static boolean hasExplicitOptIn(boolean savedOnlineChoice, boolean savedConsent)" in network_policy
 assert "browserOnlineToggle = null;" in activity and "Internet access is requested when you search or open a site." in activity, "browser UI must not expose an Online/Offline toggle"
 assert "new CheckBox(this)" not in activity[activity.index("private View buildBrowserAddressBar()"):activity.index("private void navigateFromBrowserInput()")], "address bar must not create an Online/Offline checkbox"
-assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress))" in activity, "first navigation should continue after explicit network consent"
+assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in activity, "first web navigation should continue after explicit network consent"
 assert "confirmBrowserOnlineAccess()" in activity and "setPositiveButton(\"Enable Online\"" in activity, "Online must require confirmation after its disclosure"
 online_setter = activity.split("private void setBrowserOnlineEnabled(boolean enabled)", 1)[1].split("private void confirmBrowserOnlineAccess()", 1)[0]
 assert ".putBoolean(BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY, true)" in online_setter, "the explicit opt-in marker must be saved only when Online is enabled"
@@ -402,9 +402,23 @@ for method in ("navigateFromInput", "navigateFromBrowserInput"):
     body = re.search(r"private void " + method + r"\([^)]*\)\s*\{(.*?)\n    \}", activity, re.S)
     assert body and "navigateBrowserTo(address)" in body.group(1), f"{method} must use the validated browser navigation path"
 navigate_browser = re.search(r"private void navigateBrowserTo\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
-assert navigate_browser and "confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress))" in navigate_browser.group(1), "first navigation from Offline must request consent then continue the requested page"
+assert navigate_browser and "BrowserAddress.requireAllowedBrowserNavigation(address)" in navigate_browser.group(1), "typed browser navigation must use the scheme-aware navigation validator"
+assert navigate_browser and "BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW" in navigate_browser.group(1), "file/content navigation must reach WebView under unchanged local-access isolation"
+assert navigate_browser and "BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE" in navigate_browser.group(1), "typed file/content navigation must explain its restricted access"
+assert navigate_browser and "BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)" in navigate_browser.group(1) and "BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE" in navigate_browser.group(1), "typed excluded browser/system schemes must show their WebView-only reason"
+assert navigate_browser and "BrowserUriRoutingPolicy.routeForScheme(scheme)" in navigate_browser.group(1), "typed scheme routing must happen inside navigateBrowserTo before WebView loadUrl"
+assert navigate_browser and navigate_browser.group(1).index("BrowserUriRoutingPolicy.routeForScheme(scheme)") < navigate_browser.group(1).index("loadBrowserAddress(webAddress)"), "typed URI routing must decide handoff or WebView before app-initiated loadUrl"
+assert navigate_browser and "BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null)" in navigate_browser.group(1), "typed external schemes must require explicit confirmation before Android handoff"
+assert navigate_browser and "BrowserUriRoutingPolicy.isWebScheme(Uri.parse(webAddress).getScheme())" in navigate_browser.group(1), "only HTTP(S) navigation should request Online consent"
+assert navigate_browser and "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in navigate_browser.group(1), "HTTP(S) navigation from Offline must request consent then continue the requested page"
+assert navigate_browser and "BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)" in navigate_browser.group(1), "only explicitly local WebView schemes may proceed without Online"
+assert navigate_browser and "BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE" in navigate_browser.group(1), "other non-web schemes must be visibly blocked while Offline"
+assert navigate_browser and "BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE" in navigate_browser.group(1), "excluded schemes must be visibly refused while Offline without external handoff"
+assert navigate_browser and navigate_browser.group(1).index("BrowserUriHandoff.confirmAndOpen") < navigate_browser.group(1).index("confirmBrowserOnlineAccess"), "external handoffs must not be blocked by the web network-consent path"
 load_address = re.search(r"private void loadBrowserAddress\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
-assert load_address and "browserNetworkPolicy.allowsRemoteLoads()" in load_address.group(1), "final page-load boundary must still fail closed while Offline"
+assert load_address and "BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)" in load_address.group(1) and "browserNetworkPolicy.allowsRemoteLoads()" in load_address.group(1), "final page-load boundary must allow only explicit local WebView schemes while Offline"
+assert load_address and "if (browserNetworkPolicy.allowsRemoteLoads())" in load_address.group(1), "offline local/non-web dispatch must not invoke the explicit-Online WebView preparation gate"
+assert load_address and load_address.group(1).index("if (browserNetworkPolicy.allowsRemoteLoads())") < load_address.group(1).index("BrowserWorkspaceController.prepareForExplicitNavigation"), "network unblocking must remain conditional on Online permission"
 online_setting = re.search(r"private void setBrowserOnlineEnabled\(boolean enabled\)\s*\{(.*?)\n    \}", activity, re.S)
 assert online_setting and "browserNetworkPolicy.setOnlineEnabled(enabled)" in online_setting.group(1)
 assert online_setting and "showBrowserHome()" in online_setting.group(1)
@@ -415,9 +429,12 @@ assert discard and "destroyBrowserWebView(current, stopLoading)" in discard.grou
 assert destroy_webview and "setBlockNetworkLoads(true)" in destroy_webview.group(1) and "stopLoading()" in destroy_webview.group(1), "offline/background teardown must block and stop each closed page"
 on_pause = re.search(r"protected void onPause\(\)\s*\{(.*?)\n    \}", activity, re.S)
 assert on_pause and "browserWebView.pauseTimers()" in on_pause.group(1) and "discardBrowserWebView()" not in on_pause.group(1), "backgrounding must retain the WebView session and pause timers"
-ensure_webview = re.search(r"private boolean ensureBrowserWebView\(\)\s*\{(.*?)\n    \}", activity, re.S)
-assert ensure_webview and "if (!browserNetworkPolicy.allowsRemoteLoads()) return false;" in ensure_webview.group(1), "WebView construction must fail closed while Offline"
+ensure_webview = re.search(r"private boolean ensureBrowserWebView\(boolean allowOfflineLocalNavigation\)\s*\{(.*?)\n    \}", activity, re.S)
+assert ensure_webview and "if (!browserNetworkPolicy.allowsRemoteLoads() && !allowOfflineLocalNavigation) return false;" in ensure_webview.group(1), "Offline WebView construction must require the explicit local-navigation predicate"
+ensure_default = re.search(r"private boolean ensureBrowserWebView\(\)\s*\{(.*?)\n    \}", activity, re.S)
+assert ensure_default and "return ensureBrowserWebView(false);" in ensure_default.group(1), "all default WebView creation paths must remain blocked while Offline"
 load_address = re.search(r"private void loadBrowserAddress\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
+assert load_address and "ensureBrowserWebView(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme))" in load_address.group(1), "only the explicit local WebView scheme set may initialize a WebView while Offline"
 workspace_controller = (main / "java/com/abrar/daymark/BrowserWorkspaceController.java").read_text(encoding="utf-8")
 prepare_navigation = re.search(r"static void prepareForExplicitNavigation\(BrowserNetworkPolicy policy, DaymarkWebView target\)\s*\{(.*?)\n    \}", workspace_controller, re.S)
 enforce_offline = re.search(r"static void enforceOffline\(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs\)\s*\{(.*?)\n    \}", workspace_controller, re.S)

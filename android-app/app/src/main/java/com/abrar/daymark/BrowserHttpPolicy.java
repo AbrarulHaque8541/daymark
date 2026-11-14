@@ -5,7 +5,8 @@ package com.abrar.daymark;
  *
  * <p>Contributes to #348 P0 "Support HTTP and HTTPS deliberately":
  * - Explicitly entered HTTP URLs are allowed (not silently rewritten to HTTPS)
- * - Each HTTP page load is flagged as "not encrypted" in the UI status
+ * - Each active HTTP page keeps a persistent "Not encrypted" marker in the browser UI
+ * - Transient status messages continue to explain the HTTP transport state
  * - Updater and other app network clients remain HTTPS-only (separate code path)
  *
  * <p>This is a deliberate product decision: the browser supports HTTP + HTTPS,
@@ -40,7 +41,7 @@ final class BrowserHttpPolicy {
     /**
      * Returns true if this URL should be allowed in the browser.
      * HTTP and HTTPS are both allowed when ALLOW_HTTP is true.
-     * Non-web schemes (intent://, market://, etc.) are handled by app-link handoff, not here.
+     * Non-web scheme routing is handled separately by the browser URI policies, not here.
      */
     static boolean isAllowedWebScheme(String url) {
         if (url == null) return false;
