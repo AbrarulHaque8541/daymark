@@ -25,7 +25,7 @@
     {
       id: 'task-view',
       label: 'Task list view preference',
-      description: 'The last filter and search text used for the task list, so your preferred view returns on the next visit.',
+      description: 'The last filter, search text, and sort order used for the task list, so your preferred view returns on the next visit.',
       keys: ['daymark.task-view.v1']
     },
     {
