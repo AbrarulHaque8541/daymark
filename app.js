@@ -1,1 +1,1 @@
-$(cat /tmp/app.js)
+PLACEHOLDER_APP
