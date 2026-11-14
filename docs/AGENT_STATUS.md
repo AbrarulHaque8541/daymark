@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-14T00:50:00Z (Cycle B verification of storage fencing + clear-completed busy polish)](./CURRENT_STATUS_20261114T005000Z.md)
 - [Daymark engineering status — 2026-11-13T16:23:00Z (address-bar insights card, branch feat/url-insights-vibe-20261113)](./CURRENT_STATUS_20261113T162300Z.md)
 - [Daymark engineering status — 2026-11-13T04:39:18Z (keyless GitHub release radar card, branch feat/release-radar-vibe-20261113)](./CURRENT_STATUS_20261113T043900Z.md)
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
@@ -96,16 +97,9 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261112T045000Z.md](./CURRENT_STATUS_20261112T045000Z.md) — branch `feat/daylight-card-vibe-20261112` cut from main `df9cb64e`; keyless daylight and UV planner card (web-only, self-injecting markup, index.html untouched); sandbox harness 18/18 logic + 14/15 UI checks PASS (one harness await artifact); npm test/Gradle locally NOT RUN (no toolchain); CI is the authoritative gate. Snapshot UTC 2026-11-12T04:50:00Z.
+- [CURRENT_STATUS_20261114T005000Z.md](./CURRENT_STATUS_20261114T005000Z.md) — Cycle B verification: Cycle A storage fencing complete on main `a3bdcbe`; small clear-completed busy spinner consistency polish added. Physical device NOT TESTED.
+- Previous: [CURRENT_STATUS_20261112T045000Z.md](./CURRENT_STATUS_20261112T045000Z.md) — branch `feat/daylight-card-vibe-20261112` cut from main `df9cb64e`; keyless daylight and UV planner card (web-only, self-injecting markup, index.html untouched); sandbox harness 18/18 logic + 14/15 UI checks PASS (one harness await artifact); npm test/Gradle locally NOT RUN (no toolchain); CI is the authoritative gate. Snapshot UTC 2026-11-12T04:50:00Z.
 - Previous reviewed snapshot: [CURRENT_STATUS_20261111T192431Z.md](./CURRENT_STATUS_20261111T192431Z.md) — current main `0145b03db05abd9ca4554431f9a9f690f13f497c`; 755 branches / 8 open PRs / 23 open issues; Android, Ubuntu/Windows contracts and desktop CI PASS after #744; #648 API 36 instrumentation process-start still unresolved with new diagnostics queued; #747 disclosure CI 4/4 PASS; #749 desktop cancellation follow-up Desktop CI PASS and remaining checks running. Snapshot UTC 2026-11-11T19:24:31.951Z.
-- Previous reviewed snapshot: [CURRENT_STATUS_20261111T191142Z.md](./CURRENT_STATUS_20261111T191142Z.md) — 19:11Z main `9f1c0451` pre-desktop-merge baseline.
-
-Z.md](./CURRENT_STATUS_20261111T191142Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 754 branches / 8 open PRs / 23 open issues; main Android CI 916/916 and cross-platform contracts PASS; #648 API 29 PASS / API 36 still running with bounded startup diagnostics; #747 complete localStorage disclosure expanded, four exact-head workflows running; task/Clear All/download/governance P0 blockers remain. Snapshot UTC 2026-11-11T19:11:42.986Z.
-- Previous reviewed snapshot: [CURRENT_STATUS_20261111T174430Z.md](./CURRENT_STATUS_20261111T174430Z.md) — 17:44Z main `9f1c0451` baseline.
-
-Z.md](./CURRENT_STATUS_20261111T174430Z.md) — current main `9f1c0451e767f97ef4ed5edf4340c34895b14c22`; 753 branches / 8 open PRs / 23 open issues; main Node 916/916; #744 current head 922/922 with 4/4 workflows; #747 919/919 with 4/4 workflows; #648 exact workflow_dispatch run #43061555620 failed (API29 211 assertions; API36 timeout at run 1/10); #748 checks pending on its docs branch; P0 task/Clear All/Android download/Focus/governance blockers remain.
-- Previous mainline snapshot: [CURRENT_STATUS_20261111T170455Z.md](./CURRENT_STATUS_20261111T170455Z.md) — 17:04Z pre-#746 baseline.
-- Previous mainline snapshot: [CURRENT_STATUS_20261111T131135Z.md](./CURRENT_STATUS_20261111T131135Z.md) — earlier baseline.
 
 ## Before acting
 
