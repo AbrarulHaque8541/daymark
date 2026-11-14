@@ -1717,6 +1717,7 @@
     if (searchEl) searchEl.value = '';
     persistTaskViewPrefs();
     render();
+    showToast('View reset to defaults');
   }
 
 
@@ -2183,6 +2184,12 @@
     } else if (event.key === 'n' && !$('#edit-dialog').open) {
       event.preventDefault();
       $('#new-title').focus();
+    } else if ((event.key === 'r' || event.key === 'R') && !$('#edit-dialog').open) {
+      const resetBtn = $('#reset-view');
+      if (resetBtn && !resetBtn.hidden && !resetBtn.disabled) {
+        event.preventDefault();
+        resetTaskViewPrefs();
+      }
     }
   }
 
@@ -2409,7 +2416,11 @@
     });
     const resetViewBtn = $('#reset-view');
     if (resetViewBtn) {
-      resetViewBtn.addEventListener('click', resetTaskViewPrefs);
+      resetViewBtn.addEventListener('click', () => {
+        resetViewBtn.classList.add('is-pressed');
+        setTimeout(() => resetViewBtn.classList.remove('is-pressed'), 160);
+        resetTaskViewPrefs();
+      });
     }
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
