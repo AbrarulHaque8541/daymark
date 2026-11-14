@@ -232,3 +232,13 @@
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
 }
+
+/* Focus-within accent edge for task composer, filters, and tools — consistent keyboard navigation. */
+.composer:focus-within,
+.filters:focus-within,
+.task-tools:focus-within {
+  border-color: rgba(22, 112, 95, 0.45);
+  box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+  border-radius: 16px;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
