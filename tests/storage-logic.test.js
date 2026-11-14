@@ -30,6 +30,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
   const expectedKeys = [
     'daymark.tasks.v1',
     'daymark.tasks.v1.backup',
+    'daymark.task-view.v1',
     'daymark.focus.v1',
     'daymark.focus.preset.v1',
     'daymark.focus.v1.backup',
@@ -104,6 +105,7 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
 
 test('planClear returns the exact keys and rejects unknown categories', () => {
   assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
+  assert.deepEqual(storage.planClear('task-view'), ['daymark.task-view.v1']);
   assert.deepEqual(storage.planClear('focus-preset'), ['daymark.focus.preset.v1']);
   assert.deepEqual(storage.planClear('browser-proxy'), ['daymark.browser-proxy.last-profile']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
@@ -122,6 +124,7 @@ test('planClear returns the exact keys and rejects unknown categories', () => {
   const plan = storage.planClear('tasks');
   plan.push('daymark.tasks.v1');
   assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
+  assert.deepEqual(storage.planClear('task-view'), ['daymark.task-view.v1']);
 });
 
 test('estimateBytes measures UTF-8 bytes and treats non-strings as zero', () => {

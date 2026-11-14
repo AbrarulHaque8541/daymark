@@ -6,6 +6,7 @@
   const FOCUS_KEY = 'daymark.focus.v1';
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
   const FOCUS_PRESET_KEY = 'daymark.focus.preset.v1';
+  const TASK_VIEW_KEY = 'daymark.task-view.v1';
   const FEED_KEY = 'daymark.feed.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
   const PRIORITIES = ['low', 'medium', 'high'];
@@ -886,6 +887,7 @@
   function clearSearch() {
     state.query = '';
     $('#task-search').value = '';
+    persistTaskViewPrefs();
     render();
     $('#task-search').focus();
   }
@@ -943,6 +945,7 @@
     state.filter = 'all';
     state.query = '';
     $('#task-search').value = '';
+    persistTaskViewPrefs();
     render();
     titleInput.focus();
     const saved = await save;
@@ -1664,6 +1667,38 @@
     return null;
   }
 
+  const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed']);
+
+  function loadTaskViewPrefs() {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(TASK_VIEW_KEY);
+    } catch (error) {
+      return { filter: 'all', query: '' };
+    }
+    if (!raw) return { filter: 'all', query: '' };
+    try {
+      const parsed = JSON.parse(raw);
+      const filter = parsed && VALID_FILTERS.has(parsed.filter) ? parsed.filter : 'all';
+      const query = parsed && typeof parsed.query === 'string' ? parsed.query.slice(0, 200) : '';
+      return { filter, query };
+    } catch (error) {
+      return { filter: 'all', query: '' };
+    }
+  }
+
+  function persistTaskViewPrefs() {
+    try {
+      localStorage.setItem(TASK_VIEW_KEY, JSON.stringify({
+        filter: state.filter,
+        query: state.query || ''
+      }));
+    } catch (error) {
+      // Preference persistence is best-effort; a full storage quota must not break the list.
+    }
+  }
+
+
   async function persistFocusPreset(expectedClearEpoch) {
     if (!taskMutation || !taskLockManager || !taskMutation.TASK_AND_FOCUS_LOCK_ORDER) return false;
     const result = await taskMutation.withClearEpochLock(
@@ -2089,6 +2124,7 @@
         label: 'View list',
         run: () => {
           state.filter = 'all';
+          persistTaskViewPrefs();
           render();
         }
       });
@@ -2318,6 +2354,11 @@
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
     focusRecoveryMaintenance = scheduleFocusRecoveryMaintenance();
+    const savedView = loadTaskViewPrefs();
+    state.filter = savedView.filter;
+    state.query = savedView.query;
+    const searchEl = $('#task-search');
+    if (searchEl) searchEl.value = state.query;
     const savedPreset = loadFocusPreset();
     if (savedPreset) state.focusPreset = savedPreset;
     state.feedCache = loadFeedCache();
@@ -2333,6 +2374,7 @@
     $('#new-due-time').addEventListener('change', syncNewDueTime);
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
+      persistTaskViewPrefs();
       render();
     });
     $('#clear-search').addEventListener('click', clearSearch);
@@ -2353,6 +2395,7 @@
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
+      persistTaskViewPrefs();
       render();
     }));
     taskList.addEventListener('click', handleTaskAction);

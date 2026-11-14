@@ -23,6 +23,12 @@
       keys: ['daymark.tasks.v1.backup']
     },
     {
+      id: 'task-view',
+      label: 'Task list view preference',
+      description: 'The last filter and search text used for the task list, so your preferred view returns on the next visit.',
+      keys: ['daymark.task-view.v1']
+    },
+    {
       id: 'focus',
       label: 'Focus timer',
       description: 'The current Focus session and its completed-session history log.',
