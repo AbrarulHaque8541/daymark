@@ -7,8 +7,6 @@ const path = require('node:path');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../export-ui.js');
-const fs = require('node:fs');
-const path = require('node:path');
 
 function fakeElement(tag) {
   return {
