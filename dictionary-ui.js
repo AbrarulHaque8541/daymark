@@ -161,14 +161,39 @@
       if (!resultEl || !record) return;
       clearResult();
       const entry = record.entry;
-      const parts = [entry.word + (entry.phonetic ? ' /' + entry.phonetic + '/' : '')];
-      entry.definitions.forEach((def, index) => {
-        let line = (index + 1) + '. ' + (def.partOfSpeech ? def.partOfSpeech + ': ' : '') + def.definition;
-        if (def.definitionTruncated) line += ' (definition truncated)';
-        if (def.example) line += ' (e.g. ' + def.example + (def.exampleTruncated ? ', truncated)' : ')');
-        parts.push(line);
+
+      const header = doc.createElement('div');
+      header.className = 'dictionary-header';
+      const wordStrong = doc.createElement('strong');
+      wordStrong.textContent = entry.word;
+      header.appendChild(wordStrong);
+      if (entry.phonetic) {
+        const phoneticSpan = doc.createElement('span');
+        phoneticSpan.className = 'dictionary-phonetic';
+        phoneticSpan.textContent = ' /' + entry.phonetic + '/';
+        header.appendChild(phoneticSpan);
+      }
+      resultEl.appendChild(header);
+
+      const list = doc.createElement('ul');
+      list.className = 'dictionary-definitions';
+      entry.definitions.forEach((def) => {
+        const li = doc.createElement('li');
+        if (def.partOfSpeech) {
+          const pos = doc.createElement('em');
+          pos.textContent = def.partOfSpeech + ': ';
+          li.appendChild(pos);
+        }
+        li.appendChild(doc.createTextNode(def.definition + (def.definitionTruncated ? ' (definition truncated)' : '')));
+        if (def.example) {
+          const example = doc.createElement('span');
+          example.className = 'dictionary-example';
+          example.textContent = ' (e.g. ' + def.example + (def.exampleTruncated ? ', truncated)' : ')');
+          li.appendChild(example);
+        }
+        list.appendChild(li);
       });
-      resultEl.appendChild(doc.createTextNode(parts.join(' \u00b7 ')));
+      resultEl.appendChild(list);
     }
 
     async function onLookup() {
