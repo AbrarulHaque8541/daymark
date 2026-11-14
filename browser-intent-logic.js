@@ -77,11 +77,16 @@
   const INTENT_METADATA_KEYS = [
     'scheme', 'package', 'action', 'category', 'S.browser_fallback_url'
   ];
-  const INTENT_BLOCKED_SCHEMES = [
-    'intent', 'javascript', 'vbscript', 'file', 'content', 'data', 'blob', 'about'
+  const INTENT_EXTERNAL_SCHEMES = [
+    'mailto', 'tel', 'sms', 'geo', 'smsto', 'market', 'tg', 'telegram',
+    'whatsapp', 'viber', 'spotify', 'youtube', 'chatgpt', 'instagram', 'android-app'
   ];
   const INTENT_SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]{0,63}$/;
   const INTENT_PACKAGE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/;
+
+  function isSupportedIntentTargetScheme(scheme) {
+    return WEB_SCHEMES.indexOf(scheme) !== -1 || INTENT_EXTERNAL_SCHEMES.indexOf(scheme) !== -1;
+  }
 
   function decodeIntentMetadata(value) {
     // decodeURIComponent preserves literal '+'; Android's URLDecoder adapter
@@ -341,8 +346,8 @@
       return fail('the intent URI has no valid target scheme');
     }
     scheme = scheme.toLowerCase();
-    if (INTENT_BLOCKED_SCHEMES.indexOf(scheme) !== -1) {
-      return fail('the intent target scheme is blocked');
+    if (!isSupportedIntentTargetScheme(scheme)) {
+      return fail('the intent target scheme is not HTTP(S) or on Daymark\'s explicit Android handler list');
     }
 
     const action = values.action == null ? null : values.action;
@@ -595,6 +600,7 @@
     truncateForEcho,
     WEB_SCHEMES,
     EXTERNAL_SCHEMES,
+    INTENT_EXTERNAL_SCHEMES,
     TELEGRAM_SCHEME,
     INTENT_SCHEME,
     BLOCKED_SCHEMES,

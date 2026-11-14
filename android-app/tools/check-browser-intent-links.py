@@ -28,7 +28,12 @@ for token in ('value.startsWith("intent://")', '"#Intent;"', 'value.endsWith(";e
               'CodingErrorAction.REPORT',
               'MAX_INPUT_LENGTH = 2048',
               'hasExplicitEmptyPort(baseUri)',
-              'hasExplicitEmptyPort(targetUri)'):
+              'hasExplicitEmptyPort(targetUri)',
+              'static boolean isSupportedTargetScheme(String scheme)',
+              'BrowserUriRoutingPolicy.isWebScheme(scheme)',
+              'BrowserAddress.isExplicitExternalScheme(scheme)',
+              'if (!isSupportedTargetScheme(scheme))',
+              'Android app link target scheme is not supported.'):
     assert token in policy, f"Intent URI parser missing {token}"
 for forbidden in ('Character.digit(', '"component".equals(key)', '"selector".equals(key)',
                   '"launchFlags".equals(key)', '"S.".equals(key)'):
@@ -37,6 +42,13 @@ for forbidden in ('Character.digit(', '"component".equals(key)', '"selector".equ
 assert "BrowserIntentLinkPolicy.parse(value)" in webview
 assert "BrowserUriHandoff.createBrowsableViewIntent(" in webview
 assert "BrowserUriHandoff.confirmAndOpen(" in webview
+intent_handler = webview.split("private boolean handleIntentLink(WebView view, String value)", 1)[1].split("\n    }", 1)[0]
+target_guard = "if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme))"
+assert target_guard in intent_handler and "unsupported target scheme. Nothing was opened." in intent_handler, \
+    "unsupported resolved target schemes must show a visible refusal"
+assert intent_handler.index(target_guard) < intent_handler.index("BrowserUriHandoff.createBrowsableViewIntent(") \
+    and intent_handler.index("return true;", intent_handler.index(target_guard)) < intent_handler.index("BrowserUriHandoff.createBrowsableViewIntent("), \
+    "unsupported resolved targets must return before any Android intent or chooser is created"
 assert "new Intent(Intent.ACTION_VIEW, uri)" in handoff
 assert "external.addCategory(Intent.CATEGORY_BROWSABLE)" in handoff
 assert "external.setPackage(packageName)" in handoff
@@ -48,7 +60,14 @@ assert '"No compatible Android app could be resolved. Nothing was opened."' in h
 assert '.setPositiveButton("Open"' in handoff
 assert '"Stay in Daymark"' in handoff
 assert '"This Android app link was not opened: " + invalid.getMessage()' in activity
-assert '"This Android app link was blocked because its Intent data is unsafe."' in webview
+assert '"This Android app link was not opened: its target or Intent data is unsupported or unsafe."' in webview
+assert '"This Android app link uses an unsupported target scheme. Nothing was opened."' in webview
+typed_intent = activity.split("if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION)", 1)[1]
+typed_intent = typed_intent.split("final String webAddress", 1)[0]
+typed_target_guard = "BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())"
+assert typed_target_guard in typed_intent and "unsupported target scheme. Nothing was opened." in typed_intent \
+    and typed_intent.index(typed_target_guard) < typed_intent.index("BrowserUriHandoff.createBrowsableViewIntent("), \
+    "typed intent targets must be visibly rejected before Android handoff"
 assert "BrowserUriRoutingPolicy.routeForScheme(scheme)" in webview
 assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(" in webview
 intent_route = webview.split('if ("intent".equalsIgnoreCase(scheme))', 1)[1].split("// Verified HTTP(S)", 1)[0]
@@ -108,8 +127,15 @@ assert "BrowserAddress.resolveInput(address," in typed_test, "typed URI input mu
 assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, scheme)" in callback_test, \
     "in-page links must have separate main-frame/gesture callback tests"
 assert "reject-component" in contract and "launchFlags=0x1" in contract
-assert 'launchFlags=0x00000001' in test.read_text(encoding="utf-8")
-assert 'launchFlags=0x00000003' in test.read_text(encoding="utf-8")
+for case in ("reject-chrome-target", "reject-chrome-extension-target", "reject-devtools-target",
+             "reject-view-source-target", "reject-unlisted-zxing-target",
+             "reject-unlisted-custom-target", "reject-non-web-chrome-fallback"):
+    assert case in contract, f"missing shared intent target/fallback regression: {case}"
+test_source = test.read_text(encoding="utf-8")
+assert 'launchFlags=0x00000001' in test_source
+assert 'launchFlags=0x00000003' in test_source
+assert 'isSupportedTargetScheme(scheme)' in test_source and '"chrome"' in test_source \
+    and '"devtools"' in test_source, "Android host tests must exercise excluded schemes through the target allowlist"
 assert "Intent.parseUri(" not in webview, "untrusted serialized Intent objects must never be launched"
 assert "BrowserIntentLinkPolicySmoke.java" in runner
 assert "BrowserIntentLinkPolicy.java" in runner

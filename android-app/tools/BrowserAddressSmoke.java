@@ -47,15 +47,23 @@ public final class BrowserAddressSmoke {
         for (String address : new String[]{"javascript:alert(1)", "data:text/html,hello",
                 "file:///etc/passwd", "content://com.example/private",
                 "mailto:user@example.com", "tel:+18005550100", "sms:+18005550100",
-                "geo:37.7749,-122.4194", "intent://scan/#Intent;scheme=zxing;end",
+                "geo:37.7749,-122.4194", "intent://scan/#Intent;scheme=tg;end",
                 "ftp://example.com/file"}) {
             assert BrowserAddress.resolveInput(address, BrowserAddress.SearchEngine.DUCKDUCKGO)
                     .equals(address) : "explicit URI scheme must reach route selection: " + address;
         }
+        for (String address : new String[]{"file:///etc/passwd", "content://com.example/private"}) {
+            String scheme = URI.create(BrowserAddress.resolveInput(address,
+                    BrowserAddress.SearchEngine.DUCKDUCKGO)).getScheme();
+            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW
+                    : "typed local resources must reach WebView routing: " + address;
+            assert BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)
+                    : "typed local resources may initialize WebView while Offline: " + address;
+        }
         for (String address : new String[]{"javascript:alert(1)", "data:text/html,hello",
                 "file:///etc/passwd", "content://com.example/private", "mailto:user@example.com",
                 "tel:+18005550100", "sms:+18005550100", "geo:37.7749,-122.4194",
-                "intent://scan/#Intent;scheme=zxing;end", "ftp://example.com/file"}) {
+                "intent://scan/#Intent;scheme=tg;end", "ftp://example.com/file"}) {
             assert !BrowserAddress.isAllowedWebUrl(address)
                     : "web-only validation must remain HTTP(S)-strict: " + address;
         }

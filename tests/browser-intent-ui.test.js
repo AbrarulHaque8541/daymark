@@ -68,7 +68,7 @@ test('planning a tg:// link renders an honest handoff plan', () => {
 test('planning an intent:// link discloses the package and fallback', () => {
   const doc = makeDoc(ALL_IDS);
   doc.elements['browser-intent-link'].value =
-    'intent://scan/#Intent;scheme=zxing;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
+    'intent://scan/#Intent;scheme=tg;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
   ui.attachBrowserIntentUi({ document: doc, intentApi: engine });
   doc.elements['browser-intent-form'].listeners.submit[0]({ preventDefault() {} });
   const lines = doc.elements['browser-intent-result'].children.slice(1).map((child) => child.textContent);

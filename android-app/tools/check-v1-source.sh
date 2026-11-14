@@ -429,9 +429,12 @@ assert discard and "destroyBrowserWebView(current, stopLoading)" in discard.grou
 assert destroy_webview and "setBlockNetworkLoads(true)" in destroy_webview.group(1) and "stopLoading()" in destroy_webview.group(1), "offline/background teardown must block and stop each closed page"
 on_pause = re.search(r"protected void onPause\(\)\s*\{(.*?)\n    \}", activity, re.S)
 assert on_pause and "browserWebView.pauseTimers()" in on_pause.group(1) and "discardBrowserWebView()" not in on_pause.group(1), "backgrounding must retain the WebView session and pause timers"
-ensure_webview = re.search(r"private boolean ensureBrowserWebView\(\)\s*\{(.*?)\n    \}", activity, re.S)
-assert ensure_webview and "if (!browserNetworkPolicy.allowsRemoteLoads()) return false;" in ensure_webview.group(1), "WebView construction must fail closed while Offline"
+ensure_webview = re.search(r"private boolean ensureBrowserWebView\(boolean allowOfflineLocalNavigation\)\s*\{(.*?)\n    \}", activity, re.S)
+assert ensure_webview and "if (!browserNetworkPolicy.allowsRemoteLoads() && !allowOfflineLocalNavigation) return false;" in ensure_webview.group(1), "Offline WebView construction must require the explicit local-navigation predicate"
+ensure_default = re.search(r"private boolean ensureBrowserWebView\(\)\s*\{(.*?)\n    \}", activity, re.S)
+assert ensure_default and "return ensureBrowserWebView(false);" in ensure_default.group(1), "all default WebView creation paths must remain blocked while Offline"
 load_address = re.search(r"private void loadBrowserAddress\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
+assert load_address and "ensureBrowserWebView(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme))" in load_address.group(1), "only the explicit local WebView scheme set may initialize a WebView while Offline"
 workspace_controller = (main / "java/com/abrar/daymark/BrowserWorkspaceController.java").read_text(encoding="utf-8")
 prepare_navigation = re.search(r"static void prepareForExplicitNavigation\(BrowserNetworkPolicy policy, DaymarkWebView target\)\s*\{(.*?)\n    \}", workspace_controller, re.S)
 enforce_offline = re.search(r"static void enforceOffline\(BrowserNetworkPolicy policy, List<DaymarkWebView> tabs\)\s*\{(.*?)\n    \}", workspace_controller, re.S)

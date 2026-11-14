@@ -9,10 +9,10 @@ import java.util.List;
 public final class BrowserIntentLinkPolicySmoke {
     public static void main(String[] args) throws Exception {
         BrowserIntentLinkPolicy.Decision app = BrowserIntentLinkPolicy.parse(
-                "intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;"
+                "intent://scan/#Intent;scheme=tg;package=com.example.scan;"
                         + "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end");
-        check("zxing://scan/".equals(app.targetUri), "custom app target scheme and path are preserved");
-        check("com.google.zxing.client.android".equals(app.packageName),
+        check("tg://scan/".equals(app.targetUri), "allowlisted app target scheme and path are preserved");
+        check("com.example.scan".equals(app.packageName),
                 "valid package target is parsed without trusting a component name");
         check(app.fallbackUrl == null, "fallback is optional");
 
@@ -71,30 +71,39 @@ public final class BrowserIntentLinkPolicySmoke {
                 "percent-encoded plus inside fallback URL is decoded once, not twice");
 
         BrowserIntentLinkPolicy.Decision packageOnly = BrowserIntentLinkPolicy.parse(
-                "intent://open/#Intent;scheme=myapp;package=com.example.mobile;end");
-        check("myapp://open/".equals(packageOnly.targetUri), "custom app scheme is supported");
+                "intent://open/#Intent;scheme=tg;package=com.example.mobile;end");
+        check("tg://open/".equals(packageOnly.targetUri), "allowlisted app scheme is supported");
+        check(BrowserIntentLinkPolicy.isSupportedTargetScheme("https"), "HTTPS intent targets are supported");
+        check(BrowserIntentLinkPolicy.isSupportedTargetScheme("tg"), "explicit app targets are supported");
+        for (String scheme : new String[]{"chrome", "chrome-extension", "devtools", "view-source",
+                "vbscript", "zxing", "custom+scheme"}) {
+            check(!BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme),
+                    scheme + " is not an explicit Android app target");
+            expectFailure("intent://scan/#Intent;scheme=" + scheme + ";end",
+                    "unsupported intent target scheme rejected: " + scheme);
+        }
 
         expectFailure(null, "missing URI rejected");
         expectFailure("https://example.com", "ordinary web links are not parsed as Intent URIs");
         expectFailure("intent://scan/", "missing Intent metadata rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing", "missing end marker rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;component=com.evil/.Launch;end",
+        expectFailure("intent://scan/#Intent;scheme=tg", "missing end marker rejected");
+        expectFailure("intent://scan/#Intent;scheme=tg;component=com.evil/.Launch;end",
                 "explicit component launch rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;SEL;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;SEL;end",
                 "selectors and bare Intent flags rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x10000000;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;launchFlags=0x10000000;end",
                 "arbitrary launch flags rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x00000001;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;launchFlags=0x00000001;end",
                 "URI read-grant flag rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x00000002;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;launchFlags=0x00000002;end",
                 "URI write-grant flag rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x00000003;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;launchFlags=0x00000003;end",
                 "combined URI read/write-grant flags rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;S.extra=secret;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;S.extra=secret;end",
                 "arbitrary extras rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;action=android.intent.action.SEND;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;action=android.intent.action.SEND;end",
                 "non-view actions rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;category=android.intent.category.DEFAULT;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;category=android.intent.category.DEFAULT;end",
                 "non-browsable categories rejected");
         expectFailure("intent://scan/#Intent;scheme=javascript;end",
                 "script execution scheme rejected");
@@ -104,15 +113,17 @@ public final class BrowserIntentLinkPolicySmoke {
                 "content provider scheme rejected");
         expectFailure("intent://scan/#Intent;scheme=intent;end",
                 "nested intent scheme rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;package=bad;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;package=bad;end",
                 "invalid package name rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;scheme=evil;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;scheme=evil;end",
                 "duplicate scheme metadata rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;S.browser_fallback_url=file%3A%2F%2F%2Fetc%2Fpasswd;end",
+        expectFailure("intent://scan/#Intent;scheme=tg;S.browser_fallback_url=file%3A%2F%2F%2Fetc%2Fpasswd;end",
                 "non-web fallback rejected");
-        expectFailure("intent://user@scan/#Intent;scheme=zxing;end",
+        expectFailure("intent://example.com/#Intent;scheme=tg;S.browser_fallback_url=chrome%3A%2F%2Fsettings;end",
+                "browser/system fallback scheme rejected");
+        expectFailure("intent://user@scan/#Intent;scheme=tg;end",
                 "embedded credentials rejected");
-        expectFailure("intent://scan/#Intent;scheme=zxing;end#fragment",
+        expectFailure("intent://scan/#Intent;scheme=tg;end#fragment",
                 "trailing fragments rejected");
 
         if (args.length > 0) verifySharedContract(Path.of(args[0]));
@@ -133,7 +144,7 @@ public final class BrowserIntentLinkPolicySmoke {
             if ("accept".equals(expected)) {
                 BrowserIntentLinkPolicy.Decision decision = BrowserIntentLinkPolicy.parse(input);
                 check(fields[3].equals(decision.targetUri), name + " target mismatch: " + decision.targetUri);
-                String fallback = fields[4].isEmpty() ? null : fields[4];
+                String fallback = fields[4].isEmpty() || "-".equals(fields[4]) ? null : fields[4];
                 check(java.util.Objects.equals(fallback, decision.fallbackUrl), name + " fallback mismatch");
                 accepted++;
             } else if ("reject".equals(expected)) {
@@ -143,7 +154,7 @@ public final class BrowserIntentLinkPolicySmoke {
                 throw new AssertionError("unknown shared Intent fixture expectation: " + expected);
             }
         }
-        check(accepted == 12 && rejected == 36, "shared Intent fixture must contain all forty-eight cases");
+        check(accepted == 12 && rejected == 43, "shared Intent fixture must contain all fifty-five cases");
         System.out.println("PASS shared Android/web Intent URI contract: " + accepted + " accepted, " + rejected + " rejected");
     }
 
