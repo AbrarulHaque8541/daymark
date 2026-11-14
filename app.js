@@ -2169,6 +2169,20 @@
         || target.isContentEditable));
   }
 
+  const FILTER_LABELS = { all: 'All', today: 'Today', upcoming: 'Upcoming', overdue: 'Overdue', completed: 'Completed' };
+  const FILTER_KEYS = { '1': 'all', '2': 'today', '3': 'upcoming', '4': 'overdue', '5': 'completed' };
+
+  function setTaskFilter(filter) {
+    if (!FILTER_LABELS[filter] || state.filter === filter) return;
+    state.filter = filter;
+    persistTaskViewPrefs();
+    showToast(`Showing ${FILTER_LABELS[filter]}`);
+    const list = $('#task-list');
+    if (list) list.classList.add('is-filtering');
+    render();
+    if (list) setTimeout(() => list.classList.remove('is-filtering'), 280);
+  }
+
   function handleShortcut(event) {
     if (event.defaultPrevented) return;
     const search = $('#task-search');
@@ -2195,6 +2209,9 @@
     } else if ((event.key === 's' || event.key === 'S') && !$('#edit-dialog').open) {
       event.preventDefault();
       $('#sort-toggle').click();
+    } else if (FILTER_KEYS[event.key] && !$('#edit-dialog').open) {
+      event.preventDefault();
+      setTaskFilter(FILTER_KEYS[event.key]);
     }
   }
 
@@ -2437,9 +2454,7 @@
       if (file) await importTasks(file);
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
-      state.filter = button.dataset.filter;
-      persistTaskViewPrefs();
-      render();
+      setTaskFilter(button.dataset.filter);
     }));
     taskList.addEventListener('click', handleTaskAction);
     $('#edit-form').addEventListener('submit', saveEdit);
