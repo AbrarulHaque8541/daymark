@@ -1,3 +1,4 @@
+- [Daymark engineering status - 2026-11-14T09:35:00Z (Cycle A task view sort preference persistence)](./CURRENT_STATUS_20261114T093500Z.md)
 - [Daymark engineering status - 2026-11-14T08:35:00Z (Cycle A task view preference persistence)](./CURRENT_STATUS_20261114T083500Z.md)
 - [Daymark engineering status - 2026-11-14T04:40:00Z (Cycle B dictionary structured results polish)](./CURRENT_STATUS_20261114T044000Z.md)
 - [Daymark engineering status - 2026-11-14T04:22:09Z (keyless dictionary lookup card, branch feat/dictionary-card-vibe-20261114)](./CURRENT_STATUS_20261114T042209Z.md)
