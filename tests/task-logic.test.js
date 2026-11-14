@@ -277,6 +277,7 @@ test('repeat metadata matches the shared Android/web validation contract', () =>
     'a numeric month-end anchor is valid after date clamping');
   assert.equal(logic.isValidTask({ ...dated, repeat: '', repeatDayOfMonth: null }), true,
     'the legacy empty repeat sentinel is treated as absent');
+});
 test('task ordering compares createdAt instants rather than their offset-bearing strings', () => {
   const earlier = task('earlier', 'Earlier instant', { createdAt: '2026-11-10T10:00:00+01:00' });
   const later = task('later', 'Later instant', { createdAt: '2026-11-10T09:30:00Z' });
