@@ -306,6 +306,8 @@ public final class MainActivity extends Activity {
     private LinearLayout browserScreen;
     private FrameLayout browserViewport;
     private View browserHomeView;
+    private LinearLayout browserHomeBookmarksSection;
+    private LinearLayout browserHomeBookmarkItems;
     private View browserAddressBarView;
     private BrowserAddressNoticeView browserAddressNoticeView;
     private HorizontalScrollView browserToolbarScroll;
@@ -2523,6 +2525,62 @@ public final class MainActivity extends Activity {
         return tile;
     }
 
+    /** Optional, horizontally scrollable list of recently saved bookmark origins. */
+    private LinearLayout browserHomeBookmarksSection() {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        TextView heading = text("Saved sites", 11, palette.muted, Typeface.BOLD);
+        heading.setLetterSpacing(0.02f);
+        section.addView(heading, bottomMargin(dp(5)));
+
+        HorizontalScrollView rail = new HorizontalScrollView(this);
+        rail.setHorizontalScrollBarEnabled(false);
+        rail.setClipToPadding(false);
+        browserHomeBookmarkItems = new LinearLayout(this);
+        browserHomeBookmarkItems.setOrientation(LinearLayout.HORIZONTAL);
+        rail.addView(browserHomeBookmarkItems, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        section.addView(rail);
+        section.setVisibility(View.GONE);
+        browserHomeBookmarksSection = section;
+        return section;
+    }
+
+    /** Rebuilds the optional rail only from user-saved origins; browser history is never consulted. */
+    private void refreshBrowserHomeBookmarks() {
+        if (browserHomeBookmarksSection == null || browserHomeBookmarkItems == null) return;
+        browserHomeBookmarkItems.removeAllViews();
+        List<String> origins = BrowserBookmarkShortcuts.visibleOrigins(
+                browserPreferences.getString(BROWSER_BOOKMARKS_KEY, ""));
+        if (origins.isEmpty()) {
+            browserHomeBookmarksSection.setVisibility(View.GONE);
+            return;
+        }
+        browserHomeBookmarksSection.setVisibility(View.VISIBLE);
+        for (String origin : origins) {
+            String description = origin.startsWith("http://")
+                    ? "Open saved bookmark. HTTP sites are not encrypted: " + origin
+                    : "Open saved bookmark: " + origin;
+            browserHomeBookmarkItems.addView(browserHomeChip(
+                    browserBookmarkShortcutLabel(origin), description,
+                    () -> navigateBrowserTo(origin)));
+        }
+    }
+
+    private String browserBookmarkShortcutLabel(String origin) {
+        int separator = origin.indexOf("://");
+        if (separator < 0) return "Saved site";
+        String scheme = origin.substring(0, separator);
+        String host = origin.substring(separator + 3);
+        String prefix = "http".equalsIgnoreCase(scheme) ? "HTTP · " : "";
+        int maxHostLength = 22 - prefix.length();
+        if (host.length() > maxHostLength) {
+            host = host.substring(0, maxHostLength - 1) + "…";
+        }
+        return prefix + host;
+    }
+
+
     /**
      * Browser start page, deliberately quiet: a wordmark, one search pill, one compact
      * quick-access row and a single horizontally scrolling provider rail.
@@ -2557,6 +2615,9 @@ public final class MainActivity extends Activity {
         quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
                 this::showBrowserExtensionsManager), tileParams());
         home.addView(quickRow, bottomMargin(dp(8)));
+
+        home.addView(browserHomeBookmarksSection(), bottomMargin(dp(8)));
+        refreshBrowserHomeBookmarks();
 
         home.addView(browserHomeProviderRail(), bottomMargin(dp(2)));
 
@@ -3088,6 +3149,7 @@ public final class MainActivity extends Activity {
                     StartupDiagnostics.record(StartupDiagnostics.BROWSER_RENDERER_RECREATE_FAILED,
                             new IllegalStateException("A replacement WebView could not be created."));
                 }
+                refreshBrowserHomeBookmarks();
                 if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
                 if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
                 if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -3233,6 +3295,7 @@ public final class MainActivity extends Activity {
             return;
         }
         browserWebView.setVisibility(View.GONE);
+        refreshBrowserHomeBookmarks();
         if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -3257,6 +3320,7 @@ public final class MainActivity extends Activity {
         for (DaymarkWebView openTab : browserTabs) {
             openTab.setVisibility(openTab == tab && hasPage ? View.VISIBLE : View.GONE);
         }
+        if (!hasPage) refreshBrowserHomeBookmarks();
         if (browserHomeView != null) browserHomeView.setVisibility(hasPage ? View.GONE : View.VISIBLE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(hasPage ? View.GONE : View.VISIBLE);
@@ -3286,6 +3350,7 @@ public final class MainActivity extends Activity {
         destroyBrowserWebView(closing, true);
         if (browserTabs.isEmpty()) {
             browserLastSearchQuery = "";
+            refreshBrowserHomeBookmarks();
             if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
             if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
             if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
@@ -3360,6 +3425,7 @@ public final class MainActivity extends Activity {
                             .setPositiveButton("Clear bookmarks", (confirm, selected) -> {
                                 browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY,
                                         BrowserHistory.clear()).apply();
+                                refreshBrowserHomeBookmarks();
                                 showToast("Bookmarks cleared.");
                             })
                             .show();
@@ -4559,6 +4625,7 @@ public final class MainActivity extends Activity {
 
     private void showBrowserHome() {
         discardBrowserWebView();
+        refreshBrowserHomeBookmarks();
         if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);

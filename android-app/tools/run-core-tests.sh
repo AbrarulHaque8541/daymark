@@ -8,6 +8,7 @@ python3 "$ROOT/tools/check-task-template-source.py" "$ROOT"
 python3 "$ROOT/tools/check-splash-source.py" "$ROOT"
 python3 "$ROOT/tools/check-task-open-export.py" "$ROOT"
 python3 "$ROOT/tools/check-browser-provider-query.py" "$ROOT"
+python3 "$ROOT/tools/check-browser-bookmark-shortcuts.py" "$ROOT"
 python3 "$ROOT/tools/check-browser-intent-links.py" "$ROOT"
 javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/host-stubs/android/content/Context.java" \
@@ -58,6 +59,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentLinkPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserIntentHandoffPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHistory.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserBookmarkShortcuts.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLogPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserNetworkPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserOfflineEnforcement.java" \
@@ -103,6 +105,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/TaskOpenExportSmoke.java" \
   "$ROOT/tools/BrowserExtensionSmoke.java" \
   "$ROOT/tools/BrowserHistorySmoke.java" \
+  "$ROOT/tools/BrowserBookmarkShortcutsSmoke.java" \
   "$ROOT/tools/ActivityCallbackGateSmoke.java" \
   "$ROOT/tools/UpdaterSmoke.java" \
   "$ROOT/tools/GitHubTransportSmoke.java" \
@@ -152,6 +155,7 @@ java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskSnapshotCodecSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.TaskOpenExportSmoke "$ROOT/../contracts/task-export-fixture.json"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserExtensionSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserHistorySmoke
+java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserBookmarkShortcutsSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.ActivityCallbackGateSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.UpdaterSmoke
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.updater.GitHubTransportSmoke
