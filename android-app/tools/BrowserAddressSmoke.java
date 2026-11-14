@@ -59,11 +59,13 @@ public final class BrowserAddressSmoke {
             assert !BrowserAddress.isAllowedWebUrl(address)
                     : "web-only validation must remain HTTP(S)-strict: " + address;
         }
-        for (String scheme : new String[]{"mailto", "tel", "sms", "geo", "ftp", "custom+scheme"}) {
+        for (String scheme : new String[]{"mailto", "tel", "sms", "geo"}) {
             assert BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
         for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about",
-                "file", "content", "intent", "daymark-download", "", "bad scheme", null}) {
+                "file", "content", "intent", "daymark-download", "ftp", "custom+scheme",
+                "vbscript", "chrome", "chrome-extension", "devtools", "view-source",
+                "", "bad scheme", null}) {
             assert !BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
         assert BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, "intent");
@@ -72,9 +74,9 @@ public final class BrowserAddressSmoke {
         assert BrowserUriRoutingPolicy.routeForScheme("javascript") == BrowserUriRoutingPolicy.Route.WEBVIEW;
         assert BrowserUriRoutingPolicy.routeForScheme("data") == BrowserUriRoutingPolicy.Route.WEBVIEW;
         assert BrowserUriRoutingPolicy.routeForScheme("file")
-                == BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED;
+                == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW;
         assert BrowserUriRoutingPolicy.routeForScheme("content")
-                == BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED;
+                == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW;
         assert BrowserUriRoutingPolicy.routeForScheme("mailto")
                 == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
         assert BrowserUriRoutingPolicy.routeForScheme("tel")
@@ -85,6 +87,11 @@ public final class BrowserAddressSmoke {
                 == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
         assert BrowserUriRoutingPolicy.routeForScheme("intent")
                 == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION;
+        for (String scheme : new String[]{"vbscript", "chrome", "chrome-extension", "devtools",
+                "view-source", "ftp", "custom+scheme"}) {
+            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW
+                    : "unlisted or explicitly excluded scheme must not hand off to Android: " + scheme;
+        }
         assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "mailto");
         assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "mailto");
         assert !BrowserAddress.shouldHandOffExternalScheme(true, true, null);

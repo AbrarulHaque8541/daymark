@@ -2703,9 +2703,12 @@ public final class MainActivity extends Activity {
         }
         String scheme = Uri.parse(safeAddress).getScheme();
         BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
-        if (route == BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED) {
-            showToast("File and content access stays disabled in Daymark for safety. Nothing was opened.");
-            return;
+        if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)
+                && browserNetworkPolicy.allowsRemoteLoads()) {
+            showToast(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE);
+        }
+        if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
+            showToast(BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE);
         }
         String destination = safeAddress;
         if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
@@ -2741,8 +2744,17 @@ public final class MainActivity extends Activity {
         }
         final String webAddress = destination;
         browserSelfHealingPolicy.onUserNavigation(webAddress);
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
+        if (BrowserUriRoutingPolicy.isWebScheme(Uri.parse(webAddress).getScheme())
+                && !browserNetworkPolicy.allowsRemoteLoads()) {
             confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress));
+            return;
+        }
+        String destinationScheme = Uri.parse(webAddress).getScheme();
+        if (!browserNetworkPolicy.allowsRemoteLoads()
+            && !BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)) {
+            showToast(BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(destinationScheme)
+                    ? BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE
+                    : BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE);
             return;
         }
         loadBrowserAddress(webAddress);
@@ -2750,8 +2762,14 @@ public final class MainActivity extends Activity {
 
     private void loadBrowserAddress(String address) {
         if (!webMode) return;
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
-            showBrowserOfflineStatus();
+        String scheme = Uri.parse(address).getScheme();
+        if (!browserNetworkPolicy.allowsRemoteLoads()
+                && !BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)) {
+            if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
+                showToast(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE);
+            } else {
+                showBrowserOfflineStatus();
+            }
             return;
         }
         if (!ensureBrowserWebView()) {
@@ -2759,10 +2777,12 @@ public final class MainActivity extends Activity {
             return;
         }
         try {
-            BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-            // Unblock every retained tab too: enforceOffline() blocks all of them, and a
-            // background tab left blocked would silently drop loads with no callback (#221).
-            BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+            if (browserNetworkPolicy.allowsRemoteLoads()) {
+                BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
+                // Unblock every retained tab too: enforceOffline() blocks all of them, and a
+                // background tab left blocked would silently drop loads with no callback (#221).
+                BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+            }
             browserWebView.onResume();
             browserWebView.resumeTimers();
         } catch (SecurityException denied) {

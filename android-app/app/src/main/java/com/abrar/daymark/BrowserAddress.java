@@ -181,18 +181,20 @@ final class BrowserAddress {
     }
 
     static boolean shouldHandOffExternalScheme(boolean mainFrame, boolean userGesture, String scheme) {
-        if (!mainFrame || !userGesture || scheme == null) return false;
+        return mainFrame && userGesture && isExplicitExternalScheme(scheme);
+    }
+
+    static boolean isExplicitExternalScheme(String scheme) {
+        if (scheme == null) return false;
         String normalized = scheme.trim().toLowerCase(Locale.ROOT);
         if (!Pattern.matches("^[a-z][a-z0-9+.-]*$", normalized)) return false;
-        // WebView, restricted local, internal, and separately parsed intent schemes
-        // never go through this generic Android ACTION_VIEW path.
         switch (normalized) {
-            case "http": case "https": case "javascript":
-            case "file": case "content": case "data": case "blob": case "about":
-            case "intent": case "daymark-download":
-                return false;
-            default:
+            case "mailto": case "tel": case "sms": case "geo":
+            case "smsto": case "market": case "tg": case "telegram": case "whatsapp":
+            case "viber": case "spotify": case "youtube": case "chatgpt":
+            case "instagram": case "android-app":
                 return true;
+            default: return false;
         }
     }
 

@@ -403,14 +403,22 @@ for method in ("navigateFromInput", "navigateFromBrowserInput"):
     assert body and "navigateBrowserTo(address)" in body.group(1), f"{method} must use the validated browser navigation path"
 navigate_browser = re.search(r"private void navigateBrowserTo\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
 assert navigate_browser and "BrowserAddress.requireAllowedBrowserNavigation(address)" in navigate_browser.group(1), "typed browser navigation must use the scheme-aware navigation validator"
-assert navigate_browser and "BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED" in navigate_browser.group(1), "file/content navigation must explain the unchanged local-access isolation"
+assert navigate_browser and "BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW" in navigate_browser.group(1), "file/content navigation must reach WebView under unchanged local-access isolation"
+assert navigate_browser and "BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE" in navigate_browser.group(1), "typed file/content navigation must explain its restricted access"
+assert navigate_browser and "BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)" in navigate_browser.group(1) and "BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE" in navigate_browser.group(1), "typed excluded browser/system schemes must show their WebView-only reason"
 assert navigate_browser and "BrowserUriRoutingPolicy.routeForScheme(scheme)" in navigate_browser.group(1), "typed scheme routing must happen inside navigateBrowserTo before WebView loadUrl"
 assert navigate_browser and navigate_browser.group(1).index("BrowserUriRoutingPolicy.routeForScheme(scheme)") < navigate_browser.group(1).index("loadBrowserAddress(webAddress)"), "typed URI routing must decide handoff or WebView before app-initiated loadUrl"
 assert navigate_browser and "BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null)" in navigate_browser.group(1), "typed external schemes must require explicit confirmation before Android handoff"
-assert navigate_browser and "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in navigate_browser.group(1), "web navigation from Offline must request consent then continue the requested page"
+assert navigate_browser and "BrowserUriRoutingPolicy.isWebScheme(Uri.parse(webAddress).getScheme())" in navigate_browser.group(1), "only HTTP(S) navigation should request Online consent"
+assert navigate_browser and "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in navigate_browser.group(1), "HTTP(S) navigation from Offline must request consent then continue the requested page"
+assert navigate_browser and "BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)" in navigate_browser.group(1), "only explicitly local WebView schemes may proceed without Online"
+assert navigate_browser and "BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE" in navigate_browser.group(1), "other non-web schemes must be visibly blocked while Offline"
+assert navigate_browser and "BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE" in navigate_browser.group(1), "excluded schemes must be visibly refused while Offline without external handoff"
 assert navigate_browser and navigate_browser.group(1).index("BrowserUriHandoff.confirmAndOpen") < navigate_browser.group(1).index("confirmBrowserOnlineAccess"), "external handoffs must not be blocked by the web network-consent path"
 load_address = re.search(r"private void loadBrowserAddress\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
-assert load_address and "browserNetworkPolicy.allowsRemoteLoads()" in load_address.group(1), "final page-load boundary must still fail closed while Offline"
+assert load_address and "BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)" in load_address.group(1) and "browserNetworkPolicy.allowsRemoteLoads()" in load_address.group(1), "final page-load boundary must allow only explicit local WebView schemes while Offline"
+assert load_address and "if (browserNetworkPolicy.allowsRemoteLoads())" in load_address.group(1), "offline local/non-web dispatch must not invoke the explicit-Online WebView preparation gate"
+assert load_address and load_address.group(1).index("if (browserNetworkPolicy.allowsRemoteLoads())") < load_address.group(1).index("BrowserWorkspaceController.prepareForExplicitNavigation"), "network unblocking must remain conditional on Online permission"
 online_setting = re.search(r"private void setBrowserOnlineEnabled\(boolean enabled\)\s*\{(.*?)\n    \}", activity, re.S)
 assert online_setting and "browserNetworkPolicy.setOnlineEnabled(enabled)" in online_setting.group(1)
 assert online_setting and "showBrowserHome()" in online_setting.group(1)

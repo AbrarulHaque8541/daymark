@@ -2,11 +2,11 @@
 
 ## Android browser saved-bookmark shortcuts (branch feat/android-bookmark-newtab-20261114)
 
-PR [#779](https://github.com/AbrarulHaque8541/daymark/pull/779) is OPEN and unmerged. It is based on `main` SHA `83bc05f48030f351099f55e3f2ac012b36b94bcd`, at head `0e137da77650d5a5c3f94461b25ecbf1a6bb6448`.
+At `2026-11-14T18:11:51Z`, PR [#779](https://github.com/AbrarulHaque8541/daymark/pull/779) was OPEN and unmerged on branch `feat/android-bookmark-newtab-20261114`, based on `83bc05f48030f351099f55e3f2ac012b36b94bcd` at head `0e137da77650d5a5c3f94461b25ecbf1a6bb6448`. Its current state is documented in the latest snapshot and live PR.
 
-The change adds an optional, hidden-when-empty native Saved sites rail to Android browser blank tabs. It shows up to four newest origins from the existing saved-bookmark preference, keeps origin-only persistence unchanged, labels HTTP shortcuts as not encrypted, and refreshes on blank-tab creation/switch, return home, and bookmark clearing. No browser history is used to infer shortcuts. No URI-scheme routing changes are included; existing HTTP/HTTPS behavior remains unchanged while the owner’s per-scheme routing instruction is unresolved.
+The bookmark-only change at this timestamp added an optional, hidden-when-empty native Saved sites rail to Android browser blank tabs. It showed up to four newest origins from the existing saved-bookmark preference, kept origin-only persistence unchanged, labeled HTTP shortcuts as not encrypted, and refreshed on blank-tab creation/switch, return home, and bookmark clearing. No browser history was used to infer shortcuts. The later owner-approved URI-routing work was added to this same branch and PR; the earlier routing description is historical only.
 
-> **Historical snapshot, superseded:** The details below describe state at `2026-11-14T18:11:51Z`, when PR #779 was at `0e137da77650d5a5c3f94461b25ecbf1a6bb6448` and URI routing was still unresolved. See [the newer status snapshot](./CURRENT_STATUS_20261114T185706Z.md) for the later route, verification, and blocker state. The SHA and check counts below are historical, not live.
+> **Historical snapshot, superseded:** The details below describe bookmark-only state at `2026-11-14T18:11:51Z`, when PR #779 was at `0e137da77650d5a5c3f94461b25ecbf1a6bb6448`. URI routing was subsequently implemented on the same branch/PR. See [the latest status snapshot](./CURRENT_STATUS_20261114T193525Z.md) for the current routing, verification, and blocker state. The SHA and check counts below are historical, not live.
 
 ### Verification at head 0e137da77650d5a5c3f94461b25ecbf1a6bb6448
 

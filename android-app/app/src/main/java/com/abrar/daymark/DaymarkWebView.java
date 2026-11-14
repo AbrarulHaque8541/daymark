@@ -106,6 +106,39 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         return true;
     }
 
+    private static boolean isLocalResourceAddress(String address) {
+        return address != null && BrowserUriRoutingPolicy.isLocalResourceScheme(
+                android.net.Uri.parse(address).getScheme());
+    }
+
+    private static boolean isWebAddress(String address) {
+        return address != null && BrowserUriRoutingPolicy.isWebScheme(
+                android.net.Uri.parse(address).getScheme());
+    }
+
+    private void showLocalResourceAccessNotice(WebView view, boolean blocked) {
+        if (view == null) return;
+        String message = blocked
+                ? BrowserUriRoutingPolicy.LOCAL_RESOURCE_BLOCKED_NOTICE
+                : BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE;
+        android.widget.Toast.makeText(view.getContext(), message,
+                android.widget.Toast.LENGTH_LONG).show();
+    }
+
+    private static boolean isExcludedSchemeAddress(String address) {
+        return address != null && BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(
+                android.net.Uri.parse(address).getScheme());
+    }
+
+    private void showExcludedSchemeNotice(WebView view, boolean blocked) {
+        if (view == null) return;
+        String message = blocked
+                ? BrowserUriRoutingPolicy.EXCLUDED_SCHEME_BLOCKED_NOTICE
+                : BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE;
+        android.widget.Toast.makeText(view.getContext(), message,
+                android.widget.Toast.LENGTH_LONG).show();
+    }
+
     private final ExtensionRuntime extensionRuntime;
     private final BrowserNetworkPolicy networkPolicy;
     private final Listener listener;
@@ -208,18 +241,33 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 }
                 // Verified HTTP(S) App Links stay in Daymark like every other web address.
                 BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
-                if (route == BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED) {
-                    if (request.isForMainFrame()) {
+                if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
+                    if (!networkPolicy.allowsRemoteLoads()) {
                         android.widget.Toast.makeText(view.getContext(),
-                                "File and content access stays disabled in Daymark for safety. Nothing was opened.",
+                                BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE,
                                 android.widget.Toast.LENGTH_LONG).show();
+                        return true;
                     }
-                    return true;
+                    showExcludedSchemeNotice(view, false);
+                    return false;
+                }
+                if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
+                    // Keep platform file/content isolation, but let WebView attempt the URI
+                    // and explain the disabled access for every frame.
+                    showLocalResourceAccessNotice(view, false);
+                    return false;
                 }
                 if (route == BrowserUriRoutingPolicy.Route.WEBVIEW
                         && !BrowserUriRoutingPolicy.isWebScheme(scheme)) {
                     // Script/data/blob/about navigations stay in System WebView; network
                     // requests remain subject to the existing WebView network policy.
+                    if (!networkPolicy.allowsRemoteLoads()
+                            && !BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)) {
+                        android.widget.Toast.makeText(view.getContext(),
+                                BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE,
+                                android.widget.Toast.LENGTH_LONG).show();
+                        return true;
+                    }
                     return false;
                 }
                 if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
@@ -265,7 +313,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 Log.i("DaymarkWebView", "page started origin=" + BrowserLogPolicy.redactedOrigin(url));
                 if (extensionRuntime != null) extensionRuntime.onPageStarted(url);
-                if (!networkPolicy.allowsRemoteLoads()) {
+                if (!networkPolicy.allowsRemoteLoads() && isWebAddress(url)) {
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
@@ -322,7 +370,15 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 Log.e("DaymarkWebView", "onReceivedError code=" + errorCode
                         + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl)
                         + " description=" + (description == null ? "" : description));
-                if (!networkPolicy.allowsRemoteLoads()) {
+                if (isLocalResourceAddress(failingUrl)) {
+                    showLocalResourceAccessNotice(view, true);
+                    return;
+                }
+                if (isExcludedSchemeAddress(failingUrl)) {
+                    showExcludedSchemeNotice(view, true);
+                    return;
+                }
+                if (!networkPolicy.allowsRemoteLoads() && isWebAddress(failingUrl)) {
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
@@ -331,18 +387,30 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request == null || request.getUrl() == null) return;
+                String failingUrl = request.getUrl().toString();
+                if (isLocalResourceAddress(failingUrl)) {
+                    // Report local access refusals from subframes before the main-frame filter.
+                    showLocalResourceAccessNotice(view, true);
+                    return;
+                }
+                if (isExcludedSchemeAddress(failingUrl)) {
+                    // Keep unsupported browser/system scheme failures visible in every frame.
+                    showExcludedSchemeNotice(view, true);
+                    return;
+                }
                 if (!request.isForMainFrame()) return;
                 Log.e("DaymarkWebView", "onReceivedError code=" + error.getErrorCode()
-                        + " origin=" + BrowserLogPolicy.redactedOrigin(request.getUrl().toString())
+                        + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl)
                         + " description=" + (error.getDescription() == null
                         ? "" : error.getDescription().toString()));
-                if (!networkPolicy.allowsRemoteLoads()) {
+                if (!networkPolicy.allowsRemoteLoads() && isWebAddress(failingUrl)) {
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
                 listener.onLoadError(error.getErrorCode(),
                         error.getDescription() == null ? "" : error.getDescription().toString(),
-                        request.getUrl().toString());
+                        failingUrl);
             }
 
             @Override
