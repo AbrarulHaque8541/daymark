@@ -34,14 +34,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+ 
+ contents: read
 
 jobs:
   focus-runtime:
     name: Focus runtime API ${{ matrix.api-level }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    # API 36 has had intermittent lifecycle failures. Run the complete suite
+    # Midday audit 2026-11-14: comment-only retrigger of the exact-head emulator check after
+# Focus runtime API 36 failed once on 7d036c7 (job 132350042720); no check or script changed.
+# API 36 has had intermittent lifecycle failures. Run the complete suite
     # ten consecutive times on one clean emulator; API 29 remains one baseline.
     # platform-instrumentation-repeat.sh clears only the disposable app package between runs
     # and stops at the first failure; it never retries a failed instrumentation attempt.
