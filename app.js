@@ -570,8 +570,9 @@
     const today = logic.localDateString();
     state.currentDay = today;
     const overdueTasks = state.tasks.filter((task) => !task.completed && task.dueDate !== null && task.dueDate < today);
-    const source = state.filter === 'overdue' ? overdueTasks : state.tasks;
-    const effectiveFilter = state.filter === 'overdue' ? 'all' : state.filter;
+    const highPriorityTasks = state.tasks.filter((task) => task.priority === 'high');
+    const source = state.filter === 'overdue' ? overdueTasks : state.filter === 'high' ? highPriorityTasks : state.tasks;
+    const effectiveFilter = (state.filter === 'overdue' || state.filter === 'high') ? 'all' : state.filter;
     let filteredTasks = logic.getFilteredTasks(source, effectiveFilter, state.query, today);
     const normalizedQuery = String(state.query || '').trim().toLowerCase();
     if (normalizedQuery) {
@@ -602,6 +603,7 @@
     $('#count-today').textContent = String(todayTasks.length);
     $('#count-upcoming').textContent = String(upcomingTasks.length);
     $('#count-overdue').textContent = String(overdueTasks.length);
+    $('#count-high').textContent = String(highPriorityTasks.length);
     $('#count-completed').textContent = String(completedTasks.length);
     $('#visible-count').textContent = hasQuery
       ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
@@ -644,6 +646,9 @@
     } else if (empty && state.filter === 'overdue') {
       $('#empty-title').textContent = 'Nothing overdue';
       $('#empty-copy').textContent = 'You are fully caught up on past-due tasks. Nice work.';
+    } else if (empty && state.filter === 'high') {
+      $('#empty-title').textContent = 'No high-priority tasks';
+      $('#empty-copy').textContent = 'Nothing marked high priority. Mark a task high when it needs attention first.';
     } else if (empty && state.tasks.length > 0) {
       const labels = {
         all: ['All caught up', 'Nothing on your list just now. Add a task whenever something comes to mind.'],
