@@ -644,7 +644,9 @@ assert task_editor_ime, "task editor dialog must have a dedicated IME-insets han
 assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
 assert "Api30Window.applyDialogImeInsets(MainActivity.this, dialogWindow, insets)" in task_editor_ime.group(1)
 api30_dialog_helper = (root / "app/src/main/java/com/abrar/daymark/Api30Window.java").read_text(encoding="utf-8")
-assert "Api30Window.applyDialogImeInsets(dialogWindow)" in task_editor_ime.group(1)
+# The helper takes the Activity context, the dialog window and the insets; the earlier
+# single-argument form no longer exists, so asserting it would fail on correct code.
+assert "applyDialogImeInsets(" in task_editor_ime.group(1)
 assert "WindowInsetsPolicy.dialogHeightForIme(" in api30_dialog_helper
 assert "WindowInsetsPolicy.dialogYOffsetForIme(" in api30_dialog_helper, "task editor actions must be positioned in the IME-safe dialog area"
 assert "configureDialogImeInsets(shownDialogWindow)" in activity
