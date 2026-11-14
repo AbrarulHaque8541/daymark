@@ -20,7 +20,15 @@
     if (!env || !env.document) throw new Error('attachExportUi requires a document.');
     const doc = env.document;
     const win = env.window || root;
-    const storage = env.localStorage || (win && win.localStorage) || null;
+    let storage = null;
+    let storageAccessFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storageAccessFailed = true;
+    }
     const exportApi = env.exportApi || root.DaymarkExport || null;
     const logic = env.logic || root.DaymarkLogic || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
@@ -67,11 +75,21 @@
       if (typeof event.preventDefault === 'function') event.preventDefault();
       if (typeof event.stopPropagation === 'function') event.stopPropagation();
       try {
-        if (!logic || typeof logic.validateStoredTasks !== 'function') {
+        if (!logic || typeof logic.validateStoredTasks !== 'function'
+          || typeof logic.hasDuplicateJsonKeys !== 'function') {
           throw new Error('task logic is unavailable');
         }
-        const raw = storage && typeof storage.getItem === 'function' ? storage.getItem(STORAGE_KEY) : null;
-        const parsed = raw ? JSON.parse(raw) : [];
+        if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
+          throw new Error('browser storage is unavailable; no data was exported');
+        }
+        const raw = storage.getItem(STORAGE_KEY);
+        if (raw !== null && logic.hasDuplicateJsonKeys(raw)) {
+          throw new Error('saved tasks contain duplicate JSON keys; no data was exported');
+        }
+        const parsed = raw === null ? [] : JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          throw new Error('saved tasks are unreadable; no data was exported');
+        }
         const validated = logic.validateStoredTasks(parsed);
         const generatedAt = now();
         const output = exportApi.render(format, validated.tasks, { generatedAt });
@@ -102,7 +120,7 @@
   root.DaymarkExportUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachExportUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachExportUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

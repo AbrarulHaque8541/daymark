@@ -19,7 +19,19 @@
     const downloadApi = Object.prototype.hasOwnProperty.call(env, 'downloadApi')
       ? env.downloadApi
       : (root.DaymarkBrowserDownload || null);
-    const storage = env.localStorage || null;
+    const win = env.window || (typeof window !== 'undefined' ? window : null);
+    const storageRequested = Object.prototype.hasOwnProperty.call(env, 'localStorage') || !!win;
+    let storage = null;
+    let storageAccessFailed = false;
+    let storageReadFailed = false;
+    let storageWriteFailed = false;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (e) {
+      storageAccessFailed = true;
+    }
     const nav = env.navigator || (typeof navigator !== "undefined" ? navigator : null);
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
@@ -55,29 +67,69 @@
       }
     }
 
+    function storageNotice() {
+      if (!storageRequested) return '';
+      if (storageAccessFailed || storageReadFailed) {
+        return ' · saved journey could not be read in this browser';
+      }
+      if (storageWriteFailed) {
+        return ' · saved journey could not be updated in this browser';
+      }
+      return '';
+    }
+
     function rememberScenario(id) {
-      if (!storage || typeof storage.setItem !== 'function') return;
+      if (!id || !downloadApi || typeof downloadApi.isKnownScenarioId !== 'function'
+        || !downloadApi.isKnownScenarioId(id) || !storageRequested) return true;
+      if (!storage || storageAccessFailed || storageReadFailed) return false;
       try {
-        if (id && downloadApi && typeof downloadApi.isKnownScenarioId === 'function' && downloadApi.isKnownScenarioId(id)) {
-          storage.setItem(LAST_SCENARIO_KEY, id);
+        if (typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') {
+          storageWriteFailed = true;
+          return false;
         }
-      } catch (e) { /* fail closed */ }
+        storage.setItem(LAST_SCENARIO_KEY, id);
+        return true;
+      } catch (e) {
+        storageWriteFailed = true;
+        return false;
+      }
     }
 
     function forgetScenario() {
-      if (!storage || typeof storage.removeItem !== 'function') return;
-      try { storage.removeItem(LAST_SCENARIO_KEY); } catch (e) { /* fail closed */ }
+      if (!storageRequested) return true;
+      if (!storage || storageAccessFailed || storageReadFailed) return false;
+      try {
+        if (typeof storage.getItem !== 'function' || typeof storage.removeItem !== 'function') {
+          storageWriteFailed = true;
+          return false;
+        }
+        storage.removeItem(LAST_SCENARIO_KEY);
+        return true;
+      } catch (e) {
+        storageWriteFailed = true;
+        return false;
+      }
     }
 
     function restoreScenario() {
-      if (!storage || typeof storage.getItem !== 'function' || !scenarioEl) return false;
+      if (!scenarioEl || !storageRequested) return false;
+      if (!storage || storageAccessFailed) {
+        storageReadFailed = true;
+        return false;
+      }
       try {
+        if (typeof storage.getItem !== 'function') {
+          storageReadFailed = true;
+          return false;
+        }
         const remembered = storage.getItem(LAST_SCENARIO_KEY);
         if (remembered && downloadApi && typeof downloadApi.isKnownScenarioId === 'function' && downloadApi.isKnownScenarioId(remembered)) {
           scenarioEl.value = remembered;
           return true;
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        storageReadFailed = true;
+      }
       return false;
     }
 
@@ -145,9 +197,10 @@
         const id = scenarioEl && typeof scenarioEl.value === 'string' ? scenarioEl.value : '';
         const result = downloadApi.planScenario(id);
         renderPlan(result);
-        status(buildStatus(result, restored));
-        setHasNotices(!!(result && result.notices && result.notices.length > 0));
         if (id) rememberScenario(id);
+        const persistenceNotice = storageNotice();
+        status(buildStatus(result, restored) + persistenceNotice);
+        setHasNotices(!!(result && result.notices && result.notices.length > 0) || !!persistenceNotice);
       } finally {
         setAriaBusy(false);
       }
@@ -158,9 +211,12 @@
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
       if (scenarioEl) scenarioEl.value = '';
-      setHasNotices(false);
-      forgetScenario();
-      status('Cleared. Pick a download journey to plan its safety.');
+      const forgotten = forgetScenario();
+      const persistenceNotice = storageNotice();
+      setHasNotices(!forgotten || !!persistenceNotice);
+      status(forgotten
+        ? 'Cleared. Pick a download journey to plan its safety.'
+        : 'Cleared on this page, but the saved journey could not be removed.' + persistenceNotice);
     }
 
     function collectPlanText() {
@@ -278,7 +334,7 @@
   root.DaymarkBrowserDownloadUi = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const boot = () => attachBrowserDownloadUi({ document, window, localStorage: window.localStorage });
+    const boot = () => attachBrowserDownloadUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }

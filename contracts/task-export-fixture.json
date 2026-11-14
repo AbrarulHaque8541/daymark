@@ -43,7 +43,8 @@
       "tags": [
         "home"
       ],
-      "subtasks": []
+      "subtasks": [],
+      "repeatDayOfMonth": 31
     },
     {
       "id": "task-gamma",
@@ -76,8 +77,8 @@
     }
   ],
   "expected": {
-    "markdown": "# Daymark tasks\n_Exported 2026-11-02T12:00:00.000Z · 4 tasks_\n\n- [ ] **Ship \"v1.7\", release notes** · due 2026-11-05 14:30 · high priority · repeats weekly · #work · #release\n  First line, with comma; semicolon\n  Second line\n  - [x] Draft changelog\n  - [ ] Tag the build\n\n- [ ] **Pay rent** · due 2026-11-30 · medium priority · repeats monthly · #home\n\n- [ ] **Café ☕ run** · low priority\n  Bring ✓ checklist 🎉\n\n- [x] **Archive old inbox** · low priority · #admin\n",
-    "csv": "id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt\r\ntask-alpha,\"Ship \"\"v1.7\"\", release notes\",2026-11-05,14:30,high,false,weekly,work release,\"First line, with comma; semicolon\nSecond line\",\"[{\"\"id\"\":\"\"sub-1\"\",\"\"title\"\":\"\"Draft changelog\"\",\"\"done\"\":true},{\"\"id\"\":\"\"sub-2\"\",\"\"title\"\":\"\"Tag the build\"\",\"\"done\"\":false}]\",2026-10-28T09:15:00.000Z,2026-10-30T18:45:00.000Z\r\ntask-delta,Pay rent,2026-11-30,,medium,false,monthly,home,,[],2026-10-20T12:00:00.000Z,2026-10-20T12:00:00.000Z\r\ntask-gamma,Café ☕ run,,,low,false,,,Bring ✓ checklist 🎉,[],2026-10-31T08:00:00.000Z,2026-11-01T07:30:00.000Z\r\ntask-beta,Archive old inbox,,,low,true,,admin,,[],2026-10-15T10:00:00.000Z,2026-10-25T16:20:00.000Z\r\n",
+    "markdown": "# Daymark tasks\n_Exported 2026-11-02T12:00:00.000Z · 4 tasks_\n\n- [ ] **Ship \"v1.7\", release notes** · due 2026-11-05 14:30 · high priority · repeats weekly · #work · #release\n  First line, with comma; semicolon\n  Second line\n  - [x] Draft changelog\n  - [ ] Tag the build\n\n- [ ] **Pay rent** · due 2026-11-30 · medium priority · repeats monthly · repeat day 31 · #home\n\n- [ ] **Café ☕ run** · low priority\n  Bring ✓ checklist 🎉\n\n- [x] **Archive old inbox** · low priority · #admin\n",
+    "csv": "id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt,repeatDayOfMonth\r\ntask-alpha,\"Ship \"\"v1.7\"\", release notes\",2026-11-05,14:30,high,false,weekly,work release,\"First line, with comma; semicolon\nSecond line\",\"[{\"\"id\"\":\"\"sub-1\"\",\"\"title\"\":\"\"Draft changelog\"\",\"\"done\"\":true},{\"\"id\"\":\"\"sub-2\"\",\"\"title\"\":\"\"Tag the build\"\",\"\"done\"\":false}]\",2026-10-28T09:15:00.000Z,2026-10-30T18:45:00.000Z,\r\ntask-delta,Pay rent,2026-11-30,,medium,false,monthly,home,,[],2026-10-20T12:00:00.000Z,2026-10-20T12:00:00.000Z,31\r\ntask-gamma,Café ☕ run,,,low,false,,,Bring ✓ checklist 🎉,[],2026-10-31T08:00:00.000Z,2026-11-01T07:30:00.000Z,\r\ntask-beta,Archive old inbox,,,low,true,,admin,,[],2026-10-15T10:00:00.000Z,2026-10-25T16:20:00.000Z,\r\n",
     "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Daymark//Task Export//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:task-alpha@daymark.export\r\nDTSTAMP:20261102T120000Z\r\nSUMMARY:Ship \"v1.7\"\\, release notes\r\nDTSTART:20261105T143000\r\nDESCRIPTION:First line\\, with comma\\; semicolon\\nSecond line\\nPriority: hig\r\n h\\nRepeats: weekly\\nTags: #work #release\\nChecklist: 1/2 done\\n- [x] Draft\r\n  changelog\\n- [ ] Tag the build\r\nSTATUS:CONFIRMED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:task-delta@daymark.export\r\nDTSTAMP:20261102T120000Z\r\nSUMMARY:Pay rent\r\nDTSTART;VALUE=DATE:20261130\r\nDESCRIPTION:Priority: medium\\nRepeats: monthly\\nTags: #home\r\nSTATUS:CONFIRMED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:task-gamma@daymark.export\r\nDTSTAMP:20261102T120000Z\r\nSUMMARY:Café ☕ run\r\nDESCRIPTION:Bring ✓ checklist 🎉\\nPriority: low\r\nSTATUS:CONFIRMED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:task-beta@daymark.export\r\nDTSTAMP:20261102T120000Z\r\nSUMMARY:Archive old inbox\r\nDESCRIPTION:Priority: low\\nTags: #admin\r\nSTATUS:CONFIRMED\r\nX-DAYMARK-COMPLETED:TRUE\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
   }
 }

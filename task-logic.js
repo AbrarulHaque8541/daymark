@@ -16,6 +16,7 @@
   const REMINDER_LEADS = [0, 30, 60, 1440];
   const MAX_TAGS = 5;
   const MAX_TAG_CHARS = 24;
+  const REPEAT_RULES = ['daily', 'weekly', 'monthly', 'weekdays', 'yearly'];
 
   function isDateOnly(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -176,6 +177,26 @@
     return normalized;
   }
 
+  function isValidRepeatMetadata(task) {
+    const repeat = task.repeat === undefined || task.repeat === null || task.repeat === ''
+      ? null : task.repeat;
+    const anchor = task.repeatDayOfMonth === undefined || task.repeatDayOfMonth === null
+      ? null : task.repeatDayOfMonth;
+    if (repeat === null) return anchor === null;
+    if (!REPEAT_RULES.includes(repeat) || !isDateOnly(task.dueDate)) return false;
+    if (repeat === 'monthly') {
+      return anchor === null || (Number.isInteger(anchor) && anchor >= 1 && anchor <= 31);
+    }
+    if (repeat === 'yearly') {
+      if (anchor === null) return true;
+      if (!Number.isInteger(anchor) || anchor < 1 || anchor > 31) return false;
+      const [year, month, day] = task.dueDate.split('-').map(Number);
+      const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      return day === anchor || (month === 2 && day === 28 && anchor === 29 && !leapYear);
+    }
+    return anchor === null;
+  }
+
   function isValidTask(task) {
     return Boolean(task && typeof task === 'object'
       && typeof task.id === 'string' && task.id.length > 0
@@ -193,7 +214,8 @@
       && (task.reminderShownFire === undefined || task.reminderShownFire === null
         || isValidInstant(task.reminderShownFire))
       && (task.subtasks === undefined || isValidSubtasks(task.subtasks))
-      && (task.tags === undefined || task.tags === null || isValidTags(task.tags)));
+      && (task.tags === undefined || task.tags === null || isValidTags(task.tags))
+      && isValidRepeatMetadata(task));
   }
 
   function validateStoredTasks(value) {
@@ -266,9 +288,125 @@
     }).slice(0, 3).map((task) => ({ task, reason: suggestionReason(task, today, formatDate) }));
   }
 
+
+  // Detect duplicate JSON object member names before JSON.parse can silently
+  // keep the last value. Invalid JSON remains the caller's parse error; excessive
+  // nesting is rejected here so hostile inputs cannot exhaust the call stack.
+  function hasDuplicateJsonKeys(raw) {
+    if (typeof raw !== 'string') return false;
+    let index = 0;
+    let duplicate = false;
+    let tooDeep = false;
+    const literalPattern = /(?:true|false|null)/y;
+    const numberPattern = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+    const whitespace = () => {
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character !== ' ' && character !== '\t' && character !== '\r' && character !== '\n') break;
+        index += 1;
+      }
+    };
+    const readString = () => {
+      const start = index;
+      index += 1;
+      while (index < raw.length) {
+        const character = raw[index];
+        if (character === '\\') {
+          if (index + 1 >= raw.length) throw new Error('incomplete JSON escape');
+          index += 2;
+          continue;
+        }
+        if (character === '"') {
+          index += 1;
+          return JSON.parse(raw.slice(start, index));
+        }
+        if (character.charCodeAt(0) < 0x20) throw new Error('invalid JSON string');
+        index += 1;
+      }
+      throw new Error('unterminated JSON string');
+    };
+    const readValue = (depth) => {
+      if (depth > 128) {
+        tooDeep = true;
+        throw new Error('JSON nesting limit exceeded');
+      }
+      whitespace();
+      const character = raw[index];
+      if (character === '"') {
+        readString();
+        return;
+      }
+      if (character === '{') {
+        index += 1;
+        whitespace();
+        if (raw[index] === '}') {
+          index += 1;
+          return;
+        }
+        const keys = new Set();
+        for (;;) {
+          whitespace();
+          if (raw[index] !== '"') throw new Error('invalid JSON object key');
+          const key = readString();
+          if (keys.has(key)) duplicate = true;
+          keys.add(key);
+          whitespace();
+          if (raw[index] !== ':') throw new Error('missing JSON object colon');
+          index += 1;
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === '}') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON object separator');
+          index += 1;
+        }
+      }
+      if (character === '[') {
+        index += 1;
+        whitespace();
+        if (raw[index] === ']') {
+          index += 1;
+          return;
+        }
+        for (;;) {
+          readValue(depth + 1);
+          whitespace();
+          if (raw[index] === ']') {
+            index += 1;
+            return;
+          }
+          if (raw[index] !== ',') throw new Error('invalid JSON array separator');
+          index += 1;
+        }
+      }
+      literalPattern.lastIndex = index;
+      if (literalPattern.exec(raw)) {
+        index = literalPattern.lastIndex;
+        return;
+      }
+      numberPattern.lastIndex = index;
+      if (numberPattern.exec(raw)) {
+        index = numberPattern.lastIndex;
+        return;
+      }
+      throw new Error('invalid JSON value');
+    };
+    try {
+      readValue(0);
+      whitespace();
+      return index === raw.length && (duplicate || tooDeep);
+    } catch (error) {
+      return tooDeep;
+    }
+  }
+
   const api = {
     localDateString,
     isDateOnly,
+    isValidInstant,
+    compareInstants,
     isTimeOnly,
     isValidInstant,
     compareInstants,
@@ -279,6 +417,7 @@
     isTag,
     isValidTask,
     validateStoredTasks,
+    hasDuplicateJsonKeys,
     getFilteredTasks,
     getSuggestions,
     MAX_NOTES_CHARS,

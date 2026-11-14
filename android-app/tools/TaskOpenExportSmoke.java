@@ -101,6 +101,41 @@ public final class TaskOpenExportSmoke {
                         new Task("bad-instant", "T", null, "low", false,
                                 "yesterday", "2026-10-01T00:00:00Z"))),
                 "unparseable createdAt is rejected");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("local-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00", "2026-10-01T00:00:00Z"))),
+                "createdAt without an explicit offset is rejected");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("bad-reminder-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00Z", "2026-10-01T00:00:00Z",
+                                Collections.<AttachmentRef>emptyList(), "", null, null,
+                                "2026-11-10T10:00:00.1234567890Z", null,
+                                Collections.<Subtask>emptyList()))),
+                "invalid reminderShownFire is rejected by export");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("local-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00", "2026-10-01T00:00:00Z"))),
+                "createdAt without an explicit offset is rejected");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("bad-reminder-instant", "T", null, "low", false,
+                                "2026-10-01T00:00:00Z", "2026-10-01T00:00:00Z",
+                                Collections.<AttachmentRef>emptyList(), "", null, null,
+                                "2026-11-10T10:00:00.1234567890Z", null,
+                                Collections.<Subtask>emptyList()))),
+                "invalid reminderShownFire is rejected by export");
+
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("bad-repeat", "T", "2026-11-30", "low", false,
+                                "2026-10-01T00:00:00Z", "2026-10-01T00:00:00Z",
+                                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                                "hourly", null, Collections.<Subtask>emptyList(), Collections.<String>emptyList()))),
+                "unknown repeat rule is rejected by export");
+        expectFailure(() -> TaskOpenExport.sortTasks(Collections.singletonList(
+                        new Task("bad-anchor", "T", "2026-11-30", "low", false,
+                                "2026-10-01T00:00:00Z", "2026-10-01T00:00:00Z",
+                                Collections.<AttachmentRef>emptyList(), "", null, null, null,
+                                "monthly", Integer.valueOf(32), Collections.<Subtask>emptyList(), Collections.<String>emptyList()))),
+                "out-of-range monthly anchor is rejected by export");
 
         System.out.println("PASS task open export smoke tests: " + assertions + " assertions");
     }
@@ -127,6 +162,13 @@ public final class TaskOpenExportSmoke {
         String updatedAt = StrictJsonParser.optionalString(values, "updatedAt", createdAt);
         String notes = StrictJsonParser.optionalString(values, "notes", "");
         String repeat = StrictJsonParser.optionalString(values, "repeat", null);
+        Integer repeatDayOfMonth = null;
+        Object repeatDayValue = values.get("repeatDayOfMonth");
+        if (repeatDayValue instanceof Number) {
+            repeatDayOfMonth = ((Number) repeatDayValue).intValue();
+        } else if (repeatDayValue != null) {
+            throw new IllegalArgumentException("fixture repeatDayOfMonth must be numeric.");
+        }
         List<String> tags = new ArrayList<>();
         Object tagsValue = values.get("tags");
         if (tagsValue != null) {
@@ -146,7 +188,7 @@ public final class TaskOpenExportSmoke {
         }
         return new Task(id, title, dueDate, priority, completed, createdAt, updatedAt,
                 Collections.<AttachmentRef>emptyList(), notes, dueTime, null, null,
-                repeat, null, subtasks, tags);
+                repeat, repeatDayOfMonth, subtasks, tags);
     }
 
     private static void expectFailure(Runnable operation, String message) {

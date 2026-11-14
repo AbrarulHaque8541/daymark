@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="styles-motion-efficiency.css">
   <link rel="stylesheet" href="motion-accessibility.css">
   <script src="task-logic.js" defer></script>
-  <script src="export-logic.js" defer></script>
+<script src="task-mutation-logic.js" defer></script>
+<script src="export-logic.js" defer></script>
   <script src="repeat-logic.js" defer></script>
   <script src="focus-logic.js" defer></script>
   <script src="feed-logic.js" defer></script>
@@ -491,7 +492,7 @@
         <aside class="briefing-card" id="telegram-card" aria-labelledby="telegram-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="telegram-heading">Telegram task digest</h2>
-          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your bot token stays in this tab and is cleared when you leave. After a successful send, only the non-secret chat target is remembered on this device; clear the Telegram preference in the Local data card to forget it.</p>
+          <p class="briefing-description">Send your completed tasks to your own Telegram bot. Your bot token stays in this tab only and is never saved. After a successful send, only the non-secret chat target is remembered on this device; clear the Telegram preference in the Local data card.</p>
           <form id="telegram-form" class="feed-form" novalidate>
             <label class="sr-only" for="telegram-token">Bot token from @BotFather</label>
             <input id="telegram-token" name="token" type="password" maxlength="120" placeholder="Bot token from @BotFather" autocomplete="off" spellcheck="false">

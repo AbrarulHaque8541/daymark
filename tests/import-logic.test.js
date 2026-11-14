@@ -10,21 +10,22 @@ const NOW = '2026-11-07T05:00:00.000Z';
 
 function freshCtx() {
   let n = 0;
-  return { now: NOW, makeId: () => 'gen-' + String(++n) };
+  return { now: NOW, makeId: () => 'gen-' + String(++n), hasDuplicateJsonKeys: logic.hasDuplicateJsonKeys };
 }
 
 const sampleTasks = [
   {
     id: 't1',
     title: 'Ship *v1.6* now',
-    dueDate: '2026-11-09',
+    dueDate: '2026-11-30',
     dueTime: '09:30',
     priority: 'high',
     completed: false,
     createdAt: '2026-11-01T10:00:00.000Z',
     updatedAt: '2026-11-02T11:00:00.000Z',
     notes: 'Two lines\nof notes',
-    repeat: 'weekly',
+    repeat: 'monthly',
+    repeatDayOfMonth: 31,
     tags: ['work', 'release'],
     subtasks: [{ id: 's1', title: 'Push the tag', done: true }]
   },
@@ -48,6 +49,7 @@ test('the module exposes its API', () => {
   assert.equal(typeof importer.fromCsv, 'function');
   assert.equal(typeof importer.fromMarkdown, 'function');
   assert.equal(typeof importer.mergeTasks, 'function');
+  assert.equal(importer.LEGACY_CSV_HEADER, 'id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt');
   assert.equal(importer.STORAGE_KEY, undefined);
   assert.deepEqual(importer.FORMATS, ['csv', 'markdown', 'ics']);
   assert.equal(importer.CSV_HEADER, exporter.CSV_HEADER,
@@ -77,11 +79,12 @@ test('markdown export output round-trips through fromMarkdown', () => {
   assert.equal(result.tasks.length, 2);
   const first = result.tasks[0];
   assert.equal(first.title, 'Ship *v1.6* now');
-  assert.equal(first.dueDate, '2026-11-09');
+  assert.equal(first.dueDate, '2026-11-30');
   assert.equal(first.dueTime, '09:30');
   assert.equal(first.priority, 'high');
   assert.equal(first.completed, false);
-  assert.equal(first.repeat, 'weekly');
+  assert.equal(first.repeat, 'monthly');
+  assert.equal(first.repeatDayOfMonth, 31, 'clamped monthly anchor survives Markdown round-trip');
   assert.deepEqual(first.tags, ['work', 'release']);
   assert.equal(first.notes, 'Two lines\nof notes');
   assert.deepEqual(first.subtasks.map((sub) => sub.title), ['Push the tag']);
@@ -97,8 +100,8 @@ test('markdown export output round-trips through fromMarkdown', () => {
 
 test('fromCsv skips malformed rows and fills lenient defaults', () => {
   const rows = [
-    ['', '', '', '', '', 'false', '', '', '', '[]', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'],
-    ['k1', 'Foreign row', 'not-a-date', '25:99', 'urgent', '1', 'sometimes', 'bad-tag! GoodTag', 'x', '[]', '', '']
+    ['', '', '', '', '', 'false', '', '', '', '[]', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', ''],
+    ['k1', 'Foreign row', 'not-a-date', '25:99', 'urgent', '1', 'sometimes', 'bad-tag! GoodTag', 'x', '[]', '', '', '']
   ];
   const csv = importer.CSV_HEADER + '\r\n'
     + rows.map((row) => row.join(',')).join('\r\n') + '\r\n'
@@ -113,9 +116,63 @@ test('fromCsv skips malformed rows and fills lenient defaults', () => {
   assert.equal(task.dueTime, null, 'a due time without a valid due date is dropped');
   assert.equal(task.priority, 'medium', 'unknown priority falls back to medium');
   assert.equal(task.completed, true, 'completed accepts 1 as well as true');
-  assert.equal(task.repeat, null, 'unknown repeat values are dropped');
+  assert.equal(task.repeat, 'sometimes', 'unknown repeat metadata is preserved for validation rather than silently dropped');
+  assert.equal(importer.mergeTasks([], [task], logic).invalid, 1, 'invalid recurrence metadata is rejected before storage');
   assert.deepEqual(task.tags, ['goodtag'], 'invalid tags are dropped, valid ones kept');
-  assert.equal(task.createdAt, NOW, 'unparseable createdAt falls back to now()');
+  assert.equal(task.createdAt, NOW, 'an empty createdAt falls back to now()');
+});
+
+test('fromCsv preserves explicit malformed timestamps for shared validation instead of replacing them', () => {
+  const invalidCreatedAt = 'not-a-date';
+  const invalidUpdatedAt = '2026-11-10 10:00:00Z';
+  const row = (id, title, createdAt, updatedAt) => [
+    id, title, '', '', 'medium', 'false', '', '', '', '[]', createdAt, updatedAt, ''
+  ].join(',');
+  const csv = importer.CSV_HEADER + '\n'
+    + row('bad-created', 'Bad created timestamp', invalidCreatedAt, NOW) + '\n'
+    + row('bad-updated', 'Bad updated timestamp', NOW, invalidUpdatedAt);
+  const parsed = importer.fromCsv(csv, freshCtx());
+
+  assert.equal(parsed.skippedRows, 0);
+  assert.equal(parsed.tasks.length, 2);
+  assert.equal(parsed.tasks[0].createdAt, invalidCreatedAt);
+  assert.equal(parsed.tasks[1].updatedAt, invalidUpdatedAt);
+
+  const merged = importer.mergeTasks([], parsed.tasks, logic);
+  assert.equal(merged.invalid, 2, 'the shared strict validator rejects both explicit malformed instants');
+  assert.equal(merged.added.length, 0, 'invalid timestamps never enter the stored task list');
+});
+
+test('mergeTasks requires the shared task validator and fails closed when it is absent', () => {
+  assert.throws(() => importer.mergeTasks([], []), /shared task validator/);
+  assert.throws(() => importer.mergeTasks([], [], {}), /shared task validator/);
+});
+
+test('fromCsv skips malformed or duplicate-key subtask JSON instead of silently dropping subtasks', () => {
+  const cell = (value) => {
+    const text = String(value);
+    const cr = String.fromCharCode(13);
+    const lf = String.fromCharCode(10);
+    return text.includes('"') || text.includes(',') || text.includes(cr) || text.includes(lf)
+      ? '"' + text.replace(/"/g, '""') + '"' : text;
+  };
+  const row = (id, title, subtasks) => [
+    id, title, '', '', 'medium', 'false', '', '', '', subtasks, NOW, NOW, ''
+  ].map(cell).join(',');
+  const duplicate = '[{"id":"s1","title":"First","title":"Overwritten","done":false}]';
+  const malformed = '[{"id":"s2"';
+  const valid = '[{"id":"s3","title":"Keep me","done":false}]';
+  const crlf = String.fromCharCode(13, 10);
+  const csv = [
+    importer.CSV_HEADER,
+    row('duplicate-subtask', 'Duplicate subtask keys', duplicate),
+    row('malformed-subtask', 'Malformed subtask JSON', malformed),
+    row('valid-subtask', 'Valid subtasks', valid)
+  ].join(crlf) + crlf;
+  const result = importer.fromCsv(csv, freshCtx());
+  assert.equal(result.skippedRows, 2, 'ambiguous or malformed nested JSON skips the whole CSV row');
+  assert.equal(result.tasks.length, 1);
+  assert.deepEqual(result.tasks[0].subtasks.map((subtask) => subtask.title), ['Keep me']);
 });
 
 test('fromCsv rejects a wrong header instead of guessing columns', () => {
@@ -172,4 +229,32 @@ test('file-name detection routes only open formats to the importer', () => {
   assert.equal(importer.formatFromFileName('backup'), null);
   assert.equal(importer.isFormat('csv'), true);
   assert.equal(importer.isFormat('json'), false);
+});
+
+
+test('legacy CSV headers remain importable and derive the monthly anchor', () => {
+  const row = ['legacy-monthly', 'Month end', '2026-11-30', '', 'medium', 'false',
+    'monthly', '', '', '[]', NOW, NOW];
+  const csv = [importer.LEGACY_CSV_HEADER, row.join(',')].join('\r\n') + '\r\n';
+  const result = importer.fromCsv(csv, freshCtx());
+  assert.equal(result.skippedRows, 0);
+  assert.equal(result.tasks.length, 1);
+  assert.equal(result.tasks[0].repeatDayOfMonth, 30);
+  assert.equal(logic.isValidTask(result.tasks[0]), true);
+});
+
+test('Markdown repeat-day metadata preserves a clamped monthly anchor', () => {
+  const md = [
+    '# Daymark tasks',
+    '_Exported ' + NOW + ' · 1 task_',
+    '',
+    '- [ ] **Month end** · due 2026-11-30 · medium priority · repeats monthly · repeat day 31',
+    ''
+  ].join('\n');
+  const result = importer.fromMarkdown(md, freshCtx());
+  assert.equal(result.skippedRows, 0);
+  assert.equal(result.tasks.length, 1);
+  assert.equal(result.tasks[0].repeat, 'monthly');
+  assert.equal(result.tasks[0].repeatDayOfMonth, 31);
+  assert.equal(logic.isValidTask(result.tasks[0]), true);
 });

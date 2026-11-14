@@ -128,7 +128,7 @@
     'export-backup': {
       label: 'Export a backup',
       title: 'Export a backup',
-      summary: 'Creates a local task export without changing stored data. The JSON backup uses the current in-memory task list; CSV, Markdown and iCalendar exports read the saved task store and validate parsed tasks. On this build, a present empty-string value is treated like a missing key and can yield an empty export, so a successful empty export does not prove storage is healthy. If storage access throws, export fails; if recovery is pending, a normal export may be incomplete.',
+      summary: 'Creates a local task export without changing stored data. The JSON backup uses the current in-memory task list; CSV, Markdown and iCalendar exports read the saved task store and validate parsed tasks. A present empty-string value is parsed and causes export to fail rather than being treated as a missing key; a successful empty export therefore reflects an absent saved key, not an unreadable empty value. If storage access throws, export fails; if recovery is pending, a normal export may be incomplete.',
       removes: [],
       keeps: ['Saved task data and existing recovery backups are not changed', 'The current task list remains in Daymark'],
       recoverable: true,

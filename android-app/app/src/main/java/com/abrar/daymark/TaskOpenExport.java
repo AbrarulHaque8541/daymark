@@ -26,7 +26,7 @@ public final class TaskOpenExport {
     /** RFC 5545 folding limit, counted in UTF-8 octets. */
     public static final int ICS_LINE_OCTETS = 75;
     public static final String CSV_HEADER =
-            "id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt";
+            "id,title,dueDate,dueTime,priority,completed,repeat,tags,notes,subtasks,createdAt,updatedAt,repeatDayOfMonth";
 
     private static final Comparator<Task> EXPORT_ORDER = Comparator
             .comparing((Task task) -> task.completed)
@@ -97,8 +97,32 @@ public final class TaskOpenExport {
         }
         requireInstant(task.createdAt, "createdAt");
         requireInstant(task.updatedAt == null ? task.createdAt : task.updatedAt, "updatedAt");
+        if (task.reminderShownFire != null && !TaskLogic.isValidInstant(task.reminderShownFire)) {
+            throw new IllegalArgumentException("Export task reminderShownFire is not a valid task instant.");
+        }
+        if (task.reminderShownFire != null && !TaskLogic.isValidInstant(task.reminderShownFire)) {
+            throw new IllegalArgumentException("Export task reminderShownFire is not a valid task instant.");
+        }
         requireCleanText(task.notes == null ? "" : task.notes, "notes");
-        if (task.repeatRule != null) requireCleanText(task.repeatRule, "repeat");
+        if (task.repeatRule != null) {
+            requireCleanText(task.repeatRule, "repeat");
+            if (task.dueDate == null || !TaskLogic.isRepeatRule(task.repeatRule)) {
+                throw new IllegalArgumentException("Export repeat rule must be supported and requires a valid due date.");
+            }
+            if ("monthly".equals(task.repeatRule)) {
+                if (!TaskLogic.isValidRepeatDayOfMonth(task.repeatDayOfMonth)) {
+                    throw new IllegalArgumentException("Export monthly repeat day must be from 1 to 31.");
+                }
+            } else if ("yearly".equals(task.repeatRule)) {
+                if (!TaskLogic.isValidYearlyAnchor(task.dueDate, task.repeatDayOfMonth)) {
+                    throw new IllegalArgumentException("Export yearly repeat day must match the due date, except a clamped February 29.");
+                }
+            } else if (task.repeatDayOfMonth != null) {
+                throw new IllegalArgumentException("Export repeat day is only valid for monthly or yearly rules.");
+            }
+        } else if (task.repeatDayOfMonth != null) {
+            throw new IllegalArgumentException("Export repeat day requires a monthly or yearly rule.");
+        }
         if (task.tags != null) {
             for (String tag : task.tags) requireCleanText(tag, "tags");
         }
@@ -132,11 +156,10 @@ public final class TaskOpenExport {
     }
 
     private static Instant requireInstant(String value, String field) {
-        Instant instant = parseInstantOrNull(value);
-        if (instant == null) {
-            throw new IllegalArgumentException("Export task " + field + " \"" + value + "\" is not a parseable instant.");
+        if (!TaskLogic.isValidInstant(value)) {
+            throw new IllegalArgumentException("Export task " + field + " \"" + value + "\" is not a valid task instant.");
         }
-        return instant;
+        return Instant.parse(value);
     }
 
     /** Accepts the common ISO-8601 instant forms JavaScript's Date.parse accepts. */
@@ -186,6 +209,10 @@ public final class TaskOpenExport {
             }
             parts.add(task.priority + " priority");
             if (task.repeatRule != null) parts.add("repeats " + task.repeatRule);
+            if (task.repeatDayOfMonth != null && task.dueDate != null
+                    && task.repeatDayOfMonth.intValue() != Integer.parseInt(task.dueDate.substring(8))) {
+                parts.add("repeat day " + task.repeatDayOfMonth);
+            }
             if (task.tags != null) {
                 for (String tag : task.tags) parts.add("#" + tag);
             }
@@ -278,7 +305,8 @@ public final class TaskOpenExport {
                     task.notes == null ? "" : task.notes,
                     subtasksJson(task.subtasks),
                     task.createdAt,
-                    task.updatedAt == null ? task.createdAt : task.updatedAt);
+                    task.updatedAt == null ? task.createdAt : task.updatedAt,
+                    task.repeatDayOfMonth == null ? "" : String.valueOf(task.repeatDayOfMonth));
             List<String> quoted = new ArrayList<>(fields.size());
             for (String field : fields) quoted.add(csvQuote(field));
             rows.add(String.join(",", quoted));
