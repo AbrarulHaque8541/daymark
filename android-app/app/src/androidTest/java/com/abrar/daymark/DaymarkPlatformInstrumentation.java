@@ -110,8 +110,11 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
      */
     private void marker(String message) {
         android.util.Log.i(LOG_TAG, message);
+        // Also emit to instrumentation stdout with a stable prefix: the repeat runner reads
+        // these to localise which phase stalled, and stdout survives logcat rotation.
+        System.out.println("INSTRUMENTATION_PHASE: " + message);
         try {
-            File log = new File(getTargetContext().getFilesDir(), "instrumentation-phases.log");
+            File log = new File(getContext().getFilesDir(), "instrumentation-phases.log");
             try (FileOutputStream out = new FileOutputStream(log, true)) {
                 out.write((System.currentTimeMillis() + " " + message + "\n")
                         .getBytes(StandardCharsets.UTF_8));
@@ -1189,6 +1192,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         File root = makeTestDirectory("focus-timer-runtime");
         Context isolated = new IsolatedContext(base, root);
         final int notificationId = 0x44464F43;
+        manager.cancel(notificationId);
+        check(awaitNotificationState(manager, notificationId, false),
+                "stale focus notification is cleared before the isolated lifecycle test");
         final String taskId = "focus-instrumentation-" + UUID.randomUUID();
         Task task = new Task(taskId, "Focus instrumentation task", null, "medium", false,
                 "2026-10-30T18:00:00Z", "2026-10-30T18:00:00Z");
@@ -1245,6 +1251,16 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(awaitNotificationState(manager, notificationId, true),
                     "restoring an eligible running session republishes its progress notification");
 
+            // Keep a second runtime on the old task identity. Activity onResume can have a
+            // previously-created runtime too; its reconciliation must reload the latest durable
+            // focus record instead of republishing a cached task title.
+            TaskFocusSessionRuntime staleRuntime = new TaskFocusSessionRuntime(isolated);
+            TaskFocusSessionCoordinator.Snapshot staleRestored =
+                    staleRuntime.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
+            check(staleRestored != null && staleRestored.isRunning()
+                            && task.id.equals(staleRestored.timer.taskId()),
+                    "a second runtime starts with the same persisted task identity");
+
             TaskFocusSessionCoordinator.Snapshot paused = restoredRuntime.pauseFromUserAction();
             check(paused != null && paused.isPaused(),
                     "Pause durably changes the focus session to PAUSED");
@@ -1256,6 +1272,15 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(switched != null && switched.isPaused()
                             && alternateTask.id.equals(switched.timer.taskId()),
                     "choosing task B changes the paused session identity without resuming it");
+            check(switched.notificationPublished,
+                    "switching a paused session reports successful notification publication");
+
+            TaskFocusSessionCoordinator.Snapshot reconciledStaleRuntime =
+                    staleRuntime.reconcileTasks(Arrays.asList(task, alternateTask));
+            check(reconciledStaleRuntime != null && reconciledStaleRuntime.isPaused()
+                            && alternateTask.id.equals(reconciledStaleRuntime.timer.taskId())
+                            && reconciledStaleRuntime.restored,
+                    "a stale runtime reloads the switched task ID before republishing on lifecycle reconciliation");
             TaskFocusTimer persistedSwitch = new TaskFocusTimerStore(isolated).load(
                     android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis(), -1);
             check(persistedSwitch != null && persistedSwitch.isPaused()
@@ -1267,7 +1292,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                                     .contains(alternateTask.id),
                     "the switched task identity remains protected inside the encrypted focus record");
             checkPausedNotification(manager, notificationId, alternateTask.title,
-                    "switching a paused session");
+                    "reconciling a stale runtime after a paused task switch");
 
             TaskFocusSessionRuntime pausedAfterProcessRestart = new TaskFocusSessionRuntime(isolated);
             TaskFocusSessionCoordinator.Snapshot restoredPaused =
@@ -1275,6 +1300,8 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(restoredPaused != null && restoredPaused.isPaused() && restoredPaused.restored
                             && alternateTask.id.equals(restoredPaused.timer.taskId()),
                     "the switched task ID survives process recreation while the session remains paused");
+            check(restoredPaused.notificationPublished,
+                    "restoring a paused session reports successful notification publication");
             checkPausedNotification(manager, notificationId, alternateTask.title,
                     "restoring a paused session");
 
@@ -1283,8 +1310,12 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             check(resumed != null && resumed.isRunning()
                             && alternateTask.id.equals(resumed.timer.taskId()),
                     "Resume restores monotonic state under task B's identity");
-            check(awaitNotificationTitle(manager, notificationId, alternateTask.title) != null,
-                    "resuming after task switch publishes the notification with task B's title");
+            android.app.Notification resumedNotification =
+                    awaitNotificationTitle(manager, notificationId, alternateTask.title);
+            check(resumed.notificationPublished && resumedNotification != null,
+                    "resuming after task switch publishes task B's notification"
+                            + " (published=" + resumed.notificationPublished
+                            + ", observed=" + describeNotification(resumedNotification) + ")");
             TaskFocusSessionCoordinator.Snapshot finished = pausedAfterProcessRestart.finishFromUserAction();
             check(finished != null && finished.isFinished(),
                     "Finish durably ends the focus session without completing the task");
@@ -1305,6 +1336,10 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "restore/deletion reconciliation still leaves tasks.enc byte-for-byte unchanged");
         } finally {
             manager.cancel(notificationId);
+            // The CI runner starts ten instrumentation processes back-to-back. Wait until
+            // NotificationManager has processed this run's cancellation before the next
+            // process can publish the same stable ID, avoiding a stale cross-process cancel.
+            awaitNotificationState(manager, notificationId, false);
             deleteTree(root);
         }
     }
@@ -1385,11 +1420,41 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 && "Finish".contentEquals(notification.actions[1].title);
     }
 
+    private static String describeNotification(android.app.Notification notification) {
+        if (notification == null) return "missing";
+        android.os.Bundle extras = notification.extras;
+        if (extras == null) return "extras=missing flags=0x"
+                + Integer.toHexString(notification.flags);
+        StringBuilder actions = new StringBuilder("[");
+        if (notification.actions != null) {
+            for (int i = 0; i < notification.actions.length; i++) {
+                if (i > 0) actions.append(", ");
+                CharSequence title = notification.actions[i] == null
+                        ? null : notification.actions[i].title;
+                actions.append(title == null ? "<null>" : title);
+            }
+        }
+        actions.append(']');
+        return "title=" + extras.getString(android.app.Notification.EXTRA_TITLE)
+                + ", text=" + extras.getString(android.app.Notification.EXTRA_TEXT)
+                + ", flags=0x" + Integer.toHexString(notification.flags)
+                + ", chronometer=" + extras.getBoolean(
+                        android.app.Notification.EXTRA_SHOW_CHRONOMETER, false)
+                + ", progressMax=" + extras.getInt(
+                        android.app.Notification.EXTRA_PROGRESS_MAX, 0)
+                + ", progress=" + extras.getInt(
+                        android.app.Notification.EXTRA_PROGRESS, 0)
+                + ", indeterminate=" + extras.getBoolean(
+                        android.app.Notification.EXTRA_PROGRESS_INDETERMINATE, true)
+                + ", actions=" + actions;
+    }
+
     private void checkPausedNotification(android.app.NotificationManager manager,
             int id, String expectedTitle, String lifecycleAction) throws InterruptedException {
         android.app.Notification notification = awaitPausedNotification(manager, id, expectedTitle);
         check(isExpectedPausedNotification(notification, expectedTitle),
-                lifecycleAction + " eventually publishes the expected paused notification state");
+                lifecycleAction + " eventually publishes the expected paused notification state; observed="
+                        + describeNotification(notification));
         check(notification != null && notification.extras != null
                         && expectedTitle.equals(notification.extras.getString(
                                 android.app.Notification.EXTRA_TITLE)),

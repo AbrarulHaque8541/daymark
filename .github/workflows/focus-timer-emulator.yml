@@ -1,10 +1,16 @@
 name: Focus timer Android emulator lifecycle
 
 on:
+  # Keep exact-head runtime coverage active for long-running Focus branches even
+  # when an older PR base temporarily has merge conflicts.
+  push:
+    branches:
+      - "integration/focus-*"
   pull_request:
     paths:
       - ".github/workflows/focus-timer-emulator.yml"
       - "android-app/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
+      - "android-app/app/src/androidTest/java/com/abrar/daymark/PlatformTouchSequence.java"
       - "android-app/app/src/androidTest/java/com/abrar/daymark/TaskEditorImeInstrumentation.java"
       - "android-app/app/src/main/java/com/abrar/daymark/MainActivity.java"
       - "android-app/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
@@ -20,16 +26,30 @@ on:
       - "android-app/tools/check-v1-source.sh"
       - "android-app/tools/run-core-tests.sh"
       - "android-app/tools/run-platform-instrumentation-on-emulator.sh"
+      - "android-app/tools/PlatformTouchSequenceSmoke.java"
+      - "android-app/tools/run-platform-instrumentation-touch-sequence-tests.sh"
+      - "android-app/tools/platform-instrumentation-repeat.sh"
+      - "android-app/tools/run-platform-instrumentation-repeat-tests.sh"
+      - "android-app/tools/check-focus-emulator-repeat.py"
   workflow_dispatch:
 
 permissions:
-  contents: read
+ 
+ contents: read
 
 jobs:
   focus-runtime:
     name: Focus runtime API ${{ matrix.api-level }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
+    # Midday audit 2026-11-14: comment-only retrigger of the exact-head emulator check after
+# Focus runtime API 36 failed once on 7d036c7 (job 132350042720); no check or script changed.
+# API 36 has had intermittent lifecycle failures. Run the complete suite
+    # ten consecutive times on one clean emulator; API 29 remains one baseline.
+    # platform-instrumentation-repeat.sh clears only the disposable app package between runs
+    # and stops at the first failure; it never retries a failed instrumentation attempt.
+    env:
+      DAYMARK_FOCUS_EMULATOR_REPEAT_COUNT: ${{ matrix.api-level == 36 && '10' || '1' }}
     strategy:
       fail-fast: false
       matrix:
@@ -61,4 +81,8 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           working-directory: android-app
-          script: sh tools/run-platform-instrumentation-on-emulator.sh
+          script: |
+            adb shell wm size
+            adb shell wm density
+            adb shell settings get system font_scale
+            sh tools/run-platform-instrumentation-on-emulator.sh

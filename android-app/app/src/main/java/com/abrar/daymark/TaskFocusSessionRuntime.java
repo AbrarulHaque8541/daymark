@@ -78,25 +78,27 @@ final class TaskFocusSessionRuntime {
         long elapsed = SystemClock.elapsedRealtime();
         long wall = System.currentTimeMillis();
         int boot = readBootCount();
-        TaskFocusTimer saved = store.load(elapsed, wall, boot);
+        final TaskFocusTimer saved;
+        try {
+            saved = store.load(elapsed, wall, boot);
+        } catch (Exception failure) {
+            return coordinator.restoreLoadFailure(failure);
+        }
         Task currentTask = findTask(tasks, saved == null ? null : saved.taskId());
-        return coordinator.restoreAfterProcessStart(
+        return coordinator.restoreLoadedSnapshot(
+                saved,
                 currentTask == null ? null : currentTask.id,
                 currentTask == null ? null : currentTask.title);
     }
 
-    /** Reconcile the separate focus record after a durable task-list save or restore. */
+    /**
+     * Reconcile from the latest durable record, not this runtime instance's cached coordinator
+     * snapshot. A prior Activity/runtime may have switched or cleared the session while this
+     * instance was stopped; reusing its old task title can republish a stale notification.
+     */
     TaskFocusSessionCoordinator.Snapshot reconcileTasks(List<Task> tasks) throws Exception {
-        TaskFocusSessionCoordinator.Snapshot current = coordinator.currentSnapshot();
-        if (current == null) return null;
-        Task task = findTask(tasks, current.timer.taskId());
-        if (task == null) {
-            coordinator.clearIfTaskDeleted(current.timer.taskId());
-            return null;
-        }
-        return coordinator.refreshNotification(task.title);
+        return restoreAfterProcessStart(tasks);
     }
-
     TaskFocusSessionCoordinator.Snapshot startFromUserAction(
             String taskId, String title, TaskFocusTimer.Mode mode, long targetDurationMs)
             throws Exception {

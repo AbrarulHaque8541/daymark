@@ -4,6 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 python3 ./tools/check-package-cleanliness.py "$ROOT/.."
 sh ./tools/run-core-tests.sh
+sh ./tools/run-platform-instrumentation-repeat-tests.sh
 bash ./tools/run-gradle-with-retry-tests.sh
 python3 ./tools/check-ui-motion-wiring.py "$ROOT"
 sh ./tools/run-browser-address-notice-tests.sh
@@ -637,6 +638,23 @@ assert "browserStatus.animate().alpha(0f).setDuration(180L)" in activity, \
 assert 'compactButton("Retry", true)' in activity and 'message.contains("Retry")' in activity, \
     "actionable failed-navigation status must remain available through the dedicated Retry button"
 
+# Task-editor dialogs must consume IME insets on edge-to-edge Android 11+ windows.
+task_editor_ime = re.search(r'private void configureDialogImeInsets\(Window dialogWindow\)\s*\{(.*?)\n    \}', activity, re.S)
+assert task_editor_ime, "task editor dialog must have a dedicated IME-insets handler"
+assert "WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS" in task_editor_ime.group(1)
+assert "Api30Window.applyDialogImeInsets(MainActivity.this, dialogWindow, insets)" in task_editor_ime.group(1)
+api30_dialog_helper = (root / "app/src/main/java/com/abrar/daymark/Api30Window.java").read_text(encoding="utf-8")
+# The helper takes the Activity context, the dialog window and the insets; the earlier
+# single-argument form no longer exists, so asserting it would fail on correct code.
+assert "applyDialogImeInsets(" in task_editor_ime.group(1)
+assert "WindowInsetsPolicy.dialogHeightForIme(" in api30_dialog_helper
+assert "WindowInsetsPolicy.dialogYOffsetForIme(" in api30_dialog_helper, "task editor actions must be positioned in the IME-safe dialog area"
+assert "configureDialogImeInsets(shownDialogWindow)" in activity
+assert (
+    "SOFT_INPUT_ADJUST_NOTHING" in activity
+    and "SOFT_INPUT_ADJUST_RESIZE" in activity
+), "API 30+ dialogs must use explicit IME insets while API 26-29 retain resize behavior"
+
 # One accurate summary per policy area. The previous block repeated several lines
 # verbatim and still claimed "no permissions/network" for a manifest that declares
 # INTERNET for the browser and app clients (issue #45) — a stale summary that contradicted
@@ -659,6 +677,7 @@ python3 "$ROOT/tools/check-source-check-summary.py"
 
 python3 "$ROOT/tools/check-focus-timer-notification.py" "$ROOT"
 python3 "$ROOT/tools/check-focus-timer-ui.py"
+python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT"
 python3 "$ROOT/tools/check-merged-manifests.py" "$ROOT"
 python3 "$ROOT/tools/check-ci-test-honesty.py" "$ROOT/.."
 sh "$ROOT/tools/run-browser-download-list-tests.sh"
