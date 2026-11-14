@@ -1710,13 +1710,19 @@
   }
 
   function resetTaskViewPrefs() {
+    const alreadyDefault = state.filter === 'all' && state.sort === 'smart' && !state.query;
+    if (alreadyDefault) return;
+    showToast('View reset to defaults');
     state.filter = 'all';
     state.sort = 'smart';
     state.query = '';
     const searchEl = $('#task-search');
     if (searchEl) searchEl.value = '';
     persistTaskViewPrefs();
+    const list = $('#task-list');
+    if (list) list.classList.add('is-resetting');
     render();
+    if (list) setTimeout(() => list.classList.remove('is-resetting'), 280);
   }
 
 
@@ -2183,6 +2189,9 @@
     } else if (event.key === 'n' && !$('#edit-dialog').open) {
       event.preventDefault();
       $('#new-title').focus();
+    } else if ((event.key === 'r' || event.key === 'R') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      resetTaskViewPrefs();
     }
   }
 
