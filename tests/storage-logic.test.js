@@ -48,7 +48,8 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.browser-download.last-scenario',
     'daymark.webhook.queue.v1',
     'daymark.telegram.lastChat.v1',
-    'daymark.webhook.lock.v1'
+    'daymark.webhook.lock.v1',
+    'daymark.ui.filter.v1'
   ];
   assert.deepEqual(storage.categoryIds().length, storage.CATEGORIES.length);
   const seen = new Set();

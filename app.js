@@ -2,6 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'daymark.tasks.v1';
+  const FILTER_KEY = 'daymark.ui.filter.v1';
   const BACKUP_KEY = 'daymark.tasks.v1.backup';
   const FOCUS_KEY = 'daymark.focus.v1';
   const FOCUS_BACKUP_KEY = 'daymark.focus.v1.backup';
@@ -229,6 +230,28 @@
     if (!taskMutation || typeof taskMutation.readGeneration !== 'function') return { ok: false, reason: 'coordinator-unavailable' };
     try { return taskMutation.readGeneration(localStorage); }
     catch (error) { return { ok: false, reason: 'storage-unavailable' }; }
+  }
+
+  
+  function loadPersistedFilter() {
+    try {
+      const raw = localStorage.getItem(FILTER_KEY);
+      if (raw && ['all', 'active', 'completed', 'overdue'].includes(raw)) {
+        state.filter = raw;
+      }
+    } catch (error) {
+      // Ignore storage errors; fall back to default.
+    }
+  }
+
+  function persistFilter(filter) {
+    try {
+      if (['all', 'active', 'completed', 'overdue'].includes(filter)) {
+        localStorage.setItem(FILTER_KEY, filter);
+      }
+    } catch (error) {
+      // Best-effort; do not block UI.
+    }
   }
 
   function initializeTaskMutationState() {
@@ -906,6 +929,7 @@
     $('#new-repeat').value = '';
     syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
     state.filter = 'all';
+    persistFilter('all');
     state.query = '';
     $('#task-search').value = '';
     render();
@@ -2277,6 +2301,7 @@
 
   function setUp() {
     state.tasks = loadTasks();
+    loadPersistedFilter();
     initializeTaskMutationState();
     taskRecoveryMaintenance = scheduleTaskRecoveryMaintenance();
     const focusState = loadFocusState();
@@ -2318,6 +2343,7 @@
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
+      persistFilter(state.filter);
       render();
     }));
     taskList.addEventListener('click', handleTaskAction);
