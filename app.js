@@ -651,6 +651,13 @@
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', String(active));
     });
+    const resetViewBtn = $('#reset-view');
+    if (resetViewBtn) {
+      const isDefault = state.filter === 'all' && state.sort === 'smart' && !state.query;
+      resetViewBtn.hidden = isDefault;
+      resetViewBtn.disabled = isDefault;
+      resetViewBtn.setAttribute('aria-disabled', String(isDefault));
+    }
 
     // Searching re-renders the entire list; a polite live region would re-announce all
     // of it on every keystroke, which makes search unusable with a screen reader.
@@ -1702,6 +1709,16 @@
     }
   }
 
+  function resetTaskViewPrefs() {
+    state.filter = 'all';
+    state.sort = 'smart';
+    state.query = '';
+    const searchEl = $('#task-search');
+    if (searchEl) searchEl.value = '';
+    persistTaskViewPrefs();
+    render();
+  }
+
 
   async function persistFocusPreset(expectedClearEpoch) {
     if (!taskMutation || !taskLockManager || !taskMutation.TASK_AND_FOCUS_LOCK_ORDER) return false;
@@ -2390,6 +2407,10 @@
       persistTaskViewPrefs();
       render();
     });
+    const resetViewBtn = $('#reset-view');
+    if (resetViewBtn) {
+      resetViewBtn.addEventListener('click', resetTaskViewPrefs);
+    }
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
     $('#export-tasks').addEventListener('click', exportTasks);
