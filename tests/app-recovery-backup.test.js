@@ -310,14 +310,18 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'ordinary saves must not drop the rejected task source');
 });
 
-test('a stale malformed backup is still cleared when the primary task store is healthy', async () => {
+test('a malformed backup is retained when the primary task store is healthy', async () => {
+  // Owner policy (2026-11-14): a healthy primary is not proof that a backup is redundant.
+  // These bytes may be the only surviving copy, so they are kept until the user removes them.
+  const opaque = '{previously unreadable}';
   const storedValues = new Map([
     [STORAGE_KEY, JSON.stringify([validTask('valid-1', 'Healthy task')])],
-    [BACKUP_KEY, '{previously unreadable}']
+    [BACKUP_KEY, opaque]
   ]);
   const app = bootApp(storedValues);
   await app.settle();
-  assert.equal(storedValues.has(BACKUP_KEY), false);
+  assert.equal(storedValues.get(BACKUP_KEY), opaque,
+    'opaque backup bytes must survive a healthy primary load');
 });
 
 

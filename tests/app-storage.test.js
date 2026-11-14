@@ -567,13 +567,35 @@ test('opaque task recovery backup survives healthy primary load and later save',
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('healthy task-array backup is cleared as stale when primary is healthy', async () => {
+test('a non-identical healthy backup is retained when the primary is healthy', async () => {
   const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
-  const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
-  const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
+  const olderBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: olderBackup });
   await app.settle();
 
-  assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
+  assert.equal(app.storedValues.get(BACKUP_KEY), olderBackup,
+    'a backup holding a row the primary lacks may be the only copy of that row');
+  assert.match(app.elements.get('#storage-status span').textContent,
+    /recovery backup retained/, 'the retained backup must be disclosed, not silently kept');
+});
+
+test('an incomplete backup is retained when the primary is healthy', async () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const partial = JSON.stringify([{ id: 'broken-row' }]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: partial });
+  await app.settle();
+
+  assert.equal(app.storedValues.get(BACKUP_KEY), partial,
+    'a backup that fails task validation is recoverable data and must not be deleted');
+});
+
+test('a byte-identical fully valid backup is cleared as redundant', async () => {
+  const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
+  const app = bootApp({ savedValue: primary, savedBackupValue: primary });
+  await app.settle();
+
+  assert.equal(app.storedValues.has(BACKUP_KEY), false,
+    'only a byte-identical, fully valid backup is provably redundant');
 });
 
 test('corrupt saved data is copied to a browser backup and reported as preserved', async () => {
