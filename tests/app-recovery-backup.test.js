@@ -5,12 +5,39 @@ const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const feedLogic = require('../feed-logic.js');
+const taskMutation = require('../task-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FEED_KEY = 'daymark.feed.v1';
 const FEED_XML = '<rss version="2.0"><channel><title>Example feed</title><item><title>Offline story</title><link>https://example.com/story</link></item></channel></rss>';
+
+function makeLockManager() {
+  const tails = new Map();
+  const pending = new Set();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const tail = previous.then(() => gate);
+      tails.set(name, tail);
+      const request = previous.then(() => callback({ name, mode: options && options.mode || 'exclusive' }))
+        .finally(() => {
+          release();
+          if (tails.get(name) === tail) tails.delete(name);
+        });
+      pending.add(request);
+      return request.finally(() => pending.delete(request));
+    },
+    async settle() {
+      while (pending.size) await Promise.all(Array.from(pending));
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  };
+}
+
 
 function streamedFeedResponse() {
   const bytes = new TextEncoder().encode(FEED_XML);
@@ -132,9 +159,14 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
     addEventListener() {}
   };
   const animationFrames = [];
+  const lockManager = makeLockManager();
+  class TestStorageEvent { constructor(type, init) { this.type = type; this.key = init && init.key; } }
   const window = {
     DaymarkLogic: logic,
     DaymarkFeed: feedLogic,
+    DaymarkTaskMutation: taskMutation,
+    StorageEvent: TestStorageEvent,
+    navigator: { locks: lockManager },
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     addEventListener() {}
   };
@@ -161,6 +193,7 @@ function bootApp(storedValues, failWrites = new Set(), failExport = false, suppo
 
   return {
     elements,
+    async settle() { await lockManager.settle(); await lockManager.settle(); },
     getLastBlob: () => lastBlob,
     getRevokedObjectUrls: () => revokedObjectUrls.slice(),
     getPendingTimeouts: () => Array.from(timers.entries()).map(([id, timer]) => ({ id, delay: timer.delay })),
@@ -186,19 +219,20 @@ function validTask(id, title) {
   };
 }
 
-test('partially rejected saved tasks survive a subsequent edit and page reload', () => {
+test('partially rejected saved tasks survive a subsequent edit and page reload', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
   ]);
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const first = bootApp(storedValues);
+  await first.settle();
 
   assert.equal(storedValues.get(BACKUP_KEY), original,
     'the full original payload is backed up when validation rejects a record');
 
   first.elements.get('#new-title').value = 'New task';
-  first.elements.get('#add-form').dispatch('submit');
+  await first.elements.get('#add-form').dispatch('submit');
   assert.equal(first.elements.get('#storage-status span').textContent,
     'Saved on this device; ignored originals remain in a recovery backup');
   assert.equal(storedValues.get(BACKUP_KEY), original,
@@ -208,13 +242,14 @@ test('partially rejected saved tasks survive a subsequent edit and page reload',
   assert.deepEqual(saved.map((task) => task.title), ['Keep valid task', 'New task']);
 
   const second = bootApp(storedValues);
+  await second.settle();
   assert.equal(storedValues.get(BACKUP_KEY), original,
     'reload must retain the partial-recovery backup after the primary store becomes valid');
   assert.match(second.elements.get('#storage-status span').textContent,
     /ignored originals remain in a recovery backup/);
 });
 
-test('a new partial recovery backup preserves earlier rejected task records', () => {
+test('a new partial recovery backup preserves earlier rejected task records', async () => {
   const earlier = JSON.stringify([
     validTask('earlier-valid', 'Earlier valid task'),
     validTask('earlier-invalid', 'x'.repeat(170))
@@ -229,22 +264,24 @@ test('a new partial recovery backup preserves earlier rejected task records', ()
   ]);
 
   const first = bootApp(storedValues);
+  await first.settle();
   const bundle = JSON.parse(storedValues.get(BACKUP_KEY));
   assert.equal(bundle.format, 'daymark-recovery-bundle-v1');
   assert.deepEqual(bundle.payloads, [earlier, current],
     'backing up a new rejected payload must not overwrite the previous recovery source');
 
   first.elements.get('#new-title').value = 'Another task';
-  first.elements.get('#add-form').dispatch('submit');
+  await first.elements.get('#add-form').dispatch('submit');
   assert.deepEqual(JSON.parse(storedValues.get(BACKUP_KEY)).payloads, [earlier, current],
     'subsequent saves must retain all recovery sources');
 
-  bootApp(storedValues);
+  const reloaded = bootApp(storedValues);
+  await reloaded.settle();
   assert.deepEqual(JSON.parse(storedValues.get(BACKUP_KEY)).payloads, [earlier, current],
     'reload must recognize the recovery bundle and retain it');
 });
 
-test('an opaque prior backup survives when a new partially invalid task payload is backed up', () => {
+test('an opaque prior backup survives when a new partially invalid task payload is backed up', async () => {
   const priorOpaqueBackup = '{older recovery bytes that are not parseable JSON';
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -255,6 +292,7 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     [BACKUP_KEY, priorOpaqueBackup]
   ]);
   const app = bootApp(storedValues);
+  await app.settle();
 
   const backup = JSON.parse(storedValues.get(BACKUP_KEY));
   assert.equal(backup.format, 'daymark-recovery-bundle-v1');
@@ -264,7 +302,7 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'the newly rejected primary payload must also be retained');
 
   app.elements.get('#new-title').value = 'Safe follow-up edit';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
   const afterSave = JSON.parse(storedValues.get(BACKUP_KEY));
   assert.ok(afterSave.payloads.includes(priorOpaqueBackup),
     'ordinary saves must not drop the opaque older recovery source');
@@ -272,17 +310,18 @@ test('an opaque prior backup survives when a new partially invalid task payload 
     'ordinary saves must not drop the rejected task source');
 });
 
-test('a stale malformed backup is still cleared when the primary task store is healthy', () => {
+test('a stale malformed backup is still cleared when the primary task store is healthy', async () => {
   const storedValues = new Map([
     [STORAGE_KEY, JSON.stringify([validTask('valid-1', 'Healthy task')])],
     [BACKUP_KEY, '{previously unreadable}']
   ]);
-  bootApp(storedValues);
+  const app = bootApp(storedValues);
+  await app.settle();
   assert.equal(storedValues.has(BACKUP_KEY), false);
 });
 
 
-test('failed recovery backup creation never overwrites the only original task payload', () => {
+test('failed recovery backup creation never overwrites the only original task payload', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -290,21 +329,22 @@ test('failed recovery backup creation never overwrites the only original task pa
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const failWrites = new Set([BACKUP_KEY]);
   const app = bootApp(storedValues, failWrites);
+  await app.settle();
 
   assert.equal(storedValues.get(STORAGE_KEY), original,
     'the primary remains byte-for-byte intact when backup creation fails');
   assert.equal(storedValues.has(BACKUP_KEY), false);
   assert.match(app.elements.get('#storage-status span').textContent,
-    /recovery backup could not be created/);
+    /recovery backup could not be created/i);
 
   app.elements.get('#new-title').value = 'First unsaved edit';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
   assert.equal(storedValues.get(STORAGE_KEY), original,
     'a later task save must not overwrite the only original copy');
 
   failWrites.delete(BACKUP_KEY);
   app.elements.get('#new-title').value = 'Retry after freeing storage';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
 
   assert.equal(storedValues.get(BACKUP_KEY), original,
     'retry must create the recovery backup before changing primary storage');
@@ -313,7 +353,7 @@ test('failed recovery backup creation never overwrites the only original task pa
   assert.ok(saved.some((task) => task.title === 'Retry after freeing storage'));
 });
 
-test('recovery backup export preserves a second user gesture for browser download', () => {
+test('recovery backup export preserves a second user gesture for browser download', async () => {
   const opaque = '{older opaque recovery bytes';
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -324,6 +364,7 @@ test('recovery backup export preserves a second user gesture for browser downloa
     [BACKUP_KEY, opaque]
   ]);
   const app = bootApp(storedValues);
+  await app.settle();
 
   const backupRaw = storedValues.get(BACKUP_KEY);
   const action = app.elements.get('#toast-action');
@@ -356,13 +397,14 @@ test('recovery backup export preserves a second user gesture for browser downloa
 });
 
 
-test('recovery export releases its prepared object URL when the action expires', () => {
+test('recovery export releases its prepared object URL when the action expires', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
   ]);
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const app = bootApp(storedValues);
+  await app.settle();
   const action = app.elements.get('#toast-action');
 
   action.dispatch('click');
@@ -379,13 +421,14 @@ test('recovery export releases its prepared object URL when the action expires',
 });
 
 
-test('recovery export reports Blob preparation failure without offering a broken download', () => {
+test('recovery export reports Blob preparation failure without offering a broken download', async () => {
   const original = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
   ]);
   const storedValues = new Map([[STORAGE_KEY, original]]);
   const app = bootApp(storedValues, new Set(), true);
+  await app.settle();
   const action = app.elements.get('#toast-action');
 
   action.dispatch('click');
@@ -399,7 +442,7 @@ test('recovery export reports Blob preparation failure without offering a broken
 
 
 
-test('recovery export uses encoded data URL when Blob URL APIs are unavailable', () => {
+test('recovery export uses encoded data URL when Blob URL APIs are unavailable', async () => {
   const priorOpaque = '{older opaque + recovery bytes\\nनमस्ते';
   const primary = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
@@ -456,7 +499,7 @@ test('app.js integrity guard rejects placeholder or truncated application source
 });
 
 
-test('recovery export includes task and focus backup sources together without modifying either', () => {
+test('recovery export includes task and focus backup sources together without modifying either', async () => {
   const taskPrimary = JSON.stringify([
     validTask('valid-1', 'Keep valid task'),
     validTask('invalid-1', 'x'.repeat(170))
@@ -467,6 +510,7 @@ test('recovery export includes task and focus backup sources together without mo
     ['daymark.focus.v1.backup', focusBackup]
   ]);
   const app = bootApp(storedValues);
+  await app.settle();
   const taskBackup = storedValues.get(BACKUP_KEY);
   const expected = JSON.stringify({
     format: 'daymark-combined-recovery-v1',

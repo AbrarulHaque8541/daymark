@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const nodeCrypto = require('node:crypto');
 const webhookApi = require('../webhook-logic.js');
 const ui = require('../webhook-ui.js');
+const taskMutation = require('../task-mutation-logic.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -85,22 +86,29 @@ function fakeEnv(options) {
   };
   const locks = Object.prototype.hasOwnProperty.call(opts, 'locks') ? opts.locks : createLockManager();
   const confirmations = [];
+  const listeners = new Map();
+  const win = {
+    navigator: { onLine: opts.online !== false, locks },
+    addEventListener(type, handler) { const list = listeners.get(type) || []; list.push(handler); listeners.set(type, list); },
+    dispatchEvent(event) { for (const handler of (listeners.get(event.type) || []).slice()) handler(event); return true; }
+  };
   const env = {
     document: {
       readyState: 'complete',
       getElementById(id) { return elements[id] || null; }
     },
-    window: { addEventListener() {} },
+    window: win,
     crypto: Object.prototype.hasOwnProperty.call(opts, 'crypto') ? opts.crypto : nodeCrypto.webcrypto,
     TextEncoder: Object.prototype.hasOwnProperty.call(opts, 'TextEncoder') ? opts.TextEncoder : globalThis.TextEncoder,
     confirm(message) { confirmations.push(message); return typeof opts.confirm === 'function' ? opts.confirm(message) : true; },
     localStorage: storage,
     navigator: { onLine: opts.online !== false, locks },
     webhookApi,
+    taskMutationApi: taskMutation,
     fetch: opts.fetch,
     now: () => '2026-11-04T12:00:00.000Z'
   };
-  return { env, elements, storageData, confirmations };
+  return { env, elements, storageData, confirmations, window: win };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
@@ -157,6 +165,50 @@ test('external storage clear resets this tab memory-only webhook events without 
   assert.equal(handle.readQueue().length, 1);
   assert.equal(handle.resetQueueAfterExternalClear(), true);
   assert.deepEqual(handle.readQueue(), []);
+});
+
+
+test('Clear All invalidates memory-only webhook completions and retry state across storage recovery', async () => {
+  let rejectQueueWrites = true;
+  let sends = 0;
+  const storageData = {};
+  const storage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null; },
+    setItem(key, value) {
+      if (key === webhookApi.QUEUE_KEY && rejectQueueWrites) throw new Error('quota');
+      storageData[key] = String(value);
+    },
+    removeItem(key) { delete storageData[key]; }
+  };
+  const fixture = fakeEnv({ url: DEFAULT_ENDPOINT_URL, online: false, storage, fetch: async () => { sends += 1; return { status: 200 }; } });
+  const handle = ui.attachWebhookUi(fixture.env);
+  handle.onSave({ preventDefault() {} });
+  const queued = await handle.notifyTaskCompleted(TASK, { deferDelivery: true });
+  assert.equal(queued.queued, true);
+  assert.equal(queued.reason, 'memory-only');
+  assert.equal(handle.readQueue().length, 1);
+
+  const cleared = await taskMutation.withLocksInOrder(
+    fixture.env.navigator.locks,
+    taskMutation.CLEAR_ALL_LOCK_ORDER,
+    () => {
+      const epoch = taskMutation.advanceClearEpoch(storage);
+      assert.equal(epoch.ok, true);
+      const reset = handle.prepareForClearAll();
+      storage.removeItem(webhookApi.QUEUE_KEY);
+      return reset;
+    }
+  );
+  assert.equal(cleared.ok, true);
+  assert.equal(cleared.value.reset, true);
+  assert.equal(handle.readQueue().length, 0);
+  assert.equal(fixture.elements['webhook-url'].value, '');
+
+  rejectQueueWrites = false;
+  fixture.env.navigator.onLine = true;
+  await handle.flush();
+  assert.equal(sends, 0, 'Retry after recovery cannot deliver a completion invalidated by Clear All');
+  assert.equal(storageData[webhookApi.QUEUE_KEY], undefined);
 });
 
 test('Clear Queue fails closed when the shared queue lock cannot be acquired', async () => {
@@ -858,11 +910,11 @@ test('the app queues a webhook only after the task save succeeds and handles asy
   const toggleEnd = app.indexOf("} else if", toggleStart);
   assert.ok(toggleStart >= 0 && toggleEnd > toggleStart);
   const toggle = app.slice(toggleStart, toggleEnd);
-  const persistAt = toggle.indexOf('const saved = persistTasks();');
-  const notifyAt = toggle.indexOf('void notifyWebhookTaskCompleted(task);');
+  const persistAt = toggle.indexOf('const saved = await persistTasks({');
+  const notifyAt = toggle.indexOf('notifyWebhookTaskCompleted(canonicalTask, { deferDelivery: true })');
   assert.ok(persistAt >= 0 && notifyAt > persistAt,
-    'webhook queueing must happen only after the task was durably saved');
-  assert.ok(toggle.includes('if (saved && task.completed)'));
+    'webhook queue append must run inside the post-commit callback while the task lock is still held');
+  assert.ok(toggle.includes('afterCommit: (canonicalTasks) =>'));
 });
 
 test('index markup exposes task-completion webhook controls and session-only disclosure', () => {

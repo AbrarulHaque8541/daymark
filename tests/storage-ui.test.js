@@ -4,6 +4,25 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const storageApi = require('../storage-logic.js');
 const ui = require('../storage-ui.js');
+const taskMutation = require('../task-mutation-logic.js');
+
+function createLockManager() {
+  const tails = new Map();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const tail = previous.then(() => gate);
+      tails.set(name, tail);
+      return previous.then(() => callback({ name, mode: options && options.mode || 'exclusive' }))
+        .finally(() => {
+          release();
+          if (tails.get(name) === tail) tails.delete(name);
+        });
+    }
+  };
+}
 
 function fakeElement(tag) {
   const el = {
@@ -49,15 +68,32 @@ function fakeEnv(options) {
   };
   const storageData = Object.assign({}, opts.data || {});
   const readFailures = new Set(opts.readFailures || []);
+  const removeFailures = new Set(opts.removeFailures || []);
   const storage = {
     getItem(key) {
       if (readFailures.has(key)) throw new Error('Read access failure');
       return Object.prototype.hasOwnProperty.call(storageData, key) ? storageData[key] : null;
     },
     setItem(key, value) { storageData[key] = String(value); },
-    removeItem(key) { delete storageData[key]; }
+    removeItem(key) {
+      if (removeFailures.has(key)) throw new Error('Remove access failure');
+      delete storageData[key];
+    }
   };
   const confirmations = [];
+  const lockManager = createLockManager();
+  const webhookUi = {
+    prepareForClearAll() { return { reset: true, legacyConfigCleared: true }; },
+    async clearQueue() {
+      const delivery = await lockManager.request(taskMutation.WEBHOOK_DELIVERY_LOCK_NAME, { mode: 'exclusive' },
+        () => lockManager.request(taskMutation.WEBHOOK_QUEUE_LOCK_NAME, { mode: 'exclusive' }, () => {
+          storage.removeItem('daymark.webhook.queue.v1');
+          return { cleared: true };
+        }));
+      return delivery && delivery.cleared ? delivery : { cleared: false };
+    }
+  };
+  const telegramUi = { resetForClearAll() {} };
   const confirmState = {
     result: opts.confirmResult !== false,
     throws: false
@@ -71,6 +107,10 @@ function fakeEnv(options) {
     window: { addEventListener() {} },
     localStorage: storage,
     storageApi,
+    taskMutationApi: taskMutation,
+    lockManager,
+    webhookUi,
+    telegramUi,
     confirm(message) {
       confirmations.push(String(message));
       if (confirmState.throws) throw new Error('confirmation unavailable');
@@ -78,7 +118,7 @@ function fakeEnv(options) {
     },
     now: () => '2026-11-04T12:00:00.000Z'
   };
-  return { env, elements, storageData, confirmations, confirmState };
+  return { env, elements, storageData, confirmations, confirmState, removeFailures };
 }
 
 test('the module exposes its API and stays inert under Node', () => {
@@ -120,7 +160,7 @@ test('attach with data reports category counts, sizes, and enables clearing', ()
   assert.equal(elements['data-clear-all'].disabled, false);
 });
 
-test('clearing one category asks for confirmation and removes only its keys', () => {
+test('clearing one category asks for confirmation and removes only its keys', async () => {
   const { env, elements, storageData, confirmations } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
@@ -129,7 +169,7 @@ test('clearing one category asks for confirmation and removes only its keys', ()
     }
   });
   const handle = ui.attachStorageUi(env);
-  handle.onClearCategory('tasks');
+  await handle.onClearCategory('tasks');
   assert.equal(confirmations.length, 1, 'a destructive action requires one confirmation');
   assert.match(confirmations[0], /Clear Tasks\?/);
   assert.match(confirmations[0], /This cannot be undone/);
@@ -138,6 +178,38 @@ test('clearing one category asks for confirmation and removes only its keys', ()
   assert.equal(storageData['daymark.webhook.v1'] !== undefined, true, 'webhook settings are untouched');
   assert.match(elements['data-status'].textContent, /Cleared Tasks \(1 item\(s\) removed\)/);
   assert.match(elements['data-status'].textContent, /Nothing else was touched/);
+});
+
+test('clearing only the task recovery backup preserves the task epoch and primary task writes', async () => {
+  const { env, elements, storageData } = fakeEnv({
+    data: {
+      'daymark.tasks.v1': JSON.stringify([{ id: 'keep-task', title: 'Keep task' }]),
+      'daymark.tasks.v1.backup': '{recovery copy'
+    }
+  });
+  const handle = ui.attachStorageUi(env);
+  const before = taskMutation.readGeneration(env.localStorage);
+  assert.equal(before.ok, true);
+
+  await handle.onClearCategory('task-backup');
+
+  assert.equal(storageData['daymark.tasks.v1.backup'], undefined);
+  const tasks = JSON.parse(storageData['daymark.tasks.v1']);
+  assert.equal(tasks[0].id, 'keep-task');
+  const after = taskMutation.readGeneration(env.localStorage);
+  assert.equal(after.value.taskEpoch, before.value.taskEpoch,
+    'removing only the backup does not invalidate the still-present primary task store');
+  const commit = await taskMutation.commitTaskSnapshot({
+    storage: env.localStorage,
+    lockManager: env.lockManager,
+    baseTasks: tasks,
+    desiredTasks: tasks.concat({ id: 'after-backup-clear', title: 'Still editable' }),
+    expectedTaskEpoch: before.value.taskEpoch
+  });
+  assert.equal(commit.ok, true, 'a normal primary task save remains possible');
+  assert.deepEqual(JSON.parse(storageData['daymark.tasks.v1']).map((task) => task.id),
+    ['keep-task', 'after-backup-clear']);
+  assert.match(elements['data-status'].textContent, /Cleared Task recovery backup/);
 });
 
 test('declining the confirmation changes nothing and says so', () => {
@@ -158,7 +230,7 @@ test('a throwing confirmation fails closed without touching data', () => {
   assert.match(elements['data-status'].textContent, /Could not ask for confirmation\. Nothing was cleared/);
 });
 
-test('clear-all confirms once, removes everything, and leaves foreign keys alone', () => {
+test('clear-all confirms once, removes everything, and leaves foreign keys alone', async () => {
   const { env, elements, storageData, confirmations } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
@@ -168,7 +240,7 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
     }
   });
   const handle = ui.attachStorageUi(env);
-  handle.onClearAll();
+  await handle.onClearAll();
   assert.equal(confirmations.length, 1);
   assert.match(confirmations[0], /Clear all managed Daymark data/);
   assert.match(confirmations[0], /Telegram chat target/,
@@ -184,12 +256,43 @@ test('clear-all confirms once, removes everything, and leaves foreign keys alone
   assert.equal(elements['data-clear-all'].disabled, true, 'clear-all disables after the store is empty');
 });
 
-test('a failed removal during clear-all is reported honestly', () => {
+test('a failed removal during clear-all is reported honestly', async () => {
   const { env, elements } = fakeEnv({ data: { 'daymark.tasks.v1': '[]' } });
   const handle = ui.attachStorageUi(env);
   env.localStorage.removeItem = () => { throw new Error('blocked'); };
-  handle.onClearAll();
+  await handle.onClearAll();
   assert.match(elements['data-status'].textContent, /could not be removed by the browser/);
+});
+
+test('Clear All reports a failed primary task removal and leaves the task epoch unchanged', async () => {
+  const original = JSON.stringify([{ id: 'still-here', title: 'Still here' }]);
+  const { env, elements, storageData } = fakeEnv({
+    data: { 'daymark.tasks.v1': original },
+    removeFailures: ['daymark.tasks.v1']
+  });
+  const handle = ui.attachStorageUi(env);
+  const before = taskMutation.readGeneration(env.localStorage);
+  await handle.onClearAll();
+
+  assert.equal(storageData['daymark.tasks.v1'], original,
+    'a failed primary-key deletion must leave the task payload intact');
+  const after = taskMutation.readGeneration(env.localStorage);
+  assert.equal(after.value.taskEpoch, before.value.taskEpoch,
+    'taskEpoch advances only when the primary task key was actually removed');
+  assert.equal(after.value.clearEpoch, before.value.clearEpoch + 1,
+    'the separate global clear epoch still fences other managed-data writers');
+  assert.match(elements['data-status'].textContent,
+    /1 item\(s\) could not be removed by the browser\. Nothing was cleared/);
+  const tasks = JSON.parse(storageData['daymark.tasks.v1']);
+  const commit = await taskMutation.commitTaskSnapshot({
+    storage: env.localStorage,
+    lockManager: env.lockManager,
+    baseTasks: tasks,
+    desiredTasks: tasks.concat({ id: 'after-failed-clear', title: 'Still editable' }),
+    expectedTaskEpoch: before.value.taskEpoch
+  });
+  assert.equal(commit.ok, true, 'a task save may proceed because the primary key survived');
+  assert.equal(JSON.parse(storageData['daymark.tasks.v1']).length, 2);
 });
 
 test('unavailable storage keeps the card honest and never clears anything', () => {
@@ -275,7 +378,7 @@ test('the refresh button rescans without confirmation and without changing data'
   assert.equal(storageData['daymark.weather.v1'], '{}');
 });
 
-test('clear actions set busy state (disabled + aria-busy + is-busy) while operating', () => {
+test('clear actions set busy state (disabled + aria-busy + is-busy) while operating', async () => {
   const { env, elements } = fakeEnv({
     data: { 'daymark.tasks.v1': '[]' }
   });
@@ -292,14 +395,14 @@ test('clear actions set busy state (disabled + aria-busy + is-busy) while operat
     return originalClear.apply(this, args);
   };
   const handle = ui.attachStorageUi(env);
-  handle.onClearCategory('tasks');
+  await handle.onClearCategory('tasks');
   assert.equal(sawBusy, true, 'busy state is active during clear');
   // After, busy should be cleared
   assert.equal(elements['data-list']['aria-busy'], 'false');
 });
 
 
-test('unreadable category data is shown as unknown and an explicit retry fails closed', () => {
+test('unreadable category data is shown as unknown and an explicit retry fails closed', async () => {
   const { env, elements, storageData, confirmations } = fakeEnv({
     data: { 'daymark.tasks.v1': '[]' },
     readFailures: ['daymark.tasks.v1']
@@ -316,7 +419,7 @@ test('unreadable category data is shown as unknown and an explicit retry fails c
   assert.equal(elements['data-clear-all'].disabled, true,
     'clear-all is blocked while any category is unreadable');
 
-  handle.onClearCategory('tasks');
+  await handle.onClearCategory('tasks');
   assert.equal(confirmations.length, 1, 'the retry remains explicitly user-confirmed');
   assert.equal(storageData['daymark.tasks.v1'], '[]',
     'a failed preflight read never removes the unreadable task key');
@@ -341,7 +444,7 @@ test('all unreadable categories never produce an empty-store claim or mutate dat
     'an incomplete scan must not mutate any stored value');
 });
 
-test('clear-all preflights every key and changes nothing when any key is unreadable', () => {
+test('clear-all preflights every key and changes nothing when any key is unreadable', async () => {
   const { env, elements, storageData, confirmations } = fakeEnv({
     data: {
       'daymark.tasks.v1': '[]',
@@ -353,7 +456,7 @@ test('clear-all preflights every key and changes nothing when any key is unreada
   assert.equal(elements['data-clear-all'].disabled, true,
     'the visible clear-all action is blocked while a key is unreadable');
 
-  handle.onClearAll();
+  await handle.onClearAll();
   assert.equal(confirmations.length, 1, 'direct clear-all still requires explicit confirmation');
   assert.equal(storageData['daymark.tasks.v1'], '[]');
   assert.equal(storageData['daymark.weather.v1'], '{}',
@@ -397,26 +500,40 @@ function fakePageEnv(options) {
   };
   const pageStorage = Object.assign({}, opts.data || {});
   const pageConfirmations = [];
+  const dispatched = [];
+  const pageLocks = createLockManager();
+  const pageLocalStorage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(pageStorage, key) ? pageStorage[key] : null; },
+    setItem(key, value) { pageStorage[key] = String(value); },
+    removeItem(key) { delete pageStorage[key]; }
+  };
+  class PageStorageEvent { constructor(type, init) { this.type = type; this.key = init && init.key; this.newValue = init && init.newValue; } }
+  const pageWindow = {
+    StorageEvent: PageStorageEvent,
+    navigator: { locks: pageLocks },
+    addEventListener() {},
+    dispatchEvent(event) { dispatched.push(event); return true; }
+  };
   const pageEnv = {
     document: {
       readyState: 'complete',
       getElementById(id) { return pageElements[id] || null; },
       createElement(tag) { return fakeElement(tag); }
     },
-    window: { addEventListener() {} },
-    localStorage: {
-      getItem(key) { return Object.prototype.hasOwnProperty.call(pageStorage, key) ? pageStorage[key] : null; },
-      setItem(key, value) { pageStorage[key] = String(value); },
-      removeItem(key) { delete pageStorage[key]; }
-    },
+    window: pageWindow,
+    localStorage: pageLocalStorage,
+    taskMutationApi: taskMutation,
+    lockManager: pageLocks,
+    webhookUi: { prepareForClearAll() { return { reset: true, legacyConfigCleared: true }; } },
+    telegramUi: { resetForClearAll() {} },
     storageApi,
     confirm(message) { pageConfirmations.push(String(message)); return true; }
   };
-  return { env: pageEnv, elements: pageElements, storageData: pageStorage, confirmations: pageConfirmations };
+  return { env: pageEnv, elements: pageElements, storageData: pageStorage, confirmations: pageConfirmations, dispatched };
 }
 
-test('the live storage card renders through the page ids and keeps Clear status read-only', () => {
-  const { env, elements, storageData, confirmations } = fakePageEnv({
+test('the live storage card renders through the page ids and keeps Clear status read-only', async () => {
+  const { env, elements, storageData, confirmations, dispatched } = fakePageEnv({
     data: { 'daymark.tasks.v1': '[]', 'daymark.weather.v1': '{}' }
   });
   const handle = ui.attachStorageUi(env);
@@ -434,15 +551,17 @@ test('the live storage card renders through the page ids and keeps Clear status 
 
   const clearAll = elements['storage-clear-all'].listeners.find((entry) => entry.type === 'click');
   assert.ok(clearAll, 'Clear all local data is wired');
-  clearAll.handler();
+  await clearAll.handler();
   assert.equal(confirmations.length, 1, 'Clear all still requires the explicit confirmation');
   assert.equal(storageData['daymark.tasks.v1'], undefined, 'the dedicated control clears managed data');
   assert.equal(storageData['daymark.weather.v1'], undefined, 'the dedicated control clears managed data');
+  assert.ok(dispatched.some((event) => event.key === taskMutation.GENERATION_KEY),
+    'same-tab task listeners receive the new clear generation');
   assert.equal(typeof handle.onClearAll, 'function');
 });
 
 test('the storage card Check control rescans through the page ids without confirmation', () => {
-  const { env, elements, storageData, confirmations } = fakePageEnv({
+  const { env, elements, storageData, confirmations, dispatched } = fakePageEnv({
     data: { 'daymark.feed.v1': '{}' }
   });
   ui.attachStorageUi(env);

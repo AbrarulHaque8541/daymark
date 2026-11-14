@@ -6,17 +6,44 @@ const vm = require('node:vm');
 const logic = require('../task-logic.js');
 const focus = require('../focus-logic.js');
 const repeat = require('../repeat-logic.js');
+const taskMutation = require('../task-mutation-logic.js');
 
 const APP_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const STORAGE_KEY = 'daymark.tasks.v1';
 const BACKUP_KEY = `${STORAGE_KEY}.backup`;
 const FOCUS_KEY = 'daymark.focus.v1';
 const FOCUS_BACKUP_KEY = `${FOCUS_KEY}.backup`;
+const FEED_KEY = 'daymark.feed.v1';
+function makeLockManager() {
+  const tails = new Map();
+  const pending = new Set();
+  return {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const tail = previous.then(() => gate);
+      tails.set(name, tail);
+      const request = previous.then(() => callback({ name, mode: options && options.mode || 'exclusive' }))
+        .finally(() => {
+          release();
+          if (tails.get(name) === tail) tails.delete(name);
+        });
+      pending.add(request);
+      return request.finally(() => pending.delete(request));
+    },
+    async settle() {
+      while (pending.size) await Promise.all(Array.from(pending));
+      await Promise.resolve();
+    }
+  };
+}
 
-function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
+function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, savedFocusBackupValue = null, savedFeedValue = null, feedApi = null, fetchImpl = null, failBackup = false, failPrimarySave = false, failFocusSave = false, failPrimaryRead = false, failBackupRead = false, failFocusPrimaryRead = false, failFocusBackupRead = false, confirmResult = true, confirmThrows = false, fixedToday = null, dateNow = null }) {
   const elements = new Map();
   const classSets = new Map();
   const listeners = new Map();
+  const windowListeners = new Map();
   const confirmMessages = [];
   const intervalCallbacks = [];
   const clock = dateNow === null ? null : { value: new Date(dateNow).getTime() };
@@ -32,6 +59,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   const storedValues = new Map([[STORAGE_KEY, savedValue], [FOCUS_KEY, savedFocusValue]]);
   if (savedBackupValue !== null) storedValues.set(BACKUP_KEY, savedBackupValue);
   if (savedFocusBackupValue !== null) storedValues.set(FOCUS_BACKUP_KEY, savedFocusBackupValue);
+  if (savedFeedValue !== null) storedValues.set(FEED_KEY, savedFeedValue);
 
   function element(selector) {
     if (!elements.has(selector)) {
@@ -101,23 +129,47 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     hidden: false,
     querySelector: element,
     querySelectorAll: () => [],
-    addEventListener() {}
+    addEventListener(type, handler) {
+      const handlers = windowListeners.get(type) || [];
+      handlers.push(handler);
+      windowListeners.set(type, handlers);
+    },
+    dispatchEvent(event) {
+      for (const handler of (windowListeners.get(event.type) || []).slice()) handler(event);
+      return true;
+    }
   };
   const appLogic = fixedToday
     ? Object.assign({}, logic, {
       localDateString: (date) => date === undefined ? fixedToday : logic.localDateString(date)
     })
     : logic;
+  class TestStorageEvent {
+    constructor(type, init) { this.type = type; this.key = init && init.key; this.newValue = init && init.newValue; }
+  }
+  const appLockManager = makeLockManager();
   const window = {
     DaymarkLogic: appLogic,
     DaymarkFocus: focus,
     DaymarkRepeat: repeat,
+    DaymarkFeed: feedApi,
+    DaymarkTaskMutation: taskMutation,
+    StorageEvent: TestStorageEvent,
+    navigator: { locks: appLockManager },
     confirm(message) {
       confirmMessages.push(String(message));
       if (confirmThrows) throw new Error('confirmation unavailable');
       return confirmResult;
     },
-    addEventListener() {}
+    addEventListener(type, handler) {
+      const handlers = windowListeners.get(type) || [];
+      handlers.push(handler);
+      windowListeners.set(type, handlers);
+    },
+    dispatchEvent(event) {
+      for (const handler of (windowListeners.get(event.type) || []).slice()) handler(event);
+      return true;
+    }
   };
   class TestFileReader {
     readAsText(file) {
@@ -139,6 +191,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
     document,
     localStorage,
     window,
+    fetch: fetchImpl,
     FileReader: TestFileReader,
     clearTimeout() {},
     setTimeout: () => 1,
@@ -151,6 +204,8 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   return {
     elements,
     storedValues,
+    localStorage,
+    window,
     classSets,
     listeners,
     confirmMessages,
@@ -160,7 +215,8 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
       if (!clock) throw new Error('This app instance does not have a controlled clock.');
       clock.value = new Date(value).getTime();
     },
-    get fileReadCount() { return fileReadCount; }
+    get fileReadCount() { return fileReadCount; },
+    async settle() { await appLockManager.settle(); await new Promise((resolve) => setImmediate(resolve)); await appLockManager.settle(); }
   };
 }
 
@@ -200,20 +256,20 @@ function triggerTaskCompletion(app, taskId) {
       return selector === 'button[data-action]' ? button : null;
     }
   };
-  for (const handler of handlers) handler({ target });
+  return Promise.all(handlers.map((handler) => handler({ target })));
 }
 
 function triggerFormInput(app, selector, value) {
   const input = app.elements.get(selector);
   input.value = value;
   const handlers = app.listeners.get(`${selector}:input`) || [];
-  for (const handler of handlers) handler({ currentTarget: input });
+  return Promise.all(handlers.map((handler) => handler({ currentTarget: input })));
 }
 
 function triggerFormSubmit(app, selector) {
   const form = app.elements.get(selector);
   const handlers = app.listeners.get(`${selector}:submit`) || [];
-  for (const handler of handlers) handler({ currentTarget: form, preventDefault() {} });
+  return Promise.all(handlers.map((handler) => handler({ currentTarget: form, preventDefault() {} })));
 }
 
 function triggerTaskEdit(app, taskId) {
@@ -236,17 +292,17 @@ function triggerTaskImport(app, file) {
   const input = app.elements.get('#import-file');
   input.files = [file];
   const handlers = app.listeners.get('#import-file:change') || [];
-  for (const handler of handlers) handler({ currentTarget: input });
+  return Promise.all(handlers.map((handler) => handler({ currentTarget: input })));
 }
 
-test('monthly task completed on a clamped date retains its original day anchor', () => {
+test('monthly task completed on a clamped date retains its original day anchor', async () => {
   const recurring = makeImportTask('monthly-31', 'Month-end task');
   recurring.dueDate = '2026-02-28';
   recurring.repeat = 'monthly';
   recurring.repeatDayOfMonth = 31;
   const app = bootApp({ savedValue: JSON.stringify([recurring]), fixedToday: '2026-02-28' });
 
-  triggerTaskCompletion(app, recurring.id);
+  await triggerTaskCompletion(app, recurring.id);
 
   const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
   assert.equal(saved.length, 2);
@@ -255,7 +311,82 @@ test('monthly task completed on a clamped date retains its original day anchor',
   assert.equal(saved[1].repeatDayOfMonth, 31, 'the recurring series anchor is carried forward');
 });
 
-test('task import previews additions, duplicates and invalid rows before appending', () => {
+test('ordinary task saves remain available after Clear All fails to remove primary tasks', async () => {
+  const existing = makeImportTask('kept-after-clear-failure', 'Still here');
+  const app = bootApp({ savedValue: JSON.stringify([existing]) });
+  await app.settle();
+  const before = taskMutation.readGeneration(app.localStorage);
+  assert.equal(before.ok, true);
+
+  const clearAttempt = await taskMutation.withLocksInOrder(
+    app.window.navigator.locks,
+    taskMutation.CLEAR_ALL_LOCK_ORDER,
+    () => {
+      const begun = taskMutation.beginClearAll(app.localStorage, true);
+      if (!begun.ok) return false;
+      // Simulate a browser removeItem failure: the task key remains present.
+      const finalized = taskMutation.finishClearAll(app.localStorage, false);
+      return finalized.ok;
+    }
+  );
+  assert.equal(clearAttempt.ok && clearAttempt.value, true);
+  const after = taskMutation.readGeneration(app.localStorage);
+  assert.equal(after.value.clearEpoch, before.value.clearEpoch + 1);
+  assert.equal(after.value.taskEpoch, before.value.taskEpoch);
+
+  app.elements.get('#new-title').value = 'New work after failed clear';
+  await triggerFormSubmit(app, '#add-form');
+  await app.settle();
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.deepEqual(saved.map((task) => task.title), ['Still here', 'New work after failed clear']);
+  assert.match(app.elements.get('#toast').textContent, /Task added/);
+});
+
+test('a deferred app feed response cannot recreate its absent cache after Clear All', async () => {
+  let resolveFetch;
+  let markFetchStarted;
+  const fetchStarted = new Promise((resolve) => { markFetchStarted = resolve; });
+  const fetchImpl = () => {
+    markFetchStarted();
+    return new Promise((resolve) => { resolveFetch = resolve; });
+  };
+  const feedApi = {
+    resolveFeedTarget: (rawUrl) => rawUrl,
+    isValidFeedUrl: (url) => /^https?:\/\//.test(url),
+    validateFeedCache: () => true,
+    fetchFeed: (_url, fetcher) => fetcher()
+  };
+  const app = bootApp({ savedValue: '[]', feedApi, fetchImpl });
+  assert.equal(app.storedValues.has(FEED_KEY), false, 'the managed cache key starts absent');
+  app.elements.get('#feed-url').value = 'https://example.com/feed.xml';
+  const feedRefresh = triggerFormSubmit(app, '#feed-form');
+  await fetchStarted;
+  assert.equal(app.storedValues.has(FEED_KEY), false,
+    'starting the network request must not create a cache key');
+
+  const cleared = await taskMutation.withLocksInOrder(
+    app.window.navigator.locks,
+    taskMutation.CLEAR_ALL_LOCK_ORDER,
+    () => {
+      const begun = taskMutation.beginClearAll(app.localStorage, true);
+      if (!begun.ok) return false;
+      app.localStorage.removeItem(STORAGE_KEY);
+      app.localStorage.removeItem(FEED_KEY);
+      const finalized = taskMutation.finishClearAll(app.localStorage, true);
+      return finalized.ok;
+    }
+  );
+  assert.equal(cleared.ok && cleared.value, true);
+
+  resolveFetch({ items: [{ title: 'Late result' }] });
+  await feedRefresh;
+  await app.settle();
+  assert.equal(app.storedValues.has(FEED_KEY), false,
+    'a response from before Clear All cannot create the previously absent cache key');
+  assert.match(app.elements.get('#feed-status').textContent, /finished loading after local data was cleared/);
+});
+
+test('task import previews additions, duplicates and invalid rows before appending', async () => {
   const existing = makeImportTask('same-id', 'Original task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue });
@@ -265,7 +396,7 @@ test('task import previews additions, duplicates and invalid rows before appendi
     { id: 'invalid-id', title: '', priority: 'medium', completed: false }
   ]);
 
-  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+  await triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
 
   assert.equal(app.confirmMessages.length, 1, 'the user must see a preview before data changes');
   assert.match(app.confirmMessages[0], /1 new task will be added/);
@@ -280,39 +411,39 @@ test('task import previews additions, duplicates and invalid rows before appendi
   assert.equal(saved[1].title, 'New task');
 });
 
-test('declining task import confirmation leaves storage unchanged', () => {
+test('declining task import confirmation leaves storage unchanged', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue, confirmResult: false });
   const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
 
-  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+  await triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
 
   assert.equal(app.confirmMessages.length, 1);
   assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
   assert.match(app.elements.get('#toast').textContent, /Import cancelled\. Nothing was changed/);
 });
 
-test('confirmation failure fails closed without mutating imported tasks', () => {
+test('confirmation failure fails closed without mutating imported tasks', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue, confirmThrows: true });
   const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
 
-  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+  await triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
 
   assert.equal(app.confirmMessages.length, 1);
   assert.equal(app.storedValues.get(STORAGE_KEY), savedValue);
   assert.match(app.elements.get('#toast').textContent, /confirmation could not be displayed/);
 });
 
-test('failed task import save rolls back in-memory state and reports no import', () => {
+test('failed task import save rolls back in-memory state and reports no import', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
   const app = bootApp({ savedValue, failPrimarySave: true });
   const importText = JSON.stringify([makeImportTask('incoming-id', 'Do not add')]);
 
-  triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+  await triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
 
   assert.equal(app.confirmMessages.length, 1, 'the preview and confirmation still happen before saving');
   assert.equal(app.storedValues.get(STORAGE_KEY), savedValue, 'failed storage write must preserve the original payload');
@@ -320,16 +451,16 @@ test('failed task import save rolls back in-memory state and reports no import',
   assert.match(app.elements.get('#toast').textContent, /No tasks were imported/);
 });
 
-test('oversized task backup is rejected before FileReader allocation', () => {
+test('oversized task backup is rejected before FileReader allocation', async () => {
   const app = bootApp({ savedValue: JSON.stringify([]) });
-  triggerTaskImport(app, { size: 8 * 1024 * 1024 + 1, content: '[]' });
+  await triggerTaskImport(app, { size: 8 * 1024 * 1024 + 1, content: '[]' });
 
   assert.equal(app.fileReadCount, 0, 'oversized files must be rejected before reading into memory');
   assert.equal(app.confirmMessages.length, 0);
   assert.match(app.elements.get('#toast').textContent, /maximum 8 MiB/);
 });
 
-test('combined recovery import appends task and Focus logs while preserving current session', () => {
+test('combined recovery import appends task and Focus logs while preserving current session', async () => {
   const existingTask = makeImportTask('task-existing', 'Existing task');
   const incomingTask = makeImportTask('task-new', 'Recovered task');
   const existingLog = makeFocusLogEntry('focus-log-existing');
@@ -350,7 +481,7 @@ test('combined recovery import appends task and Focus logs while preserving curr
     savedFocusValue: JSON.stringify({ session: currentSession, log: [existingLog] })
   });
 
-  triggerTaskImport(app, { size: Buffer.byteLength(combined), content: combined });
+  await triggerTaskImport(app, { size: Buffer.byteLength(combined), content: combined });
 
   assert.equal(app.confirmMessages.length, 1);
   assert.match(app.confirmMessages[0], /1 new task will be added/);
@@ -364,12 +495,12 @@ test('combined recovery import appends task and Focus logs while preserving curr
   assert.deepEqual(focusState.log.map((entry) => entry.id), ['focus-log-existing', 'focus-log-new']);
 });
 
-test('Focus-only recovery import restores a session when no current session exists', () => {
+test('Focus-only recovery import restores a session when no current session exists', async () => {
   const recoveredSession = makeFocusSession('recover-focus-session');
   const focusBackup = JSON.stringify({ session: recoveredSession, log: [] });
   const app = bootApp({ savedValue: JSON.stringify([]), savedFocusValue: JSON.stringify({ session: null, log: [] }) });
 
-  triggerTaskImport(app, { size: Buffer.byteLength(focusBackup), content: focusBackup });
+  await triggerTaskImport(app, { size: Buffer.byteLength(focusBackup), content: focusBackup });
 
   assert.equal(app.confirmMessages.length, 1);
   assert.match(app.confirmMessages[0], /One Focus session will be restored/);
@@ -377,7 +508,7 @@ test('Focus-only recovery import restores a session when no current session exis
   assert.equal(restored.session.id, 'recover-focus-session');
 });
 
-test('declining combined recovery import leaves task and Focus storage unchanged', () => {
+test('declining combined recovery import leaves task and Focus storage unchanged', async () => {
   const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
   const savedFocus = JSON.stringify({ session: null, log: [makeFocusLogEntry('keep-focus-log')] });
   const incoming = JSON.stringify({
@@ -387,7 +518,7 @@ test('declining combined recovery import leaves task and Focus storage unchanged
   });
   const app = bootApp({ savedValue: savedTasks, savedFocusValue: savedFocus, confirmResult: false });
 
-  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+  await triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
 
   assert.equal(app.confirmMessages.length, 1);
   assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
@@ -395,25 +526,25 @@ test('declining combined recovery import leaves task and Focus storage unchanged
   assert.match(app.elements.get('#toast').textContent, /Recovery import cancelled/);
 });
 
-test('Focus recovery storage failure rolls back in-memory history and preserves saved data', () => {
+test('Focus recovery storage failure rolls back in-memory history and preserves saved data', async () => {
   const savedFocus = JSON.stringify({ session: null, log: [] });
   const incoming = JSON.stringify({ session: null, log: [makeFocusLogEntry('incoming-focus-log')] });
   const app = bootApp({ savedValue: JSON.stringify([]), savedFocusValue: savedFocus, failFocusSave: true });
 
-  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+  await triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
 
   assert.equal(app.confirmMessages.length, 1);
   assert.equal(app.storedValues.get(FOCUS_KEY), savedFocus, 'failed Focus write must preserve original storage');
   assert.match(app.elements.get('#toast').textContent, /Focus log restore failed; current history was kept/);
 });
 
-test('malformed combined recovery bundle fails closed without prompting or mutation', () => {
+test('malformed combined recovery bundle fails closed without prompting or mutation', async () => {
   const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
   const savedFocus = JSON.stringify({ session: null, log: [] });
   const malformed = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup: '{bad', focusBackup: '{bad' });
   const app = bootApp({ savedValue: savedTasks, savedFocusValue: savedFocus });
 
-  triggerTaskImport(app, { size: Buffer.byteLength(malformed), content: malformed });
+  await triggerTaskImport(app, { size: Buffer.byteLength(malformed), content: malformed });
 
   assert.equal(app.confirmMessages.length, 0);
   assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
@@ -421,7 +552,7 @@ test('malformed combined recovery bundle fails closed without prompting or mutat
   assert.match(app.elements.get('#toast').textContent, /No valid recovery data/);
 });
 
-test('opaque task recovery backup survives healthy primary load and later save', () => {
+test('opaque task recovery backup survives healthy primary load and later save', async () => {
   const existing = makeImportTask('existing-task', 'Existing task');
   const savedValue = JSON.stringify([existing]);
   const opaqueBackup = '{legacy recovery bytes that are not parseable JSON';
@@ -430,39 +561,44 @@ test('opaque task recovery backup survives healthy primary load and later save',
 
   assert.equal(app.storedValues.get(BACKUP_KEY), recoveryBundle, 'explicit recovery bundle must survive healthy primary data at startup');
   const incoming = JSON.stringify([makeImportTask('new-task', 'Imported task')]);
-  triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
+  await triggerTaskImport(app, { size: Buffer.byteLength(incoming), content: incoming });
 
   assert.equal(app.storedValues.get(BACKUP_KEY), recoveryBundle, 'a successful save must not clear an opaque payload inside a recovery bundle');
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY)).length, 2);
 });
 
-test('healthy task-array backup is cleared as stale when primary is healthy', () => {
+test('healthy task-array backup is cleared as stale when primary is healthy', async () => {
   const primary = JSON.stringify([makeImportTask('primary-task', 'Primary task')]);
   const staleBackup = JSON.stringify([makeImportTask('old-task', 'Old backup task')]);
   const app = bootApp({ savedValue: primary, savedBackupValue: staleBackup });
+  await app.settle();
 
   assert.equal(app.storedValues.has(BACKUP_KEY), false, 'a backup with only fully valid task arrays is stale and can be cleared');
 });
 
-test('corrupt saved data is copied to a browser backup and reported as preserved', () => {
+test('corrupt saved data is copied to a browser backup and reported as preserved', async () => {
   const corruptData = '{not valid JSON';
-  const { elements, storedValues } = bootApp({ savedValue: corruptData });
+  const app = bootApp({ savedValue: corruptData });
+  const { elements, storedValues } = app;
+  await app.settle();
 
   assert.equal(storedValues.get(BACKUP_KEY), corruptData);
-  assert.match(elements.get('#toast').textContent, /kept in a browser backup/);
+  assert.match(elements.get('#toast').textContent, /kept in a browser (?:recovery )?backup/);
 });
 
-test('backup failure is reported honestly and leaves the original entry untouched', () => {
+test('backup failure is reported honestly and leaves the original entry untouched', async () => {
   const corruptData = '{not valid JSON';
-  const { elements, storedValues } = bootApp({ savedValue: corruptData, failBackup: true });
+  const app = bootApp({ savedValue: corruptData, failBackup: true });
+  const { elements, storedValues } = app;
+  await app.settle();
 
   assert.equal(storedValues.has(BACKUP_KEY), false);
   assert.equal(storedValues.get(STORAGE_KEY), corruptData);
-  assert.match(elements.get('#toast').textContent, /could not create a recovery backup/);
+  assert.match(elements.get('#toast').textContent, /recovery backup could not be created/i);
 });
 
 
-test('simultaneous reminders are summarized in one toast instead of overwriting each other', () => {
+test('simultaneous reminders are summarized in one toast instead of overwriting each other', async () => {
   const now = new Date();
   const fireTime = new Date(now.getTime() - 60_000);
   const dueDate = logic.localDateString(fireTime);
@@ -479,7 +615,9 @@ test('simultaneous reminders are summarized in one toast instead of overwriting 
     updatedAt: timestamp,
     reminderLeadMinutes: 0
   }));
-  const { elements, storedValues } = bootApp({ savedValue: JSON.stringify(tasks) });
+  const app = bootApp({ savedValue: JSON.stringify(tasks) });
+  const { elements, storedValues } = app;
+  await app.settle();
 
   const toast = elements.get('#toast').textContent;
   assert.match(toast, /First reminder/);
@@ -500,7 +638,7 @@ test('date-only reminder helper uses accessible live-status markup in both forms
   }
 });
 
-test('add form shows date-only reminder guidance only for a date with no time and saves null time with the selected lead', () => {
+test('add form shows date-only reminder guidance only for a date with no time and saves null time with the selected lead', async () => {
   const app = bootApp({ savedValue: JSON.stringify([]) });
   const hint = app.elements.get('#new-date-only-reminder-hint');
   assert.equal(hint.hidden, true);
@@ -518,7 +656,7 @@ test('add form shows date-only reminder guidance only for a date with no time an
   triggerFormInput(app, '#new-due-date', '2026-11-20');
   app.elements.get('#new-title').value = 'Date-only reminder';
   app.elements.get('#new-reminder').value = '60';
-  triggerFormSubmit(app, '#add-form');
+  await triggerFormSubmit(app, '#add-form');
 
   const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
   assert.equal(saved.length, 1);
@@ -528,7 +666,7 @@ test('add form shows date-only reminder guidance only for a date with no time an
   assert.equal(hint.hidden, true, 'the helper hides after the add form resets');
 });
 
-test('edit form shows date-only reminder guidance and saves a null time with its selected lead', () => {
+test('edit form shows date-only reminder guidance and saves a null time with its selected lead', async () => {
   const task = makeImportTask('date-only-edit', 'Edit reminder');
   task.dueDate = '2026-11-21';
   task.dueTime = '14:30';
@@ -549,18 +687,18 @@ test('edit form shows date-only reminder guidance and saves a null time with its
   assert.equal(hint.hidden, false);
   app.elements.get('#edit-due-time').value = '';
   app.elements.get('#edit-reminder').value = '60';
-  triggerFormSubmit(app, '#edit-form');
+  await triggerFormSubmit(app, '#edit-form');
 
   const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
   assert.equal(saved[0].dueTime, null, 'date-only edit keeps the saved time null');
   assert.equal(saved[0].reminderLeadMinutes, 60, 'date-only edit preserves the selected reminder lead');
 });
 
-function withTimeZone(timeZone, run) {
+async function withTimeZone(timeZone, run) {
   const originalTimeZone = process.env.TZ;
   process.env.TZ = timeZone;
   try {
-    return run();
+    return await run();
   } finally {
     if (originalTimeZone === undefined) delete process.env.TZ;
     else process.env.TZ = originalTimeZone;
@@ -576,7 +714,7 @@ function makeDateOnlyReminderTask(id, dueDate, reminderLeadMinutes, reminderShow
   return task;
 }
 
-test('date-only reminder persists with null dueTime and fires once at the disclosed 9 AM local time', () => withTimeZone('America/New_York', () => {
+test('date-only reminder persists with null dueTime and fires once at the disclosed 9 AM local time', async () => withTimeZone('America/New_York', async () => {
   const first = bootApp({
     savedValue: JSON.stringify([]),
     dateNow: '2026-11-20T13:59:00.000Z'
@@ -584,7 +722,7 @@ test('date-only reminder persists with null dueTime and fires once at the disclo
   triggerFormInput(first, '#new-due-date', '2026-11-20');
   first.elements.get('#new-title').value = 'Date-only add form reminder';
   first.elements.get('#new-reminder').value = '0';
-  triggerFormSubmit(first, '#add-form');
+  await triggerFormSubmit(first, '#add-form');
   const firstSavedTasks = JSON.parse(first.storedValues.get(STORAGE_KEY));
   assert.equal(firstSavedTasks.length, 1, 'the Add form stores the new reminder');
   assert.equal(firstSavedTasks[0].dueDate, '2026-11-20');
@@ -604,7 +742,7 @@ test('date-only reminder persists with null dueTime and fires once at the disclo
   assert.equal(reloadedTask.reminderLeadMinutes, 0, 'the selected lead survives reload');
 
   reloaded.setNow('2026-11-20T14:00:00.000Z');
-  reloaded.intervalCallbacks[0].callback();
+  await reloaded.intervalCallbacks[0].callback();
   let savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.dueTime, null);
   assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', '09:00 EST is recorded as the actual local fire instant');
@@ -612,13 +750,13 @@ test('date-only reminder persists with null dueTime and fires once at the disclo
 
   const toastWritesAfterFirstFire = reloaded.toastWriteCount;
   assert.equal(toastWritesAfterFirstFire, 1, 'the reminder emits one visible toast when it first fires');
-  reloaded.intervalCallbacks[0].callback();
+  await reloaded.intervalCallbacks[0].callback();
   savedTask = JSON.parse(reloaded.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', 'the same fire instant is not shown twice');
   assert.equal(reloaded.toastWriteCount, toastWritesAfterFirstFire, 'the repeated interval check does not write/show another toast');
 }));
 
-test('editing a date-only reminder reschedules it without changing null-time or lead semantics', () => withTimeZone('America/New_York', () => {
+test('editing a date-only reminder reschedules it without changing null-time or lead semantics', async () => withTimeZone('America/New_York', async () => {
   const task = makeDateOnlyReminderTask('date-only-reschedule', '2026-11-20', 0, '2026-11-20T14:00:00.000Z');
   const app = bootApp({
     savedValue: JSON.stringify([task]),
@@ -626,7 +764,7 @@ test('editing a date-only reminder reschedules it without changing null-time or 
   });
   triggerTaskEdit(app, task.id);
   triggerFormInput(app, '#edit-due-date', '2026-11-21');
-  triggerFormSubmit(app, '#edit-form');
+  await triggerFormSubmit(app, '#edit-form');
 
   let savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.dueDate, '2026-11-21');
@@ -635,39 +773,56 @@ test('editing a date-only reminder reschedules it without changing null-time or 
   assert.equal(savedTask.reminderShownFire, '2026-11-20T14:00:00.000Z', 'the previous fire marker remains attached to its old instant');
 
   app.setNow('2026-11-21T14:00:00.000Z');
-  app.intervalCallbacks[0].callback();
+  await app.intervalCallbacks[0].callback();
   savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.reminderShownFire, '2026-11-21T14:00:00.000Z', 'the rescheduled local 09:00 fire is delivered and persisted');
   assert.match(app.elements.get('#toast').textContent, /Reminder: “Reminder date-only-reschedule” is due\./);
 }));
 
-test('date-only reminders recalculate their 9 AM instant after a timezone change', () => withTimeZone('America/Los_Angeles', () => {
+test('date-only reminders recalculate their 9 AM instant after a timezone change', async () => withTimeZone('America/Los_Angeles', async () => {
   const task = makeDateOnlyReminderTask('date-only-timezone', '2026-11-06', 0);
   const app = bootApp({ savedValue: JSON.stringify([task]), dateNow: '2026-11-06T14:00:00.000Z' });
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
     'the same instant is 06:00 in Los Angeles, before the disclosed local time');
   process.env.TZ = 'America/New_York';
-  app.intervalCallbacks[0].callback();
+  await app.intervalCallbacks[0].callback();
   const savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.dueTime, null);
   assert.equal(savedTask.reminderShownFire, '2026-11-06T14:00:00.000Z',
     'the same instant is 09:00 in New York and becomes due without changing stored fields');
 }));
 
-test('date-only 9 AM scheduling stays local across the spring DST transition', () => withTimeZone('America/New_York', () => {
+test('date-only 9 AM scheduling stays local across the spring DST transition', async () => withTimeZone('America/New_York', async () => {
   const task = makeDateOnlyReminderTask('date-only-dst', '2026-03-08', 1440);
   const app = bootApp({ savedValue: JSON.stringify([task]), dateNow: '2026-03-07T13:59:00.000Z' });
   assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY))[0].reminderShownFire, undefined,
     '08:59 EST on the preceding local day is before the one-day reminder');
 
   app.setNow('2026-03-07T14:00:00.000Z');
-  app.intervalCallbacks[0].callback();
+  await app.intervalCallbacks[0].callback();
   const savedTask = JSON.parse(app.storedValues.get(STORAGE_KEY))[0];
   assert.equal(savedTask.reminderShownFire, '2026-03-07T14:00:00.000Z', 'the 24-hour lead fires at 09:00 EST on the preceding date');
   assert.equal(savedTask.dueTime, null);
   assert.equal(Date.parse('2026-03-08T13:00:00.000Z') - Date.parse(savedTask.reminderShownFire), 23 * 60 * 60 * 1000,
     '09:00 local on the due date is only 23 elapsed hours later across the spring-forward transition');
 }));
+
+test('the app reloads task memory when Clear All advances the generation in this tab', async () => {
+  const existing = makeImportTask('cleared-in-memory', 'Should disappear after Clear All');
+  const app = bootApp({ savedValue: JSON.stringify([existing]) });
+  await app.settle();
+
+  app.localStorage.removeItem(STORAGE_KEY);
+  const advanced = taskMutation.advanceClearEpoch(app.localStorage);
+  assert.equal(advanced.ok, true);
+  app.window.dispatchEvent(new app.window.StorageEvent('storage', {
+    key: taskMutation.GENERATION_KEY,
+    newValue: JSON.stringify(advanced.value)
+  }));
+
+  assert.doesNotMatch(app.elements.get('#task-list').innerHTML, /Should disappear after Clear All/);
+  assert.equal(JSON.parse(app.storedValues.get(STORAGE_KEY) || '[]').length, 0);
+});
 
 
 test('initial loading indicators clear only when the real app render and storage check finish', () => {

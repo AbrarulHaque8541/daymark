@@ -6,6 +6,7 @@ const holidaysApi = require('../holidays-logic.js');
 const ui = require('../holidays-ui.js');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createLockManager, deferred, clearKeys, taskMutation } = require('./task-clear-race-helpers.js');
 
 const FROZEN_NOW = '2026-11-06T12:00:00.000Z';
 
@@ -77,6 +78,7 @@ function fakeEnv(options) {
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
+  const lockManager = createLockManager();
   const env = {
     document: {
       readyState: 'complete',
@@ -85,11 +87,13 @@ function fakeEnv(options) {
     },
     window: {},
     localStorage: storage,
-    holidaysApi,
+    holidaysApi: opts.holidaysApi || holidaysApi,
+    taskMutationApi: taskMutation,
+    lockManager,
     fetch: opts.fetch,
     now: () => FROZEN_NOW
   };
-  return { env, elements, storageData, storage };
+  return { env, elements, storageData, storage, lockManager };
 }
 
 function streamResponse(body) {
@@ -211,6 +215,25 @@ test('refresh fetches, renders, and persists the result and preference', async (
   assert.equal(prefs.countryCode, 'IN');
 });
 
+test('a deferred holiday response cannot recreate its absent cache or preference after Clear All', async () => {
+  const waiting = deferred();
+  const started = deferred();
+  const result = makeCache([{ date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }]);
+  const delayedApi = Object.assign({}, holidaysApi, {
+    fetchHolidays() { started.resolve(); return waiting.promise; }
+  });
+  const { env, storage, storageData, lockManager } = fakeEnv({ country: 'IN', holidaysApi: delayedApi, fetch: () => Promise.resolve({}) });
+  const handle = ui.attachHolidaysUi(env);
+  assert.equal(storage.getItem(ui.STORAGE_KEY), null, 'the cache is absent before fetch begins');
+  const refreshing = handle.onRefresh();
+  await started.promise;
+  await clearKeys(storage, [ui.STORAGE_KEY, ui.PREFS_KEY], lockManager);
+  waiting.resolve(result);
+  await refreshing;
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
+});
+
 test('refresh failure keeps the cached list visible', async () => {
   const stored = JSON.stringify(makeCache([
     { date: '2026-12-25', name: 'Christmas Day', localName: 'Christmas Day', global: true }
@@ -309,14 +332,14 @@ test('restores last country preference when no cache is present', () => {
   assert.equal(elements['holiday-list'].children.length, 0);
 });
 
-test('country change persists the preference immediately', () => {
+test('country change persists the preference immediately', async () => {
   const { env, elements, storageData } = fakeEnv({});
   ui.attachHolidaysUi(env);
   const countryEl = elements['holiday-country'];
   countryEl.value = 'GB';
   const change = countryEl.listeners.find((l) => l.type === 'change');
   assert.ok(change, 'change listener registered');
-  change.handler();
+  await change.handler();
   const prefs = JSON.parse(storageData[ui.PREFS_KEY]);
   assert.equal(prefs.countryCode, 'GB');
 });
@@ -466,7 +489,7 @@ test('auto-boot lets attachHolidaysUi guard the storage getter instead of readin
 });
 
 
-test('country preference write failure is reported without throwing from the change handler', () => {
+test('country preference write failure is reported without throwing from the change handler', async () => {
   const storage = {
     getItem() { return null; },
     setItem() { throw new Error('quota exceeded'); },
@@ -478,7 +501,7 @@ test('country preference write failure is reported without throwing from the cha
   country.value = 'GB';
   const change = country.listeners.find((listener) => listener.type === 'change');
   assert.ok(change, 'country preference listener is registered');
-  assert.doesNotThrow(() => change.handler());
+  await assert.doesNotReject(() => change.handler());
   assert.match(elements['holiday-status'].textContent, /Country preference was not saved/);
   assert.match(elements['holiday-status'].textContent, /changes could not be saved/);
 });

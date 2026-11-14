@@ -35,6 +35,12 @@
       storageAccessFailed = true;
     }
     const weatherApi = env.weatherApi || root.DaymarkWeather || null;
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    let lockManager = env.lockManager || null;
+    if (!lockManager) {
+      try { lockManager = (env.navigator || (win && win.navigator) || {}).locks || null; }
+      catch (error) { lockManager = null; }
+    }
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
@@ -164,6 +170,26 @@
       }
     }
 
+    async function persistRecordFenced(record, value, epochSnapshot) {
+      if (!storageRequested) return true;
+      if (!taskMutation || !lockManager || !epochSnapshot || !epochSnapshot.ok) {
+        storageWriteFailed = true;
+        return false;
+      }
+      const result = await taskMutation.withClearEpochLock(
+        lockManager,
+        [taskMutation.TASK_LOCK_NAME],
+        storage,
+        epochSnapshot.value,
+        () => persistRecord(record, value)
+      );
+      if (!result.ok || result.value !== true) {
+        storageWriteFailed = true;
+        return false;
+      }
+      return true;
+    }
+
     function readCache() {
       cacheRecord = readRecord(STORAGE_KEY, (parsed) => !!(
         weatherApi && typeof weatherApi.validateWeatherCache === 'function'
@@ -172,8 +198,8 @@
       return cacheRecord.value;
     }
 
-    function persistCache(cache) {
-      return persistRecord(cacheRecord, cache);
+    function persistCache(cache, epochSnapshot) {
+      return persistRecordFenced(cacheRecord, cache, epochSnapshot);
     }
 
     function readPrefs() {
@@ -183,9 +209,9 @@
       return prefsRecord.value;
     }
 
-    function persistPrefs(place) {
+    function persistPrefs(place, epochSnapshot) {
       if (!place || !place.trim()) return true;
-      return persistRecord(prefsRecord, { place: place.trim() });
+      return persistRecordFenced(prefsRecord, { place: place.trim() }, epochSnapshot);
     }
 
     async function onRefresh() {
@@ -205,12 +231,13 @@
         status('Type a place name first.');
         return;
       }
+      const epochSnapshot = taskMutation && taskMutation.captureClearEpoch(storage);
       setBusy(true);
       try {
         const result = await weatherApi.fetchWeatherByPlace(query, fetchImpl, { now });
         cached = result;
-        persistCache(cached);
-        persistPrefs(query);
+        await persistCache(cached, epochSnapshot);
+        await persistPrefs(query, epochSnapshot);
         render(cached);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
       } catch (error) {
@@ -338,9 +365,12 @@
         }
       });
       inputEl.addEventListener('input', () => {
-        if (typeof inputEl.value === 'string' && !persistPrefs(inputEl.value)) {
-          status('Place preference was not saved.' + storageNotice());
-        }
+        if (typeof inputEl.value !== 'string') return undefined;
+        const epochSnapshot = taskMutation && storage ? taskMutation.captureClearEpoch(storage) : null;
+        return Promise.resolve(persistPrefs(inputEl.value, epochSnapshot)).then((saved) => {
+          if (!saved) status('Place preference was not saved.' + storageNotice());
+          return saved;
+        });
       });
     }
 

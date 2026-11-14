@@ -6,6 +6,7 @@ const importer = require('../import-logic.js');
 const exporter = require('../export-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
+const taskMutation = require('../task-mutation-logic.js');
 
 const NOW = '2026-11-07T05:00:00.000Z';
 
@@ -54,12 +55,28 @@ function fakeEnv(options) {
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
+  const tails = new Map();
+  const lockManager = {
+    request(name, options, callback) {
+      const previous = tails.get(name) || Promise.resolve();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const tail = previous.then(() => gate);
+      tails.set(name, tail);
+      return previous.then(() => callback({ name, mode: options && options.mode || 'exclusive' }))
+        .finally(() => {
+          release();
+          if (tails.get(name) === tail) tails.delete(name);
+        });
+    }
+  };
   const dispatched = [];
   class MockStorageEvent {
     constructor(type, init) { this.type = type; this.key = init && init.key; }
   }
   const win = {
     StorageEvent: MockStorageEvent,
+    navigator: { locks: lockManager },
     dispatchEvent(event) { dispatched.push(event); return true; }
   };
   return {
@@ -67,6 +84,8 @@ function fakeEnv(options) {
       document: doc,
       window: win,
       localStorage: storage,
+      taskMutationApi: taskMutation,
+      lockManager,
       importApi: importer,
       logic,
       now: () => NOW

@@ -2,12 +2,20 @@
   'use strict';
   const STORAGE_KEY = 'daymark.tasks.v1';
   const CHAT_STORAGE_KEY = 'daymark.telegram.lastChat.v1';
+  let activeHandle = null;
   function attachTelegramUi(env) {
     if (!env || !env.document) throw new Error('attachTelegramUi requires a document.');
     const doc = env.document;
     const hasOwn = Object.prototype.hasOwnProperty;
     const logicApi = hasOwn.call(env, 'logicApi') ? env.logicApi : (root.DaymarkTelegram || null);
     const taskLogicApi = hasOwn.call(env, 'taskLogicApi') ? env.taskLogicApi : (root.DaymarkLogic || null);
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    const lifecycleWindow = env.window || doc.defaultView || null;
+    let lockManager = env.lockManager || null;
+    if (!lockManager) {
+      try { lockManager = (env.navigator || (lifecycleWindow && lifecycleWindow.navigator) || {}).locks || null; }
+      catch (error) { lockManager = null; }
+    }
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     const tokenEl = element('telegram-token');
     const chatEl = element('telegram-chat');
@@ -17,11 +25,11 @@
     const testEl = element('telegram-test');
     const clearEl = element('telegram-clear');
     const sendEl = element('telegram-send');
-    const lifecycleWindow = env.window || doc.defaultView || null;
     const observesPageLifecycle = lifecycleWindow
       && typeof lifecycleWindow.addEventListener === 'function'
       && typeof lifecycleWindow.removeEventListener === 'function';
     let busy = false;
+    let observedClearEpoch = null;
     function status(message) {
       if (statusEl) statusEl.textContent = message;
     }
@@ -49,11 +57,32 @@
         return candidate && typeof candidate.getItem === 'function' ? candidate : null;
       } catch (error) { return null; }
     }
-    function persistChatTarget(target) {
-      if (!target || typeof target !== 'string') return;
+    async function persistChatTarget(target, expectedClearEpoch) {
+      if (!target || typeof target !== 'string' || !Number.isSafeInteger(expectedClearEpoch)
+          || !taskMutation || !lockManager) return false;
       const storage = resolveStorage();
-      if (!storage || typeof storage.setItem !== 'function') return;
-      try { storage.setItem(CHAT_STORAGE_KEY, target); } catch (error) { /* Fail closed; chat convenience is optional. */ }
+      if (!storage || typeof storage.setItem !== 'function') return false;
+      const locked = await taskMutation.withClearEpochLock(
+        lockManager,
+        [taskMutation.TASK_LOCK_NAME],
+        storage,
+        expectedClearEpoch,
+        () => { storage.setItem(CHAT_STORAGE_KEY, target); return true; }
+      );
+      return !!(locked.ok && locked.value === true);
+    }
+    function readClearEpoch() {
+      const storage = resolveStorage();
+      if (!taskMutation || !storage) return null;
+      const generation = taskMutation.readGeneration(storage);
+      return generation.ok && !generation.value.clearPending ? generation.value.clearEpoch : null;
+    }
+    function resetForClearAll() {
+      clearTokenField();
+      if (chatEl && typeof chatEl.value === 'string') chatEl.value = '';
+      const epoch = readClearEpoch();
+      observedClearEpoch = Number.isSafeInteger(epoch) ? epoch : null;
+      status('Cleared by local data controls. The token and remembered chat target were emptied.');
     }
     function restoreChatTarget() {
       if (!chatEl || !logicApi || typeof logicApi.isChatTarget !== 'function') return;
@@ -67,6 +96,7 @@
         }
       } catch (error) { /* Ignore unreadable preference. */ }
     }
+    observedClearEpoch = readClearEpoch();
     restoreChatTarget();
     function readStoredTasks() {
       const storage = resolveStorage();
@@ -137,14 +167,35 @@
       return inputs;
     }
     async function deliver(botToken, chatTarget, text) {
-      setControlsBusy(true);
       let result;
       try {
         result = await logicApi.sendTelegramMessage({ botToken, chatTarget, text }, networkDeps());
       } catch (error) {
         result = { ok: false, reason: 'The send attempt failed unexpectedly. Nothing was announced as sent.' };
-      } finally { setControlsBusy(false); }
+      }
       return result;
+    }
+    async function dispatchMessage(botToken, chatTarget, text, expectedClearEpoch) {
+      const storage = resolveStorage();
+      if (!taskMutation || !lockManager || !storage || !Number.isSafeInteger(expectedClearEpoch)) {
+        return { dispatched: false, reason: 'Clear All coordination is unavailable. Nothing was sent.' };
+      }
+      setControlsBusy(true);
+      const dispatched = await taskMutation.dispatchIfClearEpochUnchanged(
+        lockManager,
+        storage,
+        expectedClearEpoch,
+        () => logicApi.sendTelegramMessage({ botToken, chatTarget, text }, networkDeps())
+      );
+      if (!dispatched.ok || !dispatched.value) {
+        setControlsBusy(false);
+        return { dispatched: false, reason: 'Local data was cleared before Telegram could be contacted. Nothing was sent.' };
+      }
+      let result;
+      try { result = await dispatched.value; }
+      catch (error) { result = { ok: false, reason: 'The send attempt failed unexpectedly. Nothing was announced as sent.' }; }
+      finally { setControlsBusy(false); }
+      return { dispatched: true, result };
     }
     async function onSend() {
       if (!logicApi || typeof logicApi.sendTelegramMessage !== 'function' || typeof logicApi.buildCompletedDigest !== 'function' || typeof logicApi.isBotToken !== 'function') {
@@ -154,6 +205,7 @@
       if (busy) { status('Still sending the previous request. Wait a moment.'); return; }
       const inputs = validateInputs();
       if (!inputs) return;
+      const operationClearEpoch = readClearEpoch();
       const stored = readStoredTasks();
       if (stored.tasks === null) {
         status((stored.reason || 'Saved tasks could not be read.') + ' Nothing was sent.');
@@ -168,13 +220,25 @@
         status('No completed tasks to announce. Nothing was sent to Telegram.' + (stored.note || ''));
         return;
       }
+      if (!Number.isSafeInteger(operationClearEpoch)) {
+        status('Local data is being cleared or cannot be coordinated. Nothing was sent.');
+        return;
+      }
       status('Sending ' + digest.includedCount + ' completed task(s) to Telegram…');
-      const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text);
+      const delivery = await dispatchMessage(inputs.botToken.trim(), inputs.chatTarget.trim(), digest.text, operationClearEpoch);
+      if (!delivery.dispatched) {
+        status(delivery.reason);
+        return;
+      }
+      const result = delivery.result;
       if (result.ok) {
-        persistChatTarget(inputs.chatTarget.trim());
+        const preferenceSaved = await persistChatTarget(inputs.chatTarget.trim(), operationClearEpoch);
+        const epochChanged = readClearEpoch() !== operationClearEpoch;
         status('Sent \u00b7 ' + digest.includedCount + ' completed task(s) delivered to Telegram.'
           + (digest.omittedCount > 0 ? ' ' + digest.omittedCount + ' omitted for the message limit.' : '')
-          + (stored.note || ''));
+          + (stored.note || '')
+          + (preferenceSaved ? '' : ' The chat target was not remembered because local data was cleared or could not be safely saved.')
+          + (epochChanged ? ' The request was already sent; clearing local data cannot recall a message Telegram has accepted.' : ''));
       } else {
         status(result.reason || 'The message could not be delivered.');
       }
@@ -187,13 +251,43 @@
       if (busy) { status('Still sending the previous request. Wait a moment.'); return; }
       const inputs = validateInputs();
       if (!inputs) return;
+      const operationClearEpoch = readClearEpoch();
+      if (!Number.isSafeInteger(operationClearEpoch)) {
+        status('Local data is being cleared or cannot be coordinated. Nothing was sent.');
+        return;
+      }
       status('Sending a test message to Telegram…');
-      const result = await deliver(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE);
-      if (result.ok) persistChatTarget(inputs.chatTarget.trim());
-      status(result.ok ? 'Test message sent to Telegram.' : (result.reason || 'The test message could not be delivered.'));
+      const delivery = await dispatchMessage(inputs.botToken.trim(), inputs.chatTarget.trim(), logicApi.TEST_MESSAGE, operationClearEpoch);
+      if (!delivery.dispatched) {
+        status(delivery.reason);
+        return;
+      }
+      const result = delivery.result;
+      const preferenceSaved = result.ok
+        ? await persistChatTarget(inputs.chatTarget.trim(), operationClearEpoch) : false;
+      const epochChanged = readClearEpoch() !== operationClearEpoch;
+      status(result.ok
+        ? 'Test message sent to Telegram.' + (preferenceSaved ? '' : ' The chat target was not remembered because local data was cleared or could not be safely saved.')
+          + (epochChanged ? ' The request was already sent; clearing local data cannot recall a message Telegram has accepted.' : '')
+        : (result.reason || 'The test message could not be delivered.'));
     }
     function clearTokenField() {
       if (tokenEl && typeof tokenEl.value === 'string') tokenEl.value = '';
+    }
+    function onStorageChange(event) {
+      if (!event) return;
+      if (event.key === CHAT_STORAGE_KEY && event.newValue === null) {
+        if (chatEl && typeof chatEl.value === 'string') chatEl.value = '';
+      }
+      const generationKey = taskMutation && taskMutation.GENERATION_KEY;
+      if (generationKey && (event.key === generationKey || event.key === null)) {
+        const nextEpoch = readClearEpoch();
+        if (nextEpoch === null || observedClearEpoch === null || nextEpoch > observedClearEpoch) {
+          resetForClearAll();
+        } else {
+          observedClearEpoch = nextEpoch;
+        }
+      }
     }
     function onPageHide() { clearTokenField(); }
     function onPageShow() { clearTokenField(); }
@@ -205,6 +299,9 @@
       lifecycleWindow.addEventListener('pagehide', onPageHide);
       lifecycleWindow.addEventListener('pageshow', onPageShow);
     }
+    if (lifecycleWindow && typeof lifecycleWindow.addEventListener === 'function') {
+      lifecycleWindow.addEventListener('storage', onStorageChange);
+    }
     if (formEl && typeof formEl.addEventListener === 'function') {
       formEl.addEventListener('submit', (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
@@ -213,21 +310,34 @@
     }
     if (testEl && typeof testEl.addEventListener === 'function') testEl.addEventListener('click', onTest);
     if (clearEl && typeof clearEl.addEventListener === 'function') clearEl.addEventListener('click', onClear);
-    return {
+    const handle = {
       send: onSend,
       test: onTest,
       clear: onClear,
+      resetForClearAll,
       detach() {
         clearTokenField();
         if (observesPageLifecycle) {
           lifecycleWindow.removeEventListener('pagehide', onPageHide);
           lifecycleWindow.removeEventListener('pageshow', onPageShow);
         }
+        if (lifecycleWindow && typeof lifecycleWindow.removeEventListener === 'function') {
+          lifecycleWindow.removeEventListener('storage', onStorageChange);
+        }
         status('');
       }
     };
+    activeHandle = handle;
+    return handle;
   }
-  const api = { attachTelegramUi };
+  const api = {
+    attachTelegramUi,
+    resetForClearAll() {
+      if (!activeHandle) return false;
+      activeHandle.resetForClearAll();
+      return true;
+    }
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkTelegramUi = api;
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {

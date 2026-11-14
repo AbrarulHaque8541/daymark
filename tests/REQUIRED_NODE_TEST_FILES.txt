@@ -69,6 +69,7 @@ tests/storage-logic.test.js
 tests/storage-ui.test.js
 tests/style-coverage.test.js
 tests/task-logic.test.js
+tests/task-mutation-logic.test.js
 tests/telegram-logic.test.js
 tests/telegram-ui.test.js
 tests/url-insights-logic.test.js

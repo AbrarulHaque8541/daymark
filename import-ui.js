@@ -23,6 +23,10 @@
     const doc = env.document;
     const win = env.window || root;
     const storage = env.localStorage || (win && win.localStorage) || null;
+    const mutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    let lockManager = env.lockManager || null;
+    try { lockManager = lockManager || (win && win.navigator && win.navigator.locks) || null; }
+    catch (error) { lockManager = null; }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
@@ -98,6 +102,12 @@
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
       try {
+        if (!mutation || typeof mutation.readGeneration !== 'function'
+            || typeof mutation.commitTaskSnapshot !== 'function' || !lockManager) {
+          throw new Error('cross-tab task storage coordination is unavailable');
+        }
+        const startingGeneration = mutation.readGeneration(storage);
+        if (!startingGeneration.ok) throw new Error('task storage generation is unreadable');
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
         }
@@ -122,10 +132,20 @@
         const validated = logic.validateStoredTasks(stored);
         const merge = importApi.mergeTasks(validated.tasks, parsed.tasks, logic);
         if (merge.added.length > 0) {
-          if (!storage || typeof storage.setItem !== 'function') {
-            throw new Error('browser storage is unavailable; nothing was changed');
+          const result = await mutation.commitTaskSnapshot({
+            storage,
+            lockManager,
+            baseTasks: validated.tasks,
+            desiredTasks: merge.merged,
+            expectedGeneration: startingGeneration.value.generation,
+            expectedClearEpoch: startingGeneration.value.clearEpoch,
+            validateTasks: logic.validateStoredTasks
+          });
+          if (!result.ok) {
+            if (result.reason === 'cleared') throw new Error('local data was cleared while this file was being read; nothing was imported');
+            if (result.reason === 'conflict') throw new Error('a task changed in another tab; nothing was imported');
+            throw new Error('tasks could not be saved safely; nothing was imported');
           }
-          storage.setItem(STORAGE_KEY, JSON.stringify(merge.merged));
           notifySaved();
         }
         const parts = [];

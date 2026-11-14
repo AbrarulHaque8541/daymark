@@ -39,6 +39,12 @@
       storageAccessFailed = true;
     }
     const holidaysApi = env.holidaysApi || root.DaymarkHolidays || null;
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    let lockManager = env.lockManager || null;
+    if (!lockManager) {
+      try { lockManager = (env.navigator || (win && win.navigator) || {}).locks || null; }
+      catch (error) { lockManager = null; }
+    }
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
@@ -230,6 +236,26 @@
       }
     }
 
+    async function persistRecordFenced(record, value, epochSnapshot) {
+      if (!storageRequested) return true;
+      if (!taskMutation || !lockManager || !epochSnapshot || !epochSnapshot.ok) {
+        storageWriteFailed = true;
+        return false;
+      }
+      const result = await taskMutation.withClearEpochLock(
+        lockManager,
+        [taskMutation.TASK_LOCK_NAME],
+        storage,
+        epochSnapshot.value,
+        () => persistRecord(record, value)
+      );
+      if (!result.ok || result.value !== true) {
+        storageWriteFailed = true;
+        return false;
+      }
+      return true;
+    }
+
     function readCache() {
       cacheRecord = readRecord(STORAGE_KEY, (parsed) => !!(
         holidaysApi && typeof holidaysApi.validateHolidayCache === 'function'
@@ -238,8 +264,8 @@
       return cacheRecord.value;
     }
 
-    function persistCache(cache) {
-      return persistRecord(cacheRecord, cache);
+    function persistCache(cache, epochSnapshot) {
+      return persistRecordFenced(cacheRecord, cache, epochSnapshot);
     }
 
     function readPrefs() {
@@ -249,9 +275,9 @@
       return prefsRecord.value;
     }
 
-    function persistPrefs(countryCode) {
+    function persistPrefs(countryCode, epochSnapshot) {
       if (!countryCode || !countryCode.trim()) return true;
-      return persistRecord(prefsRecord, { countryCode: countryCode.trim().toUpperCase() });
+      return persistRecordFenced(prefsRecord, { countryCode: countryCode.trim().toUpperCase() }, epochSnapshot);
     }
 
     async function onRefresh() {
@@ -270,14 +296,15 @@
         status('Choose a country first.');
         return;
       }
+      const epochSnapshot = taskMutation && taskMutation.captureClearEpoch(storage);
       setBusy(true);
       status('Refreshing…');
       try {
         const result = await holidaysApi.fetchHolidays(code, fetchImpl, { now });
         cached = result;
         storageWriteFailed = false;
-        persistCache(cached);
-        persistPrefs(code);
+        await persistCache(cached, epochSnapshot);
+        await persistPrefs(code, epochSnapshot);
         render(cached);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
       } catch (error) {
@@ -401,9 +428,12 @@
     // Persist country preference on change so it restores even without a cache.
     if (countryEl && typeof countryEl.addEventListener === 'function') {
       countryEl.addEventListener('change', () => {
-        if (typeof countryEl.value === 'string' && !persistPrefs(countryEl.value)) {
-          status('Country preference was not saved.' + storageNotice());
-        }
+        if (typeof countryEl.value !== 'string') return undefined;
+        const epochSnapshot = taskMutation && storage ? taskMutation.captureClearEpoch(storage) : null;
+        return Promise.resolve(persistPrefs(countryEl.value, epochSnapshot)).then((saved) => {
+          if (!saved) status('Country preference was not saved.' + storageNotice());
+          return saved;
+        });
       });
     }
 

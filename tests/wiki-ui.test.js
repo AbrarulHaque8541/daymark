@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const wikiApi = require('../wiki-logic.js');
 const ui = require('../wiki-ui.js');
+const { createLockManager, deferred, clearKeys, taskMutation } = require('./task-clear-race-helpers.js');
 
 const SEARCH_BODY = JSON.stringify({
   query: {
@@ -65,6 +66,7 @@ function fakeEnv(options) {
     setItem(key, value) { storageData[key] = String(value); },
     removeItem(key) { delete storageData[key]; }
   };
+  const lockManager = createLockManager();
   const env = {
     document: {
       readyState: 'complete',
@@ -73,11 +75,13 @@ function fakeEnv(options) {
     },
     window: opts.window || {},
     localStorage: storage,
-    wikiApi,
+    wikiApi: opts.wikiApi || wikiApi,
+    taskMutationApi: taskMutation,
+    lockManager,
     fetch: opts.fetch,
     now: () => '2026-11-05T12:00:00.000Z'
   };
-  return { env, elements, storageData };
+  return { env, elements, storageData, storage, lockManager };
 }
 
 function streamResponse(body) {
@@ -155,6 +159,29 @@ test('search fetches, renders, persists, and reports the update', async () => {
   assert.equal(JSON.parse(storageData[ui.PREFS_KEY]).query, 'kanyakumari');
 });
 
+test('a deferred Wikipedia response cannot recreate its absent cache or preference after Clear All', async () => {
+  const waiting = deferred();
+  const started = deferred();
+  const result = {
+    version: 1, query: 'kanyakumari',
+    results: [{ title: 'Kanyakumari', snippet: 'A coastal town in Tamil Nadu.', pageId: 2285632, url: 'https://en.wikipedia.org/?curid=2285632' }],
+    fetchedAt: '2026-11-05T12:00:00.000Z'
+  };
+  const delayedApi = Object.assign({}, wikiApi, {
+    searchWikipedia() { started.resolve(); return waiting.promise; }
+  });
+  const { env, storage, storageData, lockManager } = fakeEnv({ query: 'kanyakumari', wikiApi: delayedApi, fetch: () => Promise.resolve({}) });
+  const handle = ui.attachWikiUi(env);
+  assert.equal(storage.getItem(ui.STORAGE_KEY), null, 'the cache is absent before search begins');
+  const searching = handle.onSearch();
+  await started.promise;
+  await clearKeys(storage, [ui.STORAGE_KEY, ui.PREFS_KEY], lockManager);
+  waiting.resolve(result);
+  await searching;
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
+});
+
 test('search failure keeps the cached results visible', async () => {
   const stored = JSON.stringify({
     version: 1,
@@ -225,14 +252,14 @@ test('a saved search term from a previous visit is restored on attach', () => {
   assert.equal(elements['wiki-status'].textContent, 'Last search restored. Tap Search to look it up again.');
 });
 
-test('typing a search term persists it for the next visit', () => {
+test('typing a search term persists it for the next visit', async () => {
   const { env, elements, storageData } = fakeEnv({});
   ui.attachWikiUi(env);
   const input = elements['wiki-query'];
   input.value = 'solar power';
   const inputListener = input.listeners.find((l) => l.type === 'input');
   assert.ok(inputListener, 'input listener registered');
-  inputListener.handler();
+  await inputListener.handler();
   assert.equal(JSON.parse(storageData[ui.PREFS_KEY]).query, 'solar power');
 });
 
@@ -368,7 +395,7 @@ test('a partial Clear failure restores the first saved value', () => {
   assert.ok(elements['wiki-status'].textContent.startsWith('Could not clear saved Wikipedia data'));
 });
 
-test('typing does not throw when preference persistence fails', () => {
+test('typing does not throw when preference persistence fails', async () => {
   const storage = { getItem() { return null; }, setItem() { throw new Error('quota exceeded'); }, removeItem() {} };
   const { env, elements } = fakeEnv({ storage });
   ui.attachWikiUi(env);
@@ -376,7 +403,7 @@ test('typing does not throw when preference persistence fails', () => {
   input.value = 'solar power';
   const listener = input.listeners.find((entry) => entry.type === 'input');
   assert.ok(listener);
-  assert.doesNotThrow(() => listener.handler());
+  await assert.doesNotReject(() => listener.handler());
   assert.ok(elements['wiki-status'].textContent.includes('Search preference could not be saved'));
 });
 
