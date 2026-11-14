@@ -48,6 +48,8 @@
   <script src="browser-proxy-failures-ui.js" defer></script>
   <script src="browser-data-logic.js" defer></script>
   <script src="browser-data-ui.js" defer></script>
+  <script src="permission-lifecycle-logic.js" defer></script>
+  <script src="permission-lifecycle-ui.js" defer></script>
   <script src="browser-intent-logic.js" defer></script>
   <script src="browser-intent-ui.js" defer></script>
   <script src="url-insights-logic.js" defer></script>
@@ -447,6 +449,25 @@
           </form>
           <p class="feed-status" id="browser-data-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="browser-data-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="permission-lifecycle-card" aria-labelledby="permission-lifecycle-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="permission-lifecycle-heading">Permission lifecycle, in plain words</h2>
+          <p class="briefing-description">What deny, "don't ask again", revoke in Android Settings and per-site reset really mean. Nothing runs.</p>
+          <form id="permission-lifecycle-form" class="feed-form" novalidate>
+            <label class="sr-only" for="permission-lifecycle-state">Permission state to explain</label>
+            <select id="permission-lifecycle-state" name="state" class="sort-select" aria-label="Permission state">
+              <option value="granted" selected>Permission granted</option>
+              <option value="denied-once">Denied this time</option>
+              <option value="denied-permanent">Denied with "don't ask again"</option>
+              <option value="revoked-settings">Revoked in Android Settings</option>
+              <option value="site-reset">Per-site permission reset</option>
+            </select>
+            <button class="button button-primary" id="permission-lifecycle-explain" type="submit">Explain</button>
+            <button class="button button-quiet" id="permission-lifecycle-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="permission-lifecycle-status" role="status" aria-live="polite"></p>
+          <div class="feed-list" id="permission-lifecycle-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="browser-intent-card" aria-labelledby="browser-intent-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>

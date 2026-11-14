@@ -54,6 +54,8 @@ tests/import-logic.test.js
 tests/import-ui.test.js
 tests/markup-hygiene.test.js
 tests/nightly-placeholder-guard.test.js
+tests/permission-lifecycle-logic.test.js
+tests/permission-lifecycle-ui.test.js
 tests/node-test-registration-guard.test.js
 tests/press-feedback-css.test.js
 tests/product-language-contract.test.js
