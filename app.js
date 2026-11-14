@@ -94,10 +94,19 @@
         setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
         offerRecoveryExport('Saved on this device; original recovery data remains in a backup');
       } else {
-        setStorageStatus('Saved on this device');
-        // Only a backup containing fully valid task arrays is stale. Partial or opaque
-        // originals remain recoverable even after the primary store becomes healthy.
-        state.recoveryBackupClearPending = true;
+        const backupRaw = readRecoveryBackupRaw();
+        if (isRedundantRecoveryBackup(saved, backupRaw)) {
+          setStorageStatus('Saved on this device');
+          // The backup is byte-identical to a fully valid primary: nothing can be recovered
+          // from it that the primary does not already hold.
+          state.recoveryBackupClearPending = true;
+        } else if (backupRaw !== null) {
+          // A healthy primary does not prove a *different* backup is redundant.
+          setStorageStatus('Saved on this device; recovery backup retained', true);
+          offerRecoveryExport('A recovery backup is retained until it can be proven redundant.');
+        } else {
+          setStorageStatus('Saved on this device');
+        }
       }
       return validated.tasks;
     } catch (error) {
@@ -212,6 +221,31 @@
       || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
   }
 
+  /** Reads the recovery backup without letting a storage failure look like "absent". */
+  function readRecoveryBackupRaw() {
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      return typeof raw === 'string' ? raw : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * A recovery backup may be dropped only when it is provably redundant: byte-identical to
+   * the primary payload and fully valid as a task array on both sides.
+   *
+   * Owner policy (2026-11-14): a healthy primary is not proof that a backup is redundant.
+   * A backup with different rows, extra history, partial records or opaque bytes may be the
+   * only surviving copy, so it is retained until the user removes it.
+   */
+  function isRedundantRecoveryBackup(primaryRaw, backupRaw) {
+    if (typeof primaryRaw !== 'string' || typeof backupRaw !== 'string') return false;
+    if (primaryRaw.length === 0 || backupRaw.length === 0) return false;
+    if (primaryRaw !== backupRaw) return false;
+    return isHealthyTaskPayload(primaryRaw) && isHealthyTaskPayload(backupRaw);
+  }
+
   function clearRecoveryBackup() {
     try {
       localStorage.removeItem(BACKUP_KEY);
@@ -273,7 +307,8 @@
           if (!backUpRawPayload(raw)) return { ok: false, reason: 'backup-failed' };
           state.recoveryBackupPendingPayload = null;
         }
-      } else if (state.recoveryBackupClearPending && isHealthyTaskPayload(raw)
+      } else if (state.recoveryBackupClearPending
+          && isRedundantRecoveryBackup(raw, readRecoveryBackupRaw())
           && !hasPartialRecoveryBackup() && !hasRecoveryBackupNeedingPreservation()) {
         clearRecoveryBackup();
       }
