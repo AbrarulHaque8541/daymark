@@ -1178,22 +1178,36 @@
   async function clearCompleted() {
     const removed = state.tasks.filter((task) => task.completed);
     if (!removed.length) return;
-    state.tasks = state.tasks.filter((task) => !task.completed);
-    const saved = await persistTasks();
-    render();
-    if (!saved.ok) {
-      showSaveResult(saved, 'Completed tasks cleared.');
-      return;
+    const button = $('#clear-completed');
+    if (button) {
+      button.classList.add('is-busy');
+      button.setAttribute('aria-busy', 'true');
+      button.disabled = true;
     }
-    showToast(`Cleared ${removed.length} completed task${removed.length === 1 ? '' : 's'}.`, {
-      label: 'Undo',
-      run: async () => {
-        state.tasks = state.tasks.concat(removed);
-        const restored = await persistTasks();
-        render();
-        showSaveResult(restored, 'Completed tasks restored.');
+    try {
+      state.tasks = state.tasks.filter((task) => !task.completed);
+      const saved = await persistTasks();
+      render();
+      if (!saved.ok) {
+        showSaveResult(saved, 'Completed tasks cleared.');
+        return;
       }
-    });
+      showToast(`Cleared ${removed.length} completed task${removed.length === 1 ? '' : 's'}.`, {
+        label: 'Undo',
+        run: async () => {
+          state.tasks = state.tasks.concat(removed);
+          const restored = await persistTasks();
+          render();
+          showSaveResult(restored, 'Completed tasks restored.');
+        }
+      });
+    } finally {
+      if (button) {
+        button.classList.remove('is-busy');
+        button.removeAttribute('aria-busy');
+        button.disabled = false;
+      }
+    }
   }
 
   function exportTasks() {
