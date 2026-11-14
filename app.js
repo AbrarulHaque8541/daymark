@@ -2195,6 +2195,12 @@
     } else if ((event.key === 's' || event.key === 'S') && !$('#edit-dialog').open) {
       event.preventDefault();
       $('#sort-toggle').click();
+    } else if (/^[1-5]$/.test(event.key) && !$('#edit-dialog').open && !isTextField(event.target)) {
+      event.preventDefault();
+      const filters = ['all', 'today', 'upcoming', 'overdue', 'completed'];
+      const idx = parseInt(event.key, 10) - 1;
+      const btn = document.querySelector(`.filter-button[data-filter="${filters[idx]}"]`);
+      if (btn) btn.click();
     }
   }
 
@@ -2437,9 +2443,16 @@
       if (file) await importTasks(file);
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
-      state.filter = button.dataset.filter;
+      const next = button.dataset.filter;
+      if (next === state.filter) return;
+      state.filter = next;
       persistTaskViewPrefs();
+      const labels = { all: 'All', today: 'Today', upcoming: 'Upcoming', overdue: 'Overdue', completed: 'Completed' };
+      showToast('Showing ' + (labels[next] || next));
+      const list = $('#task-list');
+      if (list) list.classList.add('is-filtering');
       render();
+      if (list) setTimeout(() => list.classList.remove('is-filtering'), 280);
     }));
     taskList.addEventListener('click', handleTaskAction);
     $('#edit-form').addEventListener('submit', saveEdit);
