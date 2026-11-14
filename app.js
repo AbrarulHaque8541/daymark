@@ -1669,21 +1669,24 @@
 
   const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed']);
 
+  const VALID_SORTS = new Set(['smart', 'title']);
+
   function loadTaskViewPrefs() {
     let raw = null;
     try {
       raw = localStorage.getItem(TASK_VIEW_KEY);
     } catch (error) {
-      return { filter: 'all', query: '' };
+      return { filter: 'all', sort: 'smart', query: '' };
     }
-    if (!raw) return { filter: 'all', query: '' };
+    if (!raw) return { filter: 'all', sort: 'smart', query: '' };
     try {
       const parsed = JSON.parse(raw);
       const filter = parsed && VALID_FILTERS.has(parsed.filter) ? parsed.filter : 'all';
+      const sort = parsed && VALID_SORTS.has(parsed.sort) ? parsed.sort : 'smart';
       const query = parsed && typeof parsed.query === 'string' ? parsed.query.slice(0, 200) : '';
-      return { filter, query };
+      return { filter, sort, query };
     } catch (error) {
-      return { filter: 'all', query: '' };
+      return { filter: 'all', sort: 'smart', query: '' };
     }
   }
 
@@ -1691,6 +1694,7 @@
     try {
       localStorage.setItem(TASK_VIEW_KEY, JSON.stringify({
         filter: state.filter,
+        sort: state.sort,
         query: state.query || ''
       }));
     } catch (error) {
@@ -2356,6 +2360,7 @@
     focusRecoveryMaintenance = scheduleFocusRecoveryMaintenance();
     const savedView = loadTaskViewPrefs();
     state.filter = savedView.filter;
+    state.sort = savedView.sort;
     state.query = savedView.query;
     const searchEl = $('#task-search');
     if (searchEl) searchEl.value = state.query;
@@ -2382,6 +2387,7 @@
     $('#chip-tomorrow').addEventListener('click', () => setQuickDueDate(1));
     $('#sort-toggle').addEventListener('click', () => {
       state.sort = state.sort === 'smart' ? 'title' : 'smart';
+      persistTaskViewPrefs();
       render();
     });
     $('#empty-clear-search').addEventListener('click', clearSearch);
