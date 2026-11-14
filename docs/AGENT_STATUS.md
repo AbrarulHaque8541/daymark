@@ -1,3 +1,5 @@
+- [Daymark engineering status - 2026-11-15T00:20:00Z (Cycle A filter polish fix)](./CURRENT_STATUS_20261115T002000Z.md)
+
 - [Daymark engineering status - 2026-11-14T22:37:00Z (Cycle A filter polish)](./CURRENT_STATUS_20261114T223700Z.md)
 
 - [Daymark engineering status - 2026-11-15T02:05:00Z (Cycle A sort toggle polish)](./CURRENT_STATUS_20261115T020500Z.md)
