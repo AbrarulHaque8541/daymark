@@ -38,6 +38,7 @@
       storageAccessFailed = true;
     }
     const webhookApi = env.webhookApi || root.DaymarkWebhook || null;
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
@@ -59,11 +60,17 @@
     let queueWriteFailed = false;
     let flushRequested = false;
     let coordinationFailed = false;
+    let clearEpoch = 0;
     let memoryOnlyEvents = [];
     // If a POST succeeded but the queue-removal write failed, remember those
     // resolved IDs in this tab so Retry can persist their removal without
     // sending them a second time during the same page lifetime.
     let resolvedUnpersistedIds = new Set();
+
+    if (taskMutation && typeof taskMutation.readGeneration === 'function') {
+      const generation = taskMutation.readGeneration(storage);
+      if (generation.ok) clearEpoch = generation.value.clearEpoch;
+    }
 
     function status(message) {
       let safeMessage = String(message === null || message === undefined ? '' : message);
@@ -175,6 +182,24 @@
         // The legacy value cannot be safely removed in this browser.
       }
       return false;
+    }
+
+    function invalidateForClearAll(nextEpoch) {
+      if (Number.isSafeInteger(nextEpoch) && nextEpoch >= clearEpoch) clearEpoch = nextEpoch;
+      else clearEpoch += 1;
+      config = null;
+      endpointFingerprintPromise = null;
+      if (urlEl && typeof urlEl.value === 'string') urlEl.value = '';
+      queue = [];
+      memoryOnlyEvents = [];
+      resolvedUnpersistedIds.clear();
+      queueReadFailed = false;
+      queueWriteFailed = false;
+      flushRequested = false;
+      coordinationFailed = false;
+      renderQueue();
+      status('Webhook endpoint and queued events were cleared by local data controls.');
+      return true;
     }
 
     function readQueue() {
@@ -329,6 +354,9 @@
         return;
       }
 
+      const operationEpoch = clearEpoch;
+      const operationConfig = config;
+      const operationIsCurrent = () => clearEpoch === operationEpoch && config === operationConfig;
       setBusy(true);
       try {
         let endpointFingerprint;
@@ -339,7 +367,9 @@
           renderQueue();
           return;
         }
+        if (!operationIsCurrent()) return;
         const legacyAssignment = await assignLegacyQueueToEndpoint(endpointFingerprint);
+        if (!operationIsCurrent()) return;
         if (!legacyAssignment.ok) {
           status('Webhook delivery is paused because older queued events could not be safely assigned or preserved.' + storageWarning());
           renderQueue();
@@ -351,6 +381,7 @@
           return;
         }
         const delivery = await withDeliveryLock(async () => {
+          if (!operationIsCurrent()) return { invalidated: true };
           let deliveredCount = 0;
           let droppedCount = 0;
           let lastFailure = null;
@@ -360,7 +391,9 @@
           // network I/O so another tab can durably append a completion while
           // this tab is waiting for the webhook endpoint.
           while (true) {
+            if (!operationIsCurrent()) return { invalidated: true };
             const snapshot = await withQueueLock(() => {
+              if (!operationIsCurrent()) return { ok: false, invalidated: true };
               coordinationFailed = false;
               const state = readQueue();
               if (!state.ok) {
@@ -418,6 +451,7 @@
               return { ok: true, queue: latest.slice(), recovered: recoveringQueueState || changed };
             });
 
+            if (!operationIsCurrent()) return { invalidated: true };
             if (!snapshot.ok) {
               status('Webhook delivery is paused because the shared queue could not be safely updated. '
                 + storageWarning());
@@ -471,11 +505,13 @@
               }
               break;
             }
+            if (!operationIsCurrent()) return { invalidated: true };
             const result = await webhookApi.flushQueue([event], config.url, fetchImpl, {
               endpointFingerprint,
               crypto: env.crypto || (win && win.crypto) || root.crypto,
               TextEncoder: env.TextEncoder || (win && win.TextEncoder) || root.TextEncoder
             });
+            if (!operationIsCurrent()) return { invalidated: true };
             deliveredCount += result.deliveredCount;
             droppedCount += result.droppedCount;
             if (result.failure) lastFailure = result.failure;
@@ -484,6 +520,7 @@
             // removes/updates only the event just processed and preserves
             // completions appended by any other tab during the POST.
             const updated = await withQueueLock(() => {
+              if (!operationIsCurrent()) return { ok: false, invalidated: true };
               coordinationFailed = false;
               const state = readQueue();
               if (!state.ok) {
@@ -526,6 +563,7 @@
               return { ok: true };
             });
 
+            if (!operationIsCurrent()) return { invalidated: true };
             if (!updated.ok) {
               status('Webhook delivery is paused because its queue update could not be saved safely. '
                 + storageWarning());
@@ -558,13 +596,18 @@
           return { deliveredCount, droppedCount, failure: lastFailure };
         });
 
+        if (!operationIsCurrent() || (delivery.ok && delivery.value && delivery.value.invalidated)) return;
         if (!delivery.ok) {
           status('Webhook delivery is paused because this browser could not obtain the cross-tab delivery lock. '
             + storageWarning());
           renderQueue();
         }
       } finally {
-        finishBusyOperation();
+        if (operationEpoch === clearEpoch) finishBusyOperation();
+        else {
+          setBusy(false);
+          renderQueue();
+        }
       }
     }
 
@@ -629,18 +672,19 @@
     }
 
     function resetQueueAfterExternalClear() {
-      // Called only after a coordinated storage clear removed (or confirmed
-      // absent) the durable queue key. It also drops this tab's memory-only
-      // suffix so a later Retry cannot recreate events the user just cleared.
-      queue = [];
-      memoryOnlyEvents = [];
-      resolvedUnpersistedIds.clear();
-      queueWriteFailed = false;
-      queueReadFailed = false;
-      coordinationFailed = false;
+      // Compatibility entry point for a caller that has already completed a
+      // coordinated durable queue clear. Never retain a session endpoint.
+      const generation = taskMutation && taskMutation.readGeneration(storage);
+      return invalidateForClearAll(generation && generation.ok ? generation.value.clearEpoch : clearEpoch + 1);
+    }
+
+    function prepareForClearAll() {
+      const generation = taskMutation && taskMutation.readGeneration(storage);
+      invalidateForClearAll(generation && generation.ok ? generation.value.clearEpoch : clearEpoch + 1);
+      const legacyConfigCleared = clearLegacyConfig();
+      legacyConfigCleanupFailed = !legacyConfigCleared;
       renderQueue();
-      status('Webhook queue cleared by local data controls.' + storageWarning());
-      return true;
+      return { reset: true, legacyConfigCleared };
     }
 
     function onSave(event) {
@@ -697,16 +741,38 @@
         status('Offline - connect to the internet before sending a test event. ' + queueNote());
         return;
       }
+      const operationEpoch = clearEpoch;
       setBusy(true);
       status('Sending a test event...');
       try {
         const payload = webhookApi.buildTaskCompletedPayload({ title: 'Daymark test event', priority: 'medium' }, now());
-        await webhookApi.deliverWebhook(raw, payload, fetchImpl);
+        const delivery = await withDeliveryLock(async () => {
+          if (operationEpoch !== clearEpoch) return { invalidated: true };
+          try {
+            await webhookApi.deliverWebhook(raw, payload, fetchImpl);
+            return { delivered: true };
+          } catch (error) {
+            return { failed: true };
+          }
+        });
+        if (operationEpoch !== clearEpoch || (delivery.ok && delivery.value && delivery.value.invalidated)) return;
+        if (!delivery.ok) {
+          status('Test event was not sent because this browser could not obtain the cross-tab delivery lock.' + storageWarning());
+          return;
+        }
+        if (delivery.value && delivery.value.failed) {
+          status('Test event failed. Check the endpoint and retry.');
+          return;
+        }
         status('Test event delivered. Your endpoint is reachable.' + (pendingQueueView().length ? ' ' + queueNote() : ''));
       } catch (error) {
-        status('Test event failed. Check the endpoint and retry.');
+        if (operationEpoch === clearEpoch) status('Test event failed. Check the endpoint and retry.');
       } finally {
-        finishBusyOperation();
+        if (operationEpoch === clearEpoch) finishBusyOperation();
+        else {
+          setBusy(false);
+          renderQueue();
+        }
       }
     }
 
@@ -718,6 +784,8 @@
         return { queued: false, reason: 'storage-unavailable' };
       }
       if (!config) return { queued: false, reason: 'disabled' };
+      const operationEpoch = clearEpoch;
+      const operationConfig = config;
       if (!queueCoordinatorAvailable()) {
         coordinationFailed = true;
         status('Task completion was not queued because this browser cannot safely coordinate the shared webhook queue across tabs.' + storageWarning());
@@ -733,6 +801,9 @@
       }
 
       return currentEndpointFingerprint().then((endpointFingerprint) => {
+        if (operationEpoch !== clearEpoch || config !== operationConfig) {
+          return { queued: false, reason: 'cleared' };
+        }
         let event;
         try {
           event = webhookApi.makeQueueEvent(payload, now(), endpointFingerprint);
@@ -741,6 +812,9 @@
           return { queued: false, reason: 'fingerprint-unavailable' };
         }
         return withQueueLock(() => {
+        if (operationEpoch !== clearEpoch || config !== operationConfig) {
+          return { queued: false, reason: 'cleared' };
+        }
         coordinationFailed = false;
         const state = readQueue();
         if (!state.ok) {
@@ -816,6 +890,9 @@
         renderQueue();
         return { queued: true, reason: 'queued' };
       }).then(async (locked) => {
+        if (operationEpoch !== clearEpoch || config !== operationConfig) {
+          return { queued: false, reason: 'cleared' };
+        }
         if (!locked.ok) {
           status('Task completion was not queued or sent because this browser could not obtain the cross-tab queue lock. '
             + storageWarning());
@@ -868,8 +945,18 @@
       // is informational only; all read-modify-write and delivery operations
       // still require the Web Locks exclusive lock above.
       win.addEventListener('storage', (event) => {
-        if (!event || !webhookApi
-            || (event.key !== webhookApi.QUEUE_KEY && event.key !== null)) return;
+        if (!event) return;
+        const generationChanged = taskMutation
+          && (event.key === taskMutation.GENERATION_KEY || event.key === null);
+        if (generationChanged) {
+          const generation = taskMutation.readGeneration(storage);
+          if (!generation.ok) {
+            invalidateForClearAll(clearEpoch + 1);
+          } else if (generation.value.clearEpoch > clearEpoch) {
+            invalidateForClearAll(generation.value.clearEpoch);
+          }
+        }
+        if (!webhookApi || (event.key !== webhookApi.QUEUE_KEY && event.key !== null)) return;
         const state = readQueue();
         if (!state.ok) {
           queueReadFailed = true;
@@ -894,6 +981,7 @@
       notifyTaskCompleted,
       flush: attemptFlush,
       clearQueue: onClearQueue,
+      prepareForClearAll,
       resetQueueAfterExternalClear,
       readConfig: () => config,
       readQueue: () => pendingQueueView(),
@@ -910,6 +998,14 @@
     notifyTaskCompleted(task, options) {
       if (activeHandle) return activeHandle.notifyTaskCompleted(task, options);
       return { queued: false, reason: 'not-attached' };
+    },
+    clearQueue() {
+      if (activeHandle) return activeHandle.clearQueue();
+      return { cleared: false, reason: 'not-attached' };
+    },
+    prepareForClearAll() {
+      if (activeHandle) return activeHandle.prepareForClearAll();
+      return { reset: false, legacyConfigCleared: false };
     },
     resetQueueAfterExternalClear() {
       if (activeHandle) return activeHandle.resetQueueAfterExternalClear();

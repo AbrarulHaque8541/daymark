@@ -7,7 +7,7 @@ const path = require('node:path');
 const importer = require('../import-logic.js');
 const logic = require('../task-logic.js');
 const ui = require('../import-ui.js');
-const mutation = require('../task-mutation-logic.js');
+const taskMutation = require('../task-mutation-logic.js');
 
 const NOW = '2026-11-09T05:00:00.000Z';
 
@@ -285,11 +285,11 @@ test('the import UI intercepts .ics files, saves them, and discloses the simplif
     addEventListener() {},
     removeEventListener() {}
   };
-  const locks = makeLockManager();
-  const win = { navigator: { locks }, StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } }, dispatchEvent() { return true; } };
+  const win = { StorageEvent: class { constructor(type, init) { this.type = type; this.key = init && init.key; } }, dispatchEvent() { return true; } };
+  const lockManager = { request(name, options, callback) { return Promise.resolve().then(() => callback({ name, mode: options.mode })); } };
   const handle = ui.attachImportUi({
     document: doc, window: win, localStorage: storage,
-    importApi: importer, logic, taskMutation: mutation, lockManager: locks, now: () => NOW
+    importApi: importer, logic, taskMutationApi: taskMutation, lockManager, now: () => NOW
   });
   const event = {
     target: element,

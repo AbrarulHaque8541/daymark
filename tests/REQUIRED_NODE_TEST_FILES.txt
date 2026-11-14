@@ -61,6 +61,8 @@ tests/reduced-motion.test.js
 tests/release-action-runtime.test.js
 tests/releases-logic.test.js
 tests/releases-ui.test.js
+tests/dictionary-logic.test.js
+tests/dictionary-ui.test.js
 tests/repeat-contract.test.js
 tests/repeat-logic.test.js
 tests/response-body-logic.test.js

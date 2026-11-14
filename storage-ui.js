@@ -38,8 +38,33 @@
     // Keep the initial state unknown until the user explicitly retries.
     if (!storageAccessFailed) acquireStorage();
     const storageApi = env.storageApi || root.DaymarkStorage || null;
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    const webhookUi = env.webhookUi || root.DaymarkWebhookUi || null;
+    const telegramUi = env.telegramUi || root.DaymarkTelegramUi || null;
+    let lockManager = env.lockManager || null;
+    if (!lockManager) {
+      try { lockManager = (env.navigator || (win && win.navigator) || {}).locks || null; }
+      catch (error) { lockManager = null; }
+    }
     const confirmImpl = typeof env.confirm === 'function' ? env.confirm
       : (win && typeof win.confirm === 'function' ? (message) => win.confirm(message) : null);
+
+    function notifyTaskGenerationChanged() {
+      if (!taskMutation || !storage || !win || typeof win.dispatchEvent !== 'function'
+          || typeof win.StorageEvent !== 'function') return false;
+      const generation = taskMutation.readGeneration(storage);
+      if (!generation.ok) return false;
+      try {
+        win.dispatchEvent(new win.StorageEvent('storage', {
+          key: taskMutation.GENERATION_KEY,
+          newValue: JSON.stringify(generation.value),
+          storageArea: storage
+        }));
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
 
     const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
     // The live page uses the storage-* ids; the data-* ids remain supported for
@@ -205,7 +230,7 @@
       }
     }
 
-    function onClearCategory(categoryId) {
+    async function onClearCategory(categoryId) {
       if (!storageApi || !storageAvailable()) {
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
@@ -228,7 +253,65 @@
       setBusy(true);
       let result = null;
       try {
-        result = storageApi.clearCategory(storage, categoryId);
+        if (categoryId === 'tasks' || categoryId === 'task-backup') {
+          if (!taskMutation || !lockManager) {
+            setBusy(false);
+            status('Could not safely coordinate task clearing across tabs. Nothing was cleared.');
+            return;
+          }
+          const locked = await taskMutation.withExclusiveLock(lockManager, taskMutation.TASK_LOCK_NAME, () => {
+            const before = taskMutation.readGeneration(storage);
+            const repaired = taskMutation.resolvePendingMutations(storage);
+            if (!repaired.ok) return { ok: false, reason: repaired.reason };
+            let primaryPresent = false;
+            if (categoryId === 'tasks') {
+              try { primaryPresent = storage.getItem(taskMutation.TASK_STORAGE_KEY) !== null; }
+              catch (error) {
+                return { ok: true, result: storageApi.clearCategory(storage, categoryId), generationChanged: false };
+              }
+            }
+            let begun = false;
+            if (primaryPresent) {
+              const start = taskMutation.beginTaskClear(storage);
+              if (!start.ok) return { ok: false, reason: start.reason };
+              begun = true;
+            }
+            const cleared = storageApi.clearCategory(storage, categoryId);
+            const primaryRemoved = Array.isArray(cleared.removed)
+              && cleared.removed.includes(taskMutation.TASK_STORAGE_KEY);
+            const finished = begun ? taskMutation.finishTaskClear(storage, primaryRemoved) : { ok: true };
+            const after = taskMutation.readGeneration(storage);
+            return {
+              ok: true,
+              result: cleared,
+              generationChanged: Boolean(before.ok && after.ok
+                && before.value.generation !== after.value.generation),
+              coordinationFailed: !finished.ok,
+              taskEpoch: after.ok ? after.value.taskEpoch : null
+            };
+          });
+          if (!locked.ok || !locked.value || !locked.value.ok) {
+            setBusy(false);
+            status('Could not safely coordinate task clearing across tabs. Nothing was cleared.');
+            return;
+          }
+          result = locked.value.result;
+          if (locked.value.generationChanged) notifyTaskGenerationChanged();
+          if (locked.value.coordinationFailed) {
+            result.coordinationFailed = true;
+          }
+        } else if (categoryId === 'webhook-queue' && webhookUi
+            && typeof webhookUi.clearQueue === 'function') {
+          const cleared = await webhookUi.clearQueue();
+          if (!cleared || cleared.cleared !== true) {
+            setBusy(false);
+            status('Could not safely clear the webhook queue. Existing events were preserved.');
+            return;
+          }
+          result = { removed: category.keys.slice(), failed: [], unreadable: [] };
+        } else {
+          result = storageApi.clearCategory(storage, categoryId);
+        }
       } catch (error) {
         setBusy(false);
         status('Could not clear ' + category.label + ': '
@@ -238,7 +321,7 @@
       setBusy(false);
       if (result.failed.length > 0) {
         const unreadable = Array.isArray(result.unreadable) && result.unreadable.length > 0;
-        const message = result.removed.length === 0
+        let message = result.removed.length === 0
           ? unreadable
             ? 'Could not clear ' + category.label + ': ' + result.unreadable.length
               + ' item(s) could not be read. Nothing was cleared.'
@@ -246,8 +329,13 @@
               + ' item(s) could not be removed by the browser. Nothing was cleared.'
           : 'Cleared ' + category.label + ', but ' + result.failed.length
             + ' item(s) could not be removed by the browser.';
+        if (result.coordinationFailed) message += ' Task-clear coordination could not be finalized; task writes remain blocked until storage recovers.';
         render();
         status(message);
+      } else if (result.coordinationFailed) {
+        render();
+        status('Cleared ' + category.label + ' (' + result.removed.length
+          + ' item(s) removed), but task-clear coordination could not be finalized. Task writes remain blocked until storage recovers.');
       } else {
         const message = 'Cleared ' + category.label + ' (' + result.removed.length
           + ' item(s) removed). Nothing else was touched.';
@@ -256,7 +344,7 @@
       }
     }
 
-    function onClearAll() {
+    async function onClearAll() {
       if (!storageApi || !storageAvailable()) {
         status('Browser storage is unavailable. Nothing was cleared.');
         return;
@@ -274,29 +362,92 @@
         status('Cancelled. Nothing was cleared.');
         return;
       }
+      if (!taskMutation || !lockManager || !webhookUi
+          || typeof webhookUi.prepareForClearAll !== 'function') {
+        status('Could not safely coordinate Clear All across tasks and webhooks. Nothing was cleared.');
+        return;
+      }
       setBusy(true);
-      let result = null;
+      let transaction = null;
       try {
-        result = storageApi.clearAll(storage);
+        const locked = await taskMutation.withLocksInOrder(
+          lockManager,
+          taskMutation.CLEAR_ALL_LOCK_ORDER,
+          () => {
+            const plan = storageApi.planClearAll(storage);
+            if (!plan.ok) return { ok: false, reason: 'preflight-failed', result: plan };
+            const taskKeyWillBeCleared = plan.existingKeys.includes(taskMutation.TASK_STORAGE_KEY);
+            const epoch = taskMutation.beginClearAll(storage, taskKeyWillBeCleared);
+            if (!epoch.ok) return { ok: false, reason: 'generation-failed' };
+            // Clear session-only endpoint/fingerprint and all in-memory queue state
+            // while delivery and queue locks are held, before any key is removed.
+            const webhookReset = webhookUi.prepareForClearAll();
+            if (telegramUi && typeof telegramUi.resetForClearAll === 'function') {
+              telegramUi.resetForClearAll();
+            }
+            const result = storageApi.clearPlanned(storage, plan);
+            const primaryTaskKeyRemoved = result.removedKeys.includes(taskMutation.TASK_STORAGE_KEY);
+            const finalized = taskMutation.finishClearAll(storage, primaryTaskKeyRemoved);
+            return {
+              ok: true,
+              result,
+              webhookCleanupFailed: !webhookReset || webhookReset.legacyConfigCleared !== true,
+              coordinationFailed: !finalized.ok,
+              clearEpoch: epoch.value.clearEpoch,
+              taskEpoch: finalized.ok ? finalized.value.taskEpoch : epoch.value.taskEpoch
+            };
+          }
+        );
+        if (!locked.ok) {
+          transaction = { ok: false, reason: locked.reason };
+        } else {
+          transaction = locked.value;
+        }
       } catch (error) {
         setBusy(false);
         status('Could not clear all data: '
           + (error && error.message ? error.message : 'storage is unavailable.'));
         return;
       }
+      if (transaction && transaction.ok === true) notifyTaskGenerationChanged();
       setBusy(false);
+      if (!transaction || transaction.ok !== true) {
+        const result = transaction && transaction.result;
+        if (transaction && transaction.reason === 'preflight-failed' && result) {
+          const unreadable = Array.isArray(result.unreadableKeys) ? result.unreadableKeys.length : 0;
+          status(unreadable
+            ? 'Could not clear all data: ' + unreadable + ' item(s) could not be read. Nothing was cleared.'
+            : 'Could not clear all data: storage status is unknown. Nothing was cleared.');
+        } else {
+          status('Could not safely coordinate Clear All across tabs. Nothing was cleared.');
+        }
+        return;
+      }
+      const result = transaction.result;
+      const coordinationWarning = transaction.coordinationFailed
+        ? ' Clear coordination metadata could not be finalized; some writes remain blocked until storage recovers.'
+        : '';
       if (result.failedKeys.length > 0) {
         const unreadableKeys = Array.isArray(result.unreadableKeys) ? result.unreadableKeys : [];
-        const message = result.removedKeys.length === 0
+        const message = (result.removedKeys.length === 0
           ? unreadableKeys.length > 0
             ? 'Could not clear all data: ' + unreadableKeys.length
               + ' item(s) could not be read. Nothing was cleared.'
             : 'Could not clear all data: ' + result.failedKeys.length
               + ' item(s) could not be removed by the browser. Nothing was cleared.'
           : 'Cleared ' + result.removedKeys.length + ' item(s), but '
-            + result.failedKeys.length + ' item(s) could not be removed by the browser.';
+            + result.failedKeys.length + ' item(s) could not be removed by the browser.') + coordinationWarning;
         render();
         status(message);
+      } else if (transaction.webhookCleanupFailed) {
+        render();
+        status(result.removedKeys.length
+          ? 'Cleared ' + result.removedKeys.length + ' item(s), but the legacy webhook endpoint could not be safely removed.' + coordinationWarning
+          : 'The legacy webhook endpoint could not be safely removed; no stored items were cleared.' + coordinationWarning);
+      } else if (transaction.coordinationFailed) {
+        render();
+        status('Cleared ' + result.removedKeys.length
+          + ' stored item(s), but Clear All coordination metadata could not be finalized. Some writes remain blocked until storage recovers.');
       } else {
         const message = 'Cleared all ' + result.removedKeys.length
           + ' stored item(s). Nothing outside this browser was affected.';
@@ -319,7 +470,7 @@
       });
     }
     if (clearAllEl && typeof clearAllEl.addEventListener === 'function') {
-      clearAllEl.addEventListener('click', () => { onClearAll(); });
+      clearAllEl.addEventListener('click', () => onClearAll());
     }
 
     render();

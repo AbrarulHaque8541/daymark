@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const logic = require('../task-logic.js');
+const taskMutation = require('../task-mutation-logic.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const INDEX_SOURCE = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
@@ -46,7 +47,7 @@ function bootApp({ savedValue = null } = {}) {
         dispatch: (type, event = {}) => {
           const listener = listeners.get(type);
           if (listener) {
-            listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
+            return listener({ preventDefault() {}, currentTarget: elements.get(selector), target: elements.get(selector), ...event });
           }
         },
         setAttribute: (name, value) => attributes.set(name, String(value)),
@@ -79,8 +80,11 @@ function bootApp({ savedValue = null } = {}) {
     body: { appendChild() {} },
     addEventListener() {}
   };
+  const lockManager = { request(name, options, callback) { return Promise.resolve().then(() => callback({ name, mode: options.mode })); } };
   const window = {
     DaymarkLogic: logic,
+    DaymarkTaskMutation: taskMutation,
+    navigator: { locks: lockManager },
     addEventListener() {}
   };
 
@@ -145,7 +149,7 @@ test('clearing the search restores full list announcements', () => {
     'the search status goes quiet once no query is active');
 });
 
-test('adding a task during an active search restores live list announcements', () => {
+test('adding a task during an active search restores live list announcements', async () => {
   const timestamp = new Date().toISOString();
   const seed = [{ id: 't1', title: 'Work report', dueDate: null, priority: 'medium', completed: false, createdAt: timestamp, updatedAt: timestamp }];
   const app = bootApp({ savedValue: JSON.stringify(seed) });
@@ -153,7 +157,7 @@ test('adding a task during an active search restores live list announcements', (
   typeSearch(app, 'zz');
 
   app.elements.get('#new-title').value = 'Fresh task';
-  app.elements.get('#add-form').dispatch('submit');
+  await app.elements.get('#add-form').dispatch('submit');
 
   assert.equal(taskList.getAttribute('aria-live'), 'polite',
     'a task mutation resets the list to a live region so the addition is announced');

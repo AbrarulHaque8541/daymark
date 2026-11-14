@@ -13,7 +13,21 @@
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', recoveryBackupPendingPayload: null, focusRecoveryBackupPendingPayload: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusStateClearEpoch: null, recoveryBackupPendingPayload: null, recoveryBackupClearPending: false, focusRecoveryBackupPendingPayload: null, focusRecoveryCompletionPending: null, focusRecoveryClearEpoch: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const taskMutation = window.DaymarkTaskMutation || null;
+  let taskLockManager = null;
+  try { taskLockManager = (window.navigator || globalThis.navigator || {}).locks || null; }
+  catch (error) { taskLockManager = null; }
+  let taskGeneration = 0;
+  let taskEpoch = 0;
+  let clearEpoch = 0;
+  let taskBaseSnapshot = [];
+  let taskQueuedSnapshot = [];
+  let taskWriteQueue = Promise.resolve();
+  let pendingTaskWrites = 0;
+  let taskWritesBlocked = false;
+  let taskRecoveryMaintenance = Promise.resolve();
+  let focusRecoveryMaintenance = Promise.resolve();
   const $ = (selector) => document.querySelector(selector);
   const taskList = $('#task-list');
   const suggestionList = $('#suggestion-list');
@@ -68,12 +82,9 @@
         // Some records failed validation and are about to be dropped. If backup
         // storage is full/unavailable, keep the original primary payload and
         // retry backup creation before any later save can replace it.
-        const backupSaved = backUpRawPayload(saved);
-        if (!backupSaved) state.recoveryBackupPendingPayload = saved;
-        setStorageStatus(backupSaved
-          ? 'Some saved tasks were ignored; the originals were kept in a backup'
-          : 'Some saved tasks were ignored; recovery backup could not be created. Free storage before saving', true);
-        if (backupSaved) offerRecoveryExport('Some saved tasks were ignored; originals were kept in a browser backup.');
+        state.recoveryBackupPendingPayload = saved;
+        setStorageStatus('Some saved tasks were ignored; originals are being preserved in a recovery backup', true);
+        offerRecoveryExport('Some saved tasks were ignored; originals are being preserved in a browser backup.');
       } else if (hasPartialRecoveryBackup()) {
         // Keep task records rejected by validation until the user can recover them.
         setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
@@ -86,7 +97,7 @@
         setStorageStatus('Saved on this device');
         // Only a backup containing fully valid task arrays is stale. Partial or opaque
         // originals remain recoverable even after the primary store becomes healthy.
-        clearRecoveryBackup();
+        state.recoveryBackupClearPending = true;
       }
       return validated.tasks;
     } catch (error) {
@@ -94,15 +105,10 @@
       setStorageStatus('Saved data could not be read', true);
       // Preserve the unreadable payload instead of silently discarding it, so a
       // future fix or manual recovery can still reach the original data.
-      const backupSaved = backUpRawPayload(saved);
-      if (!backupSaved) {
-        state.recoveryBackupPendingPayload = saved;
-        setStorageStatus('Saved data could not be read; recovery backup could not be created. Free storage before saving', true);
-      }
-      showToast(backupSaved
-        ? 'Saved tasks could not be read. The original data was kept in a browser backup.'
-        : 'Saved tasks could not be read. Browser storage could not create a recovery backup; the original entry was left unchanged');
-      if (backupSaved) offerRecoveryExport('Saved tasks could not be read. The original data was kept in a browser backup.');
+      state.recoveryBackupPendingPayload = saved;
+      setStorageStatus('Saved data could not be read; original data is being preserved in a recovery backup', true);
+      showToast('Saved tasks could not be read. The original data is being preserved in a browser backup.');
+      offerRecoveryExport('Saved tasks could not be read. The original data is being preserved in a browser backup.');
       return [];
     }
   }
@@ -206,37 +212,6 @@
       || (!isPartialRecoveryPayload(payload) && !isHealthyTaskPayload(payload)));
   }
 
-  function persistTasks() {
-    try {
-      if (state.recoveryBackupPendingPayload !== null) {
-        // Do not overwrite the only remaining copy of rejected/unreadable
-        // source data. Retry backing it up first; if storage still refuses,
-        // leave the primary entry untouched and let the user free space.
-        const backupSaved = backUpRawPayload(state.recoveryBackupPendingPayload);
-        if (!backupSaved) {
-          setStorageStatus('Cannot save safely: recovery backup could not be created. Free browser storage and retry.', true);
-          return false;
-        }
-        state.recoveryBackupPendingPayload = null;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
-      if (hasPartialRecoveryBackup()) {
-        setStorageStatus('Saved on this device; ignored originals remain in a recovery backup', true);
-      } else if (hasRecoveryBackupNeedingPreservation()) {
-        setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
-      } else {
-        setStorageStatus('Saved on this device');
-        // A full save can clear only a stale backup of fully valid task arrays; partial or opaque originals stay.
-        clearRecoveryBackup();
-      }
-      return true;
-    } catch (error) {
-      console.warn('Could not save Daymark tasks:', error);
-      setStorageStatus('Storage unavailable', true);
-      return false;
-    }
-  }
-
   function clearRecoveryBackup() {
     try {
       localStorage.removeItem(BACKUP_KEY);
@@ -245,8 +220,208 @@
     }
   }
 
+  function copyTaskList(tasks) {
+    try { return JSON.parse(JSON.stringify(Array.isArray(tasks) ? tasks : [])); }
+    catch (error) { return []; }
+  }
+
+  function readTaskGeneration() {
+    if (!taskMutation || typeof taskMutation.readGeneration !== 'function') return { ok: false, reason: 'coordinator-unavailable' };
+    try { return taskMutation.readGeneration(localStorage); }
+    catch (error) { return { ok: false, reason: 'storage-unavailable' }; }
+  }
+
+  function initializeTaskMutationState() {
+    const generation = readTaskGeneration();
+    if (!generation.ok) {
+      setStorageStatus('Task changes are blocked because browser storage coordination is unavailable', true);
+      return false;
+    }
+    taskGeneration = generation.value.generation;
+    taskEpoch = generation.value.taskEpoch;
+    clearEpoch = generation.value.clearEpoch;
+    state.focusStateClearEpoch = clearEpoch;
+    taskBaseSnapshot = copyTaskList(state.tasks);
+    taskQueuedSnapshot = copyTaskList(state.tasks);
+    return true;
+  }
+
+  function scheduleTaskRecoveryMaintenance() {
+    if (!taskMutation || !taskLockManager || !state.recoveryBackupPendingPayload && !state.recoveryBackupClearPending) {
+      return Promise.resolve({ ok: true, skipped: true });
+    }
+    const expectedGeneration = taskGeneration;
+    const expectedTaskEpoch = taskEpoch;
+    const expectedClearEpoch = clearEpoch;
+    const preservingOriginal = state.recoveryBackupPendingPayload !== null;
+    taskRecoveryMaintenance = taskMutation.withClearEpochLock(
+      taskLockManager,
+      [taskMutation.TASK_LOCK_NAME],
+      localStorage,
+      expectedClearEpoch,
+      () => {
+      const current = readTaskGeneration();
+      if (!current.ok || current.value.generation !== expectedGeneration
+          || current.value.taskEpoch !== expectedTaskEpoch || current.value.clearEpoch !== expectedClearEpoch) {
+        return { ok: false, reason: 'generation-changed' };
+      }
+      let raw;
+      try { raw = localStorage.getItem(STORAGE_KEY); }
+      catch (error) { return { ok: false, reason: 'tasks-unreadable' }; }
+      if (state.recoveryBackupPendingPayload !== null) {
+        if (raw === state.recoveryBackupPendingPayload) {
+          if (!backUpRawPayload(raw)) return { ok: false, reason: 'backup-failed' };
+          state.recoveryBackupPendingPayload = null;
+        }
+      } else if (state.recoveryBackupClearPending && isHealthyTaskPayload(raw)
+          && !hasPartialRecoveryBackup() && !hasRecoveryBackupNeedingPreservation()) {
+        clearRecoveryBackup();
+      }
+      state.recoveryBackupClearPending = false;
+      return { ok: true };
+    }
+    ).then((result) => {
+      if (!result.ok || !result.value || !result.value.ok) {
+        if (state.recoveryBackupPendingPayload !== null) {
+          setStorageStatus('Recovery backup could not be created; the original task data remains unchanged.', true);
+          showToast('Recovery backup could not be created; the original task data remains unchanged.');
+        }
+        return { ok: false, reason: result.reason || (result.value && result.value.reason) || 'maintenance-failed' };
+      }
+      if (state.recoveryBackupPendingPayload === null && !state.recoveryBackupClearPending) {
+        if (hasPartialRecoveryBackup()) setStorageStatus('Some saved tasks were ignored; the originals were kept in a recovery backup', true);
+        else if (hasRecoveryBackupNeedingPreservation()) setStorageStatus('Saved on this device; recovery backup retained for manual review', true);
+        if (preservingOriginal) offerRecoveryExport('The original task data was kept in a browser recovery backup.');
+      }
+      return { ok: true };
+    });
+    return taskRecoveryMaintenance;
+  }
+
+  function persistTasks(options) {
+    const opts = options || {};
+    const baseTasks = copyTaskList(taskQueuedSnapshot);
+    const desiredTasks = copyTaskList(state.tasks);
+    const baseGeneration = taskGeneration + pendingTaskWrites;
+    const generationAtStart = readTaskGeneration();
+    const taskEpochAtStart = generationAtStart.ok ? generationAtStart.value.taskEpoch : taskEpoch;
+    const clearEpochAtStart = generationAtStart.ok ? generationAtStart.value.clearEpoch : clearEpoch;
+    taskQueuedSnapshot = copyTaskList(desiredTasks);
+    pendingTaskWrites += 1;
+    let preserveRecoveryDraft = false;
+
+    const queued = taskWriteQueue.then(async () => {
+      if (taskWritesBlocked) return { ok: false, reason: 'previous-write-failed', currentTasks: copyTaskList(taskBaseSnapshot) };
+      if (!taskMutation || typeof taskMutation.commitTaskSnapshot !== 'function' || !taskLockManager) {
+        setStorageStatus('Task changes were not saved because the cross-tab storage lock is unavailable', true);
+        return { ok: false, reason: 'lock-unavailable', currentTasks: copyTaskList(taskBaseSnapshot) };
+      }
+      const result = await taskMutation.commitTaskSnapshot({
+        storage: localStorage,
+        lockManager: taskLockManager,
+        baseTasks,
+        desiredTasks,
+        expectedGeneration: baseGeneration,
+        expectedTaskEpoch: taskEpochAtStart,
+        validateTasks: logic.validateStoredTasks,
+        backupRaw: (raw) => {
+          const generation = readTaskGeneration();
+          if (!generation.ok || generation.value.clearPending
+              || generation.value.clearEpoch !== clearEpochAtStart
+              || generation.value.taskEpoch !== taskEpochAtStart) return false;
+          try {
+            const existing = localStorage.getItem(BACKUP_KEY);
+            if (recoveryBackupPayloads(existing).includes(raw)) return true;
+          } catch (error) {
+            // Retry through the normal backup path, which reports storage failures.
+          }
+          return backUpRawPayload(raw);
+        },
+        beforeCommit: ({ currentRaw }) => {
+          const generation = readTaskGeneration();
+          if (!generation.ok || generation.value.clearPending
+              || generation.value.taskEpoch !== taskEpochAtStart) return false;
+          if (state.recoveryBackupPendingPayload !== null) {
+            if (generation.value.clearEpoch !== clearEpochAtStart) return false;
+            if (state.recoveryBackupPendingPayload === currentRaw) {
+              // The coordinator has already backed up an invalid current payload.
+              state.recoveryBackupPendingPayload = null;
+            } else {
+              if (!backUpRawPayload(state.recoveryBackupPendingPayload)) return false;
+              state.recoveryBackupPendingPayload = null;
+            }
+          }
+          return true;
+        },
+        afterCommit: async (canonicalTasks) => {
+          let recoveryStatus = '';
+          if (hasPartialRecoveryBackup()) {
+            recoveryStatus = 'Saved on this device; ignored originals remain in a recovery backup';
+          } else if (hasRecoveryBackupNeedingPreservation()) {
+            recoveryStatus = 'Saved on this device; recovery backup retained for manual review';
+          } else {
+            clearRecoveryBackup();
+          }
+          state.recoveryBackupClearPending = false;
+          const afterCommitResult = typeof opts.afterCommit === 'function'
+            ? await opts.afterCommit(copyTaskList(canonicalTasks))
+            : null;
+          return { recoveryStatus, afterCommitResult };
+        }
+      });
+      if (result.ok) {
+        taskBaseSnapshot = copyTaskList(result.tasks);
+        taskGeneration = result.generation;
+        taskEpoch = result.taskEpoch;
+        clearEpoch = result.clearEpoch;
+        const recoveryStatus = result.afterCommitResult && result.afterCommitResult.recoveryStatus;
+        setStorageStatus(recoveryStatus || (result.generationMismatch
+          ? 'Changes from another tab were reconciled and saved on this device'
+          : 'Saved on this device'), Boolean(recoveryStatus));
+        result.appAfterCommitResult = result.afterCommitResult && result.afterCommitResult.afterCommitResult;
+      } else {
+        taskWritesBlocked = true;
+        preserveRecoveryDraft = state.recoveryBackupPendingPayload !== null
+          && (result.reason === 'backup-failed' || result.reason === 'pre-commit-failed');
+        if (Array.isArray(result.currentTasks)) taskBaseSnapshot = copyTaskList(result.currentTasks);
+        if (Number.isSafeInteger(result.generation)) taskGeneration = result.generation;
+        if (Number.isSafeInteger(result.taskEpoch)) taskEpoch = result.taskEpoch;
+        if (Number.isSafeInteger(result.clearEpoch)) clearEpoch = result.clearEpoch;
+        if (result.reason === 'cleared') {
+          setStorageStatus('Local data was cleared in another tab; this task change was not saved', true);
+        } else if (result.reason === 'conflict') {
+          setStorageStatus('This task changed in another tab; reload the list and retry', true);
+        } else {
+          setStorageStatus('Task changes could not be saved safely; reload the list and retry', true);
+        }
+      }
+      return result;
+    });
+    taskWriteQueue = queued.catch(() => ({ ok: false, reason: 'write-failed' }));
+    return queued.finally(() => {
+      pendingTaskWrites = Math.max(0, pendingTaskWrites - 1);
+      if (pendingTaskWrites === 0) {
+        const committed = taskBaseSnapshot;
+        if (preserveRecoveryDraft) {
+          state.tasks = copyTaskList(desiredTasks);
+          taskQueuedSnapshot = copyTaskList(baseTasks);
+        } else {
+          state.tasks = copyTaskList(committed);
+          taskQueuedSnapshot = copyTaskList(committed);
+        }
+        taskWritesBlocked = false;
+        render();
+        renderFocus();
+      }
+    });
+  }
+
   function showSaveResult(saved, successMessage) {
-    showToast(saved ? successMessage : 'Could not save to this browser. Changes may be lost when you leave.');
+    const ok = typeof saved === 'boolean' ? saved : Boolean(saved && saved.ok);
+    if (ok) showToast(successMessage);
+    else if (saved && saved.reason === 'cleared') showToast('Local data was cleared in another tab. This task change was not saved.');
+    else if (saved && saved.reason === 'conflict') showToast('This task changed in another tab. Reload the list and retry.');
+    else showToast('Could not save to this browser. Changes may be lost when you leave.');
   }
 
   function makeId() {
@@ -546,6 +721,7 @@
       const stillCurrent = state.toastAction === action;
       dismissToast();
       if (stillCurrent && expiresPreparedDownload) {
+        releasePreparedRecoveryExport();
         showToast('Recovery export expired. Tap Export recovery to prepare a new download.');
       }
     }, action ? 7000 : 2600);
@@ -679,7 +855,7 @@
     $('#task-search').focus();
   }
 
-  function addTask(event) {
+  async function addTask(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const titleInput = $('#new-title');
@@ -720,7 +896,7 @@
     const repeatRule = readRepeatRule($('#new-repeat'));
     if (hasDate && repeatRule) task.repeat = repeatRule;
     state.tasks.push(task);
-    const saved = persistTasks();
+    const save = persistTasks();
     form.reset();
     $('#new-priority').value = 'medium';
     $('#new-due-time').disabled = true;
@@ -734,6 +910,7 @@
     $('#task-search').value = '';
     render();
     titleInput.focus();
+    const saved = await save;
     showSaveResult(saved, tags ? 'Task added and tagged.' : 'Task added to your list.');
   }
 
@@ -809,7 +986,7 @@
     error.hidden = false;
   }
 
-  function saveEdit(event) {
+  async function saveEdit(event) {
     event.preventDefault();
     const titleInput = $('#edit-title');
     const title = titleInput.value.trim();
@@ -869,9 +1046,10 @@
       delete task.subtasks;
     }
     task.updatedAt = new Date().toISOString();
-    const saved = persistTasks();
+    const save = persistTasks();
     render();
     closeEditor();
+    const saved = await save;
     showSaveResult(saved, 'Task updated.');
   }
 
@@ -927,7 +1105,7 @@
     }
   }
 
-  function handleTaskAction(event) {
+  async function handleTaskAction(event) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const row = button.closest('[data-task-id]');
@@ -937,10 +1115,19 @@
       task.completed = !task.completed;
       task.updatedAt = new Date().toISOString();
       const repeatNote = task.completed ? scheduleNextOccurrence(task) : null;
-      const saved = persistTasks();
-      if (saved && task.completed) void notifyWebhookTaskCompleted(task);
+      const saved = await persistTasks({
+        afterCommit: (canonicalTasks) => {
+          if (!task.completed) return null;
+          const canonicalTask = canonicalTasks.find((item) => item.id === task.id);
+          return canonicalTask ? notifyWebhookTaskCompleted(canonicalTask, { deferDelivery: true }) : null;
+        }
+      });
       render();
-      showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
+      if (saved.ok && task.completed && saved.appAfterCommitResult && !saved.appAfterCommitResult.queued) {
+        showToast('Task completed, but its webhook event could not be added to the queue. Check webhook status and retry.');
+      } else {
+        showSaveResult(saved, repeatNote || (task.completed ? 'Task completed.' : 'Task reopened.'));
+      }
     } else if (button.dataset.action === 'edit') {
       openEditor(task);
     } else if (button.dataset.action === 'duplicate') {
@@ -949,7 +1136,7 @@
       delete copy.reminderShownFire;
       if (Array.isArray(copy.subtasks)) copy.subtasks = copy.subtasks.map((subtask) => ({ id: makeId(), title: subtask.title, done: false }));
       state.tasks.push(copy);
-      const saved = persistTasks();
+      const saved = await persistTasks();
       render();
       showSaveResult(saved, 'Task duplicated as a new open task.');
     } else if (button.dataset.action === 'focus') {
@@ -966,17 +1153,21 @@
     } else if (button.dataset.action === 'delete') {
       const deletedIndex = state.tasks.findIndex((item) => item.id === task.id);
       const [deletedTask] = state.tasks.splice(deletedIndex, 1);
-      const saved = persistTasks();
+      const saved = await persistTasks();
       render();
-      showToast(saved ? 'Task deleted.' : 'Task deleted for this session. Saving failed.', {
+      if (!saved.ok) {
+        showSaveResult(saved, 'Task deleted.');
+        return;
+      }
+      showToast('Task deleted.', {
         label: 'Undo',
-        run: () => {
+        run: async () => {
           if (state.tasks.some((item) => item.id === deletedTask.id)) {
             showToast('That task is already back on your list.');
             return;
           }
           state.tasks.splice(Math.min(deletedIndex, state.tasks.length), 0, deletedTask);
-          const restored = persistTasks();
+          const restored = await persistTasks();
           render();
           showSaveResult(restored, 'Task restored.');
         }
@@ -984,17 +1175,21 @@
     }
   }
 
-  function clearCompleted() {
+  async function clearCompleted() {
     const removed = state.tasks.filter((task) => task.completed);
     if (!removed.length) return;
     state.tasks = state.tasks.filter((task) => !task.completed);
-    const saved = persistTasks();
+    const saved = await persistTasks();
     render();
-    showToast(saved ? `Cleared ${removed.length} completed task${removed.length === 1 ? '' : 's'}.` : 'Cleared for this session. Saving failed.', {
+    if (!saved.ok) {
+      showSaveResult(saved, 'Completed tasks cleared.');
+      return;
+    }
+    showToast(`Cleared ${removed.length} completed task${removed.length === 1 ? '' : 's'}.`, {
       label: 'Undo',
-      run: () => {
+      run: async () => {
         state.tasks = state.tasks.concat(removed);
-        const restored = persistTasks();
+        const restored = await persistTasks();
         render();
         showSaveResult(restored, 'Completed tasks restored.');
       }
@@ -1091,7 +1286,8 @@
     return result;
   }
 
-  function applyImportedRecovery(recovery, rawText) {
+  async function applyImportedRecovery(recovery, rawText) {
+    const focusEpochAtImport = taskMutation && taskMutation.captureClearEpoch(localStorage);
     let taskRaw = null;
     let focusRaw = null;
     if (recovery.format === 'daymark-combined-recovery-v1') {
@@ -1206,8 +1402,7 @@
     if (incomingTasks.length) {
       const previousTasks = state.tasks;
       state.tasks = previousTasks.concat(incomingTasks);
-      tasksSaved = persistTasks();
-      if (!tasksSaved) state.tasks = previousTasks;
+      tasksSaved = await persistTasks();
     }
     let focusSaved = null;
     if (incomingFocusLog.length || incomingSession) {
@@ -1215,10 +1410,18 @@
       const previousLog = state.focusLog;
       if (incomingSession) state.focusSession = incomingSession;
       state.focusLog = previousLog.concat(incomingFocusLog);
-      focusSaved = persistFocusState();
+      focusSaved = focusEpochAtImport && focusEpochAtImport.ok
+        ? await persistFocusState(focusEpochAtImport.value)
+        : false;
       if (!focusSaved) {
-        state.focusSession = previousSession;
-        state.focusLog = previousLog;
+        const current = readTaskGeneration();
+        if (!current.ok || !focusEpochAtImport || !focusEpochAtImport.ok
+            || current.value.clearEpoch === focusEpochAtImport.value) {
+          state.focusSession = previousSession;
+          state.focusLog = previousLog;
+        } else {
+          resetFocusAfterClear();
+        }
       }
     }
     render();
@@ -1228,7 +1431,7 @@
     let successCount = 0;
     let failureCount = 0;
     if (incomingTasks.length) {
-      if (tasksSaved) {
+      if (tasksSaved && tasksSaved.ok) {
         outcomes.push(`${incomingTasks.length} task${incomingTasks.length === 1 ? '' : 's'} restored`);
         successCount += 1;
       } else {
@@ -1261,7 +1464,7 @@
         ? `Recovery import failed — ${message}.`
         : `Recovery import finished — ${message}.`);
   }
-  function applyImportedText(text) {
+  async function applyImportedText(text) {
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -1278,7 +1481,7 @@
         || Object.prototype.hasOwnProperty.call(parsed, 'log')
       );
       if (isRecovery) {
-        applyImportedRecovery(parsed, text);
+        await applyImportedRecovery(parsed, text);
         return;
       }
       showToast('That backup is not a task list or recovery bundle. Nothing was changed.');
@@ -1324,10 +1527,9 @@
 
     const previousTasks = state.tasks;
     state.tasks = previousTasks.concat(incoming);
-    const saved = persistTasks();
-    if (!saved) state.tasks = previousTasks;
+    const saved = await persistTasks();
     render();
-    if (!saved) {
+    if (!saved.ok) {
       showToast('Import could not be saved. No tasks were imported.');
       return;
     }
@@ -1337,7 +1539,7 @@
     showToast(`Import finished — ${parts.join(', ')}.`);
   }
 
-  function importTasks(file) {
+  async function importTasks(file) {
     if (typeof FileReader === 'undefined') {
       showToast('Import is not available in this browser.');
       return;
@@ -1351,12 +1553,15 @@
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => applyImportedText(String(reader.result || ''));
-    reader.onerror = () => showToast('That backup file could not be read.');
     try {
-      reader.readAsText(file);
+      const text = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('read-failed'));
+        reader.readAsText(file);
+      });
+      await applyImportedText(text);
     } catch (error) {
-      showToast('That backup file could not be opened. Nothing was changed.');
+      showToast('That backup file could not be read or opened. Nothing was changed.');
     }
   }
 
@@ -1424,12 +1629,20 @@
     return null;
   }
 
-  function persistFocusPreset() {
-    try {
-      localStorage.setItem(FOCUS_PRESET_KEY, JSON.stringify({ preset: state.focusPreset }));
-    } catch (error) {
-      console.warn('Could not save the Daymark focus preset preference:', error);
-    }
+  async function persistFocusPreset(expectedClearEpoch) {
+    if (!taskMutation || !taskLockManager || !taskMutation.TASK_AND_FOCUS_LOCK_ORDER) return false;
+    const result = await taskMutation.withClearEpochLock(
+      taskLockManager,
+      taskMutation.TASK_AND_FOCUS_LOCK_ORDER,
+      localStorage,
+      expectedClearEpoch,
+      () => {
+        if (state.focusStateClearEpoch !== expectedClearEpoch) return false;
+        localStorage.setItem(FOCUS_PRESET_KEY, JSON.stringify({ preset: state.focusPreset }));
+        return true;
+      }
+    );
+    return Boolean(result.ok && result.value === true);
   }
 
   function loadFocusState() {
@@ -1477,9 +1690,9 @@
         // Keep the complete source whenever validation rejects any focus record.
         // Valid sessions/log entries can still be used, but rejected originals
         // must remain recoverable through future saves and reloads.
-        const backupSaved = backUpRawFocusPayload(saved);
-        if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-        reportFocusRecovery(backupSaved);
+        state.focusRecoveryBackupPendingPayload = saved;
+        state.focusRecoveryClearEpoch = clearEpoch;
+        setStorageStatus('Focus data needs a recovery backup; the original is being preserved until storage is safely coordinated', true);
       } else if (hasFocusRecoveryBackup()) {
         reportFocusRecovery(true);
       }
@@ -1492,30 +1705,11 @@
           ? focus.appendLogEntry(log.entries, entry)
           : log.entries;
 
-        // If validation already found rejected data and its backup could not
-        // be written, retry that backup before replacing the primary payload.
-        if (state.focusRecoveryBackupPendingPayload !== null) {
-          const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
-          if (!backupSaved) {
-            reportFocusRecovery(false);
-            return { session, log: entries };
-          }
-          state.focusRecoveryBackupPendingPayload = null;
-        }
-
-        // One localStorage key write atomically stores session:null and its
-        // completion log. On quota failure the original primary value remains.
-        try {
-          localStorage.setItem(FOCUS_KEY, JSON.stringify({ session: null, log: entries }));
-          if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
-        } catch (saveError) {
-          const backupSaved = backUpRawFocusPayload(saved);
-          if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-          setStorageStatus(
-            'Focus session completed while Daymark was closed, but its history could not be saved. Original data was preserved; keep this page open and retry',
-            true
-          );
-        }
+        state.focusRecoveryCompletionPending = {
+          sourceRaw: saved,
+          payload: { session: null, log: entries }
+        };
+        state.focusRecoveryClearEpoch = clearEpoch;
         return { session, log: entries };
       }
       return { session, log: log.entries };
@@ -1523,39 +1717,101 @@
       console.warn('Could not load saved Daymark focus state:', error);
       // Preserve unreadable data and never let a later focus save replace its
       // only remaining copy if browser storage cannot create the backup.
-      const backupSaved = backUpRawFocusPayload(saved);
-      if (!backupSaved) state.focusRecoveryBackupPendingPayload = saved;
-      reportFocusRecovery(backupSaved);
+      state.focusRecoveryBackupPendingPayload = saved;
+      state.focusRecoveryClearEpoch = clearEpoch;
+      setStorageStatus('Focus data could not be loaded; the original is being preserved for recovery', true);
       return empty;
     }
   }
 
-  function persistFocusState() {
-    if (!focus) return false;
-    if (state.focusRecoveryBackupPendingPayload !== null) {
-      const backupSaved = backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload);
-      if (!backupSaved) {
-        reportFocusRecovery(false);
-        return false;
-      }
-      state.focusRecoveryBackupPendingPayload = null;
+  function scheduleFocusRecoveryMaintenance() {
+    const backupPayload = state.focusRecoveryBackupPendingPayload;
+    const completion = state.focusRecoveryCompletionPending;
+    if (!taskMutation || !taskLockManager || (!backupPayload && !completion)) {
+      return Promise.resolve({ ok: true, skipped: true });
     }
-    try {
-      const payload = {
-        session: state.focusSession ? focus.serialize(state.focusSession) : null,
-        log: state.focusLog
-      };
-      localStorage.setItem(FOCUS_KEY, JSON.stringify(payload));
-      // Recovery backups are intentionally retained. Clearing one implicitly
-      // here would destroy rejected history before a user recovery/export flow
-      // exists. Only an explicit recovery action may remove it in the future.
+    const expectedClearEpoch = state.focusRecoveryClearEpoch;
+    if (!Number.isSafeInteger(expectedClearEpoch)) return Promise.resolve({ ok: false, reason: 'generation-unreadable' });
+    focusRecoveryMaintenance = taskMutation.withClearEpochLock(
+      taskLockManager,
+      taskMutation.TASK_AND_FOCUS_LOCK_ORDER,
+      localStorage,
+      expectedClearEpoch,
+      () => {
+        let backupSaved = false;
+        const rawToPreserve = backupPayload || (completion && completion.sourceRaw);
+        if (backupPayload) {
+          if (state.focusRecoveryClearEpoch !== expectedClearEpoch) return { ok: false, reason: 'cleared' };
+          if (!backUpRawFocusPayload(backupPayload)) return { ok: false, reason: 'backup-failed' };
+          backupSaved = true;
+        }
+        if (completion) {
+          try {
+            localStorage.setItem(FOCUS_KEY, JSON.stringify(completion.payload));
+          } catch (error) {
+            if (!backupSaved && rawToPreserve) backupSaved = backUpRawFocusPayload(rawToPreserve);
+            return { ok: false, reason: 'focus-write-failed', backupSaved };
+          }
+        }
+        return { ok: true, backupSaved };
+      }
+    ).then((result) => {
+      const value = result.ok ? result.value : null;
+      if (result.ok && value && value.ok) {
+        if (backupPayload === state.focusRecoveryBackupPendingPayload) state.focusRecoveryBackupPendingPayload = null;
+        if (completion === state.focusRecoveryCompletionPending) state.focusRecoveryCompletionPending = null;
+        if (value.backupSaved || hasFocusRecoveryBackup()) reportFocusRecovery(true);
+        return { ok: true };
+      }
+      const reason = result.reason || (value && value.reason) || 'maintenance-failed';
+      if (reason === 'cleared' || reason === 'clear-in-progress') return { ok: false, reason };
+      if (value && value.backupSaved) {
+        if (backupPayload === state.focusRecoveryBackupPendingPayload) state.focusRecoveryBackupPendingPayload = null;
+        reportFocusRecovery(true);
+        if (completion && reason === 'focus-write-failed') {
+          setStorageStatus('Focus session completed while Daymark was closed, but its history could not be saved; the original recovery backup is retained', true);
+        }
+      } else {
+        reportFocusRecovery(false);
+      }
+      return { ok: false, reason };
+    });
+    return focusRecoveryMaintenance;
+  }
+
+  async function persistFocusState(expectedClearEpoch, payloadOverride) {
+    if (!focus || !taskMutation || !taskLockManager) return false;
+    const epoch = Number.isSafeInteger(expectedClearEpoch)
+      ? expectedClearEpoch : taskMutation.captureClearEpoch(localStorage).value;
+    if (!Number.isSafeInteger(epoch)) return false;
+    const payload = payloadOverride || {
+      session: state.focusSession ? focus.serialize(state.focusSession) : null,
+      log: copyTaskList(state.focusLog)
+    };
+    const result = await taskMutation.withClearEpochLock(
+      taskLockManager,
+      taskMutation.TASK_AND_FOCUS_LOCK_ORDER,
+      localStorage,
+      epoch,
+      () => {
+        if (state.focusStateClearEpoch !== epoch) return false;
+        if (state.focusRecoveryBackupPendingPayload !== null) {
+          if (state.focusRecoveryClearEpoch !== epoch) return false;
+          if (!backUpRawFocusPayload(state.focusRecoveryBackupPendingPayload)) return false;
+          state.focusRecoveryBackupPendingPayload = null;
+        }
+        localStorage.setItem(FOCUS_KEY, JSON.stringify(payload));
+        return true;
+      }
+    );
+    if (result.ok && result.value === true) {
       if (hasFocusRecoveryBackup()) reportFocusRecovery(true);
       return true;
-    } catch (error) {
-      console.warn('Could not save Daymark focus state:', error);
-      setStorageStatus('Focus data could not be saved; keep this page open and retry', true);
-      return false;
     }
+    if (result.reason !== 'cleared' && result.reason !== 'clear-in-progress') {
+      setStorageStatus('Focus data could not be saved; keep this page open and retry', true);
+    }
+    return false;
   }
 
   function renderFocus() {
@@ -1673,14 +1929,19 @@
     if (!focus || !state.focusSession) return;
     const outcome = focus.tick(state.focusSession, Date.now());
     if (outcome.finished) {
-      endFocusSession(true);
+      void endFocusSession(true);
       return;
     }
     renderFocus();
   }
 
-  function startFocus(taskId) {
+  async function startFocus(taskId) {
     if (!focus) return;
+    const epoch = taskMutation && taskMutation.captureClearEpoch(localStorage);
+    if (!epoch || !epoch.ok || state.focusStateClearEpoch !== epoch.value) {
+      showToast('Focus data is being cleared or storage coordination is unavailable. Try again shortly.');
+      return;
+    }
     if (state.focusSession) {
       showToast('Finish or stop the current focus session first.');
       return;
@@ -1690,9 +1951,9 @@
     const linkedTaskId = taskId || state.focusTaskId || null;
     state.focusSession = focus.createSession({ taskId: linkedTaskId, kind, durationMinutes: minutes }, Date.now());
     state.focusTaskId = linkedTaskId || '';
-    const saved = persistFocusState();
     renderFocus();
     ensureFocusTimer();
+    const saved = await persistFocusState(epoch.value);
     const task = linkedTaskId ? state.tasks.find((item) => item.id === linkedTaskId) : null;
     showToast(saved
       ? (task
@@ -1701,28 +1962,35 @@
       : 'Focus started in this tab, but could not be saved. Keep this page open.');
   }
 
-  function toggleFocusPause() {
+  async function toggleFocusPause() {
     if (!focus || !state.focusSession) return;
+    const epoch = taskMutation && taskMutation.captureClearEpoch(localStorage);
+    if (!epoch || !epoch.ok || state.focusStateClearEpoch !== epoch.value) {
+      showToast('Focus data is being cleared or storage coordination is unavailable. Try again shortly.');
+      return;
+    }
     const now = Date.now();
     if (state.focusSession.state === 'running') focus.pause(state.focusSession, now);
     else focus.resume(state.focusSession, now);
-    const saved = persistFocusState();
     renderFocus();
+    const saved = await persistFocusState(epoch.value);
     if (!saved) showToast('Focus state changed in this tab but could not be saved. Keep this page open.');
   }
 
-  function endFocusSession(completed) {
+  async function endFocusSession(completed) {
     if (!focus || !state.focusSession) return;
+    const epoch = taskMutation && taskMutation.captureClearEpoch(localStorage);
+    if (!epoch || !epoch.ok || state.focusStateClearEpoch !== epoch.value) return;
     const now = Date.now();
     focus.finish(state.focusSession, now, completed);
     const entry = focus.makeLogEntry(state.focusSession);
     if (entry) state.focusLog = focus.appendLogEntry(state.focusLog, entry);
     const task = state.focusSession.taskId ? state.tasks.find((item) => item.id === state.focusSession.taskId) : null;
     state.focusSession = null;
-    const saved = persistFocusState();
     stopFocusTimer();
     renderFocus();
     render();
+    const saved = await persistFocusState(epoch.value);
     // Brief completion title so the tab shows success even if the user is in another window.
     // Cleared after a short delay so it does not linger. Guarded for tests.
     if (completed && typeof document !== 'undefined' && document.title != null) {
@@ -1756,7 +2024,7 @@
     return fire;
   }
 
-  function checkReminders() {
+  async function checkReminders() {
     // Reminders are honest about what a web page can do: they appear as an
     // on-page message while this tab is open, never as OS notifications.
     const now = new Date();
@@ -1791,8 +2059,9 @@
       });
     }
     if (changed) {
-      persistTasks();
+      const saved = await persistTasks();
       render();
+      if (!saved.ok) showToast('A reminder change could not be saved. Reload the task list before retrying.');
     }
   }
 
@@ -1868,15 +2137,18 @@
     }
   }
 
-  function persistFeedCache() {
-    if (!feed || !state.feedCache) return false;
-    try {
-      localStorage.setItem(FEED_KEY, JSON.stringify(state.feedCache));
-      return true;
-    } catch (error) {
-      console.warn('Could not save the Daymark feed cache:', error);
-      return false;
-    }
+  async function persistFeedCache(expectedClearEpoch, cache) {
+    if (!feed || !cache || !taskMutation || !taskLockManager) return { ok: false, reason: 'lock-unavailable' };
+    return taskMutation.withClearEpochLock(
+      taskLockManager,
+      [taskMutation.TASK_LOCK_NAME],
+      localStorage,
+      expectedClearEpoch,
+      () => {
+        localStorage.setItem(FEED_KEY, JSON.stringify(cache));
+        return true;
+      }
+    );
   }
 
   function renderFeed() {
@@ -1919,14 +2191,29 @@
       renderFeed();
       return;
     }
+    const epochAtStart = taskMutation && taskMutation.captureClearEpoch(localStorage);
     state.feedLoading = true;
     state.feedNotice = 'Fetching feed…';
     renderFeed();
     try {
       if (typeof fetch !== 'function') throw new Error('fetch unavailable');
       const parsed = await feed.fetchFeed(target, fetch);
-      state.feedCache = { version: 1, url: target, fetchedAt: new Date().toISOString(), feed: parsed };
-      const savedOffline = persistFeedCache();
+      const fetchedCache = { version: 1, url: target, fetchedAt: new Date().toISOString(), feed: parsed };
+      const persisted = epochAtStart && epochAtStart.ok
+        ? await persistFeedCache(epochAtStart.value, fetchedCache)
+        : { ok: false, reason: (epochAtStart && epochAtStart.reason) || 'lock-unavailable' };
+      const currentGeneration = readTaskGeneration();
+      const clearedDuringFetch = !epochAtStart || !epochAtStart.ok
+        || !currentGeneration.ok || currentGeneration.value.clearEpoch !== epochAtStart.value
+        || (persisted && persisted.reason === 'cleared');
+      if (clearedDuringFetch) {
+        state.feedCache = null;
+        state.feedNotice = 'The feed finished loading after local data was cleared; it was not saved or restored.';
+        showToast(state.feedNotice);
+        return;
+      }
+      state.feedCache = fetchedCache;
+      const savedOffline = Boolean(persisted && persisted.ok && persisted.value === true);
       state.feedNotice = savedOffline
         ? `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}. Saved for offline reading.`
         : `Updated ${formatFeedTime(state.feedCache.fetchedAt)} from ${feedHost(target)}, but browser storage could not save an offline copy.`;
@@ -1948,25 +2235,54 @@
     return refreshFeed($('#feed-url').value);
   }
 
-  function clearFeed() {
+  async function clearFeed() {
     if (state.feedLoading) return;
+    const epoch = taskMutation && taskMutation.captureClearEpoch(localStorage);
+    if (!epoch || !epoch.ok || !taskLockManager) {
+      state.feedNotice = 'The feed cache could not be cleared safely while local data is changing.';
+      renderFeed();
+      return;
+    }
+    const cleared = await taskMutation.withClearEpochLock(
+      taskLockManager,
+      [taskMutation.TASK_LOCK_NAME],
+      localStorage,
+      epoch.value,
+      () => { localStorage.removeItem(FEED_KEY); return true; }
+    );
+    if (!cleared.ok || cleared.value !== true) {
+      state.feedNotice = 'The feed cache could not be cleared safely; saved data was left unchanged.';
+      renderFeed();
+      return;
+    }
     const input = $('#feed-url');
     if (input) input.value = '';
     state.feedCache = null;
     state.feedNotice = '';
-    try {
-      localStorage.removeItem(FEED_KEY);
-    } catch (error) {
-      console.warn('Could not clear the Daymark feed cache:', error);
-    }
     renderFeed();
+  }
+
+  function resetFocusAfterClear() {
+    stopFocusTimer();
+    state.focusSession = null;
+    state.focusLog = [];
+    state.focusPreset = 'focus';
+    state.focusTaskId = '';
+    state.focusStateClearEpoch = clearEpoch;
+    state.focusRecoveryBackupPendingPayload = null;
+    state.focusRecoveryCompletionPending = null;
+    state.focusRecoveryClearEpoch = null;
+    renderFocus();
   }
 
   function setUp() {
     state.tasks = loadTasks();
+    initializeTaskMutationState();
+    taskRecoveryMaintenance = scheduleTaskRecoveryMaintenance();
     const focusState = loadFocusState();
     state.focusSession = focusState.session;
     state.focusLog = focusState.log;
+    focusRecoveryMaintenance = scheduleFocusRecoveryMaintenance();
     const savedPreset = loadFocusPreset();
     if (savedPreset) state.focusPreset = savedPreset;
     state.feedCache = loadFeedCache();
@@ -1995,10 +2311,10 @@
     $('#clear-completed').addEventListener('click', clearCompleted);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
-    $('#import-file').addEventListener('change', (event) => {
+    $('#import-file').addEventListener('change', async (event) => {
       const file = event.currentTarget.files && event.currentTarget.files[0];
       event.currentTarget.value = '';
-      if (file) importTasks(file);
+      if (file) await importTasks(file);
     });
     document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
       state.filter = button.dataset.filter;
@@ -2045,9 +2361,36 @@
     });
     document.addEventListener('keydown', handleShortcut);
     window.addEventListener('storage', (event) => {
-      if (event.key === STORAGE_KEY || event.key === null) {
-        state.tasks = loadTasks();
+      const generationKey = taskMutation && taskMutation.GENERATION_KEY;
+      if (event.key === STORAGE_KEY || event.key === generationKey || event.key === null) {
+        const generation = readTaskGeneration();
+        if (generation.ok) {
+          const tasksCleared = generation.value.taskEpoch !== taskEpoch;
+          const cleared = generation.value.clearEpoch !== clearEpoch;
+          taskGeneration = generation.value.generation;
+          taskEpoch = generation.value.taskEpoch;
+          clearEpoch = generation.value.clearEpoch;
+          if (tasksCleared || cleared) {
+            state.recoveryBackupPendingPayload = null;
+            state.recoveryBackupClearPending = false;
+          }
+          if (cleared) {
+            resetFocusAfterClear();
+            state.feedCache = null;
+            state.feedNotice = '';
+            const feedInput = $('#feed-url');
+            if (feedInput) feedInput.value = '';
+          }
+        }
+        if (pendingTaskWrites === 0) {
+          state.tasks = loadTasks();
+          taskBaseSnapshot = copyTaskList(state.tasks);
+          taskQueuedSnapshot = copyTaskList(state.tasks);
+          taskWritesBlocked = false;
+          taskRecoveryMaintenance = scheduleTaskRecoveryMaintenance();
+        }
         render();
+        renderFeed();
       }
     });
     $('#feed-form').addEventListener('submit', handleFeedSubmit);
@@ -2076,12 +2419,16 @@
             else if (typeof button.setAttribute === 'function') button.setAttribute('aria-busy', previousAriaBusy);
           }
         };
-        try {
-          handler(event);
-        } finally {
+        let result;
+        try { result = handler(event); }
+        catch (error) { releaseBusy(); throw error; }
+        const releaseAfterHandler = () => {
           if (typeof setTimeout === 'function') setTimeout(releaseBusy, 160);
           else releaseBusy();
-        }
+        };
+        if (result && typeof result.then === 'function') result.then(releaseAfterHandler, releaseAfterHandler);
+        else releaseAfterHandler();
+        return result;
       });
     }
     withBriefBusy($('#focus-start'), () => startFocus(null));
@@ -2090,11 +2437,17 @@
     $('#focus-task').addEventListener('change', (event) => {
       state.focusTaskId = event.currentTarget.value;
     });
-    document.querySelectorAll('.focus-preset').forEach((button) => button.addEventListener('click', () => {
+    document.querySelectorAll('.focus-preset').forEach((button) => button.addEventListener('click', async () => {
       if (state.focusSession) return;
+      const epoch = taskMutation && taskMutation.captureClearEpoch(localStorage);
+      if (!epoch || !epoch.ok || state.focusStateClearEpoch !== epoch.value) {
+        showToast('Focus data is being cleared or storage coordination is unavailable. Try again shortly.');
+        return;
+      }
       state.focusPreset = button.dataset.focusPreset;
-      persistFocusPreset();
       renderFocus();
+      const saved = await persistFocusPreset(epoch.value);
+      if (!saved) showToast('The Focus preset changed in this tab but could not be saved.');
     }));
     window.addEventListener('focus', () => {
       refreshIfLocalDayChanged();
@@ -2116,4 +2469,3 @@
 
   setUp();
 })();
-

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const weatherApi = require('../weather-logic.js');
 const ui = require('../weather-ui.js');
+const { createLockManager, deferred, clearKeys, taskMutation } = require('./task-clear-race-helpers.js');
 
 const GEOCODING_BODY = JSON.stringify({
   results: [{ name: 'Kolkata', latitude: 22.5625, longitude: 88.375, country: 'India' }]
@@ -53,6 +54,7 @@ function fakeEnv(options) {
     removeItem(key) { delete storageData[key]; }
   };
   const storage = opts.storage || defaultStorage;
+  const lockManager = createLockManager();
   const env = {
     document: {
       readyState: 'complete',
@@ -60,12 +62,14 @@ function fakeEnv(options) {
     },
     window: {},
     localStorage: storage,
-    weatherApi,
+    weatherApi: opts.weatherApi || weatherApi,
+    taskMutationApi: taskMutation,
+    lockManager,
     fetch: opts.fetch,
     now: () => '2026-11-03T12:00:00.000Z'
   };
   if (opts.omitLocalStorage) delete env.localStorage;
-  return { env, elements, storageData };
+  return { env, elements, storageData, storage, lockManager };
 }
 
 function streamResponse(body) {
@@ -156,6 +160,34 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(saved.place.name, 'Kolkata');
 });
 
+test('a deferred weather response cannot recreate its absent cache or preference after Clear All', async () => {
+  const waiting = deferred();
+  const started = deferred();
+  const cache = {
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 28.4, feelsLikeC: 31.2, windKph: 11.3, humidityPercent: 64,
+      isDay: true, weatherCode: 2, label: 'Partly cloudy'
+    },
+    fetchedAt: '2026-11-03T12:00:00.000Z'
+  };
+  const delayedApi = {
+    validateWeatherCache: weatherApi.validateWeatherCache,
+    fetchWeatherByPlace() { started.resolve(); return waiting.promise; }
+  };
+  const { env, storage, storageData, lockManager } = fakeEnv({ place: 'Kolkata', weatherApi: delayedApi, fetch: () => Promise.resolve({}) });
+  const handle = ui.attachWeatherUi(env);
+  assert.equal(storage.getItem(ui.STORAGE_KEY), null, 'the cache is absent before fetch begins');
+  const refreshing = handle.onRefresh();
+  await started.promise;
+  await clearKeys(storage, [ui.STORAGE_KEY, ui.PREFS_KEY], lockManager);
+  waiting.resolve(cache);
+  await refreshing;
+  assert.equal(storageData[ui.STORAGE_KEY], undefined);
+  assert.equal(storageData[ui.PREFS_KEY], undefined);
+});
+
 test('an empty place field reuses the cached place name', async () => {
   const stored = JSON.stringify({
     version: 1,
@@ -243,14 +275,14 @@ test('a saved place from a previous visit is restored on attach', () => {
   assert.equal(elements['weather-status'].textContent, 'Last place restored. Tap Refresh for current conditions.');
 });
 
-test('typing a place persists it for the next visit', () => {
+test('typing a place persists it for the next visit', async () => {
   const { env, elements, storageData } = fakeEnv({});
   ui.attachWeatherUi(env);
   const input = elements['weather-place'];
   input.value = 'Berlin';
   const inputListener = input.listeners.find((l) => l.type === 'input');
   assert.ok(inputListener, 'input listener registered');
-  inputListener.handler();
+  await inputListener.handler();
   const saved = JSON.parse(storageData[ui.PREFS_KEY]);
   assert.equal(saved.place, 'Berlin');
 });
@@ -384,7 +416,7 @@ test('storage quota failure does not turn a successful refresh into a network er
   assert.equal(elements['weather-refresh'].disabled, false);
 });
 
-test('place preference write failure is contained inside the input event', () => {
+test('place preference write failure is contained inside the input event', async () => {
   const storage = {
     getItem() { return null; },
     setItem() { throw new Error('quota exceeded'); },
@@ -396,7 +428,7 @@ test('place preference write failure is contained inside the input event', () =>
   input.value = 'Berlin';
   const inputListener = input.listeners.find((listener) => listener.type === 'input');
   assert.ok(inputListener);
-  assert.doesNotThrow(() => inputListener.handler());
+  await assert.doesNotReject(() => inputListener.handler());
   assert.match(elements['weather-status'].textContent, /Place preference was not saved/);
   assert.match(elements['weather-status'].textContent, /changes could not be saved/);
 });

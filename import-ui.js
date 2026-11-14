@@ -31,10 +31,16 @@
     } catch (error) {
       storageAccessFailed = true;
     }
+   //  
+    const mutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    let lockManager = env.lockManager || null;
+    try { lockManager = lockManager || (win && win.navigator && win.navigator.locks) || null; }
+    catch (error) { lockManager = null; }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
-    const taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
-    const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
+   // //  con
+   // con st taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
+   //  const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     let idCounter = 0;
     const makeId = () => {
@@ -108,6 +114,12 @@
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
       try {
+        if (!mutation || typeof mutation.readGeneration !== 'function'
+            || typeof mutation.commitTaskSnapshot !== 'function' || !lockManager) {
+          throw new Error('cross-tab task storage coordination is unavailable');
+        }
+        const startingGeneration = mutation.readGeneration(storage);
+        if (!startingGeneration.ok) throw new Error('task storage generation is unreadable');
         if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
           throw new Error('the file is larger than the 8 MB import limit');
         }
@@ -161,60 +173,20 @@
         let addedCount = 0;
         let concurrentDuplicates = 0;
         if (merge.added.length > 0) {
-          if (!taskMutation || typeof taskMutation.commitTaskSnapshot !== 'function') {
-            throw new Error('safe cross-tab task coordination is unavailable; nothing was changed');
-          }
-          const committed = await taskMutation.commitTaskSnapshot({
-            lockManager,
+          const result = await mutation.commitTaskSnapshot({
             storage,
-            key: STORAGE_KEY,
+            lockManager,
             baseTasks: validated.tasks,
             desiredTasks: merge.merged,
-            expectedGeneration: generation.value,
-            readCurrent: (currentRaw) => {
-              if (currentRaw === null) {
-                return validated.tasks.length
-                  ? { ok: false, reason: 'current-removed' }
-                  : { ok: true, tasks: [] };
-              }
-              if (typeof currentRaw !== 'string' || currentRaw.length === 0
-                  || logic.hasDuplicateJsonKeys(currentRaw)) {
-                return { ok: false, reason: 'invalid-current' };
-              }
-              let currentParsed;
-              try {
-                currentParsed = JSON.parse(currentRaw);
-              } catch (error) {
-                return { ok: false, reason: 'invalid-current' };
-              }
-              if (!Array.isArray(currentParsed)) return { ok: false, reason: 'invalid-current' };
-              const currentValidated = logic.validateStoredTasks(currentParsed);
-              if (!currentValidated || !Array.isArray(currentValidated.tasks)
-                  || currentValidated.rejectedCount > 0) {
-                return { ok: false, reason: 'invalid-current' };
-              }
-              return { ok: true, tasks: currentValidated.tasks };
-            }
+            expectedGeneration: startingGeneration.value.generation,
+            expectedClearEpoch: startingGeneration.value.clearEpoch,
+            validateTasks: logic.validateStoredTasks
           });
-          if (!committed.ok) {
-            const failures = {
-              'coordination-unavailable': 'safe cross-tab task coordination is unavailable',
-              'invalid-generation': 'the task generation is unavailable or invalid',
-              'generation-invalid': 'the task generation is invalid',
-              'generation-unreadable': 'the task generation could not be read',
-              'stale-generation': 'Tasks were cleared while this file was being read; select the file again after the clear',
-              'lock-failed': 'cross-tab task coordination failed',
-              'conflict': 'an imported task conflicts with a newer task from another tab',
-              'current-removed': 'the saved task list was removed while import was being prepared',
-              'invalid-current': 'the saved task list changed to an unreadable value',
-              'storage-read-failed': 'browser storage could not be read',
-              'storage-write-failed': 'browser storage rejected the task write',
-              'storage-unavailable': 'browser storage is unavailable'
-            };
-            throw new Error((failures[committed.reason] || 'the task list could not be updated') + '; nothing was changed');
+          if (!result.ok) {
+            if (result.reason === 'cleared') throw new Error('local data was cleared while this file was being read; nothing was imported');
+            if (result.reason === 'conflict') throw new Error('a task changed in another tab; nothing was imported');
+            throw new Error('tasks could not be saved safely; nothing was imported');
           }
-          addedCount = Array.isArray(committed.addedIds) ? committed.addedIds.length : merge.added.length;
-          concurrentDuplicates = Math.max(0, merge.added.length - addedCount);
           notifySaved();
         }
         const parts = [];

@@ -32,6 +32,12 @@
       storage = null;
     }
     const wikiApi = env.wikiApi || root.DaymarkWiki || null;
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    let lockManager = env.lockManager || null;
+    if (!lockManager) {
+      try { lockManager = (env.navigator || (win && win.navigator) || {}).locks || null; }
+      catch (error) { lockManager = null; }
+    }
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
@@ -59,6 +65,7 @@
         buttonEl.disabled = isBusy;
         if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') {
           buttonEl.classList.toggle('is-busy', isBusy);
+          if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
         }
         if (typeof buttonEl.setAttribute === 'function') {
           if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
@@ -157,17 +164,40 @@
       return { ok: true, record: { state: 'valid', raw, value } };
     }
 
-    function persistCache(cache) {
-      const result = persistRecord(STORAGE_KEY, cache, cacheRecord);
-      if (result.ok) cacheRecord = result.record;
-      return result;
+    async function persistRecordFenced(key, value, record, epochSnapshot) {
+      if (!storage) return persistRecord(key, value, record);
+      if (!record || (record.state !== 'absent' && record.state !== 'valid')) {
+        return persistRecord(key, value, record);
+      }
+      if (!taskMutation || !lockManager || !epochSnapshot || !epochSnapshot.ok) {
+        return { ok: false, reason: 'lock-unavailable' };
+      }
+      const result = await taskMutation.withClearEpochLock(
+        lockManager,
+        [taskMutation.TASK_LOCK_NAME],
+        storage,
+        epochSnapshot.value,
+        () => persistRecord(key, value, record)
+      );
+      if (!result.ok || !result.value || !result.value.ok) {
+        return { ok: false, reason: result.reason || (result.value && result.value.reason) || 'write' };
+      }
+      return result.value;
     }
 
-    function persistPrefs(query) {
+    function persistCache(cache, epochSnapshot) {
+      return persistRecordFenced(STORAGE_KEY, cache, cacheRecord, epochSnapshot).then((result) => {
+        if (result.ok) cacheRecord = result.record;
+        return result;
+      });
+    }
+
+    function persistPrefs(query, epochSnapshot) {
       if (!query || !query.trim()) return { ok: true, skipped: true };
-      const result = persistRecord(PREFS_KEY, { query: query.trim() }, prefsRecord);
-      if (result.ok) prefsRecord = result.record;
-      return result;
+      return persistRecordFenced(PREFS_KEY, { query: query.trim() }, prefsRecord, epochSnapshot).then((result) => {
+        if (result.ok) prefsRecord = result.record;
+        return result;
+      });
     }
 
     function persistenceMessage(label, result) {
@@ -280,13 +310,14 @@
         status('Type a search term first.');
         return;
       }
+      const epochSnapshot = taskMutation && storage ? taskMutation.captureClearEpoch(storage) : null;
       setBusy(true);
       try {
         const result = await wikiApi.searchWikipedia(query, fetchImpl, { now });
         cached = result;
         render(cached);
-        const cacheSave = persistCache(cached);
-        const prefsSave = persistPrefs(query);
+        const cacheSave = await persistCache(cached, epochSnapshot);
+        const prefsSave = await persistPrefs(query, epochSnapshot);
         const warnings = [
           persistenceMessage('Saved Wikipedia cache', cacheSave),
           persistenceMessage('Search preference', prefsSave)
@@ -346,8 +377,11 @@
       });
       inputEl.addEventListener('input', () => {
         if (typeof inputEl.value !== 'string' || !inputEl.value.trim()) return;
-        const saved = persistPrefs(inputEl.value);
-        if (!saved.ok) status(persistenceMessage('Search preference', saved) + '.');
+        const epochSnapshot = taskMutation && storage ? taskMutation.captureClearEpoch(storage) : null;
+        return persistPrefs(inputEl.value, epochSnapshot).then((saved) => {
+          if (!saved.ok) status(persistenceMessage('Search preference', saved) + '.');
+          return saved;
+        });
       });
     }
 

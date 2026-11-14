@@ -39,6 +39,12 @@
       storageAccessFailed = true;
     }
     const currencyApi = env.currencyApi || root.DaymarkCurrency || null;
+    const taskMutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    let lockManager = env.lockManager || null;
+    if (!lockManager) {
+      try { lockManager = (env.navigator || (win && win.navigator) || {}).locks || null; }
+      catch (error) { lockManager = null; }
+    }
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = env.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
@@ -199,6 +205,27 @@
       }
     }
 
+    async function persistRecordFenced(record, value, epochSnapshot) {
+      if (!storageRequested) return true;
+      const epoch = epochSnapshot || (taskMutation && storage && taskMutation.captureClearEpoch(storage));
+      if (!taskMutation || !lockManager || !epoch || !epoch.ok) {
+        storageWriteFailed = true;
+        return false;
+      }
+      const result = await taskMutation.withClearEpochLock(
+        lockManager,
+        [taskMutation.TASK_LOCK_NAME],
+        storage,
+        epoch.value,
+        () => persistRecord(record, value)
+      );
+      if (!result.ok || result.value !== true) {
+        storageWriteFailed = true;
+        return false;
+      }
+      return true;
+    }
+
     function readCache() {
       cacheRecord = readRecord(STORAGE_KEY, (parsed) => !!(
         currencyApi && typeof currencyApi.validateCurrencyCache === 'function'
@@ -207,8 +234,8 @@
       return cacheRecord.value;
     }
 
-    function persistCache(cache) {
-      return persistRecord(cacheRecord, cache);
+    function persistCache(cache, epochSnapshot) {
+      return persistRecordFenced(cacheRecord, cache, epochSnapshot);
     }
 
     function readPrefs() {
@@ -219,10 +246,10 @@
       return prefsRecord.value;
     }
 
-    function persistPrefs() {
+    async function persistPrefs(epochSnapshot) {
       const { amountText, from, to } = readInputs();
       if (!from || !to) return true;
-      return persistRecord(prefsRecord, { amount: amountText, from, to });
+      return persistRecordFenced(prefsRecord, { amount: amountText, from, to }, epochSnapshot);
     }
 
     function restorePrefs() {
@@ -257,12 +284,13 @@
         status('Choose two different currencies.');
         return;
       }
+      const epochSnapshot = taskMutation && taskMutation.captureClearEpoch(storage);
       setBusy(true);
       try {
         const result = await currencyApi.fetchLatestRates(from, to, fetchImpl, { now });
         cached = result;
-        persistCache(cached);
-        persistPrefs();
+        await persistCache(cached, epochSnapshot);
+        await persistPrefs(epochSnapshot);
         render(cached, amount);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
       } catch (error) {
@@ -309,8 +337,11 @@
     [amountEl, fromEl, toEl].forEach((el) => {
       if (el && typeof el.addEventListener === 'function') {
         el.addEventListener('keydown', enterRefresh);
-        const savePrefs = () => {
-          if (!persistPrefs()) status('Currency preferences could not be saved.' + storageNotice());
+        const savePrefs = async () => {
+          const epochSnapshot = taskMutation && storage ? taskMutation.captureClearEpoch(storage) : null;
+          const saved = await persistPrefs(epochSnapshot);
+          if (!saved) status('Currency preferences could not be saved.' + storageNotice());
+          return saved;
         };
         el.addEventListener('change', savePrefs);
         el.addEventListener('input', savePrefs);
@@ -335,13 +366,14 @@
     }
 
     if (swapEl && typeof swapEl.addEventListener === 'function') {
-      swapEl.addEventListener('click', (event) => {
+      swapEl.addEventListener('click', async (event) => {
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
         if (!fromEl || !toEl || typeof fromEl.value !== 'string' || typeof toEl.value !== 'string') return;
         const tmp = fromEl.value;
         fromEl.value = toEl.value;
         toEl.value = tmp;
-        const prefsSaved = persistPrefs();
+        const epochSnapshot = taskMutation && storage ? taskMutation.captureClearEpoch(storage) : null;
+        const prefsPromise = persistPrefs(epochSnapshot);
         if (cached && currencyApi) {
           const amount = currencyApi.normalizeAmount(
             amountEl && typeof amountEl.value === 'string' && amountEl.value.trim() ? amountEl.value : DEFAULT_AMOUNT
@@ -376,7 +408,9 @@
         } else {
           status('Currencies swapped. Tap Refresh for the rate.');
         }
+        const prefsSaved = await prefsPromise;
         if (!prefsSaved) status((statusEl && statusEl.textContent || 'Currencies swapped.') + storageNotice());
+        return prefsSaved;
       });
     }
 
