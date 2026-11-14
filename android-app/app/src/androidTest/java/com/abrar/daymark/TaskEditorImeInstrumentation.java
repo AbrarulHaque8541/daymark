@@ -347,7 +347,7 @@ final class TaskEditorImeInstrumentation {
                 }
                 if (captureTrace && index < sampledWindows) {
                     appendObservedWindow(windowSnapshot, window, index, dialogPresent,
-                            button != null, labelPresent, visibleTarget);
+                            button, labelPresent, visibleTarget);
                 }
                 if (visibleTarget) {
                     if (trace != null) trace.record("buttonReady." + label);
@@ -377,7 +377,9 @@ final class TaskEditorImeInstrumentation {
         summary.append("; ").append(describeImeWindows(instrumentation));
         summary.append("; elapsedMs=").append(elapsedMs)
                 .append("; target={title=").append(dialogTitle).append(",viewId=").append(viewId)
-                .append(",label=").append(label).append("}; stepTrace=")
+                .append(",label=").append(label).append("}")
+                .append("; targetNode=").append(describeDialogButtonNode(instrumentation, dialogTitle, viewId, label))
+                .append("; stepTrace=")
                 .append(trace == null ? "none" : trace.summary()).append("; accessibilityWindows=");
         try {
             List<AccessibilityWindowInfo> windows = instrumentation.getUiAutomation().getWindows();
@@ -499,14 +501,45 @@ final class TaskEditorImeInstrumentation {
     }
 
     private static void appendObservedWindow(StringBuilder summary, AccessibilityWindowInfo window, int index,
-                                             boolean dialogPresent, boolean buttonPresent,
+                                             boolean dialogPresent, AccessibilityNodeInfo button,
                                              boolean labelPresent, boolean visibleTarget) {
         if (summary.length() > 0) summary.append('|');
         appendWindowMetadata(summary, window, index);
         summary.append(",dialog=").append(dialogPresent ? 1 : 0)
-                .append(",button=").append(buttonPresent ? 1 : 0)
+                .append(",button=").append(button != null ? 1 : 0)
                 .append(",label=").append(labelPresent ? 1 : 0)
-                .append(",touch=").append(visibleTarget ? 1 : 0).append('}');
+                .append(",touch=").append(visibleTarget ? 1 : 0)
+                .append(",buttonNode=").append(describeAccessibilityNode(button)).append('}');
+    }
+
+    private static String describeDialogButtonNode(Instrumentation instrumentation, String dialogTitle,
+                                                     String viewId, String label) {
+        try {
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null || findByText(root, dialogTitle) == null) continue;
+                AccessibilityNodeInfo button = findByViewId(root, viewId);
+                if (button == null) button = findButtonByText(root, label);
+                if (button != null) return describeAccessibilityNode(button);
+            }
+        } catch (Throwable failure) {
+            return "unavailable=" + failure.getClass().getSimpleName();
+        }
+        return "none";
+    }
+
+    private static String describeAccessibilityNode(AccessibilityNodeInfo node) {
+        if (node == null) return "none";
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        return "{class=" + shortDiagnosticValue(node.getClassName())
+                + ",id=" + shortDiagnosticValue(node.getViewIdResourceName())
+                + ",text=" + shortDiagnosticValue(node.getText())
+                + ",bounds=" + bounds.toShortString()
+                + ",visible=" + (node.isVisibleToUser() ? 1 : 0)
+                + ",clickable=" + (node.isClickable() ? 1 : 0)
+                + ",enabled=" + (node.isEnabled() ? 1 : 0)
+                + ",windowId=" + node.getWindowId() + "}";
     }
 
     private static void appendWindowMetadata(StringBuilder summary, AccessibilityWindowInfo window, int index) {

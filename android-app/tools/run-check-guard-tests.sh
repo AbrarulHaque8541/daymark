@@ -9,6 +9,10 @@ SCHEDULER="$ROOT/app/src/main/java/com/abrar/daymark/TaskReminderScheduler.java"
 POLICY="$ROOT/app/src/main/java/com/abrar/daymark/ReminderSchedulePolicy.java"
 MANIFEST="$ROOT/app/src/main/AndroidManifest.xml"
 RENDER_GATE="$ROOT/app/src/main/java/com/abrar/daymark/TaskListRenderGate.java"
+FOCUS_PANEL="$ROOT/app/src/main/java/com/abrar/daymark/TaskFocusTimerPanel.java"
+PLATFORM_TEST="$ROOT/app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java"
+REPEAT_HELPER="$ROOT/tools/platform-instrumentation-repeat.sh"
+SHELL_POLICY="$ROOT/app/src/androidTest/java/com/abrar/daymark/PlatformShellInputCommand.java"
 BACKUP=$(mktemp)
 cp "$ACTIVITY" "$BACKUP"
 PROVIDER_BACKUP=$(mktemp)
@@ -109,6 +113,19 @@ expect_fail_after_removal check-browser-history.py "BrowserHistory.remove(" "$AC
 # The HTTP warning must be runtime-wired, not merely defined by a policy helper.
 expect_fail_after_removal check-browser-http-policy.py "BrowserHttpPolicy.isHttp(url)" "$ACTIVITY" "$ROOT"
 expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP page has no transport security." "$ACTIVITY" "$ROOT"
+# Focus gestures must suppress ancestor interception without suppressing the selector itself.
+python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
+echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
+expect_fail_after_removal check-focus-emulator-repeat.py "getParent().requestDisallowInterceptTouchEvent(disallow);" "$FOCUS_PANEL" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "getUiAutomation().executeShellCommand(command)" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py 'while [ "$attempt" -le 20 ]' "$ROOT/tools/run-platform-instrumentation-on-emulator.sh" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "parse_platform_instrumentation_component()" "$REPEAT_HELPER" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py 'STATUS_MARKER = "__DAYMARK_INPUT_STATUS__="' "$SHELL_POLICY" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "TAP_PATTERN" "$SHELL_POLICY" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "run-platform-instrumentation-shell-input-tests.sh" "$ROOT/tools/run-platform-instrumentation-repeat-tests.sh" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "vertical drag delivers touchscreen events to target" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "parent Tasks ScrollView scrolls after a vertical Focus-mode drag" "$PLATFORM_TEST" "$ROOT"
+expect_fail_after_removal check-focus-emulator-repeat.py "check(capturedTouchTrace[0] != null && !capturedTouchTrace[0].isEmpty()" "$PLATFORM_TEST" "$ROOT"
 # The attachment streaming contract must fail closed if the reliable pipe is lost.
 expect_fail_after_removal check-attachment-source.py "ParcelFileDescriptor.createReliablePipe()" "$PROVIDER" "$ROOT"
 expect_fail_after_removal check-attachment-source.py "closeWithError(" "$PROVIDER" "$ROOT"

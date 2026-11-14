@@ -234,7 +234,6 @@ public final class MainActivity extends Activity {
     private UpdaterCore.Release pendingVerifiedRelease;
     private PendingSaveTransaction pendingSaveTransaction;
     private boolean webMode;
-    private final BrowserDownloadEnqueueGate browserDownloadEnqueueGate = new BrowserDownloadEnqueueGate();
     private final BrowserDownloadTracker browserDownloadTracker = new BrowserDownloadTracker();
     private BrowserNetworkPolicy browserNetworkPolicy = new BrowserNetworkPolicy();
     private BrowserSettingsPolicy browserSettingsPolicy = new BrowserSettingsPolicy();
@@ -3035,12 +3034,12 @@ public final class MainActivity extends Activity {
 
             @Override public void onDownloadRequested(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
                 if (!isActivityCallbackCurrent()) return;
-                queueBrowserDownload(url, userAgent, contentDisposition, mimeType);
+                queueBrowserDownload(url);
             }
 
             @Override public void onMediaDownloadRequested(String url) {
                 if (!isActivityCallbackCurrent() || !BrowserAddress.isAllowedWebUrl(url)) return;
-                queueBrowserDownload(url, null, null, null);
+                queueBrowserDownload(url);
             }
 
             @Override public void onShowFullscreen(View view, WebChromeClient.CustomViewCallback callback) {
@@ -4226,7 +4225,7 @@ public final class MainActivity extends Activity {
         if (ids.isEmpty()) {
             new AlertDialog.Builder(this)
                     .setTitle("Downloads")
-                    .setMessage("No Daymark browser downloads are available yet. Downloads started from a page will appear here when the system download provider exposes them.")
+                    .setMessage("No Daymark browser downloads are available. New browser downloads are temporarily blocked until Daymark can validate every redirect safely. Browsing remains available.")
                     .setPositiveButton("Close", null)
                     .setNeutralButton("Refresh", (dialog, which) -> showBrowserDownloadsDialog())
                     .show();
@@ -4268,7 +4267,7 @@ public final class MainActivity extends Activity {
             case DownloadManager.STATUS_SUCCESSFUL:
                 return "Completed — tap to open";
             case DownloadManager.STATUS_FAILED:
-                return "Failed — " + browserDownloadReason(false, reason) + " (tap to retry)";
+                return "Failed — " + browserDownloadReason(false, reason) + " (retry unavailable)";
             default:
                 return "Status unavailable";
         }
@@ -4324,16 +4323,9 @@ public final class MainActivity extends Activity {
             return;
         }
         if (status == DownloadManager.STATUS_FAILED) {
-            if (!BrowserAddress.isAllowedWebUrl(url)) {
-                showToast("Retry is unavailable because the saved URL is not a valid web address.");
-                return;
-            }
-            new AlertDialog.Builder(this)
-                    .setTitle("Retry download?")
-                    .setMessage("Daymark will make a new request to this URL. The site may require a valid current session.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Retry", (dialog, which) -> queueBrowserDownload(url, android.webkit.WebSettings.getDefaultUserAgent(this), null, mimeType))
-                    .show();
+            BrowserDownloadFailClosedPolicy.Decision decision =
+                    BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads());
+            showToast(decision.userMessage);
             return;
         }
         if (status == DownloadManager.STATUS_PENDING
@@ -4387,62 +4379,26 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void queueBrowserDownload(String url, String userAgent, String contentDisposition, String mimeType) {
+    private void queueBrowserDownload(String url) {
         if (!BrowserAddress.isAllowedWebUrl(url)) {
             showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
             return;
         }
-        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        if (manager == null) {
-            showToast("Downloads are unavailable on this device.");
-            return;
-        }
-        if (!browserDownloadEnqueueGate.tryAcquire(url, android.os.SystemClock.elapsedRealtime())) {
-            showToast("This download was just started. Wait a moment before retrying.");
-            return;
-        }
-        try {
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            String filename = BrowserDownloadFilenamePolicy.sanitize(
-                    URLUtil.guessFileName(url, contentDisposition, mimeType));
-            request.setTitle(filename);
-            request.setDescription("Daymark browser download");
-            if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
-            String effectiveUserAgent = userAgent;
-            if ((effectiveUserAgent == null || effectiveUserAgent.isEmpty()) && browserWebView != null) {
-                effectiveUserAgent = browserWebView.getSettings().getUserAgentString();
-            }
-            if (effectiveUserAgent != null && !effectiveUserAgent.isEmpty()) {
-                request.addRequestHeader("User-Agent", effectiveUserAgent);
-            }
-            String cookies = CookieManager.getInstance().getCookie(url);
-            if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            if (Build.VERSION.SDK_INT >= 29) {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
-            } else {
-                request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, filename);
-            }
-            long downloadId = manager.enqueue(request);
-            if (downloadId > 0L) browserDownloadTracker.start(downloadId, url, filename);
-            showToast(Build.VERSION.SDK_INT >= 29
-                    ? "Download started. Check Downloads for progress."
-                    : "Download started. Check Daymark's app Downloads folder.");
-        } catch (Exception exception) {
-            browserDownloadEnqueueGate.release(url);
-            showToast("Download could not be started.");
-        }
+        BrowserDownloadFailClosedPolicy.Decision decision =
+                BrowserDownloadFailClosedPolicy.evaluate(browserNetworkPolicy.allowsRemoteLoads());
+        showToast(decision.userMessage);
     }
 
     // UC-style media grabber: a one-shot read-only DOM probe (no JS bridge, no
     // request interception) that lists direct video/audio sources and media
-    // links on the current page so they can be downloaded even when the site
-    // itself offers no download button. Protected streaming players (DRM or
+    // links on the current page for inspection. New downloads remain blocked until
+    // a redirect-validating transport is available. Protected streaming players (DRM or
     // hidden stream manifests) stay out of scope by design.
     /**
-     * Best-effort in-player download affordance for direct HTTPS HTML5 media.
-     * It creates only a user-clicked page button and a normal HTTPS anchor; there is
-     * no JavaScript-to-native bridge and no DRM/manifest/blob extraction.
+     * Best-effort in-player media discovery affordance for direct HTTPS HTML5 media.
+     * It exposes source links for inspection only; the native download callback remains
+     * fail-closed until Daymark can validate every redirect safely.
+     * There is no JavaScript-to-native bridge and no DRM/manifest/blob extraction.
      */
     private void exitBrowserFullscreen() {
         View view = browserFullscreenView;
@@ -4556,14 +4512,14 @@ public final class MainActivity extends Activity {
         }
         new AlertDialog.Builder(this)
                 .setTitle("Videos & audio on this page")
+                .setMessage("Downloads are temporarily unavailable until Daymark can validate every redirect safely.")
                 .setItems(labels, (dialog, which) -> {
                     String url = urls[which];
                     if (!BrowserAddress.isAllowedWebUrl(url)) {
                         showToast("Download blocked: only web (HTTP/HTTPS) links can be downloaded.");
                         return;
                     }
-                    showBrowserStatus("Download started for the selected media file. Check Downloads for progress.");
-                    queueBrowserDownload(url, null, null, null);
+                    queueBrowserDownload(url);
                 })
                 .setNegativeButton("Close", null)
                 .show();
@@ -7997,25 +7953,36 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+        int editorSoftInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                | (Build.VERSION.SDK_INT >= 30
+                        ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                        : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         Window dialogWindow = dialog.getWindow();
-        if (dialogWindow != null) {
-            if (Build.VERSION.SDK_INT >= 30) {
-                // Keep this floating form inside its window insets so its action panel can resize above the IME.
-                Api30Window.setDecorFits(dialogWindow, true);
-            }
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        }
+        if (dialogWindow != null) dialogWindow.setSoftInputMode(editorSoftInputMode);
         dialog.show();
-        // AlertDialog may apply its floating-window attributes during show(). Reapply the
-        // resize policy after the window is attached so the action buttons remain reachable
-        // above the IME on current Android releases (including target-SDK 36).
+        // API 30+ edge-to-edge windows must consume IME insets explicitly. ADJUST_NOTHING
+        // keeps the floating dialog stable while its decor padding moves the action panel
+        // above the keyboard; API 26-29 retain the platform resize behavior.
         Window shownDialogWindow = dialog.getWindow();
         if (shownDialogWindow != null) {
-            shownDialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            shownDialogWindow.setSoftInputMode(editorSoftInputMode);
+            if (Build.VERSION.SDK_INT >= 30) configureDialogImeInsets(shownDialogWindow);
         }
         titleInput.requestFocus();
+        if (Build.VERSION.SDK_INT >= 30 && shownDialogWindow != null) {
+            shownDialogWindow.getDecorView().requestApplyInsets();
+        }
+    }
+
+    private void configureDialogImeInsets(Window dialogWindow) {
+        if (Build.VERSION.SDK_INT < 30) return;
+        Api30Window.setDecorFits(dialogWindow, WindowInsetsPolicy.DECOR_FITS_SYSTEM_WINDOWS);
+        View dialogDecor = dialogWindow.getDecorView();
+        dialogDecor.setOnApplyWindowInsetsListener((view, insets) -> {
+            Api30Window.applyDialogImeInsets(MainActivity.this, dialogWindow, insets);
+            return insets;
+        });
+        dialogDecor.requestApplyInsets();
     }
 
     private void saveTaskFromEditor(AlertDialog dialog, Task editing, String normalized,

@@ -42,4 +42,14 @@ check("if (Build.VERSION.SDK_INT >= 30) Api30Window.setDecorFits" in ACTIVITY,
       "API-30 decor fitting must be guarded before loading its helper")
 check("if (Build.VERSION.SDK_INT >= 30) {\n                Api30Window.applyInsets(root, insets, dp(8));" in ACTIVITY,
       "API-30 inset application must be guarded before loading its helper")
+check("WindowInsetsPolicy.dialogHeightForIme(" in API30,
+      "API-30 dialog height must use the pure keyboard-safe height policy")
+check("getCurrentWindowMetrics()" in API30 and "metrics.getWindowInsets()" in API30,
+      "dialog placement must use stable Activity window metrics rather than its already-shrunk bounds")
+check("WindowInsetsPolicy.dialogYOffsetForIme(" in API30,
+      "dialog vertical shift must be derived from the pure IME offset policy")
+check("params.height = height" in API30 and "params.y = y" in API30 and "Gravity.CENTER" in API30,
+      "the dialog must shrink and move into the unobscured area above the IME")
+check("Api30Window.applyDialogImeInsets(MainActivity.this, dialogWindow, insets)" in ACTIVITY,
+      "the task editor dialog must apply its own IME-aware window layout")
 print(f"PASS window insets/API-level source checks: {checks} assertions")

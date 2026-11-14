@@ -116,11 +116,30 @@ final class TaskFocusSessionCoordinator {
         try {
             restored = store.load(now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         } catch (Exception failure) {
-            notifications.cancel();
-            resetMemory(false);
-            throw failure;
+            return restoreLoadFailure(failure);
         }
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, now);
+    }
 
+    /**
+     * Adopts a focus record already loaded and resolved against the caller's current task snapshot.
+     * This prevents a second store read from observing a different task ID than the one whose title
+     * was resolved by the caller.
+     */
+    synchronized Snapshot restoreLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
+                                                 String currentTaskTitle) throws Exception {
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, readClock());
+    }
+
+    /** Clears stale in-memory/notification state when the runtime cannot read the durable record. */
+    synchronized Snapshot restoreLoadFailure(Exception failure) throws Exception {
+        notifications.cancel();
+        resetMemory(false);
+        throw failure;
+    }
+
+    private Snapshot restoreLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
+                                           String currentTaskTitle, ClockReading now) throws Exception {
         if (restored == null) {
             notifications.cancel();
             resetMemory(true);
@@ -139,6 +158,16 @@ final class TaskFocusSessionCoordinator {
             return null;
         }
 
+        // A newly-created runtime cannot know whether the previous process left
+        // an older notification active under this ID. Cancel once on first restore,
+        // and on every later task/title identity change.
+        boolean replaceNotification = !notificationPublished
+                || notificationIdentityChanged(restored, currentTaskTitle)
+                || notificationPresentationChanged(restored);
+        if (replaceNotification) {
+            notifications.cancel();
+            notificationPublished = false;
+        }
         current = restored;
         this.currentTaskTitle = currentTaskTitle;
         initialized = true;
@@ -152,7 +181,6 @@ final class TaskFocusSessionCoordinator {
         }
         return snapshot(true);
     }
-
     synchronized Snapshot pauseFromUserAction() throws Exception {
         requireInitialized();
         requireCurrent();
@@ -167,9 +195,14 @@ final class TaskFocusSessionCoordinator {
         } else {
             next = current.pause(now.elapsedRealtimeMs);
         }
+        boolean replaceNotification = notificationPresentationChanged(next);
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
         if (next.isPaused()) {
+            if (replaceNotification) {
+                notifications.cancel();
+                notificationPublished = false;
+            }
             notificationPublished = publishOrCancel(
                     next, currentTaskTitle, now.elapsedRealtimeMs);
         } else {
@@ -190,7 +223,15 @@ final class TaskFocusSessionCoordinator {
 
         ClockReading now = readClock();
         TaskFocusTimer next = current.switchTaskWhilePaused(taskId);
+        boolean replaceNotification = notificationPublished
+                && notificationIdentityChanged(next, currentTaskTitle);
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
+        if (replaceNotification) {
+            // Android 16 can retain the previous content title for an ongoing
+            // notification update. Remove the old identity before publishing the new one.
+            notifications.cancel();
+            notificationPublished = false;
+        }
         current = next;
         this.currentTaskTitle = currentTaskTitle;
         notificationPublished = publishOrCancel(
@@ -212,11 +253,16 @@ final class TaskFocusSessionCoordinator {
         TaskFocusTimer next = current.isCountdown() && current.isExpiredAt(now.elapsedRealtimeMs)
                 ? current.finish(now.elapsedRealtimeMs)
                 : current.resume(now.elapsedRealtimeMs);
+        boolean replaceNotification = notificationPresentationChanged(next);
         store.save(next, now.elapsedRealtimeMs, now.wallClockMs, now.bootCount);
         current = next;
         this.currentTaskTitle = currentTaskTitle;
 
         if (next.isRunning()) {
+            if (replaceNotification) {
+                notifications.cancel();
+                notificationPublished = false;
+            }
             notificationPublished = publishOrCancel(
                     next, currentTaskTitle, now.elapsedRealtimeMs);
         } else {
@@ -263,6 +309,12 @@ final class TaskFocusSessionCoordinator {
             return snapshot(false);
         }
 
+        boolean replaceNotification = notificationPublished
+                && !sameTaskTitle(this.currentTaskTitle, currentTaskTitle);
+        if (replaceNotification) {
+            notifications.cancel();
+            notificationPublished = false;
+        }
         this.currentTaskTitle = currentTaskTitle;
         notificationPublished = publishOrCancel(
                 current, currentTaskTitle, now.elapsedRealtimeMs);
@@ -320,6 +372,20 @@ final class TaskFocusSessionCoordinator {
 
     private void requireCurrent() {
         if (current == null) throw new IllegalStateException("There is no active focus session.");
+    }
+
+    private boolean notificationPresentationChanged(TaskFocusTimer next) {
+        return current != null && (current.isRunning() != next.isRunning()
+                || current.isCountdown() != next.isCountdown());
+    }
+
+    private boolean notificationIdentityChanged(TaskFocusTimer next, String nextTitle) {
+        return current != null && (!current.taskId().equals(next.taskId())
+                || !sameTaskTitle(currentTaskTitle, nextTitle));
+    }
+
+    private static boolean sameTaskTitle(String left, String right) {
+        return left == null ? right == null : left.equals(right);
     }
 
     private boolean publishOrCancel(TaskFocusTimer timer, String taskTitle, long nowElapsedRealtimeMs) {
