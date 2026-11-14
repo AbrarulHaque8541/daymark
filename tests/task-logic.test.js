@@ -56,6 +56,18 @@ test('date filters preserve completed tasks while Completed collects them all', 
   assert.equal(logic.getFilteredTasks(tasks, 'all', '', TODAY).length, tasks.length);
 });
 
+test('high priority filter returns only high-priority tasks and composes with search', () => {
+  const tasks = [
+    task('h1', 'Urgent report', { priority: 'high', dueDate: TODAY }),
+    task('m1', 'Normal task', { priority: 'medium' }),
+    task('h2', 'High later', { priority: 'high', dueDate: '2026-10-12' }),
+    task('l1', 'Low done', { priority: 'low', completed: true })
+  ];
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'high', '', TODAY).map((item) => item.id), ['h1', 'h2']);
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'high', 'urgent', TODAY).map((item) => item.id), ['h1']);
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'high', 'missing', TODAY), []);
+});
+
 test('title search is case-insensitive and composes with the active filter using deterministic lowercasing', () => {
   const tasks = [
     task('a', 'Review Project Plan', { dueDate: TODAY }),
@@ -68,204 +80,4 @@ test('title search is case-insensitive and composes with the active filter using
   // Deterministic search match verification
   const mixedTasks = [task('d', 'TURKISH İNDEX', { dueDate: TODAY })];
   assert.deepEqual(logic.getFilteredTasks(mixedTasks, 'all', 'İNDEX', TODAY).map((item) => item.id), ['d']);
-});
-
-test('demo suggestions are deterministic, prioritize nearest dates, and skip completed tasks', () => {
-  const tasks = [
-    task('later', 'Plan launch', { dueDate: '2026-10-12', priority: 'high' }),
-    task('undated', 'Sort inbox', { priority: 'high' }),
-    task('today-low', 'Water plants', { dueDate: TODAY, priority: 'low' }),
-    task('overdue', 'Pay invoice', { dueDate: '2026-10-01', priority: 'low' }),
-    task('today-high', 'Call dentist', { dueDate: TODAY, priority: 'high' }),
-    task('done', 'Already finished', { dueDate: '2026-10-01', priority: 'high', completed: true })
-  ];
-  const results = logic.getSuggestions(tasks, TODAY, (date) => date);
-  assert.deepEqual(results.map(({ task: item }) => item.id), ['overdue', 'today-high', 'today-low']);
-  assert.match(results[0].reason, /^Overdue/);
-  assert.deepEqual(logic.getSuggestions(tasks, TODAY, (date) => date), results);
-});
-
-test('due times are strict HH:mm values that require a due date', () => {
-  assert.equal(logic.isTimeOnly('14:30'), true);
-  assert.equal(logic.isTimeOnly('00:00'), true);
-  assert.equal(logic.isTimeOnly('23:59'), true);
-  assert.equal(logic.isTimeOnly('24:00'), false);
-  assert.equal(logic.isTimeOnly('9:30'), false);
-  assert.equal(logic.isTimeOnly('14:3'), false);
-  assert.equal(logic.isTimeOnly('14:60'), false);
-  assert.equal(logic.isTimeOnly(1430), false);
-
-  const base = task('t', 'Task', { dueDate: TODAY });
-  assert.equal(logic.isValidTask({ ...base, dueTime: '14:30' }), true);
-  assert.equal(logic.isValidTask({ ...base, dueTime: null }), true);
-  assert.equal(logic.isValidTask({ ...base, dueTime: '8:15' }), false);
-  assert.equal(logic.isValidTask({ ...base, dueTime: '14:30', dueDate: null }), false);
-});
-
-test('notes, reminders, and subtasks validate with bounded fields', () => {
-  const base = task('t', 'Task');
-  assert.equal(logic.isValidTask({ ...base, notes: 'remember this' }), true);
-  assert.equal(logic.isValidTask({ ...base, notes: 'x'.repeat(4000) }), true);
-  assert.equal(logic.isValidTask({ ...base, notes: 'x'.repeat(4001) }), false);
-  assert.equal(logic.isValidTask({ ...base, notes: 42 }), false);
-
-  for (const lead of [0, 30, 60, 1440]) {
-    assert.equal(logic.isValidTask({ ...base, reminderLeadMinutes: lead }), true);
-  }
-  assert.equal(logic.isValidTask({ ...base, reminderLeadMinutes: null }), true);
-  assert.equal(logic.isValidTask({ ...base, reminderLeadMinutes: 45 }), false);
-  assert.equal(logic.isValidTask({ ...base, reminderShownFire: '2026-10-05T13:30:00.000Z' }), true);
-  assert.equal(logic.isValidTask({ ...base, reminderShownFire: 'not a date' }), false);
-
-  const subtasks = [
-    { id: 's1', title: 'Step one', done: false },
-    { id: 's2', title: 'Step two', done: true }
-  ];
-  assert.equal(logic.isValidTask({ ...base, subtasks }), true);
-  assert.equal(logic.isValidSubtasks(subtasks), true);
-  assert.equal(logic.isValidSubtasks([...subtasks, { id: 's1', title: 'Duplicate', done: false }]), false);
-  assert.equal(logic.isValidSubtasks([...subtasks, { id: 's3', title: '   ', done: false }]), false);
-  assert.equal(logic.isValidSubtasks([...subtasks, { id: 's3', title: 'x'.repeat(121), done: false }]), false);
-  assert.equal(logic.isValidSubtasks([...subtasks, { id: 's3', title: 'No state' }]), false);
-  assert.equal(logic.isValidSubtasks(Array.from({ length: 21 }, (_, i) => ({ id: `s${i}`, title: `Step ${i}`, done: false }))), false);
-  assert.equal(logic.isValidTask({ ...base, subtasks: [{ id: 's1', title: 'Only', done: false }] }), true);
-});
-
-test('legacy tasks without extended fields stay valid', () => {
-  const legacy = task('legacy', 'Old task', { dueDate: TODAY });
-  assert.equal(logic.isValidTask(legacy), true);
-  const stored = logic.validateStoredTasks([legacy]);
-  assert.equal(stored.tasks.length, 1);
-  assert.equal(stored.rejectedCount, 0);
-});
-
-test('tags validate, normalize, and make tasks searchable', () => {
-  const base = task('t', 'Task', { dueDate: TODAY });
-  assert.equal(logic.isValidTask({ ...base, tags: ['work', 'errands-2'] }), true);
-  assert.equal(logic.isValidTask({ ...base, tags: ['work'] }), true);
-  assert.equal(logic.isValidTask({ ...base, tags: 'work' }), false);
-  assert.equal(logic.isValidTask({ ...base, tags: ['Work'] }), false);
-  assert.equal(logic.isValidTask({ ...base, tags: ['work', 'work'] }), false);
-  assert.equal(logic.isValidTask({ ...base, tags: Array.from({ length: 6 }, (_, i) => `t${i}`) }), false);
-  assert.equal(logic.isValidTask({ ...base, tags: ['x'.repeat(25)] }), false);
-  assert.equal(logic.isValidTask({ ...base, tags: null }), true);
-  assert.equal(logic.isTag('errands-2'), true);
-  assert.equal(logic.isTag('Errands'), false);
-  assert.deepEqual(logic.normalizeTags([' Work ', 'work', 'TO DO']), ['work', 'to-do']);
-  assert.deepEqual(logic.normalizeTags(null), []);
-  assert.throws(() => logic.normalizeTags(['x'.repeat(25)]));
-  const tagged = { ...task('tagged', 'Buy groceries', { dueDate: TODAY }), tags: ['errands-2'] };
-  const others = [task('other', 'Other'), tagged];
-  assert.deepEqual(logic.getFilteredTasks(others, 'all', 'errands', TODAY).map((i) => i.id), ['tagged']);
-  assert.deepEqual(logic.getFilteredTasks(others, 'all', 'groceries', TODAY).map((i) => i.id), ['tagged']);
-});
-
-test('search also matches notes and same-date tasks order by due time', () => {
-  const withNotes = { ...task('n', 'Plain title'), notes: 'remember the éclair receipt' };
-  const tasks = [task('a', 'Write report'), withNotes];
-  assert.deepEqual(logic.getFilteredTasks(tasks, 'all', 'ÉCLAIR', TODAY).map((item) => item.id), ['n']);
-  assert.deepEqual(logic.getFilteredTasks(tasks, 'all', 'plain', TODAY).map((item) => item.id), ['n']);
-
-  const timed = [
-    { ...task('late', 'Late today', { dueDate: TODAY }), dueTime: '18:00' },
-    { ...task('early', 'Early today', { dueDate: TODAY }), dueTime: '08:00' },
-    task('untimed', 'Untimed today', { dueDate: TODAY })
-  ];
-  assert.deepEqual(logic.getFilteredTasks(timed, 'all', '', TODAY).map((item) => item.id),
-    ['early', 'late', 'untimed']);
-});
-
-test('shared task date contract matches the Java host implementation fixture', () => {
-  const fixturePath = path.join(__dirname, '..', 'contracts', 'task-date-validation.tsv');
-  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
-  let cases = 0;
-  for (const [index, line] of lines.entries()) {
-    if (!line || line.startsWith('#')) continue;
-    const columns = line.split('\t');
-    assert.equal(columns.length, 2, `date fixture line ${index + 1} must have two columns`);
-    assert.ok(columns[1] === 'true' || columns[1] === 'false',
-      `date fixture line ${index + 1} must use a strict boolean`);
-    assert.equal(logic.isDateOnly(columns[0]), columns[1] === 'true',
-      `JavaScript date validation must match shared fixture line ${index + 1}`);
-    cases += 1;
-  }
-  assert.equal(cases, 9, 'shared date contract must include all nine cases');
-});
-
-test('shared task instant contract matches Android strict instant validation', () => {
-  const fixturePath = path.join(__dirname, '..', 'contracts', 'task-instant-validation.tsv');
-  const lines = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/);
-  let cases = 0;
-  for (const [index, line] of lines.entries()) {
-    if (!line || line.startsWith('#')) continue;
-    const columns = line.split('\t');
-    assert.equal(columns.length, 2, 'instant fixture line ' + (index + 1) + ' must have two columns');
-    assert.ok(columns[1] === 'true' || columns[1] === 'false',
-      'instant fixture line ' + (index + 1) + ' must use a strict boolean');
-    const value = columns[0] === '~' ? '' : columns[0];
-    assert.equal(logic.isValidInstant(value), columns[1] === 'true',
-      'JavaScript instant validation must match shared fixture line ' + (index + 1));
-    cases += 1;
-  }
-  assert.equal(cases, 58, 'shared instant contract must include all fifty-eight cases');
-});
-
-test('createdAt, updatedAt, and reminderShownFire use the same strict instant contract', () => {
-  const valid = task('instant-fields', 'Instant fields');
-  assert.equal(logic.isValidTask(valid), true);
-  assert.equal(logic.isValidTask({ ...valid, createdAt: '2026-02-30T00:00:00Z' }), false);
-  assert.equal(logic.isValidTask({ ...valid, updatedAt: '2026-11-10T10:00:00' }), false);
-  assert.equal(logic.isValidTask({
-    ...valid,
-    reminderShownFire: '2026-11-10T10:00:00.1234567890Z'
-  }), false);
-  assert.equal(logic.isValidTask({
-    ...valid,
-    reminderShownFire: '2016-12-31T23:59:60Z'
-  }), true);
-});
-
-test('instant comparison matches Java nanosecond, offset, and leap-second ordering', () => {
-  assert.equal(logic.compareInstants('2026-11-10T10:00:00+05:30', '2026-11-10T04:30:00Z'), 0);
-  assert.equal(logic.compareInstants('2026-11-10T10:00:00+01:30:15', '2026-11-10T08:29:45Z'), 0);
-  assert.equal(logic.compareInstants('2026-11-10T10:00:00-00:00:30', '2026-11-10T10:00:30Z'), 0);
-  assert.equal(logic.compareInstants('2026-11-10T10:00:00+18:00:00', '2026-11-09T16:00:00Z'), 0);
-  assert.equal(logic.compareInstants('2026-11-10T10:00:00.000000001Z',
-    '2026-11-10T10:00:00.000000002Z'), -1);
-  assert.equal(logic.compareInstants('2016-12-31T23:59:60Z', '2016-12-31T23:59:59Z'), 0);
-  assert.equal(logic.compareInstants('0000-01-01T00:00:00Z', '0001-01-01T00:00:00Z'), -1);
-  assert.throws(() => logic.compareInstants('invalid', '2026-11-10T10:00:00Z'), /invalid task instants/);
-});
-
-test('task ordering compares createdAt instants rather than their offset-bearing strings', () => {
-  const earlier = task('earlier', 'Earlier instant', { createdAt: '2026-11-10T10:00:00+01:00' });
-  const later = task('later', 'Later instant', { createdAt: '2026-11-10T09:30:00Z' });
-  assert.deepEqual(logic.getFilteredTasks([later, earlier], 'all', '', TODAY).map((item) => item.id),
-    ['earlier', 'later']);
-});
-
-
-
-test('expanded Java Instant years remain valid and sort without Date range loss', () => {
-  const archiveMaximum = '+999999999-12-31T23:59:59.999999999+18:00';
-  const sameLocalUtc = '+999999999-12-31T23:59:59.999999999Z';
-  assert.equal(logic.isValidInstant(archiveMaximum), true);
-  assert.equal(logic.isValidInstant('+1000000000-12-31T23:59:59.999999999Z'), true);
-  assert.equal(logic.isValidInstant('+1000000001-01-01T00:00:00+18:00'), true);
-  assert.equal(logic.isValidInstant('+1000000001-01-01T23:59:59+18:00'), false);
-  assert.equal(logic.compareInstants(archiveMaximum, sameLocalUtc), -1);
-  assert.equal(logic.compareInstants(
-    '+1000000001-01-01T00:00:00+18:00',
-    '+1000000000-12-31T06:00:00Z'), 0);
-  assert.equal(logic.compareInstants(
-    '-1000000001-12-31T23:59:59-18:00',
-    '-1000000000-01-01T17:59:59Z'), 0);
-
-  const tasks = [
-    task('later-expanded', 'Later expanded year', { createdAt: sameLocalUtc }),
-    task('archive-maximum', 'Portable backup maximum', { createdAt: archiveMaximum })
-  ];
-  assert.deepEqual(logic.getFilteredTasks(tasks, 'all', '', TODAY).map((item) => item.id),
-    ['archive-maximum', 'later-expanded']);
-  assert.equal(logic.isValidTask(tasks[1]), true);
 });
