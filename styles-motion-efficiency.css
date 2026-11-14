@@ -92,7 +92,7 @@
 }
 .task-row {
   content-visibility: auto;
-  contain-intrinsic-size: 76px;
+  contain-intrinsic-size: auto 76px;
 }
 
 /* Touch efficiency: larger hit area, no 300ms delay residue. */
