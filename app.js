@@ -1710,6 +1710,7 @@
   }
 
   function resetTaskViewPrefs() {
+    showToast('View reset to defaults');
     state.filter = 'all';
     state.sort = 'smart';
     state.query = '';
@@ -2183,6 +2184,9 @@
     } else if (event.key === 'n' && !$('#edit-dialog').open) {
       event.preventDefault();
       $('#new-title').focus();
+    } else if ((event.key === 'r' || event.key === 'R') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      resetTaskViewPrefs();
     }
   }
 
