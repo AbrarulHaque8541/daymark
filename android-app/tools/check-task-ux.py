@@ -159,7 +159,7 @@ check("searchHost.setVisibility(View.GONE);" in composer,
       "task search host must start collapsed until the upper-right icon is tapped")
 check("addTaskButton.setMinHeight(dp(40))" not in composer,
       "Add task must inherit the compact button's 48 dp minimum")
-task_row = region("private View buildTaskRow(Task task)", "private void showSwipeTaskActions",
+task_row = region("private View buildTaskRow(Task task)", "private final class SwipeTaskRow",
                   "task row")
 for marker in ("checkBox.setMinimumWidth(dp(48))", "checkBox.setMinimumHeight(dp(48))",
                "new LinearLayout.LayoutParams(dp(48), dp(48))", "more.setMinimumWidth(dp(48))",
