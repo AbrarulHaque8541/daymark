@@ -236,6 +236,7 @@
       if (filter === 'completed' && !task.completed) return false;
       if (filter === 'today' && task.dueDate !== today) return false;
       if (filter === 'upcoming' && !(task.dueDate !== null && task.dueDate > today)) return false;
+      if (filter === 'high' && task.priority !== 'high') return false;
       if (!normalizedQuery) return true;
       const notes = typeof task.notes === 'string' ? task.notes.toLowerCase() : '';
       const tags = Array.isArray(task.tags) ? task.tags.join(' ').toLowerCase() : '';
