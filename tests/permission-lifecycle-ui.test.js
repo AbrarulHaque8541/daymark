@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 const ui = require('../permission-lifecycle-ui.js');
 const engine = require('../permission-lifecycle-logic.js');
 
@@ -206,14 +207,14 @@ function bootWithBlockedStorage(readyState) {
     createElement() { return makeBootElement(); },
     addEventListener(name, listener) { documentListeners[name] = listener; }
   };
-  const context = {
+  const sandbox = {
     window,
     document,
     DaymarkPermissionLifecycle: engine,
     module: { exports: {} },
-    __dirname: '/repo/tests'
+    __dirname: path.join(__dirname)
   };
-  runInNewContext(uiSource, context, 'permission-lifecycle-ui.js');
+  vm.runInNewContext(uiSource, sandbox, { filename: 'permission-lifecycle-ui.js' });
   return {
     get localStorageReads() { return localStorageReads; },
     elements,
