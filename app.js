@@ -2192,6 +2192,9 @@
     } else if ((event.key === 'r' || event.key === 'R') && !$('#edit-dialog').open) {
       event.preventDefault();
       resetTaskViewPrefs();
+    } else if ((event.key === 's' || event.key === 'S') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      $('#sort-toggle').click();
     }
   }
 
@@ -2414,7 +2417,11 @@
     $('#sort-toggle').addEventListener('click', () => {
       state.sort = state.sort === 'smart' ? 'title' : 'smart';
       persistTaskViewPrefs();
+      showToast(state.sort === 'title' ? 'Sorted A–Z' : 'Sorted smart');
+      const list = $('#task-list');
+      if (list) list.classList.add('is-sorting');
       render();
+      if (list) setTimeout(() => list.classList.remove('is-sorting'), 280);
     });
     const resetViewBtn = $('#reset-view');
     if (resetViewBtn) {

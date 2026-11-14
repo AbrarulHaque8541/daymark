@@ -1,3 +1,5 @@
+- [Daymark engineering status - 2026-11-15T02:05:00Z (Cycle A sort toggle polish)](./CURRENT_STATUS_20261115T020500Z.md)
+
 - [Daymark engineering status — 2026-11-14T16:46:24Z (permission-lifecycle planner card, branch feat/permission-lifecycle-vibe-20261114)](./CURRENT_STATUS_20261114T164624Z.md)
 - [Daymark engineering status - 2026-11-14T12:37:30Z (Cycle A task view reset polish)](./CURRENT_STATUS_20261114T123730Z.md)
 - [Daymark engineering status - 2026-11-14T08:35:00Z (Cycle A task view preference persistence)](./CURRENT_STATUS_20261114T083500Z.md)
