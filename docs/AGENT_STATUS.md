@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-14T02:42:00Z (Cycle A: task-tools / filters / composer focus-within polish)](./CURRENT_STATUS_20261114T024200Z.md)
 - [Daymark engineering status — 2026-11-14T00:50:00Z (Cycle B verification of storage fencing + clear-completed busy polish)](./CURRENT_STATUS_20261114T005000Z.md)
 - [Daymark engineering status — 2026-11-13T16:23:00Z (address-bar insights card, branch feat/url-insights-vibe-20261113)](./CURRENT_STATUS_20261113T162300Z.md)
 - [Daymark engineering status — 2026-11-13T04:39:18Z (keyless GitHub release radar card, branch feat/release-radar-vibe-20261113)](./CURRENT_STATUS_20261113T043900Z.md)
@@ -97,7 +98,8 @@
 **Purpose:** A stable landing page for time-sensitive project facts. Durable rules live in [`AGENTS.md`](../AGENTS.md); snapshots are dated and can go stale.
 
 ## Latest reviewed snapshot
-- [CURRENT_STATUS_20261114T005000Z.md](./CURRENT_STATUS_20261114T005000Z.md) — Cycle B verification: Cycle A storage fencing complete on main `a3bdcbe`; small clear-completed busy spinner consistency polish added. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261114T024200Z.md](./CURRENT_STATUS_20261114T024200Z.md) — Cycle A: focus-within accent edge extended to task composer, filters, and tools. Base main `3b8557e`. Physical device NOT TESTED.
+- Previous: [CURRENT_STATUS_20261114T005000Z.md](./CURRENT_STATUS_20261114T005000Z.md) — Cycle B verification: Cycle A storage fencing complete on main `a3bdcbe`; small clear-completed busy spinner consistency polish added. Physical device NOT TESTED.
 - Previous: [CURRENT_STATUS_20261112T045000Z.md](./CURRENT_STATUS_20261112T045000Z.md) — branch `feat/daylight-card-vibe-20261112` cut from main `df9cb64e`; keyless daylight and UV planner card (web-only, self-injecting markup, index.html untouched); sandbox harness 18/18 logic + 14/15 UI checks PASS (one harness await artifact); npm test/Gradle locally NOT RUN (no toolchain); CI is the authoritative gate. Snapshot UTC 2026-11-12T04:50:00Z.
 - Previous reviewed snapshot: [CURRENT_STATUS_20261111T192431Z.md](./CURRENT_STATUS_20261111T192431Z.md) — current main `0145b03db05abd9ca4554431f9a9f690f13f497c`; 755 branches / 8 open PRs / 23 open issues; Android, Ubuntu/Windows contracts and desktop CI PASS after #744; #648 API 36 instrumentation process-start still unresolved with new diagnostics queued; #747 disclosure CI 4/4 PASS; #749 desktop cancellation follow-up Desktop CI PASS and remaining checks running. Snapshot UTC 2026-11-11T19:24:31.951Z.
 
