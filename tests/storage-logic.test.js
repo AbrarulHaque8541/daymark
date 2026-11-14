@@ -29,6 +29,10 @@ function fakeStorage(initial) {
 test('every daymark storage key the prototype uses is covered by exactly one category', () => {
   const expectedKeys = [
     'daymark.tasks.v1',
+    // Cross-tab write coordination for the task store. It belongs to the tasks
+    // category so clearing tasks also resets the counter; otherwise a stale
+    // generation could let a cleared snapshot be written back.
+    'daymark.tasks.mutation.generation.v1',
     'daymark.tasks.v1.backup',
     'daymark.focus.v1',
     'daymark.focus.preset.v1',
@@ -103,7 +107,8 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
 });
 
 test('planClear returns the exact keys and rejects unknown categories', () => {
-  assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
+  assert.deepEqual(storage.planClear('tasks'),
+    ['daymark.tasks.v1', 'daymark.tasks.mutation.generation.v1']);
   assert.deepEqual(storage.planClear('focus-preset'), ['daymark.focus.preset.v1']);
   assert.deepEqual(storage.planClear('browser-proxy'), ['daymark.browser-proxy.last-profile']);
   assert.deepEqual(storage.planClear('webhook-queue'), ['daymark.webhook.queue.v1']);
@@ -121,7 +126,8 @@ test('planClear returns the exact keys and rejects unknown categories', () => {
   // The plan is a copy: mutating it must not change future plans.
   const plan = storage.planClear('tasks');
   plan.push('daymark.tasks.v1');
-  assert.deepEqual(storage.planClear('tasks'), ['daymark.tasks.v1']);
+  assert.deepEqual(storage.planClear('tasks'),
+    ['daymark.tasks.v1', 'daymark.tasks.mutation.generation.v1']);
 });
 
 test('estimateBytes measures UTF-8 bytes and treats non-strings as zero', () => {

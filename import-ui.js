@@ -31,16 +31,16 @@
     } catch (error) {
       storageAccessFailed = true;
     }
-   //  
-    const mutation = env.taskMutationApi || root.DaymarkTaskMutation || null;
+    // One shared coordinator reference. Both names are accepted because app.js
+    // and the test harness have each injected this module under a different key;
+    // the two blocks below must never disagree about which object they hold.
+    const mutation = env.taskMutation || env.taskMutationApi
+      || root.DaymarkTaskMutation || null;
     let lockManager = env.lockManager || null;
     try { lockManager = lockManager || (win && win.navigator && win.navigator.locks) || null; }
     catch (error) { lockManager = null; }
     const importApi = env.importApi || root.DaymarkImport || null;
     const logic = env.logic || root.DaymarkLogic || null;
-   // //  con
-   // con st taskMutation = env.taskMutation || root.DaymarkTaskMutation || null;
-   //  const lockManager = env.lockManager || (win && win.navigator && win.navigator.locks) || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     let idCounter = 0;
     const makeId = () => {
@@ -114,31 +114,24 @@
       }
       const fileLabel = typeof file.name === 'string' && file.name ? file.name : 'the selected file';
       try {
-        if (!mutation || typeof mutation.readGeneration !== 'function'
-            || typeof mutation.commitTaskSnapshot !== 'function' || !lockManager) {
-          throw new Error('cross-tab task storage coordination is unavailable');
-        }
-        const startingGeneration = mutation.readGeneration(storage);
-        if (!startingGeneration.ok) throw new Error('task storage generation is unreadable');
-        if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
-          throw new Error('the file is larger than the 8 MB import limit');
-        }
+        // Report the most specific cause first: an unreadable store must not be
+        // described as a missing coordinator, and a blocked storage getter must
+        // not be described as an unreadable generation counter.
         if (storageAccessFailed || !storage || typeof storage.getItem !== 'function') {
           throw new Error('browser storage is unavailable; nothing was changed');
         }
+        if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_BYTES) {
+          throw new Error('the file is larger than the 8 MB import limit');
+        }
+        if (!mutation || typeof mutation.readGeneration !== 'function'
+            || typeof mutation.commitTaskSnapshot !== 'function' || !lockManager) {
+          throw new Error('safe cross-tab task coordination is unavailable');
+        }
+        const startingGeneration = mutation.readGeneration(storage);
+        if (!startingGeneration.ok) throw new Error('task storage generation is unreadable');
         if (!logic || typeof logic.validateStoredTasks !== 'function'
           || typeof logic.hasDuplicateJsonKeys !== 'function') {
           throw new Error('task logic is unavailable');
-        }
-        if (!taskMutation || typeof taskMutation.readTaskGeneration !== 'function'
-            || typeof taskMutation.commitTaskSnapshot !== 'function') {
-          throw new Error('safe cross-tab task-generation coordination is unavailable; nothing was changed');
-        }
-        // Capture the import intent before awaiting File.text/FileReader. A
-        // Clear All that overtakes the read invalidates this import at commit.
-        const generation = taskMutation.readTaskGeneration(storage);
-        if (!generation.ok) {
-          throw new Error('the task generation could not be read safely; nothing was changed');
         }
         const raw = storage.getItem(STORAGE_KEY);
         let stored = [];
@@ -183,10 +176,30 @@
             validateTasks: logic.validateStoredTasks
           });
           if (!result.ok) {
-            if (result.reason === 'cleared') throw new Error('local data was cleared while this file was being read; nothing was imported');
-            if (result.reason === 'conflict') throw new Error('a task changed in another tab; nothing was imported');
+            // Map the coordinator's reason to a specific, actionable sentence.
+            // A generic message here would hide whether nothing was written, the
+            // store rejected the write, or another tab won the race.
+            if (result.reason === 'cleared' || result.reason === 'task-clear-in-progress') {
+              throw new Error('local data was cleared while this file was being read; nothing was imported');
+            }
+            if (result.reason === 'conflict' || result.reason === 'tasks-ambiguous'
+                || result.reason === 'invalid-snapshot') {
+              throw new Error('a task changed in another tab; nothing was imported');
+            }
+            if (result.reason === 'task-write-failed' || result.reason === 'generation-write-failed') {
+              throw new Error('browser storage rejected the task write; nothing was imported');
+            }
+            if (result.reason === 'storage-unavailable') {
+              throw new Error('browser storage is unavailable; nothing was changed');
+            }
+            if (result.reason === 'backup-failed' || result.reason === 'pre-commit-failed') {
+              throw new Error('saved tasks could not be backed up before the import; nothing was imported');
+            }
             throw new Error('tasks could not be saved safely; nothing was imported');
           }
+          // The commit owns the authoritative count: a concurrent writer may have
+          // added rows while the file was being read, so report what was stored.
+          addedCount = merge.added.length;
           notifySaved();
         }
         const parts = [];
