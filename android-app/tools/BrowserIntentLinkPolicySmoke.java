@@ -84,6 +84,12 @@ public final class BrowserIntentLinkPolicySmoke {
                 "selectors and bare Intent flags rejected");
         expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x10000000;end",
                 "arbitrary launch flags rejected");
+        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x00000001;end",
+                "URI read-grant flag rejected");
+        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x00000002;end",
+                "URI write-grant flag rejected");
+        expectFailure("intent://scan/#Intent;scheme=zxing;launchFlags=0x00000003;end",
+                "combined URI read/write-grant flags rejected");
         expectFailure("intent://scan/#Intent;scheme=zxing;S.extra=secret;end",
                 "arbitrary extras rejected");
         expectFailure("intent://scan/#Intent;scheme=zxing;action=android.intent.action.SEND;end",

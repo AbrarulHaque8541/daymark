@@ -2696,17 +2696,56 @@ public final class MainActivity extends Activity {
         browserDiagnostics.record(System.currentTimeMillis(), "navigate requested", address, null);
         final String safeAddress;
         try {
-            safeAddress = BrowserAddress.requireAllowedWebUrl(address);
+            safeAddress = BrowserAddress.requireAllowedBrowserNavigation(address);
         } catch (IllegalArgumentException exception) {
             quickCaptureInput.setError(exception.getMessage());
             return;
         }
-        browserSelfHealingPolicy.onUserNavigation(safeAddress);
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
-            confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress));
+        String scheme = Uri.parse(safeAddress).getScheme();
+        BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+        if (route == BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED) {
+            showToast("File and content access stays disabled in Daymark for safety. Nothing was opened.");
             return;
         }
-        loadBrowserAddress(safeAddress);
+        String destination = safeAddress;
+        if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
+            Intent external = BrowserUriHandoff.createBrowsableViewIntent(Uri.parse(safeAddress), null);
+            BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null);
+            return;
+        }
+        if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
+            final BrowserIntentLinkPolicy.Decision decision;
+            try {
+                decision = BrowserIntentLinkPolicy.parse(safeAddress);
+            } catch (IllegalArgumentException invalid) {
+                showToast("This Android app link was not opened: " + invalid.getMessage());
+                return;
+            }
+            Uri target = Uri.parse(decision.targetUri);
+            if (BrowserUriRoutingPolicy.isWebScheme(target.getScheme())) {
+                try {
+                    // Even verified App Links and package-qualified intent fallbacks stay in Daymark.
+                    destination = BrowserAddress.requireAllowedWebUrl(decision.targetUri);
+                } catch (IllegalArgumentException invalid) {
+                    showToast("This Android app link contains an invalid web address.");
+                    return;
+                }
+            } else {
+                Intent external = BrowserUriHandoff.createBrowsableViewIntent(
+                        target, decision.packageName);
+                Runnable fallback = decision.fallbackUrl == null
+                        ? null : () -> navigateBrowserTo(decision.fallbackUrl);
+                BrowserUriHandoff.confirmAndOpen(this, external, decision.targetUri, fallback);
+                return;
+            }
+        }
+        final String webAddress = destination;
+        browserSelfHealingPolicy.onUserNavigation(webAddress);
+        if (!browserNetworkPolicy.allowsRemoteLoads()) {
+            confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress));
+            return;
+        }
+        loadBrowserAddress(webAddress);
     }
 
     private void loadBrowserAddress(String address) {

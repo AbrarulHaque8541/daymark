@@ -306,7 +306,7 @@ assert "browserPreferences.edit().putBoolean" not in online_pref, "preference re
 assert "static boolean hasExplicitOptIn(boolean savedOnlineChoice, boolean savedConsent)" in network_policy
 assert "browserOnlineToggle = null;" in activity and "Internet access is requested when you search or open a site." in activity, "browser UI must not expose an Online/Offline toggle"
 assert "new CheckBox(this)" not in activity[activity.index("private View buildBrowserAddressBar()"):activity.index("private void navigateFromBrowserInput()")], "address bar must not create an Online/Offline checkbox"
-assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress))" in activity, "first navigation should continue after explicit network consent"
+assert "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in activity, "first web navigation should continue after explicit network consent"
 assert "confirmBrowserOnlineAccess()" in activity and "setPositiveButton(\"Enable Online\"" in activity, "Online must require confirmation after its disclosure"
 online_setter = activity.split("private void setBrowserOnlineEnabled(boolean enabled)", 1)[1].split("private void confirmBrowserOnlineAccess()", 1)[0]
 assert ".putBoolean(BROWSER_ONLINE_EXPLICIT_OPT_IN_KEY, true)" in online_setter, "the explicit opt-in marker must be saved only when Online is enabled"
@@ -402,7 +402,13 @@ for method in ("navigateFromInput", "navigateFromBrowserInput"):
     body = re.search(r"private void " + method + r"\([^)]*\)\s*\{(.*?)\n    \}", activity, re.S)
     assert body and "navigateBrowserTo(address)" in body.group(1), f"{method} must use the validated browser navigation path"
 navigate_browser = re.search(r"private void navigateBrowserTo\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
-assert navigate_browser and "confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress))" in navigate_browser.group(1), "first navigation from Offline must request consent then continue the requested page"
+assert navigate_browser and "BrowserAddress.requireAllowedBrowserNavigation(address)" in navigate_browser.group(1), "typed browser navigation must use the scheme-aware navigation validator"
+assert navigate_browser and "BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED" in navigate_browser.group(1), "file/content navigation must explain the unchanged local-access isolation"
+assert navigate_browser and "BrowserUriRoutingPolicy.routeForScheme(scheme)" in navigate_browser.group(1), "typed scheme routing must happen inside navigateBrowserTo before WebView loadUrl"
+assert navigate_browser and navigate_browser.group(1).index("BrowserUriRoutingPolicy.routeForScheme(scheme)") < navigate_browser.group(1).index("loadBrowserAddress(webAddress)"), "typed URI routing must decide handoff or WebView before app-initiated loadUrl"
+assert navigate_browser and "BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null)" in navigate_browser.group(1), "typed external schemes must require explicit confirmation before Android handoff"
+assert navigate_browser and "confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress))" in navigate_browser.group(1), "web navigation from Offline must request consent then continue the requested page"
+assert navigate_browser and navigate_browser.group(1).index("BrowserUriHandoff.confirmAndOpen") < navigate_browser.group(1).index("confirmBrowserOnlineAccess"), "external handoffs must not be blocked by the web network-consent path"
 load_address = re.search(r"private void loadBrowserAddress\(String address\)\s*\{(.*?)\n    \}", activity, re.S)
 assert load_address and "browserNetworkPolicy.allowsRemoteLoads()" in load_address.group(1), "final page-load boundary must still fail closed while Offline"
 online_setting = re.search(r"private void setBrowserOnlineEnabled\(boolean enabled\)\s*\{(.*?)\n    \}", activity, re.S)

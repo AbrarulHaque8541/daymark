@@ -52,6 +52,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserExtension.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserAddress.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserUriRoutingPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadFilenamePolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadProgress.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDownloadEnqueueGate.java" \

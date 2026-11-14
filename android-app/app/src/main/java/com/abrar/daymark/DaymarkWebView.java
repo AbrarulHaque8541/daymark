@@ -77,8 +77,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
 
         android.net.Uri target = android.net.Uri.parse(decision.targetUri);
         String scheme = target.getScheme();
-        boolean webTarget = "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
-        if (webTarget && decision.packageName == null) {
+        if (BrowserUriRoutingPolicy.isWebScheme(scheme)) {
             if (!networkPolicy.allowsRemoteLoads()) {
                 listener.onOfflineNavigationBlocked();
                 return true;
@@ -92,95 +91,19 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             return true;
         }
 
-        android.content.Intent external = new android.content.Intent(
-                android.content.Intent.ACTION_VIEW, target);
-        external.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
-        if (decision.packageName != null) external.setPackage(decision.packageName);
-        try {
-            android.content.pm.ResolveInfo resolved = view.getContext().getPackageManager()
-                    .resolveActivity(external, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
-            if (resolved == null) throw new android.content.ActivityNotFoundException();
-            view.getContext().startActivity(android.content.Intent.createChooser(
-                    external, "Open with — cancel to stay in Daymark"));
-            return true;
-        } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
-            String fallback = decision.fallbackUrl;
-            if (fallback != null && BrowserAddress.isAllowedWebUrl(fallback)) {
-                if (networkPolicy.allowsRemoteLoads()) {
-                    syncNetworkBlockWithPolicy(view);
-                    view.loadUrl(fallback);
-                } else listener.onOfflineNavigationBlocked();
+        android.content.Intent external = BrowserUriHandoff.createBrowsableViewIntent(
+                target, decision.packageName);
+        Runnable fallback = decision.fallbackUrl == null ? null : () -> {
+            if (networkPolicy.allowsRemoteLoads()) {
+                syncNetworkBlockWithPolicy(view);
+                view.loadUrl(decision.fallbackUrl);
             } else {
-                android.widget.Toast.makeText(view.getContext(),
-                        "No compatible app found. This page remains open.",
-                        android.widget.Toast.LENGTH_SHORT).show();
+                listener.onOfflineNavigationBlocked();
             }
-            return true;
-        }
-    }
-
-    private boolean handOffVerifiedAppLink(WebView view, android.net.Uri uri) {
-        android.content.Intent appLink = new android.content.Intent(
-                android.content.Intent.ACTION_VIEW, uri);
-        appLink.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
-        android.content.pm.PackageManager packageManager = view.getContext().getPackageManager();
-        android.content.pm.ResolveInfo resolved = packageManager.resolveActivity(appLink,
-                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
-                        | android.content.pm.PackageManager.GET_RESOLVED_FILTER);
-        if (resolved == null || resolved.activityInfo == null || resolved.filter == null
-                || !resolved.isDefault || resolved.filter.countDataAuthorities() == 0) {
-            return false; // No default handler with an explicit host filter; keep the URL in Daymark.
-        }
-        boolean specificHost = false;
-        for (int i = 0; i < resolved.filter.countDataAuthorities(); i++) {
-            android.content.IntentFilter.AuthorityEntry authority =
-                    resolved.filter.getDataAuthority(i);
-            String filterHost = authority == null ? null : authority.getHost();
-            if (filterHost == null || filterHost.startsWith("*")) continue;
-            if (filterHost.equalsIgnoreCase(uri.getHost())
-                    && authority.match(uri) != android.content.IntentFilter.NO_MATCH_DATA) {
-                specificHost = true;
-                break;
-            }
-        }
-        if (!specificHost) {
-            return false; // Generic browser/wildcard filters never count as App Links.
-        }
-        // A default/browsable filter is not proof of verified domain ownership.
-        // Android 12+ exposes the per-host verification and user-selection state.
-        // Direct handoff requires that state; otherwise the original URL stays in Daymark.
-        if (!isVerifiedAppLinkApproved(view.getContext(),
-                resolved.activityInfo.packageName, uri.getHost())) {
-            Log.i("DaymarkWebView", "app link handoff declined origin="
-                    + BrowserLogPolicy.redactedOrigin(uri.toString())
-                    + " reason=host-not-verified-or-user-selected");
-            return false;
-        }
-        try {
-            view.getContext().startActivity(appLink);
-            return true;
-        } catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
-            return false; // Resolver changed or app declined: continue the original URL in WebView.
-        }
-    }
-
-    private boolean isVerifiedAppLinkApproved(android.content.Context context,
-                                             String packageName, String host) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false;
-        try {
-            android.content.pm.verify.domain.DomainVerificationManager manager =
-                    context.getSystemService(
-                            android.content.pm.verify.domain.DomainVerificationManager.class);
-            if (manager == null) return false;
-            android.content.pm.verify.domain.DomainVerificationUserState state =
-                    manager.getDomainVerificationUserState(packageName);
-            return state != null && BrowserAppLinkApproval.isApproved(
-                    Build.VERSION.SDK_INT, state.isLinkHandlingAllowed(),
-                    host, state.getHostToStateMap());
-        } catch (android.content.pm.PackageManager.NameNotFoundException
-                 | RuntimeException unavailable) {
-            return false;
-        }
+        };
+        BrowserUriHandoff.confirmAndOpen(
+                view.getContext(), external, decision.targetUri, fallback);
+        return true;
     }
 
     private final ExtensionRuntime extensionRuntime;
@@ -283,29 +206,35 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                     }
                     return handleIntentLink(view, url);
                 }
-                // Verified HTTP(S) App Links may open in their owning app after a top-level
-                // user gesture. Generic browser handlers remain inside Daymark.
-                if (request.isForMainFrame() && request.hasGesture()
-                        && BrowserAddress.isAllowedWebUrl(url)
-                        && handOffVerifiedAppLink(view, request.getUrl())) {
+                // Verified HTTP(S) App Links stay in Daymark like every other web address.
+                BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+                if (route == BrowserUriRoutingPolicy.Route.LOCAL_ACCESS_RESTRICTED) {
+                    if (request.isForMainFrame()) {
+                        android.widget.Toast.makeText(view.getContext(),
+                                "File and content access stays disabled in Daymark for safety. Nothing was opened.",
+                                android.widget.Toast.LENGTH_LONG).show();
+                    }
                     return true;
                 }
-
-                if (BrowserAddress.shouldHandOffExternalScheme(request.isForMainFrame(),
-                        request.hasGesture(), scheme)) {
-                    try {
-                        android.content.Intent external = new android.content.Intent(
-                                android.content.Intent.ACTION_VIEW, request.getUrl());
-                        external.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
-                        android.content.Intent chooser = android.content.Intent.createChooser(
-                                external, "Open with — cancel to stay in Daymark");
-                        view.getContext().startActivity(chooser);
-                    } catch (android.content.ActivityNotFoundException
-                             | SecurityException unavailable) {
-                        android.widget.Toast.makeText(view.getContext(),
-                                "No compatible app found. This page remains open.",
-                                android.widget.Toast.LENGTH_SHORT).show();
+                if (route == BrowserUriRoutingPolicy.Route.WEBVIEW
+                        && !BrowserUriRoutingPolicy.isWebScheme(scheme)) {
+                    // Script/data/blob/about navigations stay in System WebView; network
+                    // requests remain subject to the existing WebView network policy.
+                    return false;
+                }
+                if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
+                    if (!BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(
+                            request.isForMainFrame(), request.hasGesture(), scheme)) {
+                        if (request.isForMainFrame() && !request.hasGesture()) {
+                            android.widget.Toast.makeText(view.getContext(),
+                                    "Tap the link to confirm opening it in another app.",
+                                    android.widget.Toast.LENGTH_SHORT).show();
+                        }
+                        return true;
                     }
+                    android.content.Intent external = BrowserUriHandoff.createBrowsableViewIntent(
+                            request.getUrl(), null);
+                    BrowserUriHandoff.confirmAndOpen(view.getContext(), external, url, null);
                     return true;
                 }
                 if ("daymark-download".equalsIgnoreCase(request.getUrl().getScheme())) {

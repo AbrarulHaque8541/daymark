@@ -6,6 +6,8 @@ PR [#779](https://github.com/AbrarulHaque8541/daymark/pull/779) is OPEN and unme
 
 The change adds an optional, hidden-when-empty native Saved sites rail to Android browser blank tabs. It shows up to four newest origins from the existing saved-bookmark preference, keeps origin-only persistence unchanged, labels HTTP shortcuts as not encrypted, and refreshes on blank-tab creation/switch, return home, and bookmark clearing. No browser history is used to infer shortcuts. No URI-scheme routing changes are included; existing HTTP/HTTPS behavior remains unchanged while the owner’s per-scheme routing instruction is unresolved.
 
+> **Historical snapshot, superseded:** The details below describe state at `2026-11-14T18:11:51Z`, when PR #779 was at `0e137da77650d5a5c3f94461b25ecbf1a6bb6448` and URI routing was still unresolved. See [the newer status snapshot](./CURRENT_STATUS_20261114T185706Z.md) for the later route, verification, and blocker state. The SHA and check counts below are historical, not live.
+
 ### Verification at head 0e137da77650d5a5c3f94461b25ecbf1a6bb6448
 
 - `sh android-app/tools/run-core-tests.sh` — PASS, including the 9-assertion bookmark-shortcut smoke and source integration guard.
