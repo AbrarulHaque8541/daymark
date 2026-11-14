@@ -6647,7 +6647,7 @@ public final class MainActivity extends Activity {
                 saveTasksAsync();
                 showToast(current.completed ? "Task reopened." : "Task completed.");
             } else {
-                showSwipeTaskActions(current);
+                showTaskActions(current);
             }
         });
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -6748,7 +6748,7 @@ public final class MainActivity extends Activity {
         more.setPadding(0, 0, 0, 0);
         more.setContentDescription("Task actions for: " + task.title);
         more.setEnabled(canEdit());
-        more.setOnClickListener(view -> showSwipeTaskActions(task));
+        more.setOnClickListener(view -> showTaskActions(task));
         row.addView(more, new LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         checkBox.setOnCheckedChangeListener((button, checked) -> {
@@ -6759,32 +6759,6 @@ public final class MainActivity extends Activity {
             saveTasksAsync();
         });
         return row;
-    }
-
-    private void showSwipeTaskActions(Task task) {
-        if (task == null || !canEdit()) return;
-        String[] actions = {"Edit task", task.completed ? "Mark as not done" : "Mark as done",
-                "Task options", "Manage attachments", "Delete task"};
-        new AlertDialog.Builder(this)
-                .setTitle(task.title)
-                .setItems(actions, (dialog, which) -> {
-                    Task current = findTask(task.id);
-                    if (current == null || !canEdit()) return;
-                    if (which == 0) {
-                        showTaskEditor(current);
-                    } else if (which == 1) {
-                        replaceTask(TaskLogic.toggleCompleted(current));
-                        render();
-                        saveTasksAsync();
-                    } else if (which == 2) {
-                        showTaskActions(current);
-                    } else if (which == 3) {
-                        showAttachmentManager(current);
-                    } else if (which == 4) {
-                        confirmDeleteTask(current);
-                    }
-                })
-                .show();
     }
 
     private final class SwipeTaskRow extends LinearLayout {
@@ -6940,10 +6914,9 @@ public final class MainActivity extends Activity {
     private void showTaskActions(Task task) {
         if (task == null || !canEdit()) return;
         String[] actions = {
-                "Duplicate task", "Mark as done", "Move due date to today",
-                "Move due date to tomorrow", "Clear due date",
-                "Set high priority", "Set medium priority", "Set low priority",
-                "Save as template"
+                "Edit task", task.completed ? "Mark as not done" : "Mark as done",
+                "Set due date", "Set priority", "Duplicate task", "Manage attachments",
+                "Save as template", "Delete task"
         };
         new AlertDialog.Builder(this)
                 .setTitle(task.title)
@@ -6952,47 +6925,75 @@ public final class MainActivity extends Activity {
                     if (current == null || !canEdit()) return;
                     try {
                         if (which == 0) {
+                            showTaskEditor(current);
+                        } else if (which == 1) {
+                            replaceTask(TaskLogic.toggleCompleted(current));
+                            render();
+                            saveTasksAsync();
+                        } else if (which == 2) {
+                            showTaskDueDateActions(current);
+                        } else if (which == 3) {
+                            showTaskPriorityActions(current);
+                        } else if (which == 4) {
                             String copyTitle = current.title;
                             if (!copyTitle.endsWith(" (copy)")) copyTitle += " (copy)";
                             tasks.add(TaskLogic.create(copyTitle, current.dueDate, current.priority));
                             render();
                             saveTasksAsync();
                             showToast("Task duplicated.");
-                        } else if (which == 1) {
-                            if (!current.completed) {
-                                replaceTask(TaskLogic.toggleCompleted(current));
-                                render();
-                                saveTasksAsync();
-                            }
-                            showToast("Task marked done.");
-                        } else if (which == 2) {
-                            replaceTask(TaskLogic.update(current, current.title, LocalDate.now().toString(), current.priority));
-                            render();
-                            saveTasksAsync();
-                            showToast("Due date moved to today.");
-                        } else if (which == 3) {
-                            replaceTask(TaskLogic.update(current, current.title, LocalDate.now().plusDays(1).toString(), current.priority));
-                            render();
-                            saveTasksAsync();
-                            showToast("Due date moved to tomorrow.");
-                        } else if (which == 4) {
-                            replaceTask(TaskLogic.update(current, current.title, null, current.priority));
-                            render();
-                            saveTasksAsync();
-                            showToast("Due date cleared.");
-                        } else if (which == 5 || which == 6 || which == 7) {
-                            String priority = which == 5 ? "high" : which == 6 ? "medium" : "low";
-                            replaceTask(TaskLogic.update(current, current.title, current.dueDate, priority));
-                            render();
-                            saveTasksAsync();
-                            showToast("Priority set to " + priority + ".");
-                        } else if (which == 8) {
+                        } else if (which == 5) {
+                            showAttachmentManager(current);
+                        } else if (which == 6) {
                             if (taskTemplates.size() >= TaskTemplateLogic.MAX_TEMPLATES) throw new IllegalStateException("Template limit reached.");
                             taskTemplates.add(TaskTemplateLogic.create(current.title, current.dueDate, current.priority));
                             saveTasksAsync("Saving templates");
                             render();
                             showToast("Template saved.");
+                        } else if (which == 7) {
+                            confirmDeleteTask(current);
                         }
+                    } catch (Exception exception) {
+                        showToast("Could not update this task.");
+                    }
+                }).show();
+    }
+
+    private void showTaskDueDateActions(Task task) {
+        if (task == null || !canEdit()) return;
+        String[] actions = {"Move due date to today", "Move due date to tomorrow", "Clear due date"};
+        new AlertDialog.Builder(this)
+                .setTitle("Set due date")
+                .setItems(actions, (dialog, which) -> {
+                    Task current = findTask(task.id);
+                    if (current == null || !canEdit()) return;
+                    try {
+                        String dueDate = which == 0 ? LocalDate.now().toString()
+                                : which == 1 ? LocalDate.now().plusDays(1).toString() : null;
+                        replaceTask(TaskLogic.update(current, current.title, dueDate, current.priority));
+                        render();
+                        saveTasksAsync();
+                        showToast(which == 0 ? "Due date moved to today."
+                                : which == 1 ? "Due date moved to tomorrow." : "Due date cleared.");
+                    } catch (Exception exception) {
+                        showToast("Could not update this task.");
+                    }
+                }).show();
+    }
+
+    private void showTaskPriorityActions(Task task) {
+        if (task == null || !canEdit()) return;
+        String[] actions = {"Set high priority", "Set medium priority", "Set low priority"};
+        new AlertDialog.Builder(this)
+                .setTitle("Set priority")
+                .setItems(actions, (dialog, which) -> {
+                    Task current = findTask(task.id);
+                    if (current == null || !canEdit()) return;
+                    try {
+                        String priority = which == 0 ? "high" : which == 1 ? "medium" : "low";
+                        replaceTask(TaskLogic.update(current, current.title, current.dueDate, priority));
+                        render();
+                        saveTasksAsync();
+                        showToast("Priority set to " + priority + ".");
                     } catch (Exception exception) {
                         showToast("Could not update this task.");
                     }

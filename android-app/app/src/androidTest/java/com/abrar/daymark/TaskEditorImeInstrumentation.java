@@ -643,6 +643,12 @@ final class TaskEditorImeInstrumentation {
         });
         require(actions[0] != null && opened[0], "the saved test task exposes its actions", assertions);
         AccessibilityNodeInfo actionRoot = awaitDialogRootContaining(instrumentation, title, "Delete task");
+        require(hasVisibleTouchBounds(findActionNodeByText(actionRoot, "Duplicate task")),
+                "Duplicate task is directly available in the first task action list", assertions);
+        require(hasVisibleTouchBounds(findActionNodeByText(actionRoot, "Set due date")),
+                "date choices are directly discoverable from the first task action list", assertions);
+        require(findActionNodeByText(actionRoot, "Task options") == null,
+                "the task action list no longer routes through a generic nested Task options menu", assertions);
         AccessibilityNodeInfo deleteItem = findActionNodeByText(actionRoot, "Delete task");
         require(hasVisibleTouchBounds(deleteItem), "the task action list offers a visible Delete task target", assertions);
         require(tapNode(instrumentation, deleteItem), "the test task Delete action accepts a touch or accessibility click", assertions);

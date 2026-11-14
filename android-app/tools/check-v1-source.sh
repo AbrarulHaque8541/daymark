@@ -534,10 +534,13 @@ assert "16f * textScale" in activity and "readerFontSize[0] = Math.max(14f, read
 assert "textSizeMode == 0 ? 0.9f : textSizeMode == 2 ? 1.25f : 1.0f" in activity, "compact/standard/extra-large text choices changed"
 for label in ("Search tasks by title", "Clear task search", "Choose low, medium, or high priority", "Mark \u201c"):
     assert label in activity, f"missing screen-reader label source: {label}"
-# Task-row Edit/Delete buttons are consolidated into one accessible overflow menu.
+# Task-row actions are consolidated into one accessible, contextual overflow menu.
 assert 'more.setContentDescription("Task actions for: "' in activity, "task overflow must have a task-specific screen-reader label"
 assert '"Edit task", task.completed ? "Mark as not done" : "Mark as done"' in activity, "task overflow must expose edit and completion actions"
-assert '"Task options", "Manage attachments", "Delete task"' in activity, "task overflow must expose options, attachments, and delete actions"
+for label in ('"Set due date"', '"Set priority"', '"Duplicate task"', '"Manage attachments"', '"Save as template"', '"Delete task"'):
+    assert label in activity, f"task overflow must expose {label} directly"
+assert '"Task options"' not in activity, "the task overflow must not require a generic nested Task options menu"
+assert "showTaskDueDateActions(current)" in activity and "showTaskPriorityActions(current)" in activity, "date and priority choices must remain available from clear submenus"
 assert "setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE)" in activity
 assert "screen text is English only" in activity, "language limitations must remain explicit"
 task_logic = (main / "java/com/abrar/daymark/TaskLogic.java").read_text(encoding="utf-8")
