@@ -1,4 +1,5 @@
-- [Daymark engineering status — 2026-11-16T04:30:00Z (Cycle A: MainActivity restore prepared)](./CURRENT_STATUS_20261116T043000Z.md)
+- [Daymark engineering status — 2026-11-16T05:10:00Z (Cycle A: MainActivity fully restored on PR #779)](./CURRENT_STATUS_20261116T051000Z.md)
+- [Daymark engineering status — 2026-11-15T21:40:00Z (Cycle B: MainActivity restore prepared)](./CURRENT_STATUS_20261115T214000Z.md)
 - [Daymark engineering status — 2026-11-16T01:35:00Z (Cycle A: Android bookmark shortcuts PR progress)](./CURRENT_STATUS_20261116T013500Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
 - [Daymark engineering status - 2026-11-15T06:05:00Z (Cycle A clear-search polish)](./CURRENT_STATUS_20261115T060500Z.md)
@@ -21,7 +22,8 @@
 
 # Agent status index
 
-- [CURRENT_STATUS_20261116T043000Z.md](./CURRENT_STATUS_20261116T043000Z.md) — Cycle A: complete MainActivity restore from 51737d6 with scheme-aware load and press feedback prepared; ready to push full file. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261116T051000Z.md](./CURRENT_STATUS_20261116T051000Z.md) — Cycle A: full MainActivity restored on PR #779 with scheme-aware Offline paths, Saved sites polish, and source checks PASS. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T013500Z.md](./CURRENT_STATUS_20261116T013500Z.md) — Cycle A: progress on open Android bookmark PR #779 (security marker + URI routing guards). Physical device NOT TESTED.
 - Previous snapshots remain for history.
 

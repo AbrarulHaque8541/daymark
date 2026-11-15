@@ -1,115 +1,14 @@
-name: restore-mainactivity-emergency
+name: Restore MainActivity emergency
+
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   restore:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/android-bookmark-newtab-20261114
-          fetch-depth: 0
-      - name: Restore MainActivity from 51737d6f and apply Cycle B fixes
-        run: |
-          git show 51737d6f07e046529b13bd5ea1f29865c78f9db9:android-app/app/src/main/java/com/abrar/daymark/MainActivity.java > android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
-          python3 << 'PY2'
-          from pathlib import Path
-          path = Path("android-app/app/src/main/java/com/abrar/daymark/MainActivity.java")
-          text = path.read_text(encoding="utf-8")
-          old_sig = "    private boolean ensureBrowserWebView(boolean allowOfflineLocalNavigation) {"
-          new_sig = """    private boolean ensureBrowserWebView() {
-        return ensureBrowserWebView(false);
-    }
-
-    private boolean ensureBrowserWebView(boolean allowOfflineLocalNavigation) {"""
-          if "return ensureBrowserWebView(false);" not in text:
-              text = text.replace(old_sig, new_sig, 1)
-          old_load = """    private void loadBrowserAddress(String address) {
-        if (!webMode) return;
-        String scheme = android.net.Uri.parse(address).getScheme();
-        if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme) || browserNetworkPolicy.allowsRemoteLoads()) {
-            if (browserNetworkPolicy.allowsRemoteLoads()) {
-                if (!ensureBrowserWebView()) {
-                    showBrowserOfflineStatus();
-                    return;
-                }
-                try {
-                    BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-                    BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
-                    browserWebView.onResume();
-                    browserWebView.resumeTimers();
-                } catch (SecurityException denied) {
-                    setBrowserOnlineEnabled(false);
-                    if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
-                    showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
-                    return;
-                }
-            }
-            // Continue to load for permitted schemes even if offline
-        } else {
-            showBrowserOfflineStatus();
-            return;
-        }
-        if (!ensureBrowserWebView()) {
-            showBrowserOfflineStatus();
-            return;
-        }
-"""
-          new_load = """    private void loadBrowserAddress(String address) {
-        if (!webMode) return;
-        String scheme = android.net.Uri.parse(address).getScheme();
-        if (!(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme) || browserNetworkPolicy.allowsRemoteLoads())) {
-            showBrowserOfflineStatus();
-            return;
-        }
-        if (!ensureBrowserWebView(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme))) {
-            showBrowserOfflineStatus();
-            return;
-        }
-        if (browserNetworkPolicy.allowsRemoteLoads()) {
-            try {
-                BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-                BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
-                browserWebView.onResume();
-                browserWebView.resumeTimers();
-            } catch (SecurityException denied) {
-                setBrowserOnlineEnabled(false);
-                if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
-                showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
-                return;
-            }
-        }
-"""
-          if old_load in text:
-              text = text.replace(old_load, new_load, 1)
-          old_chip = """        chip.setBackground(pressable(palette.surface, 20, palette.line, palette.text, palette.muted));
-        chip.addView(text(label, 12, palette.text, Typeface.NORMAL));
-"""
-          new_chip = """        chip.setBackground(pressable(palette.surface, 20, palette.line, palette.text, palette.muted));
-        applyPressFeedback(chip);
-        chip.addView(text(label, 12, palette.text, Typeface.NORMAL));
-"""
-          idx = text.find("browserHomeChip")
-          idx2 = text.find("navigateFromInput")
-          if old_chip in text and "applyPressFeedback(chip);" not in text[idx:idx2]:
-              text = text.replace(old_chip, new_chip, 1)
-          old_rail = """            LinearLayout chip = browserHomeChip(labelText, "Open saved site " + origin, () -> navigateBrowserTo(origin));
-"""
-          new_rail = """            LinearLayout chip = browserHomeChip(labelText, "Open saved site " + origin, () -> {
-                showBrowserStatus("Opening saved site…");
-                navigateBrowserTo(origin);
-            });
-"""
-          if old_rail in text:
-              text = text.replace(old_rail, new_rail, 1)
-          path.write_text(text, encoding="utf-8")
-          assert "return ensureBrowserWebView(false);" in text
-          print("restored and patched", path.stat().st_size)
-          PY2
-          git config user.email "abrarbhai441@gmail.com"
-          git config user.name "Abrarul Haque"
-          git add android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
-          git commit -m "fix(android): restore MainActivity and complete offline WebView fail-closed paths"
-          git push origin HEAD:feat/android-bookmark-newtab-20261114
+      - name: Note
+        run: echo "MainActivity has been restored on the feature branch. This emergency workflow is no longer needed and is kept as a no-op for history."

@@ -66,14 +66,22 @@
     const checkButton = doc.createElement('button');
     checkButton.id = 'moon-check';
     checkButton.className = 'button button-primary';
-    if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
+    if (checkButton.setAttribute) {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('title', 'Compute moon phase for the date');
+      checkButton.setAttribute('aria-label', 'Compute moon phase for the date');
+    }
     checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
     clearButton.id = 'moon-clear';
     clearButton.className = 'button button-quiet';
-    if (clearButton.setAttribute) clearButton.setAttribute('type', 'button');
+    if (clearButton.setAttribute) {
+      clearButton.setAttribute('type', 'button');
+      clearButton.setAttribute('title', 'Clear the moon phase result');
+      clearButton.setAttribute('aria-label', 'Clear the moon phase result');
+    }
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
@@ -121,9 +129,16 @@
     const statusEl = element('moon-status');
     const resultEl = element('moon-result');
     const clearEl = element('moon-clear');
+    const checkEl = element('moon-check');
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+
+    function setBusy(busy) {
+      if (checkEl) checkEl.disabled = busy;
+      if (clearEl) clearEl.disabled = busy;
+      if (inputEl) inputEl.disabled = busy;
     }
 
     function render(record) {
@@ -149,6 +164,8 @@
         status('Moon phase is unavailable.');
         return;
       }
+      setBusy(true);
+      status('Computing on this device…');
       const typed = inputEl && typeof inputEl.value === 'string' ? inputEl.value.trim() : '';
       try {
         const record = logicApi.moonPhaseInfo(typed || undefined, { now: now });
@@ -161,16 +178,20 @@
           while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
           resultEl.textContent = '';
         }
+      } finally {
+        setBusy(false);
       }
     }
 
     function onClear() {
+      setBusy(true);
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
         resultEl.textContent = '';
       }
       status('Cleared. Leave the date empty for today, or type YYYY-MM-DD, and tap Check.');
+      setBusy(false);
     }
 
     status('Leave the date empty for today, or type YYYY-MM-DD, and tap Check. Works offline.');
