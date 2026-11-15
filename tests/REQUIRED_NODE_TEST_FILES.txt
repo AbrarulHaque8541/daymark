@@ -53,6 +53,8 @@ tests/ics-import.test.js
 tests/import-logic.test.js
 tests/import-ui.test.js
 tests/markup-hygiene.test.js
+tests/moon-logic.test.js
+tests/moon-ui.test.js
 tests/nightly-placeholder-guard.test.js
 tests/onthisday-logic.test.js
 tests/onthisday-ui.test.js
