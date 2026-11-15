@@ -38,7 +38,7 @@
     const description = doc.createElement('p');
     description.className = 'briefing-description';
     description.id = 'onthisday-description';
-    description.textContent = 'Before Check: today\u2019s date is sent to the free public Wikimedia Feed API (api.wikimedia.org) to fetch selected historical events. This happens only after you tap Check. Nothing is saved on this device. No account or API key.';
+    description.textContent = 'Before Check: today’s date is sent to the free public Wikimedia Feed API (api.wikimedia.org) to fetch selected historical events. This happens only after you tap Check. Nothing is saved on this device. No account or API key.';
     aside.appendChild(description);
 
     const form = doc.createElement('form');
@@ -68,14 +68,20 @@
     const checkButton = doc.createElement('button');
     checkButton.id = 'onthisday-check';
     checkButton.className = 'button button-primary';
-    if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
+    if (checkButton.setAttribute) {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('title', 'Check history for this date (Enter)');
+    }
     checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
     clearButton.id = 'onthisday-clear';
     clearButton.className = 'button button-quiet';
-    if (clearButton.setAttribute) clearButton.setAttribute('type', 'button');
+    if (clearButton.setAttribute) {
+      clearButton.setAttribute('type', 'button');
+      clearButton.setAttribute('title', 'Clear date and results (Escape)');
+    }
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
@@ -93,7 +99,7 @@
 
     const result = doc.createElement('div');
     result.id = 'onthisday-result';
-    result.className = 'feed-list';
+    result.className = 'feed-list onthisday-results';
     if (typeof result.setAttribute === 'function') result.setAttribute('aria-live', 'polite');
     aside.appendChild(result);
 
@@ -153,27 +159,45 @@
       while (resultEl.firstChild) {
         resultEl.removeChild(resultEl.firstChild);
       }
+      const list = doc.createElement('ul');
+      list.className = 'onthisday-event-list';
+      list.setAttribute('aria-label', 'Historical events');
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const paddedMonth = (record.month < 10 ? '0' + record.month : String(record.month));
       const dateLabel = paddedDay + '/' + paddedMonth;
       for (const event of record.events) {
-        const parts = [event.year + ': ' + event.text + (event.textTruncated ? ' (text truncated)' : '')];
-        if (event.pages.length) parts.push(event.pages.length + ' related page(s)' + (event.pagesTruncated ? ' (list truncated)' : ''));
-        resultEl.appendChild(doc.createTextNode(parts.join(' \u00b7 ') + ' \u00b7 '));
+        const item = doc.createElement('li');
+        item.className = 'onthisday-event';
+        const yearSpan = doc.createElement('strong');
+        yearSpan.className = 'onthisday-year';
+        yearSpan.textContent = event.year + ': ';
+        item.appendChild(yearSpan);
+        const textSpan = doc.createElement('span');
+        textSpan.textContent = event.text + (event.textTruncated ? ' (text truncated)' : '');
+        item.appendChild(textSpan);
         if (event.pages.length) {
           const link = doc.createElement('a');
           link.href = event.pages[0];
           link.textContent = 'Read';
+          link.className = 'onthisday-read';
           if (typeof link.setAttribute === 'function') {
             link.setAttribute('target', '_blank');
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about a ' + dateLabel + ' event from ' + event.year);
           }
-          resultEl.appendChild(link);
-          resultEl.appendChild(doc.createTextNode(' \u00b7 '));
+          item.appendChild(doc.createTextNode(' '));
+          item.appendChild(link);
+          if (event.pages.length > 1) {
+            item.appendChild(doc.createTextNode(' · ' + event.pages.length + ' related page(s)' + (event.pagesTruncated ? ' (list truncated)' : '')));
+          }
         }
+        list.appendChild(item);
       }
-      resultEl.appendChild(doc.createTextNode('Date checked: ' + dateLabel));
+      resultEl.appendChild(list);
+      const meta = doc.createElement('p');
+      meta.className = 'onthisday-meta';
+      meta.textContent = 'Date checked: ' + dateLabel;
+      resultEl.appendChild(meta);
     }
 
     async function onCheck() {
@@ -201,8 +225,8 @@
       try {
         const record = await logicApi.fetchOnThisDay(fetchImpl, options);
         render(record);
-        status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC \u00b7 not saved on this device');
+        status('Updated · ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
+          + ' UTC · not saved on this device');
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof logicApi.classifyOnThisDayError === 'function'
@@ -247,6 +271,9 @@
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
           if (typeof event.preventDefault === 'function') event.preventDefault();
           onCheck();
+        } else if (event && (event.key === 'Escape' || event.keyCode === 27)) {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          onClear();
         }
       });
     }

@@ -205,7 +205,10 @@ test('a successful check renders events with an accessible link', async () => {
   const result = doc.getElementById('onthisday-result');
   assert.ok(result.textContent.includes('1926'));
   assert.ok(result.textContent.includes('NBC opened with a radio show.'));
-  const link = result.children.find(c => c.tagName === 'a');
+  const list = result.children.find(c => c.tagName === 'ul');
+  assert.ok(list);
+  const item = list.children[0];
+  const link = item.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/NBC');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
