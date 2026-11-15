@@ -65,10 +65,31 @@
     }
     form.appendChild(input);
 
+    const chips = doc.createElement('div');
+    chips.className = 'date-chips';
+    chips.setAttribute && chips.setAttribute('aria-label', 'Quick dates');
+    const todayChip = doc.createElement('button');
+    todayChip.id = 'onthisday-chip-today';
+    todayChip.className = 'date-chip';
+    todayChip.type = 'button';
+    todayChip.textContent = 'Today';
+    const yesterdayChip = doc.createElement('button');
+    yesterdayChip.id = 'onthisday-chip-yesterday';
+    yesterdayChip.className = 'date-chip';
+    yesterdayChip.type = 'button';
+    yesterdayChip.textContent = 'Yesterday';
+    chips.appendChild(todayChip);
+    chips.appendChild(yesterdayChip);
+    form.appendChild(chips);
+
     const checkButton = doc.createElement('button');
     checkButton.id = 'onthisday-check';
     checkButton.className = 'button button-primary';
-    if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
+    if (checkButton.setAttribute) {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('aria-keyshortcuts', 'O');
+      checkButton.setAttribute('title', 'Check history (O)');
+    }
     checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
@@ -126,6 +147,8 @@
     const statusEl = element('onthisday-status');
     const resultEl = element('onthisday-result');
     const clearEl = element('onthisday-clear');
+    const todayChipEl = element('onthisday-chip-today');
+    const yesterdayChipEl = element('onthisday-chip-yesterday');
 
     let busy = false;
 
@@ -153,13 +176,17 @@
       while (resultEl.firstChild) {
         resultEl.removeChild(resultEl.firstChild);
       }
+      const list = doc.createElement('ul');
+      list.className = 'onthisday-events';
+      if (typeof list.setAttribute === 'function') list.setAttribute('aria-label', 'Historical events');
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const paddedMonth = (record.month < 10 ? '0' + record.month : String(record.month));
       const dateLabel = paddedDay + '/' + paddedMonth;
       for (const event of record.events) {
-        const parts = [event.year + ': ' + event.text + (event.textTruncated ? ' (text truncated)' : '')];
-        if (event.pages.length) parts.push(event.pages.length + ' related page(s)' + (event.pagesTruncated ? ' (list truncated)' : ''));
-        resultEl.appendChild(doc.createTextNode(parts.join(' \u00b7 ') + ' \u00b7 '));
+        const li = doc.createElement('li');
+        const text = doc.createElement('span');
+        text.textContent = event.year + ': ' + event.text + (event.textTruncated ? ' (text truncated)' : '');
+        li.appendChild(text);
         if (event.pages.length) {
           const link = doc.createElement('a');
           link.href = event.pages[0];
@@ -169,11 +196,19 @@
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about a ' + dateLabel + ' event from ' + event.year);
           }
-          resultEl.appendChild(link);
-          resultEl.appendChild(doc.createTextNode(' \u00b7 '));
+          li.appendChild(doc.createTextNode(' '));
+          li.appendChild(link);
+          if (event.pagesTruncated) {
+            li.appendChild(doc.createTextNode(' (list truncated)'));
+          }
         }
+        list.appendChild(li);
       }
-      resultEl.appendChild(doc.createTextNode('Date checked: ' + dateLabel));
+      resultEl.appendChild(list);
+      const meta = doc.createElement('p');
+      meta.className = 'feed-status';
+      meta.textContent = 'Date checked: ' + dateLabel;
+      resultEl.appendChild(meta);
     }
 
     async function onCheck() {
@@ -203,6 +238,9 @@
         render(record);
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
           + ' UTC \u00b7 not saved on this device');
+        if (win && typeof win.showToast === 'function') {
+          win.showToast('History updated');
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof logicApi.classifyOnThisDayError === 'function'
@@ -228,6 +266,29 @@
       status('Cleared. Leave the date empty for today, or type month/day, and tap Check.');
     }
 
+    function setDateAndCheck(mmdd) {
+      if (busy) return;
+      if (inputEl) inputEl.value = mmdd || '';
+      onCheck();
+    }
+
+    function onToday() {
+      setDateAndCheck('');
+    }
+
+    function onYesterday() {
+      try {
+        const iso = now();
+        const d = new Date(iso);
+        d.setUTCDate(d.getUTCDate() - 1);
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        setDateAndCheck(mm + '-' + dd);
+      } catch (e) {
+        status('Could not compute yesterday.');
+      }
+    }
+
     status('Leave the date empty for today, or type month/day, and tap Check.');
 
     if (formEl && typeof formEl.addEventListener === 'function') {
@@ -242,6 +303,12 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (todayChipEl && typeof todayChipEl.addEventListener === 'function') {
+      todayChipEl.addEventListener('click', () => { onToday(); });
+    }
+    if (yesterdayChipEl && typeof yesterdayChipEl.addEventListener === 'function') {
+      yesterdayChipEl.addEventListener('click', () => { onYesterday(); });
+    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -251,9 +318,24 @@
       });
     }
 
+    // Global shortcut O for Check, ignored when a text field is focused.
+    if (win && typeof win.addEventListener === 'function') {
+      win.addEventListener('keydown', (event) => {
+        if (!event || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+        const key = (event.key || '').toLowerCase();
+        if (key !== 'o') return;
+        const active = doc.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        onCheck();
+      });
+    }
+
     return {
       onCheck,
       onClear,
+      onToday,
+      onYesterday,
       detach() {
         setBusy(false);
       }

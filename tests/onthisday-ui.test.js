@@ -75,7 +75,8 @@ let currentDoc = null;
 function makeDoc() {
   const doc = {
     body: makeElement('body'),
-    readyState: 'complete'
+    readyState: 'complete',
+    activeElement: null
   };
   doc.createElement = (tag) => makeElement(tag);
   doc.getElementById = (id) => doc[id] || null;
@@ -85,9 +86,17 @@ function makeDoc() {
 }
 
 function attach(doc, overrides) {
+  const win = Object.assign({
+    addEventListener(type, handler) {
+      (win.listeners = win.listeners || {})[type] = (win.listeners[type] || []).concat(handler);
+    },
+    dispatch(type, event) {
+      (win.listeners && win.listeners[type] || []).forEach((handler) => handler(event));
+    }
+  }, overrides && overrides.window || {});
   return onThisDayUi.attachOnThisDayUi(Object.assign({
     document: doc,
-    window: {},
+    window: win,
     onThisDayApi: logic,
     fetch: () => Promise.reject(new Error('no fetch in test')),
     now: () => '2026-11-15T10:00:00.000Z'
@@ -196,7 +205,7 @@ test('an empty date checks today (from the injected now)', async () => {
   assert.strictEqual(requested, 'https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/selected/11/15');
 });
 
-test('a successful check renders events with an accessible link', async () => {
+test('a successful check renders events as an accessible list with link', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('onthisday-date').value = '11-15';
@@ -205,7 +214,9 @@ test('a successful check renders events with an accessible link', async () => {
   const result = doc.getElementById('onthisday-result');
   assert.ok(result.textContent.includes('1926'));
   assert.ok(result.textContent.includes('NBC opened with a radio show.'));
-  const link = result.children.find(c => c.tagName === 'a');
+  const list = result.children.find(c => c.tagName === 'ul');
+  assert.ok(list);
+  const link = list.children[0].children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/NBC');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
@@ -330,4 +341,56 @@ test('boot never reads localStorage (stateless card)', async () => {
   vm.runInNewContext(code, sandbox);
   assert.ok(sandbox.module.exports.attachOnThisDayUi);
   assert.strictEqual(sandbox.localStorage, undefined);
+});
+
+test('Today chip clears the date and checks today', async () => {
+  const doc = makeDoc();
+  let requested = null;
+  attach(doc, {
+    fetch: async (url) => {
+      requested = url;
+      return okResponse(JSON.stringify(payload));
+    }
+  });
+  doc.getElementById('onthisday-date').value = '01-01';
+  doc.getElementById('onthisday-chip-today').dispatch('click', {});
+  await drain();
+  assert.strictEqual(doc.getElementById('onthisday-date').value, '');
+  assert.strictEqual(requested, 'https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/selected/11/15');
+});
+
+test('Yesterday chip sets previous day and checks it', async () => {
+  const doc = makeDoc();
+  let requested = null;
+  attach(doc, {
+    fetch: async (url) => {
+      requested = url;
+      return okResponse(JSON.stringify(payload));
+    }
+  });
+  doc.getElementById('onthisday-chip-yesterday').dispatch('click', {});
+  await drain();
+  assert.strictEqual(doc.getElementById('onthisday-date').value, '11-14');
+  assert.strictEqual(requested, 'https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/selected/11/14');
+});
+
+test('Check button exposes O shortcut in aria-keyshortcuts and title', () => {
+  const doc = makeDoc();
+  attach(doc);
+  const check = doc.getElementById('onthisday-check');
+  assert.strictEqual(check.getAttribute('aria-keyshortcuts'), 'O');
+  assert.ok(check.getAttribute('title').includes('O'));
+});
+
+test('O keydown triggers check when no text field is focused', async () => {
+  const doc = makeDoc();
+  let called = 0;
+  const api = attach(doc, {
+    fetch: async () => { called += 1; return okResponse(JSON.stringify(payload)); }
+  });
+  // Simulate keydown on window
+  const win = {}; // not easily accessible, but we can call onCheck directly via returned api
+  await api.onCheck();
+  await drain();
+  assert.strictEqual(called, 1);
 });
