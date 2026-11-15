@@ -892,11 +892,17 @@
   }
 
   function clearSearch() {
+    if (!state.query) return;
+    showToast('Search cleared');
     state.query = '';
-    $('#task-search').value = '';
+    const searchEl = $('#task-search');
+    if (searchEl) searchEl.value = '';
     persistTaskViewPrefs();
+    const list = $('#task-list');
+    if (list) list.classList.add('is-filtering');
     render();
-    $('#task-search').focus();
+    if (list) setTimeout(() => list.classList.remove('is-filtering'), 280);
+    if (searchEl) searchEl.focus();
   }
 
   async function addTask(event) {
