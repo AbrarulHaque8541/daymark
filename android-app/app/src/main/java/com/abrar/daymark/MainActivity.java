@@ -2657,6 +2657,7 @@ public final class MainActivity extends Activity {
         chip.setContentDescription(description);
         chip.setBackground(pressable(palette.surface, 20, palette.line, palette.text, palette.muted));
         chip.addView(text(label, 12, palette.text, Typeface.NORMAL));
+        applyPressFeedback(chip);
         chip.setOnClickListener(view -> {
             haptic(view, HapticFeedbackConstants.CONFIRM);
             tap.run();
@@ -5433,6 +5434,7 @@ public final class MainActivity extends Activity {
             chip.setMinHeight(dp(48));
             chip.setMinimumHeight(dp(48));
             chip.setPadding(dp(12), 0, dp(12), 0);
+        applyPressFeedback(chip);
             chip.setOnClickListener(view -> {
                 activeFilter = key;
                 render();
@@ -6349,6 +6351,7 @@ public final class MainActivity extends Activity {
         for (String tag : tags) {
             boolean selected = tag.equals(activeTag);
             Button chip = tagChip(tag, selected);
+        applyPressFeedback(chip);
             chip.setOnClickListener(view -> {
                 activeTag = selected ? "" : tag;
                 render();
