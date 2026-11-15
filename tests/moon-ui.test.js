@@ -93,6 +93,13 @@ function attach(doc, overrides) {
   }, overrides || {}));
 }
 
+// In a real browser the Check button is type="submit", so activating it
+// fires the form's submit event. The DOM mock has no native form
+// submission, so tests drive the submit event directly.
+function submitForm(doc) {
+  doc.getElementById('moon-form').dispatch('submit', { preventDefault: () => {} });
+}
+
 test('attaches and injects the moon card', () => {
   const doc = makeDoc();
   attach(doc);
@@ -155,7 +162,7 @@ test('card falls back to the wiki card anchor', () => {
 test('an empty date computes today from the injected clock, with no network', () => {
   const doc = makeDoc();
   attach(doc);
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
   const result = doc.getElementById('moon-result');
   assert.ok(result.textContent.includes('2026-11-15'));
   assert.ok(result.textContent.includes('Waxing crescent'));
@@ -166,7 +173,7 @@ test('an empty date computes today from the injected clock, with no network', ()
 test('a successful check reports that no network was used', () => {
   const doc = makeDoc();
   attach(doc);
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
   const status = doc.getElementById('moon-status').textContent;
   assert.ok(status.includes('no network request'));
   assert.ok(status.includes('not saved on this device'));
@@ -176,7 +183,7 @@ test('an explicit date is honoured', () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('moon-date').value = '2026-01-03';
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
   const result = doc.getElementById('moon-result').textContent;
   assert.ok(result.includes('2026-01-03'));
   assert.ok(result.includes('99% lit'));
@@ -186,7 +193,7 @@ test('a malformed date is blocked with guidance', () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('moon-date').value = 'someday';
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
   assert.ok(doc.getElementById('moon-status').textContent.includes('YYYY-MM-DD'));
   assert.strictEqual(doc.getElementById('moon-result').textContent, '');
 });
@@ -195,16 +202,21 @@ test('an impossible date is blocked fail-closed', () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('moon-date').value = '2026-02-30';
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
   assert.ok(doc.getElementById('moon-status').textContent.includes('YYYY-MM-DD'));
+  assert.doesNotMatch(doc.getElementById('moon-status').textContent, /no network request/,
+    'a blocked check must not report success');
+  assert.strictEqual(doc.getElementById('moon-result').textContent, '');
 });
 
 test('a failed check clears any previous result', () => {
   const doc = makeDoc();
   attach(doc);
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
+  assert.ok(doc.getElementById('moon-result').textContent.includes('2026-11-15'),
+    'a valid check must render a result first');
   doc.getElementById('moon-date').value = '2026-02-31';
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
   assert.strictEqual(doc.getElementById('moon-result').textContent, '');
 });
 
@@ -212,7 +224,9 @@ test('clear empties the input and the result', () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('moon-date').value = '2026-01-03';
-  doc.getElementById('moon-check').dispatch('click', {});
+  submitForm(doc);
+  assert.ok(doc.getElementById('moon-result').textContent.includes('2026-01-03'),
+    'a valid check must render a result first');
   doc.getElementById('moon-clear').dispatch('click', {});
   assert.strictEqual(doc.getElementById('moon-date').value, '');
   assert.strictEqual(doc.getElementById('moon-result').textContent, '');
@@ -228,13 +242,22 @@ test('form submit is prevented and runs the check', () => {
   assert.ok(doc.getElementById('moon-result').textContent.includes('2026-11-15'));
 });
 
+test('the Check button is a submit control inside the form', () => {
+  const doc = makeDoc();
+  attach(doc);
+  const check = doc.getElementById('moon-check');
+  assert.strictEqual(check.getAttribute('type'), 'submit',
+    'activating Check in a real browser must submit the form');
+  assert.strictEqual(check.parentNode, doc.getElementById('moon-form'));
+});
+
 test('missing moon API degrades with an honest message', () => {
   const doc = makeDoc();
   const savedApi = globalThis.DaymarkMoon;
   delete globalThis.DaymarkMoon;
   try {
     attach(doc, { moonApi: null });
-    doc.getElementById('moon-check').dispatch('click', {});
+    submitForm(doc);
   } finally {
     if (savedApi) globalThis.DaymarkMoon = savedApi;
   }
