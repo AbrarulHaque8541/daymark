@@ -1143,6 +1143,8 @@
     target.setDate(target.getDate() + offsetDays);
     $('#new-due-date').value = logic.localDateString(target);
     syncDueInputs($('#new-due-date'), $('#new-due-time'), $('#new-reminder'), $('#new-repeat'), $('#new-date-only-reminder-hint'));
+    const label = offsetDays === 0 ? 'today' : 'tomorrow';
+    showToast(`Due date set to ${label}.`);
   }
 
   async function notifyWebhookTaskCompleted(task, options) {
@@ -2221,6 +2223,12 @@
     } else if (FILTER_KEYS[event.key] && !$('#edit-dialog').open) {
       event.preventDefault();
       setTaskFilter(FILTER_KEYS[event.key]);
+    } else if ((event.key === 't' || event.key === 'T') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      setQuickDueDate(0);
+    } else if ((event.key === 'y' || event.key === 'Y') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      setQuickDueDate(1);
     }
   }
 

@@ -299,6 +299,10 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .date-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
 .date-chip { height: 30px; padding: 0 12px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 999px; background: rgba(255, 255, 255, .6); color: #5f6c76; font-size: 10px; font-weight: 700; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
 .date-chip:hover { border-color: var(--accent-bright); background: var(--accent-soft); color: var(--accent); transform: translateY(-1px); }
+.date-chip:active { transform: scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  .date-chip:active { transform: none; }
+}
 .stats-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 2px 0 12px; animation: rise-in .22s ease both; }
 .stats-strip[hidden] { display: none; }
 .stat-cell { display: flex; align-items: baseline; gap: 7px; padding: 9px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(226, 240, 235, .42); }
