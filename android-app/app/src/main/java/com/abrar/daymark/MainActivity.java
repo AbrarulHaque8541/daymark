@@ -2741,32 +2741,22 @@ public final class MainActivity extends Activity {
     private void loadBrowserAddress(String address) {
         if (!webMode) return;
         String scheme = android.net.Uri.parse(address).getScheme();
-        if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme) || browserNetworkPolicy.allowsRemoteLoads()) {
-            if (browserNetworkPolicy.allowsRemoteLoads()) {
-                if (!ensureBrowserWebView()) {
-                    showBrowserOfflineStatus();
-                    return;
-                }
-                try {
-                    BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-                    BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
-                    browserWebView.onResume();
-                    browserWebView.resumeTimers();
-                } catch (SecurityException denied) {
-                    setBrowserOnlineEnabled(false);
-                    if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
-                    showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
-                    return;
-                }
-            }
-            // Continue to load for permitted schemes even if offline
-        } else {
+        if (!ensureBrowserWebView(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme))) {
             showBrowserOfflineStatus();
             return;
         }
-        if (!ensureBrowserWebView()) {
-            showBrowserOfflineStatus();
-            return;
+        if (browserNetworkPolicy.allowsRemoteLoads()) {
+            try {
+                BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
+                BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+                browserWebView.onResume();
+                browserWebView.resumeTimers();
+            } catch (SecurityException denied) {
+                setBrowserOnlineEnabled(false);
+                if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
+                showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
+                return;
+            }
         }
         browserHomeView.setVisibility(View.GONE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
@@ -3023,6 +3013,10 @@ public final class MainActivity extends Activity {
             view.setTranslationY(0f);
             view.setAlpha(1f);
         }
+    }
+
+    private boolean ensureBrowserWebView() {
+        return ensureBrowserWebView(false);
     }
 
     private boolean ensureBrowserWebView(boolean allowOfflineLocalNavigation) {
