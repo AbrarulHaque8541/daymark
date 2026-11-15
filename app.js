@@ -2221,6 +2221,15 @@
     } else if (FILTER_KEYS[event.key] && !$('#edit-dialog').open) {
       event.preventDefault();
       setTaskFilter(FILTER_KEYS[event.key]);
+    } else if ((event.key === 'f' || event.key === 'F') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      const startBtn = $('#focus-start');
+      const pauseBtn = $('#focus-pause');
+      if (startBtn && !startBtn.hidden) {
+        startBtn.click();
+      } else if (pauseBtn && !pauseBtn.hidden) {
+        pauseBtn.click();
+      }
     }
   }
 

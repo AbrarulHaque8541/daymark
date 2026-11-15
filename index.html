@@ -143,7 +143,7 @@
           <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
         </div>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
-        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>5</kbd> for filters, <kbd>C</kbd> to clear completed. Add <kbd>#tags</kbd> to the title to tag a task.</p>
+        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>5</kbd> for filters, <kbd>C</kbd> to clear completed, <kbd>F</kbd> to start/pause focus. Add <kbd>#tags</kbd> to the title to tag a task.</p>
       </section>
 
       <div class="content-grid">
@@ -227,8 +227,8 @@
           <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
           <select id="focus-task"><option value="">No task</option></select>
           <div class="focus-actions">
-            <button class="button button-primary" id="focus-start" type="button">Start</button>
-            <button class="button button-quiet" id="focus-pause" type="button" hidden>Pause</button>
+            <button class="button button-primary" id="focus-start" type="button" title="Start focus (F)" aria-label="Start focus (F)" aria-keyshortcuts="F">Start</button>
+            <button class="button button-quiet" id="focus-pause" type="button" hidden title="Pause/resume focus (F)" aria-label="Pause or resume focus (F)" aria-keyshortcuts="F">Pause</button>
             <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
           </div>
           <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
