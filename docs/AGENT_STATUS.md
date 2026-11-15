@@ -1,3 +1,4 @@
+- [Daymark engineering status - 2026-11-15T08:40:00Z (Cycle B on-this-day press feedback)](./CURRENT_STATUS_20261115T084000Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
 - [Daymark engineering status - 2026-11-15T06:05:00Z (Cycle A clear-search polish)](./CURRENT_STATUS_20261115T060500Z.md)
 
@@ -21,6 +22,7 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261115T084000Z.md](./CURRENT_STATUS_20261115T084000Z.md) — Cycle B verification: Cycle A on-this-day card complete; small glass press/busy feedback polish added on branch. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261114T044000Z.md](./CURRENT_STATUS_20261114T044000Z.md) — Cycle B verification: Cycle A dictionary card complete; small structured-results polish added on branch. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261114T042209Z.md](./CURRENT_STATUS_20261114T042209Z.md) - keyless dictionary lookup card (Free Dictionary API) on branch feat/dictionary-card-vibe-20261114. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261114T040000Z.md](./CURRENT_STATUS_20261114T040000Z.md) — Cycle B verification: Cycle A storage fencing complete; small clear-completed busy feedback polish added on branch. Physical device NOT TESTED.
