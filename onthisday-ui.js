@@ -58,7 +58,7 @@
       input.setAttribute('name', 'date');
       input.setAttribute('type', 'text');
       input.setAttribute('maxlength', '5');
-      input.setAttribute('placeholder', 'MM-DD, empty = today');
+      input.setAttribute('placeholder', 'MM-DD (empty = today)');
       input.setAttribute('autocomplete', 'off');
       input.setAttribute('inputmode', 'numeric');
       input.setAttribute('aria-describedby', 'onthisday-description');
