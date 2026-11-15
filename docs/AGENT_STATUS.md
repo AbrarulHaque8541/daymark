@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-15T05:00:00Z (Cycle A on-this-day polish)](./CURRENT_STATUS_20261115T050000Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
 - [Daymark engineering status - 2026-11-15T06:05:00Z (Cycle A clear-search polish)](./CURRENT_STATUS_20261115T060500Z.md)
 
