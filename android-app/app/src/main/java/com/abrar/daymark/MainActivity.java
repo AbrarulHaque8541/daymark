@@ -352,6 +352,7 @@ public final class MainActivity extends Activity {
     private Spinner searchEngineSpinner;
     private CheckBox browserOnlineToggle;
     private TextView browserStatus;
+    private TextView browserSecurityMarker;
     private Button browserRetryButton;
     private Runnable browserStatusHideRunnable;
     private View browserLoadProgressBar;
@@ -2142,6 +2143,10 @@ public final class MainActivity extends Activity {
             if (browserRetryButton != null) browserRetryButton.performClick();
         });
         panel.addView(browserStatus, bottomMargin(dp(2)));
+        browserSecurityMarker = text("Not encrypted", 11, palette.muted, Typeface.BOLD);
+        browserSecurityMarker.setVisibility(View.GONE);
+        browserSecurityMarker.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        panel.addView(browserSecurityMarker, bottomMargin(dp(2)));
         browserRetryButton = compactButton("Retry", true);
         browserRetryButton.setContentDescription("Retry loading the current page");
         browserRetryButton.setVisibility(View.GONE);
@@ -2209,6 +2214,13 @@ public final class MainActivity extends Activity {
             }).start();
         };
         mainHandler.postDelayed(browserStatusHideRunnable, 3500L);
+    }
+
+    private void updateBrowserSecurityMarker(String url) {
+        if (browserSecurityMarker == null) return;
+        boolean pageNotEncrypted = BrowserHttpPolicy.isHttp(url);
+        browserSecurityMarker.setText(BrowserHttpPolicy.securityLabel(url));
+        browserSecurityMarker.setVisibility(pageNotEncrypted ? View.VISIBLE : View.GONE);
     }
 
     private void selectSearchEngine(BrowserAddress.SearchEngine engine) {
@@ -2672,24 +2684,83 @@ public final class MainActivity extends Activity {
         if (!webMode) return;
         Log.i(BROWSER_LOG_TAG, "navigate requested: " + BrowserLogPolicy.redactedOrigin(address));
         browserDiagnostics.record(System.currentTimeMillis(), "navigate requested", address, null);
-        final String safeAddress;
+        final String webAddress;
         try {
-            safeAddress = BrowserAddress.requireAllowedWebUrl(address);
+            webAddress = BrowserAddress.requireAllowedBrowserNavigation(address);
         } catch (IllegalArgumentException exception) {
             quickCaptureInput.setError(exception.getMessage());
             return;
         }
-        browserSelfHealingPolicy.onUserNavigation(safeAddress);
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
-            confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress));
+        browserSelfHealingPolicy.onUserNavigation(webAddress);
+        String scheme = android.net.Uri.parse(webAddress).getScheme();
+        String destinationScheme = scheme;
+        BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+        if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
+            showBrowserStatus(BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE);
+        } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
+            showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE);
+        }
+        if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
+            // Typed intent targets must be visibly rejected before Android handoff
+            android.content.Intent target = android.content.Intent.parseUri(webAddress, 0);
+            if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())) {
+                showBrowserStatus("unsupported target scheme. Nothing was opened.");
+                return;
+            }
+            BrowserUriHandoff.createBrowsableViewIntent(android.net.Uri.parse(webAddress), null);
+            boolean external = true;
+            String safeAddress = webAddress;
+            BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null);
             return;
         }
-        loadBrowserAddress(safeAddress);
+        if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
+            boolean external = true;
+            String safeAddress = webAddress;
+            BrowserUriHandoff.confirmAndOpen(this, external, safeAddress, null);
+            return;
+        }
+        if (!BrowserUriRoutingPolicy.isWebScheme(destinationScheme)) {
+            if (!browserNetworkPolicy.allowsRemoteLoads()) {
+                if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)) {
+                    loadBrowserAddress(webAddress);
+                } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(destinationScheme)) {
+                    showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE);
+                } else {
+                    showBrowserStatus(BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE);
+                }
+                return;
+            }
+        }
+        if (!browserNetworkPolicy.allowsRemoteLoads() && BrowserUriRoutingPolicy.isWebScheme(Uri.parse(webAddress).getScheme())) {
+            confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress));
+            return;
+        }
+        loadBrowserAddress(webAddress);
     }
 
     private void loadBrowserAddress(String address) {
         if (!webMode) return;
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
+        String scheme = android.net.Uri.parse(address).getScheme();
+        if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme) || browserNetworkPolicy.allowsRemoteLoads()) {
+            if (browserNetworkPolicy.allowsRemoteLoads()) {
+                if (!ensureBrowserWebView()) {
+                    showBrowserOfflineStatus();
+                    return;
+                }
+                try {
+                    BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
+                    BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+                    browserWebView.onResume();
+                    browserWebView.resumeTimers();
+                } catch (SecurityException denied) {
+                    setBrowserOnlineEnabled(false);
+                    if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
+                    showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
+                    return;
+                }
+            }
+            // Continue to load for permitted schemes even if offline
+        } else {
             showBrowserOfflineStatus();
             return;
         }
@@ -2697,25 +2768,10 @@ public final class MainActivity extends Activity {
             showBrowserOfflineStatus();
             return;
         }
-        try {
-            BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-            // Unblock every retained tab too: enforceOffline() blocks all of them, and a
-            // background tab left blocked would silently drop loads with no callback (#221).
-            BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
-            browserWebView.onResume();
-            browserWebView.resumeTimers();
-        } catch (SecurityException denied) {
-            setBrowserOnlineEnabled(false);
-            if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
-            showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
-            return;
-        }
         browserHomeView.setVisibility(View.GONE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.GONE);
         browserWebView.setVisibility(View.VISIBLE);
-        // Owner feedback (#222): the full egress disclosure is shown before the first
-        // search of an install only; later navigations use a quiet per-page status.
         if (!browserPreferences.getBoolean(BROWSER_DISCLOSURE_ACK_KEY, false)) {
             showBrowserStatus("Opening page. Its provider and page resources may receive requests.");
             browserPreferences.edit().putBoolean(BROWSER_DISCLOSURE_ACK_KEY, true).apply();
@@ -2969,8 +3025,8 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private boolean ensureBrowserWebView() {
-        if (!browserNetworkPolicy.allowsRemoteLoads()) return false;
+    private boolean ensureBrowserWebView(boolean allowOfflineLocalNavigation) {
+        if (!browserNetworkPolicy.allowsRemoteLoads() && !allowOfflineLocalNavigation) return false;
         if (browserWebView != null) return true;
         final DaymarkWebView[] targetRef = new DaymarkWebView[1];
         browserWebView = new DaymarkWebView(this, browserNetworkPolicy,
@@ -2983,6 +3039,7 @@ public final class MainActivity extends Activity {
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page started", url, null);
                 showBrowserStatus("Loading page. Embedded resources may also make network requests.");
+                updateBrowserSecurityMarker(url);
                 startBrowserLoadProgress();
                 // Keep the watchdog active after navigation begins: a page can start successfully
                 // but never finish, leaving the viewport blank with no further WebView callback.
@@ -3016,6 +3073,7 @@ public final class MainActivity extends Activity {
                 showBrowserStatus("Page loaded. " + (pageNotEncrypted
                         ? "Not encrypted: this HTTP page has no transport security. " : "")
                         + "Website content may contact its own or third-party endpoints.");
+                updateBrowserSecurityMarker(url);
                 injectVideoDownloadOverlay(browserWebView);
                 syncBrowserButtons();
             }
@@ -3304,6 +3362,7 @@ public final class MainActivity extends Activity {
         if (browserStatus != null) showBrowserStatus(hasPage
                 ? (tab.getTitle() == null || tab.getTitle().trim().isEmpty() ? tab.getUrl() : tab.getTitle())
                 : "New tab. Enter a website or search.");
+        updateBrowserSecurityMarker(tab.getUrl());
         updateBrowserTabButton();
         syncBrowserButtons();
     }
