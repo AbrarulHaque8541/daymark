@@ -68,7 +68,12 @@
     const checkButton = doc.createElement('button');
     checkButton.id = 'onthisday-check';
     checkButton.className = 'button button-primary';
-    if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
+    if (checkButton.setAttribute) {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('title', 'Check on this day (O)');
+      checkButton.setAttribute('aria-label', 'Check on this day (O)');
+      checkButton.setAttribute('aria-keyshortcuts', 'O');
+    }
     checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
@@ -248,6 +253,18 @@
           if (typeof event.preventDefault === 'function') event.preventDefault();
           onCheck();
         }
+      });
+    }
+
+    // Global shortcut O for Check, ignored when a text field is focused.
+    if (win && typeof win.addEventListener === 'function') {
+      win.addEventListener('keydown', (event) => {
+        if (!event || event.key !== 'o' && event.key !== 'O') return;
+        const active = doc.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        onCheck();
       });
     }
 
