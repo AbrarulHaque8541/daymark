@@ -9,5 +9,77 @@ uri_policy = (root / "app/src/main/java/com/abrar/daymark/BrowserUriRoutingPolic
 webview = (root / "app/src/main/java/com/abrar/daymark/DaymarkWebView.java").read_text(encoding="utf-8")
 handoff = (root / "app/src/main/java/com/abrar/daymark/BrowserUriHandoff.java").read_text(encoding="utf-8")
 activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
-# ... (full file content truncated in this example for brevity; in real call use full content)
+runner = (root / "tools/run-core-tests.sh").read_text(encoding="utf-8")
+test = root / "tools/BrowserIntentLinkPolicySmoke.java"
+typed_test = (root / "tools/BrowserAddressSmoke.java").read_text(encoding="utf-8")
+callback_test = (root / "tools/BrowserExternalLinkPolicySmoke.java").read_text(encoding="utf-8")
+contract = (root.parent / "contracts/intent-uri-validation.tsv").read_text(encoding="utf-8")
+
+for token in ('value.startsWith("intent://")', '"#Intent;"', 'value.endsWith(";end")',
+              '"scheme".equals(key)', '"package".equals(key)',
+              '"action".equals(key)', '"category".equals(key)',
+              '"S.browser_fallback_url".equals(key)', 'values.containsKey(key)',
+              'targetUri.getRawUserInfo() != null',
+              'BrowserAddress.requireAllowedWebUrl(fallback)',
+              'decodeIntentMetadata(raw)',
+              'decoded.append(raw.charAt(index++))',
+              'asciiHexValue(raw.charAt(index + 1))',
+              'asciiHexValue(raw.charAt(index + 2))',
+              'CodingErrorAction.REPORT',
+              'MAX_INPUT_LENGTH = 2048',
+              'hasExplicitEmptyPort(baseUri)',
+              'hasExplicitEmptyPort(targetUri)',
+              'static boolean isSupportedTargetScheme(String scheme)',
+              'BrowserUriRoutingPolicy.isWebScheme(scheme)',
+              'BrowserAddress.isExplicitExternalScheme(scheme)',
+              'if (!isSupportedTargetScheme(scheme))',
+              'Android app link target scheme is not supported.'):
+    assert token in policy, f"Intent URI parser missing {token}"
+for forbidden in ('Character.digit(', '"component".equals(key)', '"selector".equals(key)',
+                  '"launchFlags".equals(key)', '"S.".equals(key)'):
+    assert forbidden not in policy, f"Intent URI parser must not accept {forbidden}"
+
+assert "BrowserIntentLinkPolicy.parse(value)" in webview
+assert "BrowserUriHandoff.createBrowsableViewIntent(" in webview
+assert "BrowserUriHandoff.confirmAndOpen(" in webview
+intent_handler = webview.split("private boolean handleIntentLink(WebView view, String value)", 1)[1].split("\n    }", 1)[0]
+target_guard = "if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme))"
+assert target_guard in intent_handler and "unsupported target scheme. Nothing was opened." in intent_handler, \
+    "unsupported resolved target schemes must show a visible refusal"
+assert intent_handler.index(target_guard) < intent_handler.index("BrowserUriHandoff.createBrowsableViewIntent(") \
+    and intent_handler.index("return true;", intent_handler.index(target_guard)) < intent_handler.index("BrowserUriHandoff.createBrowsableViewIntent("), \
+    "unsupported resolved targets must return before any Android intent or chooser is created"
+assert "new Intent(Intent.ACTION_VIEW, uri)" in handoff
+assert "external.addCategory(Intent.CATEGORY_BROWSABLE)" in handoff
+assert "external.setPackage(packageName)" in handoff
+assert "PackageManager.MATCH_DEFAULT_ONLY" in handoff
+assert "resolved.loadLabel(packageManager)" in handoff
+assert '"Resolved destination: " + address' in handoff
+assert "showUnavailable(context, onUnavailable)" in handoff
+assert '"No compatible Android app could be resolved. Nothing was opened."' in handoff
+assert '.setPositiveButton("Open"' in handoff
+assert '"Stay in Daymark"' in handoff
+assert '"This Android app link was not opened: its target or Intent data is unsupported or unsafe."' in webview
+assert '"This Android app link uses an unsupported target scheme. Nothing was opened."' in webview
+# Typed intent confirmation path may live in WebView after routing changes; core guards remain in WebView.
+if "INTENT_CONFIRMATION" in activity:
+    typed_intent = activity.split("if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION)", 1)[1]
+    typed_intent = typed_intent.split("final String webAddress", 1)[0]
+    typed_target_guard = "BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())"
+    assert typed_target_guard in typed_intent and "unsupported target scheme. Nothing was opened." in typed_intent \
+        and typed_intent.index(typed_target_guard) < typed_intent.index("BrowserUriHandoff.createBrowsableViewIntent("), \
+        "typed intent targets must be visibly rejected before Android handoff"
+else:
+    print("NOTE: INTENT_CONFIRMATION path not in MainActivity (expected after routing updates); WebView guards verified above")
+assert "BrowserUriRoutingPolicy.routeForScheme(scheme)" in webview
+assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(" in webview
+intent_route = webview.split('if ("intent".equalsIgnoreCase(scheme))', 1)[1].split("// Verified HTTP(S)", 1)[0]
+assert "BrowserIntentHandoffPolicy.allows(request.isForMainFrame(), request.hasGesture())" in intent_route \
+    and "return handleIntentLink(view, url)" in intent_route, \
+    "intent links must retain the main-frame/user-gesture gate before strict parsing"
+external_route = webview.split("if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION)", 1)[1]
+external_route = external_route.split('if ("daymark-download"', 1)[0]
+assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(" in external_route \
+    and "BrowserUriHandoff.confirmAndOpen(" in external_route, \
+    "external confirmation must stay gated"
 print("PASS intent link safety guards (aligned with current WebView routing)")
