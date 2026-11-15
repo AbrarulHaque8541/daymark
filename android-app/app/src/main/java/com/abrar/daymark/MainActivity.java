@@ -1,1 +1,1 @@
-PLACEHOLDER_WILL_FAIL
+$(cat /tmp/MainActivity.java)
