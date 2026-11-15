@@ -1010,3 +1010,15 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Cycle A: glass press + busy feedback for Add task button (accent #16705f).
+   Matches other primary actions; reduced-motion safe. */
+.add-button:active:not(.is-busy),
+.add-button.is-pressed:not(.is-busy) {
+  transform: scale(0.97);
+  transition: transform 0.08s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .add-button:active:not(.is-busy),
+  .add-button.is-pressed:not(.is-busy) { transform: none; }
+}

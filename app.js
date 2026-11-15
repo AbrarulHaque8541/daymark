@@ -908,6 +908,7 @@
   async function addTask(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    const submitBtn = form.querySelector('button[type="submit"]');
     const titleInput = $('#new-title');
     const rawTitle = titleInput.value.trim();
     const error = $('#add-error');
@@ -919,6 +920,10 @@
     }
     error.hidden = true;
     titleInput.removeAttribute('aria-invalid');
+    if (submitBtn) {
+      submitBtn.classList.add('is-busy');
+      submitBtn.setAttribute('aria-busy', 'true');
+    }
     const { title, tags } = parseQuickTags(rawTitle);
     if (!title) {
       error.hidden = false;
@@ -962,6 +967,10 @@
     render();
     titleInput.focus();
     const saved = await save;
+    if (submitBtn) {
+      submitBtn.classList.remove('is-busy');
+      submitBtn.removeAttribute('aria-busy');
+    }
     showSaveResult(saved, tags ? 'Task added and tagged.' : 'Task added to your list.');
   }
 
