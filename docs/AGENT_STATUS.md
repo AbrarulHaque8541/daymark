@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T04:30:00Z (Cycle A: MainActivity restore prepared)](./CURRENT_STATUS_20261116T043000Z.md)
 - [Daymark engineering status — 2026-11-16T01:35:00Z (Cycle A: Android bookmark shortcuts PR progress)](./CURRENT_STATUS_20261116T013500Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
 - [Daymark engineering status - 2026-11-15T06:05:00Z (Cycle A clear-search polish)](./CURRENT_STATUS_20261115T060500Z.md)
@@ -20,14 +21,9 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261116T043000Z.md](./CURRENT_STATUS_20261116T043000Z.md) — Cycle A: complete MainActivity restore from 51737d6 with scheme-aware load and press feedback prepared; ready to push full file. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T013500Z.md](./CURRENT_STATUS_20261116T013500Z.md) — Cycle A: progress on open Android bookmark PR #779 (security marker + URI routing guards). Physical device NOT TESTED.
-- [CURRENT_STATUS_20261114T193525Z.md](./CURRENT_STATUS_20261114T193525Z.md) — Android URI-routing correction on branch feat/android-bookmark-newtab-20261114, PR #779 OPEN and unmerged; remote parent `97e3a5f` was verified before the local candidate. Host/source/Node checks PASS; Android compile/device runtime NOT TESTED; API 36 remains unresolved pending exact-new-head CI.
-- [CURRENT_STATUS_20261114T185706Z.md](./CURRENT_STATUS_20261114T185706Z.md) — Historical pre-correction status snapshot; superseded by the newer URI-routing update above.
-- [CURRENT_STATUS_20261114T181151Z.md](./CURRENT_STATUS_20261114T181151Z.md) — Historical bookmark-only snapshot at 2026-11-14T18:11:51Z, head `0e137da`; its description applies only to that point in time. Later URI routing was added to the same branch/PR; see the latest snapshot above.
-- [CURRENT_STATUS_20261114T044000Z.md](./CURRENT_STATUS_20261114T044000Z.md) — Cycle B verification: Cycle A dictionary card complete; small structured-results polish added on branch. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261114T042209Z.md](./CURRENT_STATUS_20261114T042209Z.md) - keyless dictionary lookup card (Free Dictionary API) on branch feat/dictionary-card-vibe-20261114. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261114T040000Z.md](./CURRENT_STATUS_20261114T040000Z.md) — Cycle B verification: Cycle A storage fencing complete; small clear-completed busy feedback polish added on branch. Physical device NOT TESTED.
-- Previous: [CURRENT_STATUS_20261114T024500Z.md](./CURRENT_STATUS_20261114T024500Z.md) — Cycle B verification: Cycle A storage fencing complete on main `3b8557e`; UI polish consistent. Physical device NOT TESTED.
+- Previous snapshots remain for history.
 
 ## Before acting
 
