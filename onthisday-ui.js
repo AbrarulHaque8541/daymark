@@ -156,11 +156,21 @@
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const paddedMonth = (record.month < 10 ? '0' + record.month : String(record.month));
       const dateLabel = paddedDay + '/' + paddedMonth;
+      const dateHeader = doc.createElement('p');
+      dateHeader.className = 'onthisday-date';
+      dateHeader.textContent = 'Date checked: ' + dateLabel;
+      resultEl.appendChild(dateHeader);
       for (const event of record.events) {
-        const parts = [event.year + ': ' + event.text + (event.textTruncated ? ' (text truncated)' : '')];
-        if (event.pages.length) parts.push(event.pages.length + ' related page(s)' + (event.pagesTruncated ? ' (list truncated)' : ''));
-        resultEl.appendChild(doc.createTextNode(parts.join(' \u00b7 ') + ' \u00b7 '));
+        const item = doc.createElement('div');
+        item.className = 'onthisday-event';
+        const yearEl = doc.createElement('strong');
+        yearEl.textContent = event.year + ': ';
+        item.appendChild(yearEl);
+        const textEl = doc.createElement('span');
+        textEl.textContent = event.text + (event.textTruncated ? ' (text truncated)' : '');
+        item.appendChild(textEl);
         if (event.pages.length) {
+          item.appendChild(doc.createTextNode(' \u00b7 '));
           const link = doc.createElement('a');
           link.href = event.pages[0];
           link.textContent = 'Read';
@@ -169,11 +179,13 @@
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about a ' + dateLabel + ' event from ' + event.year);
           }
-          resultEl.appendChild(link);
-          resultEl.appendChild(doc.createTextNode(' \u00b7 '));
+          item.appendChild(link);
+          if (event.pages.length > 1) {
+            item.appendChild(doc.createTextNode(' \u00b7 ' + event.pages.length + ' related page(s)' + (event.pagesTruncated ? ' (list truncated)' : '')));
+          }
         }
+        resultEl.appendChild(item);
       }
-      resultEl.appendChild(doc.createTextNode('Date checked: ' + dateLabel));
     }
 
     async function onCheck() {
