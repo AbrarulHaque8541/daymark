@@ -136,6 +136,16 @@ const drain = async () => {
   for (let i = 0; i < 100; i += 1) await Promise.resolve();
 };
 
+function findLink(el) {
+  if (!el || typeof el !== 'object') return null;
+  if (el.tagName === 'a') return el;
+  for (const child of el.children || []) {
+    const found = findLink(child);
+    if (found) return found;
+  }
+  return null;
+}
+
 test('attaches and injects the on-this-day card', () => {
   const doc = makeDoc();
   attach(doc);
@@ -205,7 +215,7 @@ test('a successful check renders events with an accessible link', async () => {
   const result = doc.getElementById('onthisday-result');
   assert.ok(result.textContent.includes('1926'));
   assert.ok(result.textContent.includes('NBC opened with a radio show.'));
-  const link = result.children.find(c => c.tagName === 'a');
+  const link = findLink(result);
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/NBC');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
