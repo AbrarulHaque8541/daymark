@@ -141,7 +141,7 @@
           <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
         </div>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
-        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view. Add <kbd>#tags</kbd> to the title to tag a task.</p>
+        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>5</kbd> for filters, <kbd>C</kbd> to clear completed. Add <kbd>#tags</kbd> to the title to tag a task.</p>
       </section>
 
       <div class="content-grid">
@@ -150,15 +150,15 @@
             <div><p class="eyebrow">YOUR LIST</p><h2 id="tasks-heading">Tasks</h2></div>
             <div class="section-heading-tools">
               <span class="task-total" id="visible-count">0 tasks</span>
-              <button class="clear-completed" id="clear-completed" type="button" hidden>Clear completed</button>
+              <button class="clear-completed" id="clear-completed" type="button" hidden title="Clear completed tasks (C)" aria-label="Clear completed tasks (C)" aria-keyshortcuts="C">Clear completed</button>
             </div>
           </div>
           <nav class="filters" aria-label="Filter tasks">
-            <button type="button" class="filter-button is-active" data-filter="all" aria-pressed="true">All <span id="count-all">0</span></button>
-            <button type="button" class="filter-button" data-filter="today" aria-pressed="false">Today <span id="count-today">0</span></button>
-            <button type="button" class="filter-button" data-filter="upcoming" aria-pressed="false">Upcoming <span id="count-upcoming">0</span></button>
-            <button type="button" class="filter-button" data-filter="overdue" aria-pressed="false">Overdue <span id="count-overdue">0</span></button>
-            <button type="button" class="filter-button" data-filter="completed" aria-pressed="false">Completed <span id="count-completed">0</span></button>
+            <button type="button" class="filter-button is-active" data-filter="all" aria-pressed="true" title="Show all tasks (1)" aria-label="Show all tasks (1)" aria-keyshortcuts="1">All <span id="count-all">0</span></button>
+            <button type="button" class="filter-button" data-filter="today" aria-pressed="false" title="Show today tasks (2)" aria-label="Show today tasks (2)" aria-keyshortcuts="2">Today <span id="count-today">0</span></button>
+            <button type="button" class="filter-button" data-filter="upcoming" aria-pressed="false" title="Show upcoming tasks (3)" aria-label="Show upcoming tasks (3)" aria-keyshortcuts="3">Upcoming <span id="count-upcoming">0</span></button>
+            <button type="button" class="filter-button" data-filter="overdue" aria-pressed="false" title="Show overdue tasks (4)" aria-label="Show overdue tasks (4)" aria-keyshortcuts="4">Overdue <span id="count-overdue">0</span></button>
+            <button type="button" class="filter-button" data-filter="completed" aria-pressed="false" title="Show completed tasks (5)" aria-label="Show completed tasks (5)" aria-keyshortcuts="5">Completed <span id="count-completed">0</span></button>
           </nav>
           <div class="stats-strip" id="stats-strip" hidden aria-label="Your progress">
             <div class="stat-cell"><span class="stat-cell-number" id="stat-done-today">0</span><span class="stat-cell-label">done today</span></div>
@@ -602,4 +602,5 @@
   </div>
 </body>
 </html>
+
 
