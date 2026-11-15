@@ -73,7 +73,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .add-form select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23565f68' stroke-width='1.2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; padding-right: 28px; }
 .add-form select:disabled { background-image: none; }
 .button { border: 1px solid transparent; border-radius: 12px; height: 42px; padding: 0 15px; font-size: 12px; font-weight: 600; transition: transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease; }
-.button:active { transform: translateY(1px) scale(.99); }
+.button:active { transform: translateY(1px) scale(.97); }
+#onthisday-check:active, #onthisday-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 .button-primary { color: #fff; background: linear-gradient(145deg, #1d7f6c, #0d5449); box-shadow: 0 6px 16px rgba(22, 112, 95, .24); }
 .button-primary:hover { background: linear-gradient(145deg, #238f79, #116256); box-shadow: 0 8px 20px rgba(22, 112, 95, .3); transform: translateY(-1px); }
 .button:disabled, .button[aria-disabled="true"] { opacity: .65; cursor: not-allowed; transform: none; box-shadow: none; }

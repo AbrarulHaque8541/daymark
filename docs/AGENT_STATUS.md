@@ -39,3 +39,4 @@
 - Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
 - Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
+docs/CURRENT_STATUS_20261115T131500Z.md

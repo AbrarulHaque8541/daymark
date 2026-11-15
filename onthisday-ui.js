@@ -203,6 +203,9 @@
         render(record);
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
           + ' UTC \u00b7 not saved on this device');
+        if (win && typeof win.showToast === 'function') {
+          win.showToast('History updated · not saved on this device');
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof logicApi.classifyOnThisDayError === 'function'
@@ -226,6 +229,9 @@
         resultEl.textContent = '';
       }
       status('Cleared. Leave the date empty for today, or type month/day, and tap Check.');
+      if (win && typeof win.showToast === 'function') {
+        win.showToast('History cleared');
+      }
     }
 
     status('Leave the date empty for today, or type month/day, and tap Check.');
