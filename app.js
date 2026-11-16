@@ -905,6 +905,42 @@
     if (searchEl) searchEl.focus();
   }
 
+  async function copyVisibleTaskTitles() {
+    const btn = $('#copy-visible-tasks');
+    if (!btn || btn.classList.contains('is-busy')) return;
+    const items = document.querySelectorAll('#task-list .task-title, #task-list [data-title]');
+    const titles = Array.from(items).map(el => (el.textContent || el.dataset.title || '').trim()).filter(Boolean);
+    if (!titles.length) {
+      showToast('No visible tasks to copy');
+      return;
+    }
+    const text = titles.join('\n');
+    btn.classList.add('is-busy');
+    btn.setAttribute('aria-busy', 'true');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for older environments
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+      }
+      showToast(`Copied ${titles.length} task title${titles.length === 1 ? '' : 's'}`);
+    } catch (err) {
+      showToast('Could not copy titles. Check clipboard permissions.');
+    } finally {
+      btn.classList.remove('is-busy');
+      btn.removeAttribute('aria-busy');
+    }
+  }
+
   async function addTask(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -2449,6 +2485,10 @@
       render();
       if (list) setTimeout(() => list.classList.remove('is-sorting'), 280);
     });
+    const copyVisibleBtn = $('#copy-visible-tasks');
+    if (copyVisibleBtn) {
+      copyVisibleBtn.addEventListener('click', copyVisibleTaskTitles);
+    }
     const resetViewBtn = $('#reset-view');
     if (resetViewBtn) {
       resetViewBtn.addEventListener('click', resetTaskViewPrefs);

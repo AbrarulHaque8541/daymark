@@ -1014,3 +1014,15 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Cycle A: busy/press feedback for copy-visible-tasks button (accent #16705f). */
+#copy-visible-tasks.is-busy {
+  opacity: 0.65;
+  pointer-events: none;
+}
+#copy-visible-tasks:active:not(.is-busy) {
+  transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  #copy-visible-tasks:active { transform: none; }
+}
