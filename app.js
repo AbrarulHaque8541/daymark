@@ -662,6 +662,7 @@
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
     const openVisible = filteredTasks.filter((task) => !task.completed).length;
     $('#complete-visible').hidden = openVisible === 0;
+    $('#copy-visible').hidden = filteredTasks.length === 0;
     $('#clear-completed').hidden = completedTasks.length === 0;
     $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
     $('#sort-toggle').textContent = state.sort === 'title' ? 'Sort: A–Z' : 'Sort: Smart';
@@ -1289,6 +1290,35 @@
         showSaveResult(restored, 'Visible tasks restored.');
       }
     });
+  }
+
+
+  async function copyVisible() {
+    const filteredTasks = getCurrentlyFilteredTasks();
+    if (!filteredTasks.length) return;
+    const titles = filteredTasks.map((task) => task.title).filter(Boolean);
+    if (!titles.length) return;
+    const text = titles.join('\n');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        showToast(`Copied ${titles.length} task title${titles.length === 1 ? '' : 's'}.`);
+      } else {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(`Copied ${titles.length} task title${titles.length === 1 ? '' : 's'}.`);
+      }
+    } catch (err) {
+      showToast('Could not copy to clipboard.');
+    }
   }
 
   function exportTasks() {
@@ -2262,6 +2292,9 @@
     } else if ((event.key === 'c' || event.key === 'C') && !$('#edit-dialog').open && !$('#clear-completed').hidden) {
       event.preventDefault();
       $('#clear-completed').click();
+    } else if ((event.key === 'y' || event.key === 'Y') && !$('#edit-dialog').open && !$('#copy-visible').hidden) {
+      event.preventDefault();
+      $('#copy-visible').click();
     } else if (FILTER_KEYS[event.key] && !$('#edit-dialog').open) {
       event.preventDefault();
       setTaskFilter(FILTER_KEYS[event.key]);
@@ -2500,6 +2533,7 @@
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
     $('#complete-visible').addEventListener('click', completeVisible);
+    $('#copy-visible').addEventListener('click', copyVisible);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', async (event) => {
