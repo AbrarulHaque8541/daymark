@@ -10,5 +10,17 @@ jobs:
   restore:
     runs-on: ubuntu-latest
     steps:
-      - name: Note
-        run: echo "MainActivity has been restored on the feature branch. This emergency workflow is no longer needed and is kept as a no-op for history."
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/android-bookmark-newtab-20261114
+          fetch-depth: 0
+      - name: Restore and patch MainActivity
+        run: |
+          set -euo pipefail
+          git show 51737d6f07e046529b13bd5ea1f29865c78f9db9:android-app/app/src/main/java/com/abrar/daymark/MainActivity.java > android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
+          python3 scripts/emergency-restore-mainactivity.py
+          git config user.email "abrarbhai441@gmail.com"
+          git config user.name "Abrarul Haque"
+          git add android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
+          git commit -m "fix(android): restore MainActivity and complete offline WebView fail-closed paths" || echo no-change
+          git push origin HEAD:feat/android-bookmark-newtab-20261114
