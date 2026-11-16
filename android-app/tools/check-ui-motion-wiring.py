@@ -103,6 +103,13 @@ check("UiMotionPolicy.CHROME_HIDE_MS" in WORKSPACE,
       "WorkspaceMotion must use the shared chrome-hide duration")
 check("UiMotionPolicy.CHROME_SHOW_MS" in WORKSPACE,
       "WorkspaceMotion must use the shared chrome-show duration")
+glass_start = WORKSPACE.find("public static void applyGlassBackground(View view)")
+glass_end = WORKSPACE.find("/** Tasks ↔ Web content transition", glass_start)
+glass = WORKSPACE[glass_start:glass_end]
+check("view.getBackground() != null" in glass and "return;" in glass,
+      "glass polish must preserve caller-owned themed and state-list backgrounds")
+check("view.setBackgroundColor(GLASS_COLOR);" in glass,
+      "the glass accent may only be applied to an unstyled view")
 check(WORKSPACE.count("view.animate().cancel();") >= 2,
       "hide and show must cancel stale chrome animators before resetting properties")
 

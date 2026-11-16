@@ -28,6 +28,8 @@ check("MIN_SCALE" in POLICY and "MAX_SCALE" in POLICY,
       "the effective scale must be clamped at both ends")
 check("appScale * system" in POLICY,
       "the system font scale must multiply the app choice")
+check("return effective / system;" in POLICY,
+      "the policy must compensate for setTextSize(float) applying SP font scale")
 
 if "TextScalePolicy.combined(" in ACTIVITY:
     check(ACTIVITY.count("TextScalePolicy.combined(") >= 2,

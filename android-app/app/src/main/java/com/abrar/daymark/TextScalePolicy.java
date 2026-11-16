@@ -1,32 +1,32 @@
 package com.abrar.daymark;
 
 /**
- * Pure policy combining the app's own text-size choice with the device font scale.
+ * Pure policy for callers that pass a scaled value to TextView.setTextSize(float).
  *
- * <p>The round-2 audit found the app ignored the system font scale entirely: every
- * {@code setTextSize(... * textScale)} call used only the in-app compact/standard/
- * extra-large choice, so a user who enlarged text in Android Settings saw no change.
- * The effective scale is the product of the two, clamped so an extreme combination
- * cannot produce unreadable or overflowing text.
+ * <p>That Android overload interprets its argument as SP and applies the device's
+ * font scale itself. This policy clamps the intended rendered scale (app choice x
+ * device scale), then removes the device scale from the value passed to TextView
+ * so the platform applies it exactly once.
  */
 final class TextScalePolicy {
-    /** Smallest effective scale; below this the UI becomes unreadable. */
+    /** Smallest rendered scale; below this the UI becomes unreadable. */
     static final float MIN_SCALE = 0.85f;
-    /** Largest effective scale; above this labels overflow their controls. */
+    /** Largest rendered scale; above this labels overflow their controls. */
     static final float MAX_SCALE = 2.0f;
 
     private TextScalePolicy() { }
 
     /**
-     * Effective text scale = app choice x system font scale, clamped to
-     * [{@link #MIN_SCALE}, {@link #MAX_SCALE}]. A non-positive system scale is
-     * treated as 1.0 so a malformed configuration cannot collapse the text.
+     * Returns the multiplier for setTextSize(float), whose SP conversion applies
+     * systemFontScale implicitly. The resulting rendered scale is the app choice
+     * times the system font scale, clamped to [{@link #MIN_SCALE},
+     * {@link #MAX_SCALE}]. A non-positive system scale is treated as 1.0.
      */
     static float combined(float appScale, float systemFontScale) {
         float system = systemFontScale <= 0f ? 1.0f : systemFontScale;
         float effective = appScale * system;
-        if (effective < MIN_SCALE) return MIN_SCALE;
-        if (effective > MAX_SCALE) return MAX_SCALE;
-        return effective;
+        if (effective < MIN_SCALE) effective = MIN_SCALE;
+        if (effective > MAX_SCALE) effective = MAX_SCALE;
+        return effective / system;
     }
 }

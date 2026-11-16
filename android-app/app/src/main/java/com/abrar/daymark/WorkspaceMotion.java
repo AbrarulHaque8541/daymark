@@ -1,7 +1,6 @@
 package com.abrar.daymark;
 
 import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.provider.Settings;
 import android.view.View;
 import android.view.animation.Interpolator;
@@ -10,7 +9,7 @@ import android.view.animation.Interpolator;
  * Shared workspace / chrome motion helpers driven by {@link UiMotionPolicy}.
  * Keeps MainActivity animate blocks small and consistent.
  * Explicitly respects system animator duration scale of 0 (reduced motion).
- * Includes subtle glass polish using accent color with low alpha.
+ * Applies optional glass polish only to views without caller-owned backgrounds.
  */
 public final class WorkspaceMotion {
     private WorkspaceMotion() {}
@@ -35,13 +34,9 @@ public final class WorkspaceMotion {
         }
     }
 
-    /** Apply subtle glass background using accent tint. Idempotent to avoid redundant work. */
+    /** Apply a subtle accent only when no themed or stateful background already exists. */
     public static void applyGlassBackground(View view) {
-        if (view == null) return;
-        if (view.getBackground() instanceof ColorDrawable) {
-            ColorDrawable current = (ColorDrawable) view.getBackground();
-            if (current.getColor() == GLASS_COLOR) return;
-        }
+        if (view == null || view.getBackground() != null) return;
         view.setBackgroundColor(GLASS_COLOR);
     }
 
