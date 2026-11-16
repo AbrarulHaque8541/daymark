@@ -2612,6 +2612,7 @@ public final class MainActivity extends Activity {
         }
         scroller.addView(rail);
         browserSavedSitesContainer.addView(scroller);
+        browserSavedSitesContainer.setContentDescription(origins.size() + " saved site shortcuts available");
     }
 
     private View buildBrowserHomeView() {
