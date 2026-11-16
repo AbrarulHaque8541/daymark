@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-17T02:08:00Z (Cycle B: suggestion a11y focus+toast polish)](./CURRENT_STATUS_20261117T020800Z.md)
+
 - [Daymark engineering status — 2026-11-17T00:08:00Z (Cycle B: suggestion highlights completed on clean branch)](./CURRENT_STATUS_20261117T000800Z.md)
 - [Daymark engineering status — 2026-11-16T16:55:00Z (semantic design tokens foundation, branch feat/design-tokens-vibe-20261116)](./CURRENT_STATUS_20261116T165500Z.md)
 - [Daymark engineering status — 2026-11-16T18:30:00Z (Cycle B: Copy visible checklist polish)](./CURRENT_STATUS_20261116T183000Z.md)

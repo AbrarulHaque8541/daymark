@@ -2559,9 +2559,22 @@
       const taskId = button.dataset.suggestionTask;
       const row = taskList.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`);
       if (row) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        row.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
         row.classList.add('is-highlighted');
-        setTimeout(() => row.classList.remove('is-highlighted'), 1800);
+        // Brief focus for keyboard/screen-reader users; restore previous if possible.
+        const prevFocus = document.activeElement;
+        if (row.tabIndex < 0) row.tabIndex = -1;
+        row.focus({ preventScroll: true });
+        setTimeout(() => {
+          row.classList.remove('is-highlighted');
+          if (row.tabIndex === -1) row.removeAttribute('tabindex');
+          if (prevFocus && prevFocus !== document.body && typeof prevFocus.focus === 'function') {
+            try { prevFocus.focus({ preventScroll: true }); } catch (e) {}
+          }
+        }, 1800);
+        const title = row.querySelector('.task-title')?.textContent || 'task';
+        showToast(`Highlighted: ${title}`);
       }
     });
     $('#edit-form').addEventListener('submit', saveEdit);
