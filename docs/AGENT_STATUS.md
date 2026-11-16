@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T01:05:00Z (Cycle A: Android bookmark PR compile fix)](./CURRENT_STATUS_20261116T010500Z.md)
 - [Daymark engineering status — 2026-11-15T21:40:00Z (Cycle B: MainActivity restore prepared)](./CURRENT_STATUS_20261115T214000Z.md)
 - [Daymark engineering status — 2026-11-16T01:35:00Z (Cycle A: Android bookmark shortcuts PR progress)](./CURRENT_STATUS_20261116T013500Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
