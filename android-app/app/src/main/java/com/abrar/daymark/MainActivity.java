@@ -2559,7 +2559,7 @@ public final class MainActivity extends Activity {
         browserSavedSitesContainer.setVisibility(View.VISIBLE);
         TextView label = text("Saved sites", 11, palette.muted, Typeface.BOLD);
         label.setPadding(0, 0, 0, dp(4));
-        label.setContentDescription("Saved sites shortcuts, up to four newest bookmark origins");
+        label.setContentDescription("Saved sites, " + origins.size() + " shortcuts shown");
         browserSavedSitesContainer.addView(label);
         HorizontalScrollView scroller = new HorizontalScrollView(this);
         scroller.setHorizontalScrollBarEnabled(false);

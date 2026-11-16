@@ -36,6 +36,7 @@ assert "refreshSavedSitesRail()" in home, \
 assert 'text("Saved sites"' in refresh and "new HorizontalScrollView(this)" in refresh, \
     "saved shortcuts must be a clearly labeled, horizontally scrollable native section"
 assert "setVisibility(View.GONE)" in refresh, "empty bookmarks must not add visual clutter"
+assert "shortcuts shown" in refresh, "label content description must announce the exact visible shortcut count"
 assert 'browserPreferences.getString(BROWSER_BOOKMARKS_KEY, "")' in refresh, \
     "the row may read only the existing bookmark preference"
 assert "BrowserBookmarkShortcuts.visibleOrigins" in refresh, "the view must use the bounded saved-origin policy"
