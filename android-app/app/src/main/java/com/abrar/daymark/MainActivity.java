@@ -2599,11 +2599,12 @@ public final class MainActivity extends Activity {
             rail.addView(chip);
         }
         // More… chip when the full bookmark list exceeds the visible rail limit.
-        List<String> allOrigins = BrowserHistory.decode(serialized);
-        if (allOrigins.size() > BrowserBookmarkShortcuts.MAX_VISIBLE) {
+        // Use the policy methods so the view never decodes bookmark storage directly.
+        if (BrowserBookmarkShortcuts.hasAdditionalOrigins(serialized)) {
+            int total = BrowserBookmarkShortcuts.totalOrigins(serialized);
             LinearLayout moreChip = browserHomeChip(
                     "More…",
-                    "Open the full bookmarks list (" + allOrigins.size() + " saved sites)",
+                    "Open the full bookmarks list (" + total + " saved sites)",
                     this::showBrowserBookmarksDialog);
             moreChip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
             rail.addView(moreChip);
