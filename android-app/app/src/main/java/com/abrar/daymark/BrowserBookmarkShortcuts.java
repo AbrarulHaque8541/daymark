@@ -15,4 +15,17 @@ final class BrowserBookmarkShortcuts {
         int visibleCount = Math.min(MAX_VISIBLE, savedOrigins.size());
         return new ArrayList<>(savedOrigins.subList(0, visibleCount));
     }
+
+    /**
+     * True when the persisted bookmark list holds more origins than the rail can show.
+     * Used only to decide whether a "More…" affordance is useful; never mutates storage.
+     */
+    static boolean hasAdditionalOrigins(String serializedBookmarks) {
+        return BrowserHistory.decode(serializedBookmarks).size() > MAX_VISIBLE;
+    }
+
+    /** Total valid saved origins; for accessibility labels only. Never mutates storage. */
+    static int totalOrigins(String serializedBookmarks) {
+        return BrowserHistory.decode(serializedBookmarks).size();
+    }
 }
