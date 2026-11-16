@@ -2571,7 +2571,11 @@ public final class MainActivity extends Activity {
             if (BrowserHttpPolicy.isHttp(origin)) {
                 labelText = origin + " · Not encrypted";
             }
-            LinearLayout chip = browserHomeChip(labelText, "Open saved site " + origin + ". Long-press to copy", () -> {
+            String desc = "Open saved site " + origin + ". Long-press to copy";
+            if (BrowserHttpPolicy.isHttp(origin)) {
+                desc += ". Not encrypted";
+            }
+            LinearLayout chip = browserHomeChip(labelText, desc, () -> {
                 showBrowserStatus("Opening saved site…");
                 navigateBrowserTo(origin);
             });
