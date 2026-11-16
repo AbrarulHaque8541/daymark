@@ -2607,6 +2607,7 @@ public final class MainActivity extends Activity {
                     "Open the full bookmarks list (" + total + " saved sites)",
                     this::showBrowserBookmarksDialog);
             moreChip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
+            moreChip.setContentDescription("More saved sites, " + total + " total");
             rail.addView(moreChip);
         }
         scroller.addView(rail);
