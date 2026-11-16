@@ -54,4 +54,12 @@ assert "refreshSavedSitesRail()" in bookmarks_dialog, \
     "clearing bookmarks must immediately update the visible section"
 assert "MAX_VISIBLE = 4" in policy and "BrowserHistory.decode(serializedBookmarks)" in policy, \
     "shortcut selection must be bounded and derive only from stored bookmark origins"
-print("PASS browser bookmark shortcuts integration: saved-only data, bounded rail, safe tap, blank-tab refresh, and clear behavior")
+assert "hasAdditionalOrigins" in policy and "totalOrigins" in policy, \
+    "policy must expose overflow detection without forcing the view to decode bookmarks"
+assert "hasAdditionalOrigins(serialized)" in refresh and '"More…"' in refresh, \
+    "rail must offer a More… chip when overflow exists"
+assert "showBrowserBookmarksDialog" in refresh, \
+    "More… must open the existing bookmarks dialog"
+assert "BrowserHistory.decode" not in refresh, \
+    "view must not decode bookmark storage directly; use BrowserBookmarkShortcuts policy"
+print("PASS browser bookmark shortcuts integration: saved-only data, bounded rail, More overflow via policy, safe tap, blank-tab refresh, and clear behavior")
