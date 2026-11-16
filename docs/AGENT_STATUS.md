@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T06:08:00Z (Cycle B: PR #779 complete on branch, CI flake)](./CURRENT_STATUS_20261116T060800Z.md)
 - [Daymark engineering status — 2026-11-16T01:05:00Z (Cycle A: Android bookmark PR compile fix)](./CURRENT_STATUS_20261116T010500Z.md)
 - [Daymark engineering status — 2026-11-15T21:40:00Z (Cycle B: MainActivity restore prepared)](./CURRENT_STATUS_20261115T214000Z.md)
 - [Daymark engineering status — 2026-11-16T01:35:00Z (Cycle A: Android bookmark shortcuts PR progress)](./CURRENT_STATUS_20261116T013500Z.md)
@@ -24,6 +25,7 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T013500Z.md](./CURRENT_STATUS_20261116T013500Z.md) — Cycle A: progress on open Android bookmark PR #779 (security marker + URI routing guards). Physical device NOT TESTED.
 - [CURRENT_STATUS_20261114T044000Z.md](./CURRENT_STATUS_20261114T044000Z.md) — Cycle B verification: Cycle A dictionary card complete; small structured-results polish added on branch. Physical device NOT TESTED.
