@@ -742,7 +742,7 @@
     $('#stat-streak').textContent = String(streak);
     const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
     suggestionList.innerHTML = suggestions.length
-      ? suggestions.map(({ task, reason }, index) => `<div class="suggestion-item"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></div>`).join('')
+      ? suggestions.map(({ task, reason }, index) => `<button type="button" class="suggestion-item" data-suggestion-task="${escapeHTML(task.id)}" aria-label="Highlight task: ${escapeHTML(task.title)}"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></button>`).join('')
       : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
     renderFocus();
     renderFeed();
@@ -2553,6 +2553,17 @@
       setTaskFilter(button.dataset.filter);
     }));
     taskList.addEventListener('click', handleTaskAction);
+    suggestionList.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-suggestion-task]');
+      if (!button) return;
+      const taskId = button.dataset.suggestionTask;
+      const row = taskList.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('is-highlighted');
+        setTimeout(() => row.classList.remove('is-highlighted'), 1800);
+      }
+    });
     $('#edit-form').addEventListener('submit', saveEdit);
     $('#edit-title').addEventListener('input', () => {
       $('#edit-error').hidden = true;
