@@ -39,6 +39,7 @@ tests/crypto-logic.test.js
 tests/crypto-ui.test.js
 tests/daylight-logic.test.js
 tests/daylight-ui.test.js
+tests/design-tokens-logic.test.js
 tests/device-acceptance-workflow.test.js
 tests/device-adapter.test.js
 tests/device-capability-policy.test.js
