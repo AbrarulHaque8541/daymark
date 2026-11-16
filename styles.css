@@ -95,6 +95,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .clear-completed:hover { border-color: rgba(219, 226, 232, .9); background: rgba(255, 255, 255, .8); color: var(--red); }
 #complete-visible:hover { color: var(--accent); }
 #complete-visible:active { background: rgba(22, 112, 95, 0.12); }
+#copy-visible:hover { color: var(--accent); }
+#copy-visible:active { background: rgba(22, 112, 95, 0.12); }
 .clear-completed[hidden] { display: none; }
 .filters { display: flex; flex-wrap: wrap; gap: 0 4px; border-bottom: 1px solid var(--line); margin-bottom: 9px; }
 .filter-button { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px 8px; border: 0; border-bottom: 2px solid transparent; background: none; color: #63707a; font-size: 12px; white-space: nowrap; transition: color .16s ease, border-color .16s ease; }
@@ -182,7 +184,13 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .suggestion-card h2 { max-width: 230px; margin: 0 0 4px; font-size: 14px; line-height: 1.25; letter-spacing: -.02em; }
 .suggestion-description { max-width: 235px; margin: 0; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
 .suggestion-list { display: grid; gap: 8px; margin: 17px 0 15px; }
-.suggestion-item { display: grid; grid-template-columns: 23px minmax(0, 1fr); gap: 8px; align-items: start; padding: 10px 9px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.suggestion-item { display: grid; grid-template-columns: 23px minmax(0, 1fr); gap: 8px; align-items: start; padding: 10px 9px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease; text-align: left; width: 100%; cursor: pointer; }
+.suggestion-item:active { transform: scale(0.98); background: rgba(22, 112, 95, 0.08); }
+.task-row.is-highlighted { animation: highlight-pulse 1.8s ease; border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(22, 112, 95, .25), 0 10px 26px rgba(24, 40, 48, .08); }
+@keyframes highlight-pulse { 0%, 100% { background: var(--surface); } 40% { background: rgba(22, 112, 95, .08); } }
+@media (prefers-reduced-motion: reduce) {
+  .task-row.is-highlighted { animation: none; }
+}
 .suggestion-item:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
 .suggestion-number { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 8px; color: #1e6b58; background: #dcefe7; font: 700 9px Manrope, sans-serif; }
 .suggestion-task-title { overflow-wrap: anywhere; margin: 1px 0 4px; color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.4; }

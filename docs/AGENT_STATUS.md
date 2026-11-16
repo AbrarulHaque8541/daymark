@@ -1,16 +1,8 @@
-- [Daymark engineering status — 2026-11-16T16:30:00Z (Cycle A: merge resolve + a11y count polish)](./CURRENT_STATUS_20261116T163000Z.md)
+- [Daymark engineering status — 2026-11-17T00:08:00Z (Cycle B: suggestion highlights completed on clean branch)](./CURRENT_STATUS_20261117T000800Z.md)
+- [Daymark engineering status — 2026-11-16T16:55:00Z (semantic design tokens foundation, branch feat/design-tokens-vibe-20261116)](./CURRENT_STATUS_20261116T165500Z.md)
+- [Daymark engineering status — 2026-11-16T18:30:00Z (Cycle B: Copy visible checklist polish)](./CURRENT_STATUS_20261116T183000Z.md)
+- [Daymark engineering status — 2026-11-16T17:12:00Z (Cycle A: Copy visible tasks)](./CURRENT_STATUS_20261116T171200Z.md)
 - [Daymark engineering status — 2026-11-16T15:08:00Z (Cycle B: Complete visible tasks button)](./CURRENT_STATUS_20261116T150800Z.md)
-- [Daymark engineering status — 2026-11-16T14:15:00Z (Cycle B: #779 remove confirmation)](./CURRENT_STATUS_20261116T141500Z.md)
-- [Daymark engineering status — 2026-11-16T07:40:00Z (Cycle B: #779 conflicts resolved + web copy PR ready)](./CURRENT_STATUS_20261116T074000Z.md)
-- [Daymark engineering status — 2026-11-16T13:10:00Z (Cycle A: Saved sites long-press remove)](./CURRENT_STATUS_20261116T131000Z.md)
-- [Daymark engineering status — 2026-11-16T12:15:00Z (Cycle A: bookmark PR CI fix + a11y polish)](./CURRENT_STATUS_20261116T121500Z.md)
-- [Daymark engineering status — 2026-11-16T05:35:00Z (Cycle A: Saved sites More… chip)](./CURRENT_STATUS_20261116T053500Z.md)
-- [Daymark engineering status — 2026-11-16T11:40:00Z (Cycle B: #779 merge resolved, CI running)](./CURRENT_STATUS_20261116T114000Z.md)
-- [Daymark engineering status — 2026-11-16T04:30:00Z (Cycle B: glass accent polish on Saved sites chips)](./CURRENT_STATUS_20261116T043000Z.md)
-- [Daymark engineering status — 2026-11-16T09:10:00Z (Cycle B: HTTP a11y on Saved sites)](./CURRENT_STATUS_20261116T091000Z.md)
-- [Daymark engineering status — 2026-11-16T08:10:00Z (Cycle B: reduced-motion polish on Saved sites)](./CURRENT_STATUS_20261116T081000Z.md)
-- [Daymark engineering status — 2026-11-16T02:55:00Z (Cycle A: PR #779 compile fix)](./CURRENT_STATUS_20261116T025500Z.md)
-- [Daymark engineering status — 2026-11-16T01:45:00Z (Cycle A: merge resolve + long-press copy)](./CURRENT_STATUS_20261116T014500Z.md)
 - [Daymark engineering status — 2026-11-16T12:08:00Z (Cycle B: PR #779 complete + a11y rail count)](./CURRENT_STATUS_20261116T120800Z.md)
 - [Daymark engineering status — 2026-11-16T04:56:54Z (keyless crypto glance card, branch feat/crypto-card-vibe-20261116)](./CURRENT_STATUS_20261116T045654Z.md)
 - [Daymark engineering status — 2026-11-16T10:50:00Z (Cycle A: bookmark PR CI re-trigger + web copy-visible)](./CURRENT_STATUS_20261116T105000Z.md)
@@ -20,9 +12,13 @@
 - [Daymark engineering status — 2026-11-16T01:35:00Z (Cycle A: Android bookmark shortcuts PR progress)](./CURRENT_STATUS_20261116T013500Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
 - [Daymark engineering status - 2026-11-15T06:05:00Z (Cycle A clear-search polish)](./CURRENT_STATUS_20261115T060500Z.md)
+
 - [Daymark engineering status - 2026-11-15T00:20:00Z (Cycle A filter polish fix)](./CURRENT_STATUS_20261115T002000Z.md)
+
 - [Daymark engineering status - 2026-11-14T22:37:00Z (Cycle A filter polish)](./CURRENT_STATUS_20261114T223700Z.md)
+
 - [Daymark engineering status - 2026-11-15T02:05:00Z (Cycle A sort toggle polish)](./CURRENT_STATUS_20261115T020500Z.md)
+
 - [Daymark engineering status — 2026-11-14T16:46:24Z (permission-lifecycle planner card, branch feat/permission-lifecycle-vibe-20261114)](./CURRENT_STATUS_20261114T164624Z.md)
 - [Daymark engineering status - 2026-11-14T12:37:30Z (Cycle A task view reset polish)](./CURRENT_STATUS_20261114T123730Z.md)
 - [Daymark engineering status - 2026-11-14T08:35:00Z (Cycle A task view preference persistence)](./CURRENT_STATUS_20261114T083500Z.md)
@@ -34,7 +30,6 @@
 - [Daymark engineering status — 2026-11-13T16:23:00Z (address-bar insights card, branch feat/url-insights-vibe-20261113)](./CURRENT_STATUS_20261113T162300Z.md)
 - [Daymark engineering status — 2026-11-13T04:39:18Z (keyless GitHub release radar card, branch feat/release-radar-vibe-20261113)](./CURRENT_STATUS_20261113T043900Z.md)
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
-
 
 # Agent status index
 

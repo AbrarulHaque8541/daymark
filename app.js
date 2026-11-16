@@ -662,6 +662,7 @@
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
     const openVisible = filteredTasks.filter((task) => !task.completed).length;
     $('#complete-visible').hidden = openVisible === 0;
+    $('#copy-visible').hidden = filteredTasks.length === 0;
     $('#clear-completed').hidden = completedTasks.length === 0;
     $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
     $('#sort-toggle').textContent = state.sort === 'title' ? 'Sort: A–Z' : 'Sort: Smart';
@@ -741,7 +742,7 @@
     $('#stat-streak').textContent = String(streak);
     const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
     suggestionList.innerHTML = suggestions.length
-      ? suggestions.map(({ task, reason }, index) => `<div class="suggestion-item"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></div>`).join('')
+      ? suggestions.map(({ task, reason }, index) => `<button type="button" class="suggestion-item" data-suggestion-task="${escapeHTML(task.id)}" aria-label="Highlight task: ${escapeHTML(task.title)}"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></button>`).join('')
       : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
     renderFocus();
     renderFeed();
@@ -1289,6 +1290,43 @@
         showSaveResult(restored, 'Visible tasks restored.');
       }
     });
+  }
+
+
+  async function copyVisible() {
+    const filteredTasks = getCurrentlyFilteredTasks();
+    if (!filteredTasks.length) return;
+    const lines = filteredTasks.map((task) => {
+      const mark = task.completed ? '[x]' : '[ ]';
+      let line = `- ${mark} ${task.title || ''}`;
+      if (task.dueDate) {
+        const due = task.dueTime ? `${task.dueDate} ${task.dueTime}` : task.dueDate;
+        line += ` (due ${due})`;
+      }
+      return line;
+    }).filter(Boolean);
+    if (!lines.length) return;
+    const text = lines.join('\n');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        showToast(`Copied ${lines.length} task${lines.length === 1 ? '' : 's'} as checklist.`);
+      } else {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(`Copied ${lines.length} task${lines.length === 1 ? '' : 's'} as checklist.`);
+      }
+    } catch (err) {
+      showToast('Could not copy to clipboard.');
+    }
   }
 
   function exportTasks() {
@@ -2262,6 +2300,9 @@
     } else if ((event.key === 'c' || event.key === 'C') && !$('#edit-dialog').open && !$('#clear-completed').hidden) {
       event.preventDefault();
       $('#clear-completed').click();
+    } else if ((event.key === 'y' || event.key === 'Y') && !$('#edit-dialog').open && !$('#copy-visible').hidden) {
+      event.preventDefault();
+      $('#copy-visible').click();
     } else if (FILTER_KEYS[event.key] && !$('#edit-dialog').open) {
       event.preventDefault();
       setTaskFilter(FILTER_KEYS[event.key]);
@@ -2500,6 +2541,7 @@
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
     $('#complete-visible').addEventListener('click', completeVisible);
+    $('#copy-visible').addEventListener('click', copyVisible);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', async (event) => {
@@ -2511,6 +2553,17 @@
       setTaskFilter(button.dataset.filter);
     }));
     taskList.addEventListener('click', handleTaskAction);
+    suggestionList.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-suggestion-task]');
+      if (!button) return;
+      const taskId = button.dataset.suggestionTask;
+      const row = taskList.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('is-highlighted');
+        setTimeout(() => row.classList.remove('is-highlighted'), 1800);
+      }
+    });
     $('#edit-form').addEventListener('submit', saveEdit);
     $('#edit-title').addEventListener('input', () => {
       $('#edit-error').hidden = true;

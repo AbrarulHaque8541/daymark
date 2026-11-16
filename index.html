@@ -67,6 +67,7 @@
   <script src="storage-logic.js" defer></script>
   <script src="task-mutation-logic.js" defer></script>
   <script src="storage-ui.js" defer></script>
+  <script src="design-tokens.js" defer></script>
   <script src="motion-policy.js" defer></script>
   <script src="app.js" defer></script>
   <script src="export-ui.js" defer></script>
@@ -147,7 +148,7 @@
           <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
         </div>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
-        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>5</kbd> for filters, <kbd>C</kbd> to clear completed. Use Complete visible when filtering. Add <kbd>#tags</kbd> to the title to tag a task.</p>
+        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>5</kbd> for filters, <kbd>C</kbd> to clear completed. Use Complete visible or Copy visible (Y) for a checklist when filtering. Add <kbd>#tags</kbd> to the title to tag a task.</p>
       </section>
 
       <div class="content-grid">
@@ -157,6 +158,7 @@
             <div class="section-heading-tools">
               <span class="task-total" id="visible-count">0 tasks</span>
               <button class="clear-completed" id="complete-visible" type="button" hidden title="Mark all currently visible open tasks complete" aria-label="Complete all visible open tasks">Complete visible</button>
+              <button class="clear-completed" id="copy-visible" type="button" hidden title="Copy titles of currently visible tasks to clipboard (Y)" aria-label="Copy visible task titles (Y)" aria-keyshortcuts="Y">Copy visible</button>
               <button class="clear-completed" id="clear-completed" type="button" hidden title="Clear completed tasks (C)" aria-label="Clear completed tasks (C)" aria-keyshortcuts="C">Clear completed</button>
             </div>
           </div>
