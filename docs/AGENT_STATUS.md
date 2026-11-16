@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T03:08:00Z (Cycle B: suggestion press and busy polish)](./CURRENT_STATUS_20261117T030800Z.md)
 - [Daymark engineering status — 2026-11-17T00:08:00Z (Cycle B: suggestion highlights completed on clean branch)](./CURRENT_STATUS_20261117T000800Z.md)
 - [Daymark engineering status — 2026-11-16T16:55:00Z (semantic design tokens foundation, branch feat/design-tokens-vibe-20261116)](./CURRENT_STATUS_20261116T165500Z.md)
 - [Daymark engineering status — 2026-11-16T18:30:00Z (Cycle B: Copy visible checklist polish)](./CURRENT_STATUS_20261116T183000Z.md)
@@ -33,6 +34,7 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261117T030800Z.md](./CURRENT_STATUS_20261117T030800Z.md) — Cycle B: small suggestion press/busy polish on branch; PR #779 feature complete, merge blocked by known API 36 flake. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T120800Z.md](./CURRENT_STATUS_20261116T120800Z.md) — Cycle B: PR #779 Saved sites complete on branch + a11y rail count; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
