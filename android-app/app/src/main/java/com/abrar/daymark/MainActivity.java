@@ -2579,6 +2579,8 @@ public final class MainActivity extends Activity {
                 showBrowserStatus("Opening saved site…");
                 navigateBrowserTo(origin);
             });
+            // Glass accent polish for Saved sites chips (accent #16705f)
+            chip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
             // Long-press copies the origin for quick reuse without leaving Daymark.
             chip.setOnLongClickListener(view -> {
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
