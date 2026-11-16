@@ -38,6 +38,11 @@ function makeElement(tag) {
       child.parentNode = element;
       element.children.push(child);
       if (child.textContent) element.textContent += child.textContent;
+      /* A real <select> reports its first option as the value; emulate that so
+         handlers read the same state a browser would give them. */
+      if (/^select$/i.test(element.tagName) && /^option$/i.test(child.tagName) && !element.value) {
+        element.value = child.value;
+      }
       registerTree(child);
       return child;
     },

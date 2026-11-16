@@ -202,8 +202,12 @@
         status('Could not check the rate: fetch is unavailable in this browser.');
         return;
       }
-      const coin = coinEl && typeof coinEl.value === 'string' ? coinEl.value : '';
-      const fiat = fiatEl && typeof fiatEl.value === 'string' ? fiatEl.value : '';
+      const coinValue = coinEl && typeof coinEl.value === 'string' ? coinEl.value : '';
+      const fiatValue = fiatEl && typeof fiatEl.value === 'string' ? fiatEl.value : '';
+      // A populated select always reports its first option in a real browser;
+      // default to the catalog heads if the value is ever empty.
+      const coin = COINS.indexOf(coinValue) !== -1 ? coinValue : COINS[0];
+      const fiat = FIATS.indexOf(fiatValue) !== -1 ? fiatValue : FIATS[0];
       setBusy(true);
       try {
         const record = await cryptoApi.fetchRates(coin, fiat, fetchImpl, { now: now });
