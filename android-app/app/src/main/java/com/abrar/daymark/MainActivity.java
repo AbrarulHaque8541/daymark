@@ -2559,9 +2559,11 @@ public final class MainActivity extends Activity {
         browserSavedSitesContainer.setVisibility(View.VISIBLE);
         TextView label = text("Saved sites", 11, palette.muted, Typeface.BOLD);
         label.setPadding(0, 0, 0, dp(4));
+        label.setContentDescription("Saved sites shortcuts, up to four newest bookmark origins");
         browserSavedSitesContainer.addView(label);
         HorizontalScrollView scroller = new HorizontalScrollView(this);
         scroller.setHorizontalScrollBarEnabled(false);
+        scroller.setContentDescription("Horizontal list of saved site shortcuts");
         LinearLayout rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.HORIZONTAL);
         for (String origin : origins) {
