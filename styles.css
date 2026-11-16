@@ -1025,3 +1025,25 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Storage checking state polish */
+.local-badge.is-checking {
+  border-color: rgba(22, 112, 95, 0.35);
+  background: rgba(226, 240, 235, 0.65);
+  color: var(--accent);
+  animation: storage-check-pulse 1.8s ease-in-out infinite;
+}
+.local-badge.is-checking svg {
+  stroke: var(--accent);
+  animation: storage-check-spin 1.4s linear infinite;
+}
+@keyframes storage-check-pulse {
+  50% { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.12); }
+}
+@keyframes storage-check-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .local-badge.is-checking,
+  .local-badge.is-checking svg { animation: none; }
+}
