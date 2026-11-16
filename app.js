@@ -1226,6 +1226,52 @@
     }
   }
 
+
+  async function copyVisibleTasks() {
+    const today = logic.localDateString();
+    const overdueTasks = state.tasks.filter((task) => !task.completed && task.dueDate !== null && task.dueDate < today);
+    const source = state.filter === 'overdue' ? overdueTasks : state.tasks;
+    const effectiveFilter = state.filter === 'overdue' ? 'all' : state.filter;
+    let filteredTasks = logic.getFilteredTasks(source, effectiveFilter, state.query, today);
+    const normalizedQuery = String(state.query || '').trim().toLowerCase();
+    if (normalizedQuery) {
+      const knownIds = new Set(filteredTasks.map((task) => task.id));
+      const extra = source.filter((task) => !knownIds.has(task.id) && matchesSubtaskTitle(task, normalizedQuery));
+      if (extra.length) filteredTasks = logic.getFilteredTasks(filteredTasks.concat(extra), effectiveFilter, '', today);
+    }
+    if (state.sort === 'title') {
+      filteredTasks = filteredTasks.slice().sort((a, b) => a.title.localeCompare(b.title) || (a.dueDate || '').localeCompare(b.dueDate || ''));
+    }
+    if (!filteredTasks.length) {
+      showToast('No visible tasks to copy.');
+      return;
+    }
+    const lines = filteredTasks.map(task => {
+      const due = task.dueDate ? ` (due ${task.dueDate}${task.dueTime ? ' ' + task.dueTime : ''})` : '';
+      const mark = task.completed ? '[x]' : '[ ]';
+      return `${mark} ${task.title}${due}`;
+    });
+    const textToCopy = lines.join('\n');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = textToCopy;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      showToast(`Copied ${filteredTasks.length} task${filteredTasks.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      showToast('Could not copy tasks.');
+      console.warn(err);
+    }
+  }
+
   async function clearCompleted() {
     const removed = state.tasks.filter((task) => task.completed);
     if (!removed.length) return;
@@ -2215,6 +2261,9 @@
     } else if ((event.key === 's' || event.key === 'S') && !$('#edit-dialog').open) {
       event.preventDefault();
       $('#sort-toggle').click();
+    } else if ((event.key === 'y' || event.key === 'Y') && !$('#edit-dialog').open) {
+      event.preventDefault();
+      copyVisibleTasks();
     } else if ((event.key === 'c' || event.key === 'C') && !$('#edit-dialog').open && !$('#clear-completed').hidden) {
       event.preventDefault();
       $('#clear-completed').click();
@@ -2455,6 +2504,8 @@
     }
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
+    const copyBtn = $('#copy-visible');
+    if (copyBtn) copyBtn.addEventListener('click', copyVisibleTasks);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', async (event) => {
