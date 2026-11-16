@@ -127,7 +127,7 @@ const okResponse = (bodyText) => ({
   body: streamOf([bodyText])
 });
 
-const payload = { data: { currency: 'BTC', rates: { INR: '7341205.51' } } };
+const payload = { data: { currency: 'BTC', rates: { USD: '73412.05' } } };
 
 const drain = async () => {
   for (let i = 0; i < 500; i += 1) await Promise.resolve();
@@ -209,7 +209,7 @@ test('a successful check renders the rate line and the source note', async () =>
   doc.getElementById('crypto-check').dispatch('click', {});
   await drain();
   const result = doc.getElementById('crypto-result');
-  assert.ok(result.textContent.includes('1 BTC = 7,341,205.51 INR'));
+  assert.ok(result.textContent.includes('1 BTC = 73,412.05 USD'));
   assert.ok(result.textContent.includes('Coinbase public rates'));
 });
 
