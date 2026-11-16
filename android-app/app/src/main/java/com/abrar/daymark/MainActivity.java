@@ -2582,6 +2582,9 @@ public final class MainActivity extends Activity {
                     clipboard.setPrimaryClip(ClipData.newPlainText("Daymark saved site", origin));
                     showBrowserStatus("Copied " + origin);
                     haptic(view, HapticFeedbackConstants.LONG_PRESS);
+                    // Brief accent flash for visual confirmation without blocking.
+                    view.setAlpha(0.7f);
+                    view.animate().alpha(1f).setDuration(180).start();
                 }
                 return true;
             });
@@ -2718,7 +2721,13 @@ public final class MainActivity extends Activity {
         }
         if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
             // Typed intent targets must be visibly rejected before Android handoff
-            android.content.Intent target = android.content.Intent.parseUri(webAddress, 0);
+            android.content.Intent target;
+            try {
+                target = android.content.Intent.parseUri(webAddress, 0);
+            } catch (java.net.URISyntaxException exception) {
+                showBrowserStatus("invalid intent target. Nothing was opened.");
+                return;
+            }
             if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())) {
                 showBrowserStatus("unsupported target scheme. Nothing was opened.");
                 return;
