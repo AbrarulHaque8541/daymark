@@ -5,6 +5,7 @@ import sys
 root = Path(sys.argv[1])
 policy = (root / "app/src/main/java/com/abrar/daymark/BrowserAppLinkApproval.java").read_text(encoding="utf-8")
 webview = (root / "app/src/main/java/com/abrar/daymark/DaymarkWebView.java").read_text(encoding="utf-8")
+routes = (root / "app/src/main/java/com/abrar/daymark/BrowserUriRoutingPolicy.java").read_text(encoding="utf-8")
 smoke = (root / "tools/BrowserAppLinkApprovalSmoke.java").read_text(encoding="utf-8")
 runner = (root / "tools/run-browser-app-link-approval-tests.sh").read_text(encoding="utf-8")
 canonical = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
@@ -19,24 +20,18 @@ for expected in (
 ):
     assert expected in policy, f"App Link approval gate must retain: {expected}"
 
-for expected in (
+for forbidden in (
+    "handOffVerifiedAppLink(",
+    "isVerifiedAppLinkApproved(",
     "DomainVerificationManager",
-    "getDomainVerificationUserState(packageName)",
-    "state.isLinkHandlingAllowed()",
-    "BrowserAppLinkApproval.isApproved(",
-    "resolved.activityInfo.packageName",
-    "uri.getHost()",
-    "app link handoff declined origin=",
-    "reason=host-not-verified-or-user-selected",
+    "startActivity(appLink)",
 ):
-    assert expected in webview, f"WebView direct handoff must use platform host approval: {expected}"
-
-gate = webview.split("private boolean handOffVerifiedAppLink", 1)[1].split(
-    "private final ExtensionRuntime", 1)[0]
-assert gate.index("isVerifiedAppLinkApproved(") < gate.index("view.getContext().startActivity(appLink)"), \
-    "direct app launch must occur only after the platform host approval check"
-assert "Build.VERSION.SDK_INT < Build.VERSION_CODES.S" in webview, \
-    "pre-Android-12 direct App Link handoff must fail closed"
+    assert forbidden not in webview, f"HTTP(S) links, including verified App Links, must stay in Daymark: {forbidden}"
+assert "// Verified HTTP(S) App Links stay in Daymark" in webview
+assert "BrowserAddress.isAllowedWebUrl(url)" in webview, \
+    "HTTP(S) navigation must continue through the WebView web URL gate"
+for expected in ('case "http":', 'case "https":', 'return Route.WEBVIEW;'):
+    assert expected in routes, f"HTTP(S) must be classified for WebView routing: {expected}"
 
 for expected in (
     "pre-Android-12 must fail closed",
@@ -56,4 +51,4 @@ assert "check-browser-app-link-approval.py" in canonical, \
     "canonical source guard must enforce App Link runtime integration"
 assert "sh ./tools/check-v1-source.sh" in workflow, \
     "Android CI must execute the canonical source guard"
-print("PASS browser App Link approval source guard")
+print("PASS browser App Link routing guard: verified and ordinary HTTP(S) links stay in Daymark")

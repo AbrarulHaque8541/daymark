@@ -95,8 +95,35 @@ final class BrowserAddress {
             throw new IllegalArgumentException("Web searches and addresses can be at most 2048 characters.");
         }
         if (looksLikeBareDomain(value)) return requireAllowedWebUrl(BrowserHttpPolicy.resolveBareDomain(value));
-        if (SCHEME.matcher(value).find()) return requireAllowedWebUrl(value);
+        if (SCHEME.matcher(value).find()) return requireAllowedBrowserNavigation(value);
         return (engine == null ? SearchEngine.DUCKDUCKGO : engine).searchUrl(value);
+    }
+
+    /**
+     * Validates a user-requested browser navigation without weakening the stricter
+     * HTTP(S)-only contract used by web-only features such as history and downloads.
+     */
+    static String requireAllowedBrowserNavigation(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("A browser address is required.");
+        }
+        String candidate = value.trim();
+        if (candidate.length() > MAX_INPUT_LENGTH + 8) {
+            throw new IllegalArgumentException("This browser address is too long.");
+        }
+        java.util.regex.Matcher matcher = SCHEME.matcher(candidate);
+        if (!matcher.find()) throw new IllegalArgumentException("Enter a valid browser address.");
+        String scheme = candidate.substring(0, matcher.end() - 1);
+        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+            return requireAllowedWebUrl(candidate);
+        }
+        for (int i = 0; i < candidate.length(); i++) {
+            char ch = candidate.charAt(i);
+            if (ch <= 0x1F || ch == 0x7F) {
+                throw new IllegalArgumentException("Enter a valid browser address.");
+            }
+        }
+        return candidate;
     }
 
     static String requireAllowedWebUrl(String value) {
@@ -154,20 +181,17 @@ final class BrowserAddress {
     }
 
     static boolean shouldHandOffExternalScheme(boolean mainFrame, boolean userGesture, String scheme) {
-        if (!mainFrame || !userGesture || scheme == null) return false;
+        return mainFrame && userGesture && isExplicitExternalScheme(scheme);
+    }
+
+    static boolean isExplicitExternalScheme(String scheme) {
+        if (scheme == null) return false;
         String normalized = scheme.trim().toLowerCase(Locale.ROOT);
         if (!Pattern.matches("^[a-z][a-z0-9+.-]*$", normalized)) return false;
-        // Web navigation stays in Daymark. These schemes expose local resources, script
-        // execution, internal WebView surfaces, or privileged arbitrary Intent payloads.
         switch (normalized) {
-            case "http": case "https": case "javascript": case "vbscript":
-            case "file": case "content": case "data": case "blob": case "about":
-            case "intent": case "daymark-download": case "chrome": case "chrome-extension":
-            case "devtools": case "view-source":
-                return false;
-            default:
-                // Android's ACTION_VIEW resolver must still find a real handler; no package is guessed.
+            case "mailto": case "tel": case "sms": case "geo":
                 return true;
+            default: return false;
         }
     }
 

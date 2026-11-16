@@ -44,25 +44,66 @@ public final class BrowserAddressSmoke {
         assert BrowserAddress.resolveInput("http://example.com:8080", BrowserAddress.SearchEngine.DUCKDUCKGO)
                 .equals("http://example.com:8080");
 
-        rejects("javascript:alert(1)");
-        rejects("file:///etc/passwd");
-        rejects("content://com.example/private");
-        rejects("intent://open");
-        rejects("ftp://example.com/file");
-        rejects("data:text/html,hello");
-
-        for (String scheme : new String[]{"tg", "telegram", "mailto", "tel", "sms",
-                "smsto", "geo", "market", "whatsapp", "TG", "ftp", "viber", "spotify",
-                "youtube", "chatgpt", "instagram", "android-app", "custom+scheme"}) {
+        for (String address : new String[]{"javascript:alert(1)", "data:text/html,hello",
+                "file:///etc/passwd", "content://com.example/private",
+                "mailto:user@example.com", "tel:+18005550100", "sms:+18005550100",
+                "geo:37.7749,-122.4194", "intent://scan/#Intent;scheme=tg;end",
+                "ftp://example.com/file"}) {
+            assert BrowserAddress.resolveInput(address, BrowserAddress.SearchEngine.DUCKDUCKGO)
+                    .equals(address) : "explicit URI scheme must reach route selection: " + address;
+        }
+        for (String address : new String[]{"file:///etc/passwd", "content://com.example/private"}) {
+            String scheme = URI.create(BrowserAddress.resolveInput(address,
+                    BrowserAddress.SearchEngine.DUCKDUCKGO)).getScheme();
+            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW
+                    : "typed local resources must reach WebView routing: " + address;
+            assert BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme)
+                    : "typed local resources may initialize WebView while Offline: " + address;
+        }
+        for (String address : new String[]{"javascript:alert(1)", "data:text/html,hello",
+                "file:///etc/passwd", "content://com.example/private", "mailto:user@example.com",
+                "tel:+18005550100", "sms:+18005550100", "geo:37.7749,-122.4194",
+                "intent://scan/#Intent;scheme=tg;end", "ftp://example.com/file"}) {
+            assert !BrowserAddress.isAllowedWebUrl(address)
+                    : "web-only validation must remain HTTP(S)-strict: " + address;
+        }
+        for (String scheme : new String[]{"mailto", "tel", "sms", "geo"}) {
             assert BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
-        for (String scheme : new String[]{"http", "https", "intent", "javascript", "vbscript",
-                "file", "content", "data", "blob", "about", "daymark-download",
-                "chrome", "chrome-extension", "devtools", "view-source", "", "bad scheme", null}) {
+        for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about",
+                "file", "content", "intent", "daymark-download", "ftp", "custom+scheme",
+                "vbscript", "chrome", "chrome-extension", "devtools", "view-source", "tg", "market",
+                "whatsapp", "telegram", "smsto", "viber", "spotify", "youtube", "chatgpt",
+                "instagram", "android-app",
+                "", "bad scheme", null}) {
             assert !BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
-        assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "tg");
-        assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "tg");
+        assert BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, "intent");
+        assert BrowserUriRoutingPolicy.routeForScheme("http") == BrowserUriRoutingPolicy.Route.WEBVIEW;
+        assert BrowserUriRoutingPolicy.routeForScheme("https") == BrowserUriRoutingPolicy.Route.WEBVIEW;
+        assert BrowserUriRoutingPolicy.routeForScheme("javascript") == BrowserUriRoutingPolicy.Route.WEBVIEW;
+        assert BrowserUriRoutingPolicy.routeForScheme("data") == BrowserUriRoutingPolicy.Route.WEBVIEW;
+        assert BrowserUriRoutingPolicy.routeForScheme("file")
+                == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW;
+        assert BrowserUriRoutingPolicy.routeForScheme("content")
+                == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW;
+        assert BrowserUriRoutingPolicy.routeForScheme("mailto")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("tel")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("sms")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("geo")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("intent")
+                == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION;
+        for (String scheme : new String[]{"vbscript", "chrome", "chrome-extension", "devtools",
+                "view-source", "ftp", "custom+scheme"}) {
+            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW
+                    : "unlisted or explicitly excluded scheme must not hand off to Android: " + scheme;
+        }
+        assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "mailto");
+        assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "mailto");
         assert !BrowserAddress.shouldHandOffExternalScheme(true, true, null);
 
         assert !BrowserAddress.isAllowedWebUrl("https://user:pass@example.com/");

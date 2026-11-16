@@ -1189,10 +1189,13 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
         check(manager != null && manager.areNotificationsEnabled(),
                 "focus notification manager is available and app notifications are enabled");
 
+        FocusNotificationDiagnostics notificationDiagnostics = new FocusNotificationDiagnostics();
         File root = makeTestDirectory("focus-timer-runtime");
         Context isolated = new IsolatedContext(base, root);
         final int notificationId = 0x44464F43;
+        notificationDiagnostics.record("test setup cancel BEGIN id=" + notificationId);
         manager.cancel(notificationId);
+        notificationDiagnostics.record("test setup cancel END id=" + notificationId);
         check(awaitNotificationState(manager, notificationId, false),
                 "stale focus notification is cleared before the isolated lifecycle test");
         final String taskId = "focus-instrumentation-" + UUID.randomUUID();
@@ -1210,8 +1213,11 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             TaskFocusSessionRuntime runtime = new TaskFocusSessionRuntime(isolated);
             check(runtime.restoreAfterProcessStart(Collections.singletonList(task)) == null,
                     "first focus runtime starts with no saved session and does not auto-start");
+            notificationDiagnostics.record("startFromUserAction BEGIN; coordinator order: persist -> notify");
             TaskFocusSessionCoordinator.Snapshot started = runtime.startFromUserAction(
                     task.id, task.title, TaskFocusTimer.Mode.COUNTDOWN, 60_000L);
+            notificationDiagnostics.record("startFromUserAction END notificationPublished="
+                    + (started != null && started.notificationPublished));
             check(started != null && started.isRunning(),
                     "explicit Start creates a running task-linked countdown");
             check(started.notificationPublished,
@@ -1244,8 +1250,11 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
 
             // A second runtime instance exercises the same restore boundary used after process recreation.
             TaskFocusSessionRuntime restoredRuntime = new TaskFocusSessionRuntime(isolated);
+            notificationDiagnostics.record("restore running BEGIN; fresh-runtime coordinator order: cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot restored =
                     restoredRuntime.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
+            notificationDiagnostics.record("restore running END notificationPublished="
+                    + (restored != null && restored.notificationPublished));
             check(restored != null && restored.isRunning() && restored.restored,
                     "a still-existing task restores its persisted running focus session");
             check(awaitNotificationState(manager, notificationId, true),
@@ -1255,28 +1264,40 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             // previously-created runtime too; its reconciliation must reload the latest durable
             // focus record instead of republishing a cached task title.
             TaskFocusSessionRuntime staleRuntime = new TaskFocusSessionRuntime(isolated);
+            notificationDiagnostics.record("stale-runtime restore BEGIN; fresh-runtime coordinator order: cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot staleRestored =
                     staleRuntime.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
+            notificationDiagnostics.record("stale-runtime restore END notificationPublished="
+                    + (staleRestored != null && staleRestored.notificationPublished));
             check(staleRestored != null && staleRestored.isRunning()
                             && task.id.equals(staleRestored.timer.taskId()),
                     "a second runtime starts with the same persisted task identity");
 
+            notificationDiagnostics.record("pauseFromUserAction BEGIN; coordinator order on presentation change: persist -> cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot paused = restoredRuntime.pauseFromUserAction();
+            notificationDiagnostics.record("pauseFromUserAction END notificationPublished="
+                    + (paused != null && paused.notificationPublished));
             check(paused != null && paused.isPaused(),
                     "Pause durably changes the focus session to PAUSED");
-            checkPausedNotification(manager, notificationId, task.title, "pausing");
+            checkPausedNotification(manager, notificationId, task.title, "pausing", notificationDiagnostics);
 
+            notificationDiagnostics.record("switchTaskWhilePaused BEGIN; coordinator order on identity change: persist -> cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot switched =
                     restoredRuntime.switchTaskWhilePausedFromUserAction(
                             alternateTask.id, alternateTask.title);
+            notificationDiagnostics.record("switchTaskWhilePaused END notificationPublished="
+                    + (switched != null && switched.notificationPublished));
             check(switched != null && switched.isPaused()
                             && alternateTask.id.equals(switched.timer.taskId()),
                     "choosing task B changes the paused session identity without resuming it");
             check(switched.notificationPublished,
                     "switching a paused session reports successful notification publication");
 
+            notificationDiagnostics.record("stale-runtime reconcile BEGIN; identity change coordinator order: cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot reconciledStaleRuntime =
                     staleRuntime.reconcileTasks(Arrays.asList(task, alternateTask));
+            notificationDiagnostics.record("stale-runtime reconcile END notificationPublished="
+                    + (reconciledStaleRuntime != null && reconciledStaleRuntime.notificationPublished));
             check(reconciledStaleRuntime != null && reconciledStaleRuntime.isPaused()
                             && alternateTask.id.equals(reconciledStaleRuntime.timer.taskId())
                             && reconciledStaleRuntime.restored,
@@ -1292,21 +1313,27 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                                     .contains(alternateTask.id),
                     "the switched task identity remains protected inside the encrypted focus record");
             checkPausedNotification(manager, notificationId, alternateTask.title,
-                    "reconciling a stale runtime after a paused task switch");
+                    "reconciling a stale runtime after a paused task switch", notificationDiagnostics);
 
             TaskFocusSessionRuntime pausedAfterProcessRestart = new TaskFocusSessionRuntime(isolated);
+            notificationDiagnostics.record("restore paused BEGIN; fresh-runtime coordinator order: cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot restoredPaused =
                     pausedAfterProcessRestart.restoreAfterProcessStart(Arrays.asList(task, alternateTask));
+            notificationDiagnostics.record("restore paused END notificationPublished="
+                    + (restoredPaused != null && restoredPaused.notificationPublished));
             check(restoredPaused != null && restoredPaused.isPaused() && restoredPaused.restored
                             && alternateTask.id.equals(restoredPaused.timer.taskId()),
                     "the switched task ID survives process recreation while the session remains paused");
             check(restoredPaused.notificationPublished,
                     "restoring a paused session reports successful notification publication");
             checkPausedNotification(manager, notificationId, alternateTask.title,
-                    "restoring a paused session");
+                    "restoring a paused session", notificationDiagnostics);
 
+            notificationDiagnostics.record("resumeFromUserAction BEGIN; coordinator order on presentation change: persist -> cancel -> notify");
             TaskFocusSessionCoordinator.Snapshot resumed =
                     pausedAfterProcessRestart.resumeFromUserAction(alternateTask.id, alternateTask.title);
+            notificationDiagnostics.record("resumeFromUserAction END notificationPublished="
+                    + (resumed != null && resumed.notificationPublished));
             check(resumed != null && resumed.isRunning()
                             && alternateTask.id.equals(resumed.timer.taskId()),
                     "Resume restores monotonic state under task B's identity");
@@ -1316,7 +1343,9 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                     "resuming after task switch publishes task B's notification"
                             + " (published=" + resumed.notificationPublished
                             + ", observed=" + describeNotification(resumedNotification) + ")");
+            notificationDiagnostics.record("finishFromUserAction BEGIN; coordinator order: persist -> cancel");
             TaskFocusSessionCoordinator.Snapshot finished = pausedAfterProcessRestart.finishFromUserAction();
+            notificationDiagnostics.record("finishFromUserAction END");
             check(finished != null && finished.isFinished(),
                     "Finish durably ends the focus session without completing the task");
             check(awaitNotificationState(manager, notificationId, false),
@@ -1341,6 +1370,93 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             // process can publish the same stable ID, avoiding a stale cross-process cancel.
             awaitNotificationState(manager, notificationId, false);
             deleteTree(root);
+        }
+    }
+
+    /** Bounded, in-memory trace; expensive platform snapshots are taken only for a failed assertion. */
+    private static final class FocusNotificationDiagnostics {
+        private static final int MAX_EVENTS = 24;
+        private static final int MAX_ACTIVE_NOTIFICATIONS = 12;
+        private static final int MAX_OUTPUT_CHARS = 8192;
+        private final java.util.ArrayList<String> events = new java.util.ArrayList<>();
+
+        void record(String event) {
+            if (events.size() == MAX_EVENTS) events.remove(0);
+            events.add("wallMs=" + System.currentTimeMillis()
+                    + ", elapsedRealtimeMs=" + android.os.SystemClock.elapsedRealtime()
+                    + " " + clip(event, 180));
+        }
+
+        String describeFailure(android.app.NotificationManager manager, int expectedId,
+                String expectedTitle, String lifecycleAction,
+                android.app.Notification observed) {
+            StringBuilder output = new StringBuilder("FOCUS_NOTIFICATION_FAILURE_DIAGNOSTICS\n")
+                    .append("action=").append(clip(lifecycleAction, 120))
+                    .append(" expectedId=").append(expectedId)
+                    .append(" expectedTitle=").append(clip(expectedTitle, 96))
+                    .append(" observed=").append(clip(describeNotification(observed), 320))
+                    .append("\nnotification operation boundaries (coordinator source order):");
+            for (String event : events) output.append("\n  ").append(event);
+
+            try {
+                android.app.NotificationChannel channel = manager.getNotificationChannel(
+                        TaskFocusTimerNotification.CHANNEL_ID);
+                output.append("\nchannel id=").append(TaskFocusTimerNotification.CHANNEL_ID);
+                if (channel == null) {
+                    output.append(" importance=missing");
+                } else {
+                    int importance = channel.getImportance();
+                    output.append(" importance=").append(importance)
+                            .append(" (").append(importanceName(importance)).append(')');
+                }
+            } catch (RuntimeException failure) {
+                output.append("\nchannel diagnostics failed: ")
+                        .append(clip(failure.toString(), 180));
+            }
+
+            try {
+                android.service.notification.StatusBarNotification[] active = manager.getActiveNotifications();
+                output.append("\nactive notification count=").append(active.length);
+                int count = Math.min(active.length, MAX_ACTIVE_NOTIFICATIONS);
+                for (int index = 0; index < count; index++) {
+                    android.service.notification.StatusBarNotification posted = active[index];
+                    android.app.Notification notification = posted.getNotification();
+                    CharSequence title = notification == null || notification.extras == null ? null
+                            : notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE);
+                    output.append("\n  id=").append(posted.getId())
+                            .append(" tag=").append(clip(posted.getTag(), 80))
+                            .append(" postTime=").append(posted.getPostTime())
+                            .append(" title=").append(clip(title == null ? null : title.toString(), 96));
+                }
+                if (active.length > count) output.append("\n  omitted=").append(active.length - count);
+            } catch (RuntimeException failure) {
+                output.append("\nactive notification diagnostics failed: ")
+                        .append(clip(failure.toString(), 180));
+            }
+
+            if (output.length() > MAX_OUTPUT_CHARS) {
+                return output.substring(0, MAX_OUTPUT_CHARS) + "\n[diagnostics truncated]";
+            }
+            return output.toString();
+        }
+
+        private static String importanceName(int importance) {
+            switch (importance) {
+                case android.app.NotificationManager.IMPORTANCE_NONE: return "NONE";
+                case android.app.NotificationManager.IMPORTANCE_MIN: return "MIN";
+                case android.app.NotificationManager.IMPORTANCE_LOW: return "LOW";
+                case android.app.NotificationManager.IMPORTANCE_DEFAULT: return "DEFAULT";
+                case android.app.NotificationManager.IMPORTANCE_HIGH: return "HIGH";
+                case android.app.NotificationManager.IMPORTANCE_MAX: return "MAX";
+                default: return "OTHER";
+            }
+        }
+
+        private static String clip(String value, int maxChars) {
+            if (value == null) return "<null>";
+            String normalized = value.replace('\n', ' ').replace('\r', ' ');
+            return normalized.length() <= maxChars ? normalized
+                    : normalized.substring(0, maxChars) + "…";
         }
     }
 
@@ -1450,11 +1566,21 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
     }
 
     private void checkPausedNotification(android.app.NotificationManager manager,
-            int id, String expectedTitle, String lifecycleAction) throws InterruptedException {
+            int id, String expectedTitle, String lifecycleAction,
+            FocusNotificationDiagnostics diagnostics) throws InterruptedException {
         android.app.Notification notification = awaitPausedNotification(manager, id, expectedTitle);
-        check(isExpectedPausedNotification(notification, expectedTitle),
+        boolean expected = isExpectedPausedNotification(notification, expectedTitle);
+        String failureDiagnostics = "";
+        if (!expected) {
+            failureDiagnostics = diagnostics.describeFailure(
+                    manager, id, expectedTitle, lifecycleAction, notification);
+            android.util.Log.e(LOG_TAG, failureDiagnostics);
+            System.out.println(failureDiagnostics);
+        }
+        check(expected,
                 lifecycleAction + " eventually publishes the expected paused notification state; observed="
-                        + describeNotification(notification));
+                        + describeNotification(notification)
+                        + (expected ? "" : "\n" + failureDiagnostics));
         check(notification != null && notification.extras != null
                         && expectedTitle.equals(notification.extras.getString(
                                 android.app.Notification.EXTRA_TITLE)),

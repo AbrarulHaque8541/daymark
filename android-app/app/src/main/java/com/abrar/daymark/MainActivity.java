@@ -352,11 +352,13 @@ public final class MainActivity extends Activity {
     private Spinner searchEngineSpinner;
     private CheckBox browserOnlineToggle;
     private TextView browserStatus;
+    private TextView browserSecurityMarker;
     private Button browserRetryButton;
     private Runnable browserStatusHideRunnable;
     private View browserLoadProgressBar;
     private Runnable browserLoadProgressRunnable;
     private View browserProviderRow;
+    private LinearLayout browserSavedSitesContainer;
     private TextView browserPrivacyButton;
     private String browserPrivacyDisclosure;
     private Button browserProviderPickerButton;
@@ -2141,6 +2143,10 @@ public final class MainActivity extends Activity {
             if (browserRetryButton != null) browserRetryButton.performClick();
         });
         panel.addView(browserStatus, bottomMargin(dp(2)));
+        browserSecurityMarker = text("Not encrypted", 11, palette.muted, Typeface.BOLD);
+        browserSecurityMarker.setVisibility(View.GONE);
+        browserSecurityMarker.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        panel.addView(browserSecurityMarker, bottomMargin(dp(2)));
         browserRetryButton = compactButton("Retry", true);
         browserRetryButton.setContentDescription("Retry loading the current page");
         browserRetryButton.setVisibility(View.GONE);
@@ -2208,6 +2214,13 @@ public final class MainActivity extends Activity {
             }).start();
         };
         mainHandler.postDelayed(browserStatusHideRunnable, 3500L);
+    }
+
+    private void updateBrowserSecurityMarker(String url) {
+        if (browserSecurityMarker == null) return;
+        boolean pageNotEncrypted = BrowserHttpPolicy.isHttp(url);
+        browserSecurityMarker.setText(BrowserHttpPolicy.securityLabel(url));
+        browserSecurityMarker.setVisibility(pageNotEncrypted ? View.VISIBLE : View.GONE);
     }
 
     private void selectSearchEngine(BrowserAddress.SearchEngine engine) {
@@ -2533,6 +2546,96 @@ public final class MainActivity extends Activity {
      * the engine, not in the caption. Nothing here is a fake control — the pill focuses the real
      * address bar and every tile or chip runs the same handler as its bottom-bar counterpart.</p>
      */
+
+    private void refreshSavedSitesRail() {
+        if (browserSavedSitesContainer == null) return;
+        browserSavedSitesContainer.removeAllViews();
+        String serialized = browserPreferences.getString(BROWSER_BOOKMARKS_KEY, "");
+        List<String> origins = BrowserBookmarkShortcuts.visibleOrigins(serialized);
+        if (origins.isEmpty()) {
+            browserSavedSitesContainer.setVisibility(View.GONE);
+            return;
+        }
+        browserSavedSitesContainer.setVisibility(View.VISIBLE);
+        TextView label = text("Saved sites", 11, palette.muted, Typeface.BOLD);
+        label.setPadding(0, 0, 0, dp(4));
+        label.setContentDescription("Saved sites, " + origins.size() + " shortcuts shown");
+        browserSavedSitesContainer.addView(label);
+        HorizontalScrollView scroller = new HorizontalScrollView(this);
+        scroller.setHorizontalScrollBarEnabled(false);
+        scroller.setContentDescription("Horizontal list of saved site shortcuts");
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        for (String origin : origins) {
+            String labelText = origin;
+            if (BrowserHttpPolicy.isHttp(origin)) {
+                labelText = origin + " · Not encrypted";
+            }
+            String desc = "Open saved site " + origin + ". Long-press for options";
+            if (BrowserHttpPolicy.isHttp(origin)) {
+                desc += ". Not encrypted";
+            }
+            LinearLayout chip = browserHomeChip(labelText, desc, () -> {
+                showBrowserStatus("Opening saved site…");
+                navigateBrowserTo(origin);
+            });
+            // Glass accent polish for Saved sites chips (accent #16705f)
+            chip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
+            // Long-press offers Copy or Remove for the individual origin.
+            chip.setOnLongClickListener(view -> {
+                haptic(view, HapticFeedbackConstants.LONG_PRESS);
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(origin)
+                        .setItems(new CharSequence[]{"Copy origin", "Remove from bookmarks"}, (dialog, which) -> {
+                            if (which == 0) {
+                                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                if (clipboard != null) {
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Daymark saved site", origin));
+                                    showBrowserStatus("Copied " + origin);
+                                }
+                            } else {
+                                new AlertDialog.Builder(MainActivity.this)
+                                        .setTitle("Remove bookmark?")
+                                        .setMessage("Remove " + origin + " from saved sites? This only removes the shortcut; site history is untouched.")
+                                        .setNegativeButton("Cancel", null)
+                                        .setPositiveButton("Remove", (confirmDialog, confirmWhich) -> {
+                                            String current = browserPreferences.getString(BROWSER_BOOKMARKS_KEY, "");
+                                            String updated = BrowserHistory.remove(current, origin);
+                                            browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY, updated).apply();
+                                            showBrowserStatus("Removed " + origin + " from bookmarks");
+                                            refreshSavedSitesRail();
+                                            haptic(view, HapticFeedbackConstants.CONFIRM);
+                                        })
+                                        .show();
+                            }
+                            if (!WorkspaceMotion.isReducedMotionPublic(view)) {
+                                view.setAlpha(0.7f);
+                                view.animate().alpha(1f).setDuration(180).start();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+                return true;
+            });
+            rail.addView(chip);
+        }
+        // More… chip when the full bookmark list exceeds the visible rail limit.
+        // Use the policy methods so the view never decodes bookmark storage directly.
+        if (BrowserBookmarkShortcuts.hasAdditionalOrigins(serialized)) {
+            int total = BrowserBookmarkShortcuts.totalOrigins(serialized);
+            LinearLayout moreChip = browserHomeChip(
+                    "More…",
+                    "Open the full bookmarks list (" + total + " saved sites)",
+                    this::showBrowserBookmarksDialog);
+            moreChip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
+            moreChip.setContentDescription("More saved sites, " + total + " total");
+            rail.addView(moreChip);
+        }
+        scroller.addView(rail);
+        browserSavedSitesContainer.addView(scroller);
+        browserSavedSitesContainer.setContentDescription(origins.size() + " saved site shortcuts available");
+    }
+
     private View buildBrowserHomeView() {
         LinearLayout home = new LinearLayout(this);
         home.setOrientation(LinearLayout.VERTICAL);
@@ -2557,6 +2660,14 @@ public final class MainActivity extends Activity {
         quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
                 this::showBrowserExtensionsManager), tileParams());
         home.addView(quickRow, bottomMargin(dp(8)));
+
+        // Optional Saved sites rail: up to four newest bookmark origins
+        LinearLayout savedRailContainer = new LinearLayout(this);
+        savedRailContainer.setOrientation(LinearLayout.VERTICAL);
+        savedRailContainer.setId(View.generateViewId());
+        browserSavedSitesContainer = savedRailContainer;
+        refreshSavedSitesRail();
+        home.addView(savedRailContainer, bottomMargin(dp(8)));
 
         home.addView(browserHomeProviderRail(), bottomMargin(dp(2)));
 
@@ -2603,6 +2714,7 @@ public final class MainActivity extends Activity {
         chip.setContentDescription(description);
         chip.setBackground(pressable(palette.surface, 20, palette.line, palette.text, palette.muted));
         chip.addView(text(label, 12, palette.text, Typeface.NORMAL));
+        applyPressFeedback(chip);
         chip.setOnClickListener(view -> {
             haptic(view, HapticFeedbackConstants.CONFIRM);
             tap.run();
@@ -2633,50 +2745,94 @@ public final class MainActivity extends Activity {
         if (!webMode) return;
         Log.i(BROWSER_LOG_TAG, "navigate requested: " + BrowserLogPolicy.redactedOrigin(address));
         browserDiagnostics.record(System.currentTimeMillis(), "navigate requested", address, null);
-        final String safeAddress;
+        final String webAddress;
         try {
-            safeAddress = BrowserAddress.requireAllowedWebUrl(address);
+            webAddress = BrowserAddress.requireAllowedBrowserNavigation(address);
         } catch (IllegalArgumentException exception) {
             quickCaptureInput.setError(exception.getMessage());
             return;
         }
-        browserSelfHealingPolicy.onUserNavigation(safeAddress);
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
-            confirmBrowserOnlineAccess(() -> loadBrowserAddress(safeAddress));
+        browserSelfHealingPolicy.onUserNavigation(webAddress);
+        String scheme = android.net.Uri.parse(webAddress).getScheme();
+        String destinationScheme = scheme;
+        BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+        if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
+            showBrowserStatus(BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE);
+        } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
+            showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE);
+        }
+        if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
+            // Typed intent targets must be visibly rejected before Android handoff
+            android.content.Intent target;
+            try {
+                target = android.content.Intent.parseUri(webAddress, 0);
+            } catch (java.net.URISyntaxException exception) {
+                showBrowserStatus("invalid intent target. Nothing was opened.");
+                return;
+            }
+            if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())) {
+                showBrowserStatus("unsupported target scheme. Nothing was opened.");
+                return;
+            }
+            android.content.Intent external = BrowserUriHandoff.createBrowsableViewIntent(
+                    target.getData() != null ? target.getData() : android.net.Uri.parse(webAddress),
+                    target.getPackage());
+            BrowserUriHandoff.confirmAndOpen(this, external, webAddress, null);
             return;
         }
-        loadBrowserAddress(safeAddress);
+        if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
+            android.content.Intent external = BrowserUriHandoff.createBrowsableViewIntent(
+                    android.net.Uri.parse(webAddress), null);
+            BrowserUriHandoff.confirmAndOpen(this, external, webAddress, null);
+            return;
+        }
+        if (!BrowserUriRoutingPolicy.isWebScheme(destinationScheme)) {
+            if (!browserNetworkPolicy.allowsRemoteLoads()) {
+                if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)) {
+                    loadBrowserAddress(webAddress);
+                } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(destinationScheme)) {
+                    showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE);
+                } else {
+                    showBrowserStatus(BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE);
+                }
+                return;
+            }
+        }
+        if (!browserNetworkPolicy.allowsRemoteLoads() && BrowserUriRoutingPolicy.isWebScheme(Uri.parse(webAddress).getScheme())) {
+            confirmBrowserOnlineAccess(() -> loadBrowserAddress(webAddress));
+            return;
+        }
+        loadBrowserAddress(webAddress);
     }
 
     private void loadBrowserAddress(String address) {
         if (!webMode) return;
-        if (!browserNetworkPolicy.allowsRemoteLoads()) {
+        String scheme = android.net.Uri.parse(address).getScheme();
+        if (!(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme) || browserNetworkPolicy.allowsRemoteLoads())) {
             showBrowserOfflineStatus();
             return;
         }
-        if (!ensureBrowserWebView()) {
+        if (!ensureBrowserWebView(BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme))) {
             showBrowserOfflineStatus();
             return;
         }
-        try {
-            BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
-            // Unblock every retained tab too: enforceOffline() blocks all of them, and a
-            // background tab left blocked would silently drop loads with no callback (#221).
-            BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
-            browserWebView.onResume();
-            browserWebView.resumeTimers();
-        } catch (SecurityException denied) {
-            setBrowserOnlineEnabled(false);
-            if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
-            showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
-            return;
+        if (browserNetworkPolicy.allowsRemoteLoads()) {
+            try {
+                BrowserWorkspaceController.prepareForExplicitNavigation(browserNetworkPolicy, browserWebView);
+                BrowserWorkspaceController.prepareTabsForExplicitNavigation(browserNetworkPolicy, browserTabs);
+                browserWebView.onResume();
+                browserWebView.resumeTimers();
+            } catch (SecurityException denied) {
+                setBrowserOnlineEnabled(false);
+                if (browserOnlineToggle != null) browserOnlineToggle.setChecked(false);
+                showBrowserStatus("Online access is unavailable. No page was opened; Daymark remains offline.");
+                return;
+            }
         }
         browserHomeView.setVisibility(View.GONE);
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.GONE);
         browserWebView.setVisibility(View.VISIBLE);
-        // Owner feedback (#222): the full egress disclosure is shown before the first
-        // search of an install only; later navigations use a quiet per-page status.
         if (!browserPreferences.getBoolean(BROWSER_DISCLOSURE_ACK_KEY, false)) {
             showBrowserStatus("Opening page. Its provider and page resources may receive requests.");
             browserPreferences.edit().putBoolean(BROWSER_DISCLOSURE_ACK_KEY, true).apply();
@@ -2931,7 +3087,11 @@ public final class MainActivity extends Activity {
     }
 
     private boolean ensureBrowserWebView() {
-        if (!browserNetworkPolicy.allowsRemoteLoads()) return false;
+        return ensureBrowserWebView(false);
+    }
+
+    private boolean ensureBrowserWebView(boolean allowOfflineLocalNavigation) {
+        if (!browserNetworkPolicy.allowsRemoteLoads() && !allowOfflineLocalNavigation) return false;
         if (browserWebView != null) return true;
         final DaymarkWebView[] targetRef = new DaymarkWebView[1];
         browserWebView = new DaymarkWebView(this, browserNetworkPolicy,
@@ -2944,6 +3104,7 @@ public final class MainActivity extends Activity {
                 Log.i(BROWSER_LOG_TAG, "page started: " + BrowserLogPolicy.redactedOrigin(url));
                 browserDiagnostics.record(System.currentTimeMillis(), "page started", url, null);
                 showBrowserStatus("Loading page. Embedded resources may also make network requests.");
+                updateBrowserSecurityMarker(url);
                 startBrowserLoadProgress();
                 // Keep the watchdog active after navigation begins: a page can start successfully
                 // but never finish, leaving the viewport blank with no further WebView callback.
@@ -2977,6 +3138,7 @@ public final class MainActivity extends Activity {
                 showBrowserStatus("Page loaded. " + (pageNotEncrypted
                         ? "Not encrypted: this HTTP page has no transport security. " : "")
                         + "Website content may contact its own or third-party endpoints.");
+                updateBrowserSecurityMarker(url);
                 injectVideoDownloadOverlay(browserWebView);
                 syncBrowserButtons();
             }
@@ -3234,6 +3396,7 @@ public final class MainActivity extends Activity {
         }
         browserWebView.setVisibility(View.GONE);
         if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
+        refreshSavedSitesRail();
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
         if (browserAddressInput != null) browserAddressInput.setText("");
@@ -3264,6 +3427,7 @@ public final class MainActivity extends Activity {
         if (browserStatus != null) showBrowserStatus(hasPage
                 ? (tab.getTitle() == null || tab.getTitle().trim().isEmpty() ? tab.getUrl() : tab.getTitle())
                 : "New tab. Enter a website or search.");
+        updateBrowserSecurityMarker(tab.getUrl());
         updateBrowserTabButton();
         syncBrowserButtons();
     }
@@ -3332,6 +3496,7 @@ public final class MainActivity extends Activity {
                     BrowserHistory.add(browserPreferences.getString(BROWSER_BOOKMARKS_KEY, ""),
                             browserWebView.getUrl())).apply();
             showToast("Page bookmarked (saved as its origin).");
+            refreshSavedSitesRail();
         } catch (IllegalArgumentException invalidPage) {
             showToast("Only valid web pages can be bookmarked.");
         }
@@ -3361,6 +3526,7 @@ public final class MainActivity extends Activity {
                                 browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY,
                                         BrowserHistory.clear()).apply();
                                 showToast("Bookmarks cleared.");
+                                refreshSavedSitesRail();
                             })
                             .show();
                 }));
@@ -4560,6 +4726,7 @@ public final class MainActivity extends Activity {
     private void showBrowserHome() {
         discardBrowserWebView();
         if (browserHomeView != null) browserHomeView.setVisibility(View.VISIBLE);
+        refreshSavedSitesRail();
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
         browserLastSearchQuery = "";
@@ -5330,6 +5497,7 @@ public final class MainActivity extends Activity {
             chip.setMinHeight(dp(48));
             chip.setMinimumHeight(dp(48));
             chip.setPadding(dp(12), 0, dp(12), 0);
+        applyPressFeedback(chip);
             chip.setOnClickListener(view -> {
                 activeFilter = key;
                 render();
@@ -6246,6 +6414,7 @@ public final class MainActivity extends Activity {
         for (String tag : tags) {
             boolean selected = tag.equals(activeTag);
             Button chip = tagChip(tag, selected);
+        applyPressFeedback(chip);
             chip.setOnClickListener(view -> {
                 activeTag = selected ? "" : tag;
                 render();

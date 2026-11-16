@@ -37,6 +37,11 @@ final class BrowserIntentLinkPolicy {
 
     private BrowserIntentLinkPolicy() { }
 
+    static boolean isSupportedTargetScheme(String scheme) {
+        return BrowserUriRoutingPolicy.isWebScheme(scheme)
+                || BrowserAddress.isExplicitExternalScheme(scheme);
+    }
+
     /**
      * Percent-decode Android Intent URI metadata.
      * Intent metadata uses percent-encoding, not HTML form encoding, so a literal '+' must be preserved.
@@ -131,10 +136,8 @@ final class BrowserIntentLinkPolicy {
             throw new IllegalArgumentException("Android app link has no valid target scheme.");
         }
         scheme = scheme.toLowerCase(Locale.ROOT);
-        if ("intent".equals(scheme) || "javascript".equals(scheme) || "vbscript".equals(scheme)
-                || "file".equals(scheme) || "content".equals(scheme) || "data".equals(scheme)
-                || "blob".equals(scheme) || "about".equals(scheme)) {
-            throw new IllegalArgumentException("Android app link target scheme is not allowed.");
+        if (!isSupportedTargetScheme(scheme)) {
+            throw new IllegalArgumentException("Android app link target scheme is not supported.");
         }
 
         String action = values.get("action");

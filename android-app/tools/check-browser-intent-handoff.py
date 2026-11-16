@@ -26,6 +26,12 @@ assert intent_branch.count("handleIntentLink(view, url)") == 1, "intent handler 
 assert "return isForMainFrame && hasUserGesture;" in policy, (
     "intent handoff policy must require both independent navigation properties"
 )
+assert "BrowserUriHandoff.confirmAndOpen(" in webview, (
+    "a parsed external intent must show explicit confirmation before Android launch"
+)
+assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(" in webview, (
+    "generic external URI handoffs must use the same main-frame/gesture confirmation boundary"
+)
 for expression in (
     "allows(true, true)",
     "allows(true, false)",

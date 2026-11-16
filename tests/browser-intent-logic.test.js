@@ -28,7 +28,7 @@ test('embedded credentials in a web link are refused and disclosed', () => {
   assert.ok(!plan.lines.some((line) => line.indexOf('user:secret') !== -1));
 });
 
-test('mailto, tel and sms are explicit user-triggered handoffs', () => {
+test('mailto, tel, sms and geo are explicit user-triggered handoffs', () => {
   for (const scheme of engine.EXTERNAL_SCHEMES) {
     const result = engine.classifyLink(scheme + ':someone');
     assert.equal(result.kind, 'external-handoff', scheme);
@@ -46,21 +46,24 @@ test('a malformed external handoff fails closed', () => {
   assert.equal(plan.title, 'Not planned');
 });
 
-test('a tg:// deep link plans an honest Telegram handoff', () => {
-  const result = engine.classifyLink('tg://resolve?domain=example');
-  assert.equal(result.kind, 'telegram-deep-link');
-  const plan = engine.planIntentHandoff('tg://resolve?domain=example');
-  assert.equal(plan.verdict, 'handoff');
-  assert.ok(plan.lines.some((line) => line.indexOf('no store redirect') !== -1));
-  assert.ok(plan.lines.some((line) => line.indexOf('Daymark stays in front') !== -1));
+test('unapproved app schemes are refused instead of handed off', () => {
+  for (const scheme of [
+    'tg', 'market', 'whatsapp', 'telegram', 'smsto', 'viber', 'spotify',
+    'youtube', 'chatgpt', 'instagram', 'android-app'
+  ]) {
+    const link = scheme + '://open';
+    const result = engine.classifyLink(link);
+    assert.equal(result.kind, 'blocked', scheme);
+    assert.equal(engine.planIntentHandoff(link).verdict, 'refused', scheme);
+  }
 });
 
 test('a full intent:// URI parses package, scheme and encoded fallback', () => {
-  const link = 'intent://scan/#Intent;scheme=zxing;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
+  const link = 'intent://scan/#Intent;scheme=mailto;package=com.example.scan;S.browser_fallback_url=https%3A%2F%2Fexample.com%2Fproduct;end';
   const parsed = engine.parseIntentUri(link);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.packageName, 'com.example.scan');
-  assert.equal(parsed.scheme, 'zxing');
+  assert.equal(parsed.scheme, 'mailto');
   assert.equal(parsed.fallbackUrl, 'https://example.com/product');
   assert.equal(parsed.fallbackHonored, true);
   const plan = engine.planIntentHandoff(link);
@@ -69,6 +72,22 @@ test('a full intent:// URI parses package, scheme and encoded fallback', () => {
   assert.ok(plan.lines.some((line) => line.indexOf('com.example.scan (pinned by the link)') !== -1));
   assert.ok(plan.lines.some((line) => line.indexOf('fallback origin is https://example.com') !== -1));
   assert.ok(!plan.lines.some((line) => line.indexOf('/product') !== -1), 'fallback path is not echoed');
+});
+
+test('intent target schemes are limited to HTTP(S) and explicit Android handlers', () => {
+  assert.deepEqual(engine.INTENT_EXTERNAL_SCHEMES, ['mailto', 'tel', 'sms', 'geo']);
+  for (const scheme of [
+    'tg', 'market', 'whatsapp', 'telegram', 'smsto', 'viber', 'spotify', 'youtube',
+    'chatgpt', 'instagram', 'android-app', 'chrome', 'chrome-extension', 'devtools',
+    'view-source', 'vbscript', 'zxing', 'custom+scheme', 'file', 'content', 'javascript',
+    'data', 'intent'
+  ]) {
+    const link = 'intent://scan/#Intent;scheme=' + scheme + ';end';
+    const parsed = engine.parseIntentUri(link);
+    assert.equal(parsed.ok, false, scheme + ' target must be refused');
+    assert.match(parsed.reason, /explicit Android handler list/);
+    assert.equal(engine.planIntentHandoff(link).verdict, 'refused', scheme + ' must not plan a handoff');
+  }
 });
 
 test('an intent without a pinned package discloses the chooser', () => {
@@ -82,7 +101,7 @@ test('an intent without a pinned package discloses the chooser', () => {
 });
 
 test('a non-http fallback URL rejects the entire intent without echoing it', () => {
-  const link = 'intent://x/#Intent;scheme=zxing;S.browser_fallback_url=javascript%3Aalert(1);end';
+  const link = 'intent://x/#Intent;scheme=mailto;S.browser_fallback_url=javascript%3Aalert(1);end';
   const parsed = engine.parseIntentUri(link);
   assert.equal(parsed.ok, false);
   const plan = engine.planIntentHandoff(link);
@@ -140,14 +159,14 @@ test('oversized input fails closed at the documented limit', () => {
 });
 
 test('long targets are truncated before they are echoed back', () => {
-  const long = 'tg://resolve?domain=' + 'b'.repeat(300);
+  const long = 'mailto:' + 'b'.repeat(300);
   const result = engine.classifyLink(long);
   assert.ok(result.target.length <= engine.MAX_ECHO_CHARS + 16);
   assert.ok(result.target.indexOf('(truncated)') !== -1);
 });
 
 test('the card never claims anything ran automatically', () => {
-  const plan = engine.planIntentHandoff('tg://resolve?domain=example');
+  const plan = engine.planIntentHandoff('mailto:someone@example.com');
   assert.ok(plan.network.indexOf('explicit user action') !== -1);
   assert.ok(plan.network.indexOf('None') === 0);
 });
@@ -155,7 +174,7 @@ test('the card never claims anything ran automatically', () => {
 test('shared Android/web Intent URI contract fixture stays in parity', () => {
   const fixturePath = path.join(__dirname, '..', 'contracts', 'intent-uri-validation.tsv');
   const rows = fs.readFileSync(fixturePath, 'utf8').split(/\r?\n/).filter((line) => line && !line.startsWith('#'));
-  assert.equal(rows.length, 48, 'the shared Intent URI fixture must retain all forty-eight cases');
+  assert.equal(rows.length, 58, 'the shared Intent URI fixture must retain all fifty-eight cases');
   let acceptedCount = 0;
   let rejectedCount = 0;
   for (const row of rows) {
@@ -166,14 +185,15 @@ test('shared Android/web Intent URI contract fixture stays in parity', () => {
       acceptedCount += 1;
       assert.equal(parsed.ok, true, name);
       assert.equal(parsed.targetUri, expectedTarget, name + ' target');
-      assert.equal(parsed.fallbackUrl || '', expectedFallback, name + ' fallback');
+      const fallback = expectedFallback === '-' ? '' : expectedFallback;
+      assert.equal(parsed.fallbackUrl || '', fallback, name + ' fallback');
       const plan = engine.planIntentHandoff(input);
       assert.equal(plan.verdict, 'handoff', name + ' plan');
-      if (expectedFallback) {
-        const origin = /^(https?:\/\/[^/?#]+)/i.exec(expectedFallback);
+      if (fallback) {
+        const origin = /^(https?:\/\/[^/?#]+)/i.exec(fallback);
         assert.ok(origin, name + ' fallback origin');
         assert.ok(JSON.stringify(plan).includes(origin[1]), name + ' discloses only the fallback origin');
-        assert.ok(!JSON.stringify(plan).includes(expectedFallback.slice(origin[1].length)),
+        assert.ok(!JSON.stringify(plan).includes(fallback.slice(origin[1].length)),
           name + ' does not echo fallback path or query');
       }
     } else {
@@ -186,7 +206,7 @@ test('shared Android/web Intent URI contract fixture stays in parity', () => {
     }
   }
   assert.equal(acceptedCount, 12, 'all twelve accepted contract cases remain present');
-  assert.equal(rejectedCount, 36, 'all thirty-six rejected contract cases remain present');
+  assert.equal(rejectedCount, 46, 'all forty-six rejected contract cases remain present');
 });
 
 test('non-ASCII fullwidth hex digits are rejected in percent escapes', () => {

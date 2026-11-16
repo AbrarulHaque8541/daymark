@@ -112,6 +112,8 @@ expect_fail_after_removal check-browser-history.py "BrowserHistory.remove(" "$AC
 # The HTTP warning must be runtime-wired, not merely defined by a policy helper.
 expect_fail_after_removal check-browser-http-policy.py "BrowserHttpPolicy.isHttp(url)" "$ACTIVITY" "$ROOT"
 expect_fail_after_removal check-browser-http-policy.py "Not encrypted: this HTTP page has no transport security." "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-browser-http-policy.py "browserSecurityMarker.setVisibility(pageNotEncrypted ? View.VISIBLE : View.GONE)" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-browser-http-policy.py "updateBrowserSecurityMarker(url)" "$ACTIVITY" "$ROOT"
 # Focus gestures must suppress ancestor interception without suppressing the selector itself.
 python3 "$ROOT/tools/check-focus-emulator-repeat.py" "$ROOT" >/dev/null
 echo "PASS meta: check-focus-emulator-repeat.py passes on current source"
