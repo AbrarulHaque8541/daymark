@@ -2571,9 +2571,19 @@ public final class MainActivity extends Activity {
             if (BrowserHttpPolicy.isHttp(origin)) {
                 labelText = origin + " · Not encrypted";
             }
-            LinearLayout chip = browserHomeChip(labelText, "Open saved site " + origin, () -> {
+            LinearLayout chip = browserHomeChip(labelText, "Open saved site " + origin + ". Long-press to copy", () -> {
                 showBrowserStatus("Opening saved site…");
                 navigateBrowserTo(origin);
+            });
+            // Long-press copies the origin for quick reuse without leaving Daymark.
+            chip.setOnLongClickListener(view -> {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Daymark saved site", origin));
+                    showBrowserStatus("Copied " + origin);
+                    haptic(view, HapticFeedbackConstants.LONG_PRESS);
+                }
+                return true;
             });
             rail.addView(chip);
         }
