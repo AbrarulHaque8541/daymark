@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T15:37:00Z (Cycle A: crypto button titles polish)](./CURRENT_STATUS_20261116T153700Z.md)
 - [Daymark engineering status — 2026-11-16T12:08:00Z (Cycle B: PR #779 complete + a11y rail count)](./CURRENT_STATUS_20261116T120800Z.md)
 - [Daymark engineering status — 2026-11-16T04:56:54Z (keyless crypto glance card, branch feat/crypto-card-vibe-20261116)](./CURRENT_STATUS_20261116T045654Z.md)
 - [Daymark engineering status — 2026-11-16T10:50:00Z (Cycle A: bookmark PR CI re-trigger + web copy-visible)](./CURRENT_STATUS_20261116T105000Z.md)
@@ -28,6 +29,7 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261116T153700Z.md](./CURRENT_STATUS_20261116T153700Z.md) — Cycle A: crypto glance button titles for discoverability; PR #779 feature complete, Focus flake re-triggered. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T120800Z.md](./CURRENT_STATUS_20261116T120800Z.md) — Cycle B: PR #779 Saved sites complete on branch + a11y rail count; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
