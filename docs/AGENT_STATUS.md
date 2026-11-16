@@ -1,3 +1,6 @@
+- [Daymark engineering status — 2026-11-16T12:08:00Z (Cycle B: PR #779 complete + a11y rail count)](./CURRENT_STATUS_20261116T120800Z.md)
+- [Daymark engineering status — 2026-11-16T04:56:54Z (keyless crypto glance card, branch feat/crypto-card-vibe-20261116)](./CURRENT_STATUS_20261116T045654Z.md)
+- [Daymark engineering status — 2026-11-16T10:50:00Z (Cycle A: bookmark PR CI re-trigger + web copy-visible)](./CURRENT_STATUS_20261116T105000Z.md)
 - [Daymark engineering status — 2026-11-16T06:08:00Z (Cycle B: PR #779 complete on branch, CI flake)](./CURRENT_STATUS_20261116T060800Z.md)
 - [Daymark engineering status — 2026-11-16T01:05:00Z (Cycle A: Android bookmark PR compile fix)](./CURRENT_STATUS_20261116T010500Z.md)
 - [Daymark engineering status — 2026-11-15T21:40:00Z (Cycle B: MainActivity restore prepared)](./CURRENT_STATUS_20261115T214000Z.md)
@@ -25,6 +28,7 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261116T120800Z.md](./CURRENT_STATUS_20261116T120800Z.md) — Cycle B: PR #779 Saved sites complete on branch + a11y rail count; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T013500Z.md](./CURRENT_STATUS_20261116T013500Z.md) — Cycle A: progress on open Android bookmark PR #779 (security marker + URI routing guards). Physical device NOT TESTED.
