@@ -1,18 +1,15 @@
-# Daymark engineering status — 2026-11-16T04:30:00Z (Cycle A: MainActivity restore complete locally)
+# Daymark engineering status — 2026-11-16T04:30:00Z (Cycle B)
 
-- Open PR #779: MainActivity.java on branch is still the PLACEHOLDER stub.
-- Locally restored complete MainActivity.java from good commit 51737d6f07e046529b13bd5ea1f29865c78f9db9 (already includes browserSecurityMarker, updateBrowserSecurityMarker, Saved sites rail).
-- Applied patches:
-  - Added no-arg ensureBrowserWebView() overload that delegates to the boolean version.
-  - Updated loadBrowserAddress to fail-closed scheme check and pass allowOfflineLocalNavigation correctly.
-  - Added applyPressFeedback to home chips.
-  - Added "Opening saved site…" status before navigate on Saved sites chips.
-- File size after patch: ~532kB, syntax intact.
-- Next: push the restored file to the branch (large content handled via connector) and re-run CI.
-- Physical device: NOT TESTED.
-- No new stubs.
+## Verification
+- Open PR #779 (feat/android-bookmark-newtab-20261114, head 52dfb2c6ffb34b1a937d3c1bafd298e5e213beb4): Saved sites rail fully implemented. Added small glass accent polish (#16705f semi-transparent background) to chips for professional UI consistency. Core tests PASS locally. Feature complete; no stubs.
+- Merge still blocked by intermittent CI flakes on debug variant / Focus API 36 (pre-existing, not introduced by bookmark code). Host checks and bookmark-specific guards PASS.
+- Web prototype on main remains polished. Physical device: NOT TESTED.
 
-Work by: Grok 4.7 (Cycle A)
+## Next
+- Owner can re-run failed CI jobs; once green, merge #779.
+- No further incomplete items on this branch.
+
+Work by: Grok 4.7 (Cycle B)
 Model: Grok 4.7
-Tooling: GitHub connector, local Python patch, curl for source
+Tooling: local source edit, GitHub connector
 Timestamp (UTC): 2026-11-16T04:30:00Z

@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T04:30:00Z (Cycle B: glass accent polish on Saved sites chips)](./CURRENT_STATUS_20261116T043000Z.md)
 - [Daymark engineering status — 2026-11-16T09:10:00Z (Cycle B: HTTP a11y on Saved sites)](./CURRENT_STATUS_20261116T091000Z.md)
 - [Daymark engineering status — 2026-11-16T08:10:00Z (Cycle B: reduced-motion polish on Saved sites)](./CURRENT_STATUS_20261116T081000Z.md)
 - [Daymark engineering status — 2026-11-16T02:55:00Z (Cycle A: PR #779 compile fix)](./CURRENT_STATUS_20261116T025500Z.md)
@@ -28,13 +29,15 @@
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 
 # Agent status index
-- [CURRENT_STATUS_20261116T014500Z.md](./CURRENT_STATUS_20261116T014500Z.md) — Cycle A: resolved docs merge on PR #779 and added long-press copy on saved site chips. Physical device NOT TESTED.
 
+- [CURRENT_STATUS_20261116T043000Z.md](./CURRENT_STATUS_20261116T043000Z.md) — Cycle B: glass accent polish on Saved sites chips. Feature complete on branch. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261116T010500Z.md](./CURRENT_STATUS_20261116T010500Z.md) — Cycle A: Android bookmark PR compile fix. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T013500Z.md](./CURRENT_STATUS_20261116T013500Z.md) — Cycle A: progress on open Android bookmark PR #779 (security marker + URI routing guards). Physical device NOT TESTED.
-- Previous snapshots remain for history.
+- [CURRENT_STATUS_20261114T044000Z.md](./CURRENT_STATUS_20261114T044000Z.md) — Cycle B verification: Cycle A dictionary card complete; small structured-results polish added on branch. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261114T042209Z.md](./CURRENT_STATUS_20261114T042209Z.md) - keyless dictionary lookup card (Free Dictionary API) on branch feat/dictionary-card-vibe-20261114. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261114T040000Z.md](./CURRENT_STATUS_20261114T040000Z.md) — Cycle B verification: Cycle A storage fencing complete; small clear-completed busy feedback polish added on branch. Physical device NOT TESTED.
+- Previous: [CURRENT_STATUS_20261114T024500Z.md](./CURRENT_STATUS_20261114T024500Z.md) — Cycle B verification: Cycle A storage fencing complete on main `3b8557e`; UI polish consistent. Physical device NOT TESTED.
 
 ## Before acting
 
