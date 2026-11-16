@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T13:10:00Z (Cycle A: Saved sites long-press remove)](./CURRENT_STATUS_20261116T131000Z.md)
 - [Daymark engineering status — 2026-11-16T12:15:00Z (Cycle A: bookmark PR CI fix + a11y polish)](./CURRENT_STATUS_20261116T121500Z.md)
 - [Daymark engineering status — 2026-11-16T05:35:00Z (Cycle A: Saved sites More… chip)](./CURRENT_STATUS_20261116T053500Z.md)
 - [Daymark engineering status — 2026-11-16T11:40:00Z (Cycle B: #779 merge resolved, CI running)](./CURRENT_STATUS_20261116T114000Z.md)
