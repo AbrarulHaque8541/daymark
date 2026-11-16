@@ -319,3 +319,10 @@ test('index.html wires both crypto modules with defer tags', () => {
   assert.ok(indexHtml.includes('<script src="crypto-logic.js" defer></script>'));
   assert.ok(indexHtml.includes('<script src="crypto-ui.js" defer></script>'));
 });
+
+test('Check and Clear buttons expose title attributes for discoverability', () => {
+  const doc = makeDoc();
+  attach(doc);
+  assert.strictEqual(doc.getElementById('crypto-check').getAttribute('title'), 'Check the current rate (nothing is saved on this device)');
+  assert.strictEqual(doc.getElementById('crypto-clear').getAttribute('title'), 'Clear the rate display');
+});
