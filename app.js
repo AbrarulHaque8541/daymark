@@ -533,6 +533,12 @@
     if (!task.dueDate) return 'No due date';
     if (task.dueDate < today) return `Overdue · ${formatDate(task.dueDate)}${suffix}`;
     if (task.dueDate === today) return `Due today${suffix}`;
+    // Relative for near future (1-7 days) to aid scanning
+    const due = new Date(task.dueDate + 'T00:00:00');
+    const now = new Date(today + 'T00:00:00');
+    const diffDays = Math.round((due - now) / 86400000);
+    if (diffDays === 1) return `Due tomorrow${suffix}`;
+    if (diffDays > 1 && diffDays <= 7) return `Due in ${diffDays} days · ${formatDate(task.dueDate)}${suffix}`;
     return `Due ${formatDate(task.dueDate)}${suffix}`;
   }
 
