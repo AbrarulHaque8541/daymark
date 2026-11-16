@@ -2582,9 +2582,11 @@ public final class MainActivity extends Activity {
                     clipboard.setPrimaryClip(ClipData.newPlainText("Daymark saved site", origin));
                     showBrowserStatus("Copied " + origin);
                     haptic(view, HapticFeedbackConstants.LONG_PRESS);
-                    // Brief accent flash for visual confirmation without blocking.
-                    view.setAlpha(0.7f);
-                    view.animate().alpha(1f).setDuration(180).start();
+                    // Brief accent flash for visual confirmation without blocking; skipped under reduced motion.
+                    if (!WorkspaceMotion.isReducedMotionPublic(view)) {
+                        view.setAlpha(0.7f);
+                        view.animate().alpha(1f).setDuration(180).start();
+                    }
                 }
                 return true;
             });
