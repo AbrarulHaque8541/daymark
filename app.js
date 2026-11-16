@@ -1296,13 +1296,21 @@
   async function copyVisible() {
     const filteredTasks = getCurrentlyFilteredTasks();
     if (!filteredTasks.length) return;
-    const titles = filteredTasks.map((task) => task.title).filter(Boolean);
-    if (!titles.length) return;
-    const text = titles.join('\n');
+    const lines = filteredTasks.map((task) => {
+      const mark = task.completed ? '[x]' : '[ ]';
+      let line = `- ${mark} ${task.title || ''}`;
+      if (task.dueDate) {
+        const due = task.dueTime ? `${task.dueDate} ${task.dueTime}` : task.dueDate;
+        line += ` (due ${due})`;
+      }
+      return line;
+    }).filter(Boolean);
+    if (!lines.length) return;
+    const text = lines.join('\n');
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        showToast(`Copied ${titles.length} task title${titles.length === 1 ? '' : 's'}.`);
+        showToast(`Copied ${lines.length} task${lines.length === 1 ? '' : 's'} as checklist.`);
       } else {
         // Fallback for older browsers
         const ta = document.createElement('textarea');
@@ -1314,7 +1322,7 @@
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast(`Copied ${titles.length} task title${titles.length === 1 ? '' : 's'}.`);
+        showToast(`Copied ${lines.length} task${lines.length === 1 ? '' : 's'} as checklist.`);
       }
     } catch (err) {
       showToast('Could not copy to clipboard.');
