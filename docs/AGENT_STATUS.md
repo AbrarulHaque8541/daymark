@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T01:45:00Z (Cycle A: merge resolve + long-press copy)](./CURRENT_STATUS_20261116T014500Z.md)
 - [Daymark engineering status — 2026-11-16T06:08:00Z (Cycle B: PR #779 complete on branch, CI flake)](./CURRENT_STATUS_20261116T060800Z.md)
 - [Daymark engineering status — 2026-11-16T01:05:00Z (Cycle A: Android bookmark PR compile fix)](./CURRENT_STATUS_20261116T010500Z.md)
 - [Daymark engineering status — 2026-11-15T21:40:00Z (Cycle B: MainActivity restore prepared)](./CURRENT_STATUS_20261115T214000Z.md)
@@ -24,6 +25,7 @@
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 
 # Agent status index
+- [CURRENT_STATUS_20261116T014500Z.md](./CURRENT_STATUS_20261116T014500Z.md) — Cycle A: resolved docs merge on PR #779 and added long-press copy on saved site chips. Physical device NOT TESTED.
 
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T010500Z.md](./CURRENT_STATUS_20261116T010500Z.md) — Cycle A: Android bookmark PR compile fix. Physical device NOT TESTED.
