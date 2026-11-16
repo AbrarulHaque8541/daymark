@@ -88,14 +88,20 @@
     const checkButton = doc.createElement('button');
     checkButton.id = 'crypto-check';
     checkButton.className = 'button button-primary';
-    if (typeof checkButton.setAttribute === 'function') checkButton.setAttribute('type', 'submit');
+    if (typeof checkButton.setAttribute === 'function') {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('title', 'Check the current rate (nothing is saved on this device)');
+    }
     checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
     clearButton.id = 'crypto-clear';
     clearButton.className = 'button button-quiet';
-    if (typeof clearButton.setAttribute === 'function') clearButton.setAttribute('type', 'button');
+    if (typeof clearButton.setAttribute === 'function') {
+      clearButton.setAttribute('type', 'button');
+      clearButton.setAttribute('title', 'Clear the rate display');
+    }
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
