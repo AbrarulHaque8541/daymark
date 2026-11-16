@@ -2571,7 +2571,7 @@ public final class MainActivity extends Activity {
             if (BrowserHttpPolicy.isHttp(origin)) {
                 labelText = origin + " · Not encrypted";
             }
-            String desc = "Open saved site " + origin + ". Long-press to copy";
+            String desc = "Open saved site " + origin + ". Long-press for options";
             if (BrowserHttpPolicy.isHttp(origin)) {
                 desc += ". Not encrypted";
             }
@@ -2581,19 +2581,32 @@ public final class MainActivity extends Activity {
             });
             // Glass accent polish for Saved sites chips (accent #16705f)
             chip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
-            // Long-press copies the origin for quick reuse without leaving Daymark.
+            // Long-press offers Copy or Remove for the individual origin.
             chip.setOnLongClickListener(view -> {
-                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                if (clipboard != null) {
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Daymark saved site", origin));
-                    showBrowserStatus("Copied " + origin);
-                    haptic(view, HapticFeedbackConstants.LONG_PRESS);
-                    // Brief accent flash for visual confirmation without blocking; skipped under reduced motion.
-                    if (!WorkspaceMotion.isReducedMotionPublic(view)) {
-                        view.setAlpha(0.7f);
-                        view.animate().alpha(1f).setDuration(180).start();
-                    }
-                }
+                haptic(view, HapticFeedbackConstants.LONG_PRESS);
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(origin)
+                        .setItems(new CharSequence[]{"Copy origin", "Remove from bookmarks"}, (dialog, which) -> {
+                            if (which == 0) {
+                                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                if (clipboard != null) {
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Daymark saved site", origin));
+                                    showBrowserStatus("Copied " + origin);
+                                }
+                            } else {
+                                String current = browserPreferences.getString(BROWSER_BOOKMARKS_KEY, "");
+                                String updated = BrowserHistory.remove(current, origin);
+                                browserPreferences.edit().putString(BROWSER_BOOKMARKS_KEY, updated).apply();
+                                showBrowserStatus("Removed " + origin);
+                                refreshSavedSitesRail();
+                            }
+                            if (!WorkspaceMotion.isReducedMotionPublic(view)) {
+                                view.setAlpha(0.7f);
+                                view.animate().alpha(1f).setDuration(180).start();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
                 return true;
             });
             rail.addView(chip);
