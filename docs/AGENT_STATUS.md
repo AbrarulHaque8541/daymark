@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T18:00:00Z (Cycle A: Prioritize visible tasks)](./CURRENT_STATUS_20261116T180000Z.md)
 - [Daymark engineering status — 2026-11-16T15:08:00Z (Cycle B: Complete visible tasks button)](./CURRENT_STATUS_20261116T150800Z.md)
 - [Daymark engineering status — 2026-11-16T12:08:00Z (Cycle B: PR #779 complete + a11y rail count)](./CURRENT_STATUS_20261116T120800Z.md)
 - [Daymark engineering status — 2026-11-16T04:56:54Z (keyless crypto glance card, branch feat/crypto-card-vibe-20261116)](./CURRENT_STATUS_20261116T045654Z.md)

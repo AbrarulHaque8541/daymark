@@ -662,6 +662,7 @@
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
     const openVisible = filteredTasks.filter((task) => !task.completed).length;
     $('#complete-visible').hidden = openVisible === 0;
+    $('#prioritize-visible').hidden = openVisible === 0;
     $('#clear-completed').hidden = completedTasks.length === 0;
     $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
     $('#sort-toggle').textContent = state.sort === 'title' ? 'Sort: A–Z' : 'Sort: Smart';
@@ -1287,6 +1288,33 @@
         const restored = await persistTasks();
         render();
         showSaveResult(restored, 'Visible tasks restored.');
+      }
+    });
+  }
+
+  async function prioritizeVisible() {
+    const filteredTasks = getCurrentlyFilteredTasks();
+    const toPrioritize = filteredTasks.filter((task) => !task.completed && task.priority !== "high");
+    if (!toPrioritize.length) {
+      showToast("No open visible tasks need prioritization.");
+      return;
+    }
+    const ids = new Set(toPrioritize.map((task) => task.id));
+    const previous = state.tasks.map((task) => ({ ...task }));
+    state.tasks = state.tasks.map((task) => ids.has(task.id) ? { ...task, priority: "high", updatedAt: new Date().toISOString() } : task);
+    const saved = await persistTasks();
+    render();
+    if (!saved.ok) {
+      showSaveResult(saved, "Visible tasks prioritized.");
+      return;
+    }
+    showToast(`Set ${toPrioritize.length} visible task${toPrioritize.length === 1 ? "" : "s"} to high priority.`, {
+      label: "Undo",
+      run: async () => {
+        state.tasks = previous;
+        const restored = await persistTasks();
+        render();
+        showSaveResult(restored, "Visible task priorities restored.");
       }
     });
   }
@@ -2262,6 +2290,9 @@
     } else if ((event.key === 'c' || event.key === 'C') && !$('#edit-dialog').open && !$('#clear-completed').hidden) {
       event.preventDefault();
       $('#clear-completed').click();
+    } else if ((event.key === 'p' || event.key === 'P') && !$('#edit-dialog').open && !$('#prioritize-visible').hidden) {
+      event.preventDefault();
+      $('#prioritize-visible').click();
     } else if (FILTER_KEYS[event.key] && !$('#edit-dialog').open) {
       event.preventDefault();
       setTaskFilter(FILTER_KEYS[event.key]);
@@ -2500,6 +2531,7 @@
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
     $('#complete-visible').addEventListener('click', completeVisible);
+    $('#prioritize-visible').addEventListener('click', prioritizeVisible);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', async (event) => {
