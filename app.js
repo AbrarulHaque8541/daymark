@@ -602,6 +602,24 @@
       && subtask.title.toLowerCase().includes(normalizedQuery));
   }
 
+
+  function getCurrentlyFilteredTasks() {
+    const today = logic.localDateString();
+    const overdueTasks = state.tasks.filter((task) => !task.completed && task.dueDate !== null && task.dueDate < today);
+    const source = state.filter === 'overdue' ? overdueTasks : state.tasks;
+    const effectiveFilter = state.filter === 'overdue' ? 'all' : state.filter;
+    let filteredTasks = logic.getFilteredTasks(source, effectiveFilter, state.query, today);
+    const normalizedQuery = String(state.query || '').trim().toLowerCase();
+    if (normalizedQuery) {
+      const knownIds = new Set(filteredTasks.map((task) => task.id));
+      const extra = source.filter((task) => !knownIds.has(task.id) && matchesSubtaskTitle(task, normalizedQuery));
+      if (extra.length) filteredTasks = logic.getFilteredTasks(filteredTasks.concat(extra), effectiveFilter, '', today);
+    }
+    if (state.sort === 'title') {
+      filteredTasks = filteredTasks.slice().sort((a, b) => a.title.localeCompare(b.title) || (a.dueDate || '').localeCompare(b.dueDate || ''));
+    }
+    return filteredTasks;
+  }
   function render() {
     const today = logic.localDateString();
     state.currentDay = today;
@@ -642,6 +660,8 @@
     $('#visible-count').textContent = hasQuery
       ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
+    const openVisible = filteredTasks.filter((task) => !task.completed).length;
+    $('#complete-visible').hidden = openVisible === 0;
     $('#clear-completed').hidden = completedTasks.length === 0;
     $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
     $('#sort-toggle').textContent = state.sort === 'title' ? 'Sort: A–Z' : 'Sort: Smart';
@@ -1243,6 +1263,30 @@
         const restored = await persistTasks();
         render();
         showSaveResult(restored, 'Completed tasks restored.');
+      }
+    });
+  }
+
+  async function completeVisible() {
+    const filteredTasks = getCurrentlyFilteredTasks();
+    const toComplete = filteredTasks.filter((task) => !task.completed);
+    if (!toComplete.length) return;
+    const ids = new Set(toComplete.map((task) => task.id));
+    const previous = state.tasks.map((task) => ({ ...task }));
+    state.tasks = state.tasks.map((task) => ids.has(task.id) ? { ...task, completed: true, updatedAt: new Date().toISOString() } : task);
+    const saved = await persistTasks();
+    render();
+    if (!saved.ok) {
+      showSaveResult(saved, 'Visible tasks marked complete.');
+      return;
+    }
+    showToast(`Marked ${toComplete.length} visible task${toComplete.length === 1 ? '' : 's'} complete.`, {
+      label: 'Undo',
+      run: async () => {
+        state.tasks = previous;
+        const restored = await persistTasks();
+        render();
+        showSaveResult(restored, 'Visible tasks restored.');
       }
     });
   }
@@ -2455,6 +2499,7 @@
     }
     $('#empty-clear-search').addEventListener('click', clearSearch);
     $('#clear-completed').addEventListener('click', clearCompleted);
+    $('#complete-visible').addEventListener('click', completeVisible);
     $('#export-tasks').addEventListener('click', exportTasks);
     $('#import-tasks').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', async (event) => {

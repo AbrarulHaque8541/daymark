@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-16T15:08:00Z (Cycle B: Complete visible tasks button)](./CURRENT_STATUS_20261116T150800Z.md)
 - [Daymark engineering status — 2026-11-16T14:15:00Z (Cycle B: #779 remove confirmation)](./CURRENT_STATUS_20261116T141500Z.md)
 - [Daymark engineering status — 2026-11-16T07:40:00Z (Cycle B: #779 conflicts resolved + web copy PR ready)](./CURRENT_STATUS_20261116T074000Z.md)
 - [Daymark engineering status — 2026-11-16T13:10:00Z (Cycle A: Saved sites long-press remove)](./CURRENT_STATUS_20261116T131000Z.md)
@@ -18,13 +19,9 @@
 - [Daymark engineering status — 2026-11-16T01:35:00Z (Cycle A: Android bookmark shortcuts PR progress)](./CURRENT_STATUS_20261116T013500Z.md)
 - [Daymark engineering status — 20261115 074500Z (keyless on-this-day history card, branch feat/onthisday-card-vibe-20261115)](./CURRENT_STATUS_20261115T074500Z.md)
 - [Daymark engineering status - 2026-11-15T06:05:00Z (Cycle A clear-search polish)](./CURRENT_STATUS_20261115T060500Z.md)
-
 - [Daymark engineering status - 2026-11-15T00:20:00Z (Cycle A filter polish fix)](./CURRENT_STATUS_20261115T002000Z.md)
-
 - [Daymark engineering status - 2026-11-14T22:37:00Z (Cycle A filter polish)](./CURRENT_STATUS_20261114T223700Z.md)
-
 - [Daymark engineering status - 2026-11-15T02:05:00Z (Cycle A sort toggle polish)](./CURRENT_STATUS_20261115T020500Z.md)
-
 - [Daymark engineering status — 2026-11-14T16:46:24Z (permission-lifecycle planner card, branch feat/permission-lifecycle-vibe-20261114)](./CURRENT_STATUS_20261114T164624Z.md)
 - [Daymark engineering status - 2026-11-14T12:37:30Z (Cycle A task view reset polish)](./CURRENT_STATUS_20261114T123730Z.md)
 - [Daymark engineering status - 2026-11-14T08:35:00Z (Cycle A task view preference persistence)](./CURRENT_STATUS_20261114T083500Z.md)
@@ -37,9 +34,9 @@
 - [Daymark engineering status — 2026-11-13T04:39:18Z (keyless GitHub release radar card, branch feat/release-radar-vibe-20261113)](./CURRENT_STATUS_20261113T043900Z.md)
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 
+
 # Agent status index
 
-- [CURRENT_STATUS_20261116T043000Z.md](./CURRENT_STATUS_20261116T043000Z.md) — Cycle B: glass accent polish on Saved sites chips. Feature complete on branch. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T120800Z.md](./CURRENT_STATUS_20261116T120800Z.md) — Cycle B: PR #779 Saved sites complete on branch + a11y rail count; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.

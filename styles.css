@@ -93,6 +93,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .task-total { color: #5f6c76; font-size: 11px; }
 .clear-completed { height: 30px; padding: 0 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #5f6c76; font-size: 11px; transition: border-color .16s ease, background .16s ease, color .16s ease; }
 .clear-completed:hover { border-color: rgba(219, 226, 232, .9); background: rgba(255, 255, 255, .8); color: var(--red); }
+#complete-visible:hover { color: var(--accent); }
+#complete-visible:active { background: rgba(22, 112, 95, 0.12); }
 .clear-completed[hidden] { display: none; }
 .filters { display: flex; flex-wrap: wrap; gap: 0 4px; border-bottom: 1px solid var(--line); margin-bottom: 9px; }
 .filter-button { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px 8px; border: 0; border-bottom: 2px solid transparent; background: none; color: #63707a; font-size: 12px; white-space: nowrap; transition: color .16s ease, border-color .16s ease; }
