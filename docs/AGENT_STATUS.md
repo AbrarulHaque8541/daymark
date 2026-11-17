@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T13:05:49Z (Cycle A: focus timer and date-chip press feedback)](./CURRENT_STATUS_20261117T130549Z.md)
 - [Daymark engineering status — 2026-11-17T12:48:00Z (Cycle B: remaining glance card polish)](./CURRENT_STATUS_20261117T124800Z.md)
 
 - [Daymark engineering status — 2026-11-17T11:45:00Z (Cycle A: card titles + press feedback)](./CURRENT_STATUS_20261117T114500Z.md)
