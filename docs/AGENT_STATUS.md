@@ -58,3 +58,4 @@
 - Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
 - Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
+- [Daymark engineering status — 2026-11-17T08:40:00Z (Cycle B: launch press feedback)](./CURRENT_STATUS_20261117T084000Z.md)
