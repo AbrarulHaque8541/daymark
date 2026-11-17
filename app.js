@@ -40,6 +40,7 @@
     if (label) label.textContent = message;
     status.classList.toggle('is-warning', unavailable);
     status.classList.remove('is-checking');
+    status.setAttribute('aria-busy', 'false');
   }
 
   function loadTasks() {
