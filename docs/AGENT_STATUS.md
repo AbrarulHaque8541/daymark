@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T10:36:00Z (Cycle A: search match count badge)](./CURRENT_STATUS_20261117T103600Z.md)
 - [Daymark engineering status — 2026-11-17T04:07:51Z (keyless rocket launch schedule card, branch feat/launch-card-vibe-20261117)](./CURRENT_STATUS_20261117T040751Z.md)
 - [Daymark engineering status — 2026-11-17T01:35:00Z (Cycle A: storage ready flash)](./CURRENT_STATUS_20261117T013500Z.md)
 - [Daymark engineering status — 2026-11-17T05:30:00Z (Cycle B: storage checking polish)](./CURRENT_STATUS_20261117T053000Z.md)
@@ -43,7 +44,7 @@
 - [CURRENT_STATUS_20261114T044000Z.md](./CURRENT_STATUS_20261114T044000Z.md) — Cycle B verification: Cycle A dictionary card complete; small structured-results polish added on branch. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261114T042209Z.md](./CURRENT_STATUS_20261114T042209Z.md) - keyless dictionary lookup card (Free Dictionary API) on branch feat/dictionary-card-vibe-20261114. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261114T040000Z.md](./CURRENT_STATUS_20261114T040000Z.md) — Cycle B verification: Cycle A storage fencing complete; small clear-completed busy feedback polish added on branch. Physical device NOT TESTED.
-- Previous: [CURRENT_STATUS_20261114T024500Z.md](./CURRENT_STATUS_20261114T024500Z.md) — Cycle B verification: Cycle A storage fencing complete on main `3b8557e`; UI polish consistent. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261114T024500Z.md](./CURRENT_STATUS_20261114T024500Z.md) — Cycle B verification: Cycle A storage fencing complete on main `3b8557e`; UI polish consistent. Physical device NOT TESTED.
 
 ## Before acting
 
