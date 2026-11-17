@@ -134,6 +134,24 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function clearResult() {
+      if (resultEl) {
+        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+        resultEl.textContent = '';
+      }
+    }
+
+    function showSkeletons() {
+      if (!resultEl) return;
+      clearResult();
+      for (let i = 0; i < 2; i += 1) {
+        const sk = doc.createElement('div');
+        sk.className = 'feed-item skeleton-row';
+        if (typeof sk.setAttribute === 'function') sk.setAttribute('aria-hidden', 'true');
+        resultEl.appendChild(sk);
+      }
+    }
+
     function setBusy(isBusy) {
       busy = isBusy;
       if (buttonEl) {
@@ -147,12 +165,9 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
-    }
-
-    function clearResult() {
-      if (resultEl) {
-        while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
-        resultEl.textContent = '';
+      if (isBusy) {
+        status('Checking the schedule…');
+        showSkeletons();
       }
     }
 
