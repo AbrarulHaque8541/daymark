@@ -462,8 +462,18 @@
 
   function showSaveResult(saved, successMessage) {
     const ok = typeof saved === 'boolean' ? saved : Boolean(saved && saved.ok);
-    if (ok) showToast(successMessage);
-    else if (saved && saved.reason === 'cleared') showToast('Local data was cleared in another tab. This task change was not saved.');
+    if (ok) {
+      showToast(successMessage);
+      // Small related improvement: surface last successful save time on the storage badge.
+      const status = $('#storage-status');
+      if (status) {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const base = status.title.replace(/ · last saved .*/i, '') || 'Local browser storage status';
+        status.title = `${base} · last saved ${hh}:${mm}`;
+      }
+    } else if (saved && saved.reason === 'cleared') showToast('Local data was cleared in another tab. This task change was not saved.');
     else if (saved && saved.reason === 'conflict') showToast('This task changed in another tab. Reload the list and retry.');
     else showToast('Could not save to this browser. Changes may be lost when you leave.');
   }
