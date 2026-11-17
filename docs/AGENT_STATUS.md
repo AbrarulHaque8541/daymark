@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T05:42:00Z (Cycle B: launch ready flash + count)](./CURRENT_STATUS_20261117T054200Z.md)
 - [Daymark engineering status — 2026-11-17T04:07:51Z (keyless rocket launch schedule card, branch feat/launch-card-vibe-20261117)](./CURRENT_STATUS_20261117T040751Z.md)
 - [Daymark engineering status — 2026-11-17T01:35:00Z (Cycle A: storage ready flash)](./CURRENT_STATUS_20261117T013500Z.md)
 - [Daymark engineering status — 2026-11-17T05:30:00Z (Cycle B: storage checking polish)](./CURRENT_STATUS_20261117T053000Z.md)
@@ -36,6 +37,7 @@
 
 # Agent status index
 
+- [CURRENT_STATUS_20261117T054200Z.md](./CURRENT_STATUS_20261117T054200Z.md) — Cycle B: launch ready flash + count completed on branch. Critical paths clean. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T120800Z.md](./CURRENT_STATUS_20261116T120800Z.md) — Cycle B: PR #779 Saved sites complete on branch + a11y rail count; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
