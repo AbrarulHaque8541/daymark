@@ -128,6 +128,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #currency-refresh:active, #currency-clear:active, #currency-copy:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #wiki-search:active, #wiki-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #zones-add:active, #zones-refresh:active, #zones-clear:active, #zones-copy:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#focus-start:active, #focus-pause:active, #focus-stop:active, .focus-preset:active, #chip-today:active, #chip-tomorrow:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 .task-list.is-resetting { animation: task-list-reset .28s ease; }
 .task-list.is-sorting { animation: task-list-reset .28s ease; }
 .task-list.is-filtering { animation: task-list-reset .28s ease; }
