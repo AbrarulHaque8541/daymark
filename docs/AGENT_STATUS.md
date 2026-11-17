@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T02:45:00Z (Cycle A: storage badge hover polish)](./CURRENT_STATUS_20261117T024500Z.md)
 - [Daymark engineering status — 2026-11-17T01:35:00Z (Cycle A: storage ready flash)](./CURRENT_STATUS_20261117T013500Z.md)
 - [Daymark engineering status — 2026-11-17T05:30:00Z (Cycle B: storage checking polish)](./CURRENT_STATUS_20261117T053000Z.md)
 - [Daymark engineering status — 2026-11-17T00:08:00Z (Cycle B: suggestion highlights completed on clean branch)](./CURRENT_STATUS_20261117T000800Z.md)
