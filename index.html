@@ -144,7 +144,7 @@
             <option value="high">High priority</option>
             <option value="low">Low priority</option>
           </select>
-          <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
+          <button class="button button-primary add-button" type="submit" title="Add a new task (N)"><span aria-hidden="true">+</span> Add task</button>
         </form>
         <p id="new-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
         <div class="date-chips" aria-label="Quick due dates">
@@ -192,8 +192,8 @@
               <option value="csv">CSV (.csv)</option>
               <option value="ics">Calendar (.ics)</option>
             </select>
-            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks" aria-describedby="browser-storage-disclosure">Export</button>
-            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file" aria-describedby="browser-storage-disclosure">Import</button>
+            <button class="tool-button" id="export-tasks" type="button" title="Download a backup of your tasks" aria-label="Download a backup file of your tasks" aria-describedby="browser-storage-disclosure">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" title="Restore tasks from a backup file" aria-label="Restore tasks or Focus recovery from a backup file" aria-describedby="browser-storage-disclosure">Import</button>
             <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
             <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
           </div>
@@ -424,8 +424,8 @@
               <option value="offline">Offline</option>
               <option value="online">Online (explicit consent)</option>
             </select>
-            <button class="button button-primary" id="tls-gate-plan" type="submit">Plan</button>
-            <button class="button button-quiet" id="tls-gate-clear" type="button">Clear</button>
+            <button class="button button-primary" id="tls-gate-plan" type="submit" title="Plan TLS failure explanation and consent gate">Plan</button>
+            <button class="button button-quiet" id="tls-gate-clear" type="button" title="Clear TLS planner results">Clear</button>
           </form>
           <p class="feed-status" id="tls-gate-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="tls-gate-result" aria-live="polite"></div>
