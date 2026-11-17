@@ -1,5 +1,7 @@
 - [Daymark engineering status — 2026-11-17T12:48:00Z (Cycle B: remaining glance card polish)](./CURRENT_STATUS_20261117T124800Z.md)
 
+- [Daymark engineering status — 2026-11-17T16:25:00Z (TLS failure and consent-gate planner card, branch feat/tls-gate-vibe-20261117)](./CURRENT_STATUS_20261117T162500Z.md)
+
 - [Daymark engineering status — 2026-11-17T11:45:00Z (Cycle A: card titles + press feedback)](./CURRENT_STATUS_20261117T114500Z.md)
 
 - [Daymark engineering status — 2026-11-17T04:07:51Z (keyless rocket launch schedule card, branch feat/launch-card-vibe-20261117)](./CURRENT_STATUS_20261117T040751Z.md)
