@@ -70,6 +70,7 @@
     checkButton.className = 'button button-primary';
     if (typeof checkButton.setAttribute === 'function') checkButton.setAttribute('type', 'submit');
     checkButton.textContent = 'Check';
+    if (typeof checkButton.setAttribute === 'function') checkButton.setAttribute('title', 'Check upcoming rocket launches');
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
@@ -77,6 +78,7 @@
     clearButton.className = 'button button-quiet';
     if (typeof clearButton.setAttribute === 'function') clearButton.setAttribute('type', 'button');
     clearButton.textContent = 'Clear';
+    if (typeof clearButton.setAttribute === 'function') clearButton.setAttribute('title', 'Clear the launch schedule view');
     form.appendChild(clearButton);
 
     aside.appendChild(form);

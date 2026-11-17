@@ -117,6 +117,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .clear-completed:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #export-tasks:active, #import-tasks:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #moon-check:active, #moon-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#crypto-check:active, #crypto-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#launch-check:active, #launch-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 .task-list.is-resetting { animation: task-list-reset .28s ease; }
 .task-list.is-sorting { animation: task-list-reset .28s ease; }
 .task-list.is-filtering { animation: task-list-reset .28s ease; }
