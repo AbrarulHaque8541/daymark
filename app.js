@@ -582,7 +582,7 @@
     const reminderChip = hasReminder
       ? `<span class="task-chip reminder-chip" title="${task.reminderLeadMinutes === 0 ? 'Reminder at due time' : `Reminder ${task.reminderLeadMinutes === 1440 ? '1 day' : task.reminderLeadMinutes === 60 ? '1 hour' : '30 min'} before`}">${icon('bell')}</span>`
       : '';
-    return `<article class="task-row${task.completed ? ' is-complete' : ''}" data-task-id="${escapeHTML(task.id)}">
+    return `<article class="task-row${task.completed ? ' is-complete' : ''} priority-${task.priority}" data-task-id="${escapeHTML(task.id)}">
       <button class="complete-button" type="button" data-action="toggle" aria-label="${completionLabel}" aria-pressed="${task.completed}">${icon('check')}</button>
       <div class="task-main">
         <span class="task-title" title="${escapeHTML(task.title)}">${escapeHTML(task.title)}</span>
