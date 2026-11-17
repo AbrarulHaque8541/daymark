@@ -243,3 +243,16 @@
   }
   .local-badge.is-ready svg { stroke: #6fae9b; }
 }
+
+/* Launch card press feedback — accent #16705f glass, matches other primary/quiet buttons. */
+#launch-check:active,
+#launch-clear:active {
+  transform: translateY(1px) scale(.985);
+  box-shadow: inset 0 1px 2px rgba(22, 112, 95, .12);
+}
+@media (prefers-reduced-motion: reduce) {
+  #launch-check:active,
+  #launch-clear:active {
+    transform: none;
+  }
+}
