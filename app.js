@@ -41,6 +41,13 @@
     status.classList.toggle('is-warning', unavailable);
     status.classList.remove('is-checking');
     status.setAttribute('aria-busy', 'false');
+    status.title = message || 'Local browser storage status';
+    // Brief success pulse when storage becomes ready (not a warning).
+    status.classList.remove('is-ready');
+    if (!unavailable && /ready|available/i.test(message || '')) {
+      status.classList.add('is-ready');
+      setTimeout(() => status.classList.remove('is-ready'), 1200);
+    }
   }
 
   function loadTasks() {

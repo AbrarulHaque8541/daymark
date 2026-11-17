@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T01:35:00Z (Cycle A: storage ready flash)](./CURRENT_STATUS_20261117T013500Z.md)
 - [Daymark engineering status — 2026-11-17T05:30:00Z (Cycle B: storage checking polish)](./CURRENT_STATUS_20261117T053000Z.md)
 - [Daymark engineering status — 2026-11-17T00:08:00Z (Cycle B: suggestion highlights completed on clean branch)](./CURRENT_STATUS_20261117T000800Z.md)
 - [Daymark engineering status — 2026-11-16T16:55:00Z (semantic design tokens foundation, branch feat/design-tokens-vibe-20261116)](./CURRENT_STATUS_20261116T165500Z.md)
