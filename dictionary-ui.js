@@ -72,6 +72,7 @@
     checkButton.className = 'button button-primary';
     if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
     checkButton.textContent = 'Look up';
+    if (checkButton.setAttribute) checkButton.setAttribute('title', 'Look up the word in the dictionary');
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
@@ -79,6 +80,7 @@
     clearButton.className = 'button button-quiet';
     if (clearButton.setAttribute) clearButton.setAttribute('type', 'button');
     clearButton.textContent = 'Clear';
+    if (clearButton.setAttribute) clearButton.setAttribute('title', 'Clear the dictionary result');
     form.appendChild(clearButton);
 
     aside.appendChild(form);

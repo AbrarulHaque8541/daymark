@@ -70,6 +70,7 @@
     checkButton.className = 'button button-primary';
     if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
     checkButton.textContent = 'Check';
+    if (checkButton.setAttribute) checkButton.setAttribute('title', 'Check historical events for the date');
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
@@ -77,6 +78,7 @@
     clearButton.className = 'button button-quiet';
     if (clearButton.setAttribute) clearButton.setAttribute('type', 'button');
     clearButton.textContent = 'Clear';
+    if (clearButton.setAttribute) clearButton.setAttribute('title', 'Clear the on-this-day view');
     form.appendChild(clearButton);
 
     aside.appendChild(form);
