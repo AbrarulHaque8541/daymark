@@ -55,7 +55,10 @@
     const countSelect = doc.createElement('select');
     countSelect.id = 'launch-count';
     countSelect.className = 'sort-select';
-    if (typeof countSelect.setAttribute === 'function') countSelect.setAttribute('aria-label', 'How many launches to show');
+    if (typeof countSelect.setAttribute === 'function') {
+      countSelect.setAttribute('aria-label', 'How many launches to show');
+      countSelect.setAttribute('title', 'How many upcoming launches to show');
+    }
     COUNTS.forEach((count, index) => {
       const option = doc.createElement('option');
       option.value = String(count);
