@@ -68,14 +68,22 @@
     const checkButton = doc.createElement('button');
     checkButton.id = 'launch-check';
     checkButton.className = 'button button-primary';
-    if (typeof checkButton.setAttribute === 'function') checkButton.setAttribute('type', 'submit');
+    if (typeof checkButton.setAttribute === 'function') {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('title', 'Check upcoming rocket launches (public API, nothing saved)');
+      checkButton.setAttribute('aria-label', 'Check upcoming rocket launches');
+    }
     checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
     clearButton.id = 'launch-clear';
     clearButton.className = 'button button-quiet';
-    if (typeof clearButton.setAttribute === 'function') clearButton.setAttribute('type', 'button');
+    if (typeof clearButton.setAttribute === 'function') {
+      clearButton.setAttribute('type', 'button');
+      clearButton.setAttribute('title', 'Clear the launch list');
+      clearButton.setAttribute('aria-label', 'Clear the launch list');
+    }
     clearButton.textContent = 'Clear';
     form.appendChild(clearButton);
 
