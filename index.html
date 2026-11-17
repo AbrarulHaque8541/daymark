@@ -48,6 +48,8 @@
   <script src="browser-address-ui.js" defer></script>
   <script src="browser-error-logic.js" defer></script>
   <script src="browser-error-ui.js" defer></script>
+  <script src="tls-gate-logic.js" defer></script>
+  <script src="tls-gate-ui.js" defer></script>
   <script src="browser-download-logic.js" defer></script>
   <script src="browser-download-ui.js" defer></script>
   <script src="browser-proxy-logic.js" defer></script>
@@ -142,12 +144,12 @@
             <option value="high">High priority</option>
             <option value="low">Low priority</option>
           </select>
-          <button class="button button-primary add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
+          <button class="button button-primary add-button" type="submit" title="Add a new task (N)"><span aria-hidden="true">+</span> Add task</button>
         </form>
         <p id="new-date-only-reminder-hint" class="date-only-reminder-hint" role="status" aria-live="polite" aria-atomic="true" hidden>Date-only reminders use 9:00 AM local time.</p>
         <div class="date-chips" aria-label="Quick due dates">
-          <button class="date-chip" id="chip-today" type="button">Today</button>
-          <button class="date-chip" id="chip-tomorrow" type="button">Tomorrow</button>
+          <button class="date-chip" id="chip-today" type="button" title="Set due date to today">Today</button>
+          <button class="date-chip" id="chip-tomorrow" type="button" title="Set due date to tomorrow">Tomorrow</button>
         </div>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
         <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>5</kbd> for filters, <kbd>C</kbd> to clear completed. Use Complete visible or Copy visible (Y) for a checklist when filtering. Add <kbd>#tags</kbd> to the title to tag a task.</p>
@@ -190,8 +192,8 @@
               <option value="csv">CSV (.csv)</option>
               <option value="ics">Calendar (.ics)</option>
             </select>
-            <button class="tool-button" id="export-tasks" type="button" aria-label="Download a backup file of your tasks" aria-describedby="browser-storage-disclosure">Export</button>
-            <button class="tool-button" id="import-tasks" type="button" aria-label="Restore tasks or Focus recovery from a backup file" aria-describedby="browser-storage-disclosure">Import</button>
+            <button class="tool-button" id="export-tasks" type="button" title="Download a backup of your tasks" aria-label="Download a backup file of your tasks" aria-describedby="browser-storage-disclosure">Export</button>
+            <button class="tool-button" id="import-tasks" type="button" title="Restore tasks from a backup file" aria-label="Restore tasks or Focus recovery from a backup file" aria-describedby="browser-storage-disclosure">Import</button>
             <input id="import-file" type="file" accept="application/json,.json,text/csv,.csv,text/markdown,.md,.markdown,text/calendar,.ics" hidden>
             <p id="import-status" class="import-status" role="status" aria-live="polite" aria-atomic="true"></p>
           </div>
@@ -229,16 +231,16 @@
           </div>
           <div class="focus-progress" id="focus-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Focus session progress"><div class="focus-progress-fill" id="focus-progress-fill"></div></div>
           <div class="focus-presets" role="group" aria-label="Timer length">
-            <button class="date-chip focus-preset is-active" type="button" data-focus-preset="focus">Focus · 25 min</button>
-            <button class="date-chip focus-preset" type="button" data-focus-preset="short-break">Break · 5 min</button>
-            <button class="date-chip focus-preset" type="button" data-focus-preset="long-break">Long break · 15 min</button>
+            <button class="date-chip focus-preset is-active" type="button" data-focus-preset="focus" title="Start a 25-minute focus session">Focus · 25 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="short-break" title="Start a 5-minute short break">Break · 5 min</button>
+            <button class="date-chip focus-preset" type="button" data-focus-preset="long-break" title="Start a 15-minute long break">Long break · 15 min</button>
           </div>
           <label class="field-label" for="focus-task">Link to an open task <span>(optional)</span></label>
           <select id="focus-task"><option value="">No task</option></select>
           <div class="focus-actions">
-            <button class="button button-primary" id="focus-start" type="button">Start</button>
-            <button class="button button-quiet" id="focus-pause" type="button" hidden>Pause</button>
-            <button class="button button-quiet" id="focus-stop" type="button" hidden>Stop</button>
+            <button class="button button-primary" id="focus-start" type="button" title="Start the focus timer">Start</button>
+            <button class="button button-quiet" id="focus-pause" type="button" hidden title="Pause the focus timer">Pause</button>
+            <button class="button button-quiet" id="focus-stop" type="button" hidden title="Stop and reset the focus timer">Stop</button>
           </div>
           <p class="focus-today"><span id="focus-today">0</span> min focused today</p>
         </aside>
@@ -403,7 +405,32 @@
           <p class="feed-status" id="browser-error-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="browser-error-result" aria-live="polite"></div>
         </aside>
-        <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
+        <aside class="briefing-card" id="tls-gate-card" aria-labelledby="tls-gate-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="tls-gate-heading">TLS failures and the Online consent gate</h2>
+          <p class="briefing-description">Plan a certificate failure and the fresh-install consent state, computed locally. Nothing is fetched.</p>
+          <form id="tls-gate-form" class="feed-form" novalidate>
+            <label class="sr-only" for="tls-gate-failure">Certificate failure</label>
+            <select id="tls-gate-failure" name="failure" class="sort-select" aria-label="Certificate failure">
+              <option value="net::ERR_CERT_DATE_INVALID" selected>Certificate date invalid</option>
+              <option value="net::ERR_CERT_AUTHORITY_INVALID">Certificate authority invalid</option>
+              <option value="net::ERR_CERT_COMMON_NAME_INVALID">Certificate name mismatch</option>
+              <option value="net::ERR_CERT_REVOKED">Certificate revoked</option>
+              <option value="net::ERR_SSL_PROTOCOL_ERROR">TLS protocol error</option>
+            </select>
+            <label class="sr-only" for="tls-gate-consent">Consent state</label>
+            <select id="tls-gate-consent" name="consent" class="sort-select" aria-label="Consent state">
+              <option value="undecided" selected>No choice made yet</option>
+              <option value="offline">Offline</option>
+              <option value="online">Online (explicit consent)</option>
+            </select>
+            <button class="button button-primary" id="tls-gate-plan" type="submit" title="Plan TLS failure explanation and consent gate">Plan</button>
+            <button class="button button-quiet" id="tls-gate-clear" type="button" title="Clear TLS planner results">Clear</button>
+          </form>
+          <p class="feed-status" id="tls-gate-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="tls-gate-result" aria-live="polite"></div>
+        </aside>
+                <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="browser-download-heading">Download safety check</h2>
           <p class="briefing-description">Plan a sample download journey. Nothing is fetched.</p>
