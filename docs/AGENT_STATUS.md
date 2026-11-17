@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-17T20:45:00Z (Cycle B: export/TLS titles + press)](./CURRENT_STATUS_20261117T204500Z.md)
+
 - [Daymark engineering status — 2026-11-17T12:48:00Z (Cycle B: remaining glance card polish)](./CURRENT_STATUS_20261117T124800Z.md)
 
 - [Daymark engineering status — 2026-11-17T16:25:00Z (TLS failure and consent-gate planner card, branch feat/tls-gate-vibe-20261117)](./CURRENT_STATUS_20261117T162500Z.md)
