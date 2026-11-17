@@ -48,6 +48,8 @@
   <script src="browser-address-ui.js" defer></script>
   <script src="browser-error-logic.js" defer></script>
   <script src="browser-error-ui.js" defer></script>
+  <script src="tls-gate-logic.js" defer></script>
+  <script src="tls-gate-ui.js" defer></script>
   <script src="browser-download-logic.js" defer></script>
   <script src="browser-download-ui.js" defer></script>
   <script src="browser-proxy-logic.js" defer></script>
@@ -403,7 +405,32 @@
           <p class="feed-status" id="browser-error-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="browser-error-result" aria-live="polite"></div>
         </aside>
-        <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
+        <aside class="briefing-card" id="tls-gate-card" aria-labelledby="tls-gate-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="tls-gate-heading">TLS failures and the Online consent gate</h2>
+          <p class="briefing-description">Plan a certificate failure and the fresh-install consent state, computed locally. Nothing is fetched.</p>
+          <form id="tls-gate-form" class="feed-form" novalidate>
+            <label class="sr-only" for="tls-gate-failure">Certificate failure</label>
+            <select id="tls-gate-failure" name="failure" class="sort-select" aria-label="Certificate failure">
+              <option value="net::ERR_CERT_DATE_INVALID" selected>Certificate date invalid</option>
+              <option value="net::ERR_CERT_AUTHORITY_INVALID">Certificate authority invalid</option>
+              <option value="net::ERR_CERT_COMMON_NAME_INVALID">Certificate name mismatch</option>
+              <option value="net::ERR_CERT_REVOKED">Certificate revoked</option>
+              <option value="net::ERR_SSL_PROTOCOL_ERROR">TLS protocol error</option>
+            </select>
+            <label class="sr-only" for="tls-gate-consent">Consent state</label>
+            <select id="tls-gate-consent" name="consent" class="sort-select" aria-label="Consent state">
+              <option value="undecided" selected>No choice made yet</option>
+              <option value="offline">Offline</option>
+              <option value="online">Online (explicit consent)</option>
+            </select>
+            <button class="button button-primary" id="tls-gate-plan" type="submit">Plan</button>
+            <button class="button button-quiet" id="tls-gate-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="tls-gate-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="tls-gate-result" aria-live="polite"></div>
+        </aside>
+                <aside class="briefing-card" id="browser-download-card" aria-labelledby="browser-download-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="browser-download-heading">Download safety check</h2>
           <p class="briefing-description">Plan a sample download journey. Nothing is fetched.</p>
