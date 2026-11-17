@@ -15,7 +15,8 @@
   .empty-illustration,
   .sparkle,
   .skeleton-row,
-  .local-badge.is-checking {
+  .local-badge.is-checking,
+  .local-badge.is-ready {
     animation: none !important;
   }
   .task-row:hover,
@@ -231,4 +232,14 @@
 .briefing-card:focus-within {
   border-color: rgba(22, 112, 95, 0.45);
   box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.12);
+}
+
+/* Dark-mode ready flash matching accent glass. */
+@media (prefers-color-scheme: dark) {
+  .local-badge.is-ready {
+    background: rgba(22, 112, 95, 0.22);
+    border-color: rgba(42, 143, 122, 0.5);
+    color: #6fae9b;
+  }
+  .local-badge.is-ready svg { stroke: #6fae9b; }
 }
