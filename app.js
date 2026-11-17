@@ -598,9 +598,9 @@
       </div>
       <div class="task-actions">
         <button class="icon-button focus-button" type="button" data-action="focus" aria-label="Start focus timer for ${escapeHTML(task.title)}" title="Start a focus timer for this task">${icon('timer')}</button>
-        <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}">${icon('edit')}</button>
+        <button class="icon-button" type="button" data-action="edit" aria-label="Edit ${escapeHTML(task.title)}" title="Edit this task">${icon('edit')}</button>
         <button class="icon-button duplicate-button" type="button" data-action="duplicate" aria-label="Duplicate ${escapeHTML(task.title)}" title="Duplicate as a new task">${icon('copy')}</button>
-        <button class="icon-button delete-button" type="button" data-action="delete" aria-label="Delete ${escapeHTML(task.title)}">${icon('trash')}</button>
+        <button class="icon-button delete-button" type="button" data-action="delete" aria-label="Delete ${escapeHTML(task.title)}" title="Delete this task">${icon('trash')}</button>
       </div>
     </article>`;
   }
