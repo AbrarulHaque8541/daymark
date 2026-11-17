@@ -135,6 +135,12 @@
   display: none;
 }
 
+/* Compact skeletons for keyless glance result lists (launch etc.). */
+.feed-list .skeleton-row {
+  height: 52px;
+  border-radius: 12px;
+}
+
 /* Storage badge loading pulse while checking. */
 .local-badge.is-checking {
   animation: storage-pulse 1.6s ease-in-out infinite;
