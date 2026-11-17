@@ -16,7 +16,8 @@
   .sparkle,
   .skeleton-row,
   .local-badge.is-checking,
-  .local-badge.is-ready {
+  .local-badge.is-ready,
+  .feed-status.is-ready {
     animation: none !important;
   }
   .task-row:hover,
@@ -242,4 +243,19 @@
     color: #6fae9b;
   }
   .local-badge.is-ready svg { stroke: #6fae9b; }
+  .feed-status.is-ready {
+    background: rgba(22, 112, 95, 0.18);
+    border-color: rgba(42, 143, 122, 0.45);
+    color: #6fae9b;
+  }
+}
+
+/* Brief accent ready flash for glance status lines (launch card and similar). */
+.feed-status.is-ready {
+  background: rgba(22, 112, 95, 0.12);
+  border-color: rgba(22, 112, 95, 0.4);
+  color: #16705f;
+  border-radius: 8px;
+  padding: 4px 8px;
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
 }
