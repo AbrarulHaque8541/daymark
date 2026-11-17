@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-17T05:37:05Z (Cycle A: storage status task count + duplicate script fix)](./CURRENT_STATUS_20261117T053705Z.md)
 - [Daymark engineering status — 2026-11-17T04:07:51Z (keyless rocket launch schedule card, branch feat/launch-card-vibe-20261117)](./CURRENT_STATUS_20261117T040751Z.md)
 - [Daymark engineering status — 2026-11-17T01:35:00Z (Cycle A: storage ready flash)](./CURRENT_STATUS_20261117T013500Z.md)
 - [Daymark engineering status — 2026-11-17T05:30:00Z (Cycle B: storage checking polish)](./CURRENT_STATUS_20261117T053000Z.md)

@@ -44,7 +44,7 @@
     status.title = message || 'Local browser storage status';
     // Brief success pulse when storage becomes ready (not a warning).
     status.classList.remove('is-ready');
-    if (!unavailable && /ready|available/i.test(message || '')) {
+    if (!unavailable && /ready|available|Saved on this device/i.test(message || '')) {
       status.classList.add('is-ready');
       setTimeout(() => status.classList.remove('is-ready'), 1200);
     }
@@ -80,7 +80,7 @@
       return [];
     }
     if (!saved) {
-      setStorageStatus('Local storage ready');
+      setStorageStatus(`Local storage ready · ${state.tasks.length} task${state.tasks.length === 1 ? "" : "s"}`);
       return [];
     }
     try {
@@ -105,7 +105,7 @@
       } else {
         const backupRaw = readRecoveryBackupRaw();
         if (isRedundantRecoveryBackup(saved, backupRaw)) {
-          setStorageStatus('Saved on this device');
+          setStorageStatus(`Saved on this device · ${state.tasks.length} task${state.tasks.length === 1 ? '' : 's'}`);
           // The backup is byte-identical to a fully valid primary: nothing can be recovered
           // from it that the primary does not already hold.
           state.recoveryBackupClearPending = true;
@@ -114,7 +114,7 @@
           setStorageStatus('Saved on this device; recovery backup retained', true);
           offerRecoveryExport('A recovery backup is retained until it can be proven redundant.');
         } else {
-          setStorageStatus('Saved on this device');
+          setStorageStatus(`Saved on this device · ${state.tasks.length} task${state.tasks.length === 1 ? '' : 's'}`);
         }
       }
       return validated.tasks;
