@@ -134,6 +134,17 @@
       if (statusEl) statusEl.textContent = message;
     }
 
+    function flashReady() {
+      if (!statusEl || !statusEl.classList) return;
+      statusEl.classList.remove('is-ready');
+      // Force reflow so the animation can restart on repeated success.
+      void statusEl.offsetWidth;
+      statusEl.classList.add('is-ready');
+      const remove = () => statusEl.classList.remove('is-ready');
+      if (typeof win.setTimeout === 'function') win.setTimeout(remove, 1200);
+      else setTimeout(remove, 1200);
+    }
+
     function setBusy(isBusy) {
       busy = isBusy;
       if (buttonEl) {
@@ -207,8 +218,10 @@
       try {
         const record = await launchApi.fetchUpcomingLaunches(count, fetchImpl, { now: now });
         render(record);
-        status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
+        const found = Array.isArray(record.launches) ? record.launches.length : 0;
+        status(found + ' launch' + (found === 1 ? '' : 'es') + ' \u00b7 Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
           + ' UTC \u00b7 not saved on this device');
+        flashReady();
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof launchApi.classifyLaunchError === 'function'
