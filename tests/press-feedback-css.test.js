@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
-const glanceCss = fs.readFileSync(path.join(__dirname, '..', 'styles-glance-status.css'), 'utf8');
+const glanceCss = fs.readFileSync(path.join(__dirname, '..', 'motion-accessibility.css'), 'utf8');
 
 test('press feedback CSS stays complete, deduplicated, cascade-correct, and reduced-motion aware', () => {
   assert.ok(css.length > 10000, 'the complete application stylesheet must be present');
@@ -31,7 +31,7 @@ test('country and weather success flashes remain in main stylesheet', () => {
   assert.match(css, /#weather-status\.is-success/);
 });
 
-test('feed-status success flash lives in styles-glance-status.css', () => {
+test('feed-status success flash lives in motion-accessibility.css', () => {
   assert.match(glanceCss, /\.feed-status\.is-success/);
   assert.match(glanceCss, /weather-success-flash/);
   assert.match(glanceCss, /prefers-reduced-motion/);
