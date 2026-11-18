@@ -60,8 +60,12 @@
     let cacheRecord = null;
     let prefsRecord = null;
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, isSuccess) {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
     }
 
     function setBusy(isBusy) {
@@ -241,7 +245,7 @@
         await persistCache(cached, epochSnapshot);
         await persistPrefs(query, epochSnapshot);
         render(cached);
-        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice());
+        status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice(), true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {
