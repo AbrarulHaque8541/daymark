@@ -1,15 +1,16 @@
 (function (root) {
   'use strict';
 
-  // Country glance UI wiring for the web prototype. A deliberately stateless
-  // card: nothing is saved on this device, so there is no storage key, no
-  // boot-time storage reads, and Clear only empties the view. The card markup
-  // is injected here instead of being hand-placed in index.html. Mirrors the
-  // launch-ui.js module style: attachCountryUi(env) is fully injectable for
-  // unit tests.
+  // Country glance UI wiring for the web prototype. The last successful query
+  // is remembered in localStorage (daymark.country.lastQuery.v1) so common
+  // lookups return on the next visit. Country facts themselves are never stored.
+  // Clear only empties the view. The card markup is injected here instead of
+  // being hand-placed in index.html. Mirrors the launch-ui.js module style:
+  // attachCountryUi(env) is fully injectable for unit tests.
 
   const CARD_ID = 'country-card';
   const HINT_TEXT = 'e.g. India, Japan, Brazil';
+  const LAST_QUERY_KEY = 'daymark.country.lastQuery.v1';
 
   function ensureCard(doc) {
     const existing = typeof doc.getElementById === 'function' ? doc.getElementById(CARD_ID) : null;
@@ -38,7 +39,7 @@
     const description = doc.createElement('p');
     description.className = 'briefing-description';
     description.id = 'country-description';
-    description.textContent = 'The request goes to the public REST Countries API (restcountries.com) only after you tap Check. No account or API key. Nothing is saved on this device.';
+    description.textContent = 'The request goes to the public REST Countries API (restcountries.com) only after you tap Check. No account or API key. Only the last query is remembered; country facts are not saved on this device.';
     aside.appendChild(description);
 
     const form = doc.createElement('form');
@@ -118,6 +119,7 @@
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
     const fetchImpl = typeof env.fetch === 'function' ? env.fetch
       : (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
+    const storage = (win && win.localStorage) || (typeof localStorage !== 'undefined' ? localStorage : null);
 
     ensureCard(doc);
 
@@ -128,6 +130,16 @@
     const statusEl = element('country-status');
     const resultEl = element('country-result');
     const clearEl = element('country-clear');
+
+    // Restore last query, fail closed.
+    try {
+      if (storage && typeof storage.getItem === 'function' && nameEl) {
+        const saved = storage.getItem(LAST_QUERY_KEY);
+        if (typeof saved === 'string' && saved.length > 0 && saved.length <= 60) {
+          nameEl.value = saved;
+        }
+      }
+    } catch (error) { /* storage unavailable or blocked: leave the field empty */ }
 
     let busy = false;
 
@@ -212,8 +224,14 @@
       try {
         const record = await countryApi.fetchCountries(rawQuery, fetchImpl, { now: now });
         render(record);
+        // Remember the normalized query, fail closed.
+        try {
+          if (storage && typeof storage.setItem === 'function' && record && typeof record.query === 'string') {
+            storage.setItem(LAST_QUERY_KEY, record.query);
+          }
+        } catch (error) { /* best-effort; lookup still succeeded */ }
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC \u00b7 not saved on this device');
+          + ' UTC \u00b7 query remembered');
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof countryApi.classifyCountryError === 'function'
