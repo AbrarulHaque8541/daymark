@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+const glanceCss = fs.readFileSync(path.join(__dirname, '..', 'styles-glance-status.css'), 'utf8');
 
 test('press feedback CSS stays complete, deduplicated, cascade-correct, and reduced-motion aware', () => {
   assert.ok(css.length > 10000, 'the complete application stylesheet must be present');
@@ -21,4 +22,18 @@ test('press feedback CSS stays complete, deduplicated, cascade-correct, and redu
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.card:active,\s*\.task-row:active\s*\{\s*transform:\s*none;/);
   assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length,
     'stylesheet braces must remain balanced');
+});
+
+test('country and weather success flashes remain in main stylesheet', () => {
+  assert.match(css, /@keyframes\s+country-success-flash/);
+  assert.match(css, /@keyframes\s+weather-success-flash/);
+  assert.match(css, /#country-status\.is-success/);
+  assert.match(css, /#weather-status\.is-success/);
+});
+
+test('feed-status success flash lives in styles-glance-status.css', () => {
+  assert.match(glanceCss, /\.feed-status\.is-success/);
+  assert.match(glanceCss, /weather-success-flash/);
+  assert.match(glanceCss, /prefers-reduced-motion/);
+  assert.match(glanceCss, /rgba\(22,\s*112,\s*95/);
 });
