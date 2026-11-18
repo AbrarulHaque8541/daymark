@@ -62,6 +62,8 @@
   <script src="browser-data-ui.js" defer></script>
   <script src="permission-lifecycle-logic.js" defer></script>
   <script src="permission-lifecycle-ui.js" defer></script>
+  <script src="capability-registry-logic.js" defer></script>
+  <script src="capability-registry-ui.js" defer></script>
   <script src="browser-intent-logic.js" defer></script>
   <script src="browser-intent-ui.js" defer></script>
   <script src="url-insights-logic.js" defer></script>
@@ -534,6 +536,29 @@
           </form>
           <p class="feed-status" id="url-insights-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="url-insights-result" aria-live="polite"></div>
+        </aside>
+        <aside class="briefing-card" id="capability-registry-card" aria-labelledby="capability-registry-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="capability-registry-heading">What each capability is</h2>
+          <p class="briefing-description">The registry of what this prototype can and cannot do: where a feature lives, what network it uses and what it honestly lacks. Nothing is fetched.</p>
+          <form id="capability-registry-form" class="feed-form" novalidate>
+            <label class="sr-only" for="capability-registry-feature">Capability to describe</label>
+            <select id="capability-registry-feature" name="feature" class="sort-select" aria-label="Capability">
+              <option value="task-list" selected>Tasks, notes and tags</option>
+              <option value="focus-timer">Focus timer</option>
+              <option value="backup-export-import">Backups, export and import</option>
+              <option value="planner-cards">Offline planning cards</option>
+              <option value="online-glance-cards">Online glance cards</option>
+              <option value="telegram-digest">Telegram task digest</option>
+              <option value="webhook-events">Task completion webhook</option>
+              <option value="daymark-browser">Daymark browser (Android only)</option>
+              <option value="cross-platform-desktop">Cross-platform desktop (planned)</option>
+            </select>
+            <button class="button button-primary" id="capability-registry-describe" type="submit">Describe</button>
+            <button class="button button-quiet" id="capability-registry-clear" type="button">Clear</button>
+          </form>
+          <p class="feed-status" id="capability-registry-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="capability-registry-result" aria-live="polite"></div>
         </aside>
         <aside class="briefing-card" id="webhook-card" aria-labelledby="webhook-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
