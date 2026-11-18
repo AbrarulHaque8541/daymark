@@ -7,6 +7,7 @@ const ui = require('../capability-registry-ui.js');
 const registry = require('../capability-registry-logic.js');
 
 function makeElement(tagName) {
+  const classes = new Set();
   const el = {
     tagName,
     className: '',
@@ -14,6 +15,20 @@ function makeElement(tagName) {
     value: '',
     children: [],
     listeners: {},
+    classList: {
+      toggle(name, force) {
+        if (force === undefined) {
+          if (classes.has(name)) classes.delete(name);
+          else classes.add(name);
+        } else if (force) {
+          classes.add(name);
+        } else {
+          classes.delete(name);
+        }
+        return classes.has(name);
+      },
+      contains(name) { return classes.has(name); }
+    },
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) {
       const index = el.children.indexOf(child);
@@ -53,6 +68,7 @@ test('the card describes its first capability at boot', () => {
   const handle = ui.attachCapabilityRegistryUi({ document: doc, registryApi: registry });
   const status = doc.elements['capability-registry-status'].textContent;
   assert.match(status, /Described \u00b7 Tasks, notes and tags/);
+  assert.equal(doc.elements['capability-registry-status'].classList.contains('is-success'), true);
   const result = doc.elements['capability-registry-result'];
   assert.equal(result.children[0].className, 'feed-item');
   assert.equal(result.children[0].children[0].className, 'feed-item-title');

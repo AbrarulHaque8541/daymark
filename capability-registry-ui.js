@@ -27,8 +27,13 @@
     const formEl = element('capability-registry-form');
     const clearEl = element('capability-registry-clear');
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, isSuccess) {
+      if (statusEl) {
+        statusEl.textContent = message;
+        if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+          statusEl.classList.toggle('is-success', !!isSuccess);
+        }
+      }
     }
 
     function makeItem(text) {
@@ -76,9 +81,11 @@
       }
       const feature = featureEl && typeof featureEl.value === 'string' ? featureEl.value : '';
       const result = dataApi.describeFeature(feature);
-      status(!result.available
-        ? 'Not available here \u00b7 ' + result.label + ' \u2014 described honestly, nothing rendered as available'
-        : 'Described \u00b7 ' + result.label);
+      const success = !!result.available;
+      status(success
+        ? 'Described \u00b7 ' + result.label
+        : 'Not available here \u00b7 ' + result.label + ' \u2014 described honestly, nothing rendered as available',
+        success);
       renderFeature(result);
     }
 
