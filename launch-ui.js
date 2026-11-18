@@ -132,8 +132,12 @@
 
     let busy = false;
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, isSuccess) {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
     }
 
     function setBusy(isBusy) {
@@ -210,7 +214,7 @@
         const record = await launchApi.fetchUpcomingLaunches(count, fetchImpl, { now: now });
         render(record);
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC \u00b7 not saved on this device');
+          + ' UTC \u00b7 not saved on this device', true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof launchApi.classifyLaunchError === 'function'
