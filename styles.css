@@ -1,1 +1,3 @@
-PLACEHOLDER
+/* Temporary emergency restore: branch styles.css was overwritten with PLACEHOLDER.
+   Re-export full rules from main until a full blob restore lands. */
+@import url("https://cdn.jsdelivr.net/gh/AbrarulHaque8541/daymark@df0b79a5a6b7664c9a62aebe0420f630f0f21db6/styles.css");
