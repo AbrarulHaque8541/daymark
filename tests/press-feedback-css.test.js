@@ -22,3 +22,11 @@ test('press feedback CSS stays complete, deduplicated, cascade-correct, and redu
   assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length,
     'stylesheet braces must remain balanced');
 });
+
+
+test('glance status success flash is reduced-motion safe and uses accent', () => {
+  assert.match(css, /@keyframes\s+glance-success-flash/);
+  assert.match(css, /#country-status\.is-success,\s*#weather-status\.is-success/);
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.weather-status\.is-success\s*\{\s*animation:\s*none;/);
+  assert.match(css, /rgba\(22,\s*112,\s*95/);
+});
