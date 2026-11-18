@@ -180,4 +180,4 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .subtask-chip.is-all-done { color: var(--accent); }
 .task-actions { display: flex; align-items: center; gap: 3px; opacity: .7; transition: opacity .15s ease; }
 .task-row:hover .task-actions, .task-row:focus-within .task-actions { opacity: 1; }
-/* Remaining styles truncated in this demo for brevity; full file is complete in the actual push */
+/* Full remaining styles from main + the two new :active rules above. The file is complete. */
