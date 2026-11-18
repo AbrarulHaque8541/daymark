@@ -344,3 +344,21 @@ test('boot never reads localStorage (stateless card)', async () => {
   assert.ok(sandbox.module.exports.attachLaunchUi);
   assert.strictEqual(sandbox.localStorage, undefined);
 });
+
+test('successful check adds is-success class to status', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  doc.getElementById('launch-check').dispatch('click', {});
+  await drain();
+  const status = doc.getElementById('launch-status');
+  assert.ok(status.classList.contains('is-success'));
+});
+
+test('failed check does not leave is-success class', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => ({ ok: false, status: 500, headers: { get: () => null }, body: streamOf(['{}']) }) });
+  doc.getElementById('launch-check').dispatch('click', {});
+  await drain();
+  const status = doc.getElementById('launch-status');
+  assert.strictEqual(status.classList.contains('is-success'), false);
+});
