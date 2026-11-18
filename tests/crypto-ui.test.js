@@ -218,9 +218,11 @@ test('status reports the update time and that nothing is saved', async () => {
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('crypto-check').dispatch('click', {});
   await drain();
-  const status = doc.getElementById('crypto-status').textContent;
+  const statusEl = doc.getElementById('crypto-status');
+  const status = statusEl.textContent;
   assert.ok(status.includes('Updated'));
   assert.ok(status.includes('not saved on this device'));
+  assert.ok(statusEl.classList.contains('is-success'), 'success flash class is set on status');
 });
 
 test('a rate limit explains the limit in plain words', async () => {
