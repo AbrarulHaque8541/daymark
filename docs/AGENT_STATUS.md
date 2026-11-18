@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-18T20:27:00Z (Cycle A: capability registry press + success flash)](./CURRENT_STATUS_20261118T202700Z.md)
+
 - [Daymark engineering status — 2026-11-18T16:47:00Z (capability registry card, branch feat/capability-registry-vibe-20261118)](./CURRENT_STATUS_20261118T164700Z.md)
 
 - [Daymark engineering status — 2026-11-18T15:30:00Z (Cycle A: crypto glance success flash)](./CURRENT_STATUS_20261118T153000Z.md)

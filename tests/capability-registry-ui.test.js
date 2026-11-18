@@ -234,3 +234,26 @@ test('DOMContentLoaded boot also avoids a throwing localStorage getter', () => {
   assert.equal(result.elements['capability-registry-status'].textContent,
     'Described \u00b7 Tasks, notes and tags');
 });
+
+test('describe toggles is-success on status when the capability is available', () => {
+  const doc = makeDoc(ALL_IDS);
+  const statusEl = doc.elements['capability-registry-status'];
+  statusEl.classList = {
+    toggle(cls, on) {
+      statusEl._classes = statusEl._classes || new Set();
+      if (on) statusEl._classes.add(cls);
+      else statusEl._classes.delete(cls);
+    }
+  };
+  doc.elements['capability-registry-feature'].value = 'task-list';
+  ui.attachCapabilityRegistryUi({ document: doc, registryApi: registry });
+  assert.ok(statusEl._classes && statusEl._classes.has('is-success'), 'available describe should set is-success');
+
+  doc.elements['capability-registry-feature'].value = 'definitely-not-a-capability';
+  // re-trigger via change listener if present, else call describe through form
+  const form = doc.elements['capability-registry-form'];
+  if (form.listeners && form.listeners.submit) {
+    form.listeners.submit.forEach((h) => h({ preventDefault() {} }));
+  }
+  assert.ok(!statusEl._classes || !statusEl._classes.has('is-success'), 'unavailable describe should clear is-success');
+});

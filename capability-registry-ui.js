@@ -27,8 +27,11 @@
     const formEl = element('capability-registry-form');
     const clearEl = element('capability-registry-clear');
 
-    function status(message) {
+    function status(message, isSuccess) {
       if (statusEl) statusEl.textContent = message;
+      if (statusEl && statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
     }
 
     function makeItem(text) {
@@ -71,14 +74,14 @@
 
     function describe() {
       if (!dataApi || typeof dataApi.describeFeature !== 'function') {
-        status('Capability registry descriptions are unavailable.');
+        status('Capability registry descriptions are unavailable.', false);
         return;
       }
       const feature = featureEl && typeof featureEl.value === 'string' ? featureEl.value : '';
       const result = dataApi.describeFeature(feature);
       status(!result.available
         ? 'Not available here \u00b7 ' + result.label + ' \u2014 described honestly, nothing rendered as available'
-        : 'Described \u00b7 ' + result.label);
+        : 'Described \u00b7 ' + result.label, !!result.available);
       renderFeature(result);
     }
 
@@ -86,7 +89,7 @@
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
       }
-      status('Registry view cleared; nothing was fetched, run or stored.');
+      status('Registry view cleared; nothing was fetched, run or stored.', false);
     }
 
     if (clearEl) {

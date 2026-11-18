@@ -1153,3 +1153,31 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     color: var(--accent-bright);
   }
 }
+
+/* Cycle A 2026-11-19: capability registry card glass press feedback + status success flash (accent #16705f).
+   Reduced-motion safe; no new network or storage. */
+#capability-registry-describe:active,
+#capability-registry-clear:active {
+  transform: scale(0.96);
+  background: rgba(22, 112, 95, 0.12);
+}
+#capability-registry-status.is-success {
+  color: var(--accent);
+  border-color: rgba(22, 112, 95, 0.35);
+  background: rgba(226, 240, 235, 0.65);
+  animation: capability-registry-success-flash 1.1s ease-out;
+}
+@keyframes capability-registry-success-flash {
+  0% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0.28); }
+  50% { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #capability-registry-status.is-success { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  #capability-registry-status.is-success {
+    background: rgba(26, 58, 50, 0.45);
+    color: var(--accent-bright);
+  }
+}
