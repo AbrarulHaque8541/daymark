@@ -209,6 +209,7 @@ test('status reports the update time and that nothing is saved', async () => {
   const status = doc.getElementById('dictionary-status').textContent;
   assert.ok(status.includes('Updated'));
   assert.ok(status.includes('not saved on this device'));
+  assert.ok(doc.getElementById('dictionary-status').classList.contains('is-success'));
 });
 
 test('404 explains that no definition was found', async () => {
