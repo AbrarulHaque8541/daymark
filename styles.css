@@ -1153,3 +1153,14 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     color: var(--accent-bright);
   }
 }
+
+/* Capability registry card press feedback (accent #16705f, glass, reduced-motion safe). */
+#capability-registry-describe.is-pressed,
+#capability-registry-clear.is-pressed {
+  transform: translateY(1px) scale(.985);
+  transition: transform .08s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  #capability-registry-describe.is-pressed,
+  #capability-registry-clear.is-pressed { transform: none; }
+}

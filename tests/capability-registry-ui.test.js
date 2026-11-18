@@ -14,6 +14,11 @@ function makeElement(tagName) {
     value: '',
     children: [],
     listeners: {},
+    classList: {
+      add() {},
+      remove() {},
+      contains() { return false; }
+    },
     appendChild(child) { el.children.push(child); return child; },
     removeChild(child) {
       const index = el.children.indexOf(child);

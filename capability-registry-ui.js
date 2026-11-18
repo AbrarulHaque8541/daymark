@@ -107,6 +107,28 @@
     }
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
+      // Glass press feedback (accent-consistent, reduced-motion safe).
+      clearEl.addEventListener('pointerdown', () => {
+        if (clearEl.classList && typeof clearEl.classList.add === 'function') clearEl.classList.add('is-pressed');
+      });
+      clearEl.addEventListener('pointerup', () => {
+        if (clearEl.classList && typeof clearEl.classList.remove === 'function') clearEl.classList.remove('is-pressed');
+      });
+      clearEl.addEventListener('pointerleave', () => {
+        if (clearEl.classList && typeof clearEl.classList.remove === 'function') clearEl.classList.remove('is-pressed');
+      });
+    }
+    const describeBtn = element('capability-registry-describe');
+    if (describeBtn && typeof describeBtn.addEventListener === 'function') {
+      describeBtn.addEventListener('pointerdown', () => {
+        if (describeBtn.classList && typeof describeBtn.classList.add === 'function') describeBtn.classList.add('is-pressed');
+      });
+      describeBtn.addEventListener('pointerup', () => {
+        if (describeBtn.classList && typeof describeBtn.classList.remove === 'function') describeBtn.classList.remove('is-pressed');
+      });
+      describeBtn.addEventListener('pointerleave', () => {
+        if (describeBtn.classList && typeof describeBtn.classList.remove === 'function') describeBtn.classList.remove('is-pressed');
+      });
     }
 
     // Initial describe for loading-state completeness.
