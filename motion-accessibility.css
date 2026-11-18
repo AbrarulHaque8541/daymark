@@ -13,3 +13,20 @@
     outline-offset: 2px !important;
   }
 }
+
+/* Holidays feed-status success flash (accent #16705f). Uses weather-success-flash keyframes from styles.css. */
+.feed-status.is-success {
+  color: var(--accent);
+  border-color: rgba(22, 112, 95, 0.35);
+  background: rgba(226, 240, 235, 0.65);
+  animation: weather-success-flash 1.1s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-status.is-success { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  .feed-status.is-success {
+    background: rgba(26, 58, 50, 0.45);
+    color: var(--accent-bright);
+  }
+}
