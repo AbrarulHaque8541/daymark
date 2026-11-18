@@ -594,7 +594,7 @@
       <button class="complete-button" type="button" data-action="toggle" aria-label="${completionLabel}" title="${completionLabel}" aria-pressed="${task.completed}">${icon('check')}</button>
       <div class="task-main">
         <span class="task-title" title="${escapeHTML(task.title)}">${escapeHTML(task.title)}</span>
-        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}" title="Priority: ${task.priority}">${task.priority.toUpperCase()}</span>${tags}${repeatChip}${reminderChip}${notesChip}${subtaskChip}</div>
+        <div class="task-meta"><span class="due-label ${getDueClass(task, today)}" title="${escapeHTML(getDueText(task, today))}">${task.dueTime && logic.isTimeOnly(task.dueTime) ? icon('clock') : icon('calendar')} ${escapeHTML(getDueText(task, today))}</span><span class="priority-pill priority-${task.priority}" title="Priority: ${task.priority}">${task.priority.toUpperCase()}</span>${tags}${repeatChip}${reminderChip}${notesChip}${subtaskChip}</div>
       </div>
       <div class="task-actions">
         <button class="icon-button focus-button" type="button" data-action="focus" aria-label="Start focus timer for ${escapeHTML(task.title)}" title="Start a focus timer for this task">${icon('timer')}</button>

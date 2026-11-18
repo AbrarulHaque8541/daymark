@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-18T09:00:00Z (Cycle B: due-label titles)](./CURRENT_STATUS_20261118T090000Z.md)
+
 - [Daymark engineering status — 2026-11-18T04:10:00Z (Cycle A: complete button and priority titles)](./CURRENT_STATUS_20261118T041000Z.md)
 
 - [Daymark engineering status — 2026-11-18T03:10:00Z (Cycle B: task action titles)](./CURRENT_STATUS_20261118T031000Z.md)
