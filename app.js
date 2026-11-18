@@ -750,7 +750,7 @@
     $('#stat-streak').textContent = String(streak);
     const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
     suggestionList.innerHTML = suggestions.length
-      ? suggestions.map(({ task, reason }, index) => `<button type="button" class="suggestion-item" data-suggestion-task="${escapeHTML(task.id)}" aria-label="Highlight task: ${escapeHTML(task.title)}"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></button>`).join('')
+      ? suggestions.map(({ task, reason }, index) => `<button type="button" class="suggestion-item" data-suggestion-task="${escapeHTML(task.id)}" aria-label="Highlight task: ${escapeHTML(task.title)}" title="Highlight this suggested task"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></button>`).join('')
       : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
     renderFocus();
     renderFeed();
@@ -1040,9 +1040,9 @@
       return;
     }
     list.innerHTML = state.editSubtasks.map((subtask, index) => `<div class="subtask-row${subtask.done ? ' is-done' : ''}">
-      <button class="subtask-check" type="button" data-subtask-toggle="${index}" aria-pressed="${subtask.done}" aria-label="Mark “${escapeHTML(subtask.title)}” ${subtask.done ? 'incomplete' : 'complete'}">${icon('check')}</button>
+      <button class="subtask-check" type="button" data-subtask-toggle="${index}" aria-pressed="${subtask.done}" aria-label="Mark “${escapeHTML(subtask.title)}” ${subtask.done ? 'incomplete' : 'complete'}" title="Toggle this step complete">${icon('check')}</button>
       <span class="subtask-title">${escapeHTML(subtask.title)}</span>
-      <button class="subtask-remove" type="button" data-subtask-remove="${index}" aria-label="Remove step “${escapeHTML(subtask.title)}”">×</button>
+      <button class="subtask-remove" type="button" data-subtask-remove="${index}" aria-label="Remove step “${escapeHTML(subtask.title)}”" title="Remove this step">×</button>
     </div>`).join('');
   }
 
