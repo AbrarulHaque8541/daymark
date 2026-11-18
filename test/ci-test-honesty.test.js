@@ -17,11 +17,27 @@ function spawnDetails(result) {
   return `status=${result.status}, signal=${result.signal || "none"}, error=${error}`;
 }
 
+// A fixture that satisfies every rule the honesty guard enforces: real host
+// checks, no vacuous unit-test task, source checks before signing, and a Gradle
+// build that verifies the merged manifest after the assemble and bundle tasks.
+const cleanGradleBuild = [
+  'val verifyMergedManifests by tasks.registering {',
+  '    doLast {',
+  '        val script = file("tools/check-merged-manifests.py")',
+  '    }',
+  '}',
+  'tasks.matching { it.name.startsWith("assemble") }.configureEach {',
+  '    finalizedBy(verifyMergedManifests)',
+  '}',
+  '',
+].join("\n");
+
 const cleanWorkflows = {
   ".github/workflows/android.yml": "run: sh ./tools/check-v1-source.sh\n",
   ".github/workflows/android-production-release.yml":
     "run: sh ./tools/check-v1-source.sh\nKEYSTORE_BASE64: configured-secret\n",
   ".github/workflows/android-release-assets.yml": "run: npm test\n",
+  "android-app/app/build.gradle.kts": cleanGradleBuild,
 };
 
 function runGuard(overrides = {}) {
@@ -60,6 +76,29 @@ test("CI honesty guard rejects vacuous Gradle unit-test tasks in any workflow", 
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /android-release-assets\.yml:1: vacuous unit-test task reference/);
+});
+
+test("CI honesty guard rejects a build that never verifies the merged manifest", () => {
+  const result = runGuard({
+    "android-app/app/build.gradle.kts": "plugins { id(\"com.android.application\") }\n",
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr,
+    /android-app\/app\/build\.gradle\.kts: missing the verifyMergedManifests task/);
+});
+
+test("CI honesty guard rejects a merged-manifest check that is not run after the build", () => {
+  const result = runGuard({
+    "android-app/app/build.gradle.kts": [
+      'val verifyMergedManifests by tasks.registering {',
+      '    doLast { val script = file("tools/check-merged-manifests.py") }',
+      '}',
+      '',
+    ].join("\n"),
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr,
+    /must be finalized after the assemble and bundle tasks/);
 });
 
 test("CI honesty guard requires main host checks and production checks before signing", () => {

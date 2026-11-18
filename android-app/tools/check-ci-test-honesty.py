@@ -42,6 +42,32 @@ if main_ci.exists():
     if "check-v1-source.sh" not in text:
         failures.append("android.yml: missing check-v1-source.sh host regression checks")
 
+# The merged manifest is the real permission and cleartext set of the built
+# artifact, and it only exists after Gradle has produced it. The host source
+# guard runs before the build, so inside check-v1-source.sh the merged-manifest
+# assertions are silently skipped while the manifest architecture policy is
+# still reported as verified. The Gradle build therefore verifies the merged
+# manifest after every assemble and bundle task, which covers every workflow
+# that produces an artifact. Require that wiring so the coverage cannot be
+# silently removed.
+app_gradle = root / "android-app" / "app" / "build.gradle.kts"
+if app_gradle.exists():
+    gradle_text = app_gradle.read_text(encoding="utf-8")
+    if "verifyMergedManifests" not in gradle_text:
+        failures.append(
+            "android-app/app/build.gradle.kts: missing the verifyMergedManifests task"
+        )
+    if "finalizedBy(verifyMergedManifests)" not in gradle_text:
+        failures.append(
+            "android-app/app/build.gradle.kts: the merged-manifest verification must be "
+            "finalized after the assemble and bundle tasks"
+        )
+    if "check-merged-manifests.py" not in gradle_text:
+        failures.append(
+            "android-app/app/build.gradle.kts: the merged-manifest verification must use "
+            "tools/check-merged-manifests.py"
+        )
+
 if failures:
     for f in failures:
         print(f"FAIL: {f}", file=sys.stderr)

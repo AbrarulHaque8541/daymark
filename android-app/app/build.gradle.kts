@@ -98,6 +98,81 @@ android {
     }
 }
 
+/**
+ * Verifies the merged Android manifest of every variant this build produced.
+ *
+ * The merged manifest is the real permission and cleartext set of the built
+ * artifact, not the source manifests. It only exists after Gradle has run, so
+ * it is verified here rather than in the host source guard: that guard runs
+ * before the build and can therefore only ever skip the merged assertions
+ * while still reporting the manifest architecture policy as verified.
+ *
+ * The same repository script backs the host guard, so the expected permission
+ * and cleartext sets have exactly one source of truth.
+ */
+val verifyMergedManifests by tasks.registering {
+    group = "verification"
+    description = "Verifies the merged Android manifest of the variants this build produced."
+    doLast {
+        val mergedManifests = file("build/intermediates/merged_manifest")
+        if (!mergedManifests.isDirectory) {
+            logger.lifecycle("Merged manifest verification skipped: this build produced no merged manifest.")
+            return@doLast
+        }
+        val script = rootProject.file("tools/check-merged-manifests.py")
+        if (!script.isFile) {
+            throw GradleException(
+                "Merged manifest verification failed: tools/check-merged-manifests.py is missing."
+            )
+        }
+        val interpreter = sequenceOf("python3", "python").firstOrNull { candidate ->
+            try {
+                ProcessBuilder(candidate, "--version").redirectErrorStream(true).start().waitFor() == 0
+            } catch (ignored: Exception) {
+                false
+            }
+        }
+        if (interpreter == null) {
+            // Not fatal: a developer machine without Python still gets a working build,
+            // and the host source guard still checks the source manifests. CI runners
+            // always provide an interpreter, so this never weakens CI.
+            logger.lifecycle("Merged manifest verification skipped: no Python interpreter is available.")
+            return@doLast
+        }
+        // Verify only the variants this build actually produced. A stale merged manifest
+        // left behind by an earlier or aborted build must never be checked against the
+        // current source, or a local build could fail for a reason that no longer exists.
+        val builtVariants = project.gradle.taskGraph.allTasks
+            .filter { it.name.startsWith("process") && it.name.endsWith("MainManifest") }
+            .map { it.name.removePrefix("process").removeSuffix("MainManifest") }
+            .map { it.replaceFirstChar { first -> first.lowercaseChar() } }
+            .distinct()
+            .sorted()
+        val process = ProcessBuilder(
+            interpreter,
+            script.absolutePath,
+            rootProject.projectDir.absolutePath,
+            "--variants",
+            builtVariants.joinToString(",")
+        ).redirectErrorStream(true).start()
+        // Read the whole stream before waiting so a large output cannot deadlock the pipe,
+        // then surface it in the build log so the verification is auditable in CI.
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        val exitCode = process.waitFor()
+        if (output.isNotBlank()) logger.lifecycle(output.trim())
+        if (exitCode != 0) {
+            throw GradleException(
+                "Merged manifest verification failed with exit code $exitCode. The built " +
+                "artifact does not match the expected permission and cleartext policy."
+            )
+        }
+    }
+}
+
+tasks.matching { it.name.startsWith("assemble") || it.name.startsWith("bundle") }.configureEach {
+    finalizedBy(verifyMergedManifests)
+}
+
 gradle.taskGraph.whenReady {
     val hasReleaseAssembleTask = allTasks.any { task ->
         task.name.contains("Release", ignoreCase = true) &&
