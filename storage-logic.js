@@ -137,6 +137,12 @@
       keys: ['daymark.telegram.lastChat.v1']
     },
     {
+      id: 'country-preference',
+      label: 'Country glance preference',
+      description: 'The last country name remembered for the country glance card so common lookups return on the next visit. Nothing else from the lookup is stored.',
+      keys: ['daymark.country.lastQuery.v1']
+    },
+    {
       id: 'webhook-lock',
       label: 'Legacy webhook coordination lock',
       description: 'A short-lived localStorage marker from older webhook versions. Newer versions use browser Web Locks; any leftover marker is safe to clear.',
