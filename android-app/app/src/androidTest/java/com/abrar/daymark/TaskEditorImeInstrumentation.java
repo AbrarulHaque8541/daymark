@@ -289,6 +289,8 @@ final class TaskEditorImeInstrumentation {
             Log.i(TAG, "No software keyboard on this runner; IME-viewport assertions skipped.");
         } else {
             require(imeBounds.height() >= 100, "the software keyboard is visible and consumes viewport height", assertions);
+            require(isRectOnScreen(instrumentation, imeBounds),
+                    "the visible software keyboard rectangle is contained within the device screen", assertions);
         }
 
         root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
@@ -605,6 +607,18 @@ final class TaskEditorImeInstrumentation {
         require(!Rect.intersects(bounds, imeBounds), label + " is not covered by the IME", assertions);
     }
 
+    private static boolean isRectOnScreen(Instrumentation instrumentation, Rect bounds) {
+        if (bounds == null || bounds.isEmpty() || bounds.left < 0 || bounds.top < 0) return false;
+        WindowManager manager = (WindowManager) instrumentation.getTargetContext()
+                .getSystemService(Context.WINDOW_SERVICE);
+        Display display = manager == null ? null : manager.getDefaultDisplay();
+        if (display == null) return false;
+        DisplayMetrics metrics = new DisplayMetrics();
+        display.getRealMetrics(metrics);
+        return metrics.widthPixels > 0 && metrics.heightPixels > 0
+                && bounds.right <= metrics.widthPixels && bounds.bottom <= metrics.heightPixels;
+    }
+
     private static void tapDialogAction(Instrumentation instrumentation, MainActivity activity,
                                         String dialogTitle, String viewId, String label, int[] assertions,
                                         UiTrace trace)
@@ -821,15 +835,14 @@ final class TaskEditorImeInstrumentation {
     private static void awaitImeHidden(Instrumentation instrumentation) throws Exception {
         long deadline = SystemClock.uptimeMillis() + WAIT_MS;
         while (SystemClock.uptimeMillis() < deadline) {
-            boolean shown = false;
+            boolean imeWindowRemains = false;
             for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
                 if (window.getType() == AccessibilityWindowInfo.TYPE_INPUT_METHOD) {
-                    Rect bounds = new Rect();
-                    window.getBoundsInScreen(bounds);
-                    shown |= !bounds.isEmpty();
+                    imeWindowRemains = true;
+                    break;
                 }
             }
-            if (!shown) return;
+            if (!imeWindowRemains) return;
             SystemClock.sleep(50L);
         }
         throw new AssertionError("The software keyboard did not hide after dismissing the task editor.");

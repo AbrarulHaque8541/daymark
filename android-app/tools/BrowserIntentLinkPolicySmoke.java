@@ -101,6 +101,9 @@ public final class BrowserIntentLinkPolicySmoke {
                 "malicious address-bar Intent component and arbitrary extra rejected");
         expectFailure("intent://example.com/path#Intent;scheme=https;launchFlags=0x00000003;end",
                 "address-bar Intent URI read/write grant flags rejected");
+        expectFailure("intent://scan/#Intent;scheme=mailto;component=com.evil/.PrivateActivity;"
+                        + "launchFlags=0x00000003;end",
+                "malicious component plus URI read/write-grant flags rejected");
         expectFailure("intent://scan/#Intent;scheme=mailto;SEL;end",
                 "selectors and bare Intent flags rejected");
         expectFailure("intent://scan/#Intent;scheme=mailto;launchFlags=0x10000000;end",
