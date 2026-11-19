@@ -2184,6 +2184,23 @@
     renderFocus();
     render();
     const saved = await persistFocusState(epoch.value);
+    // Brief success flash on the focus state label (accent #16705f, reduced-motion safe).
+    if (completed && typeof document !== 'undefined') {
+      const labelEl = document.getElementById('focus-state-label');
+      if (labelEl) {
+        labelEl.classList.add('is-success');
+        const previous = labelEl.textContent;
+        labelEl.textContent = 'Complete';
+        if (typeof setTimeout === 'function') {
+          setTimeout(() => {
+            if (labelEl) {
+              labelEl.classList.remove('is-success');
+              if (labelEl.textContent === 'Complete') labelEl.textContent = previous || 'Ready';
+            }
+          }, 1400);
+        }
+      }
+    }
     // Brief completion title so the tab shows success even if the user is in another window.
     // Cleared after a short delay so it does not linger. Guarded for tests.
     if (completed && typeof document !== 'undefined' && document.title != null) {

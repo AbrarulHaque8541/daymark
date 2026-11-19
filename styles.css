@@ -1185,3 +1185,25 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     transform: none;
   }
 }
+
+/* Cycle A 2026-11-19: focus timer completion success flash (accent #16705f).
+   Reduced-motion safe; no new network or storage. */
+#focus-state-label.is-success {
+  color: var(--accent);
+  font-weight: 800;
+  animation: focus-complete-flash 1.2s ease-out;
+}
+@keyframes focus-complete-flash {
+  0% { opacity: 0.6; text-shadow: 0 0 0 transparent; }
+  40% { opacity: 1; text-shadow: 0 0 8px rgba(22, 112, 95, 0.35); }
+  100% { opacity: 1; text-shadow: 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #focus-state-label.is-success { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  #focus-state-label.is-success {
+    color: #6fae9b;
+    text-shadow: none;
+  }
+}
