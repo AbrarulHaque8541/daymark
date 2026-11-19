@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-19T14:00:00Z (Cycle A: icon-button press feedback)](./CURRENT_STATUS_20261119T140000Z.md)
+
 - [Daymark engineering status — 2026-11-19T10:45:00Z (Cycle B: moon phase success flash)](./CURRENT_STATUS_20261119T104500Z.md)
 
 - [Daymark engineering status — 2026-11-19T07:45:00Z (Cycle B: potd press feedback + success flash)](./CURRENT_STATUS_20261119T074500Z.md)
