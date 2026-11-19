@@ -1249,3 +1249,10 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     color: var(--accent-bright);
   }
 }
+
+/* POTD image glass styling and error fallback (accent #16705f). Reduced-motion safe. */
+#potd-result img { display: block; max-width: 100%; height: auto; border-radius: 12px; object-fit: cover; border: 1px solid rgba(22, 112, 95, 0.18); background: rgba(226, 240, 235, 0.4); }
+.potd-image-error { display: block; padding: 12px; border: 1px dashed rgba(22, 112, 95, 0.35); border-radius: 12px; background: rgba(226, 240, 235, 0.35); color: var(--muted-text); font-size: 11px; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  .potd-image-error { background: rgba(26, 58, 50, 0.35); border-color: rgba(42, 143, 122, 0.4); }
+}
