@@ -99,8 +99,8 @@ function makeDoc() {
     addEventListener() {}
   };
 }
-function fixtureResponse() {
-  return okResponse(JSON.stringify({
+function fixturePayload() {
+  return {
     image: {
       title: 'File:Harbour example.jpg',
       description: { text: 'A harbour at dusk' },
@@ -110,7 +110,10 @@ function fixtureResponse() {
       image: { source: 'https://upload.wikimedia.org/wikipedia/commons/harbour.jpg', width: 1200, height: 800 },
       thumbnail: { source: 'https://upload.wikimedia.org/wikipedia/commons/thumb/harbour.jpg', width: 320, height: 213 }
     }
-  }));
+  };
+}
+function fixtureResponse(payload) {
+  return okResponse(JSON.stringify(payload || fixturePayload()));
 }
 function environment(doc, fetchImpl) {
   return {
@@ -165,9 +168,34 @@ test('Check with an empty field fetches today and renders the credited image', a
   const image = result.children[0];
   assert.strictEqual(image.tagName, 'img');
   assert.strictEqual(image.attrs.src, 'https://upload.wikimedia.org/wikipedia/commons/thumb/harbour.jpg');
+  assert.strictEqual(image.attrs.width, '320', 'reserve the rendered thumbnail width before lazy loading');
+  assert.strictEqual(image.attrs.height, '213', 'reserve the rendered thumbnail height before lazy loading');
   assert.strictEqual(image.attrs.loading, 'lazy');
   assert.strictEqual(image.attrs.referrerpolicy, 'no-referrer');
   assert.ok(image.attrs.alt.indexOf('Harbour example.jpg') !== -1, 'expected the title in the alt text');
+});
+test('a full-size fallback reserves full-image dimensions when no thumbnail exists', async () => {
+  const doc = makeDoc();
+  const payload = fixturePayload();
+  delete payload.image.thumbnail;
+  const controls = ui.attachPotdUi(environment(doc, () => Promise.resolve(fixtureResponse(payload))));
+  await controls.onCheck();
+  const image = doc.getElementById('potd-result').children[0];
+  assert.strictEqual(image.attrs.src, 'https://upload.wikimedia.org/wikipedia/commons/harbour.jpg');
+  assert.strictEqual(image.attrs.width, '1200');
+  assert.strictEqual(image.attrs.height, '800');
+});
+test('invalid thumbnail dimensions are omitted instead of reserving a false ratio', async () => {
+  const doc = makeDoc();
+  const payload = fixturePayload();
+  payload.image.thumbnail.width = 0;
+  payload.image.thumbnail.height = 'unknown';
+  const controls = ui.attachPotdUi(environment(doc, () => Promise.resolve(fixtureResponse(payload))));
+  await controls.onCheck();
+  const image = doc.getElementById('potd-result').children[0];
+  assert.strictEqual(image.attrs.src, 'https://upload.wikimedia.org/wikipedia/commons/thumb/harbour.jpg');
+  assert.strictEqual(image.attrs.width, undefined);
+  assert.strictEqual(image.attrs.height, undefined);
 });
 test('the rendered card credits the photographer, license and file page', async () => {
   const doc = makeDoc();

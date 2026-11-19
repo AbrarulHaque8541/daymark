@@ -91,7 +91,8 @@
     if (!imageUrl && !thumbUrl) {
       throw new Error('No readable picture of the day came back for that date.');
     }
-    const source = (imageUrl ? full : thumb) || {};
+    // Match the dimensions to the source the UI prefers to render.
+    const source = (thumbUrl ? thumb : full) || {};
     let rawTitle = typeof potd.title === 'string' ? potd.title : '';
     if (rawTitle.indexOf('File:') === 0) rawTitle = rawTitle.slice(5);
     const title = cleanText(rawTitle, MAX_TITLE_CHARS) || '';

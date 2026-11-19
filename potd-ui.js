@@ -139,6 +139,11 @@
           : 'Picture of the day for ' + dateLabel + ' from Wikimedia');
         image.setAttribute('loading', 'lazy');
         image.setAttribute('referrerpolicy', 'no-referrer');
+        if (Number.isInteger(picture.width) && picture.width > 0
+          && Number.isInteger(picture.height) && picture.height > 0) {
+          image.setAttribute('width', String(picture.width));
+          image.setAttribute('height', String(picture.height));
+        }
       }
       resultEl.appendChild(image);
       const parts = [];

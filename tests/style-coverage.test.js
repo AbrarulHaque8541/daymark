@@ -48,6 +48,11 @@ test('currency form keeps From, swap and To on one row', () => {
     'swap must be centered between the two selects');
 });
 
+test('Picture of the Day image reserves its ratio and fits the card width', () => {
+  assert.ok(css.includes('#potd-result img { display: block; max-width: 100%; height: auto; }'),
+    'POTD image should stay responsive without losing its reserved intrinsic ratio');
+});
+
 test('edit dialog is named by its visible heading', () => {
   const dialog = markup.match(/<dialog\b[^>]*id="edit-dialog"[^>]*>/);
   assert.ok(dialog, 'edit task dialog is present');
