@@ -69,6 +69,8 @@ tests/moon-ui.test.js
 tests/nightly-placeholder-guard.test.js
 tests/onthisday-logic.test.js
 tests/onthisday-ui.test.js
+tests/potd-logic.test.js
+tests/potd-ui.test.js
 tests/permission-lifecycle-logic.test.js
 tests/permission-lifecycle-ui.test.js
 tests/node-test-registration-guard.test.js
