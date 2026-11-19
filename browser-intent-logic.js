@@ -7,7 +7,7 @@
  * BrowserExternalLinkPolicy / BrowserIntentLinkPolicy source guards)
  * and explains, in plain words, what would happen if the user followed
  * it: a normal web navigation, a user-triggered handoff to another app
- * (mailto/tel/sms/geo), an Android intent:// URI with
+ * (mailto/tel/sms/geo/tg/market/whatsapp), an Android intent:// URI with
  * its package, fallback URL and chooser behavior, a blocked scheme, or
  * an honest refusal for anything this prototype cannot prove.
  *
@@ -24,13 +24,13 @@
   const MAX_ECHO_CHARS = 160;
 
   const WEB_SCHEMES = ['http', 'https'];
-  const EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms', 'geo'];
+  const EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms', 'geo', 'tg', 'market', 'whatsapp'];
   const INTENT_SCHEME = 'intent';
   // Schemes that must never be treated as navigation or handoff targets.
   const BLOCKED_SCHEMES = [
     'javascript', 'data', 'vbscript', 'file', 'blob', 'about', 'chrome',
-    'chrome-extension', 'market', 'view-source', 'ws', 'wss', 'ftp', 'ftps',
-    'gopher', 'content', 'tg', 'telegram', 'smsto', 'whatsapp', 'viber',
+    'chrome-extension', 'view-source', 'ws', 'wss', 'ftp', 'ftps',
+    'gopher', 'content', 'telegram', 'smsto', 'viber',
     'spotify', 'youtube', 'chatgpt', 'instagram', 'android-app'
   ];
 
@@ -77,7 +77,7 @@
   const INTENT_METADATA_KEYS = [
     'scheme', 'package', 'action', 'category', 'S.browser_fallback_url'
   ];
-  const INTENT_EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms', 'geo'];
+  const INTENT_EXTERNAL_SCHEMES = ['mailto', 'tel', 'sms', 'geo', 'tg', 'market', 'whatsapp'];
   const INTENT_SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]{0,63}$/;
   const INTENT_PACKAGE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/;
 

@@ -2,7 +2,7 @@ package com.abrar.daymark;
 
 public final class BrowserExternalLinkPolicySmoke {
     public static void main(String[] args) {
-        for (String scheme : new String[]{"mailto", "tel", "sms", "geo"}) {
+        for (String scheme : new String[]{"mailto", "tel", "sms", "geo", "tg", "market", "whatsapp"}) {
             check(BrowserUriRoutingPolicy.routeForScheme(scheme)
                             == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION,
                     scheme + " is an owner-approved Android handoff");
@@ -12,8 +12,8 @@ public final class BrowserExternalLinkPolicySmoke {
                     scheme + " requires explicit handoff confirmation");
         }
 
-        for (String scheme : new String[]{"tg", "market", "whatsapp", "telegram", "smsto",
-                "viber", "spotify", "youtube", "chatgpt", "instagram", "android-app", "TG"}) {
+        for (String scheme : new String[]{"telegram", "smsto", "viber", "spotify", "youtube",
+                "chatgpt", "instagram", "android-app"}) {
             check(BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW,
                     scheme + " is not an approved Android handoff and stays in Daymark WebView");
             check(!BrowserAddress.shouldHandOffExternalScheme(true, true, scheme),
@@ -67,7 +67,7 @@ public final class BrowserExternalLinkPolicySmoke {
                         == BrowserUriRoutingPolicy.Route.INTERNAL,
                 "Daymark's media-download callback remains internal");
 
-        for (String scheme : new String[]{"tg", "mailto", "tel", "sms", "geo", "custom+scheme",
+        for (String scheme : new String[]{"tg", "market", "whatsapp", "mailto", "tel", "sms", "geo", "custom+scheme",
                 "vbscript", "chrome", "chrome-extension", "devtools", "view-source"}) {
             check(!BrowserAddress.shouldHandOffExternalScheme(false, true, scheme),
                     "subframe " + scheme + " cannot trigger an Android chooser");
