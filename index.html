@@ -256,8 +256,8 @@
           <form id="feed-form" class="feed-form" novalidate>
             <label class="sr-only" for="feed-url">Feed URL (RSS or Atom)</label>
             <input id="feed-url" name="feedUrl" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" autocomplete="off" required>
-            <button class="button button-primary feed-refresh" id="feed-refresh" type="submit">Refresh</button>
-            <button class="button button-quiet feed-clear" id="feed-clear" type="button">Clear</button>
+            <button class="button button-primary feed-refresh" id="feed-refresh" type="submit" title="Refresh the feed">Refresh</button>
+            <button class="button button-quiet feed-clear" id="feed-clear" type="button" title="Clear the feed">Clear</button>
           </form>
           <p class="feed-status" id="feed-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="feed-list" aria-live="polite"></div>
@@ -269,8 +269,8 @@
           <form id="weather-form" class="feed-form" novalidate>
             <label class="sr-only" for="weather-place">Place name</label>
             <input id="weather-place" name="place" type="text" maxlength="80" placeholder="City, e.g. Kolkata" autocomplete="off">
-            <button class="button button-primary weather-refresh" id="weather-refresh" type="button">Refresh</button>
-            <button class="button button-quiet weather-clear" id="weather-clear" type="button">Clear</button>
+            <button class="button button-primary weather-refresh" id="weather-refresh" type="button" title="Refresh weather">Refresh</button>
+            <button class="button button-quiet weather-clear" id="weather-clear" type="button" title="Clear weather">Clear</button>
           </form>
           <p class="weather-status" id="weather-status" role="status" aria-live="polite"></p>
           <div class="weather-now" id="weather-now" aria-live="polite"></div>
@@ -299,8 +299,8 @@
               <option value="ZA">ZA — South Africa</option>
               <option value="NZ">NZ — New Zealand</option>
             </select>
-            <button class="button button-primary" id="holiday-refresh" type="submit">Refresh</button>
-            <button class="button button-quiet" id="holiday-clear" type="button">Clear</button>
+            <button class="button button-primary" id="holiday-refresh" type="submit" title="Refresh holidays">Refresh</button>
+            <button class="button button-quiet" id="holiday-clear" type="button" title="Clear holidays">Clear</button>
           </form>
           <p class="feed-status" id="holiday-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="holiday-list" aria-live="polite"></div>
@@ -336,9 +336,9 @@
               <option value="CNY">CNY</option>
               <option value="SGD">SGD</option>
             </select>
-            <button class="button button-primary" id="currency-refresh" type="submit">Refresh</button>
-            <button class="button button-quiet" id="currency-clear" type="button">Clear</button>
-            <button class="button button-quiet" id="currency-copy" type="button" aria-label="Copy currency result to clipboard">Copy result</button>
+            <button class="button button-primary" id="currency-refresh" type="submit" title="Refresh currency rates">Refresh</button>
+            <button class="button button-quiet" id="currency-clear" type="button" title="Clear currency">Clear</button>
+            <button class="button button-quiet" id="currency-copy" type="button" title="Copy currency result" aria-label="Copy currency result to clipboard">Copy result</button>
           </form>
           <p class="feed-status" id="currency-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="currency-list" aria-live="polite"></div>
@@ -362,9 +362,9 @@
               <option value="Australia/Sydney">Australia · Sydney (AEST/AEDT)</option>
               <option value="Pacific/Auckland">New Zealand · Auckland (NZST/NZDT)</option>
             </select>
-            <button class="button button-primary" id="zones-add" type="submit">Add</button>
-            <button class="button button-quiet" id="zones-refresh" type="button">Refresh</button>
-            <button class="button button-quiet" id="zones-clear" type="button">Clear</button>
+            <button class="button button-primary" id="zones-add" type="submit" title="Add a timezone">Add</button>
+            <button class="button button-quiet" id="zones-refresh" type="button" title="Refresh world clocks">Refresh</button>
+            <button class="button button-quiet" id="zones-clear" type="button" title="Clear world clocks">Clear</button>
             <button class="button button-quiet" id="zones-copy" type="button" aria-label="Copy world clock and overlap summary to clipboard">Copy overlap</button>
             <button class="button button-quiet" id="zones-share" type="button" aria-label="Share world clock and overlap summary">Share overlap</button>
             <button class="button button-quiet" id="zones-save" type="button" aria-label="Save world clock and overlap summary as a local text file">Save as text</button>
