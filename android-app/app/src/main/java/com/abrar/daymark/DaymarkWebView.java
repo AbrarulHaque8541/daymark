@@ -68,6 +68,11 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         final BrowserIntentLinkPolicy.Decision decision;
         try {
             decision = BrowserIntentLinkPolicy.parse(value);
+        } catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported) {
+            android.widget.Toast.makeText(view.getContext(),
+                    "This Android app link uses an unsupported target scheme. Nothing was opened.",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return true;
         } catch (IllegalArgumentException invalid) {
             android.widget.Toast.makeText(view.getContext(),
                     "This Android app link was not opened: its target or Intent data is unsupported or unsafe.",

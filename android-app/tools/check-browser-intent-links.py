@@ -43,6 +43,9 @@ assert "BrowserIntentLinkPolicy.parse(value)" in webview
 assert "BrowserUriHandoff.createBrowsableViewIntent(" in webview
 assert "BrowserUriHandoff.confirmAndOpen(" in webview
 intent_handler = webview.split("private boolean handleIntentLink(WebView view, String value)", 1)[1].split("\n    }", 1)[0]
+assert "catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported)" in intent_handler
+assert "This Android app link uses an unsupported target scheme. Nothing was opened." in intent_handler
+assert "This Android app link was not opened: its target or Intent data is unsupported or unsafe." in intent_handler
 target_guard = "if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme))"
 assert target_guard in intent_handler and "unsupported target scheme. Nothing was opened." in intent_handler, \
     "unsupported resolved target schemes must show a visible refusal"
@@ -64,11 +67,25 @@ assert '"This Android app link uses an unsupported target scheme. Nothing was op
 # Typed intent confirmation path may live in WebView after routing changes; core guards remain in WebView.
 if "INTENT_CONFIRMATION" in activity:
     typed_intent = activity.split("if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION)", 1)[1]
-    typed_intent = typed_intent.split("final String webAddress", 1)[0]
+    typed_intent = typed_intent.split("if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION)", 1)[0]
     typed_target_guard = "BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())"
-    assert typed_target_guard in typed_intent and "unsupported target scheme. Nothing was opened." in typed_intent \
-        and typed_intent.index(typed_target_guard) < typed_intent.index("BrowserUriHandoff.createBrowsableViewIntent("), \
-        "typed intent targets must be visibly rejected before Android handoff"
+    assert "BrowserIntentLinkPolicy.parse(webAddress)" in typed_intent, \
+        "typed intent addresses must use the shared strict metadata parser"
+    assert "Intent.parseUri(" not in typed_intent, \
+        "typed intent addresses must not invoke Android's permissive serialized-Intent parser"
+    assert "catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported)" in typed_intent \
+        and "This Android app link uses an unsupported target scheme. Nothing was opened." in typed_intent, \
+        "typed unsupported targets must have a visible refusal"
+    assert "This Android app link was blocked because its Intent data is unsafe. Nothing was opened." in typed_intent, \
+        "typed unsafe metadata must have a visible refusal"
+    assert typed_target_guard in typed_intent and typed_intent.index(typed_target_guard) \
+        < typed_intent.index("BrowserUriHandoff.createBrowsableViewIntent("), \
+        "typed intent target validation must precede any Android handoff"
+    assert "Uri.parse(decision.targetUri)" in typed_intent \
+        and "BrowserUriHandoff.createBrowsableViewIntent(\n                    target, decision.packageName)" in typed_intent, \
+        "typed handoff must be rebuilt only from the sanitized URI and validated package"
+    assert "BrowserUriHandoff.confirmAndOpen(this, external, decision.targetUri, null)" in typed_intent, \
+        "typed confirmation must show the resolved destination, not serialized metadata"
 else:
     print("NOTE: INTENT_CONFIRMATION path not in MainActivity (expected after routing updates); WebView guards verified above")
 assert "BrowserUriRoutingPolicy.routeForScheme(scheme)" in webview
