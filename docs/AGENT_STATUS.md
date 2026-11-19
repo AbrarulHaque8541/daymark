@@ -68,6 +68,8 @@
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 
 # Agent status index
+- [CURRENT_STATUS_20261119T121713Z.md](./CURRENT_STATUS_20261119T121713Z.md) — main `8def610b`; PR #816 merged with 6/6 exact-head checks passing. PR #815 head `4f65143d` has 7 checks passed and 7 in progress. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261119T121202Z.md](./CURRENT_STATUS_20261119T121202Z.md) — Historical 12:12Z snapshot for superseded PR #815 head `f44e816c`; its API 36 failure was superseded by head `4f65143d`. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261119T074500Z.md](./CURRENT_STATUS_20261119T074500Z.md) — Cycle B: potd glass press feedback + status success flash. Physical device NOT TESTED.
 
 - [CURRENT_STATUS_20261119T043600Z.md](./CURRENT_STATUS_20261119T043600Z.md) — Cycle A: main clean after CI manifest verification, no open incomplete work. Physical device NOT TESTED.
