@@ -12,13 +12,16 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Display;
 import android.view.InputDevice;
 import android.view.InputEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -123,7 +126,7 @@ final class TaskEditorImeInstrumentation {
             byte[] storageBeforeCancel = encryptedTaskStorageSnapshot(activity);
 
             openEditor(instrumentation, activity, assertions, trace);
-            exerciseImeActions(instrumentation, cancelledTitle, assertions, trace);
+            exerciseImeActions(instrumentation, activity, cancelledTitle, assertions, trace);
             tapDialogAction(instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", assertions, trace);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
             awaitImeHidden(instrumentation);
@@ -133,7 +136,7 @@ final class TaskEditorImeInstrumentation {
                     "Cancel closes the editor without creating the typed task", assertions);
 
             openEditor(instrumentation, activity, assertions, trace);
-            exerciseImeActions(instrumentation, savedTitle, assertions, trace);
+            exerciseImeActions(instrumentation, activity, savedTitle, assertions, trace);
             savedTaskMayExist = true;
             tapDialogAction(instrumentation, activity, EDITOR_TITLE, "android:id/button1", "Add task", assertions, trace);
             awaitDialogGone(instrumentation, EDITOR_TITLE);
@@ -261,7 +264,7 @@ final class TaskEditorImeInstrumentation {
         trace.record("open.canonicalDialogRootReady");
     }
 
-    private static void exerciseImeActions(Instrumentation instrumentation,
+    private static void exerciseImeActions(Instrumentation instrumentation, MainActivity activity,
                                            String title, int[] assertions, UiTrace trace)
             throws Exception {
         AccessibilityNodeInfo root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
@@ -293,9 +296,22 @@ final class TaskEditorImeInstrumentation {
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
         // The editor is an AlertDialog with its own window; Activity.getCurrentFocus() may not
-        // identify the IME's window token. Request system Back and verify the IME window is gone
-        // before probing the dialog footer or comparing bounds that may have changed with layout.
+        // identify the IME's window token. Check footer geometry against the live IME while shown,
+        // then request system Back and re-query the footer after the IME window is gone.
         if (imeBounds != null) {
+            trace.record("exercise.beforeImeVisibleFooterWait");
+            AccessibilityNodeInfo cancelWhileIme = awaitDialogButton(
+                    instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", trace);
+            AccessibilityNodeInfo addWhileIme = awaitDialogButton(
+                    instrumentation, activity, EDITOR_TITLE, "android:id/button1", "Add task", trace);
+            Rect visibleImeBounds = findImeBounds(instrumentation);
+            require(visibleImeBounds != null,
+                    "the software keyboard remains visible while checking dialog footer bounds", assertions);
+            if (visibleImeBounds != null) {
+                checkVisibleAboveIme(instrumentation, cancelWhileIme, visibleImeBounds, "Cancel", assertions);
+                checkVisibleAboveIme(instrumentation, addWhileIme, visibleImeBounds, "Add task", assertions);
+            }
+            trace.record("exercise.footerTargetsVisibleAboveIme");
             trace.record("exercise.beforeImeDismissRequest");
             requestImeDismissal(instrumentation, assertions);
         }
@@ -569,6 +585,24 @@ final class TaskEditorImeInstrumentation {
         if (value == null) return "none";
         String text = value.toString().replace('\n', ' ').replace('\r', ' ').replace(';', ',');
         return text.length() <= 72 ? text : text.substring(0, 69) + "...";
+    }
+
+    private static void checkVisibleAboveIme(Instrumentation instrumentation, AccessibilityNodeInfo button,
+                                             Rect imeBounds, String label, int[] assertions) {
+        require(button != null, label + " dialog target exists while the IME is shown", assertions);
+        Rect bounds = new Rect();
+        button.getBoundsInScreen(bounds);
+        DisplayMetrics metrics = new DisplayMetrics();
+        WindowManager manager = (WindowManager) instrumentation.getTargetContext()
+                .getSystemService(Context.WINDOW_SERVICE);
+        Display display = manager == null ? null : manager.getDefaultDisplay();
+        if (display != null) display.getRealMetrics(metrics);
+        boolean onScreen = !bounds.isEmpty() && bounds.left >= 0 && bounds.top >= 0
+                && (metrics.widthPixels <= 0 || bounds.right <= metrics.widthPixels)
+                && (metrics.heightPixels <= 0 || bounds.bottom <= metrics.heightPixels);
+        require(button.isVisibleToUser() && onScreen,
+                label + " is visible within the device screen while the IME is shown", assertions);
+        require(!Rect.intersects(bounds, imeBounds), label + " is not covered by the IME", assertions);
     }
 
     private static void tapDialogAction(Instrumentation instrumentation, MainActivity activity,

@@ -1,6 +1,8 @@
+- [Daymark engineering status — 2026-11-19T13:45:40Z (PR #815: d929 exact-head CI diagnosis + IME coverage restoration)](./CURRENT_STATUS_20261119T134540Z.md)
+
 - [Daymark engineering status — 2026-11-19T13:22:56Z (PR #815: verified IME dismissal; two distinct API 36 blockers)](./CURRENT_STATUS_20261119T132256Z.md)
 
-- [Daymark engineering status — 2026-11-19T13:00:00Z (Cycle A: IME dismiss hardening + browser status a11y)](./CURRENT_STATUS_20261119T130000Z.md)
+- [Daymark engineering status — 2026-11-19T13:00:00Z (Cycle A: IME dismiss hardening + browser status a11y)](./CURRENT_STATUS_20261119T130000Z_CYCLEA.md)
 
 - [Daymark engineering status — 2026-11-19T10:45:00Z (Cycle B: moon phase success flash)](./CURRENT_STATUS_20261119T104500Z.md)
 
@@ -72,7 +74,8 @@
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 
 # Agent status index
-- [CURRENT_STATUS_20261119T132256Z.md](./CURRENT_STATUS_20261119T132256Z.md) — The snapshot records the 13:21Z state: `main`/PR #815 base `0aa24edf`; prior remote head `2e92ef1` had 12/14 checks pass, with separate Focus API 36 assertion and Service Worker API 36 dependency-resolution failures. The IME-test fix is now committed as `dd221823b4e878f230b0360f4274ad8cf82a548c` on the PR branch; use the live [PR #815](https://github.com/AbrarulHaque8541/daymark/pull/815) for the exact current head and fresh check state. Local source/core/Node tests PASS; Android instrumentation compile NOT RUN (no SDK path). Fresh exact-head CI and independent review are required; no merge. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261119T134540Z.md](./CURRENT_STATUS_20261119T134540Z.md) — At 13:45:40Z, live PR #815 was at remote head `d929cb56` on base/main `0aa24edf`: 9/14 checks passed and 5 failed on the same missing `activity` symbol at test lines 310/314; the Focus API29/36 assertions did not execute and Service Worker API36 passed. The local candidate fixes the Activity parameter and restores the pre-hide IME bounds checks. Source/core/Node tests PASS; Android-test compilation NOT RUN locally (no SDK path). Its next pushed head requires fresh CI and Watchdog re-review; no merge. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261119T132256Z.md](./CURRENT_STATUS_20261119T132256Z.md) — Historical 13:21Z verification of predecessor remote head `2e92ef1` on base `0aa24edf`: 12/14 checks passed, with the distinct Focus API36 assertion and Service Worker API36 dependency-resolution failures. The snapshot predates the later `dd221823` implementation commit and `d929cb56` status-index commit; it is not current CI evidence. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261119T121713Z.md](./CURRENT_STATUS_20261119T121713Z.md) — Historical 12:17Z snapshot: `main` `8def610b`; PR #816 merged with 6/6 checks. PR #815 was then at superseded head `4f65143d` with 7 checks passed and 7 in progress. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261119T121202Z.md](./CURRENT_STATUS_20261119T121202Z.md) — Historical 12:12Z snapshot for superseded PR #815 head `f44e816c`; its API 36 failure was superseded by head `4f65143d`. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261119T074500Z.md](./CURRENT_STATUS_20261119T074500Z.md) — Cycle B: potd glass press feedback + status success flash. Physical device NOT TESTED.
