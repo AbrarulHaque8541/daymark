@@ -47,7 +47,9 @@ public final class BrowserAddressSmoke {
         for (String address : new String[]{"javascript:alert(1)", "data:text/html,hello",
                 "file:///etc/passwd", "content://com.example/private",
                 "mailto:user@example.com", "tel:+18005550100", "sms:+18005550100",
-                "geo:37.7749,-122.4194", "intent://scan/#Intent;scheme=tg;end",
+                "geo:37.7749,-122.4194", "tg://resolve?domain=example",
+                "market://details?id=com.example.app", "whatsapp://send?text=hello",
+                "intent://scan/#Intent;scheme=tg;end",
                 "ftp://example.com/file"}) {
             assert BrowserAddress.resolveInput(address, BrowserAddress.SearchEngine.DUCKDUCKGO)
                     .equals(address) : "explicit URI scheme must reach route selection: " + address;
@@ -63,17 +65,19 @@ public final class BrowserAddressSmoke {
         for (String address : new String[]{"javascript:alert(1)", "data:text/html,hello",
                 "file:///etc/passwd", "content://com.example/private", "mailto:user@example.com",
                 "tel:+18005550100", "sms:+18005550100", "geo:37.7749,-122.4194",
+                "tg://resolve?domain=example", "market://details?id=com.example.app",
+                "whatsapp://send?text=hello",
                 "intent://scan/#Intent;scheme=tg;end", "ftp://example.com/file"}) {
             assert !BrowserAddress.isAllowedWebUrl(address)
                     : "web-only validation must remain HTTP(S)-strict: " + address;
         }
-        for (String scheme : new String[]{"mailto", "tel", "sms", "geo"}) {
+        for (String scheme : new String[]{"mailto", "tel", "sms", "geo", "tg", "market", "whatsapp"}) {
             assert BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
         }
         for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about",
                 "file", "content", "intent", "daymark-download", "ftp", "custom+scheme",
-                "vbscript", "chrome", "chrome-extension", "devtools", "view-source", "tg", "market",
-                "whatsapp", "telegram", "smsto", "viber", "spotify", "youtube", "chatgpt",
+                "vbscript", "chrome", "chrome-extension", "devtools", "view-source",
+                "telegram", "smsto", "viber", "spotify", "youtube", "chatgpt",
                 "instagram", "android-app",
                 "", "bad scheme", null}) {
             assert !BrowserAddress.shouldHandOffExternalScheme(true, true, scheme) : scheme;
@@ -94,6 +98,12 @@ public final class BrowserAddressSmoke {
         assert BrowserUriRoutingPolicy.routeForScheme("sms")
                 == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
         assert BrowserUriRoutingPolicy.routeForScheme("geo")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("tg")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("market")
+                == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
+        assert BrowserUriRoutingPolicy.routeForScheme("whatsapp")
                 == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION;
         assert BrowserUriRoutingPolicy.routeForScheme("intent")
                 == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION;

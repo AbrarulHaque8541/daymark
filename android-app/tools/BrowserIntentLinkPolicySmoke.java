@@ -74,7 +74,7 @@ public final class BrowserIntentLinkPolicySmoke {
                 "intent://open/#Intent;scheme=mailto;package=com.example.mobile;end");
         check("mailto://open/".equals(packageOnly.targetUri), "approved app scheme is supported");
         check(BrowserIntentLinkPolicy.isSupportedTargetScheme("https"), "HTTPS intent targets are supported");
-        for (String scheme : new String[]{"mailto", "tel", "sms", "geo"}) {
+        for (String scheme : new String[]{"mailto", "tel", "sms", "geo", "tg", "market", "whatsapp"}) {
             check(BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme),
                     scheme + " is an approved app target");
             BrowserIntentLinkPolicy.Decision allowedTarget = BrowserIntentLinkPolicy.parse(
@@ -82,7 +82,7 @@ public final class BrowserIntentLinkPolicySmoke {
             check((scheme + "://open/").equals(allowedTarget.targetUri),
                     scheme + " sanitized Intent target is preserved");
         }
-        for (String scheme : new String[]{"tg", "market", "whatsapp", "telegram", "smsto", "viber",
+        for (String scheme : new String[]{"telegram", "smsto", "viber",
                 "spotify", "youtube", "chatgpt", "instagram", "android-app", "chrome",
                 "chrome-extension", "devtools", "view-source", "vbscript", "zxing", "custom+scheme"}) {
             check(!BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme),
@@ -162,7 +162,7 @@ public final class BrowserIntentLinkPolicySmoke {
                 throw new AssertionError("unknown shared Intent fixture expectation: " + expected);
             }
         }
-        check(accepted == 12 && rejected == 46, "shared Intent fixture must contain all fifty-eight cases");
+        check(accepted == 15 && rejected == 43, "shared Intent fixture must contain all fifty-eight cases");
         System.out.println("PASS shared Android/web Intent URI contract: " + accepted + " accepted, " + rejected + " rejected");
     }
 

@@ -28,13 +28,23 @@ test('embedded credentials in a web link are refused and disclosed', () => {
   assert.ok(!plan.lines.some((line) => line.indexOf('user:secret') !== -1));
 });
 
-test('mailto, tel, sms and geo are explicit user-triggered handoffs', () => {
+test('approved external schemes are explicit user-triggered handoffs', () => {
   for (const scheme of engine.EXTERNAL_SCHEMES) {
     const result = engine.classifyLink(scheme + ':someone');
     assert.equal(result.kind, 'external-handoff', scheme);
     const plan = engine.planIntentHandoff(scheme + ':someone');
     assert.equal(plan.verdict, 'handoff');
     assert.ok(plan.lines.some((line) => line.indexOf('explicit user tap') !== -1));
+  }
+});
+
+test('Android-only planner additions do not widen general web address-bar handoffs', () => {
+  const generalAddress = require('../browser-address-logic.js');
+  assert.deepEqual(generalAddress.EXTERNAL_SCHEMES, ['mailto', 'tel', 'sms']);
+  for (const scheme of ['tg', 'market', 'whatsapp']) {
+    const result = generalAddress.parseAddressInput(scheme + '://open');
+    assert.notEqual(result.kind, 'external', scheme + ' is not a general browser handoff');
+    assert.notEqual(result.kind, 'navigate', scheme + ' is not a general browser navigation');
   }
 });
 
@@ -48,7 +58,7 @@ test('a malformed external handoff fails closed', () => {
 
 test('unapproved app schemes are refused instead of handed off', () => {
   for (const scheme of [
-    'tg', 'market', 'whatsapp', 'telegram', 'smsto', 'viber', 'spotify',
+    'telegram', 'smsto', 'viber', 'spotify',
     'youtube', 'chatgpt', 'instagram', 'android-app'
   ]) {
     const link = scheme + '://open';
@@ -75,9 +85,9 @@ test('a full intent:// URI parses package, scheme and encoded fallback', () => {
 });
 
 test('intent target schemes are limited to HTTP(S) and explicit Android handlers', () => {
-  assert.deepEqual(engine.INTENT_EXTERNAL_SCHEMES, ['mailto', 'tel', 'sms', 'geo']);
+  assert.deepEqual(engine.INTENT_EXTERNAL_SCHEMES, ['mailto', 'tel', 'sms', 'geo', 'tg', 'market', 'whatsapp']);
   for (const scheme of [
-    'tg', 'market', 'whatsapp', 'telegram', 'smsto', 'viber', 'spotify', 'youtube',
+    'telegram', 'smsto', 'viber', 'spotify', 'youtube',
     'chatgpt', 'instagram', 'android-app', 'chrome', 'chrome-extension', 'devtools',
     'view-source', 'vbscript', 'zxing', 'custom+scheme', 'file', 'content', 'javascript',
     'data', 'intent'
@@ -205,8 +215,8 @@ test('shared Android/web Intent URI contract fixture stays in parity', () => {
       assert.ok(!JSON.stringify(plan).includes('secret'), name + ' does not echo secret-bearing input');
     }
   }
-  assert.equal(acceptedCount, 12, 'all twelve accepted contract cases remain present');
-  assert.equal(rejectedCount, 46, 'all forty-six rejected contract cases remain present');
+  assert.equal(acceptedCount, 15, 'all fifteen accepted contract cases remain present');
+  assert.equal(rejectedCount, 43, 'all forty-three rejected contract cases remain present');
 });
 
 test('non-ASCII fullwidth hex digits are rejected in percent escapes', () => {

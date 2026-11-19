@@ -55,6 +55,6 @@ reject-view-source-target	reject	intent://scan/#Intent;scheme=view-source;end	-	
 reject-unlisted-zxing-target	reject	intent://scan/#Intent;scheme=zxing;end	-	-
 reject-unlisted-custom-target	reject	intent://scan/#Intent;scheme=custom+scheme;end	-	-
 reject-non-web-chrome-fallback	reject	intent://example.com/#Intent;scheme=mailto;S.browser_fallback_url=chrome%3A%2F%2Fsettings;end	-	-
-reject-tg-target	reject	intent://scan/#Intent;scheme=tg;end	-	-
-reject-market-target	reject	intent://scan/#Intent;scheme=market;end	-	-
-reject-whatsapp-target	reject	intent://scan/#Intent;scheme=whatsapp;end	-	-
+valid-tg-target	accept	intent://scan/#Intent;scheme=tg;end	tg://scan/	-
+valid-market-target	accept	intent://scan/#Intent;scheme=market;end	market://scan/	-
+valid-whatsapp-target	accept	intent://scan/#Intent;scheme=whatsapp;end	whatsapp://scan/	-
