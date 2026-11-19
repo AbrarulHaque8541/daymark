@@ -54,6 +54,24 @@ public final class BrowserAddressSmoke {
             assert BrowserAddress.resolveInput(address, BrowserAddress.SearchEngine.DUCKDUCKGO)
                     .equals(address) : "explicit URI scheme must reach route selection: " + address;
         }
+        String[] maliciousTypedIntents = {
+                "intent://example.com/path#Intent;scheme=https;component=com.example/.MainActivity;S.debug=1;end",
+                "intent://example.com/path#Intent;scheme=https;launchFlags=0x00000003;end"
+        };
+        for (String malicious : maliciousTypedIntents) {
+            String resolved = BrowserAddress.resolveInput(malicious, BrowserAddress.SearchEngine.DUCKDUCKGO);
+            assert resolved.equals(malicious) : "typed Intent URI must reach the strict intent route";
+            assert BrowserUriRoutingPolicy.routeForScheme(URI.create(resolved).getScheme())
+                    == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION
+                    : "typed malicious Intent URI must not bypass the confirmation route";
+            boolean rejected = false;
+            try {
+                BrowserIntentLinkPolicy.parse(resolved);
+            } catch (IllegalArgumentException expected) {
+                rejected = true;
+            }
+            assert rejected : "typed malicious Intent URI must be rejected before confirmation or handoff";
+        }
         for (String address : new String[]{"file:///etc/passwd", "content://com.example/private"}) {
             String scheme = URI.create(BrowserAddress.resolveInput(address,
                     BrowserAddress.SearchEngine.DUCKDUCKGO)).getScheme();
@@ -108,9 +126,9 @@ public final class BrowserAddressSmoke {
         assert BrowserUriRoutingPolicy.routeForScheme("intent")
                 == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION;
         for (String scheme : new String[]{"vbscript", "chrome", "chrome-extension", "devtools",
-                "view-source", "ftp", "custom+scheme"}) {
-            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW
-                    : "unlisted or explicitly excluded scheme must not hand off to Android: " + scheme;
+                "view-source", "ftp", "custom+scheme", "telegram", "smsto", "spotify", "gopher"}) {
+            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.REJECTED
+                    : "unapproved scheme must be refused before WebView or Android handoff: " + scheme;
         }
         assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "mailto");
         assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "mailto");

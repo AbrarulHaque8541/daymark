@@ -19,12 +19,8 @@ final class BrowserUriRoutingPolicy {
             "Daymark WebView will try this URI, but local file and content-provider access is disabled for safety.";
     static final String LOCAL_RESOURCE_BLOCKED_NOTICE =
             "Daymark WebView could not open this URI because local file and content-provider access is disabled for safety.";
-    static final String EXCLUDED_SCHEME_ATTEMPT_NOTICE =
-            "This browser/system URI stays in Daymark; WebView may not support it, and it will not be sent to another app.";
-    static final String EXCLUDED_SCHEME_BLOCKED_NOTICE =
-            "Daymark WebView could not open this browser/system URI. It was not sent to another app.";
-    static final String EXCLUDED_SCHEME_OFFLINE_NOTICE =
-            "This browser/system URI is unavailable while Daymark is Offline. It was not sent to another app.";
+    static final String REJECTED_SCHEME_NOTICE =
+            "Daymark blocked this URI scheme. Nothing was opened or sent to another app.";
     static final String OFFLINE_NON_WEB_BLOCKED_NOTICE =
             "This URI is not available while Daymark is Offline. No external app was opened.";
 
@@ -34,7 +30,7 @@ final class BrowserUriRoutingPolicy {
         if (scheme == null) return Route.REJECTED;
         String normalized = scheme.trim().toLowerCase(Locale.ROOT);
         if (!SCHEME.matcher(normalized).matches()) return Route.REJECTED;
-        if (isExplicitlyExcludedScheme(normalized)) return Route.WEBVIEW;
+        if (isExplicitlyExcludedScheme(normalized)) return Route.REJECTED;
         switch (normalized) {
             case "http":
             case "https":
@@ -51,10 +47,8 @@ final class BrowserUriRoutingPolicy {
             case "daymark-download":
                 return Route.INTERNAL;
             default:
-                // Only the explicit Android-app URI allowlist leaves Daymark; other valid
-                // but unlisted schemes are still offered to System WebView.
                 return BrowserAddress.isExplicitExternalScheme(normalized)
-                        ? Route.EXTERNAL_CONFIRMATION : Route.WEBVIEW;
+                        ? Route.EXTERNAL_CONFIRMATION : Route.REJECTED;
         }
     }
 

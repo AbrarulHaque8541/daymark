@@ -1,4 +1,10 @@
+- [Daymark engineering status — 2026-11-19T13:45:40Z (PR #815: d929 exact-head CI diagnosis + IME coverage restoration)](./CURRENT_STATUS_20261119T134540Z.md)
+
+- [Daymark engineering status — 2026-11-19T13:22:56Z (PR #815: verified IME dismissal; two distinct API 36 blockers)](./CURRENT_STATUS_20261119T132256Z.md)
+
 - [Daymark engineering status — 2026-11-19T13:00:00Z (Cycle B: potd image error fallback)](./CURRENT_STATUS_20261119T130000Z.md)
+
+- [Daymark engineering status — 2026-11-19T13:00:00Z (Cycle A: IME dismiss hardening + browser status a11y)](./CURRENT_STATUS_20261119T130000Z_CYCLEA.md)
 
 - [Daymark engineering status — 2026-11-19T10:45:00Z (Cycle B: moon phase success flash)](./CURRENT_STATUS_20261119T104500Z.md)
 
@@ -70,7 +76,9 @@
 - [Daymark engineering status — 2026-11-12T04:50:00Z (daylight and UV planner card, branch feat/daylight-card-vibe-20261112)](./CURRENT_STATUS_20261112T045000Z.md)
 
 # Agent status index
-- [CURRENT_STATUS_20261119T121713Z.md](./CURRENT_STATUS_20261119T121713Z.md) — main `8def610b`; PR #816 merged with 6/6 exact-head checks passing. PR #815 head `4f65143d` has 7 checks passed and 7 in progress. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261119T134540Z.md](./CURRENT_STATUS_20261119T134540Z.md) — The timestamped 13:45:40Z snapshot is preserved as historical evidence for `d929cb56`; it is not the latest PR state. Live verification at 2026-11-19T14:25Z found PR #815 open at exact head `34c275bece854d2007159b29bd5f72201021141c`, base/main `0aa24edf70c7f8e790c9d1df5a89615398ab66c7`, GitHub `CLEAN`, and 14/14 exact-head checks successful. System Watchdog's fresh review of this exact head cleared code/security and the IME checks, and identified this stale index entry as the remaining documentation gap; a still-registered zero-bounds `TYPE_INPUT_METHOD` window intentionally keeps the strict absence wait pending until its bounded timeout. This index-only update records the current exact facts; the resulting docs-only head still requires fresh exact-head CI, Watchdog review, and clean mergeability before merge. Pre-push local validation on the preceding code head: `sh android-app/tools/check-v1-source.sh` PASS (exit 0; Android core: 440 assertions; intent parser/handoff guards PASS); `npm test` PASS (1,475/1,475); Android instrumentation compilation NOT RUN because this sandbox has no Android SDK. Physical device NOT TESTED. The older Focus API 36 failure was a separate unchanged paused-notification assertion on predecessor `2e92ef1`, not caused or mitigated by the IME work; the 13:22:56Z snapshot records the correction to the older 13:00Z attribution. Preserve all dated snapshots as historical.
+- [CURRENT_STATUS_20261119T132256Z.md](./CURRENT_STATUS_20261119T132256Z.md) — Historical 13:21Z verification of predecessor remote head `2e92ef1` on base `0aa24edf`: 12/14 checks passed, with the distinct Focus API36 assertion and Service Worker API36 dependency-resolution failures. The snapshot predates the later `dd221823` implementation commit and `d929cb56` status-index commit; it is not current CI evidence. Physical device NOT TESTED.
+- [CURRENT_STATUS_20261119T121713Z.md](./CURRENT_STATUS_20261119T121713Z.md) — Historical 12:17Z snapshot: `main` `8def610b`; PR #816 merged with 6/6 checks. PR #815 was then at superseded head `4f65143d` with 7 checks passed and 7 in progress. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261119T121202Z.md](./CURRENT_STATUS_20261119T121202Z.md) — Historical 12:12Z snapshot for superseded PR #815 head `f44e816c`; its API 36 failure was superseded by head `4f65143d`. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261119T074500Z.md](./CURRENT_STATUS_20261119T074500Z.md) — Cycle B: potd glass press feedback + status success flash. Physical device NOT TESTED.
 

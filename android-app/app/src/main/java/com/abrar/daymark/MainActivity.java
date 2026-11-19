@@ -2192,6 +2192,10 @@ public final class MainActivity extends Activity {
         if (browserStatusHideRunnable != null) mainHandler.removeCallbacks(browserStatusHideRunnable);
         browserStatus.animate().cancel();
         browserStatus.setText(message == null ? "" : message);
+        // Expose the status text to accessibility services so TalkBack announces
+        // intent refusals, security labels, and other transient browser messages.
+        browserStatus.setContentDescription(message == null ? "" : message);
+        browserStatus.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         browserStatus.setVisibility(View.VISIBLE);
         browserStatus.setAlpha(0f);
         browserStatus.animate().alpha(1f).setDuration(150L).start();
@@ -2756,28 +2760,33 @@ public final class MainActivity extends Activity {
         String scheme = android.net.Uri.parse(webAddress).getScheme();
         String destinationScheme = scheme;
         BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+        if (route == BrowserUriRoutingPolicy.Route.REJECTED) {
+            showBrowserStatus(BrowserUriRoutingPolicy.REJECTED_SCHEME_NOTICE);
+            return;
+        }
         if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
             showBrowserStatus(BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE);
-        } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
-            showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE);
         }
         if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
-            // Typed intent targets must be visibly rejected before Android handoff
-            android.content.Intent target;
+            // Typed intent targets share the strict metadata parser used for in-page links.
+            BrowserIntentLinkPolicy.Decision decision;
             try {
-                target = android.content.Intent.parseUri(webAddress, 0);
-            } catch (java.net.URISyntaxException exception) {
-                showBrowserStatus("invalid intent target. Nothing was opened.");
+                decision = BrowserIntentLinkPolicy.parse(webAddress);
+            } catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported) {
+                showBrowserStatus("This Android app link uses an unsupported target scheme. Nothing was opened.");
+                return;
+            } catch (IllegalArgumentException invalid) {
+                showBrowserStatus("This Android app link was blocked because its Intent data is unsafe. Nothing was opened.");
                 return;
             }
+            Uri target = Uri.parse(decision.targetUri);
             if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())) {
-                showBrowserStatus("unsupported target scheme. Nothing was opened.");
+                showBrowserStatus("This Android app link uses an unsupported target scheme. Nothing was opened.");
                 return;
             }
             android.content.Intent external = BrowserUriHandoff.createBrowsableViewIntent(
-                    target.getData() != null ? target.getData() : android.net.Uri.parse(webAddress),
-                    target.getPackage());
-            BrowserUriHandoff.confirmAndOpen(this, external, webAddress, null);
+                    target, decision.packageName);
+            BrowserUriHandoff.confirmAndOpen(this, external, decision.targetUri, null);
             return;
         }
         if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION) {
@@ -2790,8 +2799,6 @@ public final class MainActivity extends Activity {
             if (!browserNetworkPolicy.allowsRemoteLoads()) {
                 if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)) {
                     loadBrowserAddress(webAddress);
-                } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(destinationScheme)) {
-                    showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE);
                 } else {
                     showBrowserStatus(BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE);
                 }

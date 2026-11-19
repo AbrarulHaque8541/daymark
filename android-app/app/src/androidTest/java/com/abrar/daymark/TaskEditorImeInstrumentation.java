@@ -3,6 +3,7 @@ package com.abrar.daymark;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.app.UiAutomation;
+import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Context;
 import android.content.Intent;
@@ -288,12 +289,40 @@ final class TaskEditorImeInstrumentation {
             Log.i(TAG, "No software keyboard on this runner; IME-viewport assertions skipped.");
         } else {
             require(imeBounds.height() >= 100, "the software keyboard is visible and consumes viewport height", assertions);
+            require(isRectOnScreen(instrumentation, imeBounds),
+                    "the visible software keyboard rectangle is contained within the device screen", assertions);
         }
 
         root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
         trace.record("exercise.dialogRootAfterImeReady");
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
+        // The editor is an AlertDialog with its own window; Activity.getCurrentFocus() may not
+        // identify the IME's window token. Check footer geometry against the live IME while shown,
+        // then request system Back and re-query the footer after the IME window is gone.
+        if (imeBounds != null) {
+            trace.record("exercise.beforeImeVisibleFooterWait");
+            AccessibilityNodeInfo cancelWhileIme = awaitDialogButton(
+                    instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", trace);
+            AccessibilityNodeInfo addWhileIme = awaitDialogButton(
+                    instrumentation, activity, EDITOR_TITLE, "android:id/button1", "Add task", trace);
+            Rect visibleImeBounds = findImeBounds(instrumentation);
+            require(visibleImeBounds != null,
+                    "the software keyboard remains visible while checking dialog footer bounds", assertions);
+            if (visibleImeBounds != null) {
+                checkVisibleAboveIme(instrumentation, cancelWhileIme, visibleImeBounds, "Cancel", assertions);
+                checkVisibleAboveIme(instrumentation, addWhileIme, visibleImeBounds, "Add task", assertions);
+            }
+            trace.record("exercise.footerTargetsVisibleAboveIme");
+            trace.record("exercise.beforeImeDismissRequest");
+            requestImeDismissal(instrumentation, assertions);
+        }
+        awaitImeHidden(instrumentation);
+        instrumentation.waitForIdleSync();
+        trace.record("exercise.afterImeHidden");
+        root = awaitDialogRoot(instrumentation, EDITOR_TITLE);
+        require(root != null, "the task editor remains open after the software keyboard is hidden", assertions);
+        trace.record("exercise.dialogRootAfterImeHidden");
         trace.record("exercise.beforeCancelButtonWait");
         AccessibilityNodeInfo cancel = awaitDialogButton(
                 instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", trace);
@@ -304,10 +333,6 @@ final class TaskEditorImeInstrumentation {
         trace.record("exercise.addButtonReady");
         require(hasVisibleTouchBounds(cancel), "the Cancel dialog action has a visible touch target", assertions);
         require(hasVisibleTouchBounds(add), "the Add Task dialog action has a visible touch target", assertions);
-        if (imeBounds != null) {
-            checkVisibleAboveIme(instrumentation, cancel, imeBounds, "Cancel", assertions);
-            checkVisibleAboveIme(instrumentation, add, imeBounds, "Add Task", assertions);
-        }
 
         titleField = findByDescription(root, TITLE_FIELD_DESCRIPTION);
         Bundle text = new Bundle();
@@ -566,6 +591,7 @@ final class TaskEditorImeInstrumentation {
 
     private static void checkVisibleAboveIme(Instrumentation instrumentation, AccessibilityNodeInfo button,
                                              Rect imeBounds, String label, int[] assertions) {
+        require(button != null, label + " dialog target exists while the IME is shown", assertions);
         Rect bounds = new Rect();
         button.getBoundsInScreen(bounds);
         DisplayMetrics metrics = new DisplayMetrics();
@@ -579,6 +605,18 @@ final class TaskEditorImeInstrumentation {
         require(button.isVisibleToUser() && onScreen,
                 label + " is visible within the device screen while the IME is shown", assertions);
         require(!Rect.intersects(bounds, imeBounds), label + " is not covered by the IME", assertions);
+    }
+
+    private static boolean isRectOnScreen(Instrumentation instrumentation, Rect bounds) {
+        if (bounds == null || bounds.isEmpty() || bounds.left < 0 || bounds.top < 0) return false;
+        WindowManager manager = (WindowManager) instrumentation.getTargetContext()
+                .getSystemService(Context.WINDOW_SERVICE);
+        Display display = manager == null ? null : manager.getDefaultDisplay();
+        if (display == null) return false;
+        DisplayMetrics metrics = new DisplayMetrics();
+        display.getRealMetrics(metrics);
+        return metrics.widthPixels > 0 && metrics.heightPixels > 0
+                && bounds.right <= metrics.widthPixels && bounds.bottom <= metrics.heightPixels;
     }
 
     private static void tapDialogAction(Instrumentation instrumentation, MainActivity activity,
@@ -797,15 +835,14 @@ final class TaskEditorImeInstrumentation {
     private static void awaitImeHidden(Instrumentation instrumentation) throws Exception {
         long deadline = SystemClock.uptimeMillis() + WAIT_MS;
         while (SystemClock.uptimeMillis() < deadline) {
-            boolean shown = false;
+            boolean imeWindowRemains = false;
             for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
                 if (window.getType() == AccessibilityWindowInfo.TYPE_INPUT_METHOD) {
-                    Rect bounds = new Rect();
-                    window.getBoundsInScreen(bounds);
-                    shown |= !bounds.isEmpty();
+                    imeWindowRemains = true;
+                    break;
                 }
             }
-            if (!shown) return;
+            if (!imeWindowRemains) return;
             SystemClock.sleep(50L);
         }
         throw new AssertionError("The software keyboard did not hide after dismissing the task editor.");
@@ -982,5 +1019,11 @@ final class TaskEditorImeInstrumentation {
             throw new AssertionError(message);
         }
         assertions[0]++;
+    }
+
+    private static void requestImeDismissal(Instrumentation instrumentation, int[] assertions) {
+        boolean requested = instrumentation.getUiAutomation()
+                .performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+        require(requested, "the visible software keyboard accepts a system Back dismissal request", assertions);
     }
 }

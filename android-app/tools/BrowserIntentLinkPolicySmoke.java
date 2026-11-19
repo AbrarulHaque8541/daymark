@@ -97,6 +97,13 @@ public final class BrowserIntentLinkPolicySmoke {
         expectFailure("intent://scan/#Intent;scheme=mailto", "missing end marker rejected");
         expectFailure("intent://scan/#Intent;scheme=mailto;component=com.evil/.Launch;end",
                 "explicit component launch rejected");
+        expectFailure("intent://example.com/path#Intent;scheme=https;component=com.example/.MainActivity;S.debug=1;end",
+                "malicious address-bar Intent component and arbitrary extra rejected");
+        expectFailure("intent://example.com/path#Intent;scheme=https;launchFlags=0x00000003;end",
+                "address-bar Intent URI read/write grant flags rejected");
+        expectFailure("intent://scan/#Intent;scheme=mailto;component=com.evil/.PrivateActivity;"
+                        + "launchFlags=0x00000003;end",
+                "malicious component plus URI read/write-grant flags rejected");
         expectFailure("intent://scan/#Intent;scheme=mailto;SEL;end",
                 "selectors and bare Intent flags rejected");
         expectFailure("intent://scan/#Intent;scheme=mailto;launchFlags=0x10000000;end",
@@ -133,6 +140,8 @@ public final class BrowserIntentLinkPolicySmoke {
                 "embedded credentials rejected");
         expectFailure("intent://scan/#Intent;scheme=mailto;end#fragment",
                 "trailing fragments rejected");
+        expectUnsupportedTarget("intent://scan/#Intent;scheme=ftp;end",
+                "unsupported target scheme receives a distinct visible-refusal decision");
 
         if (args.length > 0) verifySharedContract(Path.of(args[0]));
         System.out.println("PASS Android intent link routing policy");
@@ -172,6 +181,15 @@ public final class BrowserIntentLinkPolicySmoke {
             throw new AssertionError(message);
         } catch (IllegalArgumentException expected) {
             // Expected fail-closed behavior.
+        }
+    }
+
+    private static void expectUnsupportedTarget(String input, String message) {
+        try {
+            BrowserIntentLinkPolicy.parse(input);
+            throw new AssertionError(message);
+        } catch (BrowserIntentLinkPolicy.UnsupportedTargetException expected) {
+            // The Android adapters map this decision to a visible refusal and do not hand off.
         }
     }
 

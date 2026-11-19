@@ -68,6 +68,11 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
         final BrowserIntentLinkPolicy.Decision decision;
         try {
             decision = BrowserIntentLinkPolicy.parse(value);
+        } catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported) {
+            android.widget.Toast.makeText(view.getContext(),
+                    "This Android app link uses an unsupported target scheme. Nothing was opened.",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return true;
         } catch (IllegalArgumentException invalid) {
             android.widget.Toast.makeText(view.getContext(),
                     "This Android app link was not opened: its target or Intent data is unsupported or unsafe.",
@@ -136,12 +141,9 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 android.net.Uri.parse(address).getScheme());
     }
 
-    private void showExcludedSchemeNotice(WebView view, boolean blocked) {
+    private void showRejectedSchemeNotice(WebView view) {
         if (view == null) return;
-        String message = blocked
-                ? BrowserUriRoutingPolicy.EXCLUDED_SCHEME_BLOCKED_NOTICE
-                : BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE;
-        android.widget.Toast.makeText(view.getContext(), message,
+        android.widget.Toast.makeText(view.getContext(), BrowserUriRoutingPolicy.REJECTED_SCHEME_NOTICE,
                 android.widget.Toast.LENGTH_LONG).show();
     }
 
@@ -247,15 +249,9 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 }
                 // Verified HTTP(S) App Links stay in Daymark like every other web address.
                 BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
-                if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
-                    if (!networkPolicy.allowsRemoteLoads()) {
-                        android.widget.Toast.makeText(view.getContext(),
-                                BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE,
-                                android.widget.Toast.LENGTH_LONG).show();
-                        return true;
-                    }
-                    showExcludedSchemeNotice(view, false);
-                    return false;
+                if (route == BrowserUriRoutingPolicy.Route.REJECTED) {
+                    if (request.isForMainFrame()) showRejectedSchemeNotice(view);
+                    return true;
                 }
                 if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
                     // Keep platform file/content isolation, but let WebView attempt the URI
@@ -381,7 +377,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                     return;
                 }
                 if (isExcludedSchemeAddress(failingUrl)) {
-                    showExcludedSchemeNotice(view, true);
+                    showRejectedSchemeNotice(view);
                     return;
                 }
                 if (!networkPolicy.allowsRemoteLoads() && isWebAddress(failingUrl)) {
@@ -402,7 +398,7 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                 }
                 if (isExcludedSchemeAddress(failingUrl)) {
                     // Keep unsupported browser/system scheme failures visible in every frame.
-                    showExcludedSchemeNotice(view, true);
+                    showRejectedSchemeNotice(view);
                     return;
                 }
                 if (!request.isForMainFrame()) return;

@@ -23,6 +23,14 @@ final class BrowserIntentLinkPolicy {
     private static final Pattern PACKAGE = Pattern.compile(
             "[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+");
 
+    static final class UnsupportedTargetException extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+
+        private UnsupportedTargetException() {
+            super("Android app link target scheme is not supported.");
+        }
+    }
+
     static final class Decision {
         final String targetUri;
         final String packageName;
@@ -137,7 +145,7 @@ final class BrowserIntentLinkPolicy {
         }
         scheme = scheme.toLowerCase(Locale.ROOT);
         if (!isSupportedTargetScheme(scheme)) {
-            throw new IllegalArgumentException("Android app link target scheme is not supported.");
+            throw new UnsupportedTargetException();
         }
 
         String action = values.get("action");

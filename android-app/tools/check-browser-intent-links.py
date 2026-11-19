@@ -11,8 +11,10 @@ handoff = (root / "app/src/main/java/com/abrar/daymark/BrowserUriHandoff.java").
 activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read_text(encoding="utf-8")
 runner = (root / "tools/run-core-tests.sh").read_text(encoding="utf-8")
 test = root / "tools/BrowserIntentLinkPolicySmoke.java"
+test_source = test.read_text(encoding="utf-8")
 typed_test = (root / "tools/BrowserAddressSmoke.java").read_text(encoding="utf-8")
 callback_test = (root / "tools/BrowserExternalLinkPolicySmoke.java").read_text(encoding="utf-8")
+source_check = (root / "tools/check-v1-source.sh").read_text(encoding="utf-8")
 contract = (root.parent / "contracts/intent-uri-validation.tsv").read_text(encoding="utf-8")
 
 for token in ('value.startsWith("intent://")', '"#Intent;"', 'value.endsWith(";end")',
@@ -39,10 +41,34 @@ for forbidden in ('Character.digit(', '"component".equals(key)', '"selector".equ
                   '"launchFlags".equals(key)', '"S.".equals(key)'):
     assert forbidden not in policy, f"Intent URI parser must not accept {forbidden}"
 
+for sample in (
+    'intent://example.com/path#Intent;scheme=https;component=com.example/.MainActivity;S.debug=1;end',
+    'intent://example.com/path#Intent;scheme=https;launchFlags=0x00000003;end',
+):
+    assert sample in test_source and sample in typed_test, \
+        "malicious component/extra and URI-grant cases must be covered by parser and typed-address smoke tests"
+assert "expectUnsupportedTarget(" in test_source, "unsupported targets need an executable parser regression"
+assert "BrowserIntentLinkPolicy.parse(resolved)" in typed_test \
+    and "BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION" in typed_test, \
+    "typed-address smoke must route malicious Intent input through the strict parser"
+assert '"$ROOT/tools/BrowserIntentLinkPolicySmoke.java"' in runner \
+    and 'java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserIntentLinkPolicySmoke "$ROOT/../contracts/intent-uri-validation.tsv"' in runner, \
+    "the strict Intent parser smoke must be compiled and executed by the core runner"
+assert '"$ROOT/tools/BrowserAddressSmoke.java"' in runner \
+    and 'java -ea -cp "$BUILD_DIR" com.abrar.daymark.BrowserAddressSmoke' in runner, \
+    "typed-address smoke must be compiled and executed by the core runner"
+assert 'python3 "$ROOT/tools/check-browser-intent-links.py" "$ROOT"' in runner \
+    and 'sh ./tools/run-core-tests.sh' in source_check \
+    and 'python3 ./tools/check-browser-intent-links.py "$ROOT"' in source_check, \
+    "intent source guard and core smoke tests must be wired into canonical Android source checks"
+
 assert "BrowserIntentLinkPolicy.parse(value)" in webview
 assert "BrowserUriHandoff.createBrowsableViewIntent(" in webview
 assert "BrowserUriHandoff.confirmAndOpen(" in webview
 intent_handler = webview.split("private boolean handleIntentLink(WebView view, String value)", 1)[1].split("\n    }", 1)[0]
+assert "catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported)" in intent_handler
+assert "This Android app link uses an unsupported target scheme. Nothing was opened." in intent_handler
+assert "This Android app link was not opened: its target or Intent data is unsupported or unsafe." in intent_handler
 target_guard = "if (!BrowserIntentLinkPolicy.isSupportedTargetScheme(scheme))"
 assert target_guard in intent_handler and "unsupported target scheme. Nothing was opened." in intent_handler, \
     "unsupported resolved target schemes must show a visible refusal"
@@ -61,18 +87,41 @@ assert '.setPositiveButton("Open"' in handoff
 assert '"Stay in Daymark"' in handoff
 assert '"This Android app link was not opened: its target or Intent data is unsupported or unsafe."' in webview
 assert '"This Android app link uses an unsupported target scheme. Nothing was opened."' in webview
-# Typed intent confirmation path may live in WebView after routing changes; core guards remain in WebView.
-if "INTENT_CONFIRMATION" in activity:
-    typed_intent = activity.split("if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION)", 1)[1]
-    typed_intent = typed_intent.split("final String webAddress", 1)[0]
-    typed_target_guard = "BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())"
-    assert typed_target_guard in typed_intent and "unsupported target scheme. Nothing was opened." in typed_intent \
-        and typed_intent.index(typed_target_guard) < typed_intent.index("BrowserUriHandoff.createBrowsableViewIntent("), \
-        "typed intent targets must be visibly rejected before Android handoff"
-else:
-    print("NOTE: INTENT_CONFIRMATION path not in MainActivity (expected after routing updates); WebView guards verified above")
+typed_route = "if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION)"
+assert typed_route in activity, "typed address-bar intent confirmation route must remain in MainActivity"
+typed_intent = activity.split(typed_route, 1)[1]
+typed_intent = typed_intent.split("if (route == BrowserUriRoutingPolicy.Route.EXTERNAL_CONFIRMATION)", 1)[0]
+typed_target_guard = "BrowserIntentLinkPolicy.isSupportedTargetScheme(target.getScheme())"
+assert "BrowserIntentLinkPolicy.parse(webAddress)" in typed_intent, \
+    "typed intent addresses must use the shared strict metadata parser"
+assert "Intent.parseUri(" not in typed_intent, \
+    "typed intent addresses must not invoke Android's permissive serialized-Intent parser"
+assert "catch (BrowserIntentLinkPolicy.UnsupportedTargetException unsupported)" in typed_intent \
+    and "This Android app link uses an unsupported target scheme. Nothing was opened." in typed_intent, \
+    "typed unsupported targets must have a visible refusal"
+assert "This Android app link was blocked because its Intent data is unsafe. Nothing was opened." in typed_intent, \
+    "typed unsafe metadata must have a visible refusal"
+assert typed_target_guard in typed_intent and typed_intent.index(typed_target_guard) \
+    < typed_intent.index("BrowserUriHandoff.createBrowsableViewIntent("), \
+    "typed intent target validation must precede any Android handoff"
+assert "Uri.parse(decision.targetUri)" in typed_intent \
+    and "BrowserUriHandoff.createBrowsableViewIntent(\n                    target, decision.packageName)" in typed_intent, \
+    "typed handoff must be rebuilt only from the sanitized URI and validated package"
+assert "BrowserUriHandoff.confirmAndOpen(this, external, decision.targetUri, null)" in typed_intent, \
+    "typed confirmation must show the resolved destination, not serialized metadata"
 assert "BrowserUriRoutingPolicy.routeForScheme(scheme)" in webview
 assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(" in webview
+assert "Route.EXTERNAL_CONFIRMATION : Route.REJECTED;" in uri_policy, \
+    "only explicitly approved external schemes may leave the WebView path"
+rejected_navigation = webview.split(
+    "if (route == BrowserUriRoutingPolicy.Route.REJECTED)", 1)[1]
+rejected_navigation = rejected_navigation.split(
+    "if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW)", 1)[0]
+assert "showRejectedSchemeNotice(view)" in rejected_navigation and "return true;" in rejected_navigation, \
+    "unapproved in-page schemes must show a refusal and stop before WebView navigation"
+assert "if (route == BrowserUriRoutingPolicy.Route.REJECTED)" in activity \
+    and "BrowserUriRoutingPolicy.REJECTED_SCHEME_NOTICE" in activity, \
+    "unapproved typed addresses must show an accessible refusal before WebView loadUrl"
 intent_route = webview.split('if ("intent".equalsIgnoreCase(scheme))', 1)[1].split("// Verified HTTP(S)", 1)[0]
 assert "BrowserIntentHandoffPolicy.allows(request.isForMainFrame(), request.hasGesture())" in intent_route \
     and "return handleIntentLink(view, url)" in intent_route, \

@@ -13,27 +13,27 @@ public final class BrowserExternalLinkPolicySmoke {
         }
 
         for (String scheme : new String[]{"telegram", "smsto", "viber", "spotify", "youtube",
-                "chatgpt", "instagram", "android-app"}) {
-            check(BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW,
-                    scheme + " is not an approved Android handoff and stays in Daymark WebView");
+                "chatgpt", "instagram", "android-app", "vbscript", "chrome", "chrome-extension",
+                "devtools", "view-source", "ftp", "custom+scheme", "gopher"}) {
+            check(BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.REJECTED,
+                    scheme + " is not approved and must be rejected, not sent to another app or WebView");
             check(!BrowserAddress.shouldHandOffExternalScheme(true, true, scheme),
                     scheme + " must not start an Android app");
             check(!BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, scheme),
                     scheme + " must not request Android handoff confirmation");
         }
 
-        for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about",
-                "vbscript", "chrome", "chrome-extension", "devtools", "view-source", "ftp",
-                "custom+scheme", "gopher"}) {
-            check(BrowserUriRoutingPolicy.routeForScheme(scheme)
-                            == BrowserUriRoutingPolicy.Route.WEBVIEW,
-                    scheme + " must stay in Daymark WebView");
+        for (String scheme : new String[]{"http", "https", "javascript", "data", "blob", "about"}) {
+            check(BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW,
+                    scheme + " is an explicitly permitted WebView scheme");
             check(!BrowserAddress.shouldHandOffExternalScheme(true, true, scheme),
                     scheme + " must not start an Android app");
         }
         for (String scheme : new String[]{"vbscript", "chrome", "chrome-extension", "devtools", "view-source"}) {
             check(BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme),
                     scheme + " must remain an explicit non-handoff exclusion");
+            check(BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.REJECTED,
+                    scheme + " must be refused before WebView navigation");
             check(!BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(true, true, scheme),
                     scheme + " must never request Android confirmation");
             check(!BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(scheme),
@@ -82,11 +82,11 @@ public final class BrowserExternalLinkPolicySmoke {
                 "a missing scheme is not an external target");
         check(BrowserUriRoutingPolicy.routeForScheme("bad scheme") == BrowserUriRoutingPolicy.Route.REJECTED,
                 "malformed schemes are not external targets");
-        check(BrowserUriRoutingPolicy.routeForScheme("custom+scheme") == BrowserUriRoutingPolicy.Route.WEBVIEW,
-                "an unlisted valid scheme must not be sent to an Android app");
+        check(BrowserUriRoutingPolicy.routeForScheme("custom+scheme") == BrowserUriRoutingPolicy.Route.REJECTED,
+                "an unapproved valid scheme must be refused");
         check(!BrowserAddress.shouldHandOffExternalScheme(true, true, null),
                 "a missing scheme cannot hand off to Android");
-        System.out.println("PASS browser URI routing: WebView, local isolation, and confirmed Android scheme handoffs");
+        System.out.println("PASS browser URI routing: explicit WebView allowlist, local isolation, confirmed handoffs, and fail-closed rejection");
     }
 
     private static void check(boolean condition, String message) {
