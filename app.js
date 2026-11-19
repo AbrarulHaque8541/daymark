@@ -2394,6 +2394,10 @@
       }
     }
     status.textContent = state.feedNotice || (state.feedCache
+    if (status.classList && typeof status.classList.toggle === "function") {
+      const isSuccess = Boolean(state.feedNotice && state.feedNotice.startsWith("Updated"));
+      status.classList.toggle("is-success", isSuccess);
+    }
       ? `Saved on this device · ${formatFeedTime(state.feedCache.fetchedAt)}`
       : 'No feed loaded yet. Paste an RSS or Atom URL and tap Refresh.');
     const cache = state.feedCache;
