@@ -91,9 +91,35 @@ test('parsePotd maps the feed attribution fields honestly', () => {
   assert.strictEqual(picture.thumbUrl, 'https://upload.wikimedia.org/wikipedia/commons/thumb/harbour.jpg');
   assert.strictEqual(picture.imageUrl, 'https://upload.wikimedia.org/wikipedia/commons/harbour.jpg');
   assert.strictEqual(picture.filePage, 'https://commons.wikimedia.org/wiki/File:Harbour_example.jpg');
+  assert.strictEqual(picture.width, 320, 'dimensions match the thumbnail shown by the card');
+  assert.strictEqual(picture.height, 213, 'dimensions match the thumbnail shown by the card');
+  assert.strictEqual(picture.descriptionTruncated, false);
+});
+test('parsePotd uses full-image dimensions when the thumbnail is unavailable', () => {
+  const payload = fixturePayload();
+  delete payload.image.thumbnail;
+  const picture = logic.parsePotd(payload);
+  assert.strictEqual(picture.thumbUrl, null);
+  assert.strictEqual(picture.imageUrl, 'https://upload.wikimedia.org/wikipedia/commons/harbour.jpg');
   assert.strictEqual(picture.width, 1200);
   assert.strictEqual(picture.height, 800);
-  assert.strictEqual(picture.descriptionTruncated, false);
+});
+test('parsePotd uses thumbnail dimensions when it is the only readable image', () => {
+  const payload = fixturePayload();
+  payload.image.image.source = 'http://upload.wikimedia.org/wikipedia/commons/harbour.jpg';
+  const picture = logic.parsePotd(payload);
+  assert.strictEqual(picture.imageUrl, null);
+  assert.strictEqual(picture.thumbUrl, 'https://upload.wikimedia.org/wikipedia/commons/thumb/harbour.jpg');
+  assert.strictEqual(picture.width, 320);
+  assert.strictEqual(picture.height, 213);
+});
+test('parsePotd omits invalid geometry for the selected thumbnail source', () => {
+  const payload = fixturePayload();
+  payload.image.thumbnail.width = 0;
+  payload.image.thumbnail.height = 'unknown';
+  const picture = logic.parsePotd(payload);
+  assert.strictEqual(picture.width, null);
+  assert.strictEqual(picture.height, null);
 });
 test('parsePotd fails closed on a malformed payload', () => {
   assert.throws(() => logic.parsePotd({}), /malformed/);

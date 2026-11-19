@@ -395,6 +395,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .feed-refresh:disabled { opacity: .65; cursor: wait; }
 .feed-status { min-height: 12px; margin: 5px 0 2px; color: var(--muted-text); font-size: 10px; }
 .feed-list { display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
+#potd-result img { display: block; max-width: 100%; height: auto; }
 .feed-item { padding: 9px 10px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
 .feed-item:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
 .feed-item-link, .feed-item-title { display: block; color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }
