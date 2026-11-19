@@ -24,7 +24,13 @@
     const resultEl = element('release-compat-result');
     const formEl = element('release-compat-form');
     const clearEl = element('release-compat-clear');
-    function status(message) { if (statusEl) statusEl.textContent = message; }
+    function status(message, isSuccess) {
+      if (statusEl) statusEl.textContent = message;
+      if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function' && typeof statusEl.classList.remove === 'function') {
+        if (isSuccess) statusEl.classList.add('is-success');
+        else statusEl.classList.remove('is-success');
+      }
+    }
     function makeItem(className, text) {
       const item = doc.createElement('div');
       item.className = className;
@@ -71,9 +77,10 @@
       }
       const topic = topicEl && typeof topicEl.value === 'string' ? topicEl.value : '';
       const result = dataApi.explainTopic(topic);
-      status(!result.available
+      const ok = !!result.available;
+      status(!ok
         ? 'Unavailable · ' + result.label + ' · no action was run'
-        : 'Explained · ' + result.label + (result.requiresAction ? ' · action required' : ' · already pinned'));
+        : 'Explained · ' + result.label + (result.requiresAction ? ' · action required' : ' · already pinned'), ok);
       renderExplanation(result);
     }
     function onClear() {
