@@ -188,7 +188,9 @@ test('a successful check reports that nothing was saved on the device', async ()
   const doc = makeDoc();
   const controls = ui.attachPotdUi(environment(doc, () => Promise.resolve(fixtureResponse())));
   await controls.onCheck();
-  assert.ok(doc.getElementById('potd-status').textContent.indexOf('not saved on this device') !== -1);
+  const statusEl = doc.getElementById('potd-status');
+  assert.ok(statusEl.textContent.indexOf('not saved on this device') !== -1);
+  assert.ok(statusEl.classList.contains('is-success'), 'success flash class is set on status');
 });
 test('a 403 answer surfaces the friendly rate-limit wording', async () => {
   const doc = makeDoc();
