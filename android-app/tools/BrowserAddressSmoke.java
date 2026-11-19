@@ -126,9 +126,9 @@ public final class BrowserAddressSmoke {
         assert BrowserUriRoutingPolicy.routeForScheme("intent")
                 == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION;
         for (String scheme : new String[]{"vbscript", "chrome", "chrome-extension", "devtools",
-                "view-source", "ftp", "custom+scheme"}) {
-            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.WEBVIEW
-                    : "unlisted or explicitly excluded scheme must not hand off to Android: " + scheme;
+                "view-source", "ftp", "custom+scheme", "telegram", "smsto", "spotify", "gopher"}) {
+            assert BrowserUriRoutingPolicy.routeForScheme(scheme) == BrowserUriRoutingPolicy.Route.REJECTED
+                    : "unapproved scheme must be refused before WebView or Android handoff: " + scheme;
         }
         assert !BrowserAddress.shouldHandOffExternalScheme(false, true, "mailto");
         assert !BrowserAddress.shouldHandOffExternalScheme(true, false, "mailto");

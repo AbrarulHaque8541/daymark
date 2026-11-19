@@ -2760,10 +2760,12 @@ public final class MainActivity extends Activity {
         String scheme = android.net.Uri.parse(webAddress).getScheme();
         String destinationScheme = scheme;
         BrowserUriRoutingPolicy.Route route = BrowserUriRoutingPolicy.routeForScheme(scheme);
+        if (route == BrowserUriRoutingPolicy.Route.REJECTED) {
+            showBrowserStatus(BrowserUriRoutingPolicy.REJECTED_SCHEME_NOTICE);
+            return;
+        }
         if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW) {
             showBrowserStatus(BrowserUriRoutingPolicy.LOCAL_RESOURCE_ATTEMPT_NOTICE);
-        } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(scheme)) {
-            showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_ATTEMPT_NOTICE);
         }
         if (route == BrowserUriRoutingPolicy.Route.INTENT_CONFIRMATION) {
             // Typed intent targets share the strict metadata parser used for in-page links.
@@ -2797,8 +2799,6 @@ public final class MainActivity extends Activity {
             if (!browserNetworkPolicy.allowsRemoteLoads()) {
                 if (BrowserUriRoutingPolicy.isOfflinePermittedWebViewScheme(destinationScheme)) {
                     loadBrowserAddress(webAddress);
-                } else if (BrowserUriRoutingPolicy.isExplicitlyExcludedScheme(destinationScheme)) {
-                    showBrowserStatus(BrowserUriRoutingPolicy.EXCLUDED_SCHEME_OFFLINE_NOTICE);
                 } else {
                     showBrowserStatus(BrowserUriRoutingPolicy.OFFLINE_NON_WEB_BLOCKED_NOTICE);
                 }

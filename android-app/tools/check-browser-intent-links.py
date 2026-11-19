@@ -111,6 +111,17 @@ assert "BrowserUriHandoff.confirmAndOpen(this, external, decision.targetUri, nul
     "typed confirmation must show the resolved destination, not serialized metadata"
 assert "BrowserUriRoutingPolicy.routeForScheme(scheme)" in webview
 assert "BrowserUriRoutingPolicy.shouldConfirmExternalHandoff(" in webview
+assert "Route.EXTERNAL_CONFIRMATION : Route.REJECTED;" in uri_policy, \
+    "only explicitly approved external schemes may leave the WebView path"
+rejected_navigation = webview.split(
+    "if (route == BrowserUriRoutingPolicy.Route.REJECTED)", 1)[1]
+rejected_navigation = rejected_navigation.split(
+    "if (route == BrowserUriRoutingPolicy.Route.LOCAL_WEBVIEW)", 1)[0]
+assert "showRejectedSchemeNotice(view)" in rejected_navigation and "return true;" in rejected_navigation, \
+    "unapproved in-page schemes must show a refusal and stop before WebView navigation"
+assert "if (route == BrowserUriRoutingPolicy.Route.REJECTED)" in activity \
+    and "BrowserUriRoutingPolicy.REJECTED_SCHEME_NOTICE" in activity, \
+    "unapproved typed addresses must show an accessible refusal before WebView loadUrl"
 intent_route = webview.split('if ("intent".equalsIgnoreCase(scheme))', 1)[1].split("// Verified HTTP(S)", 1)[0]
 assert "BrowserIntentHandoffPolicy.allows(request.isForMainFrame(), request.hasGesture())" in intent_route \
     and "return handleIntentLink(view, url)" in intent_route, \
