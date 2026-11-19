@@ -13,6 +13,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         restoreMustPrecedeAnyUserStart();
         explicitStartPauseResumeFinishIsDurableAndOrdered();
         staleRuntimeReplacesNotificationWhenPresentationChanges();
+        staleRuntimeKeepsExactActivePausedNoticeDuringLifecycleReconciliation();
         pausedTaskSwitchPersistsIdentityAcrossRestoreAndResume();
         failedPausedTaskSwitchLeavesOriginalSessionUntouched();
         anActiveSessionCannotBeReplaced();
@@ -125,6 +126,39 @@ public final class TaskFocusSessionCoordinatorSmoke {
         check(original.notifications.active
                         && original.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
                 "the notification sink ends with the paused session presentation");
+    }
+
+    private static void staleRuntimeKeepsExactActivePausedNoticeDuringLifecycleReconciliation()
+            throws Exception {
+        Fixture writer = new Fixture();
+        writer.initializeWithoutSession();
+        Fixture staleRuntime = new Fixture(writer.clock, writer.store, writer.notifications);
+        staleRuntime.initializeWithoutSession();
+
+        writer.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.STOPWATCH, 0);
+        staleRuntime.coordinator.restoreAfterProcessStart("task-a", "Task A");
+        writer.clock.advance(4_500);
+        writer.coordinator.pauseFromUserAction();
+        writer.coordinator.switchTaskWhilePausedFromUserAction("task-b", "Task B");
+
+        TaskFocusTimer persisted = writer.store.load(
+                writer.clock.elapsed, writer.clock.wall, writer.clock.boot);
+        int publishesBefore = writer.notifications.publishCount;
+        int skipsBefore = writer.notifications.skipCount;
+        writer.store.events.clear();
+
+        TaskFocusSessionCoordinator.Snapshot reconciled = staleRuntime.coordinator
+                .reconcileLoadedSnapshot(persisted, "task-b", "Task B");
+        check(reconciled != null && reconciled.isPaused() && reconciled.restored
+                        && reconciled.notificationPublished
+                        && "task-b".equals(reconciled.timer.taskId()),
+                "a stale lifecycle runtime adopts the latest durable paused task identity");
+        check(writer.notifications.active && "Task B".equals(writer.notifications.lastTitle)
+                        && writer.notifications.publishCount == publishesBefore
+                        && writer.notifications.skipCount == skipsBefore + 1
+                        && writer.events().equals(list("skip")),
+                "an exact active paused presentation is kept before stale cancel/repost can remove it");
     }
 
     private static void pausedTaskSwitchPersistsIdentityAcrossRestoreAndResume() throws Exception {
@@ -652,10 +686,15 @@ public final class TaskFocusSessionCoordinatorSmoke {
         }
 
         Fixture(FakeClock clock, FakeStore existingStore) {
+            this(clock, existingStore, null);
+        }
+
+        Fixture(FakeClock clock, FakeStore existingStore, FakeNotifications existingNotifications) {
             this.clock = clock;
             this.eventLog = existingStore == null ? new ArrayList<>() : existingStore.events;
             this.store = existingStore == null ? new FakeStore(eventLog) : existingStore;
-            this.notifications = new FakeNotifications(eventLog);
+            this.notifications = existingNotifications == null
+                    ? new FakeNotifications(eventLog) : existingNotifications;
             this.coordinator = new TaskFocusSessionCoordinator(clock, store, notifications);
         }
 
@@ -733,6 +772,19 @@ public final class TaskFocusSessionCoordinatorSmoke {
         TaskFocusTimer.Status lastStatus;
 
         FakeNotifications(List<String> events) { this.events = events; }
+
+        @Override
+        public boolean hasActivePausedPresentation(TaskFocusTimer timer, String currentTaskTitle,
+                                                   long nowElapsed) {
+            if (timer == null || !timer.isPaused() || !active || !activeSetReadable) return false;
+            String signature = TaskFocusTimerNotificationSignature.forPaused(
+                    timer, currentTaskTitle, 1, nowElapsed);
+            if (signature == null || !signature.equals(lastPresentationSignature)) return false;
+            lastAllowUnchangedPausedSkip = true;
+            events.add("skip");
+            skipCount++;
+            return true;
+        }
 
         @Override
         public boolean publish(TaskFocusTimer timer, String currentTaskTitle, long nowElapsed,

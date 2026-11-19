@@ -63,6 +63,7 @@ checks = [
      "notifications are skipped when permission or app-level notification access is unavailable"),
     ("TaskFocusTimerNotificationSignature.forPaused(" in source
      and "EXTRA_PRESENTATION_SIGNATURE" in source
+     and "hasActivePausedPresentation" in source
      and "hasActiveNotificationWithSignature" in source
      and "getActiveNotifications()" in source
      and "allowUnchangedPausedSkip" in source
@@ -114,8 +115,10 @@ switch_start = coordinator.index("synchronized Snapshot switchTaskWhilePausedFro
 switch_end = coordinator.index("synchronized Snapshot resumeFromUserAction", switch_start)
 switch_block = coordinator[switch_start:switch_end]
 restore_start = coordinator.index("private Snapshot restoreLoadedSnapshot(TaskFocusTimer restored")
-restore_end = coordinator.index("return snapshot(true);", restore_start)
+restore_end = coordinator.index("synchronized Snapshot pauseFromUserAction", restore_start)
 restore_block = coordinator[restore_start:restore_end]
+preflight_start = restore_block.index("notifications.hasActivePausedPresentation(")
+post_preflight_restore_block = restore_block[preflight_start:]
 refresh_start = coordinator.index("synchronized Snapshot refreshNotification(String currentTaskTitle)")
 refresh_end = coordinator.index("synchronized boolean clearIfTaskDeleted", refresh_start)
 refresh_block = coordinator[refresh_start:refresh_end]
@@ -144,15 +147,17 @@ checks.extend([
      and "coordinator.restoreLoadedSnapshot(" in runtime,
      "restoration resolves one persisted task snapshot against the loaded encrypted task list"),
     ("TaskFocusSessionCoordinator.Snapshot reconcileTasks(List<Task> tasks)" in runtime
-     and "return loadAndReconcileTasks(tasks, false);" in runtime
+     and "return loadAndReconcileTasks(tasks);" in runtime
      and "reconcileTasksAfterTaskSave(List<Task> tasks)" in runtime
-     and "return loadAndReconcileTasks(tasks, true);" in runtime
+     and runtime.count("return loadAndReconcileTasks(tasks);") == 2
      and "coordinator.reconcileLoadedSnapshot(saved, currentTaskId, currentTaskTitle)" in runtime
-     and "coordinator.restoreLoadedSnapshot(saved, currentTaskId, currentTaskTitle)" in runtime
+     and "return coordinator.restoreLoadedSnapshot(" in runtime
+     and "TaskFocusTimerNotification.hasActivePausedPresentation(" in runtime
      and "reconcileTasksAfterTaskSave(snapshot)" in activity
      and "reconcileTasks(taskSnapshot)" in activity,
-     "only task saves opt into coalescing; lifecycle reconciliation and restore retain forced publication"),
+     "lifecycle and task-save reconciliation share exact-active reuse; process restore remains forced"),
     ("TaskFocusTimerNotificationSignature.java" in coordinator_runner
+     and "staleRuntimeKeepsExactActivePausedNoticeDuringLifecycleReconciliation" in coordinator_tests
      and "unchangedPausedTaskSaveCoalescesOnlyAnExactActivePresentation" in coordinator_tests
      and "taskSavePublishesChangedIdentityContentProgressAndActions" in coordinator_tests
      and "missingOrUnverifiableActiveNotificationFallsBackToPublish" in coordinator_tests
@@ -178,8 +183,10 @@ checks.extend([
      "paused task switch persists, cancels the old notification identity, then publishes the new task title"),
     ("!notificationPublished" in restore_block
      and "notificationIdentityChanged(restored, currentTaskTitle)" in restore_block
-     and restore_block.index("notifications.cancel();") < restore_block.index("publishOrCancel("),
-     "first restore and changed persisted task/title remove stale notification content before replacement"),
+     and "notifications.hasActivePausedPresentation(" in restore_block
+     and post_preflight_restore_block.index("notifications.cancel();")
+            < post_preflight_restore_block.index("publishOrCancel("),
+     "reconciliation verifies an exact paused notice before cancel; cold restore and mismatches still replace"),
     ("sameTaskTitle(this.currentTaskTitle, currentTaskTitle)" in refresh_block
      and refresh_block.index("notifications.cancel();") < refresh_block.index("publishOrCancel("),
      "a changed task title cancels stale content before the refreshed notification is published"),

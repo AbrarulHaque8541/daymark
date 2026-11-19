@@ -32,6 +32,13 @@ final class TaskFocusSessionCoordinator {
 
     interface NotificationSink {
         /**
+         * Returns true only when the active paused notice already has the exact requested
+         * presentation. Implementations must fail open when the active set cannot be verified.
+         */
+        boolean hasActivePausedPresentation(TaskFocusTimer timer, String currentTaskTitle,
+                                            long nowElapsedRealtimeMs);
+
+        /**
          * Publishes an already-persisted running or paused session. Return false when notification
          * access is not available; this must not change the persisted timer state.
          */
@@ -163,6 +170,19 @@ final class TaskFocusSessionCoordinator {
             }
             resetMemory(true);
             return null;
+        }
+
+        // A different runtime may already have posted this exact durable paused presentation.
+        // Check before canceling: checking only in publish() is too late after a stale runtime
+        // removes the correct active notice and the replacement may not appear immediately.
+        if (allowUnchangedPausedSkip && restored.isPaused()
+                && notifications.hasActivePausedPresentation(
+                        restored, currentTaskTitle, now.elapsedRealtimeMs)) {
+            current = restored;
+            this.currentTaskTitle = currentTaskTitle;
+            notificationPublished = true;
+            initialized = true;
+            return snapshot(true);
         }
 
         // A newly-created runtime cannot know whether the previous process left

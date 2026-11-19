@@ -153,6 +153,29 @@ final class TaskFocusTimerNotification {
         return true;
     }
 
+    /**
+     * Verifies the currently active paused presentation before a reconciliation can cancel it.
+     * This is deliberately fail-open: absent permissions, notification manager, active entry,
+     * signature metadata, or a readable active set all require the normal publish path.
+     */
+    static boolean hasActivePausedPresentation(Context context, TaskFocusTimer timer,
+            String taskTitle, int notificationId, long nowElapsedRealtimeMs) {
+        if (context == null || timer == null || !timer.isPaused()
+                || notificationId <= 0 || nowElapsedRealtimeMs < 0) {
+            return false;
+        }
+        NotificationManager manager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null || !manager.areNotificationsEnabled()
+                || !hasNotificationPermission(context)) {
+            return false;
+        }
+        String signature = TaskFocusTimerNotificationSignature.forPaused(
+                timer, taskTitle, notificationId, nowElapsedRealtimeMs);
+        return signature != null
+                && hasActiveNotificationWithSignature(manager, notificationId, signature);
+    }
+
     private static boolean hasActiveNotificationWithSignature(
             NotificationManager manager, int notificationId, String signature) {
         if (Build.VERSION.SDK_INT < 23) return false;
