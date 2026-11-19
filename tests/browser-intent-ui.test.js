@@ -48,20 +48,21 @@ test('attachBrowserIntentUi requires a document', () => {
   assert.throws(() => ui.attachBrowserIntentUi({}), /requires a document/);
 });
 
-test('planning a tg:// link renders a refusal instead of a handoff plan', () => {
+test('planning a tg:// link describes a confirmed handoff without opening anything', () => {
   const doc = makeDoc(ALL_IDS);
   doc.elements['browser-intent-link'].value = 'tg://resolve?domain=example';
   const handle = ui.attachBrowserIntentUi({ document: doc, intentApi: engine });
   assert.equal(typeof handle.plan, 'function');
   handle.plan();
   const status = doc.elements['browser-intent-status'].textContent;
-  assert.match(status, new RegExp('Planned · Blocked scheme'));
+  assert.match(status, new RegExp('Planned · Handoff to another app'));
   assert.match(status, new RegExp('nothing was opened'));
   const result = doc.elements['browser-intent-result'];
   assert.equal(result.children[0].className, 'feed-item');
-  assert.equal(result.children[0].children[0].textContent, 'Blocked scheme');
+  assert.equal(result.children[0].children[0].textContent, 'Handoff to another app');
   const lines = result.children.slice(1).map((child) => child.textContent);
-  assert.ok(lines.some((line) => line.indexOf('Action · nothing opens') !== -1));
+  assert.ok(lines.some((line) => line.indexOf('Trigger · only an explicit user tap starts it') !== -1));
+  assert.ok(lines.some((line) => line.indexOf('If no app handles it · the handoff fails visibly') !== -1));
   assert.ok(lines.some((line) => line.indexOf('Network · None here') === 0));
 });
 
