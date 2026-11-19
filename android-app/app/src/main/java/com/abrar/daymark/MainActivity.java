@@ -2192,6 +2192,10 @@ public final class MainActivity extends Activity {
         if (browserStatusHideRunnable != null) mainHandler.removeCallbacks(browserStatusHideRunnable);
         browserStatus.animate().cancel();
         browserStatus.setText(message == null ? "" : message);
+        // Expose the status text to accessibility services so TalkBack announces
+        // intent refusals, security labels, and other transient browser messages.
+        browserStatus.setContentDescription(message == null ? "" : message);
+        browserStatus.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         browserStatus.setVisibility(View.VISIBLE);
         browserStatus.setAlpha(0f);
         browserStatus.animate().alpha(1f).setDuration(150L).start();

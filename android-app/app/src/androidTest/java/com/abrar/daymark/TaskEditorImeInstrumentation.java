@@ -294,6 +294,15 @@ final class TaskEditorImeInstrumentation {
         trace.record("exercise.dialogRootAfterImeReady");
         AccessibilityNodeInfo scrollView = findScrollable(root);
         require(scrollView != null, "the task form remains scrollable within the dialog viewport", assertions);
+        // When the software IME is open it can report the dialog buttons as not visible
+        // (visible=0) on some API 36 emulator images, causing intermittent timeouts.
+        // Hide the IME first so the footer actions become reliably tappable for the rest of the exercise.
+        if (imeBounds != null) {
+            hideSoftInput(activity);
+            SystemClock.sleep(300L);
+            instrumentation.waitForIdleSync();
+            trace.record("exercise.afterImeDismissAttempt");
+        }
         trace.record("exercise.beforeCancelButtonWait");
         AccessibilityNodeInfo cancel = awaitDialogButton(
                 instrumentation, activity, EDITOR_TITLE, "android:id/button2", "Cancel", trace);
@@ -982,5 +991,18 @@ final class TaskEditorImeInstrumentation {
             throw new AssertionError(message);
         }
         assertions[0]++;
+    }
+
+    private static void hideSoftInput(MainActivity activity) {
+        if (activity == null) return;
+        new Handler(Looper.getMainLooper()).post(() -> {
+            try {
+                InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                View focus = activity.getCurrentFocus();
+                if (imm != null && focus != null) {
+                    imm.hideSoftInputFromWindow(focus.getWindowToken(), 0);
+                }
+            } catch (Throwable ignored) { }
+        });
     }
 }
