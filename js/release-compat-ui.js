@@ -80,10 +80,23 @@
       if (resultEl) { while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild); }
       status('Explanation cleared; no setting, build or release was changed.');
     }
+    const explainEl = element('release-compat-explain');
+    if (explainEl) {
+      if (typeof explainEl.setAttribute === 'function') {
+        explainEl.setAttribute('title', 'Explain the selected release topic locally');
+        explainEl.setAttribute('aria-label', 'Explain the selected release topic; nothing is fetched or changed');
+      }
+      if (typeof explainEl.addEventListener === 'function') {
+        explainEl.addEventListener('pointerdown', function () { if (explainEl.classList && explainEl.classList.add) explainEl.classList.add('is-pressed'); });
+        explainEl.addEventListener('pointerup', function () { if (explainEl.classList && explainEl.classList.remove) explainEl.classList.remove('is-pressed'); });
+        explainEl.addEventListener('pointercancel', function () { if (explainEl.classList && explainEl.classList.remove) explainEl.classList.remove('is-pressed'); });
+      }
+    }
     if (clearEl) {
       clearEl.textContent = 'Clear explanation';
       if (typeof clearEl.setAttribute === 'function') {
         clearEl.setAttribute('aria-label', 'Clear explanation only; no setting, build or release is changed');
+        clearEl.setAttribute('title', 'Clear the release explanation');
       }
       if (typeof clearEl.addEventListener === 'function') {
         clearEl.addEventListener('pointerdown', function () { if (clearEl.classList && clearEl.classList.add) clearEl.classList.add('is-pressed'); });
