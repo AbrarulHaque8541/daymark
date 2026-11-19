@@ -133,6 +133,13 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #wiki-search:active, #wiki-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #zones-add:active, #zones-refresh:active, #zones-clear:active, #zones-copy:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #focus-start:active, #focus-pause:active, #focus-stop:active, .focus-preset:active, #chip-today:active, #chip-tomorrow:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#browser-download-check:active, #browser-download-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#browser-proxy-plan:active, #browser-proxy-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#permission-lifecycle-explain:active, #permission-lifecycle-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#url-insights-explain:active, #url-insights-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#capability-registry-describe:active, #capability-registry-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#storage-check:active, #storage-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+
 .task-list.is-resetting { animation: task-list-reset .28s ease; }
 .task-list.is-sorting { animation: task-list-reset .28s ease; }
 .task-list.is-filtering { animation: task-list-reset .28s ease; }
@@ -1209,4 +1216,14 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
     background: rgba(26, 58, 50, 0.45);
     color: var(--accent-bright);
   }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  #browser-download-check:active, #browser-download-clear:active,
+  #browser-proxy-plan:active, #browser-proxy-clear:active,
+  #permission-lifecycle-explain:active, #permission-lifecycle-clear:active,
+  #url-insights-explain:active, #url-insights-clear:active,
+  #capability-registry-describe:active, #capability-registry-clear:active,
+  #storage-check:active, #storage-clear:active { transform: none; }
 }
