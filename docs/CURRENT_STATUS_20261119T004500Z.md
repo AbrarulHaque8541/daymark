@@ -1,0 +1,1 @@
+$(cat /tmp/daymark/CURRENT_STATUS_20261119T004500Z.md)
