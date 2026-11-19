@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-19T00:45:00Z (Cycle A: remaining glance titles + press feedback)](./CURRENT_STATUS_20261119T004500Z.md)
+
 - [Daymark engineering status — 2026-11-19T02:20:00Z (re-audit of main + merged-manifest CI fix, branch fix/ci-merged-manifest-check-20261119)](./CURRENT_STATUS_20261119T022000Z.md)
 
 - [Daymark engineering status — 2026-11-18T16:47:00Z (capability registry card, branch feat/capability-registry-vibe-20261118)](./CURRENT_STATUS_20261118T164700Z.md)
