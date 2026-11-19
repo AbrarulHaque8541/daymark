@@ -109,6 +109,18 @@ test('planUpgradePath rejects an empty list', () => {
   assert.ok(p.error.indexOf('needs at least one known topic') !== -1);
 });
 
+test('every action-required warning embeds its recovery text', () => {
+  for (const id of logic.TOPIC_IDS) {
+    const entry = logic.explainTopic(id);
+    if (!entry.requiresAction) continue;
+    const p = logic.planUpgradePath([id]);
+    assert.equal(p.ok, true, id);
+    assert.equal(p.warnings.length, 1, id);
+    assert.ok(p.warnings[0].indexOf(entry.label) !== -1, id);
+    assert.ok(p.warnings[0].indexOf(entry.recovery) !== -1, id);
+  }
+});
+
 test('planUpgradePath covers the full six-topic path honestly', () => {
   const p = logic.planUpgradePath(logic.TOPIC_IDS);
   assert.equal(p.ok, true);
