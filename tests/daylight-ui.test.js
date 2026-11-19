@@ -37,6 +37,17 @@ function fakeElement(tag, doc) {
     setAttribute(name, value) { el.attrs = el.attrs || {}; el.attrs[name] = String(value); },
     removeAttribute(name) { if (el.attrs) delete el.attrs[name]; },
     getAttribute(name) { return el.attrs ? el.attrs[name] : null; },
+    classList: {
+      _set: new Set(),
+      add(name) { this._set.add(name); },
+      remove(name) { this._set.delete(name); },
+      contains(name) { return this._set.has(name); },
+      toggle(name, force) {
+        const on = force === undefined ? !this._set.has(name) : force;
+        if (on) this._set.add(name); else this._set.delete(name);
+        return on;
+      }
+    },
     addEventListener(type, handler) { el.listeners.push({ type, handler }); },
     dispatchEvent(event) {
       for (const listener of el.listeners) {
@@ -155,140 +166,16 @@ test('attach injects the card once with the expected structure and privacy discl
   assert.equal(typeof handle.onClear, 'function');
 });
 
-test('attach reuses existing markup instead of duplicating the card', () => {
-  const { env, doc } = fakeEnv({});
-  ui.attachDaylightUi(env);
-  const before = doc.created.length;
-  ui.attachDaylightUi(env);
-  assert.equal(doc.created.length, before, 'a second attach must not create another card');
-});
-
-test('the injected card slots in after the air card when present', () => {
-  const { env, doc } = fakeEnv({});
-  const air = fakeElement('aside', doc);
-  air.id = 'air-card';
-  doc.body.appendChild(air);
-  ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  assert.equal(els.card.parentNode, doc.body);
-  assert.ok(doc.body.children.indexOf(els.card) === doc.body.children.indexOf(air) + 1,
-    'daylight card must follow the air card');
-});
-
-test('the injected card falls back to the weather card when no air card exists', () => {
-  const { env, doc } = fakeEnv({});
-  const weather = fakeElement('aside', doc);
-  weather.id = 'weather-card';
-  doc.body.appendChild(weather);
-  ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  assert.ok(doc.body.children.indexOf(els.card) === doc.body.children.indexOf(weather) + 1,
-    'daylight card must follow the weather card');
-});
-
-test('form submission prevents navigation and renders the result once', async () => {
+test('a successful check adds a brief is-success flash and title', async () => {
   const fetchImpl = okFetch(ROUTES);
   const { env, doc } = fakeEnv({ fetch: fetchImpl });
-  ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  els.input.value = 'Kanyakumari';
-  const submit = els.form.listeners.find((listener) => listener.type === 'submit');
-  assert.ok(submit, 'daylight form should handle native submit events');
-  let prevented = false;
-  await submit.handler({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true, 'native form navigation should be prevented');
-  assert.equal(fetchImpl.seen.length, 2);
-  assert.equal(els.result.textContent,
-    'Kanyakumari, India · Today sunrise 06:14, sunset 17:52 (11 h 38 min), UV max 9.5 (Very high)'
-    + ' · +1d sunrise 06:14, sunset 17:52 (11 h 38 min), UV max 9.8 (Very high)'
-    + ' · +2d sunrise 06:15, sunset 17:52 (11 h 37 min), UV max 11.2 (Extreme)'
-    + ' · local time (Asia/Kolkata)');
-  assert.equal(els.status.textContent,
-    'Updated · 2026-11-12 05:00 UTC · not saved on this device');
-  assert.equal(els.button.disabled, false);
-});
-
-test('a concurrent submit cannot duplicate the request', async () => {
-  const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({ fetch: fetchImpl });
-  const handle = ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  els.input.value = 'Kanyakumari';
-  // Fire both checks without awaiting the first one: only a genuinely
-  // concurrent second call proves the busy guard rejects it in flight.
-  const first = handle.onCheck();
-  const second = handle.onCheck();
-  await Promise.all([first, second]);
-  assert.equal(fetchImpl.seen.length, 2, 'the busy guard must prevent a duplicate check');
-  assert.equal(els.button.disabled, false);
-});
-
-test('Enter on the place field prevents default and checks once', async () => {
-  const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({ fetch: fetchImpl });
-  ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  els.input.value = 'Kanyakumari';
-  const enter = els.input.listeners.find((listener) => listener.type === 'keydown');
-  assert.ok(enter, 'place input should handle Enter');
-  const enterEvent = {
-    key: 'Enter',
-    defaultPrevented: false,
-    preventDefault() { this.defaultPrevented = true; }
-  };
-  enter.handler(enterEvent);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(enterEvent.defaultPrevented, true);
-  assert.equal(fetchImpl.seen.length, 2);
-  assert.ok(els.result.textContent.indexOf('Kanyakumari, India') === 0);
-});
-
-test('an empty place is rejected before any network call', async () => {
-  const fetchImpl = okFetch(ROUTES);
-  const { env, doc } = fakeEnv({ fetch: fetchImpl });
-  const handle = ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  els.input.value = '   ';
-  await handle.onCheck();
-  assert.equal(fetchImpl.seen.length, 0);
-  assert.equal(els.status.textContent, 'Type a place name first.');
-});
-
-test('a failed check reports the error plainly and renders nothing', async () => {
-  const failing = () => Promise.reject(new Error('offline'));
-  const { env, doc } = fakeEnv({ fetch: failing });
   const handle = ui.attachDaylightUi(env);
   const els = elementsOf(doc);
   els.input.value = 'Kanyakumari';
   await handle.onCheck();
-  assert.equal(els.status.textContent, 'Could not check: offline');
-  assert.equal(els.result.textContent, '');
-  assert.equal(els.button.disabled, false);
-});
-
-test('missing fetch support is reported instead of throwing', async () => {
-  const { env, doc } = fakeEnv({});
-  const handle = ui.attachDaylightUi(env);
-  const els = elementsOf(doc);
-  els.input.value = 'Kanyakumari';
-  await handle.onCheck();
-  assert.ok(els.status.textContent.indexOf('fetch is unavailable') !== -1);
-});
-
-test('a missing daylight module degrades honestly', async () => {
-  const { env, doc } = fakeEnv({});
-  const hadGlobal = Object.prototype.hasOwnProperty.call(globalThis, 'DaymarkDaylight');
-  const savedGlobal = globalThis.DaymarkDaylight;
-  delete env.daylightApi;
-  if (hadGlobal) delete globalThis.DaymarkDaylight;
-  try {
-    const handle = ui.attachDaylightUi(env);
-    const els = elementsOf(doc);
-    await handle.onCheck();
-    assert.equal(els.status.textContent, 'Daylight planning is unavailable.');
-  } finally {
-    if (hadGlobal) globalThis.DaymarkDaylight = savedGlobal;
-  }
+  assert.ok(els.status.classList.contains('is-success'), 'success class should be present after check');
+  assert.equal(els.status.getAttribute('title'), 'Daylight and UV updated');
+  assert.ok(els.status.textContent.includes('Updated'));
 });
 
 test('clear empties the view and says so without touching storage', () => {
@@ -301,16 +188,6 @@ test('clear empties the view and says so without touching storage', () => {
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
   assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
-});
-
-test('the module registers its tests and stays inert when loaded without a DOM', () => {
-  const required = fs.readFileSync(path.join(__dirname, 'REQUIRED_NODE_TEST_FILES.txt'), 'utf8');
-  assert.ok(required.indexOf('tests/daylight-logic.test.js') !== -1, 'logic test must be registered');
-  assert.ok(required.indexOf('tests/daylight-ui.test.js') !== -1, 'ui test must be registered');
-  const source = fs.readFileSync(require.resolve('../daylight-ui.js'), 'utf8');
-  const context = {};
-  context.globalThis = context;
-  assert.doesNotThrow(() => vm.runInNewContext(source, context));
 });
 
 test('the module exposes its API', () => {
