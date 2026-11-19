@@ -133,6 +133,15 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #wiki-search:active, #wiki-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #zones-add:active, #zones-refresh:active, #zones-clear:active, #zones-copy:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #focus-start:active, #focus-pause:active, #focus-stop:active, .focus-preset:active, #chip-today:active, #chip-tomorrow:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#browser-download-check:active, #browser-download-clear:active,
+#browser-proxy-plan:active, #browser-proxy-clear:active,
+#permission-lifecycle-explain:active, #permission-lifecycle-clear:active,
+#url-insights-explain:active, #url-insights-clear:active,
+#capability-registry-describe:active, #capability-registry-clear:active,
+#storage-check:active, #storage-clear:active {
+  transform: scale(0.96);
+  background: rgba(22, 112, 95, 0.12);
+}
 .task-list.is-resetting { animation: task-list-reset .28s ease; }
 .task-list.is-sorting { animation: task-list-reset .28s ease; }
 .task-list.is-filtering { animation: task-list-reset .28s ease; }
@@ -1181,6 +1190,12 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   #air-refresh:active, #air-clear:active,
   #tls-gate-plan:active, #tls-gate-clear:active,
   #export-tasks:active, #import-tasks:active,
+  #browser-download-check:active, #browser-download-clear:active,
+  #browser-proxy-plan:active, #browser-proxy-clear:active,
+  #permission-lifecycle-explain:active, #permission-lifecycle-clear:active,
+  #url-insights-explain:active, #url-insights-clear:active,
+  #capability-registry-describe:active, #capability-registry-clear:active,
+  #storage-check:active, #storage-clear:active,
   #reset-view:active, #sort-toggle:active, #clear-search:active,
   .empty-clear-search:active,
   .add-button:active {

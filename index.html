@@ -450,8 +450,8 @@
               <option value="unknown-type">Unknown content type</option>
               <option value="retryable-error">Retryable network error</option>
             </select>
-            <button class="button button-primary" id="browser-download-check" type="submit">Plan</button>
-            <button class="button button-quiet" id="browser-download-clear" type="button">Clear</button>
+            <button class="button button-primary" id="browser-download-check" type="submit" title="Plan a sample download safety check">Plan</button>
+            <button class="button button-quiet" id="browser-download-clear" type="button" title="Clear the download safety plan">Clear</button>
             <button class="button button-quiet" id="browser-download-copy" type="button" aria-label="Copy the safety plan to the clipboard">Copy plan</button>
             <button class="button button-quiet" id="browser-download-save" type="button" aria-label="Save the safety plan as a local text file">Save plan</button>
             <button class="button button-quiet" id="browser-download-share" type="button" aria-label="Share the safety plan">Share plan</button>
@@ -466,8 +466,8 @@
           <form id="browser-proxy-form" class="feed-form" novalidate>
             <label class="sr-only" for="browser-proxy-address">Proxy address</label>
             <input id="browser-proxy-address" name="address" type="text" maxlength="512" placeholder="proxy.example.org:8080" autocomplete="off">
-            <button class="button button-primary" id="browser-proxy-plan" type="submit">Plan</button>
-            <button class="button button-quiet" id="browser-proxy-clear" type="button">Clear</button>
+            <button class="button button-primary" id="browser-proxy-plan" type="submit" title="Plan a proxy address validation">Plan</button>
+            <button class="button button-quiet" id="browser-proxy-clear" type="button" title="Clear the proxy check">Clear</button>
             <button class="button button-quiet" id="browser-proxy-copy" type="button" aria-label="Copy the proxy plan to the clipboard">Copy plan</button>
           </form>
           <p class="feed-status" id="browser-proxy-status" role="status" aria-live="polite" aria-atomic="true"></p>
@@ -507,8 +507,8 @@
               <option value="revoked-settings">Revoked in Android Settings</option>
               <option value="site-reset">Per-site permission reset</option>
             </select>
-            <button class="button button-primary" id="permission-lifecycle-explain" type="submit">Explain</button>
-            <button class="button button-quiet" id="permission-lifecycle-clear" type="button">Clear</button>
+            <button class="button button-primary" id="permission-lifecycle-explain" type="submit" title="Explain the selected permission lifecycle">Explain</button>
+            <button class="button button-quiet" id="permission-lifecycle-clear" type="button" title="Clear the permission explanation">Clear</button>
           </form>
           <p class="feed-status" id="permission-lifecycle-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="permission-lifecycle-result" aria-live="polite"></div>
@@ -533,8 +533,8 @@
           <form id="url-insights-form" class="feed-form" novalidate>
             <label class="sr-only" for="url-insights-input">Address or search words</label>
             <input id="url-insights-input" name="address" type="text" maxlength="2048" placeholder="https://example.com:8443/path or plain words" autocomplete="off" spellcheck="false">
-            <button class="button button-primary" id="url-insights-explain" type="submit">Explain</button>
-            <button class="button button-quiet" id="url-insights-clear" type="button">Clear plan</button>
+            <button class="button button-primary" id="url-insights-explain" type="submit" title="Explain the address bar input">Explain</button>
+            <button class="button button-quiet" id="url-insights-clear" type="button" title="Clear the address explanation">Clear plan</button>
           </form>
           <p class="feed-status" id="url-insights-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="url-insights-result" aria-live="polite"></div>
@@ -556,8 +556,8 @@
               <option value="daymark-browser">Daymark browser (Android only)</option>
               <option value="cross-platform-desktop">Cross-platform desktop (planned)</option>
             </select>
-            <button class="button button-primary" id="capability-registry-describe" type="submit">Describe</button>
-            <button class="button button-quiet" id="capability-registry-clear" type="button">Clear</button>
+            <button class="button button-primary" id="capability-registry-describe" type="submit" title="Describe the selected capability">Describe</button>
+            <button class="button button-quiet" id="capability-registry-clear" type="button" title="Clear the capability description">Clear</button>
           </form>
           <p class="feed-status" id="capability-registry-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="feed-list" id="capability-registry-result" aria-live="polite"></div>
@@ -598,8 +598,8 @@
           <h2 id="storage-heading">Browser storage health</h2>
           <p class="briefing-description">Local-only check of this origin’s storage. No network.</p>
           <form id="storage-form" class="feed-form" novalidate>
-            <button class="button button-primary" id="storage-check" type="button">Check</button>
-            <button class="button button-quiet" id="storage-clear" type="button">Clear status</button>
+            <button class="button button-primary" id="storage-check" type="button" title="Check local browser storage health">Check</button>
+            <button class="button button-quiet" id="storage-clear" type="button" title="Clear the storage status">Clear status</button>
             <button class="button button-quiet" id="storage-clear-all" type="button" aria-label="Clear all managed Daymark data stored in this browser">Clear all local data</button>
           </form>
           <p class="feed-status" id="storage-status-line" role="status" aria-live="polite"></p>
