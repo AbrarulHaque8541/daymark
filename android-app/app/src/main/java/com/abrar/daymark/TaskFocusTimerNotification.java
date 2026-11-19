@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.service.notification.StatusBarNotification;
 
 import java.util.Collections;
 
@@ -39,6 +40,8 @@ final class TaskFocusTimerNotification {
     private static final int REQUEST_PAUSE = 9412;
     private static final int REQUEST_RESUME = 9413;
     private static final int REQUEST_FINISH = 9414;
+    private static final String EXTRA_PRESENTATION_SIGNATURE =
+            "com.abrar.daymark.extra.FOCUS_PRESENTATION_SIGNATURE";
     /**
      * Equals {@code Notification.EXTRA_REQUEST_PROMOTED_ONGOING}, which was added in API 36.1.
      * At compileSdk 36 the constant is unavailable, so this string key is the only framework
@@ -49,7 +52,8 @@ final class TaskFocusTimerNotification {
     private TaskFocusTimerNotification() { }
 
     static boolean publish(Context context, TaskFocusTimer timer, String taskTitle,
-                           int notificationId, long nowElapsedRealtimeMs) {
+                           int notificationId, long nowElapsedRealtimeMs,
+                           boolean allowUnchangedPausedSkip) {
         if (context == null || timer == null || notificationId <= 0 || nowElapsedRealtimeMs < 0) {
             return false;
         }
@@ -68,10 +72,13 @@ final class TaskFocusTimerNotification {
             return false;
         }
 
+        String presentationSignature = TaskFocusTimerNotificationSignature.forPaused(
+                timer, taskTitle, notificationId, nowElapsedRealtimeMs);
+
         ensureChannel(context, manager);
         Notification.Builder builder = new Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
-                .setContentTitle(safeTitle(taskTitle))
+                .setContentTitle(TaskFocusTimerNotificationSignature.safeTitle(taskTitle))
                 .setContentText(state.contentText)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
@@ -132,8 +139,35 @@ final class TaskFocusTimerNotification {
             built = builder.build();
         }
 
+        if (presentationSignature != null) {
+            if (built.extras == null) built.extras = new Bundle();
+            built.extras.putString(EXTRA_PRESENTATION_SIGNATURE, presentationSignature);
+            if (allowUnchangedPausedSkip
+                    && hasActiveNotificationWithSignature(
+                            manager, notificationId, presentationSignature)) {
+                return true;
+            }
+        }
+
         manager.notify(notificationId, built);
         return true;
+    }
+
+    private static boolean hasActiveNotificationWithSignature(
+            NotificationManager manager, int notificationId, String signature) {
+        if (Build.VERSION.SDK_INT < 23) return false;
+        try {
+            for (StatusBarNotification active : manager.getActiveNotifications()) {
+                if (active.getId() != notificationId) continue;
+                Notification notification = active.getNotification();
+                Bundle extras = notification == null ? null : notification.extras;
+                return extras != null
+                        && signature.equals(extras.getString(EXTRA_PRESENTATION_SIGNATURE));
+            }
+        } catch (RuntimeException unavailable) {
+            // Fail open: if the active set cannot be verified, attempt the normal publish.
+        }
+        return false;
     }
 
     static void cancel(Context context, int notificationId) {
@@ -169,8 +203,6 @@ final class TaskFocusTimerNotification {
     }
 
     private static String safeTitle(String title) {
-        if (title == null || title.trim().isEmpty()) return "Focus session";
-        String normalized = title.replace('\n', ' ').replace('\r', ' ').trim();
-        return normalized.length() > 120 ? normalized.substring(0, 120) : normalized;
+        return TaskFocusTimerNotificationSignature.safeTitle(title);
     }
 }

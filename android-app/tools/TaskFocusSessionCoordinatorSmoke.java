@@ -18,6 +18,10 @@ public final class TaskFocusSessionCoordinatorSmoke {
         anActiveSessionCannotBeReplaced();
         processRestorePublishesOnlyAnExistingRunningSession();
         restoreLoadedSnapshotUsesCallerResolvedRecord();
+        unchangedPausedTaskSaveCoalescesOnlyAnExactActivePresentation();
+        taskSavePublishesChangedIdentityContentProgressAndActions();
+        missingOrUnverifiableActiveNotificationFallsBackToPublish();
+        coldRestorePublishesEvenWhenTheOldPausedPresentationMatches();
         aMissingTaskClearsOnlyTheFocusRecord();
         expiredAndUnknownBootRestoresFailClosed();
         failedNotificationPublicationCancelsPriorVisibleState();
@@ -299,6 +303,159 @@ public final class TaskFocusSessionCoordinatorSmoke {
                 "changing notification identity cancels the old title before publishing without a second storage read/write");
     }
 
+    private static void unchangedPausedTaskSaveCoalescesOnlyAnExactActivePresentation()
+            throws Exception {
+        Fixture fixture = pausedCountdownFixture();
+        TaskFocusTimer persisted = fixture.store.load(
+                fixture.clock.elapsed, fixture.clock.wall, fixture.clock.boot);
+        int publishesBefore = fixture.notifications.publishCount;
+        fixture.store.events.clear();
+
+        for (int iteration = 1; iteration <= 2; iteration++) {
+            fixture.notifications.events.clear();
+            TaskFocusSessionCoordinator.Snapshot reconciled = fixture.coordinator
+                    .reconcileLoadedSnapshot(persisted, "task-a", "Task A");
+            check(reconciled != null && reconciled.isPaused() && reconciled.notificationPublished,
+                    "an unchanged task save retains the active paused session");
+            check(fixture.notifications.publishCount == publishesBefore
+                            && fixture.notifications.skipCount == iteration,
+                    "repeated unchanged task saves do not enqueue another notification");
+            check(fixture.events().equals(list("skip"))
+                            && fixture.notifications.lastAllowUnchangedPausedSkip,
+                    "only the task-save path asks the sink to verify and skip the unchanged notice");
+        }
+    }
+
+    private static void taskSavePublishesChangedIdentityContentProgressAndActions()
+            throws Exception {
+        Fixture fixture = pausedCountdownFixture();
+        TaskFocusTimer persisted = fixture.store.load(
+                fixture.clock.elapsed, fixture.clock.wall, fixture.clock.boot);
+        fixture.store.events.clear();
+
+        int beforeTitleChange = fixture.notifications.publishCount;
+        fixture.coordinator.reconcileLoadedSnapshot(persisted, "task-a", "Renamed Task");
+        check(fixture.notifications.publishCount == beforeTitleChange + 1
+                        && fixture.events().equals(list("cancel", "publish"))
+                        && "Renamed Task".equals(fixture.notifications.lastTitle),
+                "a changed task title cancels and republishes the updated notification");
+        check(!fixture.notifications.lastAllowUnchangedPausedSkip,
+                "an identity change cannot use the unchanged-notification shortcut");
+
+        TaskFocusTimer switched = persisted.switchTaskWhilePaused("task-b");
+        fixture.notifications.events.clear();
+        int beforeTaskChange = fixture.notifications.publishCount;
+        fixture.coordinator.reconcileLoadedSnapshot(switched, "task-b", "Renamed Task");
+        check(fixture.notifications.publishCount == beforeTaskChange + 1
+                        && fixture.events().equals(list("cancel", "publish")),
+                "a changed task ID cancels and republishes even when visible title text is the same");
+
+        TaskFocusTimer progressChanged = TaskFocusTimer.start(
+                "task-b", TaskFocusTimer.Mode.COUNTDOWN, 10_000L,
+                fixture.clock.elapsed - 3_500L).pause(fixture.clock.elapsed);
+        String oldSignature = fixture.notifications.lastPresentationSignature;
+        String newSignature = TaskFocusTimerNotificationSignature.forPaused(
+                progressChanged, "Renamed Task", 1, fixture.clock.elapsed);
+        check(oldSignature != null && newSignature != null && !oldSignature.equals(newSignature),
+                "the generated presentation identity includes exact paused text and progress");
+        fixture.notifications.events.clear();
+        int beforeProgressChange = fixture.notifications.publishCount;
+        fixture.coordinator.reconcileLoadedSnapshot(progressChanged, "task-b", "Renamed Task");
+        check(fixture.notifications.publishCount == beforeProgressChange + 1
+                        && fixture.events().equals(list("publish"))
+                        && fixture.notifications.lastStatus == TaskFocusTimer.Status.PAUSED,
+                "same-mode countdown content/progress changes republish without hiding behind identity equality");
+
+        TaskFocusTimer running = progressChanged.resume(fixture.clock.elapsed);
+        TaskFocusTimerNotificationState runningState =
+                TaskFocusTimerNotificationState.from(running, fixture.clock.elapsed);
+        check(runningState.shouldShowPauseAction() && !runningState.shouldShowResumeAction()
+                        && runningState.shouldUseChronometer(),
+                "running state changes the chronometer and Pause/Resume action set");
+        fixture.notifications.events.clear();
+        int beforeRunning = fixture.notifications.publishCount;
+        fixture.coordinator.reconcileLoadedSnapshot(running, "task-b", "Renamed Task");
+        check(fixture.notifications.publishCount == beforeRunning + 1
+                        && fixture.events().equals(list("cancel", "publish"))
+                        && fixture.notifications.lastStatus == TaskFocusTimer.Status.RUNNING
+                        && !fixture.notifications.lastAllowUnchangedPausedSkip,
+                "a running session and its changed action set always publish normally");
+        check(TaskFocusTimerNotificationSignature.forPaused(
+                        running, "Renamed Task", 1, fixture.clock.elapsed) == null,
+                "running presentations are never eligible for paused-notification coalescing");
+    }
+
+    private static void missingOrUnverifiableActiveNotificationFallsBackToPublish()
+            throws Exception {
+        Fixture fixture = pausedCountdownFixture();
+        TaskFocusTimer persisted = fixture.store.load(
+                fixture.clock.elapsed, fixture.clock.wall, fixture.clock.boot);
+        fixture.store.events.clear();
+
+        fixture.notifications.active = false;
+        fixture.notifications.lastPresentationSignature = null;
+        assertTaskSaveFallsBackToPublish(fixture, persisted,
+                "an OS-removed active notification is recreated instead of being skipped");
+
+        fixture.notifications.active = true;
+        fixture.notifications.lastPresentationSignature = null;
+        assertTaskSaveFallsBackToPublish(fixture, persisted,
+                "an active legacy notification without the signature is refreshed");
+
+        fixture.notifications.activeSetReadable = false;
+        assertTaskSaveFallsBackToPublish(fixture, persisted,
+                "an unreadable active-notification set fails open to a normal publish");
+    }
+
+    private static void assertTaskSaveFallsBackToPublish(
+            Fixture fixture, TaskFocusTimer timer, String message) throws Exception {
+        fixture.notifications.events.clear();
+        int publishesBefore = fixture.notifications.publishCount;
+        TaskFocusSessionCoordinator.Snapshot result = fixture.coordinator
+                .reconcileLoadedSnapshot(timer, "task-a", "Task A");
+        check(result.notificationPublished && fixture.notifications.active
+                        && fixture.notifications.publishCount == publishesBefore + 1
+                        && fixture.events().equals(list("publish")), message);
+    }
+
+    private static void coldRestorePublishesEvenWhenTheOldPausedPresentationMatches()
+            throws Exception {
+        Fixture beforeProcessDeath = pausedCountdownFixture();
+        TaskFocusTimer persisted = beforeProcessDeath.store.load(
+                beforeProcessDeath.clock.elapsed, beforeProcessDeath.clock.wall,
+                beforeProcessDeath.clock.boot);
+        String oldSignature = TaskFocusTimerNotificationSignature.forPaused(
+                persisted, "Task A", 1, beforeProcessDeath.clock.elapsed);
+        Fixture afterProcessDeath = new Fixture(beforeProcessDeath.clock, beforeProcessDeath.store);
+        afterProcessDeath.notifications.active = true;
+        afterProcessDeath.notifications.lastPresentationSignature = oldSignature;
+        afterProcessDeath.notifications.lastTitle = "Task A";
+        afterProcessDeath.notifications.lastStatus = TaskFocusTimer.Status.PAUSED;
+        afterProcessDeath.store.events.clear();
+
+        TaskFocusSessionCoordinator.Snapshot restored = afterProcessDeath.coordinator
+                .restoreAfterProcessStart("task-a", "Task A");
+        check(restored != null && restored.isPaused() && restored.notificationPublished,
+                "a cold process restore republishes the persisted paused session");
+        check(afterProcessDeath.events().equals(list("load", "cancel", "publish"))
+                        && afterProcessDeath.notifications.publishCount == 1
+                        && afterProcessDeath.notifications.skipCount == 0
+                        && !afterProcessDeath.notifications.lastAllowUnchangedPausedSkip,
+                "restore forces a publish even if a matching old notification is still active");
+    }
+
+    private static Fixture pausedCountdownFixture() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.initializeWithoutSession();
+        fixture.coordinator.startFromUserAction(
+                "task-a", "Task A", TaskFocusTimer.Mode.COUNTDOWN, 10_000L);
+        fixture.clock.advance(2_500L);
+        fixture.coordinator.pauseFromUserAction();
+        fixture.notifications.events.clear();
+        fixture.store.events.clear();
+        return fixture;
+    }
+
     private static void aMissingTaskClearsOnlyTheFocusRecord() throws Exception {
         Fixture first = new Fixture();
         first.initializeWithoutSession();
@@ -567,20 +724,39 @@ public final class TaskFocusSessionCoordinatorSmoke {
         final List<String> events;
         boolean available = true;
         boolean active;
+        boolean activeSetReadable = true;
         int publishCount;
+        int skipCount;
+        boolean lastAllowUnchangedPausedSkip;
         String lastTitle;
+        String lastPresentationSignature;
         TaskFocusTimer.Status lastStatus;
 
         FakeNotifications(List<String> events) { this.events = events; }
 
         @Override
-        public boolean publish(TaskFocusTimer timer, String currentTaskTitle, long nowElapsed) {
+        public boolean publish(TaskFocusTimer timer, String currentTaskTitle, long nowElapsed,
+                               boolean allowUnchangedPausedSkip) {
+            lastAllowUnchangedPausedSkip = allowUnchangedPausedSkip;
+            if (!available || timer == null || (!timer.isRunning() && !timer.isPaused())) {
+                events.add("publish");
+                publishCount++;
+                return false;
+            }
+            String nextSignature = TaskFocusTimerNotificationSignature.forPaused(
+                    timer, currentTaskTitle, 1, nowElapsed);
+            if (allowUnchangedPausedSkip && timer.isPaused() && active && activeSetReadable
+                    && nextSignature != null && nextSignature.equals(lastPresentationSignature)) {
+                events.add("skip");
+                skipCount++;
+                return true;
+            }
             events.add("publish");
             publishCount++;
-            if (!available || timer == null || (!timer.isRunning() && !timer.isPaused())) return false;
             lastTitle = currentTaskTitle;
             lastStatus = timer.status();
             active = true;
+            lastPresentationSignature = nextSignature;
             return true;
         }
 
@@ -588,6 +764,7 @@ public final class TaskFocusSessionCoordinatorSmoke {
         public void cancel() {
             events.add("cancel");
             active = false;
+            lastPresentationSignature = null;
         }
     }
 

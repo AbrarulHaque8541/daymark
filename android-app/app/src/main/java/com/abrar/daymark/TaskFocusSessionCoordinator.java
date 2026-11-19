@@ -36,7 +36,7 @@ final class TaskFocusSessionCoordinator {
          * access is not available; this must not change the persisted timer state.
          */
         boolean publish(TaskFocusTimer timer, String currentTaskTitle,
-                        long nowElapsedRealtimeMs);
+                        long nowElapsedRealtimeMs, boolean allowUnchangedPausedSkip);
 
         /** Cancels only the focus-session notification, never a reminder or task record. */
         void cancel();
@@ -118,7 +118,7 @@ final class TaskFocusSessionCoordinator {
         } catch (Exception failure) {
             return restoreLoadFailure(failure);
         }
-        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, now);
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, now, false);
     }
 
     /**
@@ -128,7 +128,13 @@ final class TaskFocusSessionCoordinator {
      */
     synchronized Snapshot restoreLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
                                                  String currentTaskTitle) throws Exception {
-        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, readClock());
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, readClock(), false);
+    }
+
+    /** Same-process task-save reconciliation may coalesce an exactly unchanged paused notice. */
+    synchronized Snapshot reconcileLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
+                                                  String currentTaskTitle) throws Exception {
+        return restoreLoadedSnapshot(restored, currentTaskId, currentTaskTitle, readClock(), true);
     }
 
     /** Clears stale in-memory/notification state when the runtime cannot read the durable record. */
@@ -139,7 +145,8 @@ final class TaskFocusSessionCoordinator {
     }
 
     private Snapshot restoreLoadedSnapshot(TaskFocusTimer restored, String currentTaskId,
-                                           String currentTaskTitle, ClockReading now) throws Exception {
+                                           String currentTaskTitle, ClockReading now,
+                                           boolean allowUnchangedPausedSkip) throws Exception {
         if (restored == null) {
             notifications.cancel();
             resetMemory(true);
@@ -174,7 +181,8 @@ final class TaskFocusSessionCoordinator {
 
         if (restored.isRunning() || restored.isPaused()) {
             notificationPublished = publishOrCancel(
-                    restored, currentTaskTitle, now.elapsedRealtimeMs);
+                    restored, currentTaskTitle, now.elapsedRealtimeMs,
+                    allowUnchangedPausedSkip && notificationPublished && restored.isPaused());
         } else {
             notifications.cancel();
             notificationPublished = false;
@@ -389,7 +397,13 @@ final class TaskFocusSessionCoordinator {
     }
 
     private boolean publishOrCancel(TaskFocusTimer timer, String taskTitle, long nowElapsedRealtimeMs) {
-        boolean published = notifications.publish(timer, taskTitle, nowElapsedRealtimeMs);
+        return publishOrCancel(timer, taskTitle, nowElapsedRealtimeMs, false);
+    }
+
+    private boolean publishOrCancel(TaskFocusTimer timer, String taskTitle,
+                                   long nowElapsedRealtimeMs, boolean allowUnchangedPausedSkip) {
+        boolean published = notifications.publish(
+                timer, taskTitle, nowElapsedRealtimeMs, allowUnchangedPausedSkip);
         if (!published) notifications.cancel();
         return published;
     }

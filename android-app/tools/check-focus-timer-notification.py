@@ -5,6 +5,7 @@ root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
 main = root / "app/src/main"
 source = (main / "java/com/abrar/daymark/TaskFocusTimerNotification.java").read_text(encoding="utf-8")
 state = (main / "java/com/abrar/daymark/TaskFocusTimerNotificationState.java").read_text(encoding="utf-8")
+signature = (main / "java/com/abrar/daymark/TaskFocusTimerNotificationSignature.java").read_text(encoding="utf-8")
 coordinator = (main / "java/com/abrar/daymark/TaskFocusSessionCoordinator.java").read_text(encoding="utf-8")
 store = (main / "java/com/abrar/daymark/TaskFocusTimerStore.java").read_text(encoding="utf-8")
 codec = (main / "java/com/abrar/daymark/TaskFocusTimerSnapshotCodec.java").read_text(encoding="utf-8")
@@ -60,6 +61,18 @@ checks = [
      "elapsed, remaining and countdown progress share one monotonic timestamp"),
     ("manager.areNotificationsEnabled()" in source and "hasNotificationPermission(context)" in source,
      "notifications are skipped when permission or app-level notification access is unavailable"),
+    ("TaskFocusTimerNotificationSignature.forPaused(" in source
+     and "EXTRA_PRESENTATION_SIGNATURE" in source
+     and "hasActiveNotificationWithSignature" in source
+     and "getActiveNotifications()" in source
+     and "allowUnchangedPausedSkip" in source
+     and "catch (RuntimeException unavailable)" in source,
+     "paused dedupe requires an active exact signature and fails open when active notifications cannot be checked"),
+    ("rawTaskTitle" in signature and "renderedTaskTitle" in signature
+     and "taskId" in signature and "contentText" in signature
+     and "progressPermille" in signature and "resumeAction" in signature
+     and "finishAction" in signature and 'getInstance("SHA-256")' in signature,
+     "the opaque presentation signature covers task/title, rendered content, progress, and ordered actions"),
     ("setCustomContentView" not in source and "setColorized(true)" not in source,
      "notification keeps standard platform rendering"),
     ('"focus-session.enc"' in store and '"daymark.focus-timer.aes-gcm.v1"' in store
@@ -96,6 +109,7 @@ state_tests = (root / "tools/TaskFocusTimerNotificationStateSmoke.java").read_te
 timer_tests = (root / "tools/TaskFocusTimerSmoke.java").read_text(encoding="utf-8")
 coordinator_tests = (root / "tools/TaskFocusSessionCoordinatorSmoke.java").read_text(encoding="utf-8")
 test_runner = (root / "tools/run-focus-timer-tests.sh").read_text(encoding="utf-8")
+coordinator_runner = (root / "tools/run-focus-session-coordinator-tests.sh").read_text(encoding="utf-8")
 switch_start = coordinator.index("synchronized Snapshot switchTaskWhilePausedFromUserAction")
 switch_end = coordinator.index("synchronized Snapshot resumeFromUserAction", switch_start)
 switch_block = coordinator[switch_start:switch_end]
@@ -130,8 +144,20 @@ checks.extend([
      and "coordinator.restoreLoadedSnapshot(" in runtime,
      "restoration resolves one persisted task snapshot against the loaded encrypted task list"),
     ("TaskFocusSessionCoordinator.Snapshot reconcileTasks(List<Task> tasks)" in runtime
-     and "return restoreAfterProcessStart(tasks);" in runtime,
-     "lifecycle reconciliation reloads durable Focus state instead of republishing a stale coordinator snapshot"),
+     and "return loadAndReconcileTasks(tasks, false);" in runtime
+     and "reconcileTasksAfterTaskSave(List<Task> tasks)" in runtime
+     and "return loadAndReconcileTasks(tasks, true);" in runtime
+     and "coordinator.reconcileLoadedSnapshot(saved, currentTaskId, currentTaskTitle)" in runtime
+     and "coordinator.restoreLoadedSnapshot(saved, currentTaskId, currentTaskTitle)" in runtime
+     and "reconcileTasksAfterTaskSave(snapshot)" in activity
+     and "reconcileTasks(taskSnapshot)" in activity,
+     "only task saves opt into coalescing; lifecycle reconciliation and restore retain forced publication"),
+    ("TaskFocusTimerNotificationSignature.java" in coordinator_runner
+     and "unchangedPausedTaskSaveCoalescesOnlyAnExactActivePresentation" in coordinator_tests
+     and "taskSavePublishesChangedIdentityContentProgressAndActions" in coordinator_tests
+     and "missingOrUnverifiableActiveNotificationFallsBackToPublish" in coordinator_tests
+     and "coldRestorePublishesEvenWhenTheOldPausedPresentationMatches" in coordinator_tests,
+     "coordinator tests cover no-op coalescing and all meaningful updates, fallback and restore boundaries"),
     ("setContentIntent(actionPendingIntent(" in source and ".addAction(" in source
      and "PendingIntent.getActivity(" in source and "FLAG_IMMUTABLE" in source,
      "focus notification is tappable and carries immutable shade action PendingIntents"),
