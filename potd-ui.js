@@ -1,1 +1,1 @@
-PLACEHOLDER_POTD
+PLACEHOLDER - will replace with real
