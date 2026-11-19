@@ -116,7 +116,7 @@ required_integration = [
     "startFocusSession(mode, targetDurationMs)",
     "focusSessionRuntime.startFromUserAction(",
     "focusSessionRuntime.restoreAfterProcessStart(loaded)",
-    "focusSessionRuntime.reconcileTasks(snapshot)",
+    "focusSessionRuntime.reconcileTasksAfterTaskSave(snapshot)",
     "focusSessionRuntime.reconcileTasks(currentTasksAfterRestore)",
     "focusTimerPanel.render(timer, android.os.SystemClock.elapsedRealtime())",
     "focusTimerPanel.close()",

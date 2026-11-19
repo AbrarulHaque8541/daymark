@@ -57,9 +57,18 @@ final class TaskFocusSessionRuntime {
                 },
                 new TaskFocusSessionCoordinator.NotificationSink() {
                     @Override
-                    public boolean publish(TaskFocusTimer timer, String title, long elapsed) {
-                        return TaskFocusTimerNotification.publish(
+                    public boolean hasActivePausedPresentation(
+                            TaskFocusTimer timer, String title, long elapsed) {
+                        return TaskFocusTimerNotification.hasActivePausedPresentation(
                                 appContext, timer, title, NOTIFICATION_ID, elapsed);
+                    }
+
+                    @Override
+                    public boolean publish(TaskFocusTimer timer, String title, long elapsed,
+                                           boolean allowUnchangedPausedSkip) {
+                        return TaskFocusTimerNotification.publish(
+                                appContext, timer, title, NOTIFICATION_ID, elapsed,
+                                allowUnchangedPausedSkip);
                     }
 
                     @Override
@@ -97,7 +106,30 @@ final class TaskFocusSessionRuntime {
      * instance was stopped; reusing its old task title can republish a stale notification.
      */
     TaskFocusSessionCoordinator.Snapshot reconcileTasks(List<Task> tasks) throws Exception {
-        return restoreAfterProcessStart(tasks);
+        return loadAndReconcileTasks(tasks);
+    }
+
+    /** Task snapshot saves may also reuse only an already-active, exactly unchanged paused notice. */
+    TaskFocusSessionCoordinator.Snapshot reconcileTasksAfterTaskSave(List<Task> tasks)
+            throws Exception {
+        return loadAndReconcileTasks(tasks);
+    }
+
+    private TaskFocusSessionCoordinator.Snapshot loadAndReconcileTasks(List<Task> tasks)
+            throws Exception {
+        long elapsed = SystemClock.elapsedRealtime();
+        long wall = System.currentTimeMillis();
+        int boot = readBootCount();
+        final TaskFocusTimer saved;
+        try {
+            saved = store.load(elapsed, wall, boot);
+        } catch (Exception failure) {
+            return coordinator.restoreLoadFailure(failure);
+        }
+        Task currentTask = findTask(tasks, saved == null ? null : saved.taskId());
+        String currentTaskId = currentTask == null ? null : currentTask.id;
+        String currentTaskTitle = currentTask == null ? null : currentTask.title;
+        return coordinator.reconcileLoadedSnapshot(saved, currentTaskId, currentTaskTitle);
     }
     TaskFocusSessionCoordinator.Snapshot startFromUserAction(
             String taskId, String title, TaskFocusTimer.Mode mode, long targetDurationMs)
