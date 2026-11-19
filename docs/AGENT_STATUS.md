@@ -2,6 +2,8 @@
 
 - [Daymark engineering status — 2026-11-19T13:22:56Z (PR #815: verified IME dismissal; two distinct API 36 blockers)](./CURRENT_STATUS_20261119T132256Z.md)
 
+- [Daymark engineering status — 2026-11-19T13:00:00Z (Cycle B: potd image error fallback)](./CURRENT_STATUS_20261119T130000Z.md)
+
 - [Daymark engineering status — 2026-11-19T13:00:00Z (Cycle A: IME dismiss hardening + browser status a11y)](./CURRENT_STATUS_20261119T130000Z_CYCLEA.md)
 
 - [Daymark engineering status — 2026-11-19T10:45:00Z (Cycle B: moon phase success flash)](./CURRENT_STATUS_20261119T104500Z.md)

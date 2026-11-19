@@ -145,6 +145,14 @@
           image.setAttribute('height', String(picture.height));
         }
       }
+      image.onerror = function () {
+        if (image.parentNode) image.parentNode.removeChild(image);
+        const err = doc.createElement('p');
+        err.className = 'potd-image-error';
+        err.textContent = 'Picture could not be loaded. The Wikimedia image is unavailable right now.';
+        if (err.setAttribute) err.setAttribute('role', 'status');
+        resultEl.appendChild(err);
+      };
       resultEl.appendChild(image);
       const parts = [];
       if (picture.title) parts.push(picture.title);

@@ -5776,7 +5776,7 @@ public final class MainActivity extends Activity {
                 taskStore.saveSnapshot(snapshot, templateSnapshot);
                 if (focusSessionRuntime != null) {
                     try {
-                        focusAfterSave = focusSessionRuntime.reconcileTasks(snapshot);
+                        focusAfterSave = focusSessionRuntime.reconcileTasksAfterTaskSave(snapshot);
                         focusReconciled = true;
                     } catch (Exception focusFailure) {
                         Log.w("DaymarkFocus", "Focus session reconciliation failed; task save remains committed", focusFailure);
