@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-19T15:15:00Z (Cycle A: moon phase success flash + busy feedback)](./CURRENT_STATUS_20261119T151500Z.md)
+
 - [Daymark engineering status — 2026-11-19T07:45:00Z (Cycle B: potd press feedback + success flash)](./CURRENT_STATUS_20261119T074500Z.md)
 
 - [Daymark engineering status — 2026-11-19T04:45:30Z (keyless picture-of-the-day card, branch feat/potd-card-vibe-20261119)](./CURRENT_STATUS_20261119T044500Z.md)

@@ -136,6 +136,10 @@
     }
 
     function setBusy(busy) {
+      if (checkEl && checkEl.classList && typeof checkEl.classList.toggle === 'function') {
+        checkEl.classList.toggle('is-busy', busy);
+        if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', busy);
+      }
       if (checkEl) checkEl.disabled = busy;
       if (clearEl) clearEl.disabled = busy;
       if (inputEl) inputEl.disabled = busy;
@@ -171,9 +175,21 @@
         const record = logicApi.moonPhaseInfo(typed || undefined, { now: now });
         render(record);
         status('Computed on this device \u00b7 no network request \u00b7 not saved on this device');
+        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Moon phase computed');
+          setTimeout(function () {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+          }, 1400);
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         status(message);
+        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+          statusEl.classList.remove('is-success');
+          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+        }
         if (resultEl) {
           while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
           resultEl.textContent = '';
@@ -191,6 +207,10 @@
         resultEl.textContent = '';
       }
       status('Cleared. Leave the date empty for today, or type YYYY-MM-DD, and tap Check.');
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+      }
       setBusy(false);
     }
 
