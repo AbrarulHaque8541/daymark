@@ -162,6 +162,10 @@
     function onCheck() {
       if (!logicApi || typeof logicApi.moonPhaseInfo !== 'function') {
         status('Moon phase is unavailable.');
+        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+          statusEl.classList.remove('is-success');
+          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+        }
         return;
       }
       setBusy(true);
@@ -171,9 +175,21 @@
         const record = logicApi.moonPhaseInfo(typed || undefined, { now: now });
         render(record);
         status('Computed on this device \u00b7 no network request \u00b7 not saved on this device');
+        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Moon phase computed');
+          setTimeout(function () {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+          }, 1400);
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         status(message);
+        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+          statusEl.classList.remove('is-success');
+          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+        }
         if (resultEl) {
           while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
           resultEl.textContent = '';
@@ -191,6 +207,10 @@
         resultEl.textContent = '';
       }
       status('Cleared. Leave the date empty for today, or type YYYY-MM-DD, and tap Check.');
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+      }
       setBusy(false);
     }
 
