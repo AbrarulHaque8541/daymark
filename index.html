@@ -66,6 +66,8 @@
   <script src="permission-lifecycle-ui.js" defer></script>
   <script src="capability-registry-logic.js" defer></script>
   <script src="capability-registry-ui.js" defer></script>
+    <script src="release-compat-logic.js" defer></script>
+    <script src="release-compat-ui.js" defer></script>
   <script src="browser-intent-logic.js" defer></script>
   <script src="browser-intent-ui.js" defer></script>
   <script src="url-insights-logic.js" defer></script>
@@ -513,7 +515,28 @@
           <p class="feed-status" id="permission-lifecycle-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="permission-lifecycle-result" aria-live="polite"></div>
         </aside>
-        <aside class="briefing-card" id="browser-intent-card" aria-labelledby="browser-intent-heading">
+        <aside class="briefing-card" id="release-compat-card" aria-labelledby="release-compat-heading">
+  <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+  <h2 id="release-compat-heading">Update and release safety, in plain words</h2>
+  <p class="briefing-description">What updates change, what the signer pin and package identity really mean, and how to back out safely. Explained locally; nothing runs.</p>
+  <form id="release-compat-form" class="feed-form" novalidate>
+    <label class="sr-only" for="release-compat-topic">Release topic to explain</label>
+    <select id="release-compat-topic" name="topic" class="sort-select" aria-label="Release topic">
+      <option value="package-identity" selected>Package identity stays put</option>
+      <option value="signer-continuity">Same signer, same key</option>
+      <option value="data-migration">Data survives the upgrade</option>
+      <option value="updater-security">The updater stays HTTPS-only</option>
+      <option value="device-gates">Device evidence before release</option>
+      <option value="rollback-recovery">A way back, planned honestly</option>
+      <option value="not-a-real-topic">Unknown topic (fail-closed check)</option>
+    </select>
+    <button class="button button-primary" id="release-compat-explain" type="submit" title="Explain the selected release topic">Explain</button>
+    <button class="button button-quiet" id="release-compat-clear" type="button" title="Clear the release explanation">Clear</button>
+  </form>
+  <p class="feed-status" id="release-compat-status" role="status" aria-live="polite"></p>
+  <div class="feed-list" id="release-compat-result" aria-live="polite"></div>
+</aside>
+<aside class="briefing-card" id="browser-intent-card" aria-labelledby="browser-intent-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
           <h2 id="browser-intent-heading">App links, planned safely</h2>
           <p class="briefing-description">Paste a link to see, offline, what would open: the page, another app, or nothing.</p>

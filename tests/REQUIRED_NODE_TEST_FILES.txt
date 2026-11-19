@@ -24,6 +24,8 @@ tests/browser-data-ui.test.js
 tests/browser-doc-current-state.test.js
 tests/capability-registry-logic.test.js
 tests/capability-registry-ui.test.js
+tests/release-compat-logic.test.js
+tests/release-compat-ui.test.js
 tests/browser-download-logic.test.js
 tests/browser-download-ui.test.js
 tests/browser-error-logic.test.js

@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-19T17:05:46Z (release-compatibility planner card, branch feat/release-compat-vibe-20261119)](./CURRENT_STATUS_20261119T170546Z.md)
+
 - [Daymark engineering status — 2026-11-19T13:45:40Z (PR #815: d929 exact-head CI diagnosis + IME coverage restoration)](./CURRENT_STATUS_20261119T134540Z.md)
 
 - [Daymark engineering status — 2026-11-19T13:22:56Z (PR #815: verified IME dismissal; two distinct API 36 blockers)](./CURRENT_STATUS_20261119T132256Z.md)
