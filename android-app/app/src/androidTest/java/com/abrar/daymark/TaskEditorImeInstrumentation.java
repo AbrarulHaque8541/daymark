@@ -706,15 +706,11 @@ final class TaskEditorImeInstrumentation {
                                                          String title, int[] assertions) throws Exception {
         String description = "Task: " + title
                 + ". Activate to open task actions. Swipe right to toggle completion; swipe left for task actions.";
-        AccessibilityNodeInfo[] rowNode = { null };
-        instrumentation.runOnMainSync(() -> {
-            View row = findByDescription(activity.getWindow().getDecorView(), description);
-            if (row != null) rowNode[0] = row.createAccessibilityNodeInfo();
-        });
-        require(rowNode[0] != null && rowNode[0].isClickable() && rowNode[0].isFocusable(),
+        AccessibilityNodeInfo rowNode = awaitAccessibilityNodeByDescription(instrumentation, description);
+        require(rowNode.isClickable() && rowNode.isFocusable(),
                 "the task row exposes its advertised activation to accessibility", assertions);
-        boolean activated = rowNode[0].performAction(AccessibilityNodeInfo.ACTION_CLICK);
-        rowNode[0].recycle();
+        boolean activated = rowNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        rowNode.recycle();
         require(activated, "the task row accepts the accessibility click action", assertions);
 
         AccessibilityNodeInfo actions = awaitDialogRootContaining(instrumentation, title, "Delete task");
@@ -802,6 +798,21 @@ final class TaskEditorImeInstrumentation {
             SystemClock.sleep(50L);
         }
         return false;
+    }
+
+    private static AccessibilityNodeInfo awaitAccessibilityNodeByDescription(Instrumentation instrumentation,
+                                                                             String description) throws Exception {
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            instrumentation.waitForIdleSync();
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                AccessibilityNodeInfo node = findByDescription(root, description);
+                if (node != null && node.isVisibleToUser()) return node;
+            }
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for accessible node: " + description);
     }
 
     private static AccessibilityNodeInfo awaitDialogRoot(Instrumentation instrumentation, String title)
