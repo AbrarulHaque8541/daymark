@@ -20,10 +20,13 @@ function makeElement(tag) {
     className: '',
     textContent: '',
     disabled: false,
+    hidden: false,
     value: '',
     href: '',
     classList: {
       set: new Set(),
+      add(name) { this.set.add(name); },
+      remove(name) { this.set.delete(name); },
       toggle(name, force) {
         const on = force === undefined ? !this.set.has(name) : force;
         if (on) this.set.add(name); else this.set.delete(name);
@@ -223,12 +226,16 @@ test('a successful check renders articles with an accessible link', async () => 
   assert.ok(result.textContent.includes('Grand Theft Auto VI'));
   assert.ok(result.textContent.includes('519,632'));
   assert.ok(result.textContent.includes('views'));
-  const link = result.children.find(c => c.tagName === 'a');
+  const item = result.children.find(c => c.className === 'feed-item');
+  assert.ok(item);
+  const link = item.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/Grand_Theft_Auto_VI');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
   assert.strictEqual(link.getAttribute('target'), '_blank');
   assert.ok(link.getAttribute('aria-label').includes('Grand Theft Auto VI'));
+  assert.ok(doc.getElementById('trending-copy'));
+  assert.strictEqual(doc.getElementById('trending-copy').hidden, false);
 });
 
 test('status reports the view-count date, update time and that nothing is saved', async () => {
@@ -381,4 +388,41 @@ test('boot never reads localStorage (stateless card)', async () => {
   vm.runInNewContext(code, sandbox);
   assert.ok(sandbox.module.exports.attachTrendingUi);
   assert.strictEqual(sandbox.localStorage, undefined);
+});
+
+test('copy button is hidden until a result exists', () => {
+  const doc = makeDoc();
+  attach(doc);
+  const copy = doc.getElementById('trending-copy');
+  assert.ok(copy);
+  assert.strictEqual(copy.hidden, true);
+});
+
+test('copy writes the list and shows success flash', async () => {
+  const doc = makeDoc();
+  let copied = null;
+  const fakeClipboard = { writeText: async (t) => { copied = t; } };
+  attach(doc, {
+    fetch: async () => okResponse(JSON.stringify(payload)),
+    window: { navigator: { clipboard: fakeClipboard } }
+  });
+  doc.getElementById('trending-check').dispatch('click', {});
+  await drain();
+  doc.getElementById('trending-copy').dispatch('click', {});
+  await drain();
+  assert.ok(copied);
+  assert.ok(copied.includes('Grand Theft Auto VI'));
+  assert.ok(copied.includes('519,632'));
+  assert.ok(doc.getElementById('trending-status').textContent.includes('Copied'));
+  assert.ok(doc.getElementById('trending-status').classList.contains('is-success'));
+});
+
+test('clear hides the copy button', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  doc.getElementById('trending-check').dispatch('click', {});
+  await drain();
+  assert.strictEqual(doc.getElementById('trending-copy').hidden, false);
+  doc.getElementById('trending-clear').dispatch('click', {});
+  assert.strictEqual(doc.getElementById('trending-copy').hidden, true);
 });

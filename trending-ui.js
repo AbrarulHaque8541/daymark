@@ -81,6 +81,18 @@
     if (clearButton.setAttribute) clearButton.setAttribute('title', 'Clear the trending view');
     form.appendChild(clearButton);
 
+    const copyButton = doc.createElement('button');
+    copyButton.id = 'trending-copy';
+    copyButton.className = 'button button-quiet';
+    if (copyButton.setAttribute) {
+      copyButton.setAttribute('type', 'button');
+      copyButton.setAttribute('title', 'Copy the trending list');
+    }
+    if (typeof copyButton.hidden !== 'undefined') copyButton.hidden = true;
+    else if (copyButton.setAttribute) copyButton.setAttribute('hidden', 'hidden');
+    copyButton.textContent = 'Copy';
+    form.appendChild(copyButton);
+
     aside.appendChild(form);
 
     const statusLine = doc.createElement('p');
@@ -128,8 +140,10 @@
     const statusEl = element('trending-status');
     const resultEl = element('trending-result');
     const clearEl = element('trending-clear');
+    const copyEl = element('trending-copy');
 
     let busy = false;
+    let lastRecord = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
@@ -168,8 +182,36 @@
 
     if (buttonEl) addPressFeedback(buttonEl);
     if (clearEl) addPressFeedback(clearEl);
+    if (copyEl) addPressFeedback(copyEl);
+
+    function buildCopyText(record) {
+      if (!record || !record.articles || !record.articles.length) return '';
+      const lines = [];
+      const paddedMonth = (record.month < 10 ? '0' + record.month : String(record.month));
+      const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
+      lines.push('Trending on Wikipedia for ' + paddedMonth + '/' + paddedDay);
+      const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
+      for (const article of record.articles) {
+        const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
+        let line = '- ' + article.title + (article.titleTruncated ? ' (truncated)' : '') + ' · ' + viewsText + ' views';
+        if (article.url) line += ' · ' + article.url;
+        lines.push(line);
+      }
+      if (record.articlesTruncated) lines.push('(list truncated)');
+      return lines.join('\n');
+    }
+
+    function updateCopyVisibility(has) {
+      if (!copyEl) return;
+      if (typeof copyEl.hidden !== 'undefined') copyEl.hidden = !has;
+      if (typeof copyEl.setAttribute === 'function') {
+        if (has) copyEl.removeAttribute('hidden');
+        else copyEl.setAttribute('hidden', 'hidden');
+      }
+    }
 
     function render(record) {
+      lastRecord = record;
       if (!resultEl || !record) return;
       while (resultEl.firstChild) {
         resultEl.removeChild(resultEl.firstChild);
@@ -179,14 +221,20 @@
       const dateLabel = paddedMonth + '/' + paddedDay;
       const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
       for (const article of record.articles) {
-        const viewsText = viewsApi ? viewsApi.formatViews(article.views) : null;
-        const parts = [
-          article.title + (article.titleTruncated ? ' (title truncated)' : ''),
-          (viewsText ? viewsText : String(article.views)) + ' views'
-        ];
-        resultEl.appendChild(doc.createTextNode(parts.join(' \u00b7 ') + ' \u00b7 '));
+        const item = doc.createElement('div');
+        item.className = 'feed-item';
+        const title = doc.createElement('span');
+        title.className = 'feed-item-title';
+        title.textContent = article.title + (article.titleTruncated ? ' (title truncated)' : '');
+        item.appendChild(title);
+        const meta = doc.createElement('span');
+        meta.className = 'feed-item-date';
+        const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
+        meta.textContent = viewsText + ' views';
+        item.appendChild(meta);
         if (article.url) {
           const link = doc.createElement('a');
+          link.className = 'feed-item-link';
           link.href = article.url;
           link.textContent = 'Read';
           if (typeof link.setAttribute === 'function') {
@@ -194,13 +242,16 @@
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about ' + article.title + ', trending for ' + dateLabel);
           }
-          resultEl.appendChild(link);
-          resultEl.appendChild(doc.createTextNode(' \u00b7 '));
+          item.appendChild(link);
         }
+        resultEl.appendChild(item);
       }
-      resultEl.appendChild(doc.createTextNode('Trending for: ' + dateLabel
-        + (record.articlesTruncated ? ' (list truncated, showing the top ' + record.articles.length + ')' : '')
-      ));
+      const footer = doc.createElement('p');
+      footer.className = 'feed-item-summary';
+      footer.textContent = 'Trending for: ' + dateLabel
+        + (record.articlesTruncated ? ' (list truncated, showing the top ' + record.articles.length + ')' : '');
+      resultEl.appendChild(footer);
+      updateCopyVisibility(record.articles && record.articles.length > 0);
     }
 
     async function onCheck() {
@@ -259,8 +310,40 @@
       }
     }
 
+    async function onCopy() {
+      if (busy || !lastRecord) return;
+      const textToCopy = buildCopyText(lastRecord);
+      if (!textToCopy) {
+        status('Nothing to copy yet.');
+        return;
+      }
+      const clipboard = (win && win.navigator && win.navigator.clipboard && typeof win.navigator.clipboard.writeText === 'function')
+        ? win.navigator.clipboard
+        : (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function' ? navigator.clipboard : null);
+      if (!clipboard) {
+        status('Copy is not available in this browser.');
+        return;
+      }
+      try {
+        await clipboard.writeText(textToCopy);
+        status('Copied the trending list.');
+        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'List copied');
+          setTimeout(function () {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+          }, 1400);
+        }
+      } catch (err) {
+        status('Could not copy the list.');
+      }
+    }
+
     function onClear() {
       if (busy) return;
+      lastRecord = null;
+      updateCopyVisibility(false);
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
@@ -287,6 +370,9 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (copyEl && typeof copyEl.addEventListener === 'function') {
+      copyEl.addEventListener('click', () => { onCopy(); });
+    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -299,6 +385,7 @@
     return {
       onCheck,
       onClear,
+      onCopy,
       detach() {
         setBusy(false);
       }
