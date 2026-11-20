@@ -706,6 +706,7 @@ final class TaskEditorImeInstrumentation {
                                                          String title, int[] assertions) throws Exception {
         String description = "Task: " + title
                 + ". Activate to open task actions. Swipe right to toggle completion; swipe left for task actions.";
+        scrollTaskRowIntoView(instrumentation, activity, description);
         AccessibilityNodeInfo rowNode = awaitAccessibilityNodeByDescription(instrumentation, description);
         require(rowNode.isClickable() && rowNode.isFocusable(),
                 "the task row exposes its advertised activation to accessibility", assertions);
@@ -720,6 +721,16 @@ final class TaskEditorImeInstrumentation {
         require(instrumentation.getUiAutomation().performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
                 "the task actions dialog can be dismissed before the remaining row-action checks", assertions);
         awaitDialogGone(instrumentation, title);
+    }
+
+    private static void scrollTaskRowIntoView(Instrumentation instrumentation, Activity activity, String description)
+            throws Exception {
+        instrumentation.runOnMainSync(() -> {
+            View row = findByDescription(activity.getWindow().getDecorView(), description);
+            if (row != null && row.getWidth() > 0 && row.getHeight() > 0) {
+                row.requestRectangleOnScreen(new Rect(0, 0, row.getWidth(), row.getHeight()), true);
+            }
+        });
     }
 
     private static boolean taskTitleVisible(Instrumentation instrumentation, Activity activity, String title)
