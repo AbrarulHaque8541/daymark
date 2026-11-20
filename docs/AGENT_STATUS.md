@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-20T19:13:31Z (R&D: task-search render isolation and final CI)](./CURRENT_STATUS_20261120T191331Z.md)
 - [Daymark engineering status — 2026-11-20T18:55:40Z (R&D: task search and render isolation)](./CURRENT_STATUS_20261120T185540Z.md)
 - [Daymark engineering status — 2026-11-20T16:55:00Z (Cycle A: lifecycle recovery glass polish)](./CURRENT_STATUS_20261120T165500Z.md)
 
