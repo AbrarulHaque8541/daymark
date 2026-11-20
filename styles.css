@@ -969,6 +969,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   animation: rise-in .18s ease both;
 }
 .button.is-pressed,
+.filter-button.is-pressed,
+.complete-button.is-pressed,
 #browser-intent-plan.is-pressed,
 #browser-intent-clear.is-pressed {
   transform: translateY(1px) scale(.985);
@@ -977,6 +979,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 @media (prefers-reduced-motion: reduce) {
   #browser-intent-result.is-updating { animation: none; }
   .button.is-pressed,
+  .filter-button.is-pressed,
+  .complete-button.is-pressed,
   #browser-intent-plan.is-pressed,
   #browser-intent-clear.is-pressed { transform: none; }
 }

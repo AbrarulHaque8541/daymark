@@ -101,3 +101,9 @@ test('edit dialog preserves all fields and controls consumed by the task editor'
       'the editor field #' + id + ' must have an associated label');
   }
 });
+
+test('task filter and complete buttons receive glass press feedback handlers', () => {
+  assert.match(app, /filter-button.*pointerdown/s, 'filter buttons must have pointerdown press feedback');
+  assert.match(app, /complete-button.*is-pressed/s, 'complete buttons must receive is-pressed class');
+  assert.match(app, /pointercancel.*release/s, 'pointercancel must release press state');
+});
