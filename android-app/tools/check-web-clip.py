@@ -60,7 +60,7 @@ for marker in (
     "webClipDialog.setOnDismissListener(null);",
     "saveWebClipDraftState(outState, pendingWebClip);",
     "restoreWebClipDraftState(savedInstanceState,",
-    "activeWebClipDraftToken(preferences)",
+    "activeWebClipDraftToken(getSharedPreferences(PREFERENCES, MODE_PRIVATE))",
     "setPendingWebClipDraft(WebClip.fromReader(",
     "if (!isChangingConfigurations() && pendingWebClip != null",
     "&& !setPendingWebClipDraft(null))",

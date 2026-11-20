@@ -516,7 +516,7 @@ public final class MainActivity extends Activity {
             if (retained instanceof WebClip.Draft) pendingWebClip = (WebClip.Draft) retained;
             if (savedInstanceState != null) {
                 WebClip.Draft restoredWebClip = restoreWebClipDraftState(savedInstanceState,
-                        activeWebClipDraftToken(preferences));
+                        activeWebClipDraftToken(getSharedPreferences(PREFERENCES, MODE_PRIVATE)));
                 if (restoredWebClip != null) pendingWebClip = restoredWebClip;
                 pendingAttachmentTaskId = savedInstanceState.getString(STATE_PENDING_ATTACHMENT_TASK);
                 ArrayList<Uri> restoredSharedUris =
