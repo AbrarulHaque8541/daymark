@@ -213,12 +213,24 @@
         status('Updated \u00b7 view counts ' + statsDate + ' \u00b7 '
           + record.fetchedAt.slice(0, 16).replace('T', ' ')
           + ' UTC \u00b7 not saved on this device');
+        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Trending updated');
+          setTimeout(function () {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+          }, 1400);
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof logicApi.classifyTrendingError === 'function'
           ? logicApi.classifyTrendingError(error)
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
+        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+          statusEl.classList.remove('is-success');
+          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+        }
         if (resultEl) {
           while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
           resultEl.textContent = '';
@@ -236,6 +248,10 @@
         resultEl.textContent = '';
       }
       status('Cleared. Leave the date empty for today, or type month/day, and tap Check.');
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+      }
     }
 
     status('Leave the date empty for today, or type month/day, and tap Check.');
