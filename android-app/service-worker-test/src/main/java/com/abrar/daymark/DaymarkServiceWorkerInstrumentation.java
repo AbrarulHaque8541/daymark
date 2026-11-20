@@ -353,6 +353,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             AtomicReference<Object> storeRef = new AtomicReference<>();
             AtomicReference<Object> policyRef = new AtomicReference<>();
             AtomicReference<Throwable> setupFailure = new AtomicReference<>();
+            AtomicReference<String> pageLoadError = new AtomicReference<>();
             instrumentation.runOnMainSync(() -> {
                 try {
                     Class<?> policyType = Class.forName(
@@ -374,6 +375,9 @@ public final class DaymarkServiceWorkerInstrumentation {
                                     if ("equals".equals(method.getName())) {
                                         return args != null && args.length == 1 && proxy == args[0];
                                     }
+                                }
+                                if ("onLoadError".equals(method.getName()) && args != null) {
+                                    pageLoadError.set(java.util.Arrays.toString(args));
                                 }
                                 return null;
                             });
@@ -484,10 +488,18 @@ public final class DaymarkServiceWorkerInstrumentation {
             // Use a real TLS connection so System WebView exercises production network and
             // same-document callbacks rather than loadDataWithBaseURL's synthetic origin.
             load(view, server.url("/private/start"));
-            check(evaluateBoolean(view,
+            boolean loopbackHttps = evaluateBoolean(view,
                             "location.protocol === 'https:'"
-                                    + " && location.hostname === '127.0.0.1'"),
-                    "the extension SPA fixture was fetched over HTTPS from loopback");
+                                    + " && location.hostname === '127.0.0.1'");
+            String observedLocation = evaluateString(view,
+                    "location.href + ' | protocol=' + location.protocol"
+                            + " + ' | hostname=' + location.hostname"
+                            + " + ' | title=' + document.title");
+            check(loopbackHttps,
+                    "the extension SPA fixture was fetched over HTTPS from loopback"
+                            + " (observed=" + observedLocation
+                            + ", loadError=" + pageLoadError.get()
+                            + ", serverRequests=" + server.count("/private/start") + ")");
             check(server.count("/private/start") == 1,
                     "the SPA page was served by the controlled TLS fixture");
             String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
