@@ -108,7 +108,10 @@
     const result = doc.createElement('div');
     result.id = 'trending-result';
     result.className = 'feed-list';
-    if (typeof result.setAttribute === 'function') result.setAttribute('aria-live', 'polite');
+    if (typeof result.setAttribute === 'function') {
+      result.setAttribute('aria-live', 'polite');
+      result.setAttribute('aria-label', 'Trending articles list');
+    }
     aside.appendChild(result);
 
     const anchor = typeof doc.getElementById === 'function'
@@ -220,6 +223,7 @@
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const dateLabel = paddedMonth + '/' + paddedDay;
       const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
+      let firstLink = null;
       for (const article of record.articles) {
         const item = doc.createElement('div');
         item.className = 'feed-item';
@@ -243,6 +247,7 @@
             link.setAttribute('aria-label', 'Read more about ' + article.title + ', trending for ' + dateLabel);
           }
           item.appendChild(link);
+          if (!firstLink) firstLink = link;
         }
         resultEl.appendChild(item);
       }
@@ -252,6 +257,13 @@
         + (record.articlesTruncated ? ' (list truncated, showing the top ' + record.articles.length + ')' : '');
       resultEl.appendChild(footer);
       updateCopyVisibility(record.articles && record.articles.length > 0);
+      // Accessibility: after successful render, move focus to the first Read link if present, or status.
+      if (firstLink && typeof firstLink.focus === 'function') {
+        setTimeout(() => firstLink.focus(), 100);
+      } else if (statusEl && typeof statusEl.focus === 'function') {
+        statusEl.setAttribute('tabindex', '-1');
+        setTimeout(() => statusEl.focus(), 100);
+      }
     }
 
     async function onCheck() {
@@ -354,6 +366,7 @@
         statusEl.classList.remove('is-success');
         if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
       }
+      if (inputEl && typeof inputEl.focus === 'function') inputEl.focus();
     }
 
     status('Leave the date empty for today, or type month/day, and tap Check.');
