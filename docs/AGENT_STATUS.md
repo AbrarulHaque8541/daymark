@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-20T18:55:40Z (R&D: task search and render isolation)](./CURRENT_STATUS_20261120T185540Z.md)
 - [Daymark engineering status — 2026-11-20T16:55:00Z (Cycle A: lifecycle recovery glass polish)](./CURRENT_STATUS_20261120T165500Z.md)
 
 - 2026-11-20 · docs/CURRENT_STATUS_20261120T162228Z.md — autonomous run: offline lifecycle recovery planner card (issue #348 lifecycle item, PR pending).
