@@ -650,6 +650,7 @@
     const todayTasks = state.tasks.filter((task) => task.dueDate === today);
     const upcomingTasks = state.tasks.filter((task) => task.dueDate !== null && task.dueDate > today);
     const completedTasks = state.tasks.filter((task) => task.completed);
+    const highPriorityTasks = state.tasks.filter((task) => task.priority === 'high');
     const hasQuery = Boolean(state.query.trim());
 
     const openCountElement = $('#open-count');
@@ -665,6 +666,7 @@
     $('#count-upcoming').textContent = String(upcomingTasks.length);
     $('#count-overdue').textContent = String(overdueTasks.length);
     $('#count-completed').textContent = String(completedTasks.length);
+    $('#count-high').textContent = String(highPriorityTasks.length);
     $('#visible-count').textContent = hasQuery
       ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
@@ -720,7 +722,8 @@
       const labels = {
         all: ['All caught up', 'Nothing on your list just now. Add a task whenever something comes to mind.'],
         today: ['Nothing due today', 'A little breathing room. Switch filters or add something new.'],
-        upcoming: ['Nothing coming up', 'No future-dated tasks yet. Add a due date to plan ahead.']
+        upcoming: ['Nothing coming up', 'No future-dated tasks yet. Add a due date to plan ahead.'],
+        high: ['No high-priority tasks', 'Set a task to high priority to see it here.']
       };
       $('#empty-title').textContent = labels[state.filter][0];
       $('#empty-copy').textContent = labels[state.filter][1];
@@ -1770,7 +1773,7 @@
     return null;
   }
 
-  const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed']);
+  const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed', 'high']);
 
   const VALID_SORTS = new Set(['smart', 'title']);
 
@@ -2276,8 +2279,12 @@
         || target.isContentEditable));
   }
 
-  const FILTER_LABELS = { all: 'All', today: 'Today', upcoming: 'Upcoming', overdue: 'Overdue', completed: 'Completed' };
-  const FILTER_KEYS = { '1': 'all', '2': 'today', '3': 'upcoming', '4': 'overdue', '5': 'completed' };
+  const FILTER_LABELS = {
+    all: 'All', today: 'Today', upcoming: 'Upcoming', overdue: 'Overdue', completed: 'Completed', high: 'High priority'
+  };
+  const FILTER_KEYS = {
+    '1': 'all', '2': 'today', '3': 'upcoming', '4': 'overdue', '5': 'completed', '6': 'high'
+  };
 
   function setTaskFilter(filter) {
     if (!FILTER_LABELS[filter] || state.filter === filter) return;
@@ -2731,4 +2738,3 @@
 
   setUp();
 })();
-
