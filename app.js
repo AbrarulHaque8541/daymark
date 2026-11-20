@@ -2111,6 +2111,7 @@
 
   function ensureFocusTimer() {
     if (state.focusTimer != null || typeof setInterval !== 'function') return;
+    if (typeof document === 'object' && document && document.hidden === true) return;
     state.focusTimer = setInterval(tickFocus, 1000);
   }
 
@@ -2119,6 +2120,21 @@
     clearTimeout(state.focusTimer);
     if (typeof clearInterval === 'function') clearInterval(state.focusTimer);
     state.focusTimer = null;
+  }
+
+  // Background wake-up control (battery pass, 2026-11-20): when the page is
+  // hidden, pure timestamp math keeps Focus and reminders correct with zero
+  // polling; both timers restart as soon as the page is visible again.
+  function ensureReminderTimer() {
+    if (state.reminderTimer != null || typeof setInterval !== 'function') return;
+    if (typeof document === 'object' && document && document.hidden === true) return;
+    state.reminderTimer = setInterval(checkReminders, 30000);
+  }
+
+  function stopReminderTimer() {
+    if (state.reminderTimer == null) return;
+    if (typeof clearInterval === 'function') clearInterval(state.reminderTimer);
+    state.reminderTimer = null;
   }
 
   function tickFocus() {
@@ -2725,15 +2741,19 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         refreshIfLocalDayChanged();
+        if (state.focusSession) ensureFocusTimer();
         tickFocus();
+        ensureReminderTimer();
+        checkReminders();
+      } else {
+        stopFocusTimer();
+        stopReminderTimer();
       }
     });
     if (state.focusSession) ensureFocusTimer();
     scheduleNextDayRefresh();
-    if (typeof setInterval === 'function') {
-      state.reminderTimer = setInterval(checkReminders, 30000);
-      checkReminders();
-    }
+    ensureReminderTimer();
+    checkReminders();
   }
 
   setUp();

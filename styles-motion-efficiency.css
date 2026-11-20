@@ -294,3 +294,17 @@
 @media (prefers-reduced-motion: reduce) {
   .feed-status.is-success { animation: none; }
 }
+
+/* 2026-11-20 battery + render pass (Vibe): give every glance card its own layout
+   and paint boundary and skip rendering offscreen cards, so one card's DOM update
+   or spinner cannot relayout/repaint the whole page while the user reads or
+   scrolls the rest. No palette, structure, or glass design change. */
+.briefing-card,
+.focus-card,
+.weather-card,
+.currency-card,
+.suggestion-card {
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
