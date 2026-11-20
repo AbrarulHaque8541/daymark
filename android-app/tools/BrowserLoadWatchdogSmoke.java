@@ -12,14 +12,16 @@ public final class BrowserLoadWatchdogSmoke {
         int failures;
         int finished;
         int errors;
+        int lastErrorCode;
         String lastAddress;
+        String lastDescription;
         @Override public void onStageHint(String address) { hints++; lastAddress = address; }
         @Override public void onStageRetry(String address) { retries++; lastAddress = address; }
         @Override public void onStageFail(String address) { failures++; lastAddress = address; }
         @Override public void onLoadStarted(String address) {}
         @Override public void onLoadFinished(String address) { finished++; lastAddress = address; }
         @Override public void onLoadError(String address, int errorCode, String description) {
-            errors++; lastAddress = address;
+            errors++; lastAddress = address; lastErrorCode = errorCode; lastDescription = description;
         }
     }
 
@@ -83,9 +85,18 @@ public final class BrowserLoadWatchdogSmoke {
         Events error = new Events();
         watchdog = create(error);
         watchdog.onLoadRequested(URL);
-        watchdog.onReceivedError(URL, -2, "connection failed");
+        watchdog.onReceivedError(URL, 123456);
         advance(30_000L);
         assert error.errors == 1 : "load error callback missing";
+        assert "https://example.com".equals(error.lastAddress)
+                : "watchdog error callback must receive only the redacted origin";
+        assert error.lastErrorCode == 9999 && "error code 9999".equals(error.lastDescription)
+                : "watchdog callback must expose only a safe numeric error code";
+        assert watchdog.snapshotEvents().stream().noneMatch(event ->
+                event.contains("private/path") || event.contains("token=") || event.contains("connection failed"))
+                : "watchdog diagnostics must not retain error descriptions or full URLs";
+        assert watchdog.snapshotEvents().stream().anyMatch(event -> event.endsWith("code=9999"))
+                : "watchdog ring buffer must clamp unexpected error codes";
         assert error.retries == 0 && error.failures == 0 && error.hints == 0
                 : "watchdog stage fired after load error";
 
