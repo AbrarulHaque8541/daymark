@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-20T01:30:00Z (Cycle B: generalized glance success flash)](./CURRENT_STATUS_20261120T013000Z.md)
+
 - [Daymark engineering status — 2026-11-20T00:15:00Z (Cycle B: release-compat success flash)](./CURRENT_STATUS_20261120T001500Z.md)
 
 - [Daymark engineering status — 2026-11-19T17:05:46Z (release-compatibility planner card, branch feat/release-compat-vibe-20261119)](./CURRENT_STATUS_20261119T170546Z.md)
