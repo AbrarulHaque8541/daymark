@@ -40,6 +40,16 @@ test('every literal app.js ID lookup resolves to one unique element in index.htm
   assert.deepEqual(missing, [], 'every static ID selector used by app.js must resolve exactly once');
 });
 
+test('high-priority filter is discoverable, accessible, persisted, and has shortcut 6', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="high"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a high-priority button');
+  assert.match(button[0], /aria-label="Show high-priority tasks \(6\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="6"/i);
+  assert.match(button[0], /id="count-high"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'high'[^\]]*\]\)/);
+  assert.match(app, /'6': 'high'/);
+});
+
 test('toast host exposes the live region and action elements used by app.js', () => {
   const stack = elementById(html, 'toast-stack');
   const toast = elementById(html, 'toast');
