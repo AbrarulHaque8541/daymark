@@ -354,6 +354,8 @@ public final class DaymarkServiceWorkerInstrumentation {
             AtomicReference<Object> policyRef = new AtomicReference<>();
             AtomicReference<Throwable> setupFailure = new AtomicReference<>();
             AtomicReference<String> pageLoadError = new AtomicReference<>();
+            AtomicReference<String> pageFinishedUrl = new AtomicReference<>();
+            AtomicReference<String> expectedSpaStartUrl = new AtomicReference<>();
             instrumentation.runOnMainSync(() -> {
                 try {
                     Class<?> policyType = Class.forName(
@@ -378,6 +380,13 @@ public final class DaymarkServiceWorkerInstrumentation {
                                 }
                                 if ("onLoadError".equals(method.getName()) && args != null) {
                                     pageLoadError.set(java.util.Arrays.toString(args));
+                                }
+                                if ("onPageFinished".equals(method.getName()) && args != null
+                                        && args.length > 0) {
+                                    String finishedUrl = String.valueOf(args[0]);
+                                    if (finishedUrl.equals(expectedSpaStartUrl.get())) {
+                                        pageFinishedUrl.set(finishedUrl);
+                                    }
                                 }
                                 return null;
                             });
@@ -487,7 +496,10 @@ public final class DaymarkServiceWorkerInstrumentation {
             }
             // Use a real TLS connection so System WebView exercises production network and
             // same-document callbacks rather than loadDataWithBaseURL's synthetic origin.
-            load(view, server.url("/private/start"));
+            String startUrl = server.url("/private/start");
+            expectedSpaStartUrl.set(startUrl);
+            load(view, startUrl);
+            awaitExtensionSpaPageFinished(startUrl, server, pageFinishedUrl, pageLoadError);
             boolean loopbackHttps = evaluateBoolean(view,
                             "location.protocol === 'https:'"
                                     + " && location.hostname === '127.0.0.1'");
@@ -660,6 +672,21 @@ public final class DaymarkServiceWorkerInstrumentation {
             SystemClock.sleep(100);
         }
         throw new AssertionError(message);
+    }
+
+    private void awaitExtensionSpaPageFinished(String expectedUrl, ControlledServer server,
+                                               AtomicReference<String> pageFinishedUrl,
+                                               AtomicReference<String> pageLoadError) {
+        long deadline = SystemClock.elapsedRealtime() + WAIT_MS;
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (expectedUrl.equals(pageFinishedUrl.get())) return;
+            SystemClock.sleep(100);
+        }
+        throw new AssertionError("the real HTTPS SPA fixture must finish loading"
+                + " (expectedPageFinishedUrl=" + expectedUrl
+                + ", observedPageFinishedUrl=" + pageFinishedUrl.get()
+                + ", loadError=" + pageLoadError.get()
+                + ", serverRequests=" + server.count("/private/start") + ")");
     }
 
     private void requestWorkerEgress(WebView view) throws Exception {

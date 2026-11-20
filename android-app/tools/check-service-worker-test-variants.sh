@@ -39,6 +39,22 @@ do
   fi
 done
 
+test_keystore="service-worker-test/src/main/assets/daymark_service_worker_test_server.p12"
+if ! keystore_info="$(openssl pkcs12 -in "$test_keystore" -passin pass:daymark-test -info -noout 2>&1)"; then
+  echo "Service Worker HTTPS test keystore could not be inspected." >&2
+  exit 1
+fi
+for required in \
+  'MAC: sha1' \
+  'PKCS7 Encrypted data: pbeWithSHA1And3-KeyTripleDES-CBC' \
+  'Shrouded Keybag: pbeWithSHA1And3-KeyTripleDES-CBC'
+do
+  if ! printf '%s\n' "$keystore_info" | grep -Fq "$required"; then
+    echo "Service Worker HTTPS test keystore is missing API26-compatible PKCS#12 protection: $required" >&2
+    exit 1
+  fi
+done
+
 test_source="$(find service-worker-test/src/main/java -name DaymarkServiceWorkerInstrumentation.java -print -quit)"
 if [ -z "$test_source" ]; then
   echo "Service Worker runtime test source is missing." >&2
