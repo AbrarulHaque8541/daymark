@@ -14,7 +14,7 @@
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusStateClearEpoch: null, recoveryBackupPendingPayload: null, recoveryBackupClearPending: false, focusRecoveryBackupPendingPayload: null, focusRecoveryCompletionPending: null, focusRecoveryClearEpoch: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, previousHighCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusStateClearEpoch: null, recoveryBackupPendingPayload: null, recoveryBackupClearPending: false, focusRecoveryBackupPendingPayload: null, focusRecoveryCompletionPending: null, focusRecoveryClearEpoch: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const taskMutation = window.DaymarkTaskMutation || null;
   let taskLockManager = null;
   try { taskLockManager = (window.navigator || globalThis.navigator || {}).locks || null; }
@@ -666,7 +666,15 @@
     $('#count-upcoming').textContent = String(upcomingTasks.length);
     $('#count-overdue').textContent = String(overdueTasks.length);
     $('#count-completed').textContent = String(completedTasks.length);
-    $('#count-high').textContent = String(highPriorityTasks.length);
+    const highCountElement = $('#count-high');
+    if (state.previousHighCount !== null && highPriorityTasks.length > state.previousHighCount) {
+      highCountElement.classList.remove('is-success');
+      void highCountElement.offsetWidth;
+      highCountElement.classList.add('is-success');
+      setTimeout(() => highCountElement.classList.remove('is-success'), 1400);
+    }
+    state.previousHighCount = highPriorityTasks.length;
+    highCountElement.textContent = String(highPriorityTasks.length);
     $('#visible-count').textContent = hasQuery
       ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
       : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
