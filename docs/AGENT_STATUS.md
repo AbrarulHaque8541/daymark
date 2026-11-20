@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-20T05:36:00Z (Cycle A: low-priority task filter)](./CURRENT_STATUS_20261120T053600Z.md)
+
 - [Daymark engineering status — 2026-11-20T04:02:54Z (web high-priority filter merged)](./CURRENT_STATUS_20261120T040254Z.md)
 
 - [Daymark engineering status — 2026-11-20T09:10:00Z (Cycle B: focus completion success flash)](./CURRENT_STATUS_20261120T091000Z.md)

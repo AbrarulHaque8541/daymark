@@ -41,13 +41,93 @@ test('every literal app.js ID lookup resolves to one unique element in index.htm
 });
 
 test('high-priority filter is discoverable, accessible, persisted, and has shortcut 6', () => {
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   const button = html.match(/<button\b[^>]*\bdata-filter="high"[^>]*>[\s\S]*?<\/button>/i);
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   assert.ok(button, 'the task filters must include a high-priority button');
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   assert.match(button[0], /aria-label="Show high-priority tasks \(6\)"/i);
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   assert.match(button[0], /aria-keyshortcuts="6"/i);
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   assert.match(button[0], /id="count-high"/i);
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'high'[^\]]*\]\)/);
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
   assert.match(app, /'6': 'high'/);
+
+test('low-priority filter is discoverable, accessible, persisted, and has shortcut 7', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="low"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a low-priority button');
+  assert.match(button[0], /aria-label="Show low-priority tasks \(7\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="7"/i);
+  assert.match(button[0], /id="count-low"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'low'[^\]]*\]\)/);
+  assert.match(app, /'7': 'low'/);
+});
 });
 
 test('toast host exposes the live region and action elements used by app.js', () => {

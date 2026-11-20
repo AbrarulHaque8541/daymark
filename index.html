@@ -160,7 +160,7 @@
           <button class="date-chip" id="chip-tomorrow" type="button" title="Set due date to tomorrow">Tomorrow</button>
         </div>
         <p class="form-error" id="add-error" role="alert" hidden>Please enter a task title.</p>
-        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd>1</kbd>–<kbd>6</kbd> for filters, <kbd>C</kbd> to clear completed. Use Complete visible or Copy visible (Y) for a checklist when filtering. Add <kbd>#tags</kbd> to the title to tag a task.</p>
+        <p class="composer-hint">Tip: <kbd>N</kbd> to add, <kbd>/</kbd> to search, <kbd>S</kbd> to sort, <kbd>R</kbd> to reset view, <kbd><kbd>1</kbd>–<kbd>7</kbd> for filters, <kbd>C</kbd> to clear completed. Use Complete visible or Copy visible (Y) for a checklist when filtering. Add <kbd>#tags</kbd> to the title to tag a task.</p>
       </section>
 
       <div class="content-grid">
@@ -181,6 +181,7 @@
             <button type="button" class="filter-button" data-filter="overdue" aria-pressed="false" title="Show overdue tasks (4)" aria-label="Show overdue tasks (4)" aria-keyshortcuts="4">Overdue <span id="count-overdue">0</span></button>
             <button type="button" class="filter-button" data-filter="completed" aria-pressed="false" title="Show completed tasks (5)" aria-label="Show completed tasks (5)" aria-keyshortcuts="5">Completed <span id="count-completed">0</span></button>
             <button type="button" class="filter-button" data-filter="high" aria-pressed="false" title="Show high-priority tasks (6)" aria-label="Show high-priority tasks (6)" aria-keyshortcuts="6">High <span id="count-high">0</span></button>
+            <button type="button" class="filter-button" data-filter="low" aria-pressed="false" title="Show low-priority tasks (7)" aria-label="Show low-priority tasks (7)" aria-keyshortcuts="7">Low <span id="count-low">0</span></button>
           </nav>
           <div class="stats-strip" id="stats-strip" hidden aria-label="Your progress">
             <div class="stat-cell"><span class="stat-cell-number" id="stat-done-today">0</span><span class="stat-cell-label">done today</span></div>
