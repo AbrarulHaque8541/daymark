@@ -14,7 +14,8 @@ const STATUS_ID = 'lifecycle-recovery-status';
 const RESULT_ID = 'lifecycle-recovery-result';
 const FORM_ID = 'lifecycle-recovery-form';
 const CLEAR_ID = 'lifecycle-recovery-clear';
-const CARD_IDS = [FORM_ID, SCENARIO_SELECT_ID, STATUS_ID, RESULT_ID, CLEAR_ID];
+const EXPLAIN_ID = 'lifecycle-recovery-explain';
+const CARD_IDS = [FORM_ID, SCENARIO_SELECT_ID, STATUS_ID, RESULT_ID, CLEAR_ID, EXPLAIN_ID];
 
 function makeElement(id, tag) {
   const el = {
@@ -25,10 +26,23 @@ function makeElement(id, tag) {
     listeners: {},
     children: [],
     attributes: {},
+    classList: {
+      _set: new Set(),
+      add(cls) { this._set.add(cls); },
+      remove(cls) { this._set.delete(cls); },
+      contains(cls) { return this._set.has(cls); },
+      toggle(cls, force) {
+        if (force === true) this._set.add(cls);
+        else if (force === false) this._set.delete(cls);
+        else this._set.has(cls) ? this._set.delete(cls) : this._set.add(cls);
+        return this._set.has(cls);
+      }
+    },
     setAttribute(name, v) { this.attributes[name] = v; },
     getAttribute(name) {
       return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
     },
+    removeAttribute(name) { delete this.attributes[name]; },
     addEventListener(type, fn) {
       this.listeners[type] = this.listeners[type] || [];
       this.listeners[type].push(fn);
@@ -61,6 +75,7 @@ function makeDoc(readyState) {
   elements[STATUS_ID] = makeElement(STATUS_ID, 'p');
   elements[RESULT_ID] = makeElement(RESULT_ID, 'div');
   elements[CLEAR_ID] = makeElement(CLEAR_ID, 'button');
+  elements[EXPLAIN_ID] = makeElement(EXPLAIN_ID, 'button');
   const doc = {
     readyState: readyState || 'complete',
     listeners: {},
@@ -151,7 +166,7 @@ test('missing card elements return a graceful no instead of throwing', () => {
   assert.equal(outcome.reason, 'missing-elements');
 });
 
-test('index.html pins the card, its five ids and both script tags', () => {
+test('index.html pins the card, its ids and both script tags', () => {
   const source = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   assert.ok(source.indexOf('id="lifecycle-recovery-card"') !== -1);
   for (const id of CARD_IDS) {
@@ -191,4 +206,19 @@ test('boot in a loading document defers the first explanation', () => {
   made.doc.dispatch('DOMContentLoaded', {});
   assert.ok(made.elements[STATUS_ID].textContent.indexOf(ui.AVAILABLE_PREFIX) === 0);
   assert.equal(made.elements[RESULT_ID].children.length, 7);
+});
+
+test('press feedback adds is-pressed on pointerdown for explain and clear', () => {
+  const made = makeDoc();
+  ui.attachLifecycleRecoveryUi({ document: made.doc, engine });
+  const explain = made.elements[EXPLAIN_ID];
+  const clear = made.elements[CLEAR_ID];
+  explain.dispatch('pointerdown', {});
+  assert.equal(explain.classList.contains('is-pressed'), true);
+  explain.dispatch('pointerup', {});
+  assert.equal(explain.classList.contains('is-pressed'), false);
+  clear.dispatch('pointerdown', {});
+  assert.equal(clear.classList.contains('is-pressed'), true);
+  clear.dispatch('pointerleave', {});
+  assert.equal(clear.classList.contains('is-pressed'), false);
 });
