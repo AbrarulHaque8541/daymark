@@ -93,8 +93,10 @@ expect_fail_after_removal check-task-ux.py "ShareIntake.parse("
 expect_fail_after_removal check-task-ux.py "Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())"
 expect_fail_after_removal check-task-ux.py 'if (task != iterator.next()) return false;' "$RENDER_GATE"
 # A clip is review-only until the user saves it through the encrypted task pipeline.
-expect_fail_after_removal check-web-clip.py "pendingWebClip = WebClip.fromReader(" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-web-clip.py "setPendingWebClipDraft(WebClip.fromReader(" "$ACTIVITY" "$ROOT"
 expect_fail_after_removal check-web-clip.py 'saveTasksAsync("Saving offline clip…");' "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-web-clip.py "saveWebClipDraftState(outState, pendingWebClip);" "$ACTIVITY" "$ROOT"
+expect_fail_after_removal check-web-clip.py "WebClip.restoreDraft(" "$ACTIVITY" "$ROOT"
 # Reminder notification must retain the per-duration action labels and only re-arm its alarm slot.
 expect_fail_after_removal check-reminder-lifecycle.py '"Snooze " + minutes + " min"' "$RECEIVER" "$ROOT"
 expect_fail_after_removal check-reminder-lifecycle.py "alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeFire.toEpochMilli()," "$SCHEDULER" "$ROOT"
