@@ -14,6 +14,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewConfiguration;
+import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
@@ -388,9 +389,10 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
 
     private void chooseMode(TaskFocusTimer.Mode mode) {
         if (closed || actionPending || timer != null && !timer.isFinished()) return;
+        boolean changed = selectedMode != mode;
         selectedMode = mode;
-        modeStopwatch.setSelected(mode == TaskFocusTimer.Mode.STOPWATCH);
-        modeCountdown.setSelected(mode == TaskFocusTimer.Mode.COUNTDOWN);
+        setChoiceSelected(modeStopwatch, mode == TaskFocusTimer.Mode.STOPWATCH, changed);
+        setChoiceSelected(modeCountdown, mode == TaskFocusTimer.Mode.COUNTDOWN, changed);
         sounds.onSelection();
         modeStopwatch.setBackground(round(mode == TaskFocusTimer.Mode.STOPWATCH ? ACCENT_SOFT : SURFACE, 18));
         modeCountdown.setBackground(round(mode == TaskFocusTimer.Mode.COUNTDOWN ? ACCENT_SOFT : SURFACE, 18));
@@ -539,6 +541,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
 
     private void chooseDisplayUnit(DisplayUnit unit) {
         if (closed || actionPending || unit == null) return;
+        boolean changed = displayUnit != unit;
         displayUnit = unit;
         sounds.onSelection();
         String[] names = {"Auto", "Seconds", "Minutes", "Hours"};
@@ -547,7 +550,7 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
             boolean selected = values[i] == unit;
             displayUnitButtons[i].setBackground(round(selected ? ACCENT_SOFT : SURFACE, 14));
             displayUnitButtons[i].setTextColor(selected ? TEXT : MUTED);
-            displayUnitButtons[i].setSelected(selected);
+            setChoiceSelected(displayUnitButtons[i], selected, changed);
             displayUnitButtons[i].setContentDescription(names[i]);
         }
         render(timer, timer == null ? 0 : android.os.SystemClock.elapsedRealtime());
@@ -662,6 +665,11 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         view.setClickable(true);
         view.setFocusable(true);
         view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override public void onInitializeAccessibilityEvent(View host, AccessibilityEvent event) {
+                super.onInitializeAccessibilityEvent(host, event);
+                event.setChecked(host.isSelected());
+            }
+
             @Override public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
                 super.onInitializeAccessibilityNodeInfo(host, info);
                 info.setClassName(RadioButton.class.getName());
@@ -669,6 +677,14 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
                 info.setChecked(host.isSelected());
             }
         });
+    }
+
+    private void setChoiceSelected(TextView view, boolean selected, boolean announceChange) {
+        boolean changed = view.isSelected() != selected;
+        view.setSelected(selected);
+        if (changed && selected && announceChange) {
+            view.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
+        }
     }
 
     private void configureToggleAccessibility(TextView view) {
