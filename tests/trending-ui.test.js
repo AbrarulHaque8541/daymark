@@ -223,7 +223,11 @@ test('a successful check renders articles with an accessible link', async () => 
   assert.ok(result.textContent.includes('Grand Theft Auto VI'));
   assert.ok(result.textContent.includes('519,632'));
   assert.ok(result.textContent.includes('views'));
-  const link = result.children.find(c => c.tagName === 'a');
+  const list = result.children.find(c => c.tagName === 'ul');
+  assert.ok(list);
+  const item = list.children.find(c => c.tagName === 'li');
+  assert.ok(item);
+  const link = item.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/Grand_Theft_Auto_VI');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
@@ -363,8 +367,8 @@ test('missing trending API degrades with an honest message', async () => {
 
 test('index.html wires both trending modules as defer scripts', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.ok(html.includes('<script src="trending-logic.js" defer></script>'));
-  assert.ok(html.includes('<script src="trending-ui.js" defer></script>'));
+  assert.ok(html.includes('<script src=\"trending-logic.js\" defer></script>'));
+  assert.ok(html.includes('<script src=\"trending-ui.js\" defer></script>'));
 });
 
 test('boot never reads localStorage (stateless card)', async () => {
