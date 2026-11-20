@@ -26,7 +26,7 @@ final class ExtensionInjector {
     private ExtensionInjector() { }
 
     static boolean apply(WebView webView, String pageUrl, List<BrowserExtension> packs) {
-        if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)
+        if (webView == null || packs == null || !BrowserExtension.isAllowedExtensionUrl(pageUrl)
                 || !pageUrl.equals(webView.getUrl())) return false;
 
         List<BrowserExtension> matching = matchingPacks(pageUrl, packs);
@@ -83,7 +83,7 @@ final class ExtensionInjector {
      * @return true when a current-page reconciliation script was submitted.
      */
     static boolean applyStyles(WebView webView, String pageUrl, List<BrowserExtension> packs) {
-        if (webView == null || packs == null || !BrowserAddress.isAllowedWebUrl(pageUrl)) return false;
+        if (webView == null || packs == null || !BrowserExtension.isAllowedExtensionUrl(pageUrl)) return false;
         return submitCurrentPageStyles(webView, pageUrl, matchingPacks(pageUrl, packs));
     }
 

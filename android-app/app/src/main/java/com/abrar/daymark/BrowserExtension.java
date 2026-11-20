@@ -75,9 +75,18 @@ final class BrowserExtension {
         this.disabledSites = Collections.unmodifiableList(sites);
     }
 
+    static boolean isAllowedExtensionUrl(String url) {
+        if (!BrowserAddress.isAllowedWebUrl(url)) return false;
+        try {
+            return "https".equalsIgnoreCase(new java.net.URI(url.trim()).getScheme());
+        } catch (Exception invalid) {
+            return false;
+        }
+    }
+
     boolean matchesUrl(String url) {
         if (url == null || url.isEmpty() || matches.isEmpty()) return false;
-        if (!BrowserAddress.isAllowedWebUrl(url)) return false;
+        if (!isAllowedExtensionUrl(url)) return false;
         if (isSiteDisabled(url)) return false;
         for (String pattern : excludes) {
             if (MatchRules.matches(pattern, url)) return false;
@@ -176,9 +185,8 @@ final class BrowserExtension {
             if (pattern == null || url == null) return false;
             String p = pattern.trim();
             if (p.isEmpty()) return false;
-            if ("<all_urls>".equals(p) || "*://*/*".equals(p)) {
-                return BrowserAddress.isAllowedWebUrl(url);
-            }
+            if (!isAllowedExtensionUrl(url)) return false;
+            if ("<all_urls>".equals(p) || "*://*/*".equals(p)) return true;
             try {
                 java.net.URI uri = new java.net.URI(url);
                 String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);

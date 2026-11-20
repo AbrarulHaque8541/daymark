@@ -20,6 +20,7 @@ public final class ExtensionStoreSmoke {
         try {
             Context context = new Context(root);
             ExtensionStore store = new ExtensionStore(context);
+            wildcardPackSurvivesReload(store, context);
             String id = "user.store-smoke";
             BrowserExtension incoming = ExtensionPackageParser.parseDaymarkJson(pack(id, "window.sample = 1;", true), false);
             store.installUserPack(incoming);
@@ -261,6 +262,28 @@ public final class ExtensionStoreSmoke {
             if (fileName.equals(record.fileName)) return record;
         }
         throw new AssertionError("malformed recovery record is missing: " + fileName);
+    }
+
+    private static void wildcardPackSurvivesReload(ExtensionStore store, Context context) throws Exception {
+        String manifest = "{\"name\":\"Wildcard reload\",\"content_scripts\":["
+                + "{\"matches\":[\"<all_urls>\",\"*://*/*\"],\"js\":[\"wildcard.js\"]}]}";
+        BrowserExtension imported = ExtensionPackageParser.parseWebExtensionManifest(manifest);
+        store.installUserPack(imported);
+        store.setUserPackEnabled(imported.id, true);
+
+        ExtensionStore reloaded = new ExtensionStore(context);
+        BrowserExtension visible = reloaded.listAll().stream()
+                .filter(extension -> imported.id.equals(extension.id)).findFirst().orElse(null);
+        check(visible != null && visible.enabled,
+                "imported wildcard pack remains visible and enabled after persisted-store reload");
+        check(visible != null && Arrays.asList("<all_urls>", "*://*/*").equals(visible.matches),
+                "both wildcard rules survive storage and reload unchanged");
+        check(reloaded.enabledMatching("https://example.com/page").stream()
+                        .anyMatch(extension -> imported.id.equals(extension.id)),
+                "reloaded wildcard pack matches HTTPS at runtime");
+        check(reloaded.enabledMatching("http://example.com/page").stream()
+                        .noneMatch(extension -> imported.id.equals(extension.id)),
+                "reloaded wildcard pack does not match HTTP at runtime");
     }
 
     private static void expectRecoveryReadFailure(ExtensionStore store, String fileName, String fingerprint) throws Exception {
