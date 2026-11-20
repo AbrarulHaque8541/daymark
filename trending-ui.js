@@ -191,9 +191,10 @@
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       lines.push('Trending on Wikipedia for ' + paddedMonth + '/' + paddedDay);
       const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
-      for (const article of record.articles) {
+      for (let index = 0; index < record.articles.length; index += 1) {
+        const article = record.articles[index];
         const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
-        let line = '- ' + article.title + (article.titleTruncated ? ' (truncated)' : '') + ' · ' + viewsText + ' views';
+        let line = (index + 1) + '. ' + article.title + (article.titleTruncated ? ' (truncated)' : '') + ' · ' + viewsText + ' views';
         if (article.url) line += ' · ' + article.url;
         lines.push(line);
       }
@@ -220,9 +221,15 @@
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const dateLabel = paddedMonth + '/' + paddedDay;
       const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
-      for (const article of record.articles) {
+      for (let index = 0; index < record.articles.length; index += 1) {
+        const article = record.articles[index];
         const item = doc.createElement('div');
         item.className = 'feed-item';
+        const rank = doc.createElement('span');
+        rank.className = 'feed-item-rank';
+        rank.textContent = String(index + 1);
+        if (typeof rank.setAttribute === 'function') rank.setAttribute('aria-hidden', 'true');
+        item.appendChild(rank);
         const title = doc.createElement('span');
         title.className = 'feed-item-title';
         title.textContent = article.title + (article.titleTruncated ? ' (title truncated)' : '');

@@ -228,6 +228,10 @@ test('a successful check renders articles with an accessible link', async () => 
   assert.ok(result.textContent.includes('views'));
   const item = result.children.find(c => c.className === 'feed-item');
   assert.ok(item);
+  const rank = item.children.find(c => c.className === 'feed-item-rank');
+  assert.ok(rank);
+  assert.strictEqual(rank.textContent, '1');
+  assert.strictEqual(rank.getAttribute('aria-hidden'), 'true');
   const link = item.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/Grand_Theft_Auto_VI');
