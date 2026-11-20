@@ -518,16 +518,16 @@
         <aside class="briefing-card" id="release-compat-card" aria-labelledby="release-compat-heading">
   <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
   <h2 id="release-compat-heading">Update and release safety, in plain words</h2>
-  <p class="briefing-description">What updates change, what the signer pin and package identity really mean, and how to back out safely. Explained locally; nothing runs.</p>
+  <p class="briefing-description">Short explanations from current Daymark source. This guide does not inspect your installed app or APK, test data migration, or perform an update or rollback.</p>
   <form id="release-compat-form" class="feed-form" novalidate>
     <label class="sr-only" for="release-compat-topic">Release topic to explain</label>
     <select id="release-compat-topic" name="topic" class="sort-select" aria-label="Release topic">
-      <option value="package-identity" selected>Package identity stays put</option>
-      <option value="signer-continuity">Same signer, same key</option>
-      <option value="data-migration">Data survives the upgrade</option>
-      <option value="updater-security">The updater stays HTTPS-only</option>
-      <option value="device-gates">Device evidence before release</option>
-      <option value="rollback-recovery">A way back, planned honestly</option>
+      <option value="package-identity" selected>App ID in current source</option>
+      <option value="signer-continuity">App ID, signer and version code</option>
+      <option value="data-migration">Task data and migration limits</option>
+      <option value="updater-security">HTTPS-only updater in current source</option>
+      <option value="device-gates">CI and device evidence</option>
+      <option value="rollback-recovery">Going back to an older version</option>
       <option value="not-a-real-topic">Unknown topic (fail-closed check)</option>
     </select>
     <button class="button button-primary" id="release-compat-explain" type="submit" title="Explain the selected release topic">Explain</button>
@@ -692,5 +692,3 @@
   </div>
 </body>
 </html>
-
-

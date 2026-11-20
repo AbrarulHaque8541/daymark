@@ -70,11 +70,11 @@ test('ui module exports attachReleaseCompatUi', () => {
 test('boot explains the default topic without any call', () => {
   const { doc, els } = makeCard();
   attachReleaseCompatUi({ document: doc, dataApi: logic });
-  assert.equal(els['release-compat-status'].textContent, 'Explained · Package identity stays put · already pinned');
+  assert.equal(els['release-compat-status'].textContent, 'Explained · App identity: current source · check needed');
   const result = els['release-compat-result'];
   const explained = logic.explainTopic('package-identity');
   assert.equal(result.children.length, 1 + explained.keepsWorking.length + explained.breaksIfIgnored.length + 4);
-  assert.equal(result.children[0].children[0].textContent, 'com.abrar.daymark is the app for life, not per version');
+  assert.equal(result.children[0].children[0].textContent, 'This source uses com.abrar.daymark today');
 });
 
 test('rendered explanation carries all six fixed line prefixes', () => {
@@ -91,8 +91,8 @@ test('change event explains data migration with action-required status', () => {
   const ui = attachReleaseCompatUi({ document: doc, dataApi: logic });
   els['release-compat-topic'].value = 'data-migration';
   els['release-compat-topic'].emit('change');
-  assert.equal(els['release-compat-status'].textContent, 'Explained · Data survives the upgrade · action required');
-  assert.ok(els['release-compat-result'].textContent.indexOf('Encrypted on-device data must survive every version step') !== -1);
+  assert.equal(els['release-compat-status'].textContent, 'Explained · Task-data migration limits · check needed');
+  assert.ok(els['release-compat-result'].textContent.indexOf('The current TaskSnapshotCodec reads schema versions 1–5') !== -1);
   assert.equal(typeof ui.explain, 'function');
 });
 
@@ -103,8 +103,8 @@ test('submit prevents default and explains updater security', () => {
   const ev = { prevented: false, preventDefault() { this.prevented = true; } };
   els['release-compat-form'].emit('submit', ev);
   assert.equal(ev.prevented, true);
-  assert.equal(els['release-compat-status'].textContent, 'Explained · The updater stays HTTPS-only · already pinned');
-  assert.ok(els['release-compat-result'].textContent.indexOf('Release downloads ride the strict path, never the browser one') !== -1);
+  assert.equal(els['release-compat-status'].textContent, 'Explained · HTTPS-only updater in current source');
+  assert.ok(els['release-compat-result'].textContent.indexOf('Current updater code uses HTTPS-only requests') !== -1);
 });
 
 test('unknown topic fails closed and runs nothing', () => {
@@ -190,6 +190,8 @@ test('index.html wires the card, ids and both scripts', () => {
   for (const id of ['release-compat-card', 'release-compat-heading', 'release-compat-form', 'release-compat-topic', 'release-compat-explain', 'release-compat-clear', 'release-compat-status', 'release-compat-result']) {
     assert.ok(index.indexOf('id="' + id + '"') !== -1, id);
   }
+  assert.ok(index.indexOf('This guide does not inspect your installed app or APK') !== -1);
+  assert.ok(index.indexOf('Task data and migration limits') !== -1);
   assert.ok(index.indexOf('<script src="release-compat-logic.js" defer></script>') !== -1);
   assert.ok(index.indexOf('<script src="release-compat-ui.js" defer></script>') !== -1);
   assert.ok(index.indexOf('tests/release-compat-logic.test.js') === -1);

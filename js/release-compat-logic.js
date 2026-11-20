@@ -1,13 +1,12 @@
 /* Daymark release-compatibility engine for the web prototype.
  *
- * Pure, dependency-free catalog behind the "Update and release safety, in
- * plain words" card. For each release topic it explains in plain words: what
- * is true about Daymark releases, what breaks if it is ignored, what recovery
- * looks like, the scope and whether any network is involved.
+ * Pure, dependency-free source guide behind the "Update and release safety,
+ * in plain words" card. It explains selected topics; it does not inspect an
+ * installed app or APK, test a migration, or carry out an update or rollback.
  *
  * Fail-closed policy: any unknown or malformed topic id explains as the honest
- * "unknown" entry instead of guessing, and planUpgradePath() refuses to plan
- * paths containing unknown topics rather than silently skipping them.
+ * "unknown" entry instead of guessing. planUpgradePath() only assembles a
+ * topic checklist; it does not calculate or verify a version-to-version path.
  * Everything is local; no network access happens here and this engine changes
  * no Android or browser setting.
  */
@@ -16,70 +15,70 @@
   const TOPIC_IDS = ['package-identity', 'signer-continuity', 'data-migration', 'updater-security', 'device-gates', 'rollback-recovery'];
   const CATALOG = {
     'package-identity': {
-      label: 'Package identity stays put',
-      title: 'com.abrar.daymark is the app for life, not per version',
-      summary: 'The application id names what Android sees as the app. It is com.abrar.daymark and every release keeps it. A build with a different id installs as a separate app instead of upgrading the installed one, so changing the id is effectively an uninstall path for existing users.',
-      keepsWorking: ['The existing installed app, upgraded in place by every future release'],
-      breaksIfIgnored: ['Users keep an old version forever while the renamed build sits beside it as a second app'],
-      requiresAction: false,
-      recovery: 'Nothing to recover. The identity is already pinned in the app build file and guarded, so no action is needed.',
-      scope: 'This app on this device',
-      network: 'None - identity is decided by the build files'
+      label: 'App identity: current source',
+      title: 'This source uses com.abrar.daymark today',
+      summary: 'Android treats a different application ID as a different app. Current Gradle source declares com.abrar.daymark, but this guide cannot guarantee every future build keeps it or that a particular APK matches it. A different ID does not automatically move data from an installed copy.',
+      keepsWorking: ['The current Gradle source declares applicationId com.abrar.daymark'],
+      breaksIfIgnored: ['A changed application ID creates a separate app; private data is not automatically moved'],
+      requiresAction: true,
+      recovery: 'Compare the exact release APK application ID with the installed app before updating. If they differ, stop and plan a supported, tested migration; do not assume Android carries app data across.',
+      scope: 'Current source only; not a check of a built APK',
+      network: 'None - this guide shows fixed source-backed text'
     },
     'signer-continuity': {
-      label: 'Same signer, same key',
-      title: 'Only the pinned signer can upgrade the installed app',
-      summary: 'Android accepts an in-place upgrade only when the new APK is signed with the same key as the installed build. The Daymark signer pin is fixed for that reason. Uninstalling to work around a signer change deletes app data, so the pin is never changed casually.',
-      keepsWorking: ['Every future matched-signer build installs straight over the installed app'],
-      breaksIfIgnored: ['A re-signed build is refused by Android unless the app is uninstalled first'],
+      label: 'Update identity and version checks',
+      title: 'Android checks the app ID, signer and version code',
+      summary: 'An in-place update needs the same app ID and a signing identity Android accepts. Android also uses versionCode to block installing an APK with a lower code over a newer install. Current source pins a production signer and requires versionCode to rise, but this guide does not inspect a particular APK.',
+      keepsWorking: ['Current source pins a production signer and requires a monotonic versionCode'],
+      breaksIfIgnored: ['A different app ID, unaccepted signer or lower versionCode can block an install-over update'],
       requiresAction: true,
-      recovery: 'Keep using builds from the pinned release workflow, which signs with the trusted key. If a signing change is ever considered, plan it as a data-losing migration with an explicit export first, never as a quiet switch.',
-      scope: 'This app on this device',
-      network: 'None - signing is checked locally at install time'
+      recovery: 'Check the exact APK app ID, signer and versionCode against the installed app and release metadata. Do not uninstall to bypass a mismatch: removing the app can delete its private data.',
+      scope: 'A specific APK and installed app must be checked',
+      network: 'None - Android checks install identity locally'
     },
     'data-migration': {
-      label: 'Data survives the upgrade',
-      title: 'Encrypted on-device data must survive every version step',
-      summary: 'Tasks, notes, Focus history and backups are stored on-device in encrypted Daymark storage. An upgrade changes code, not data, and preferences are read with safe defaults plus unknown-value handling so an older stored value never breaks a newer build. No user data is moved to any cloud to make this work.',
-      keepsWorking: ['Existing tasks, notes, Focus sessions and backups, exactly where the user left them'],
-      breaksIfIgnored: ['A careless change to storage shapes can make stored data unreadable with no undo'],
+      label: 'Task-data migration limits',
+      title: 'The current codec supports specific task formats',
+      summary: 'Tasks and templates use an encrypted app-private snapshot. The current TaskSnapshotCodec reads schema versions 1–5 and writes version 5. That is evidence for those source formats, not a promise that every future build, field or device will preserve all data. Storage changes need explicit migrations and tests.',
+      keepsWorking: ['Current source has codec rules for task snapshot schemas v1–v5'],
+      breaksIfIgnored: ['An unsupported or malformed snapshot can fail to load; there is no blanket retention guarantee'],
       requiresAction: true,
-      recovery: 'Before releases that touch storage, export a portable backup first, keep it outside the app, and test upgrading over an install that already has real data. Uninstall is data loss by design; never suggest it as a fix.',
-      scope: 'This device and user-chosen export files',
-      network: 'None - local-only storage; exports go where the user says'
+      recovery: 'For a build that changes task storage, use only an export path present and validated for that build, keep the export outside app storage, and test restore before relying on it. Do not uninstall or clear data as a generic fix.',
+      scope: 'Task/template snapshot code only; not all app state or every release',
+      network: 'None - this guide shows fixed source-backed text'
     },
     'updater-security': {
-      label: 'The updater stays HTTPS-only',
-      title: 'Release downloads ride the strict path, never the browser one',
-      summary: 'The release-gated GitHub sideload updater fetches release metadata and APKs over HTTPS only, and a source guard keeps it that way. The browser deliberate plain-HTTP allowance is a separate WebView path; it never relaxes the updater. A failed or in-between state stops the update instead of downgrading transport security.',
-      keepsWorking: ['HTTPS-only release metadata, asset download and signature checks'],
+      label: 'HTTPS-only updater in current source',
+      title: 'Current updater code uses HTTPS-only requests',
+      summary: 'Current updater source uses HTTPS for release metadata and APK assets, and repository source checks guard that policy. Browser HTTP is a separate WebView path. This card shows fixed text; it does not inspect a built APK or prove that future source will keep the policy.',
+      keepsWorking: ['Current source and its guard declare HTTPS-only updater requests'],
       breaksIfIgnored: ['Weakening the updater path would let a compromise on the network swap a release APK mid-download'],
       requiresAction: false,
-      recovery: 'Nothing to recover: the HTTPS-only updater policy is pinned in code and CI, and any change to it is a policy decision, not a bug fix.',
-      scope: 'This app updater path',
+      recovery: 'Check the current source guard and exact release artifact; this guide does not inspect either.',
+      scope: 'Current updater source only; not an APK check',
       network: 'HTTPS to GitHub, keyless; nothing else'
     },
     'device-gates': {
-      label: 'Device evidence before release',
-      title: 'Green CI and a built APK are not device acceptance',
-      summary: 'A release is gated on CI source guards, contract tests and emulator runs, and separately on the physical-device acceptance matrix. Emulator passes and downloadable debug APKs prove the toolchain works, not that a real phone behaves. A release claim without device evidence is not made.',
-      keepsWorking: ['The honest status labels: PASS, FAIL, NOT RUN, NOT TESTED, per scenario'],
-      breaksIfIgnored: ['A release cut on CI evidence alone can break real keyboards, storage paths or OEM background rules'],
+      label: 'CI and device evidence',
+      title: 'CI and physical-device checks answer different questions',
+      summary: 'Host tests and emulator workflows are evidence for the exact code and scenarios they test; they do not prove behavior on a physical phone. This repository also tracks device acceptance separately. This guide does not inspect test runs or certify a build.',
+      keepsWorking: ['Use PASS, FAIL, NOT RUN and NOT TESTED for the evidence actually collected'],
+      breaksIfIgnored: ['A green CI job or generated APK can be mistaken for physical-device acceptance'],
       requiresAction: true,
-      recovery: 'Install the non-production debug build on real hardware, record device model, API level, variant, commit and APK SHA for each scenario, then decide. Until then the matrix says NOT TESTED, and the acceptance issue stays open.',
-      scope: 'Physical devices, per the acceptance matrix',
-      network: 'Whatever the scenario being tested uses'
+      recovery: 'Check the current exact-head CI results and the relevant device record separately. If a physical-device scenario was not run, report it as NOT TESTED.',
+      scope: 'Evidence for a particular code revision and tested device',
+      network: 'Depends on the test scenario; this guide makes no network request'
     },
     'rollback-recovery': {
-      label: 'A way back, planned honestly',
-      title: 'Exports and the previous build are the only rollback',
-      summary: 'Android does not offer a go-back button across versions on-device. The honest backup plan is: export a portable backup before updating, keep the previous signed build available, and use the sideload release path to install it again if needed. Clearing data or uninstalling is treated as the emergency exit it is.',
-      keepsWorking: ['Portable backups that a fresh install can import', 'The pinned release workflow that can rebuild any tagged version'],
-      breaksIfIgnored: ['An update with no export before it leaves only uninstall, which loses tasks and history'],
+      label: 'Rollback limits',
+      title: 'Android can block an older APK over a newer one',
+      summary: 'Android uses versionCode to protect against downgrades, so it can refuse an older APK over the current install. This guide cannot bypass that check or confirm a rollback APK will install. Uninstalling first may remove app-private data, and a backup helps only if it is valid, compatible and contains that data.',
+      keepsWorking: ['A user-held export may help only when its contents and restore path are tested'],
+      breaksIfIgnored: ['Having an older APK available does not guarantee it can replace the installed version or restore data'],
       requiresAction: true,
-      recovery: 'Export a backup before every update, keep at least one copy outside the app, note the current version and signer state, and only then install. If a rollback is needed, install the previous release from the pinned path and import the backup.',
-      scope: 'This device plus user-chosen export files',
-      network: 'HTTPS to GitHub for release downloads; exports are local'
+      recovery: 'Before updating, check the exact installed and proposed APKs, supported migration and a tested export/restore path. Do not rely on uninstalling or installing an older APK as a rollback plan.',
+      scope: 'This device and user-held exports; no device state is checked here',
+      network: 'None - this guide does not download or install APKs'
     }
   };
   const UNKNOWN = {
@@ -116,7 +115,7 @@
   }
   function planUpgradePath(rawIds) {
     const fail = (error) => ({ ok: false, error, ids: [], steps: [], warnings: [] });
-    if (!Array.isArray(rawIds)) return fail('An upgrade path needs a list of topic ids.');
+    if (!Array.isArray(rawIds)) return fail('A topic checklist needs a list of topic ids.');
     const seen = Object.create(null);
     const ids = [];
     const unknown = [];
@@ -125,19 +124,19 @@
       if (!isKnownTopic(raw)) { unknown.push(typeof raw === 'string' ? raw : String(raw)); continue; }
       if (!seen[raw]) { seen[raw] = true; ids.push(raw); }
     }
-    if (unknown.length > 0) return fail('Unknown release topic(s), so nothing was planned: ' + unknown.join(', '));
-    if (ids.length === 0) return fail('An upgrade path needs at least one known topic.');
+    if (unknown.length > 0) return fail('Unknown release topic(s), so no checklist was created: ' + unknown.join(', '));
+    if (ids.length === 0) return fail('A topic checklist needs at least one known topic.');
     const steps = [];
     const warnings = [];
     for (let i = 0; i < ids.length; i += 1) {
       const entry = explainTopic(ids[i]);
-      if (!entry.available) return fail(entry.label + ' is unavailable in this build; no path was created.');
-      steps.push(entry.label + ' - ' + (entry.requiresAction ? 'needs a deliberate action before release' : 'already pinned; no action needed'));
-      if (entry.requiresAction) warnings.push(entry.label + ' needs action: ' + entry.recovery);
+      if (!entry.available) return fail(entry.label + ' is unavailable in this build; no checklist was created.');
+      steps.push('Review ' + entry.label + ' - ' + (entry.requiresAction ? 'needs a separate check' : 'current source describes this as pinned'));
+      if (entry.requiresAction) warnings.push(entry.label + ' needs a separate check: ' + entry.recovery);
     }
     return {
       ok: true, ids: ids.slice(), steps, warnings,
-      note: 'Daymark runs nothing automatically; this plan only explains and does not change any setting, build or release.'
+      note: 'This is a topic checklist only: it does not inspect app versions, an installed package, signer, task data or APK, and does not run an update, migration, install or rollback.'
     };
   }
   const api = { explainTopic, listTopics, planUpgradePath, isKnownTopic, TOPIC_IDS, CATALOG };

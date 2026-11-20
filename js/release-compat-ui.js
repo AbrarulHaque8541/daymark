@@ -1,11 +1,10 @@
 /* Daymark release-compatibility card UI wiring for the web prototype.
  *
- * A small offline card next to the other planner cards: the user picks a
- * release topic (package identity, signer continuity, data migration, the
- * HTTPS-only updater, device gates, rollback and recovery) and this card
- * shows, locally and in plain words, what is true, what breaks if it is
- * ignored, the recovery and its cost. Nothing is fetched, nothing runs and
- * no setting is changed; the catalog engine is DaymarkReleaseCompat
+ * A small local guide next to the other briefing cards: the user picks a
+ * release topic and sees fixed source-backed explanations. It does not
+ * inspect an installed app or APK, test a migration, or perform an update or
+ * rollback. Nothing is fetched, nothing runs and no setting is changed; the
+ * catalog engine is DaymarkReleaseCompat
  * (release-compat-logic.js). Mirrors the permission-lifecycle-ui.js module
  * style: attachReleaseCompatUi(env) is fully injectable for unit tests and
  * the card is stateless, so boot never touches window.localStorage.
@@ -80,7 +79,7 @@
       const ok = !!result.available;
       status(!ok
         ? 'Unavailable · ' + result.label + ' · no action was run'
-        : 'Explained · ' + result.label + (result.requiresAction ? ' · action required' : ' · already pinned'), ok);
+        : 'Explained · ' + result.label + (result.requiresAction ? ' · check needed' : ''), ok);
       renderExplanation(result);
     }
     function onClear() {
