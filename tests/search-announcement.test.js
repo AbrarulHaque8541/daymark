@@ -15,6 +15,8 @@ const APP_SOURCE = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 function bootApp({ savedValue = null } = {}) {
   const elements = new Map();
   const storedValues = new Map();
+  const timeouts = new Map();
+  let nextTimeoutId = 1;
   if (savedValue !== null) storedValues.set('daymark.tasks.v1', savedValue);
 
   function element(selector) {
@@ -96,12 +98,28 @@ function bootApp({ savedValue = null } = {}) {
     document,
     localStorage,
     window,
-    clearTimeout() {},
-    setTimeout: () => 1,
+    clearTimeout(id) { timeouts.delete(id); },
+    setTimeout(callback, delay) {
+      const id = nextTimeoutId++;
+      timeouts.set(id, { id, callback, delay });
+      return id;
+    },
     setInterval: () => 1
   }, { filename: 'app.js' });
 
-  return { elements, storedValues };
+  return {
+    elements,
+    storedValues,
+    runTimeoutsWithDelay(delay) {
+      const due = Array.from(timeouts.values()).filter((timer) => timer.delay === delay);
+      for (const timer of due) {
+        if (!timeouts.has(timer.id)) continue;
+        timeouts.delete(timer.id);
+        timer.callback();
+      }
+      return due.length;
+    }
+  };
 }
 
 function typeSearch(app, value) {
@@ -129,11 +147,17 @@ test('an active query quiets the task list and announces the concise match count
 
   typeSearch(app, 'wo');
   assert.equal(taskList.getAttribute('aria-live'), 'off',
-    'a query must stop the whole list being re-announced on every keystroke');
+    'an active query immediately stops the whole list being re-announced on every keystroke');
+  assert.equal(app.elements.get('#search-result-status').textContent, '',
+    'the result announcement remains aligned with the currently rendered list during debounce');
+  assert.equal(app.runTimeoutsWithDelay(120), 1);
   assert.equal(app.elements.get('#search-result-status').textContent, '1 matching task',
-    'the dedicated status carries the concise count');
+    'after the debounced render, the dedicated status carries the concise count');
 
   typeSearch(app, 'zz');
+  assert.equal(app.elements.get('#search-result-status').textContent, '1 matching task',
+    'the prior count remains paired with the prior rendered list during debounce');
+  assert.equal(app.runTimeoutsWithDelay(120), 1);
   assert.equal(app.elements.get('#search-result-status').textContent, '0 matching tasks');
   assert.equal(app.elements.get('#empty-state').hidden, false, 'the empty state still renders');
 });
@@ -142,9 +166,13 @@ test('clearing the search restores full list announcements', () => {
   const app = bootApp({ savedValue: JSON.stringify([]) });
   const taskList = app.elements.get('#task-list');
   typeSearch(app, 'zz');
+  app.runTimeoutsWithDelay(120);
   typeSearch(app, '');
+  assert.equal(taskList.getAttribute('aria-live'), 'off',
+    'the list remains quiet until the cleared-query results are rendered');
+  assert.equal(app.runTimeoutsWithDelay(120), 1);
   assert.equal(taskList.getAttribute('aria-live'), 'polite',
-    'task add/remove announcements must come back when the query is gone');
+    'task add/remove announcements return when the cleared query is rendered');
   assert.equal(app.elements.get('#search-result-status').textContent, '',
     'the search status goes quiet once no query is active');
 });
