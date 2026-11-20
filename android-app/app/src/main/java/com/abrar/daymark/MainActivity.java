@@ -128,7 +128,14 @@ public final class MainActivity extends Activity {
     private static final String STATE_PENDING_PORTABLE_IMPORT_TOKEN = "pending_portable_import_token";
     private static final String STATE_WEB_MODE = WebModeState.KEY;
     private static final String STATE_TASK_DRAFT = "state_task_draft";
+    private static final String STATE_WEB_CLIP_DRAFT_PRESENT = "state_web_clip_draft_present";
+    private static final String STATE_WEB_CLIP_DRAFT_TITLE = "state_web_clip_draft_title";
+    private static final String STATE_WEB_CLIP_DRAFT_NOTES = "state_web_clip_draft_notes";
+    private static final String STATE_WEB_CLIP_DRAFT_SHORTENED = "state_web_clip_draft_shortened";
+    private static final String STATE_WEB_CLIP_DRAFT_SOURCE_TREATMENT = "state_web_clip_draft_source_treatment";
+    private static final String STATE_WEB_CLIP_DRAFT_TOKEN = "state_web_clip_draft_token";
     private static final String PREFERENCES = "daymark.preferences.v1";
+    private static final String WEB_CLIP_ACTIVE_TOKEN_KEY = "web_clip.active_state_token.v1";
     private static final String THEME_KEY = "theme_mode";
     private static final int THEME_SYSTEM = 0;
     private static final int THEME_LIGHT = 1;
@@ -508,6 +515,9 @@ public final class MainActivity extends Activity {
             Object retained = getLastNonConfigurationInstance();
             if (retained instanceof WebClip.Draft) pendingWebClip = (WebClip.Draft) retained;
             if (savedInstanceState != null) {
+                WebClip.Draft restoredWebClip = restoreWebClipDraftState(savedInstanceState,
+                        activeWebClipDraftToken(getSharedPreferences(PREFERENCES, MODE_PRIVATE)));
+                if (restoredWebClip != null) pendingWebClip = restoredWebClip;
                 pendingAttachmentTaskId = savedInstanceState.getString(STATE_PENDING_ATTACHMENT_TASK);
                 ArrayList<Uri> restoredSharedUris =
                         savedInstanceState.getParcelableArrayList(STATE_SHARED_ATTACHMENT_URIS);
@@ -1090,6 +1100,77 @@ public final class MainActivity extends Activity {
         return pendingWebClip;
     }
 
+    static void saveWebClipDraftState(Bundle outState, WebClip.Draft draft) {
+        WebClip.Draft bounded = draft == null ? null : WebClip.restoreDraft(
+                draft.title, draft.notes, draft.excerptShortened, draft.sourceTreatment.name(), draft.stateToken);
+        if (bounded == null) {
+            outState.remove(STATE_WEB_CLIP_DRAFT_PRESENT);
+            outState.remove(STATE_WEB_CLIP_DRAFT_TITLE);
+            outState.remove(STATE_WEB_CLIP_DRAFT_NOTES);
+            outState.remove(STATE_WEB_CLIP_DRAFT_SHORTENED);
+            outState.remove(STATE_WEB_CLIP_DRAFT_SOURCE_TREATMENT);
+            outState.remove(STATE_WEB_CLIP_DRAFT_TOKEN);
+            return;
+        }
+        outState.putBoolean(STATE_WEB_CLIP_DRAFT_PRESENT, true);
+        outState.putString(STATE_WEB_CLIP_DRAFT_TITLE, bounded.title);
+        outState.putString(STATE_WEB_CLIP_DRAFT_NOTES, bounded.notes);
+        outState.putBoolean(STATE_WEB_CLIP_DRAFT_SHORTENED, bounded.excerptShortened);
+        outState.putString(STATE_WEB_CLIP_DRAFT_SOURCE_TREATMENT, bounded.sourceTreatment.name());
+        outState.putString(STATE_WEB_CLIP_DRAFT_TOKEN, bounded.stateToken);
+    }
+
+    static WebClip.Draft restoreWebClipDraftState(Bundle savedInstanceState, String activeStateToken) {
+        if (savedInstanceState == null || activeStateToken == null
+                || !savedInstanceState.getBoolean(STATE_WEB_CLIP_DRAFT_PRESENT, false)) return null;
+        try {
+            WebClip.Draft restored = WebClip.restoreDraft(
+                    savedInstanceState.getString(STATE_WEB_CLIP_DRAFT_TITLE),
+                    savedInstanceState.getString(STATE_WEB_CLIP_DRAFT_NOTES),
+                    savedInstanceState.getBoolean(STATE_WEB_CLIP_DRAFT_SHORTENED, false),
+                    savedInstanceState.getString(STATE_WEB_CLIP_DRAFT_SOURCE_TREATMENT),
+                    savedInstanceState.getString(STATE_WEB_CLIP_DRAFT_TOKEN));
+            return restored != null && activeStateToken.equals(restored.stateToken) ? restored : null;
+        } catch (ClassCastException malformedState) {
+            return null;
+        }
+    }
+
+    static boolean commitWebClipDraftToken(SharedPreferences.Editor editor, String stateToken) {
+        try {
+            if (stateToken == null) editor.remove(WEB_CLIP_ACTIVE_TOKEN_KEY);
+            else editor.putString(WEB_CLIP_ACTIVE_TOKEN_KEY, stateToken);
+            return editor.commit();
+        } catch (RuntimeException persistenceFailure) {
+            return false;
+        }
+    }
+
+    static String activeWebClipDraftToken(SharedPreferences preferences) {
+        try {
+            return preferences.getString(WEB_CLIP_ACTIVE_TOKEN_KEY, null);
+        } catch (ClassCastException malformedPreference) {
+            return null;
+        }
+    }
+
+    private boolean setPendingWebClipDraft(WebClip.Draft draft) {
+        if (draft != null) pendingWebClip = draft;
+        final SharedPreferences.Editor editor;
+        try {
+            editor = getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit();
+        } catch (RuntimeException persistenceFailure) {
+            Log.w("Daymark-WebClip", "Could not open draft lifecycle token storage");
+            return false;
+        }
+        if (!commitWebClipDraftToken(editor, draft == null ? null : draft.stateToken)) {
+            Log.w("Daymark-WebClip", "Could not persist the transient draft lifecycle token");
+            return false;
+        }
+        pendingWebClip = draft;
+        return true;
+    }
+
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (pendingAttachmentTaskId != null) {
@@ -1108,6 +1189,7 @@ public final class MainActivity extends Activity {
         if (taskDraft != null && !taskDraft.isEmpty()) {
             outState.putString(STATE_TASK_DRAFT, taskDraft);
         }
+        saveWebClipDraftState(outState, pendingWebClip);
         PortableImportGrantRecovery.Selection pendingSelection = pendingPortableImportSelection();
         if (pendingSelection != null) {
             try {
@@ -4924,7 +5006,9 @@ public final class MainActivity extends Activity {
                 return;
             }
             try {
-                pendingWebClip = WebClip.fromReader(title, body, readerSourceUrl);
+                if (!setPendingWebClipDraft(WebClip.fromReader(title, body, readerSourceUrl))) {
+                    showToast("This clip is open, but may not restore after an unexpected app restart.");
+                }
             } catch (IllegalArgumentException invalidClip) {
                 haptic(view, HapticFeedbackConstants.REJECT);
                 showToast(invalidClip.getMessage());
@@ -5071,10 +5155,23 @@ public final class MainActivity extends Activity {
         dialog.setOnDismissListener(ignored -> {
             if (webClipDialog == dialog) {
                 webClipDialog = null;
-                if (!isChangingConfigurations()) pendingWebClip = null;
+                if (!isChangingConfigurations() && pendingWebClip != null
+                        && !setPendingWebClipDraft(null)) {
+                    validation.setText("Could not safely discard this draft. It remains open; try Cancel again.");
+                    validation.setVisibility(View.VISIBLE);
+                    webClipDialog = dialog;
+                    dialog.show();
+                }
             }
         });
-        cancel.setOnClickListener(view -> dialog.dismiss());
+        cancel.setOnClickListener(view -> {
+            if (setPendingWebClipDraft(null)) {
+                dialog.dismiss();
+            } else {
+                validation.setText("Could not safely discard this draft. It remains open; try again.");
+                validation.setVisibility(View.VISIBLE);
+            }
+        });
         save.setOnClickListener(view -> {
             if (!canEdit()) {
                 haptic(view, HapticFeedbackConstants.REJECT);
@@ -5140,8 +5237,13 @@ public final class MainActivity extends Activity {
         }
         try {
             Task task = WebClip.createTask(pendingWebClip);
+            if (!setPendingWebClipDraft(null)) {
+                haptic(action, HapticFeedbackConstants.REJECT);
+                validation.setText("Could not safely complete this save. Your draft is still open; try again.");
+                validation.setVisibility(View.VISIBLE);
+                return;
+            }
             tasks.add(task);
-            pendingWebClip = null;
             haptic(action, HapticFeedbackConstants.CONFIRM);
             dialog.dismiss();
             setWebMode(false);

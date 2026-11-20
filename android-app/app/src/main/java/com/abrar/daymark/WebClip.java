@@ -1,6 +1,7 @@
 package com.abrar.daymark;
 
 import java.util.Collections;
+import java.util.UUID;
 
 /** Builds a bounded, reviewable offline task draft from Reader Mode's local text extraction. */
 final class WebClip {
@@ -17,21 +18,48 @@ final class WebClip {
         final String notes;
         final boolean excerptShortened;
         final SourceTreatment sourceTreatment;
+        final String stateToken;
 
         private Draft(String title, String notes, boolean excerptShortened,
-                      SourceTreatment sourceTreatment) {
+                      SourceTreatment sourceTreatment, String stateToken) {
             this.title = title;
             this.notes = notes;
             this.excerptShortened = excerptShortened;
             this.sourceTreatment = sourceTreatment;
+            this.stateToken = stateToken;
         }
 
         Draft withTitle(String value) {
-            return new Draft(value == null ? "" : value, notes, excerptShortened, sourceTreatment);
+            return new Draft(value == null ? "" : value, notes, excerptShortened, sourceTreatment, stateToken);
         }
 
         Draft withNotes(String value) {
-            return new Draft(title, value == null ? "" : value, excerptShortened, sourceTreatment);
+            return new Draft(title, value == null ? "" : value, excerptShortened, sourceTreatment, stateToken);
+        }
+    }
+
+    /** Rebuilds only a complete, bounded draft from Android saved-instance state. */
+    static Draft restoreDraft(String title, String notes, boolean excerptShortened,
+                              String sourceTreatmentName, String stateToken) {
+        if (title == null || notes == null || sourceTreatmentName == null
+                || title.length() > MAX_TITLE_CHARS
+                || notes.length() > TaskLogic.MAX_NOTES_CHARS
+                || !isValidStateToken(stateToken)) return null;
+        final SourceTreatment treatment;
+        try {
+            treatment = SourceTreatment.valueOf(sourceTreatmentName);
+        } catch (IllegalArgumentException invalidTreatment) {
+            return null;
+        }
+        return new Draft(validUnicode(title), validUnicode(notes), excerptShortened, treatment, stateToken);
+    }
+
+    private static boolean isValidStateToken(String value) {
+        if (value == null) return false;
+        try {
+            return UUID.fromString(value).toString().equals(value);
+        } catch (IllegalArgumentException invalidToken) {
+            return false;
         }
     }
 
@@ -50,7 +78,8 @@ final class WebClip {
         String excerpt = text.substring(0, end).trim();
         if (excerpt.isEmpty()) throw new IllegalArgumentException("No readable text fits in this clip.");
         boolean shortened = readerEnd < rawText.length() || end < text.length();
-        return new Draft(taskTitle(pageTitle), prefix + excerpt, shortened, source.treatment);
+        return new Draft(taskTitle(pageTitle), prefix + excerpt, shortened, source.treatment,
+                UUID.randomUUID().toString());
     }
 
     /** This uses the same task schema and validation as every other task; it performs no I/O. */

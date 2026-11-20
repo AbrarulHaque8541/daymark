@@ -4,10 +4,12 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.SharedPreferences;
 import android.content.pm.ProviderInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
 import android.security.keystore.KeyGenParameterSpec;
@@ -71,6 +73,7 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
             runPhase("import-legacy-snapshot", this::importLegacySnapshotRoundTripAndRollback);
             runPhase("offline-web-clip-store", this::offlineWebClipStoreRoundTrip);
+            runPhase("offline-web-clip-saved-state", this::offlineWebClipDraftSavedStateRoundTrip);
             runPhase("connections-panel-accessibility", this::connectionsPanelAccessibility);
             runPhase("attachment-provider-pipe", this::attachmentProviderPipeAndAndroidCrypto);
             runPhase("portable-import-uri-journal", this::portableImportUriJournalPreservesRecreationAndCleansOrphans);
@@ -1669,6 +1672,99 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
             }
         });
         if (failure.get() != null) throw new Exception("Connections panel accessibility failed", failure.get());
+    }
+
+    /** Exercises Android saved-state parceling, restoration, cancellation and encrypted clip creation. */
+    private void offlineWebClipDraftSavedStateRoundTrip() throws Exception {
+        char[] longText = new char[TaskLogic.MAX_NOTES_CHARS + 1];
+        Arrays.fill(longText, 'x');
+        WebClip.Draft edited = WebClip.fromReader("Saved article", new String(longText),
+                        "https://example.com/story?token=private#section")
+                .withTitle("Edited saved title 🚀")
+                .withNotes("Source: https://example.com/story\n\nEdited excerpt");
+        SharedPreferences tokenPreferences = getTargetContext()
+                .getSharedPreferences("web-clip-lifecycle-instrumentation", Context.MODE_PRIVATE);
+        check(tokenPreferences.edit().clear().commit(), "token fixture starts clean");
+        check(MainActivity.commitWebClipDraftToken(tokenPreferences.edit(), edited.stateToken)
+                        && edited.stateToken.equals(MainActivity.activeWebClipDraftToken(tokenPreferences)),
+                "active clip token is persisted separately from draft text");
+        Bundle outState = new Bundle();
+        MainActivity.saveWebClipDraftState(outState, edited);
+
+        Parcel parcel = Parcel.obtain();
+        Bundle recreatedState;
+        try {
+            outState.writeToParcel(parcel, 0);
+            parcel.setDataPosition(0);
+            recreatedState = Bundle.CREATOR.createFromParcel(parcel);
+            recreatedState.setClassLoader(getTargetContext().getClassLoader());
+        } finally {
+            parcel.recycle();
+        }
+        WebClip.Draft restored = MainActivity.restoreWebClipDraftState(recreatedState,
+                MainActivity.activeWebClipDraftToken(tokenPreferences));
+        check(restored != null && restored.title.equals(edited.title) && restored.notes.equals(edited.notes),
+                "saved-state parcel restores the exact reviewed title and edited excerpt");
+        check(restored.excerptShortened
+                        && restored.sourceTreatment == WebClip.SourceTreatment.PARAMETERS_REMOVED,
+                "saved-state parcel restores truncation and URL-treatment disclosures");
+        check(!restored.notes.contains("token=private") && !restored.notes.contains("#section"),
+                "restored draft does not reintroduce source URL secrets");
+
+        Bundle cancelledState = new Bundle();
+        MainActivity.saveWebClipDraftState(cancelledState, null);
+        check(MainActivity.restoreWebClipDraftState(cancelledState, edited.stateToken) == null,
+                "Cancel/Back state contains no restorable clip draft");
+
+        check(!MainActivity.commitWebClipDraftToken(failingSharedPreferencesEditor(false), null),
+                "a false preference commit is reported as failed token invalidation");
+        check(edited.stateToken.equals(MainActivity.activeWebClipDraftToken(tokenPreferences))
+                        && MainActivity.restoreWebClipDraftState(recreatedState,
+                        MainActivity.activeWebClipDraftToken(tokenPreferences)) != null,
+                "failed invalidation leaves the active draft intact for the UI to keep open");
+        check(!MainActivity.commitWebClipDraftToken(failingSharedPreferencesEditor(true), null)
+                        && edited.stateToken.equals(MainActivity.activeWebClipDraftToken(tokenPreferences)),
+                "a throwing preference commit also fails closed without clearing the live token");
+        check(MainActivity.commitWebClipDraftToken(tokenPreferences.edit(), null),
+                "successful Cancel/Back or Save invalidation clears the active token");
+        String clearedToken = MainActivity.activeWebClipDraftToken(tokenPreferences);
+        check(clearedToken == null && MainActivity.restoreWebClipDraftState(recreatedState, clearedToken) == null,
+                "a stale snapshot cannot restore after Cancel/Back or Save removes its active token");
+        WebClip.Draft replacement = WebClip.fromReader("Another article", "Another excerpt", null);
+        check(MainActivity.commitWebClipDraftToken(tokenPreferences.edit(), replacement.stateToken)
+                        && !replacement.stateToken.equals(edited.stateToken)
+                        && MainActivity.restoreWebClipDraftState(recreatedState,
+                        MainActivity.activeWebClipDraftToken(tokenPreferences)) == null,
+                "starting a new clip invalidates any older saved-state snapshot");
+        check(tokenPreferences.edit().clear().commit(), "token fixture is cleaned up");
+
+        File root = makeTestDirectory("web-clip-saved-state");
+        File snapshotFile = new File(root, "tasks.enc");
+        EncryptedBlobStore.KeyAccess keys = new FixedTestKey();
+        EncryptedTaskStore store = new EncryptedTaskStore(snapshotFile, keys);
+        check(store.load().isEmpty(), "restored-draft fixture starts with an empty task store");
+        Task saved = WebClip.createTask(restored);
+        store.saveSnapshot(Collections.singletonList(saved), Collections.emptyList());
+        List<Task> reopened = new EncryptedTaskStore(snapshotFile, keys).load();
+        check(reopened.size() == 1 && reopened.get(0).id.equals(saved.id)
+                        && reopened.get(0).title.equals(edited.title)
+                        && reopened.get(0).notes.equals(edited.notes),
+                "saving a restored draft creates exactly one encrypted task with the reviewed content");
+    }
+
+    private static SharedPreferences.Editor failingSharedPreferencesEditor(boolean throwOnCommit) {
+        return (SharedPreferences.Editor) java.lang.reflect.Proxy.newProxyInstance(
+                DaymarkPlatformInstrumentation.class.getClassLoader(),
+                new Class<?>[] { SharedPreferences.Editor.class },
+                (proxy, method, arguments) -> {
+                    if ("remove".equals(method.getName())) return proxy;
+                    if ("commit".equals(method.getName())) {
+                        if (throwOnCommit) throw new IllegalStateException("simulated preference failure");
+                        return false;
+                    }
+                    if ("apply".equals(method.getName())) return null;
+                    throw new UnsupportedOperationException(method.getName());
+                });
     }
 
     /** Exercises the clip through the Android AtomicFile task-store adapter, without network access. */

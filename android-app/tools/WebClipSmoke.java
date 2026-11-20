@@ -23,6 +23,7 @@ public final class WebClipSmoke {
         buildsReviewableDraftAndRemovesSensitiveUrlComponents();
         handlesSourcesConservatively();
         enforcesLengthsWithoutSplittingUnicode();
+        restoresBoundedSavedDraft();
         editableDraftUsesNormalTaskValidation();
         encryptedSnapshotRoundTripAndWriteFailure();
         System.out.println("PASS offline web clip: " + assertions + " assertions");
@@ -101,6 +102,43 @@ public final class WebClipSmoke {
         check(huge.excerptShortened && huge.notes.length() == TaskLogic.MAX_NOTES_CHARS,
                 "an unbounded caller remains bounded and reports shortening");
         check(WebClip.taskTitle("\n\t").equals("Read this article"), "blank title has a useful fallback");
+    }
+
+    private static void restoresBoundedSavedDraft() {
+        WebClip.Draft original = WebClip.fromReader("Article", "Body",
+                "https://example.com/article?token=private#section");
+        WebClip.Draft edited = original.withTitle("Edited title 🚀")
+                .withNotes("Source: https://example.com/article\n\nEdited excerpt");
+        WebClip.Draft restored = WebClip.restoreDraft(edited.title, edited.notes,
+                edited.excerptShortened, edited.sourceTreatment.name(), edited.stateToken);
+        check(restored != null && restored.title.equals(edited.title) && restored.notes.equals(edited.notes),
+                "saved-state reconstruction preserves the reviewed title and notes");
+        check(restored.stateToken.equals(original.stateToken),
+                "editing and restoring a draft preserves its opaque lifecycle token");
+        check(restored.sourceTreatment == WebClip.SourceTreatment.PARAMETERS_REMOVED,
+                "saved-state reconstruction preserves source-treatment disclosure");
+        check(!restored.notes.contains("token=private") && !restored.notes.contains("#section"),
+                "source URL secrets remain absent after draft restoration");
+        check(WebClip.restoreDraft(null, edited.notes, false, edited.sourceTreatment.name(),
+                        edited.stateToken) == null
+                        && WebClip.restoreDraft(edited.title, null, false, edited.sourceTreatment.name(),
+                        edited.stateToken) == null,
+                "incomplete saved state is discarded rather than partially restored");
+        check(WebClip.restoreDraft(repeat('t', WebClip.MAX_TITLE_CHARS + 1), edited.notes,
+                        false, edited.sourceTreatment.name(), edited.stateToken) == null,
+                "oversized saved title is rejected");
+        check(WebClip.restoreDraft(edited.title, repeat('n', TaskLogic.MAX_NOTES_CHARS + 1),
+                        false, edited.sourceTreatment.name(), edited.stateToken) == null,
+                "oversized saved notes are rejected");
+        check(WebClip.restoreDraft(edited.title, edited.notes, false, "UNRECOGNIZED", edited.stateToken) == null
+                        && WebClip.restoreDraft(edited.title, edited.notes, false,
+                        edited.sourceTreatment.name(), "not-a-uuid") == null,
+                "unknown source-treatment values and malformed lifecycle tokens are rejected");
+        WebClip.Draft malformed = WebClip.restoreDraft("Title\uD800", "Note\uDC00", false,
+                WebClip.SourceTreatment.OMITTED.name(), edited.stateToken);
+        check(malformed != null && malformed.title.equals("Title\uFFFD")
+                        && malformed.notes.equals("Note\uFFFD"),
+                "malformed saved Unicode is normalized before display or persistence");
     }
 
     private static void editableDraftUsesNormalTaskValidation() throws Exception {
