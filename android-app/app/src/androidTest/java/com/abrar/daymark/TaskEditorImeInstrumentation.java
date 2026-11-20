@@ -720,7 +720,7 @@ final class TaskEditorImeInstrumentation {
                 "activating the task row opens the same contextual actions as its overflow button", assertions);
         require(instrumentation.getUiAutomation().performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
                 "the task actions dialog can be dismissed before the remaining row-action checks", assertions);
-        awaitDialogGone(instrumentation, title);
+        awaitDialogGoneContaining(instrumentation, title, "Delete task");
     }
 
     private static void scrollTaskRowIntoView(Instrumentation instrumentation, Activity activity, String description)
@@ -862,6 +862,25 @@ final class TaskEditorImeInstrumentation {
             SystemClock.sleep(50L);
         }
         throw new AssertionError("Dialog did not close: " + title);
+    }
+
+    private static void awaitDialogGoneContaining(Instrumentation instrumentation, String title, String requiredText)
+            throws Exception {
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            instrumentation.waitForIdleSync();
+            boolean dialogRemains = false;
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root != null && findByText(root, title) != null && findByText(root, requiredText) != null) {
+                    dialogRemains = true;
+                    break;
+                }
+            }
+            if (!dialogRemains) return;
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Dialog did not close: " + title + " containing " + requiredText);
     }
 
     private static Rect findImeBounds(Instrumentation instrumentation) {
