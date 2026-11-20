@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-20T15:28:00Z (Cycle A: duplicate script fix + trending Today button)](./CURRENT_STATUS_20261120T152800Z.md)
+
 - [Daymark engineering status — 2026-11-20T06:40:00Z (Cycle B: trending press feedback)](./CURRENT_STATUS_20261120T064000Z.md)
 
 - [Daymark engineering status — 2026-11-20T06:37:00Z (Cycle A: trending card CI fix + polish)](./CURRENT_STATUS_20261120T063700Z.md)
