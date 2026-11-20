@@ -10,6 +10,7 @@ import java.util.List;
 /** Host regressions for page-bound injection and private current-page-only extension metadata. */
 public final class ExtensionInjectorSmoke {
     private static final String PAGE = "https://example.com/account?tab=one";
+    private static final String HTTP_PAGE = "http://example.com/account?tab=one";
     private static int assertions;
 
     public static void main(String[] args) {
@@ -20,6 +21,7 @@ public final class ExtensionInjectorSmoke {
         appliesStylesOnlyForSameDocumentUpdates();
         skipsStaleOnPageFinishedCallbacks();
         skipsInvalidAndEmptyInputs();
+        wildcardMatchingAndSubmissionAreHttpsOnly();
         boundsMatchingPacks();
         escapesExpectedUrlAsJavaScriptString();
         System.out.println("PASS ExtensionInjectorSmoke: " + assertions + " assertions");
@@ -29,7 +31,8 @@ public final class ExtensionInjectorSmoke {
         WebView webView = new WebView(PAGE);
         BrowserExtension pack = pack("scope", true, "https://example.com/account*",
                 "body{color:red}", "window.__scopeTest=1;");
-        ExtensionInjector.apply(webView, PAGE, Collections.singletonList(pack));
+        check(ExtensionInjector.apply(webView, PAGE, Collections.singletonList(pack)),
+                "HTTPS extension injection succeeds");
 
         List<String> scripts = webView.getEvaluatedScripts();
         equal(2, scripts.size(), "current-page styles and userscript use two submissions");
@@ -162,6 +165,26 @@ public final class ExtensionInjectorSmoke {
 
         check(!ExtensionInjector.applyStyles(null, PAGE, Collections.<BrowserExtension>emptyList()),
                 "null WebView is rejected");
+    }
+
+    private static void wildcardMatchingAndSubmissionAreHttpsOnly() {
+        check(HTTP_PAGE.equals(BrowserAddress.requireAllowedBrowserNavigation(HTTP_PAGE)),
+                "normal browser navigation continues to allow HTTP");
+        for (String wildcard : Arrays.asList("<all_urls>", "*://*/*", "*://example.com/*")) {
+            BrowserExtension pack = pack("wildcard", true, wildcard, "body{color:red}", "window.__wildcard=1;");
+            check(pack.matchesUrl(PAGE), wildcard + " still matches HTTPS");
+            check(!pack.matchesUrl(HTTP_PAGE), wildcard + " never matches HTTP");
+        }
+
+        WebView httpView = new WebView(HTTP_PAGE);
+        BrowserExtension pack = pack("http-wildcard", true, "<all_urls>",
+                "body{color:red}", "window.__mustNotRunOnHttp=1;");
+        check(!ExtensionInjector.apply(httpView, HTTP_PAGE, Collections.singletonList(pack)),
+                "full extension injection is rejected before submission on HTTP");
+        check(!ExtensionInjector.applyStyles(httpView, HTTP_PAGE, Collections.singletonList(pack)),
+                "style reconciliation is rejected before submission on HTTP");
+        equal(0, httpView.getEvaluatedScripts().size(),
+                "HTTP receives zero CSS cleanup/config or JavaScript submissions");
     }
 
     private static void boundsMatchingPacks() {

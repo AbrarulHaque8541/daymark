@@ -29,6 +29,7 @@ public final class ExtensionPackageParserSmoke {
         webExtensionManifestTranslatesContentScriptsOnly();
         webExtensionManifestWithoutContentScriptsIsRejected();
         webExtensionMatchScopesFailClosed();
+        webExtensionWildcardScopesRemainImportable();
         webExtensionRuleLimitsFailClosed();
         importedIdsAreStableAndCollisionResistant();
         documentStartImportsNormalizeToHonestTiming();
@@ -214,6 +215,30 @@ public final class ExtensionPackageParserSmoke {
         } catch (IllegalArgumentException unexpected) {
             throw new AssertionError("valid restricted scopes must import: " + unexpected, unexpected);
         }
+    }
+
+    private static void webExtensionWildcardScopesRemainImportable() throws Exception {
+        String manifest = "{\"name\":\"Wildcard scopes\",\"content_scripts\":["
+                + "{\"matches\":[\"<all_urls>\"],\"js\":[\"all.js\"]},"
+                + "{\"matches\":[\"*://*/*\"],\"css\":[\"wildcard.css\"]}]}";
+        BrowserExtension imported = ExtensionPackageParser.parseWebExtensionManifest(manifest);
+        check(imported.matches.equals(Arrays.asList("<all_urls>", "*://*/*")),
+                "WebExtension import preserves both declared wildcard scopes");
+        check(imported.matches.size() == 2,
+                "wildcard imports are neither hidden nor silently replaced by a narrower rule");
+
+        BrowserExtension archived = ExtensionPackageParser.parseWebExtensionArchive(
+                zipArchive(manifest, false));
+        check(archived.matches.equals(Arrays.asList("<all_urls>", "*://*/*")),
+                "archive import preserves both wildcard scopes");
+
+        BrowserExtension daymarkPack = ExtensionPackageParser.parseDaymarkJson(
+                ExtensionPackageParser.toDaymarkJson(imported), false);
+        check(daymarkPack.matches.equals(imported.matches),
+                "stored Daymark JSON accepts wildcard scopes on reload");
+        expectWebExtensionRejected(
+                "{\"name\":\"Cleartext wildcard\",\"content_scripts\":[{\"matches\":[\"http://*/*\"],\"js\":[\"a.js\"]}]}",
+                "explicit HTTP match rules remain rejected");
     }
 
     private static void webExtensionRuleLimitsFailClosed() throws Exception {
