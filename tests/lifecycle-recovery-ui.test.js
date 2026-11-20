@@ -183,6 +183,7 @@ test('boot in a loading document defers the first explanation', () => {
   Object.defineProperty(fakeWindow, 'localStorage', {
     get() { throw new Error('localStorage must not be read at boot'); }
   });
+  fakeWindow.DaymarkLifecycleRecovery = engine;
   const source = fs.readFileSync(path.join(__dirname, '../lifecycle-recovery-ui.js'), 'utf8');
   vm.runInNewContext(source, { window: fakeWindow, document: made.doc });
   assert.equal(made.elements[STATUS_ID].textContent, '');
