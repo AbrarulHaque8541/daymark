@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-20T03:36:00Z (Cycle A: release-compat topic prefs)](./CURRENT_STATUS_20261120T033600Z.md)
+
 - [Daymark engineering status — 2026-11-20T03:18:49Z (PR #821: release-compatibility guidance)](./CURRENT_STATUS_20261120T031849Z.md)
 
 - [Daymark engineering status — 2026-11-20T01:30:00Z (Cycle B: generalized glance success flash)](./CURRENT_STATUS_20261120T013000Z.md)
