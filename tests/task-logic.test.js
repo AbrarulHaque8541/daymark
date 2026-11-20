@@ -56,6 +56,20 @@ test('date filters preserve completed tasks while Completed collects them all', 
   assert.equal(logic.getFilteredTasks(tasks, 'all', '', TODAY).length, tasks.length);
 });
 
+test('high-priority filter includes completed tasks and composes with search', () => {
+  const tasks = [
+    task('high-open', 'Urgent report', { priority: 'high' }),
+    task('high-done', 'Done report', { priority: 'high', completed: true }),
+    task('medium', 'Routine report', { priority: 'medium' }),
+    task('low', 'Urgent follow-up', { priority: 'low' })
+  ];
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'high', '', TODAY).map((item) => item.id),
+    ['high-open', 'high-done']);
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'high', 'report', TODAY).map((item) => item.id),
+    ['high-open', 'high-done']);
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'high', 'follow-up', TODAY), []);
+});
+
 test('title search is case-insensitive and composes with the active filter using deterministic lowercasing', () => {
   const tasks = [
     task('a', 'Review Project Plan', { dueDate: TODAY }),
