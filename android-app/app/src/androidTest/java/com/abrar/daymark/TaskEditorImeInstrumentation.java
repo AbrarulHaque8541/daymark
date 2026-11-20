@@ -145,6 +145,7 @@ final class TaskEditorImeInstrumentation {
                     "Add Task saves and renders the typed task", assertions);
             require(awaitPersistedTaskTitle(activity, savedTitle),
                     "Add Task persists the typed task in encrypted storage", assertions);
+            verifyTaskRowAccessibilityAction(instrumentation, activity, savedTitle, assertions);
 
             deleteSavedTask(instrumentation, activity, savedTitle, assertions);
             savedTaskMayExist = false;
@@ -699,6 +700,30 @@ final class TaskEditorImeInstrumentation {
         awaitDialogGone(instrumentation, "Delete this task?");
         require(awaitTaskTitleGone(instrumentation, activity, title), "the test task is removed from the real task list",
                 assertions);
+    }
+
+    private static void verifyTaskRowAccessibilityAction(Instrumentation instrumentation, MainActivity activity,
+                                                         String title, int[] assertions) throws Exception {
+        String description = "Task: " + title
+                + ". Activate to open task actions. Swipe right to toggle completion; swipe left for task actions.";
+        AccessibilityNodeInfo[] rowNode = { null };
+        instrumentation.runOnMainSync(() -> {
+            View row = findByDescription(activity.getWindow().getDecorView(), description);
+            if (row != null) rowNode[0] = row.createAccessibilityNodeInfo();
+        });
+        require(rowNode[0] != null && rowNode[0].isClickable() && rowNode[0].isFocusable(),
+                "the task row exposes its advertised activation to accessibility", assertions);
+        boolean activated = rowNode[0].performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        rowNode[0].recycle();
+        require(activated, "the task row accepts the accessibility click action", assertions);
+
+        AccessibilityNodeInfo actions = awaitDialogRootContaining(instrumentation, title, "Delete task");
+        require(findActionNodeByText(actions, "Edit task") != null
+                        && findActionNodeByText(actions, "Delete task") != null,
+                "activating the task row opens the same contextual actions as its overflow button", assertions);
+        require(instrumentation.getUiAutomation().performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
+                "the task actions dialog can be dismissed before the remaining row-action checks", assertions);
+        awaitDialogGone(instrumentation, title);
     }
 
     private static boolean taskTitleVisible(Instrumentation instrumentation, Activity activity, String title)
