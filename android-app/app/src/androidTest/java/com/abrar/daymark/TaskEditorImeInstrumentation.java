@@ -145,6 +145,7 @@ final class TaskEditorImeInstrumentation {
                     "Add Task saves and renders the typed task", assertions);
             require(awaitPersistedTaskTitle(activity, savedTitle),
                     "Add Task persists the typed task in encrypted storage", assertions);
+            verifyTaskRowAccessibilityAction(instrumentation, activity, savedTitle, assertions);
 
             deleteSavedTask(instrumentation, activity, savedTitle, assertions);
             savedTaskMayExist = false;
@@ -701,6 +702,37 @@ final class TaskEditorImeInstrumentation {
                 assertions);
     }
 
+    private static void verifyTaskRowAccessibilityAction(Instrumentation instrumentation, MainActivity activity,
+                                                         String title, int[] assertions) throws Exception {
+        String description = "Task: " + title
+                + ". Activate to open task actions. Swipe right to toggle completion; swipe left for task actions.";
+        scrollTaskRowIntoView(instrumentation, activity, description);
+        AccessibilityNodeInfo rowNode = awaitAccessibilityNodeByDescription(instrumentation, description);
+        require(rowNode.isClickable() && rowNode.isFocusable(),
+                "the task row exposes its advertised activation to accessibility", assertions);
+        boolean activated = rowNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        rowNode.recycle();
+        require(activated, "the task row accepts the accessibility click action", assertions);
+
+        AccessibilityNodeInfo actions = awaitDialogRootContaining(instrumentation, title, "Delete task");
+        require(findActionNodeByText(actions, "Edit task") != null
+                        && findActionNodeByText(actions, "Delete task") != null,
+                "activating the task row opens the same contextual actions as its overflow button", assertions);
+        require(instrumentation.getUiAutomation().performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
+                "the task actions dialog can be dismissed before the remaining row-action checks", assertions);
+        awaitDialogGoneContaining(instrumentation, title, "Delete task");
+    }
+
+    private static void scrollTaskRowIntoView(Instrumentation instrumentation, Activity activity, String description)
+            throws Exception {
+        instrumentation.runOnMainSync(() -> {
+            View row = findByDescription(activity.getWindow().getDecorView(), description);
+            if (row != null && row.getWidth() > 0 && row.getHeight() > 0) {
+                row.requestRectangleOnScreen(new Rect(0, 0, row.getWidth(), row.getHeight()), true);
+            }
+        });
+    }
+
     private static boolean taskTitleVisible(Instrumentation instrumentation, Activity activity, String title)
             throws Exception {
         boolean[] visible = { false };
@@ -779,6 +811,21 @@ final class TaskEditorImeInstrumentation {
         return false;
     }
 
+    private static AccessibilityNodeInfo awaitAccessibilityNodeByDescription(Instrumentation instrumentation,
+                                                                             String description) throws Exception {
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            instrumentation.waitForIdleSync();
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                AccessibilityNodeInfo node = findByDescription(root, description);
+                if (node != null && node.isVisibleToUser()) return node;
+            }
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for accessible node: " + description);
+    }
+
     private static AccessibilityNodeInfo awaitDialogRoot(Instrumentation instrumentation, String title)
             throws Exception {
         long deadline = SystemClock.uptimeMillis() + WAIT_MS;
@@ -815,6 +862,25 @@ final class TaskEditorImeInstrumentation {
             SystemClock.sleep(50L);
         }
         throw new AssertionError("Dialog did not close: " + title);
+    }
+
+    private static void awaitDialogGoneContaining(Instrumentation instrumentation, String title, String requiredText)
+            throws Exception {
+        long deadline = SystemClock.uptimeMillis() + WAIT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            instrumentation.waitForIdleSync();
+            boolean dialogRemains = false;
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root != null && findByText(root, title) != null && findByText(root, requiredText) != null) {
+                    dialogRemains = true;
+                    break;
+                }
+            }
+            if (!dialogRemains) return;
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Dialog did not close: " + title + " containing " + requiredText);
     }
 
     private static Rect findImeBounds(Instrumentation instrumentation) {

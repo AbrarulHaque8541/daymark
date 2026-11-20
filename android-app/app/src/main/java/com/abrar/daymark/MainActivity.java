@@ -6808,7 +6808,19 @@ public final class MainActivity extends Activity {
                 palette.text, palette.muted, palette.warning, palette.danger));
         row.setElevation(dp(1));
         row.setContentDescription("Task: " + task.title
-                + ". Swipe right to toggle completion; swipe left for task actions.");
+                + ". Activate to open task actions. Swipe right to toggle completion; swipe left for task actions.");
+        row.setOnClickListener(view -> {
+            if (!canEdit()) {
+                showToast("Task actions are temporarily unavailable while Daymark finishes the current operation.");
+                return;
+            }
+            Task current = findTask(task.id);
+            if (current == null) {
+                showToast("This task is no longer available.");
+                return;
+            }
+            showTaskActions(current);
+        });
 
         CheckBox checkBox = new CheckBox(this);
         checkBox.setButtonTintList(ColorStateList.valueOf(task.completed ? palette.accent : palette.muted));
@@ -6968,6 +6980,10 @@ public final class MainActivity extends Activity {
                         haptic(this, HapticFeedbackConstants.REJECT);
                     }
                 }
+                return true;
+            }
+            if (event.getAction() == android.view.MotionEvent.ACTION_UP
+                    && !horizontalSwipe && !consumedSwipe) {
                 performClick();
                 return true;
             }
