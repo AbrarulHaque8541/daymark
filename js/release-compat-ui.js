@@ -5,15 +5,25 @@
  * inspect an installed app or APK, test a migration, or perform an update or
  * rollback. Nothing is fetched, nothing runs and no setting is changed; the
  * catalog engine is DaymarkReleaseCompat
- * (release-compat-logic.js). Mirrors the permission-lifecycle-ui.js module
- * style: attachReleaseCompatUi(env) is fully injectable for unit tests and
- * the card is stateless, so boot never touches window.localStorage.
+ * (release-compat-logic.js). Remembers the last selected topic across
+ * sessions (localStorage only, fail-closed). Mirrors the permission-lifecycle-ui.js module
+ * style: attachReleaseCompatUi(env) is fully injectable for unit tests.
  */
 ((root) => {
   'use strict';
+  const PREFS_KEY = 'daymark.release-compat.prefs.v1';
   function attachReleaseCompatUi(env) {
     if (!env || !env.document) throw new Error('attachReleaseCompatUi requires a document.');
     const doc = env.document;
+    const win = env.window || root;
+    let storage = null;
+    try {
+      storage = Object.prototype.hasOwnProperty.call(env, 'localStorage')
+        ? env.localStorage
+        : (win && win.localStorage) || null;
+    } catch (error) {
+      storage = null;
+    }
     const dataApi = Object.prototype.hasOwnProperty.call(env, 'dataApi')
       ? env.dataApi
       : (root.DaymarkReleaseCompat || null);
@@ -63,10 +73,29 @@
         try {
           setTimeout(function () { resultEl.classList.remove('is-updating'); }, 180);
         } catch (timerUnavailable) {
-          // Some embedded engines provide no working timer; the class is
-          // removed immediately instead. Rendering stays complete.
           resultEl.classList.remove('is-updating');
         }
+      }
+    }
+    function persistTopic(topic) {
+      if (!storage || typeof storage.setItem !== 'function' || !topic) return;
+      try {
+        storage.setItem(PREFS_KEY, JSON.stringify({ topic: topic }));
+      } catch (error) {
+        // Fail closed: do not surface storage errors as user-facing failures for this optional preference.
+      }
+    }
+    function restoreTopic() {
+      if (!storage || typeof storage.getItem !== 'function' || !topicEl) return;
+      try {
+        const raw = storage.getItem(PREFS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.topic === 'string' && parsed.topic) {
+          topicEl.value = parsed.topic;
+        }
+      } catch (error) {
+        // Ignore corrupt or inaccessible preference.
       }
     }
     function explain() {
@@ -75,6 +104,7 @@
         return;
       }
       const topic = topicEl && typeof topicEl.value === 'string' ? topicEl.value : '';
+      persistTopic(topic);
       const result = dataApi.explainTopic(topic);
       const ok = !!result.available;
       status(!ok
@@ -105,19 +135,18 @@
     }
     if (topicEl && typeof topicEl.addEventListener === 'function') topicEl.addEventListener('change', function () { explain(); });
     if (clearEl && typeof clearEl.addEventListener === 'function') clearEl.addEventListener('click', function () { onClear(); });
+    restoreTopic();
     explain();
     return {
       explain, onClear,
       detach() { status(''); }
     };
   }
-  const api = { attachReleaseCompatUi };
+  const api = { attachReleaseCompatUi, PREFS_KEY };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.DaymarkReleaseCompatUi = api;
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    // This UI is stateless. Do not touch window storage state during boot:
-    // storage may be disabled or its getter may throw before the card renders.
-    const boot = () => attachReleaseCompatUi({ document });
+    const boot = () => attachReleaseCompatUi({ document, window });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
   }
