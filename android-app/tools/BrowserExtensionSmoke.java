@@ -43,8 +43,8 @@ public final class BrowserExtensionSmoke {
     }
 
     private static void nonWebUrlsNeverMatch() {
-        check(BrowserExtension.MatchRules.matches("*://*/*", "http://example.com/"),
-                "wildcard patterns match HTTP pages when the browser explicitly allows HTTP");
+        check(!BrowserExtension.MatchRules.matches("*://*/*", "http://example.com/"),
+                "wildcard extension patterns never match HTTP pages");
         check(!BrowserExtension.MatchRules.matches("https://example.com/*", "http://example.com/"),
                 "HTTPS-only patterns never match cleartext pages");
         check(!BrowserExtension.MatchRules.matches("*://*/*", "file:///etc/passwd"),
@@ -58,8 +58,8 @@ public final class BrowserExtensionSmoke {
     private static void disabledSitesExcludeMatchingOrigins() {
         BrowserExtension ext = extension(Collections.<String>emptyList());
         check(ext.matchesUrl("https://example.com/page"), "enabled extension matches its rule");
-        check(ext.matchesUrl("http://example.com/page"),
-                "enabled wildcard extension follows the explicit HTTP match pattern");
+        check(!ext.matchesUrl("http://example.com/page"),
+                "enabled wildcard extension remains HTTPS-only at runtime");
         BrowserExtension disabled = extension(Arrays.asList("example.com"));
         check(!disabled.matchesUrl("https://example.com/page"), "disabled site excludes the extension");
         check(!disabled.matchesUrl("https://sub.example.com/page"),
