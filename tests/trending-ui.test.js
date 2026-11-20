@@ -430,3 +430,24 @@ test('clear hides the copy button', async () => {
   doc.getElementById('trending-clear').dispatch('click', {});
   assert.strictEqual(doc.getElementById('trending-copy').hidden, true);
 });
+
+test('checking sets loading class on result and busy on status', async () => {
+  const doc = makeDoc();
+  let release;
+  attach(doc, {
+    fetch: () => new Promise((resolve) => { release = () => resolve(okResponse(JSON.stringify(payload))); })
+  });
+  const check = doc.getElementById('trending-check');
+  const pending = check.dispatch('click', {});
+  await drain();
+  const result = doc.getElementById('trending-result');
+  const status = doc.getElementById('trending-status');
+  assert.ok(result.classList.contains('is-loading'));
+  assert.ok(status.classList.contains('is-busy'));
+  assert.ok(status.textContent.includes('Checking'));
+  release();
+  await pending;
+  await drain();
+  assert.strictEqual(result.classList.contains('is-loading'), false);
+  assert.strictEqual(status.classList.contains('is-busy'), false);
+});
