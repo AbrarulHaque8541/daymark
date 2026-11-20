@@ -7,6 +7,7 @@ on:
       - "android-app/build.gradle.kts"
       - "android-app/settings.gradle.kts"
       - "android-app/service-worker-test/**"
+      - "android-app/app/src/debug/**"
       - "android-app/tools/run-service-worker-instrumentation-on-emulator.sh"
       - "android-app/tools/check-service-worker-test-variants.sh"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerEnforcement.java"

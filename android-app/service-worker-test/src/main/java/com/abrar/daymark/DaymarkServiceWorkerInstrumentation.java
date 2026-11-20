@@ -15,6 +15,7 @@ import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
@@ -51,9 +52,6 @@ public final class DaymarkServiceWorkerInstrumentation {
     private static final String TAG = "DaymarkSWRuntime";
     private static final long WAIT_MS = 15000L;
     private static final String WEB_VIEW_CLASS = "com.abrar.daymark.DaymarkWebView";
-    private static final String EXTENSION_SPA_HTML =
-            "<!doctype html><html><head><title>extension-spa</title></head>"
-                    + "<body><main id=daymark-spa-probe>Extension SPA acceptance</main></body></html>";
 
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
     private int assertions;
@@ -329,7 +327,7 @@ public final class DaymarkServiceWorkerInstrumentation {
      */
     private void verifyExtensionSpaNavigation() throws Exception {
         marker("starting Daymark WebView extension SPA route acceptance");
-        ControlledServer server = new ControlledServer();
+        ControlledServer server = ControlledServer.forHttps(instrumentation.getContext());
         android.app.Activity activity = null;
         WebView view = null;
         Object extensionStore = null;
@@ -483,14 +481,15 @@ public final class DaymarkServiceWorkerInstrumentation {
                 throw new AssertionError("could not prepare the production DaymarkWebView for explicit navigation",
                         prepareFailure.get());
             }
-            // Use a synthetic HTTPS origin for the extension phase. The production injector is
-            // intentionally HTTPS-only; the surrounding Service Worker phases still exercise
-            // real requests against the controlled loopback servers.
-            loadHtmlWithBaseUrl(view, "https://127.0.0.1/private/start", EXTENSION_SPA_HTML);
+            // Use a real TLS connection so System WebView exercises production network and
+            // same-document callbacks rather than loadDataWithBaseURL's synthetic origin.
+            load(view, server.url("/private/start"));
             check(evaluateBoolean(view,
                             "location.protocol === 'https:'"
                                     + " && location.hostname === '127.0.0.1'"),
-                    "the extension SPA fixture uses an HTTPS loopback origin");
+                    "the extension SPA fixture was fetched over HTTPS from loopback");
+            check(server.count("/private/start") == 1,
+                    "the SPA page was served by the controlled TLS fixture");
             String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
                     + matchingPackId + "\"]";
             String unrelatedSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
@@ -614,13 +613,6 @@ public final class DaymarkServiceWorkerInstrumentation {
         instrumentation.runOnMainSync(() -> view.loadUrl(url));
         awaitBoolean(view, "document.readyState === 'complete'", WAIT_MS,
                 "the controlled page must finish loading");
-    }
-
-    private void loadHtmlWithBaseUrl(WebView view, String baseUrl, String html) throws Exception {
-        instrumentation.runOnMainSync(() -> view.loadDataWithBaseURL(
-                baseUrl, html, "text/html", "UTF-8", baseUrl));
-        awaitBoolean(view, "document.readyState === 'complete'", WAIT_MS,
-                "the HTTPS-origin HTML fixture must finish loading");
     }
 
     private void setPageNetworkBlocked(WebView view, boolean blocked) throws Exception {
@@ -800,12 +792,22 @@ public final class DaymarkServiceWorkerInstrumentation {
 
     private static final class ControlledServer implements AutoCloseable {
         private final ServerSocket socket;
+        private final boolean https;
         private final ExecutorService clients = Executors.newFixedThreadPool(4);
         private final Map<String, AtomicInteger> counts = new ConcurrentHashMap<>();
         private volatile boolean closed;
 
         ControlledServer() throws IOException {
-            socket = new ServerSocket();
+            this(new ServerSocket(), false);
+        }
+
+        static ControlledServer forHttps(android.content.Context testContext) throws Exception {
+            return new ControlledServer(createHttpsServerSocket(testContext), true);
+        }
+
+        private ControlledServer(ServerSocket socket, boolean https) throws IOException {
+            this.socket = socket;
+            this.https = https;
             socket.setReuseAddress(true);
             socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
             Thread acceptor = new Thread(() -> {
@@ -817,13 +819,30 @@ public final class DaymarkServiceWorkerInstrumentation {
                         if (!closed) Log.e(TAG, "controlled server accept failed", error);
                     }
                 }
-            }, "DaymarkServiceWorkerTestServer");
+            }, https ? "DaymarkServiceWorkerTestHttpsServer" : "DaymarkServiceWorkerTestServer");
             acceptor.setDaemon(true);
             acceptor.start();
         }
 
+        private static ServerSocket createHttpsServerSocket(android.content.Context context) throws Exception {
+            java.security.KeyStore keyStore = java.security.KeyStore.getInstance("PKCS12");
+            char[] password = "daymark-test".toCharArray();
+            try (InputStream input = context.getAssets().open(
+                    "daymark_service_worker_test_server.p12")) {
+                keyStore.load(input, password);
+            }
+            javax.net.ssl.KeyManagerFactory keyManagerFactory =
+                    javax.net.ssl.KeyManagerFactory.getInstance(
+                            javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keyStore, password);
+            javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), null,
+                    new java.security.SecureRandom());
+            return sslContext.getServerSocketFactory().createServerSocket();
+        }
+
         String url(String path) {
-            return "http://127.0.0.1:" + socket.getLocalPort() + path;
+            return (https ? "https" : "http") + "://127.0.0.1:" + socket.getLocalPort() + path;
         }
 
         int count(String path) {
@@ -997,4 +1016,3 @@ public final class DaymarkServiceWorkerInstrumentation {
         }
     }
 }
-
