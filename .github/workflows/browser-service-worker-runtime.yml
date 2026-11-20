@@ -13,6 +13,16 @@ on:
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserServiceWorkerPolicy.java"
       - "android-app/app/src/main/java/com/abrar/daymark/DaymarkWebView.java"
       - "android-app/app/src/main/java/com/abrar/daymark/BrowserWorkspaceController.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserAddress.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserExtension.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserNetworkPolicy.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionInjector.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionPackageParser.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionRuntime.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/ExtensionStore.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BuiltInExtensions.java"
+      - "android-app/app/src/main/java/com/abrar/daymark/BrowserHttpPolicy.java"
+      - "android-app/app/src/main/assets/daymark-extension-spa.js"
   workflow_dispatch:
 
 permissions:

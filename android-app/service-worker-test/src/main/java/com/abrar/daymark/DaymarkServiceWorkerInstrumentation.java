@@ -51,6 +51,9 @@ public final class DaymarkServiceWorkerInstrumentation {
     private static final String TAG = "DaymarkSWRuntime";
     private static final long WAIT_MS = 15000L;
     private static final String WEB_VIEW_CLASS = "com.abrar.daymark.DaymarkWebView";
+    private static final String EXTENSION_SPA_HTML =
+            "<!doctype html><html><head><title>extension-spa</title></head>"
+                    + "<body><main id=daymark-spa-probe>Extension SPA acceptance</main></body></html>";
 
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
     private int assertions;
@@ -442,7 +445,7 @@ public final class DaymarkServiceWorkerInstrumentation {
 
             String matchingJson = "{\"id\":\"" + matchingPackId
                     + "\",\"name\":\"SPA route probe\",\"version\":\"1.0.0\",\"enabled\":true,"
-                    + "\"matches\":[\"*://127.0.0.1/private/*\"],\"excludes\":[],"
+                    + "\"matches\":[\"https://127.0.0.1/private/*\"],\"excludes\":[],"
                     + "\"css\":\"" + matchingCss + "\"}";
             String unrelatedJson = "{\"id\":\"" + unrelatedPackId
                     + "\",\"name\":\"Unrelated scope probe\",\"version\":\"1.0.0\",\"enabled\":true,"
@@ -480,7 +483,14 @@ public final class DaymarkServiceWorkerInstrumentation {
                 throw new AssertionError("could not prepare the production DaymarkWebView for explicit navigation",
                         prepareFailure.get());
             }
-            load(view, server.url("/private/start"));
+            // Use a synthetic HTTPS origin for the extension phase. The production injector is
+            // intentionally HTTPS-only; the surrounding Service Worker phases still exercise
+            // real requests against the controlled loopback servers.
+            loadHtmlWithBaseUrl(view, "https://127.0.0.1/private/start", EXTENSION_SPA_HTML);
+            check(evaluateBoolean(view,
+                            "location.protocol === 'https:'"
+                                    + " && location.hostname === '127.0.0.1'"),
+                    "the extension SPA fixture uses an HTTPS loopback origin");
             String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
                     + matchingPackId + "\"]";
             String unrelatedSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
@@ -488,7 +498,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             String matchingCount = "document.querySelectorAll('" + matchingSelector + "').length";
             String unrelatedCount = "document.querySelectorAll('" + unrelatedSelector + "').length";
             awaitSpa(view, matchingCount + " === 1", WAIT_MS,
-                    "a matching localhost route receives its pack CSS through production injection",
+                    "a matching HTTPS loopback route receives its pack CSS through production injection",
                     extensionStore);
             check(evaluateBoolean(view, unrelatedCount + " === 0"),
                     "a nonmatching installed pack is not injected into the current page");
@@ -604,6 +614,13 @@ public final class DaymarkServiceWorkerInstrumentation {
         instrumentation.runOnMainSync(() -> view.loadUrl(url));
         awaitBoolean(view, "document.readyState === 'complete'", WAIT_MS,
                 "the controlled page must finish loading");
+    }
+
+    private void loadHtmlWithBaseUrl(WebView view, String baseUrl, String html) throws Exception {
+        instrumentation.runOnMainSync(() -> view.loadDataWithBaseURL(
+                baseUrl, html, "text/html", "UTF-8", baseUrl));
+        awaitBoolean(view, "document.readyState === 'complete'", WAIT_MS,
+                "the HTTPS-origin HTML fixture must finish loading");
     }
 
     private void setPageNetworkBlocked(WebView view, boolean blocked) throws Exception {
