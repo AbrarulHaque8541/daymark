@@ -232,12 +232,15 @@ test('a successful check renders articles with an accessible link', async () => 
   assert.ok(rank);
   assert.strictEqual(rank.textContent, '1');
   assert.strictEqual(rank.getAttribute('aria-hidden'), 'true');
+  assert.ok(item.getAttribute('aria-label').includes('Rank 1'));
+  assert.ok(item.getAttribute('aria-label').includes('Grand Theft Auto VI'));
   const link = item.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/Grand_Theft_Auto_VI');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
   assert.strictEqual(link.getAttribute('target'), '_blank');
   assert.ok(link.getAttribute('aria-label').includes('Grand Theft Auto VI'));
+  assert.ok(link.getAttribute('aria-label').includes('rank 1'));
   assert.ok(doc.getElementById('trending-copy'));
   assert.strictEqual(doc.getElementById('trending-copy').hidden, false);
 });
