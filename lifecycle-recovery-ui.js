@@ -71,10 +71,12 @@
     if (els.status.classList && typeof els.status.classList.add === 'function') {
       els.status.classList.add('is-success');
       if (typeof els.status.setAttribute === 'function') els.status.setAttribute('title', 'Explanation ready');
-      setTimeout(function () {
-        if (els.status.classList) els.status.classList.remove('is-success');
-        if (typeof els.status.removeAttribute === 'function') els.status.removeAttribute('title');
-      }, 1400);
+      if (typeof setTimeout === 'function') {
+        setTimeout(function () {
+          if (els.status.classList) els.status.classList.remove('is-success');
+          if (typeof els.status.removeAttribute === 'function') els.status.removeAttribute('title');
+        }, 1400);
+      }
     }
   }
 
