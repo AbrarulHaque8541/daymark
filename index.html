@@ -66,6 +66,8 @@
   <script src="browser-data-ui.js" defer></script>
   <script src="permission-lifecycle-logic.js" defer></script>
   <script src="permission-lifecycle-ui.js" defer></script>
+  <script src="lifecycle-recovery-logic.js" defer></script>
+  <script src="lifecycle-recovery-ui.js" defer></script>
   <script src="capability-registry-logic.js" defer></script>
   <script src="capability-registry-ui.js" defer></script>
     <script src="release-compat-logic.js" defer></script>
@@ -518,7 +520,28 @@
           <p class="feed-status" id="permission-lifecycle-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="permission-lifecycle-result" aria-live="polite"></div>
         </aside>
-        <aside class="briefing-card" id="release-compat-card" aria-labelledby="release-compat-heading">
+        <aside class="briefing-card" id="lifecycle-recovery-card" aria-labelledby="lifecycle-recovery-heading">
+          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+          <h2 id="lifecycle-recovery-heading">Lifecycle recovery, in plain words</h2>
+          <p class="briefing-description">What rotation, process death, background return, a renderer crash, low memory and restore really mean. Nothing runs.</p>
+          <form id="lifecycle-recovery-form" class="feed-form" novalidate>
+            <label class="sr-only" for="lifecycle-recovery-scenario">Lifecycle scenario to explain</label>
+            <select id="lifecycle-recovery-scenario" name="scenario" class="sort-select" aria-label="Lifecycle scenario">
+              <option value="rotation" selected>Rotation and other configuration changes</option>
+              <option value="process-death">Android stopped the app in the background</option>
+              <option value="background-return">Background and foreground return</option>
+              <option value="renderer-crash">WebView renderer crashed</option>
+              <option value="low-memory">Low-memory trimming</option>
+              <option value="restore-backup">Reinstall and backup restore</option>
+              <option value="not-a-real-scenario">Unknown scenario (fail-closed check)</option>
+            </select>
+            <button class="button button-primary" id="lifecycle-recovery-explain" type="submit" title="Explain the selected lifecycle scenario">Explain</button>
+            <button class="button button-quiet" id="lifecycle-recovery-clear" type="button" title="Clear the lifecycle explanation" aria-label="Clear explanation">Clear</button>
+          </form>
+          <p class="feed-status" id="lifecycle-recovery-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <div class="feed-list" id="lifecycle-recovery-result" aria-live="polite"></div>
+        </aside>
+<aside class="briefing-card" id="release-compat-card" aria-labelledby="release-compat-heading">
   <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
   <h2 id="release-compat-heading">Update and release safety, in plain words</h2>
   <p class="briefing-description">Short explanations from current Daymark source. This guide does not inspect your installed app or APK, test data migration, or perform an update or rollback.</p>
