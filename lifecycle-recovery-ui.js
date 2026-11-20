@@ -19,7 +19,8 @@
     'lifecycle-recovery-scenario',
     'lifecycle-recovery-status',
     'lifecycle-recovery-result',
-    'lifecycle-recovery-clear'
+    'lifecycle-recovery-clear',
+    'lifecycle-recovery-explain'
   ];
 
   const AVAILABLE_PREFIX = 'Explained · ';
@@ -51,11 +52,13 @@
     while (els.result.firstChild) els.result.removeChild(els.result.firstChild);
     if (!engine || typeof engine.explainLifecycle !== 'function') {
       els.status.textContent = NO_ENGINE_MESSAGE;
+      if (els.status.classList) els.status.classList.remove('is-success');
       return;
     }
     const info = engine.explainLifecycle(value);
     if (!info || info.available === false) {
       els.status.textContent = UNAVAILABLE_MESSAGE;
+      if (els.status.classList) els.status.classList.remove('is-success');
       return;
     }
     const lines = explanationLines(info);
@@ -65,6 +68,14 @@
       els.result.appendChild(item);
     }
     els.status.textContent = AVAILABLE_PREFIX + info.label + AVAILABLE_SUFFIX;
+    if (els.status.classList && typeof els.status.classList.add === 'function') {
+      els.status.classList.add('is-success');
+      if (typeof els.status.setAttribute === 'function') els.status.setAttribute('title', 'Explanation ready');
+      setTimeout(function () {
+        if (els.status.classList) els.status.classList.remove('is-success');
+        if (typeof els.status.removeAttribute === 'function') els.status.removeAttribute('title');
+      }, 1400);
+    }
   }
 
   function collectElements(doc, ids) {
@@ -76,6 +87,22 @@
       els[ids[i]] = el;
     }
     return { els, missing };
+  }
+
+  function addPressFeedback(button) {
+    if (!button || !button.classList) return;
+    const press = () => {
+      if (button.classList) button.classList.add('is-pressed');
+    };
+    const release = () => {
+      if (button.classList) button.classList.remove('is-pressed');
+    };
+    if (typeof button.addEventListener === 'function') {
+      button.addEventListener('pointerdown', press);
+      button.addEventListener('pointerup', release);
+      button.addEventListener('pointerleave', release);
+      button.addEventListener('pointercancel', release);
+    }
   }
 
   function attachLifecycleRecoveryUi(env) {
@@ -96,7 +123,11 @@
     const status = picked.els['lifecycle-recovery-status'];
     const result = picked.els['lifecycle-recovery-result'];
     const clearBtn = picked.els['lifecycle-recovery-clear'];
+    const explainBtn = picked.els['lifecycle-recovery-explain'];
     clearBtn.setAttribute('aria-label', CLEAR_ARIA_LABEL);
+
+    addPressFeedback(explainBtn);
+    addPressFeedback(clearBtn);
 
     const run = () => {
       renderInto(doc, { status, result }, engine, select.value);
@@ -110,6 +141,7 @@
     clearBtn.addEventListener('click', () => {
       while (result.firstChild) result.removeChild(result.firstChild);
       status.textContent = '';
+      if (status.classList) status.classList.remove('is-success');
     });
 
     run();
