@@ -24,18 +24,18 @@ test('isKnownTopic accepts known ids only', () => {
 test('explainTopic describes package identity plainly', () => {
   const r = logic.explainTopic('package-identity');
   assert.equal(r.available, true);
-  assert.equal(r.requiresAction, false);
+  assert.equal(r.requiresAction, true);
   assert.equal(r.id, 'package-identity');
-  assert.equal(r.title, 'com.abrar.daymark is the app for life, not per version');
+  assert.equal(r.title, 'This source uses com.abrar.daymark today');
   assert.ok(typeof r.recovery === 'string' && r.recovery.length > 0);
   assert.ok(typeof r.summary === 'string' && r.summary.length > 0);
 });
 
-test('explainTopic marks action-required topics honestly', () => {
-  for (const id of ['signer-continuity', 'data-migration', 'device-gates', 'rollback-recovery']) {
+test('explainTopic marks topics needing a separate check honestly', () => {
+  for (const id of ['package-identity', 'signer-continuity', 'data-migration', 'device-gates', 'rollback-recovery']) {
     assert.equal(logic.explainTopic(id).requiresAction, true, id);
   }
-  for (const id of ['package-identity', 'updater-security']) {
+  for (const id of ['updater-security']) {
     assert.equal(logic.explainTopic(id).requiresAction, false, id);
   }
 });
@@ -56,9 +56,10 @@ test('explainTopic fails closed for malformed ids', () => {
 
 test('explainTopic returns defensive copies of arrays', () => {
   const a = logic.explainTopic('rollback-recovery');
+  const originalLength = a.keepsWorking.length;
   a.keepsWorking.push('mutated');
   const b = logic.explainTopic('rollback-recovery');
-  assert.equal(b.keepsWorking.length, 2);
+  assert.equal(b.keepsWorking.length, originalLength);
 });
 
 test('listTopics mirrors the catalog in order', () => {
@@ -77,8 +78,8 @@ test('planUpgradePath plans a mixed path and warns for action topics', () => {
   assert.equal(p.ok, true);
   assert.deepEqual(p.ids, ['package-identity', 'signer-continuity']);
   assert.equal(p.steps.length, 2);
-  assert.equal(p.warnings.length, 1);
-  assert.ok(p.warnings[0].indexOf('Same signer, same key') !== -1);
+  assert.equal(p.warnings.length, 2);
+  assert.ok(p.warnings[1].indexOf('Update identity and version checks') !== -1);
 });
 
 test('planUpgradePath dedupes repeated topics', () => {
@@ -125,8 +126,23 @@ test('planUpgradePath covers the full six-topic path honestly', () => {
   const p = logic.planUpgradePath(logic.TOPIC_IDS);
   assert.equal(p.ok, true);
   assert.equal(p.steps.length, 6);
-  assert.equal(p.warnings.length, 4);
-  assert.ok(p.note.indexOf('does not change any setting') !== -1);
+  assert.equal(p.warnings.length, 5);
+  assert.ok(p.note.indexOf('topic checklist only') !== -1);
+  assert.ok(p.note.indexOf('does not inspect app versions') !== -1);
+});
+
+test('catalog copy avoids blanket compatibility guarantees and names downgrade limits', () => {
+  const identity = logic.explainTopic('package-identity');
+  const migration = logic.explainTopic('data-migration');
+  const update = logic.explainTopic('signer-continuity');
+  const rollback = logic.explainTopic('rollback-recovery');
+  assert.ok(identity.title.indexOf('today') !== -1);
+  assert.ok(identity.summary.indexOf('cannot guarantee every future build keeps it') !== -1);
+  assert.ok(migration.summary.indexOf('schema versions 1–5') !== -1);
+  assert.ok(migration.summary.indexOf('not a promise') !== -1);
+  assert.ok(update.summary.indexOf('lower code') !== -1);
+  assert.ok(rollback.summary.indexOf('protect against downgrades') !== -1);
+  assert.ok(rollback.summary.indexOf('cannot bypass that check') !== -1);
 });
 
 test('every known topic explains scope and network honestly', () => {
