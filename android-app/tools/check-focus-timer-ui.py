@@ -37,15 +37,15 @@ required_accessibility = [
     "info.setClassName(android.widget.CheckBox.class.getName());",
     "info.setCheckable(true);",
     "info.setChecked(host.isSelected());",
+    "event.setChecked(host.isSelected());",
+    "private void setChoiceSelected(TextView view, boolean selected, boolean announceChange)",
+    "view.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);",
     "configureChoiceAccessibility(view);",
     "configureChoiceAccessibility(choice);",
     "configureChoiceAccessibility(preset);",
     "configureToggleAccessibility(view);",
     "setToggleState(soundToggle, \"Soft interaction sounds\", soundEnabled);",
     "setToggleState(tickToggle, \"Final 10-second ticks\", finalTicksEnabled);",
-    "modeStopwatch.setSelected(mode == TaskFocusTimer.Mode.STOPWATCH);",
-    "modeCountdown.setSelected(mode == TaskFocusTimer.Mode.COUNTDOWN);",
-    "displayUnitButtons[i].setSelected(selected);",
     "preset.setSelected(selected);",
     "new LayoutParams(0, dp(48), 1)",
     "tickToggle.setEnabled(!actionPending && enabled);",
@@ -60,6 +60,26 @@ for token in required_accessibility:
 assert 'timeValue.setContentDescription("Focus timer value");' not in panel, (
     "a generic timer description must not hide the displayed time from screen readers"
 )
+
+choice_selection = panel.split("private void chooseMode(", 1)[1].split("/** Intercepts only intentional horizontal drags", 1)[0]
+assert "setChoiceSelected(modeStopwatch, mode == TaskFocusTimer.Mode.STOPWATCH, changed);" in choice_selection
+assert "setChoiceSelected(modeCountdown, mode == TaskFocusTimer.Mode.COUNTDOWN, changed);" in choice_selection
+display_selection = panel.split("private void chooseDisplayUnit(", 1)[1].split("private TextView modeButton(", 1)[0]
+assert "setChoiceSelected(displayUnitButtons[i], selected, changed);" in display_selection
+assert "boolean changed = selectedMode != mode;" in choice_selection
+assert "boolean changed = displayUnit != unit;" in display_selection
+choice_accessibility = panel.split("private void configureChoiceAccessibility(", 1)[1].split(
+    "private void setChoiceSelected(", 1
+)[0]
+assert "event.setChecked(host.isSelected());" in choice_accessibility
+selection_helper = panel.split("private void setChoiceSelected(", 1)[1].split(
+    "private void configureToggleAccessibility(", 1
+)[0]
+assert "boolean changed = view.isSelected() != selected;" in selection_helper
+assert "if (changed && selected && announceChange)" in selection_helper, (
+    "only a newly selected value should emit a selection announcement; reselecting must be silent"
+)
+assert "view.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);" in selection_helper
 
 # The selector must never consume the terminal UP of a vertical gesture.
 # The parent Tasks ScrollView owns the complete vertical stream, including UP.
