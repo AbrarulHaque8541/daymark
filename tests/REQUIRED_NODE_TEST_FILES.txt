@@ -56,7 +56,8 @@ tests/extension-spa-navigation.test.js
 tests/feed-logic.test.js
 tests/focus-logic.test.js
 tests/focus-storage.test.js
-tests/holidays-logic.test.js
+tests/holidays-logic.test.j
+s
 tests/holidays-ui.test.js
 tests/ics-import.test.js
 tests/import-logic.test.js
@@ -71,6 +72,8 @@ tests/moon-ui.test.js
 tests/nightly-placeholder-guard.test.js
 tests/onthisday-logic.test.js
 tests/onthisday-ui.test.js
+tests/trending-logic.test.js
+tests/trending-ui.test.js
 tests/potd-logic.test.js
 tests/potd-ui.test.js
 tests/permission-lifecycle-logic.test.js
