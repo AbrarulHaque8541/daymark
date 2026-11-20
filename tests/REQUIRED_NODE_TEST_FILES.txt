@@ -56,8 +56,7 @@ tests/extension-spa-navigation.test.js
 tests/feed-logic.test.js
 tests/focus-logic.test.js
 tests/focus-storage.test.js
-tests/holidays-logic.test.j
-s
+tests/holidays-logic.test.js
 tests/holidays-ui.test.js
 tests/ics-import.test.js
 tests/import-logic.test.js
