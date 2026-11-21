@@ -1608,70 +1608,154 @@ public final class DaymarkPlatformInstrumentation extends Instrumentation {
                 lifecycleAction + " exposes Resume and Finish actions");
     }
 
-    /** Exercises filter semantics, touch-target minima and real catalog action gates on Android. */
+    /** Exercises filter semantics, touch targets, result announcements and catalog action gates. */
     private void connectionsPanelAccessibility() throws Exception {
-        java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+        java.util.concurrent.atomic.AtomicReference<IntegrationCatalogPanel> panelRef =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<android.widget.EditText> searchRef =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<android.widget.Button> allRef =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<android.widget.Button> filesRef =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<android.widget.LinearLayout> entriesRef =
                 new java.util.concurrent.atomic.AtomicReference<>();
         java.util.concurrent.atomic.AtomicReference<String> used =
                 new java.util.concurrent.atomic.AtomicReference<>();
+
+        int minimumTarget = Math.round(48 * getTargetContext().getResources().getDisplayMetrics().density);
+        int totalCount = IntegrationCatalog.all().size();
+        int fileCount = 0;
+        for (IntegrationCatalog.Entry entry : IntegrationCatalog.all()) {
+            if (entry.family == IntegrationCatalog.Family.FILES) fileCount++;
+        }
+        String totalStatus = connectionsCountLabel(totalCount);
+        String filesStatus = connectionsCountLabel(fileCount);
+
+        runConnectionsOnMain("initial panel", () -> {
+            Context themed = new android.view.ContextThemeWrapper(getTargetContext(), R.style.AppThemeLight);
+            IntegrationCatalogPanel panel = new IntegrationCatalogPanel(themed, entry -> used.set(entry.id));
+            panelRef.set(panel);
+            android.widget.EditText search = (android.widget.EditText) panel.getChildAt(2);
+            searchRef.set(search);
+            android.widget.HorizontalScrollView scroller =
+                    (android.widget.HorizontalScrollView) panel.getChildAt(3);
+            android.widget.LinearLayout families = (android.widget.LinearLayout) scroller.getChildAt(0);
+            android.widget.Button all = (android.widget.Button) families.getChildAt(0);
+            allRef.set(all);
+            android.widget.Button files = null;
+            for (int index = 0; index < families.getChildCount(); index++) {
+                android.widget.Button chip = (android.widget.Button) families.getChildAt(index);
+                if (chip.getTag() == IntegrationCatalog.Family.FILES) files = chip;
+            }
+            filesRef.set(files);
+            android.widget.TextView status = (android.widget.TextView) panel.getChildAt(4);
+            android.widget.ScrollView scroll = (android.widget.ScrollView) panel.getChildAt(5);
+            android.widget.LinearLayout entries = (android.widget.LinearLayout) scroll.getChildAt(0);
+            entriesRef.set(entries);
+
+            check(all.isSelected() && all.getContentDescription().toString().contains(", selected"),
+                    "initial All filter announces selection");
+            check(search.getMinimumHeight() >= minimumTarget && all.getMinimumHeight() >= minimumTarget,
+                    "search and category controls request at least 48 dp touch targets");
+            check(files != null && files.getMinimumHeight() >= minimumTarget,
+                    "file filter exists with a 48 dp minimum target");
+            check(status.getAccessibilityLiveRegion() == android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE,
+                    "result count uses a polite accessibility live region");
+            check(status.getImportantForAccessibility() == android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES,
+                    "result status is exposed to accessibility services");
+            check(status.getText().toString().equals(totalStatus),
+                    "initial status reports the complete integration count");
+        });
+
+        IntegrationCatalogPanel panel = panelRef.get();
+        runConnectionsOnMain("file family filter", () -> {
+            android.widget.Button files = filesRef.get();
+            android.widget.Button all = allRef.get();
+            android.widget.HorizontalScrollView scroller = (android.widget.HorizontalScrollView) panel.getChildAt(3);
+            android.widget.LinearLayout families = (android.widget.LinearLayout) scroller.getChildAt(0);
+            android.widget.Button originalFiles = files;
+            files.performClick();
+            check(files.isSelected() && files.getContentDescription().toString().contains(", selected"),
+                    "selected category is announced");
+            check(!all.isSelected() && all.getContentDescription().toString().contains(", not selected"),
+                    "previous category announces it is not selected");
+            check(families.getChildAt(0) == all && originalFiles.getParent() == families,
+                    "selecting a category retains the existing focusable views");
+        });
+        awaitConnectionsStatus(panel, filesStatus);
+
+        runConnectionsOnMain("All family filter", () -> allRef.get().performClick());
+        awaitConnectionsStatus(panel, totalStatus);
+
+        runConnectionsOnMain("planned integration search", () -> {
+            searchRef.get().setText("n8n");
+            android.widget.LinearLayout entries = entriesRef.get();
+            check(entries.getChildCount() == 1, "search narrows the visible catalog");
+            android.widget.LinearLayout plannedCard = (android.widget.LinearLayout) entries.getChildAt(0);
+            android.widget.Button planned = (android.widget.Button) plannedCard.getChildAt(4);
+            check(!planned.isEnabled() && planned.getMinimumHeight() >= minimumTarget,
+                    "planned integration is disabled and has a 48 dp minimum target");
+            planned.performClick();
+            check(used.get() == null, "a planned integration cannot invoke a host action");
+        });
+        awaitConnectionsStatus(panel, connectionsCountLabel(1));
+
+        runConnectionsOnMain("available integration search", () -> {
+            searchRef.get().setText("Android text sharing");
+            android.widget.LinearLayout entries = entriesRef.get();
+            check(entries.getChildCount() == 1, "search finds the implemented Android sharing entry");
+            android.widget.LinearLayout availableCard = (android.widget.LinearLayout) entries.getChildAt(0);
+            android.widget.Button available = (android.widget.Button) availableCard.getChildAt(4);
+            check(available.isEnabled() && available.getContentDescription().toString()
+                            .contains("Android text sharing"),
+                    "available action announces which integration it uses");
+            available.performClick();
+            check("android.share.text".equals(used.get()), "available entry dispatches its real action");
+            used.set(null);
+            panel.setListener(null);
+            available.performClick();
+            check(used.get() == null, "a stale button cannot invoke a removed host listener");
+        });
+        awaitConnectionsStatus(panel, connectionsCountLabel(1));
+
+        runConnectionsOnMain("empty search", () -> {
+            searchRef.get().setText("no-matching-connection-token-20261121");
+            check(entriesRef.get().getChildCount() == 0,
+                    "empty search keeps the single result-status view instead of duplicating empty-state text");
+        });
+        awaitConnectionsStatus(panel, "No matching integrations. Try another search or choose All.");
+    }
+
+    private void runConnectionsOnMain(String phase, PhaseAction action) throws Exception {
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<>();
         runOnMainSync(() -> {
             try {
-                Context themed = new android.view.ContextThemeWrapper(getTargetContext(), R.style.AppThemeLight);
-                IntegrationCatalogPanel panel = new IntegrationCatalogPanel(themed, entry -> used.set(entry.id));
-                android.widget.EditText search = (android.widget.EditText) panel.getChildAt(2);
-                android.widget.HorizontalScrollView scroller =
-                        (android.widget.HorizontalScrollView) panel.getChildAt(3);
-                android.widget.LinearLayout families = (android.widget.LinearLayout) scroller.getChildAt(0);
-                android.widget.Button all = (android.widget.Button) families.getChildAt(0);
-                android.widget.Button files = null;
-                for (int index = 0; index < families.getChildCount(); index++) {
-                    android.widget.Button chip = (android.widget.Button) families.getChildAt(index);
-                    if (chip.getTag() == IntegrationCatalog.Family.FILES) files = chip;
-                }
-                int minimumTarget = Math.round(48 * themed.getResources().getDisplayMetrics().density);
-                check(all.isSelected() && all.getContentDescription().toString().contains(", selected"),
-                        "initial All filter announces selection");
-                check(search.getMinimumHeight() >= minimumTarget && all.getMinimumHeight() >= minimumTarget,
-                        "search and category controls request at least 48 dp touch targets");
-                check(files != null && files.getMinimumHeight() >= minimumTarget,
-                        "file filter exists with a 48 dp minimum target");
-                android.widget.Button originalFiles = files;
-                files.performClick();
-                check(files.isSelected() && files.getContentDescription().toString().contains(", selected"),
-                        "selected category is announced");
-                check(!all.isSelected() && all.getContentDescription().toString().contains(", not selected"),
-                        "previous category announces it is not selected");
-                check(families.getChildAt(0) == all && originalFiles.getParent() == families,
-                        "selecting a category retains the existing focusable views");
-                all.performClick();
-                android.widget.ScrollView scroll = (android.widget.ScrollView) panel.getChildAt(4);
-                android.widget.LinearLayout entries = (android.widget.LinearLayout) scroll.getChildAt(0);
-                search.setText("n8n");
-                check(entries.getChildCount() == 1, "search narrows the visible catalog");
-                android.widget.LinearLayout plannedCard = (android.widget.LinearLayout) entries.getChildAt(0);
-                android.widget.Button planned = (android.widget.Button) plannedCard.getChildAt(4);
-                check(!planned.isEnabled() && planned.getMinimumHeight() >= minimumTarget,
-                        "planned integration is disabled and has a 48 dp minimum target");
-                planned.performClick();
-                check(used.get() == null, "a planned integration cannot invoke a host action");
-                search.setText("Android text sharing");
-                check(entries.getChildCount() == 1, "search finds the implemented Android sharing entry");
-                android.widget.LinearLayout availableCard = (android.widget.LinearLayout) entries.getChildAt(0);
-                android.widget.Button available = (android.widget.Button) availableCard.getChildAt(4);
-                check(available.isEnabled() && available.getContentDescription().toString()
-                                .contains("Android text sharing"),
-                        "available action announces which integration it uses");
-                available.performClick();
-                check("android.share.text".equals(used.get()), "available entry dispatches its real action");
-                used.set(null);
-                panel.setListener(null);
-                available.performClick();
-                check(used.get() == null, "a stale button cannot invoke a removed host listener");
+                action.run();
             } catch (Throwable error) {
                 failure.set(error);
             }
         });
-        if (failure.get() != null) throw new Exception("Connections panel accessibility failed", failure.get());
+        if (failure.get() != null) throw new Exception("Connections " + phase + " failed", failure.get());
+    }
+
+    private void awaitConnectionsStatus(IntegrationCatalogPanel panel, String expected) throws Exception {
+        java.util.concurrent.atomic.AtomicReference<String> observed =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        long deadline = android.os.SystemClock.uptimeMillis() + 3000L;
+        do {
+            runConnectionsOnMain("result-status read", () -> observed.set(
+                    ((android.widget.TextView) panel.getChildAt(4)).getText().toString()));
+            if (expected.equals(observed.get())) return;
+            Thread.sleep(25L);
+        } while (android.os.SystemClock.uptimeMillis() < deadline);
+        throw new Exception("Connections status did not settle; expected='" + expected
+                + "' observed='" + observed.get() + "'");
+    }
+
+    private static String connectionsCountLabel(int count) {
+        return count + (count == 1 ? " integration" : " integrations");
     }
 
     /** Exercises Android saved-state parceling, restoration, cancellation and encrypted clip creation. */
