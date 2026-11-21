@@ -225,6 +225,26 @@ test('a command query with no matches announces a visible empty state immediatel
   handle.input.dispatch('keydown', { key: 'Escape' });
   assert.equal(handle.isOpen(), false);
 });
+test('an unmatched toggle query announces empty results and Enter changes no flags', () => {
+  const doc = makeDoc();
+  const windowObj = makeWindow();
+  const storage = flagsOnStorage();
+  const savedFlags = storage.getItem('daymark.features.v1');
+  const handle = ui.attachCommandBarUi(makeEnv(doc, storage, windowObj));
+  handle.open();
+  handle.input.value = 'toggle a-feature-that-does-not-exist';
+  handle.input.dispatch('input', {});
+  assert.equal(handle.listEl.hidden, true);
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.input.getAttribute('aria-activedescendant'), null);
+  assert.equal(handle.statusEl.getAttribute('role'), 'status');
+  assert.equal(handle.statusEl.getAttribute('aria-live'), 'polite');
+  assert.equal(handle.statusEl.textContent, 'Nothing matches that. Try a card name, "open ", or a !bang with text.');
+  handle.input.dispatch('keydown', { key: 'Enter' });
+  assert.equal(storage.getItem('daymark.features.v1'), savedFlags);
+  assert.equal(windowObj.openedUrls.length, 0);
+  assert.equal(handle.isOpen(), true);
+});
 test('with the flag off, opening is refused honestly and no keyboard path can summon it', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
