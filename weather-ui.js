@@ -243,7 +243,9 @@
         const result = await weatherApi.fetchWeatherByPlace(query, fetchImpl, { now });
         cached = result;
         await persistCache(cached, epochSnapshot);
-        await persistPrefs(query, epochSnapshot);
+        const latestTyped = inputEl && typeof inputEl.value === 'string' ? inputEl.value : typed;
+        const preferredPlace = latestTyped === typed ? query : latestTyped;
+        await persistPrefs(preferredPlace, epochSnapshot);
         render(cached);
         status(`Updated · ${cached.fetchedAt.slice(0, 16).replace('T', ' ')} UTC` + storageNotice(), true);
       } catch (error) {
