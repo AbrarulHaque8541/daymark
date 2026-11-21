@@ -199,6 +199,32 @@ test('the listbox exposes the active option and Arrow keys update it without mov
   assert.equal(handle.listEl.hidden, true);
   assert.equal(handle.input.getAttribute('aria-activedescendant'), null);
 });
+test('a command query with no matches announces a visible empty state immediately', () => {
+  const doc = makeDoc();
+  const windowObj = makeWindow();
+  const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), windowObj));
+  handle.open();
+  handle.input.value = 'goto a-card-that-does-not-exist';
+  handle.input.dispatch('input', {});
+  assert.equal(handle.listEl.hidden, true);
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.input.getAttribute('aria-activedescendant'), null);
+  assert.equal(handle.statusEl.getAttribute('role'), 'status');
+  assert.equal(handle.statusEl.getAttribute('aria-live'), 'polite');
+  assert.equal(handle.statusEl.textContent, 'Nothing matches that. Try a card name, "open ", or a !bang with text.');
+  assert.equal(handle.isOpen(), true);
+  handle.input.dispatch('keydown', { key: 'Enter' });
+  assert.equal(handle.statusEl.textContent, 'Nothing matches that. Try a card name, "open ", or a !bang with text.');
+  assert.equal(windowObj.openedUrls.length, 0);
+  handle.input.value = 'goto local data';
+  handle.input.dispatch('input', {});
+  assert.equal(handle.listEl.hidden, false);
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'true');
+  assert.equal(handle.statusEl.textContent, '');
+  assert.ok(doc.getElementById(handle.input.getAttribute('aria-activedescendant')));
+  handle.input.dispatch('keydown', { key: 'Escape' });
+  assert.equal(handle.isOpen(), false);
+});
 test('with the flag off, opening is refused honestly and no keyboard path can summon it', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
