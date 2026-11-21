@@ -1,104 +1,1162 @@
 <!DOCTYPE html>
-<html lang="hi"><head>
-<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Daymark Browser</title>
 <style>
-:root{--ink:#071018;--navy:#0c1c30;--navy2:#13283f;--fg:#eef3f8;--muted:#8ea3b8;--line:#1d3550;--accent:#2f7cf6;--sheet:#f6f8fb;--sheet-fg:#121820;--chip:#e8eef5;--pill:999px}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;font-family:system-ui,sans-serif;background:var(--ink);color:var(--fg);overflow:hidden}
-button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-input{font:inherit;color:inherit;border:none;outline:none;background:transparent}
-.phone{max-width:420px;height:100%;margin:0 auto;display:flex;flex-direction:column;position:relative;background:radial-gradient(120% 50% at 80% 90%,#f3f7fb 0%,#c5d6e6 18%,transparent 48%),linear-gradient(180deg,#050d18 0%,#0a2744 48%,#3d6f96 78%,#d5e4f0 100%);overflow:hidden}
-.dune{position:absolute;left:-20%;right:-10%;bottom:-10%;height:40%;border-radius:50% 45% 0 0;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(214,228,238,.5) 45%,transparent);pointer-events:none}
-.top,.body,.nav{position:relative;z-index:2}
-.top{padding:12px 14px 8px}
-.body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
-.scroll{flex:1;overflow-y:auto;padding:0 14px 12px}
-.omnibox{display:flex;align-items:center;gap:8px;height:48px;padding:0 12px;background:rgba(12,28,48,.78);border:1px solid rgba(255,255,255,.12);border-radius:var(--pill);backdrop-filter:blur(14px)}
-.engine-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;background:#de5833;color:#fff}
-.omnibox input{flex:1;min-width:0;font-size:15px}
-.omnibox input::placeholder{color:var(--muted)}
-.home-wrap{display:flex;flex-direction:column;align-items:center;padding-top:36px}
-.brand{font-size:34px;font-weight:600}
-.brand-sub{font-size:12px;color:var(--muted);margin:4px 0 28px}
-.dials{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;width:100%;max-width:340px}
-.dial{display:flex;flex-direction:column;align-items:center;gap:6px}
-.dial-ico{width:52px;height:52px;border-radius:16px;background:var(--navy2);display:grid;place-items:center;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.18)}
-.dial span{font-size:11px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.type-tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 14px 0}
-.type-tab{flex-shrink:0;padding:8px 14px;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent}
-.type-tab.on{color:var(--fg);border-bottom-color:var(--accent)}
-.engine-bar{display:flex;gap:8px;overflow-x:auto;padding:10px 14px 6px}
-.eng-chip{flex-shrink:0;padding:6px 12px;border-radius:var(--pill);font-size:12px;background:var(--navy2);color:var(--muted)}
-.eng-chip.on{background:var(--fg);color:var(--ink)}
-.result-card{background:rgba(12,28,48,.85);border-radius:16px;padding:14px;margin-bottom:10px;border:1px solid rgba(255,255,255,.06)}
-.r-host{font-size:11px;color:var(--muted);margin-bottom:4px}
-.r-title{font-size:16px;font-weight:600;color:#7eb6ff;margin-bottom:4px}
-.r-snip{font-size:13px;line-height:1.45;opacity:.9}
-.nav{display:flex;align-items:center;justify-content:space-around;height:56px;border-top:1px solid rgba(255,255,255,.06);background:rgba(7,16,24,.7);backdrop-filter:blur(12px)}
-.nav-btn{width:48px;height:48px;border-radius:14px;display:grid;place-items:center}
-.tab-badge{min-width:28px;height:28px;border-radius:8px;border:1.5px solid rgba(255,255,255,.4);display:grid;place-items:center;font-size:12px;font-weight:600}
-.overlay{position:absolute;inset:0;z-index:40;background:rgba(0,0,0,.48);display:flex;align-items:flex-end}
-.sheet{width:100%;max-height:78%;overflow-y:auto;background:var(--sheet);color:var(--sheet-fg);border-radius:22px 22px 0 0;padding:16px 16px 24px}
-.sheet-handle{width:36px;height:4px;border-radius:2px;background:#c5ced8;margin:0 auto 12px}
-.tool-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:11px}
-.tool{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;color:var(--sheet-fg)}
-.tool-ico{width:40px;height:40px;border-radius:12px;background:var(--chip);display:grid;place-items:center}
-.group{background:var(--navy2);border-radius:16px;padding:4px 14px;margin-bottom:12px}
-.group-label{font-size:11px;color:var(--muted);padding:10px 0 4px;text-transform:uppercase}
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid rgba(255,255,255,.06);font-size:14px;gap:12px}
-.toggle-row:first-of-type{border-top:none}
-.switch{width:44px;height:26px;border-radius:var(--pill);background:var(--line);position:relative;flex-shrink:0}
-.switch.on{background:var(--accent)}
-.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}
-.switch.on::after{transform:translateX(18px)}
-.screen-head{display:flex;align-items:center;gap:10px;padding:8px 0 12px}
-.back-btn{width:36px;height:36px;border-radius:50%;background:var(--navy2);display:grid;place-items:center}
-.row{padding:12px;border-radius:14px;background:var(--navy2);margin-bottom:8px}
-.row-title{font-size:14px;font-weight:500}
-.row-sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.page-article{background:var(--sheet);color:var(--sheet-fg);border-radius:18px;padding:18px;margin-top:6px}
-.page-article h2{font-size:22px;margin:6px 0 12px}
-.page-article p{font-size:17px;line-height:1.6;color:#2a3440}
-.hidden{display:none!important}
-.empty{text-align:center;color:var(--muted);font-size:13px;padding:28px 12px}
-.toast{position:absolute;left:50%;bottom:80px;z-index:50;transform:translateX(-50%);background:var(--sheet);color:var(--sheet-fg);padding:10px 18px;border-radius:var(--pill);font-size:13px}
-.shield-pill{font-size:11px;color:var(--muted);padding:4px 0 2px 14px}
-</style></head><body>
+  :root {
+    --ink: #071018;
+    --navy: #0c1c30;
+    --navy2: #13283f;
+    --fg: #eef3f8;
+    --muted: #8ea3b8;
+    --line: #1d3550;
+    --accent: #2f7cf6;
+    --sheet: #f6f8fb;
+    --sheet-fg: #121820;
+    --sheet-muted: #5c6b7c;
+    --chip: #e8eef5;
+    --ok: #22c55e;
+    --radius: 16px;
+    --pill: 999px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --nav-h: 56px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--ink);
+    color: var(--fg);
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  input { font: inherit; color: inherit; border: none; outline: none; background: transparent; }
+
+  .phone {
+    max-width: 420px;
+    height: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background:
+      radial-gradient(120% 50% at 80% 90%, #f3f7fb 0%, #c5d6e6 18%, transparent 48%),
+      radial-gradient(80% 40% at 15% 100%, #9eb6cc 0%, transparent 55%),
+      linear-gradient(180deg, #050d18 0%, #0a2744 48%, #3d6f96 78%, #d5e4f0 100%);
+    overflow: hidden;
+  }
+  .dune {
+    position: absolute; left: -20%; right: -10%; bottom: -10%;
+    height: 40%; border-radius: 50% 45% 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(214,228,238,.5) 45%, transparent);
+    pointer-events: none; z-index: 0;
+  }
+
+  .top, .body, .nav { position: relative; z-index: 2; }
+  .top { padding: 12px 14px 8px; }
+  .body { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 12px; }
+
+  .omnibox {
+    display: flex; align-items: center; gap: 8px;
+    height: 48px; padding: 0 12px;
+    background: color-mix(in srgb, var(--navy) 78%, transparent);
+    border: 1px solid color-mix(in srgb, white 12%, transparent);
+    border-radius: var(--pill);
+    backdrop-filter: blur(14px);
+    transition: box-shadow .2s, border-color .2s;
+  }
+  .omnibox:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .engine-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .omnibox input { flex: 1; min-width: 0; font-size: 15px; }
+  .omnibox input::placeholder { color: var(--muted); }
+  .ob-btn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+  .ob-btn:active { background: color-mix(in srgb, white 10%, transparent); }
+
+  .home-wrap { display: flex; flex-direction: column; align-items: center; padding-top: 36px; }
+  .brand { font-size: 34px; font-weight: 600; letter-spacing: -0.5px; }
+  .brand-sub { font-size: 12px; color: var(--muted); margin-top: 4px; margin-bottom: 28px; }
+  .dials {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px 8px; width: 100%; max-width: 340px;
+  }
+  .dial {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    animation: rise .4s ease both;
+  }
+  .dial:nth-child(1) { animation-delay: .02s; }
+  .dial:nth-child(2) { animation-delay: .06s; }
+  .dial:nth-child(3) { animation-delay: .1s; }
+  .dial:nth-child(4) { animation-delay: .14s; }
+  .dial:nth-child(5) { animation-delay: .18s; }
+  .dial:nth-child(6) { animation-delay: .22s; }
+  .dial:nth-child(7) { animation-delay: .26s; }
+  .dial:nth-child(8) { animation-delay: .3s; }
+  .dial-ico {
+    width: 52px; height: 52px; border-radius: 16px;
+    background: var(--navy2); display: grid; place-items: center;
+    font-size: 18px; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,.18);
+    transition: transform .15s;
+  }
+  .dial:active .dial-ico { transform: scale(.92); }
+  .dial span { font-size: 11px; max-width: 64px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .result-chrome { flex-shrink: 0; }
+  .type-tabs {
+    display: flex; gap: 4px; overflow-x: auto; padding: 6px 14px 0;
+    scrollbar-width: none;
+  }
+  .type-tabs::-webkit-scrollbar { display: none; }
+  .type-tab {
+    flex-shrink: 0; padding: 8px 14px; font-size: 13px; font-weight: 500;
+    color: var(--muted); border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+  }
+  .type-tab.on { color: var(--fg); border-bottom-color: var(--accent); }
+
+  .engine-bar {
+    display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px 6px;
+    scrollbar-width: none;
+  }
+  .engine-bar::-webkit-scrollbar { display: none; }
+  .eng-chip {
+    flex-shrink: 0; padding: 6px 12px; border-radius: var(--pill);
+    font-size: 12px; background: var(--navy2); color: var(--muted);
+    transition: background .15s, color .15s, transform .12s;
+  }
+  .eng-chip.on { background: var(--fg); color: var(--ink); }
+  .eng-chip:active { transform: scale(.96); }
+
+  .result-card {
+    background: color-mix(in srgb, var(--navy) 85%, transparent);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
+    border: 1px solid color-mix(in srgb, white 6%, transparent);
+    animation: rise .35s ease both;
+  }
+  .result-card:nth-child(1) { animation-delay: .02s; }
+  .result-card:nth-child(2) { animation-delay: .06s; }
+  .result-card:nth-child(3) { animation-delay: .1s; }
+  .result-card:nth-child(4) { animation-delay: .14s; }
+  .result-card:nth-child(5) { animation-delay: .18s; }
+  .result-card:active { transform: scale(.985); }
+  .r-host { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .r-title { font-size: 16px; font-weight: 600; color: #7eb6ff; line-height: 1.3; margin-bottom: 4px; }
+  .r-snip { font-size: 13px; color: color-mix(in srgb, var(--fg) 80%, transparent); line-height: 1.45; }
+  .r-meta { display: flex; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: var(--pill);
+    background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok);
+  }
+
+  .img-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-bottom: 8px;
+  }
+  .img-cell {
+    aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+    background: var(--navy2); display: grid; place-items: center;
+    font-size: 12px; color: var(--muted); animation: rise .3s ease both;
+  }
+
+  .page-article {
+    background: var(--sheet); color: var(--sheet-fg);
+    border-radius: 18px; padding: 18px; margin-top: 6px;
+    animation: rise .3s ease;
+  }
+  .page-article .ph { font-size: 11px; color: var(--sheet-muted); }
+  .page-article h2 { font-size: 22px; line-height: 1.25; margin: 6px 0 12px; }
+  .page-article p { font-size: var(--reader-size, 17px); line-height: 1.6; color: #2a3440; }
+  .page-tools {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+  }
+  .page-tools button {
+    padding: 8px 12px; border-radius: var(--pill);
+    background: var(--chip); color: var(--sheet-fg); font-size: 12px;
+  }
+
+  .screen-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0 12px; position: sticky; top: 0;
+  }
+  .screen-head h2 { flex: 1; font-size: 18px; font-weight: 600; }
+  .back-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--navy2); display: grid; place-items: center;
+  }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border-radius: 14px; background: var(--navy2);
+    margin-bottom: 8px; animation: rise .25s ease both;
+  }
+  .row-ico {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--navy); display: grid; place-items: center; flex-shrink: 0;
+  }
+  .row-body { flex: 1; min-width: 0; }
+  .row-title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .group {
+    background: var(--navy2); border-radius: 16px; padding: 4px 14px;
+    margin-bottom: 12px; animation: rise .3s ease both;
+  }
+  .group-label { font-size: 11px; color: var(--muted); padding: 10px 0 4px; text-transform: uppercase; letter-spacing: .4px; }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-top: 1px solid color-mix(in srgb, white 6%, transparent);
+    font-size: 14px; gap: 12px;
+  }
+  .toggle-row:first-of-type { border-top: none; }
+  .toggle-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .switch {
+    width: 44px; height: 26px; border-radius: var(--pill);
+    background: var(--line); position: relative; flex-shrink: 0;
+    transition: background .2s;
+  }
+  .switch.on { background: var(--accent); }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 50%; background: #fff;
+    transition: transform .2s;
+  }
+  .switch.on::after { transform: translateX(18px); }
+
+  .nav {
+    display: flex; align-items: center; justify-content: space-around;
+    height: calc(var(--nav-h) + var(--safe-b));
+    padding-bottom: var(--safe-b);
+    background: color-mix(in srgb, var(--ink) 70%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid color-mix(in srgb, white 6%, transparent);
+  }
+  .nav-btn {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: grid; place-items: center; color: var(--fg);
+  }
+  .nav-btn:active { background: color-mix(in srgb, white 8%, transparent); }
+  .tab-badge {
+    min-width: 28px; height: 28px; border-radius: 8px;
+    border: 1.5px solid color-mix(in srgb, white 40%, transparent);
+    display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  }
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 40;
+    background: rgba(0,0,0,.48);
+    display: flex; align-items: flex-end;
+    animation: fade .2s ease;
+  }
+  .sheet {
+    width: 100%; max-height: 78%; overflow-y: auto;
+    background: var(--sheet); color: var(--sheet-fg);
+    border-radius: 22px 22px 0 0; padding: 16px 16px calc(20px + var(--safe-b));
+    animation: slideUp .28s cubic-bezier(.2,.8,.2,1);
+  }
+  .sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: #c5ced8; margin: 0 auto 12px;
+  }
+  .sheet h3 { font-size: 16px; margin-bottom: 4px; }
+  .sheet .hint { font-size: 12px; color: var(--sheet-muted); margin-bottom: 14px; }
+  .tool-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    text-align: center; font-size: 11px;
+  }
+  .tool {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 10px 4px; border-radius: 12px; color: var(--sheet-fg);
+  }
+  .tool:active { background: var(--chip); }
+  .tool-ico {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--chip); display: grid; place-items: center; font-size: 18px;
+  }
+  .sheet-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;
+  }
+  .sheet-actions button {
+    padding: 12px; border-radius: 14px; background: var(--chip);
+    color: var(--sheet-fg); font-size: 13px; font-weight: 500;
+  }
+
+  .toast {
+    position: absolute; left: 50%; bottom: 80px; z-index: 50;
+    transform: translateX(-50%);
+    background: var(--sheet); color: var(--sheet-fg);
+    padding: 10px 18px; border-radius: var(--pill); font-size: 13px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    animation: fade .2s ease;
+    pointer-events: none;
+  }
+
+  .shield-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--muted); padding: 4px 0 2px 14px;
+  }
+
+  .hidden { display: none !important; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .suggest {
+    padding: 10px 4px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid color-mix(in srgb, white 5%, transparent);
+  }
+  .suggest:active { background: color-mix(in srgb, white 5%, transparent); }
+  .suggest-ico { color: var(--muted); font-size: 14px; }
+  .url-chips { display: flex; gap: 8px; padding: 10px 0; flex-wrap: wrap; }
+  .url-chips button {
+    padding: 6px 12px; border-radius: var(--pill);
+    background: var(--navy2); font-size: 12px; color: var(--muted);
+  }
+
+  .progress {
+    height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 8px;
+  }
+  .progress > i {
+    display: block; height: 100%; background: var(--accent);
+    width: 0%; transition: width .35s ease;
+  }
+
+  .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 28px 12px; }
+</style>
+</head>
+<body>
 <div class="phone" id="app">
-<div class="dune"></div>
-<div class="top"><form class="omnibox" id="omniForm">
-<button type="button" class="engine-dot" id="engineDot">D</button>
-<input id="omniInput" type="search" placeholder="Search or enter URL" autocomplete="off"/>
-</form></div>
-<div class="body">
-<div class="scroll" id="viewHome"><div class="home-wrap">
-<div class="brand">Daymark</div><div class="brand-sub" id="homeSub">On this phone · privacy first</div>
-<div class="dials" id="dials"></div>
-</div></div>
-<div class="scroll hidden" id="viewFocus"><div id="suggestions"></div></div>
-<div class="hidden" id="viewResults" style="display:none;flex-direction:column;flex:1;min-height:0">
-<div class="type-tabs" id="typeTabs">
-<button type="button" class="type-tab on" data-type="all">All</button>
-<button type="button" class="type-tab" data-type="images">Images</button>
-<button type="button" class="type-tab" data-type="news">News</button>
-<button type="button" class="type-tab" data-type="videos">Videos</button>
-<button type="button" class="type-tab" data-type="maps">Maps</button>
+  <div class="dune" aria-hidden="true"></div>
+
+  <div class="top" id="topBar">
+    <form class="omnibox" id="omniForm">
+      <button type="button" class="engine-dot" id="engineDot" title="Engine">D</button>
+      <input id="omniInput" type="search" placeholder="Search or enter URL" autocomplete="off" enterkeyhint="go" />
+      <button type="button" class="ob-btn" id="clearBtn" title="Clear" hidden>×</button>
+      <button type="button" class="ob-btn" id="refreshBtn" title="Refresh">↻</button>
+    </form>
+  </div>
+
+  <div class="body" id="body">
+    <div class="scroll" id="viewHome">
+      <div class="home-wrap">
+        <div class="brand">Daymark</div>
+        <div class="brand-sub" id="homeSub">On this phone · privacy first</div>
+        <div class="dials" id="dials"></div>
+      </div>
+    </div>
+
+    <div class="scroll hidden" id="viewFocus">
+      <div class="url-chips">
+        <button type="button" data-chip="https://">https://</button>
+        <button type="button" data-chip="www.">www.</button>
+        <button type="button" data-chip=".com">.com</button>
+        <button type="button" data-chip=".co.in">.co.in</button>
+      </div>
+      <div id="suggestions"></div>
+    </div>
+
+    <div class="hidden" id="viewResults" style="display:none;flex-direction:column;flex:1;min-height:0;">
+      <div class="result-chrome">
+        <div class="type-tabs" id="typeTabs">
+          <button type="button" class="type-tab on" data-type="all">All</button>
+          <button type="button" class="type-tab" data-type="images">Images</button>
+          <button type="button" class="type-tab" data-type="news">News</button>
+          <button type="button" class="type-tab" data-type="videos">Videos</button>
+          <button type="button" class="type-tab" data-type="maps">Maps</button>
+        </div>
+        <div class="shield-pill" id="shieldPill">Shields on · 0 blocked</div>
+      </div>
+      <div class="scroll" id="resultsList"></div>
+      <div class="engine-bar" id="engineBar"></div>
+    </div>
+
+    <div class="scroll hidden" id="viewPage"></div>
+    <div class="scroll hidden" id="viewList"></div>
+  </div>
+
+  <nav class="nav" id="nav">
+    <button type="button" class="nav-btn" id="btnBack" aria-label="Back">←</button>
+    <button type="button" class="nav-btn" id="btnForward" aria-label="Forward">→</button>
+    <button type="button" class="nav-btn" id="btnMenu" aria-label="Menu">☰</button>
+    <button type="button" class="nav-btn" id="btnTabs" aria-label="Tabs"><span class="tab-badge" id="tabCount">1</span></button>
+    <button type="button" class="nav-btn" id="btnHome" aria-label="Home">⌂</button>
+  </nav>
 </div>
-<div class="shield-pill" id="shieldPill">Shields on</div>
-<div class="scroll" id="resultsList"></div>
-<div class="engine-bar" id="engineBar"></div>
-</div>
-<div class="scroll hidden" id="viewPage"></div>
-<div class="scroll hidden" id="viewList"></div>
-</div>
-<nav class="nav">
-<button type="button" class="nav-btn" id="btnBack">←</button>
-<button type="button" class="nav-btn" id="btnForward">→</button>
-<button type="button" class="nav-btn" id="btnMenu">☰</button>
-<button type="button" class="nav-btn" id="btnTabs"><span class="tab-badge" id="tabCount">1</span></button>
-<button type="button" class="nav-btn" id="btnHome">⌂</button>
-</nav>
-</div>
-<script src="./daymark-browser.js"></script>
-</body></html>
+
+<script>
+/* Daymark browser UI shell — design preview only. Not the production WebView. */
+const ENGINES = [
+  { id: "ddg", label: "DuckDuckGo", mark: "D", tone: "#de5833" },
+  { id: "google", label: "Google", mark: "G", tone: "#4285f4" },
+  { id: "brave", label: "Brave", mark: "B", tone: "#fb542b" },
+  { id: "bing", label: "Bing", mark: "b", tone: "#00809d" },
+  { id: "perplexity", label: "Perplexity", mark: "*", tone: "#1a1a1a" },
+];
+
+const DEFAULT_DIALS = [
+  { title: "Wikipedia", url: "https://wikipedia.org", letter: "W" },
+  { title: "Tasks", url: "daymark://tasks", letter: "T" },
+  { title: "News", url: "https://news.google.com", letter: "N" },
+  { title: "Maps", url: "https://maps.google.com", letter: "M" },
+  { title: "YouTube", url: "https://youtube.com", letter: "Y" },
+  { title: "GitHub", url: "https://github.com", letter: "G" },
+  { title: "Reddit", url: "https://reddit.com", letter: "R" },
+  { title: "Translate", url: "https://translate.google.com", letter: "अ" },
+];
+
+const FEATURES = [
+  { id: "shields", group: "Privacy", label: "Shields", desc: "Block ads, trackers, fingerprinting", def: true },
+  { id: "cookieIsolation", group: "Privacy", label: "Cookie isolation", desc: "Separate cookies per site", def: true },
+  { id: "antiFingerprint", group: "Privacy", label: "Anti-fingerprinting", def: true },
+  { id: "httpsOnly", group: "Privacy", label: "HTTPS lock", def: true },
+  { id: "blockCookiePopups", group: "Privacy", label: "Block cookie popups", def: false },
+  { id: "privateDefault", group: "Privacy", label: "Always private", def: false },
+  { id: "dataSaver", group: "Performance", label: "Data saver", def: false },
+  { id: "autoArchive", group: "Tabs", label: "Auto-archive idle tabs", def: true },
+  { id: "tabStacks", group: "Tabs", label: "Tab stacks / islands", def: true },
+  { id: "privateInSameWindow", group: "Tabs", label: "Private + normal tabs", def: true },
+  { id: "reader", group: "Reading", label: "Reader mode", def: true },
+  { id: "readingList", group: "Reading", label: "Reading list", def: true },
+  { id: "pageNotes", group: "Reading", label: "Page notes", def: true },
+  { id: "translate", group: "AI & tools", label: "Page translate", def: true },
+  { id: "summarize", group: "AI & tools", label: "Page summary", def: true },
+  { id: "findInPage", group: "AI & tools", label: "Find in page", def: true },
+  { id: "desktopSite", group: "AI & tools", label: "Request desktop site", def: true },
+  { id: "videoAssist", group: "Media", label: "Video assistant", def: false },
+  { id: "downloadMgr", group: "Media", label: "Download manager", def: true },
+  { id: "night", group: "Look", label: "Night mode", def: true },
+  { id: "adaptiveDark", group: "Look", label: "Force dark on light sites", def: false },
+  { id: "barBottom", group: "Look", label: "Address bar at bottom", def: false },
+  { id: "uiAutohide", group: "Look", label: "Hide chrome while reading", def: false },
+  { id: "animations", group: "Look", label: "Motion & transitions", def: true },
+  { id: "askExit", group: "General", label: "Ask before closing tab", def: true },
+  { id: "fireButton", group: "General", label: "Fire / clear tab session", def: true },
+  { id: "spaces", group: "Work", label: "Spaces / workspaces", def: false },
+  { id: "snooze", group: "Work", label: "Snooze page", def: false },
+];
+
+const STORE = "daymark-proto-v2";
+
+const state = {
+  view: "home",
+  listKind: null,
+  engine: "ddg",
+  resultType: "all",
+  draft: "",
+  query: "",
+  hits: [],
+  page: null,
+  tabs: [{ id: crypto.randomUUID(), title: "New tab", private: false }],
+  activeTab: 0,
+  history: [],
+  bookmarks: [],
+  reading: [],
+  notes: [],
+  downloads: [],
+  dials: [...DEFAULT_DIALS],
+  features: Object.fromEntries(FEATURES.map(f => [f.id, f.def])),
+  blocked: 0,
+  sheet: null,
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.engine) state.engine = d.engine;
+    if (d.features) state.features = { ...state.features, ...d.features };
+    if (d.history) state.history = d.history;
+    if (d.bookmarks) state.bookmarks = d.bookmarks;
+    if (d.reading) state.reading = d.reading;
+    if (d.notes) state.notes = d.notes;
+    if (d.dials) state.dials = d.dials;
+  } catch {}
+}
+function save() {
+  localStorage.setItem(STORE, JSON.stringify({
+    engine: state.engine,
+    features: state.features,
+    history: state.history.slice(0, 60),
+    bookmarks: state.bookmarks,
+    reading: state.reading,
+    notes: state.notes,
+    dials: state.dials,
+  }));
+}
+load();
+
+const $ = (id) => document.getElementById(id);
+const omni = $("omniInput");
+const engineDot = $("engineDot");
+
+function toast(msg) {
+  let el = document.querySelector(".toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "toast";
+    $("app").appendChild(el);
+  }
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.hidden = true; }, 1400);
+}
+
+function meta() {
+  return ENGINES.find(e => e.id === state.engine) || ENGINES[0];
+}
+
+function isUrl(v) {
+  const t = v.trim();
+  if (!t || t.includes(" ")) return false;
+  return /^https?:\/\//i.test(t) || /^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(t);
+}
+function hostOf(url) {
+  try { return new URL(url.startsWith("http") ? url : "https://" + url).hostname.replace(/^www\./, ""); }
+  catch { return url; }
+}
+function normUrl(v) {
+  const t = v.trim();
+  return /^https?:\/\//i.test(t) ? t : "https://" + t;
+}
+
+function remember(hit) {
+  if (state.tabs[state.activeTab]?.private) return;
+  state.history = [hit, ...state.history.filter(h => h.url !== hit.url)].slice(0, 80);
+  save();
+}
+
+async function search(q) {
+  state.query = q;
+  state.view = "results";
+  state.page = null;
+  state.blocked = state.features.shields ? 3 + (q.length % 8) : 0;
+  state.hits = [];
+  render();
+
+  try {
+    const res = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&limit=8&origin=*&search=${encodeURIComponent(q)}`
+    );
+    const data = await res.json();
+    const hits = (data[1] || []).map((title, i) => ({
+      title,
+      snippet: data[2]?.[i] || "Open result",
+      url: data[3]?.[i] || "about:blank",
+    }));
+    state.hits = hits.length ? hits : [{ title: q, snippet: "No matches. Try another query.", url: "about:blank" }];
+  } catch {
+    state.hits = [
+      { title: q, snippet: "Offline demo result — live search needs a network.", url: "about:blank" },
+      { title: "Daymark local help", snippet: "Tasks and notes stay on this phone.", url: "daymark://help" },
+    ];
+  }
+  remember({ title: q, snippet: meta().label, url: state.hits[0]?.url || "about:blank" });
+  render();
+}
+
+function openHit(hit) {
+  state.page = hit;
+  state.view = "page";
+  state.query = hit.url;
+  remember(hit);
+  render();
+}
+
+function openUrlOrSearch(raw) {
+  const q = (raw || omni.value).trim();
+  if (!q) return;
+  omni.blur();
+  if (isUrl(q)) {
+    const url = normUrl(q);
+    openHit({ title: hostOf(url), snippet: "Preview card — Daymark on phone opens this in system WebView. Shields, reader, notes still work here.", url });
+  } else {
+    search(q);
+  }
+}
+
+function setEngine(id) {
+  state.engine = id;
+  save();
+  const m = meta();
+  engineDot.textContent = m.mark;
+  engineDot.style.background = m.tone;
+  engineDot.style.color = "#fff";
+  if (state.view === "results" && state.query) search(state.query);
+  else render();
+}
+
+function showList(kind) {
+  state.view = "list";
+  state.listKind = kind;
+  state.sheet = null;
+  render();
+}
+
+function closeSheet() {
+  state.sheet = null;
+  render();
+}
+
+function render() {
+  const m = meta();
+  engineDot.textContent = m.mark;
+  engineDot.style.background = m.tone;
+  engineDot.style.color = "#fff";
+
+  $("tabCount").textContent = String(state.tabs.length);
+  $("homeSub").textContent = state.tabs[state.activeTab]?.private
+    ? "Private tab · not saved"
+    : "On this phone · privacy first";
+
+  const views = ["viewHome", "viewFocus", "viewResults", "viewPage", "viewList"];
+  views.forEach(id => {
+    const el = $(id);
+    el.classList.add("hidden");
+    el.style.display = "none";
+  });
+
+  if (state.view === "home") {
+    $("viewHome").classList.remove("hidden");
+    $("viewHome").style.display = "block";
+    renderDials();
+    if (!document.activeElement || document.activeElement !== omni) omni.value = "";
+  } else if (state.view === "focus") {
+    $("viewFocus").classList.remove("hidden");
+    $("viewFocus").style.display = "block";
+    renderSuggestions();
+  } else if (state.view === "results") {
+    const el = $("viewResults");
+    el.classList.remove("hidden");
+    el.style.display = "flex";
+    renderResults();
+    omni.value = state.query;
+  } else if (state.view === "page") {
+    $("viewPage").classList.remove("hidden");
+    $("viewPage").style.display = "block";
+    renderPage();
+    omni.value = state.page ? hostOf(state.page.url) : state.query;
+  } else if (state.view === "list") {
+    $("viewList").classList.remove("hidden");
+    $("viewList").style.display = "block";
+    renderList();
+  }
+
+  $("clearBtn").hidden = !(document.activeElement === omni && omni.value);
+  $("shieldPill").textContent = state.features.shields
+    ? `Shields on · ${state.blocked} blocked`
+    : "Shields off";
+
+  renderSheet();
+}
+
+function renderDials() {
+  $("dials").innerHTML = state.dials.slice(0, 8).map(d => `
+    <button type="button" class="dial" data-url="${escapeAttr(d.url)}" data-title="${escapeAttr(d.title)}">
+      <div class="dial-ico">${escapeHtml(d.letter || d.title[0])}</div>
+      <span>${escapeHtml(d.title)}</span>
+    </button>
+  `).join("");
+  $("dials").querySelectorAll(".dial").forEach(btn => {
+    btn.onclick = () => openHit({ title: btn.dataset.title, url: btn.dataset.url, snippet: "Speed dial" });
+  });
+}
+
+function renderSuggestions() {
+  const q = omni.value.trim().toLowerCase();
+  const pool = [...state.dials, ...state.bookmarks, ...state.history];
+  const seen = new Set();
+  const local = pool.filter(item => {
+    if (seen.has(item.url)) return false;
+    const hay = `${item.title} ${item.url}`.toLowerCase();
+    if (q && !hay.includes(q)) return false;
+    seen.add(item.url);
+    return true;
+  }).slice(0, 6);
+
+  let html = "";
+  if (isUrl(omni.value)) {
+    html += `<button type="button" class="suggest" data-go="${escapeAttr(omni.value)}">
+      <span class="suggest-ico">↗</span>
+      <span><strong>Open site</strong><br><span style="font-size:12px;color:var(--muted)">${escapeHtml(normUrl(omni.value))}</span></span>
+    </button>`;
+  }
+  html += local.map(item => `
+    <button type="button" class="suggest" data-title="${escapeAttr(item.title)}" data-url="${escapeAttr(item.url)}">
+      <span class="suggest-ico">⏱</span>
+      <span style="text-align:left;min-width:0">
+        <div style="font-size:14px">${escapeHtml(item.title)}</div>
+        <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.url)}</div>
+      </span>
+    </button>
+  `).join("");
+  if (!html) html = `<p class="empty">Type a site or a question · engine is ${escapeHtml(meta().label)}</p>`;
+  $("suggestions").innerHTML = html;
+  $("suggestions").querySelectorAll(".suggest").forEach(btn => {
+    btn.onclick = () => {
+      if (btn.dataset.go) openUrlOrSearch(btn.dataset.go);
+      else openHit({ title: btn.dataset.title, url: btn.dataset.url, snippet: "" });
+    };
+  });
+}
+
+function renderResults() {
+  $("typeTabs").querySelectorAll(".type-tab").forEach(t => {
+    t.classList.toggle("on", t.dataset.type === state.resultType);
+  });
+
+  $("engineBar").innerHTML = ENGINES.map(e =>
+    `<button type="button" class="eng-chip ${e.id === state.engine ? "on" : ""}" data-eng="${e.id}">${e.label}</button>`
+  ).join("");
+  $("engineBar").querySelectorAll(".eng-chip").forEach(b => {
+    b.onclick = () => setEngine(b.dataset.eng);
+  });
+
+  const list = $("resultsList");
+  if (state.resultType === "images") {
+    list.innerHTML = `<div class="img-grid">${
+      (state.hits.length ? state.hits : [{ title: "Image" }]).slice(0, 6).map((h, i) =>
+        `<div class="img-cell" style="animation-delay:${i * 0.04}s">${escapeHtml((h.title || "Img").slice(0, 18))}</div>`
+      ).join("")
+    }</div><p class="empty">Image grid is a layout preview. Real images load in the phone WebView.</p>`;
+    return;
+  }
+  if (state.resultType === "maps") {
+    list.innerHTML = `<div class="result-card"><div class="r-title">Maps for “${escapeHtml(state.query)}”</div>
+      <div class="r-snip">Map panel placeholder. Daymark can deep-link to system maps.</div></div>`;
+    return;
+  }
+  if (state.resultType === "videos" || state.resultType === "news") {
+    const kind = state.resultType;
+    list.innerHTML = state.hits.slice(0, 5).map(h => `
+      <div class="result-card">
+        <div class="r-host">${kind} · ${escapeHtml(hostOf(h.url))}</div>
+        <div class="r-title">${escapeHtml(h.title)}</div>
+        <div class="r-snip">${escapeHtml(state.features.dataSaver ? "" : h.snippet)}</div>
+      </div>`).join("") || `<p class="empty">No matches</p>`;
+    list.querySelectorAll(".result-card").forEach((card, i) => {
+      card.onclick = () => openHit(state.hits[i]);
+    });
+    return;
+  }
+
+  list.innerHTML = state.hits.map(h => `
+    <div class="result-card">
+      <div class="r-host">${escapeHtml(hostOf(h.url))} · ${escapeHtml(meta().label)}</div>
+      <div class="r-title">${escapeHtml(h.title)}</div>
+      <div class="r-snip">${escapeHtml(state.features.dataSaver ? "" : h.snippet)}</div>
+      ${state.features.shields ? `<div class="r-meta"><span class="badge">Protected</span></div>` : ""}
+    </div>
+  `).join("") || `<p class="empty">Searching…</p>`;
+  list.querySelectorAll(".result-card").forEach((card, i) => {
+    card.onclick = () => openHit(state.hits[i]);
+  });
+}
+
+function renderPage() {
+  const p = state.page;
+  if (!p) return;
+  const saved = state.bookmarks.some(b => b.url === p.url);
+  const onList = state.reading.some(b => b.url === p.url);
+  $("viewPage").innerHTML = `
+    <div class="page-article" style="--reader-size:${state.features.reader ? 17 : 15}px">
+      <div class="ph">${escapeHtml(hostOf(p.url))}${state.features.shields ? " · shields on" : ""}</div>
+      <h2>${escapeHtml(p.title)}</h2>
+      <p>${escapeHtml(p.snippet || "No preview text.")}</p>
+      <div class="page-tools">
+        <button type="button" id="pgBookmark">${saved ? "★ Saved" : "☆ Bookmark"}</button>
+        <button type="button" id="pgRead">${onList ? "In reading list" : "Reading list"}</button>
+        <button type="button" id="pgNote">Note</button>
+        <button type="button" id="pgSum">Summary</button>
+        <button type="button" id="pgDl">Save page</button>
+      </div>
+    </div>
+    <p class="empty" style="padding-top:12px">Live site embeds on the phone WebView. This card is the design shell.</p>
+  `;
+  $("pgBookmark").onclick = () => {
+    if (saved) state.bookmarks = state.bookmarks.filter(b => b.url !== p.url);
+    else state.bookmarks = [p, ...state.bookmarks];
+    save(); toast(saved ? "Removed" : "Bookmarked"); render();
+  };
+  $("pgRead").onclick = () => {
+    if (onList) state.reading = state.reading.filter(b => b.url !== p.url);
+    else state.reading = [p, ...state.reading];
+    save(); toast(onList ? "Removed" : "Added to reading list"); render();
+  };
+  $("pgNote").onclick = () => {
+    const body = prompt("Note for this page", "");
+    if (body && body.trim()) {
+      state.notes = [{ id: crypto.randomUUID(), title: p.title, body: body.trim() }, ...state.notes];
+      save(); toast("Note saved");
+    }
+  };
+  $("pgSum").onclick = () => toast(state.features.summarize ? "Summary preview" : "Enable Page summary in Settings");
+  $("pgDl").onclick = () => {
+    state.downloads = [{ id: crypto.randomUUID(), name: `${p.title.slice(0, 24)}.pdf`, progress: 12, paused: false }, ...state.downloads];
+    toast("Download started");
+    showList("downloads");
+  };
+}
+
+function renderList() {
+  const kind = state.listKind;
+  const titles = {
+    history: "History", bookmarks: "Bookmarks", downloads: "Downloads",
+    reading: "Reading list", notes: "Notes", settings: "Settings", tabs: "Tabs",
+  };
+  let body = "";
+  if (kind === "settings") body = renderSettingsHtml();
+  else if (kind === "history") {
+    body = state.history.length ? state.history.map((h, i) => rowHtml(h.title, h.url, i)).join("") : `<p class="empty">Nothing here</p>`;
+  } else if (kind === "bookmarks") {
+    body = state.bookmarks.length ? state.bookmarks.map((h, i) => rowHtml(h.title, h.url, i)).join("") : `<p class="empty">Save a page from the menu</p>`;
+  } else if (kind === "reading") {
+    body = state.reading.length ? state.reading.map((h, i) => rowHtml(h.title, h.url, i)).join("") : `<p class="empty">Long pages go here</p>`;
+  } else if (kind === "notes") {
+    body = state.notes.length ? state.notes.map(n => `
+      <div class="row"><div class="row-body"><div class="row-title">${escapeHtml(n.title)}</div>
+      <div class="row-sub">${escapeHtml(n.body)}</div></div></div>`).join("") : `<p class="empty">No notes yet</p>`;
+  } else if (kind === "downloads") {
+    body = state.downloads.length ? state.downloads.map(d => `
+      <div class="row">
+        <div class="row-body">
+          <div class="row-title">${escapeHtml(d.name)}</div>
+          <div class="progress"><i style="width:${d.progress}%"></i></div>
+        </div>
+      </div>`).join("") : `<p class="empty">No downloads</p>`;
+    state.downloads.forEach(d => { if (!d.paused && d.progress < 100) d.progress = Math.min(100, d.progress + 11); });
+  } else if (kind === "tabs") {
+    body = state.tabs.map((t, i) => `
+      <div class="row" data-tab="${i}">
+        <div class="row-body">
+          <div class="row-title">${escapeHtml(t.title)}${t.private ? " · private" : ""}</div>
+          <div class="row-sub">${i === state.activeTab ? "Current" : "Background"}</div>
+        </div>
+        <button type="button" data-close="${i}" style="padding:8px;color:var(--muted)">×</button>
+      </div>`).join("");
+  }
+
+  $("viewList").innerHTML = `
+    <div class="screen-head">
+      <button type="button" class="back-btn" id="listBack">←</button>
+      <h2>${titles[kind] || kind}</h2>
+      ${kind === "history" ? `<button type="button" id="clearHist" style="font-size:13px;color:var(--muted)">Clear</button>` : ""}
+    </div>
+    ${body}
+  `;
+  $("listBack").onclick = () => { state.view = "home"; render(); };
+  const ch = $("clearHist");
+  if (ch) ch.onclick = () => { state.history = []; save(); render(); };
+
+  if (kind === "history" || kind === "bookmarks" || kind === "reading") {
+    const src = kind === "history" ? state.history : kind === "bookmarks" ? state.bookmarks : state.reading;
+    $("viewList").querySelectorAll(".row").forEach((row, i) => {
+      row.onclick = () => openHit(src[i]);
+    });
+  }
+  if (kind === "tabs") {
+    $("viewList").querySelectorAll("[data-tab]").forEach(row => {
+      row.onclick = (e) => {
+        if (e.target.dataset.close != null) return;
+        state.activeTab = +row.dataset.tab;
+        state.view = "home";
+        render();
+      };
+    });
+    $("viewList").querySelectorAll("[data-close]").forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const i = +btn.dataset.close;
+        state.tabs = state.tabs.filter((_, idx) => idx !== i);
+        if (!state.tabs.length) state.tabs = [{ id: crypto.randomUUID(), title: "New tab", private: false }];
+        state.activeTab = Math.min(state.activeTab, state.tabs.length - 1);
+        render();
+      };
+    });
+  }
+  if (kind === "settings") wireSettings();
+}
+
+function rowHtml(title, sub) {
+  return `<div class="row">
+    <div class="row-ico">◎</div>
+    <div class="row-body">
+      <div class="row-title">${escapeHtml(title)}</div>
+      <div class="row-sub">${escapeHtml(sub)}</div>
+    </div>
+  </div>`;
+}
+
+function renderSettingsHtml() {
+  const groups = {};
+  FEATURES.forEach(f => {
+    if (!groups[f.group]) groups[f.group] = [];
+    groups[f.group].push(f);
+  });
+  let html = `<div class="group"><div class="group-label">Search engine</div>`;
+  ENGINES.forEach(e => {
+    html += `<button type="button" class="toggle-row" data-set-engine="${e.id}" style="width:100%;text-align:left">
+      <span>${e.label}</span><span>${state.engine === e.id ? "✓" : ""}</span>
+    </button>`;
+  });
+  html += `</div>`;
+
+  Object.entries(groups).forEach(([g, items]) => {
+    html += `<div class="group"><div class="group-label">${escapeHtml(g)}</div>`;
+    items.forEach(f => {
+      html += `<div class="toggle-row" data-feat="${f.id}">
+        <div><div>${escapeHtml(f.label)}</div>
+        ${f.desc ? `<div class="toggle-desc">${escapeHtml(f.desc)}</div>` : ""}</div>
+        <div class="switch ${state.features[f.id] ? "on" : ""}" data-switch="${f.id}"></div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  html += `<div class="group"><div class="group-label">Data on this phone</div>
+    <button type="button" class="toggle-row" id="clearAll" style="width:100%">Clear history, downloads & notes</button>
+  </div>
+  <p class="empty">Feature toggles are product decisions for Daymark. Real WebView power lives in the Android app.</p>`;
+  return html;
+}
+
+function wireSettings() {
+  $("viewList").querySelectorAll("[data-set-engine]").forEach(btn => {
+    btn.onclick = () => setEngine(btn.dataset.setEngine);
+  });
+  $("viewList").querySelectorAll("[data-feat]").forEach(row => {
+    row.onclick = () => {
+      const id = row.dataset.feat;
+      state.features[id] = !state.features[id];
+      save();
+      render();
+    };
+  });
+  const ca = $("clearAll");
+  if (ca) ca.onclick = () => {
+    state.history = []; state.downloads = []; state.notes = [];
+    save(); toast("Cleared"); render();
+  };
+}
+
+function renderSheet() {
+  document.querySelectorAll(".overlay").forEach(o => o.remove());
+  if (!state.sheet) return;
+
+  const ov = document.createElement("div");
+  ov.className = "overlay";
+  ov.onclick = (e) => { if (e.target === ov) closeSheet(); };
+
+  if (state.sheet === "menu") {
+    ov.innerHTML = `<div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <h3>Daymark</h3>
+      <p class="hint">${escapeHtml(meta().label)} · tools only in this menu</p>
+      <div class="tool-grid">
+        ${toolBtn("☆", "Bookmark", "bookmark")}
+        ${toolBtn("⏱", "History", "history")}
+        ${toolBtn("↓", "Downloads", "downloads")}
+        ${toolBtn("▤", "Reading", "reading")}
+        ${toolBtn("✎", "Notes", "notes")}
+        ${toolBtn("⚙", "Settings", "settings")}
+        ${toolBtn("🛡", state.features.shields ? "Shields" : "Off", "shields")}
+        ${toolBtn("🔥", "Fire", "fire")}
+        ${toolBtn("+", "New tab", "newtab")}
+        ${toolBtn("👁", "Private", "private")}
+        ${toolBtn("⎘", "Copy URL", "copy")}
+        ${toolBtn("⌂", "Add dial", "dial")}
+      </div>
+      <div class="sheet-actions">
+        <button type="button" data-act="desktop">Desktop site</button>
+        <button type="button" data-act="translate">Translate</button>
+      </div>
+    </div>`;
+  } else if (state.sheet === "tabs") {
+    ov.innerHTML = `<div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <h3>${state.tabs.length} tabs</h3>
+      <div class="sheet-actions">
+        <button type="button" data-act="newtab">New tab</button>
+        <button type="button" data-act="private">Private tab</button>
+      </div>
+      <div style="margin-top:12px">
+        ${state.tabs.map((t, i) => `
+          <div class="row" style="background:var(--chip);color:var(--sheet-fg)" data-pick="${i}">
+            <div class="row-body">
+              <div class="row-title">${escapeHtml(t.title)}${t.private ? " · private" : ""}</div>
+            </div>
+            <button type="button" data-close="${i}" style="padding:8px">×</button>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  $("app").appendChild(ov);
+
+  ov.querySelectorAll("[data-tool]").forEach(btn => {
+    btn.onclick = () => handleTool(btn.dataset.tool);
+  });
+  ov.querySelectorAll("[data-act]").forEach(btn => {
+    btn.onclick = () => handleAct(btn.dataset.act);
+  });
+  ov.querySelectorAll("[data-pick]").forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.dataset.close != null) return;
+      state.activeTab = +row.dataset.pick;
+      state.sheet = null;
+      state.view = "home";
+      render();
+    };
+  });
+  ov.querySelectorAll("[data-close]").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const i = +btn.dataset.close;
+      state.tabs = state.tabs.filter((_, idx) => idx !== i);
+      if (!state.tabs.length) state.tabs = [{ id: crypto.randomUUID(), title: "New tab", private: false }];
+      state.activeTab = Math.min(state.activeTab, state.tabs.length - 1);
+      render();
+    };
+  });
+}
+
+function toolBtn(ico, label, id) {
+  return `<button type="button" class="tool" data-tool="${id}">
+    <div class="tool-ico">${ico}</div>${label}
+  </button>`;
+}
+
+function handleTool(id) {
+  if (id === "history") showList("history");
+  else if (id === "bookmarks") showList("bookmarks");
+  else if (id === "downloads") showList("downloads");
+  else if (id === "reading") showList("reading");
+  else if (id === "notes") showList("notes");
+  else if (id === "settings") showList("settings");
+  else if (id === "bookmark") {
+    if (!state.page) { toast("Open a page first"); return; }
+    const exists = state.bookmarks.some(b => b.url === state.page.url);
+    if (exists) state.bookmarks = state.bookmarks.filter(b => b.url !== state.page.url);
+    else state.bookmarks = [state.page, ...state.bookmarks];
+    save(); toast(exists ? "Removed" : "Bookmarked"); closeSheet();
+  } else if (id === "shields") {
+    state.features.shields = !state.features.shields;
+    save(); toast(state.features.shields ? "Shields on" : "Shields off"); render();
+  } else if (id === "fire") {
+    state.page = null; state.hits = []; state.query = ""; state.view = "home";
+    toast("Tab cleared"); closeSheet();
+  } else if (id === "newtab") {
+    state.tabs.push({ id: crypto.randomUUID(), title: "New tab", private: false });
+    state.activeTab = state.tabs.length - 1;
+    state.view = "home"; state.page = null; state.hits = [];
+    closeSheet();
+  } else if (id === "private") {
+    state.tabs.push({ id: crypto.randomUUID(), title: "Private", private: true });
+    state.activeTab = state.tabs.length - 1;
+    state.view = "home"; state.page = null; state.hits = [];
+    closeSheet();
+  } else if (id === "copy") {
+    const u = state.page?.url || state.query;
+    if (u && navigator.clipboard) navigator.clipboard.writeText(u);
+    toast("Copied"); closeSheet();
+  } else if (id === "dial") {
+    if (!state.page) { toast("Open a page first"); return; }
+    state.dials = [{ title: state.page.title, url: state.page.url, letter: state.page.title[0] }, ...state.dials].slice(0, 8);
+    save(); toast("Added to home"); closeSheet();
+  }
+}
+
+function handleAct(id) {
+  if (id === "newtab" || id === "private") handleTool(id);
+  else if (id === "desktop") { toast("Request desktop site"); closeSheet(); }
+  else if (id === "translate") { toast("Translate preview"); closeSheet(); }
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s).replace(/`/g, ""); }
+
+$("omniForm").onsubmit = (e) => { e.preventDefault(); openUrlOrSearch(omni.value); };
+
+omni.onfocus = () => {
+  if (state.view !== "results" && state.view !== "page") {
+    state.view = "focus";
+    render();
+  }
+  $("clearBtn").hidden = !omni.value;
+};
+omni.oninput = () => {
+  $("clearBtn").hidden = !omni.value;
+  if (state.view === "focus") renderSuggestions();
+};
+$("clearBtn").onclick = () => { omni.value = ""; omni.focus(); $("clearBtn").hidden = true; renderSuggestions(); };
+$("refreshBtn").onclick = () => {
+  if (state.view === "results" && state.query) search(state.query);
+  else if (state.page) openHit(state.page);
+  else toast("Nothing to refresh");
+};
+engineDot.onclick = () => {
+  const idx = ENGINES.findIndex(e => e.id === state.engine);
+  setEngine(ENGINES[(idx + 1) % ENGINES.length].id);
+  toast(meta().label);
+};
+
+$("typeTabs").onclick = (e) => {
+  const t = e.target.closest(".type-tab");
+  if (!t) return;
+  state.resultType = t.dataset.type;
+  renderResults();
+};
+
+$("viewFocus").onclick = (e) => {
+  const b = e.target.closest("[data-chip]");
+  if (!b) return;
+  omni.value += b.dataset.chip;
+  omni.focus();
+  $("clearBtn").hidden = false;
+};
+
+$("btnHome").onclick = () => { state.view = "home"; state.sheet = null; render(); };
+$("btnBack").onclick = () => {
+  if (state.view === "page") { state.view = state.hits.length ? "results" : "home"; state.page = null; render(); }
+  else if (state.view === "results" || state.view === "focus" || state.view === "list") { state.view = "home"; render(); }
+};
+$("btnForward").onclick = () => { if (state.hits[0] && state.view !== "page") openHit(state.hits[0]); };
+$("btnMenu").onclick = () => { state.sheet = "menu"; render(); };
+$("btnTabs").onclick = () => { state.sheet = "tabs"; render(); };
+
+setInterval(() => {
+  if (state.view === "list" && state.listKind === "downloads") {
+    let changed = false;
+    state.downloads.forEach(d => {
+      if (!d.paused && d.progress < 100) { d.progress = Math.min(100, d.progress + 8); changed = true; }
+    });
+    if (changed) renderList();
+  }
+}, 500);
+
+render();
+</script>
+</body>
+</html>

@@ -7,14 +7,15 @@
 Daymark already has a real browser stack (address bar, downloads, data, search providers). This branch adds a **mobile UI shell** so we can align layout with:
 
 - Clean home (omnibox + speed dial only — no duplicate tool row on home)
-- Search results: **All / Images / News / Videos / Maps** tabs on top
+- Search results: **All / Images / News / Videos / Maps** tabs on **top**
 - Search **engine switcher at the bottom** of the results chrome (not competing with type tabs)
 - Menu as the single place for tools (bookmarks, history, downloads, settings, shields, fire, private tab)
 - Settings with many **opt-in toggles** drawn from common mobile browser patterns (privacy, tabs, reading, look)
+- Light motion: rise-in cards, slide-up sheets
 
 ## How to view
 
-Open `docs/browser-ui-preview/daymark-browser.html` in a mobile browser or Chrome device mode.
+Open [`daymark-browser.html`](./daymark-browser.html) in a mobile browser or Chrome device mode (phone width).
 
 ## What is real in this file
 
@@ -49,4 +50,10 @@ Use this shell to decide layout, then port to Android layouts / Compose against 
 1. Reorder search-results chrome: type tabs top, engine chips bottom.
 2. Remove home shortcut row that duplicates the overflow menu.
 3. Wire Settings feature flags to real preferences where already supported.
-4. Keep privacy defaults aligned with Daymark (local-first, no forced account).
+4. Keep privacy defaults aligned with Daymark (on-device task data, no forced account).
+
+---
+Work by: Grok
+Model: Grok 4.5 (xAI)
+Tooling: GitHub MCP (push_files, create/update pull request)
+Timestamp (UTC): 2026-11-21T07:40:00Z
