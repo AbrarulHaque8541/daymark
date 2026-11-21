@@ -160,6 +160,43 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(saved.place.name, 'Kolkata');
 });
 
+test('editing the place during refresh keeps the newer place preference', async () => {
+  const waiting = deferred();
+  const started = deferred();
+  const cache = {
+    version: 1,
+    place: { name: 'Kolkata', country: 'India', latitude: 22.5625, longitude: 88.375 },
+    weather: {
+      temperatureC: 28.4, feelsLikeC: 31.2, windKph: 11.3, humidityPercent: 64,
+      isDay: true, weatherCode: 2, label: 'Partly cloudy'
+    },
+    fetchedAt: '2026-11-03T12:00:00.000Z'
+  };
+  const delayedApi = {
+    validateWeatherCache: weatherApi.validateWeatherCache,
+    fetchWeatherByPlace(place) { started.resolve(place); return waiting.promise; }
+  };
+  const { env, elements, storageData } = fakeEnv({
+    place: 'Kolkata', weatherApi: delayedApi, fetch: () => Promise.resolve({})
+  });
+  const handle = ui.attachWeatherUi(env);
+  const refreshing = handle.onRefresh();
+  assert.equal(await started.promise, 'Kolkata');
+
+  elements['weather-place'].value = 'Tokyo';
+  const input = elements['weather-place'];
+  const inputListener = input.listeners.find((listener) => listener.type === 'input');
+  assert.ok(inputListener, 'place input should persist edits');
+  await inputListener.handler();
+  waiting.resolve(cache);
+  await refreshing;
+
+  assert.equal(elements['weather-now'].textContent,
+    'Kolkata, India · 28°C · Partly cloudy · Feels 31°C · Wind 11 km/h · Humidity 64%');
+  assert.equal(elements['weather-place'].value, 'Tokyo');
+  assert.equal(JSON.parse(storageData[ui.PREFS_KEY]).place, 'Tokyo');
+});
+
 test('a deferred weather response cannot recreate its absent cache or preference after Clear All', async () => {
   const waiting = deferred();
   const started = deferred();
