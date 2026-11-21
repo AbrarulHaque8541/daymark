@@ -193,7 +193,7 @@
     overlayStatus.setAttribute('id', 'focus-mode-overlay-status');
     overlayStatus.setAttribute('role', 'status');
     overlayStatus.setAttribute('aria-live', 'polite');
-    overlayStatus.textContent = '';
+    overlayStatus.textContent = ''; overlayStatus.classList.remove('is-success');
     panel.appendChild(overlayStatus);
     const completeButton = doc.createElement('button');
     completeButton.className = 'button button-primary';
@@ -209,7 +209,7 @@
     panel.appendChild(exitButton);
 
     const styleEl = doc.createElement('style');
-    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border:1px solid rgba(22,112,95,.28);box-shadow:0 18px 50px rgba(24,40,48,.12);}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}}@media (prefers-color-scheme: dark){#focus-mode-overlay .focus-mode-panel{background:rgba(18,24,30,.78);border-color:rgba(42,143,122,.4);}}';
+    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border:1px solid rgba(22,112,95,.28);box-shadow:0 18px 50px rgba(24,40,48,.12);}#focus-mode-overlay .focus-mode-panel .button:active:not(:disabled){transform:scale(0.96);background:rgba(22,112,95,0.12);}#focus-mode-overlay-status.is-success{margin:0;padding:8px 10px;border-radius:10px;background:rgba(226,240,235,.85);color:#0d5449;border:1px solid rgba(22,112,95,.35);-webkit-backdrop-filter:saturate(160%) blur(12px);backdrop-filter:saturate(160%) blur(12px);}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}#focus-mode-overlay .focus-mode-panel .button:active{transform:none;}}@media (prefers-color-scheme: dark){#focus-mode-overlay .focus-mode-panel{background:rgba(18,24,30,.78);border-color:rgba(42,143,122,.4);}#focus-mode-overlay-status.is-success{background:rgba(26,58,50,.55);color:#2a8f7a;border-color:rgba(42,143,122,.4);}}';
 
     let openTaskId = null;
     let returnFocusTo = null;
@@ -235,7 +235,7 @@
       if (!overlayOpen()) return false;
       overlay.classList.remove('is-open');
       overlay.setAttribute('aria-hidden', 'true');
-      overlayStatus.textContent = '';
+      overlayStatus.textContent = ''; overlayStatus.classList.remove('is-success');
       const target = returnFocusTo;
       returnFocusTo = null;
       openTaskId = null;
@@ -301,63 +301,76 @@
     async function markComplete() {
       if (!openTaskId) {
         overlayStatus.textContent = 'No task is open in the overlay, so nothing was saved.';
+        overlayStatus.classList.remove('is-success');
         return false;
       }
+      completeButton.disabled = true;
+      completeButton.setAttribute('aria-busy', 'true');
+      overlayStatus.classList.remove('is-success');
       overlayStatus.textContent = 'Saving the completed task\u2026';
-      const read = readSavedTasks();
-      if (!read.ok) {
-        overlayStatus.textContent = focusLogic.describeCompleteError(read.reason);
-        return false;
-      }
-      let completion = null;
-      try { completion = now(); }
-      catch (error) { completion = null; }
-      if (typeof completion !== 'string' || completion === '') {
-        overlayStatus.textContent = focusLogic.describeCompleteError('invalid-timestamp');
-        return false;
-      }
-      const planned = focusLogic.completeTaskInSnapshot(read.tasks, openTaskId, completion);
-      if (!planned.ok) {
-        overlayStatus.textContent = focusLogic.describeCompleteError(planned.reason);
-        return false;
-      }
-      const locks = resolveLockManager(win);
-      if (!locks) {
-        overlayStatus.textContent = focusLogic.describeCompleteError('lock-unavailable');
-        return false;
-      }
-      let generation = null;
-      try { generation = mutation.readGeneration(storage); }
-      catch (error) { generation = null; }
-      if (!generation || !generation.ok) {
-        overlayStatus.textContent = focusLogic.describeCompleteError(generation && generation.reason ? generation.reason : 'generation-unreadable');
-        return false;
-      }
-      let saved = null;
+      let success = false;
       try {
-        saved = await mutation.commitTaskSnapshot({
-          storage: storage,
-          lockManager: locks,
-          baseTasks: read.tasks,
-          desiredTasks: planned.tasks,
-          expectedTaskEpoch: generation.value.taskEpoch,
-          validateTasks: logic.validateStoredTasks
-        });
-      } catch (error) { saved = { ok: false, reason: 'tasks-ambiguous' }; }
-      if (!saved || saved.ok !== true) {
-        overlayStatus.textContent = focusLogic.describeCompleteError(saved && saved.reason ? saved.reason : 'tasks-ambiguous');
-        return false;
-      }
-      try {
-        if (win && typeof win.StorageEvent === 'function' && typeof win.dispatchEvent === 'function') {
-          win.dispatchEvent(new win.StorageEvent('storage', { key: focusLogic.TASKS_STORAGE_KEY }));
+        const read = readSavedTasks();
+        if (!read.ok) {
+          overlayStatus.textContent = focusLogic.describeCompleteError(read.reason);
+          return false;
         }
-      } catch (error) {
-        // The saved data is durable even when the same-tab refresh hint fails.
+        let completion = null;
+        try { completion = now(); }
+        catch (error) { completion = null; }
+        if (typeof completion !== 'string' || completion === '') {
+          overlayStatus.textContent = focusLogic.describeCompleteError('invalid-timestamp');
+          return false;
+        }
+        const planned = focusLogic.completeTaskInSnapshot(read.tasks, openTaskId, completion);
+        if (!planned.ok) {
+          overlayStatus.textContent = focusLogic.describeCompleteError(planned.reason);
+          return false;
+        }
+        const locks = resolveLockManager(win);
+        if (!locks) {
+          overlayStatus.textContent = focusLogic.describeCompleteError('lock-unavailable');
+          return false;
+        }
+        let generation = null;
+        try { generation = mutation.readGeneration(storage); }
+        catch (error) { generation = null; }
+        if (!generation || !generation.ok) {
+          overlayStatus.textContent = focusLogic.describeCompleteError(generation && generation.reason ? generation.reason : 'generation-unreadable');
+          return false;
+        }
+        let saved = null;
+        try {
+          saved = await mutation.commitTaskSnapshot({
+            storage: storage,
+            lockManager: locks,
+            baseTasks: read.tasks,
+            desiredTasks: planned.tasks,
+            expectedTaskEpoch: generation.value.taskEpoch,
+            validateTasks: logic.validateStoredTasks
+          });
+        } catch (error) { saved = { ok: false, reason: 'tasks-ambiguous' }; }
+        if (!saved || saved.ok !== true) {
+          overlayStatus.textContent = focusLogic.describeCompleteError(saved && saved.reason ? saved.reason : 'tasks-ambiguous');
+          return false;
+        }
+        try {
+          if (win && typeof win.StorageEvent === 'function' && typeof win.dispatchEvent === 'function') {
+            win.dispatchEvent(new win.StorageEvent('storage', { key: focusLogic.TASKS_STORAGE_KEY }));
+          }
+        } catch (error) {
+          // The saved data is durable even when the same-tab refresh hint fails.
+        }
+        overlayStatus.textContent = 'Task marked complete and saved on this device. Exit when ready.';
+        overlayStatus.classList.add('is-success');
+        success = true;
+        refreshChooser();
+        return true;
+      } finally {
+        completeButton.disabled = false;
+        if (typeof completeButton.removeAttribute === 'function') completeButton.removeAttribute('aria-busy'); else if (typeof completeButton.setAttribute === 'function') completeButton.setAttribute('aria-busy', 'false');
+        if (!success) overlayStatus.classList.remove('is-success');
       }
-      overlayStatus.textContent = 'Task marked complete and saved on this device. Exit when ready.';
-      refreshChooser();
-      return true;
     }
 
     function onEnterTap(event) {
