@@ -22,3 +22,9 @@ ChatGPT, Perplexity, Google Gemini, Claude, Microsoft Copilot, Grok, DeepSeek, P
 ## Security and scope
 
 Bare domains still open over HTTPS, and explicit HTTP navigation remains blocked. The selected provider is stored in Daymark's local browser preferences. This is not a federated meta-search and does not combine results from multiple providers into one page. Provider availability, regional restrictions, URL formats and query-prefill behavior should be verified on physical Android devices.
+
+## Search filters row (opt-in)
+
+Browser Settings can enable an optional filters row above search results. When a web search is open, chips offer the same query in the engine's Images, Videos, News, and Maps verticals where the engine supports them.
+
+Chips are honest per engine: verticals a provider does not offer are never shown. Vertical URLs are engine-specific query links (for example Google's tbm parameters and Bing's vertical subpaths); what each vertical page shows remains under the provider's control and should be verified on physical devices. The feature is off by default and does not send any request on its own.
