@@ -2,6 +2,7 @@
   'use strict';
   const OVERLAY_ID = 'command-bar-overlay';
   const STATUS_ONLY = 'Status messages only. Nothing here is sent to a server.';
+  const NO_MATCH_MESSAGE = 'Nothing matches that. Try a card name, "open ", or a !bang with text.';
   function resolveStorage(rootRef, preferred) {
     if (typeof preferred !== 'undefined') return preferred;
     try {
@@ -148,7 +149,7 @@
       if (currentList.length > commandBar.MAX_RESULTS) currentList = currentList.slice(0, commandBar.MAX_RESULTS);
       selectedIndex = 0;
       renderList(currentList);
-      setStatus('');
+      setStatus(parsed.kind === 'command' && currentList.length === 0 ? NO_MATCH_MESSAGE : '');
     }
     function flagOn(id) {
       if (!storage) return false;
@@ -287,7 +288,7 @@
           run({ kind: 'search', engine: pendingParsed.engine, query: pendingParsed.query });
           return;
         }
-        setStatus(currentList.length === 0 ? 'Nothing matches that. Try a card name, "open ", or a !bang with text.' : 'More than one match: pick one with the arrow keys first. Nothing was run.');
+        setStatus(currentList.length === 0 ? NO_MATCH_MESSAGE : 'More than one match: pick one with the arrow keys first. Nothing was run.');
       }
     });
     closeButton.addEventListener('click', () => { close(); });
