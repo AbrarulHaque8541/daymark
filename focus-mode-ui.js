@@ -209,7 +209,7 @@
     panel.appendChild(exitButton);
 
     const styleEl = doc.createElement('style');
-    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;}#focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}}';
+    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}}';
 
     let openTaskId = null;
     let returnFocusTo = null;
