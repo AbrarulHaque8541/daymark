@@ -277,6 +277,18 @@ function triggerFormSubmit(app, selector, submitter = null) {
   })));
 }
 
+function triggerFormButtonClick(app, selector) {
+  const button = app.elements.get(selector);
+  const handlers = app.listeners.get(`${selector}:click`) || [];
+  const event = {
+    currentTarget: button,
+    defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; }
+  };
+  handlers.forEach((handler) => handler(event));
+  return event;
+}
+
 function triggerTaskEdit(app, taskId) {
   const handlers = app.listeners.get('#task-list:click') || [];
   const button = {
@@ -710,6 +722,23 @@ test('task editor Cancel closes without mutating or saving the task', async () =
   assert.equal(app.storedValues.get(STORAGE_KEY), originalValue, 'Cancel must not persist editor changes');
   triggerTaskEdit(app, task.id);
   assert.equal(app.elements.get('#edit-title').value, 'Original task', 'Cancel must not mutate the in-memory task');
+  app.elements.get('#edit-dialog').close();
+});
+
+test('task editor Cancel click works without SubmitEvent.submitter support', () => {
+  const task = makeImportTask('cancel-edit-no-submitter', 'Original task');
+  const originalValue = JSON.stringify([task]);
+  const app = bootApp({ savedValue: originalValue });
+
+  triggerTaskEdit(app, task.id);
+  app.elements.get('#edit-title').value = 'Unsaved title';
+  const clickEvent = triggerFormButtonClick(app, '#edit-form button[value="cancel"]');
+
+  assert.equal(clickEvent.defaultPrevented, true, 'the fallback suppresses the native form submission');
+  assert.equal(app.elements.get('#edit-dialog').open, false, 'the fallback closes the editor');
+  assert.equal(app.storedValues.get(STORAGE_KEY), originalValue, 'the fallback does not persist changes');
+  triggerTaskEdit(app, task.id);
+  assert.equal(app.elements.get('#edit-title').value, 'Original task', 'the fallback does not mutate task state');
   app.elements.get('#edit-dialog').close();
 });
 

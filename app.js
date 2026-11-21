@@ -1072,6 +1072,11 @@
     else dialog.removeAttribute('open');
   }
 
+  function handleCancelEdit(event) {
+    event.preventDefault();
+    closeEditor();
+  }
+
   function renderSubtaskEditor() {
     const list = $('#subtask-list');
     if (!state.editSubtasks.length) {
@@ -2656,6 +2661,8 @@
         setTimeout(() => row.classList.remove('is-highlighted'), 1800);
       }
     });
+    const cancelEditButton = $('#edit-form button[value="cancel"]');
+    if (cancelEditButton) cancelEditButton.addEventListener('click', handleCancelEdit);
     $('#edit-form').addEventListener('submit', saveEdit);
     $('#edit-title').addEventListener('input', () => {
       $('#edit-error').hidden = true;
