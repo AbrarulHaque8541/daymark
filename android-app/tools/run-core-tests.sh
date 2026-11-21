@@ -204,3 +204,6 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/app/src/main/java/com/abrar/daymark/SplashPolicy.java" \
   "$ROOT/tools/SplashPolicySmoke.java"
 java -ea -cp "$BUILD_DIR" com.abrar.daymark.SplashPolicySmoke
+
+# Browser UX speed policies (home / tools sheet / downloads filters / settings hierarchy).
+sh "$ROOT/tools/run-browser-ux-speed-policy-tests.sh"
