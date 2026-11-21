@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
+const { scanWorkflowDirectory, scanWorkflowText } = require('../scripts/check-workflow-action-pins.js');
 
 const root = path.resolve(__dirname, '..');
 const workflowPath = '.github/workflows/platform-contract.yml';
@@ -28,6 +29,35 @@ test('workflow lint scans every top-level yml and yaml workflow file, including 
   assert.match(script, /-name '\*\.yml' -o -name '\*\.yaml'/);
   assert.match(script, /"\$actionlint" -shellcheck= -color -oneline "\$\{workflow_files\[@\]\}"/);
   assert.match(script, /No GitHub Actions workflow files were found/);
+});
+
+test('every external action in the repository workflows is pinned to an immutable revision', () => {
+  const result = scanWorkflowDirectory(path.join(root, '.github/workflows'));
+  assert.ok(result.files > 0, 'workflow scanner must find repository workflows');
+  assert.ok(result.references > 0, 'workflow scanner must inspect external action references');
+  assert.deepEqual(result.violations, []);
+});
+
+test('action pin scanner rejects tags and dynamic refs but accepts local paths and image digests', () => {
+  const digest = 'a'.repeat(64);
+  const contents = [
+    'steps:',
+    '  - uses: actions/checkout@v5',
+    '  - uses: "org/action@main"',
+    '  - uses: ${{ inputs.action }}',
+    `  - uses: actions/checkout@${'b'.repeat(40)} # v5`,
+    '  - uses: ./.github/actions/local',
+    '  - uses: docker://alpine:latest',
+    `  - uses: docker://alpine@sha256:${digest}`,
+  ].join('\n');
+  const result = scanWorkflowText(contents, 'fixture.yml');
+  assert.equal(result.references, 6);
+  assert.deepEqual(result.violations.map(({ line, reference }) => ({ line, reference })), [
+    { line: 2, reference: 'actions/checkout@v5' },
+    { line: 3, reference: 'org/action@main' },
+    { line: 4, reference: '${{ inputs.action }}' },
+    { line: 7, reference: 'docker://alpine:latest' },
+  ]);
 });
 
 test('existing main-targeted contract workflow runs the linter on every pull request and main push', () => {
