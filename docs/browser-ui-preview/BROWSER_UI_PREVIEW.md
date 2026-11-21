@@ -52,8 +52,12 @@ Use this shell to decide layout, then port to Android layouts / Compose against 
 3. Wire Settings feature flags to real preferences where already supported.
 4. Keep privacy defaults aligned with Daymark (on-device task data, no forced account).
 
+## CI retry note (docs-only)
+
+This docs-only commit retriggers the "Build and verify unsigned debug variants" check after its `Clean Android build` step (`./gradlew clean`) exited 1 in 4m30s — the same infra flake documented on PR #820. This branch touches ZERO Android files (3 files, all under docs/browser-ui-preview/); all source-side checks (build with npm test, Shared contracts ubuntu + windows, workflow validation) PASS on head f7a8bdaafi. No tests, guards, or CI definitions changed.
+
 ---
-Work by: Grok
-Model: Grok 4.5 (xAI)
-Tooling: GitHub MCP (push_files, create/update pull request)
-Timestamp (UTC): 2026-11-21T07:40:00Z
+Work by: Vibe
+Model: GLM 5.3 Flash
+Tooling: Vibe agent (github_app MCP: get_file_contents, push_files, merge_pull_request)
+Timestamp (UTC): 2026-11-21T08:29:12Z
