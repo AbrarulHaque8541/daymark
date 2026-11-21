@@ -10,8 +10,14 @@ activity = (root / "app/src/main/java/com/abrar/daymark/MainActivity.java").read
 for token in ("Search integrations", "renderEntries()", "renderFamilies()",
               "IntegrationCatalog.all()", "entry.canConnect() && listener != null",
               "current.onUse(entry)", "action.setEnabled(false)",
-              "entry.statusLabel()", "No matching integrations."):
+              "entry.statusLabel()", "No matching integrations.",
+              "View.ACCESSIBILITY_LIVE_REGION_POLITE",
+              "View.IMPORTANT_FOR_ACCESSIBILITY_YES",
+              "updateResultStatus(shown)", "RESULT_STATUS_DEBOUNCE_MS",
+              "mainHandler.removeCallbacks(pendingResultStatusUpdate)"):
     assert token in panel, f"Connections panel missing contract: {token}"
+assert 'shown == 1 ? " integration" : " integrations"' in panel, \
+    "result count must use readable singular/plural wording"
 assert "return availability == Availability.AVAILABLE;" in catalog
 for token in ('"Apps & services"', 'showIntegrationCatalogDialog()',
               'new IntegrationCatalogPanel(this, null)', 'panel.setListener(entry ->',
@@ -35,6 +41,10 @@ for token in ('selected ? ", selected" : ", not selected"', 'chip.setMinimumHeig
 instrumentation = (root / "app/src/androidTest/java/com/abrar/daymark/DaymarkPlatformInstrumentation.java").read_text(encoding="utf-8")
 assert 'runPhase("connections-panel-accessibility", this::connectionsPanelAccessibility)' in instrumentation, \
     "Android instrumentation must exercise the Connections panel contract"
+for token in ("result count uses a polite accessibility live region",
+              "awaitConnectionsStatus(panel, filesStatus)",
+              'awaitConnectionsStatus(panel, "No matching integrations. Try another search or choose All.")'):
+    assert token in instrumentation, f"Connections result-announcement regression missing: {token}"
 for forbidden in ("HttpURLConnection", "SharedPreferences", "OAuthTokenVault", "startActivity("):
     assert forbidden not in panel, f"catalog UI must not perform hidden connection work: {forbidden}"
 print("PASS Connections catalog UI source guard")
