@@ -146,17 +146,19 @@ test('the card mounts with its id, class and a status live region, then mounts n
   assert.deepEqual(second, { attached: false, reason: 'already-attached' });
 });
 
-test('one checkbox per flag, planned ones disabled with their note', () => {
+test('one checkbox per current flag; planned ones are disabled with their note', () => {
   const doc = makeDoc();
   attach(doc, makeStorage({}));
   const card = doc.getElementById('feature-flags-card');
   const boxes = findAll(card).filter((node) => node.getAttribute && node.getAttribute('data-feature-id'));
-  assert.equal(boxes.length, 5);
+  assert.equal(boxes.length, 4);
   assert.deepEqual(boxes.map((b) => b.getAttribute('data-feature-id')),
-    ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
+    ['command-bar', 'search-bangs', 'comfort-tint', 'focus-mode']);
+  assert.equal(checkboxById(doc, 'mindful-breaks'), null);
   assert.equal(checkboxById(doc, 'comfort-tint').disabled, true);
+  assert.ok(textOfTree(card).includes('A soft warm tint over the page for long reading sessions. Planned, not switchable yet.'));
   assert.equal(checkboxById(doc, 'focus-mode').disabled, false);
-  assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 2);
+  assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 1);
   assert.equal(checkboxById(doc, 'command-bar').disabled, false);
 });
 
@@ -222,6 +224,23 @@ test('flipping the live focus-mode switch persists too', () => {
   assert.equal(saved['focus-mode'], true);
   assert.equal(box.checked, true);
   assert.match(doc.getElementById('feature-flags-status').textContent, /Focus view \(one task, one view\)/);
+});
+
+test('every implemented feature kind has an enabled switch that persists changes', () => {
+  const doc = makeDoc();
+  const storage = makeStorage({});
+  attach(doc, storage);
+  const implemented = flags.FEATURE_FLAGS.filter((flag) => flag.kind === 'feature');
+  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'focus-mode']);
+  for (const flag of implemented) {
+    const box = checkboxById(doc, flag.id);
+    assert.ok(box, flag.id + ' checkbox exists');
+    assert.equal(box.disabled, false, flag.id + ' checkbox is enabled');
+    box.checked = true;
+    doc.dispatchDoc('change', { target: box });
+    const saved = JSON.parse(storage.getItem('daymark.features.v1'));
+    assert.equal(saved[flag.id], true, flag.id + ' change is persisted');
+  }
 });
 
 test('a failed save reverts the checkbox to the stored value and says so honestly', () => {

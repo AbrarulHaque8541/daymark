@@ -10,7 +10,7 @@ test('focus-mode is a live, switchable feature flag now', () => {
   assert.equal(flag.kind, 'feature');
   const flagRest = flags.FEATURE_FLAGS.filter((entry) => entry.id !== 'focus-mode');
   assert.equal(flagRest.filter((entry) => entry.kind === 'feature').length, 2);
-  assert.equal(flagRest.filter((entry) => entry.kind === 'planned').length, 2);
+  assert.equal(flagRest.filter((entry) => entry.kind === 'planned').length, 1);
   const storage = storageWith({});
   const saved = flags.setFlag(storage, 'focus-mode', true);
   assert.equal(saved.ok, true);
