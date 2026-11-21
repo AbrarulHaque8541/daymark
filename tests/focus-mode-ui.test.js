@@ -252,6 +252,25 @@ test('entering focus opens a labelled dialog overlay with the task in plain word
   assert.equal(plan.join(' ').indexOf('Notes: For the review.') !== -1, true);
 });
 
+test('the overlay plan list styles target its generated panel class', () => {
+  const doc = makeDoc();
+  const storage = makeStorage({
+    'daymark.tasks.v1': tasksJson([task()]),
+    'daymark.features.v1': flagsJson({ 'focus-mode': true })
+  });
+  const handle = attach(doc, storage, makeWindow());
+  handle.enterFocus();
+
+  const panel = findAll(handle.overlay).find((node) => node.className === 'focus-mode-panel');
+  const planList = findAll(handle.overlay).find((node) => node.className === 'focus-mode-plan');
+  const style = doc.head.children.find((node) => node.tagName === 'style');
+  assert.ok(panel, 'the dialog panel is generated with the focus-mode-panel class');
+  assert.ok(planList, 'the plan list is generated with the focus-mode-plan class');
+  assert.equal(planList.parentNode, panel, 'the plan list is inside its styled panel');
+  assert.ok(style, 'the overlay stylesheet is injected into the document head');
+  assert.match(style.textContent, /\.focus-mode-panel \.focus-mode-plan\{/);
+});
+
 test('Escape and the Exit button close the overlay', () => {
   const doc = makeDoc();
   const storage = makeStorage({ 'daymark.tasks.v1': tasksJson([task()]), 'daymark.features.v1': flagsJson({ 'focus-mode': true }) });
