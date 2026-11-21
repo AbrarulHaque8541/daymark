@@ -306,26 +306,47 @@
       return lines.join('\n');
     }
 
+    function writeClipboardSummary(text, button, messages) {
+      const nav = env.navigator || (win && win.navigator) || null;
+      const clipboard = nav && nav.clipboard;
+      if (!clipboard || typeof clipboard.writeText !== 'function') {
+        status(messages.unavailable);
+        setAriaBusy(button, false);
+        return Promise.resolve(false);
+      }
+      let request;
+      try { request = clipboard.writeText(text); }
+      catch (error) {
+        status(messages.failed);
+        setAriaBusy(button, false);
+        return Promise.resolve(false);
+      }
+      return Promise.resolve(request).then(
+        () => {
+          status(messages.success);
+          setAriaBusy(button, false);
+          return true;
+        },
+        () => {
+          status(messages.failed);
+          setAriaBusy(button, false);
+          return false;
+        }
+      );
+    }
+
     function onCopy() {
       const text = buildCopyText();
       if (!text) {
         status('Nothing to copy yet.');
         return;
       }
-      const nav = env.navigator || (win && win.navigator) || null;
       setAriaBusy(copyEl, true);
-      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
-        nav.clipboard.writeText(text).then(() => {
-          status('Copied world clock and overlap to clipboard.');
-          setAriaBusy(copyEl, false);
-        }).catch(() => {
-          status('Could not copy the summary.');
-          setAriaBusy(copyEl, false);
-        });
-      } else {
-        status('Clipboard is unavailable.');
-        setAriaBusy(copyEl, false);
-      }
+      return writeClipboardSummary(text, copyEl, {
+        success: 'Copied world clock and overlap to clipboard.',
+        failed: 'Could not copy the summary.',
+        unavailable: 'Clipboard is unavailable.'
+      });
     }
 
     function onShare() {
@@ -337,17 +358,31 @@
       const nav = env.navigator || (win && win.navigator) || null;
       setAriaBusy(shareEl, true);
       if (nav && typeof nav.share === 'function') {
-        nav.share({ title: 'Daymark world clock and overlap', text }).then(() => {
-          status('Shared world clock and overlap.');
-          setAriaBusy(shareEl, false);
-        }).catch(() => {
+        let request;
+        try { request = nav.share({ title: 'Daymark world clock and overlap', text }); }
+        catch (error) {
           status('Could not share the summary.');
           setAriaBusy(shareEl, false);
-        });
-        return;
+          return Promise.resolve(false);
+        }
+        return Promise.resolve(request).then(
+          () => {
+            status('Shared world clock and overlap.');
+            setAriaBusy(shareEl, false);
+            return true;
+          },
+          () => {
+            status('Could not share the summary.');
+            setAriaBusy(shareEl, false);
+            return false;
+          }
+        );
       }
-      status('Sharing is not available in this environment.');
-      setAriaBusy(shareEl, false);
+      return writeClipboardSummary(text, shareEl, {
+        success: 'Native sharing is unavailable; copied the summary to the clipboard instead.',
+        failed: 'Native sharing is unavailable, and the summary could not be copied.',
+        unavailable: 'Sharing and clipboard copy are unavailable in this environment.'
+      });
     }
 
     function onSave() {
@@ -489,10 +524,10 @@
       clearEl.addEventListener('click', () => { onClear(); });
     }
     if (copyEl && typeof copyEl.addEventListener === 'function') {
-      copyEl.addEventListener('click', () => { onCopy(); });
+      copyEl.addEventListener('click', () => onCopy());
     }
     if (shareEl && typeof shareEl.addEventListener === 'function') {
-      shareEl.addEventListener('click', () => { onShare(); });
+      shareEl.addEventListener('click', () => onShare());
     }
     if (saveEl && typeof saveEl.addEventListener === 'function') {
       saveEl.addEventListener('click', () => { onSave(); });
