@@ -14,17 +14,17 @@ test('six bang engines with stable tokens and names', () => {
     ['Google', 'DuckDuckGo', 'Brave Search', 'Bing', 'Startpage', 'Yahoo']);
 });
 
-test('exactly 23 card targets, all unique', () => {
-  assert.equal(bar.CARD_TARGETS.length, 23);
-  assert.equal(new Set(bar.CARD_TARGETS).size, 23);
+test('exactly 24 card targets, all unique', () => {
+  assert.equal(bar.CARD_TARGETS.length, 24);
+  assert.equal(new Set(bar.CARD_TARGETS).size, 24);
 });
 
-test('buildCommands: 23 go-to jumps plus 2 toggles, ids unique', () => {
+test('buildCommands: 24 go-to jumps plus 2 toggles, ids unique', () => {
   const commands = bar.buildCommands();
-  assert.equal(commands.length, 25);
-  assert.equal(commands.filter((c) => c.kind === 'goto').length, 23);
+  assert.equal(commands.length, 26);
+  assert.equal(commands.filter((c) => c.kind === 'goto').length, 24);
   assert.equal(commands.filter((c) => c.kind === 'toggle').length, 2);
-  assert.equal(new Set(commands.map((c) => c.id)).size, 25);
+  assert.equal(new Set(commands.map((c) => c.id)).size, 26);
   assert.deepEqual(commands.filter((c) => c.kind === 'toggle').map((c) => c.flagId).sort(), ['command-bar', 'search-bangs']);
 });
 
