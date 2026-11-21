@@ -154,8 +154,9 @@ test('one checkbox per flag, planned ones disabled with their note', () => {
   assert.equal(boxes.length, 5);
   assert.deepEqual(boxes.map((b) => b.getAttribute('data-feature-id')),
     ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
-  assert.equal(checkboxById(doc, 'focus-mode').disabled, true);
-  assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 3);
+  assert.equal(checkboxById(doc, 'comfort-tint').disabled, true);
+  assert.equal(checkboxById(doc, 'focus-mode').disabled, false);
+  assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 2);
   assert.equal(checkboxById(doc, 'command-bar').disabled, false);
 });
 
@@ -210,6 +211,19 @@ test('flipping a checkbox through a change event persists the switch', () => {
   assert.match(doc.getElementById('feature-flags-status').textContent, /is now on/);
 });
 
+test('flipping the live focus-mode switch persists too', () => {
+  const doc = makeDoc();
+  const storage = makeStorage({});
+  attach(doc, storage);
+  const box = checkboxById(doc, 'focus-mode');
+  box.checked = true;
+  doc.dispatchDoc('change', { target: box });
+  const saved = JSON.parse(storage.getItem('daymark.features.v1'));
+  assert.equal(saved['focus-mode'], true);
+  assert.equal(box.checked, true);
+  assert.match(doc.getElementById('feature-flags-status').textContent, /Focus view \(one task, one view\)/);
+});
+
 test('a failed save reverts the checkbox to the stored value and says so honestly', () => {
   const doc = makeDoc();
   const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
@@ -227,8 +241,20 @@ test('planned checkboxes never dispatch a save', () => {
   const doc = makeDoc();
   const storage = makeStorage({});
   attach(doc, storage);
-  const box = checkboxById(doc, 'focus-mode');
+  const box = checkboxById(doc, 'comfort-tint');
   box.checked = true;
   doc.dispatchDoc('change', { target: box });
   assert.equal(storage.writes(), 0);
+});
+
+test('a focus-mode save failure reverts the switch honestly', () => {
+  const doc = makeDoc();
+  const storage = makeStorage({});
+  attach(doc, storage);
+  storage.setItem = () => { throw new Error('disk unavailable'); };
+  const box = checkboxById(doc, 'focus-mode');
+  box.checked = true;
+  doc.dispatchDoc('change', { target: box });
+  assert.equal(box.checked, false);
+  assert.match(doc.getElementById('feature-flags-status').textContent, /Could not save this switch/);
 });
