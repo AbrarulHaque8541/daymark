@@ -48,6 +48,9 @@ jobs:
     # ten consecutive times on one clean emulator; API 29 remains one baseline.
     # platform-instrumentation-repeat.sh clears only the disposable app package between runs
     # and stops at the first failure; it never retries a failed instrumentation attempt.
+    # Deep retrigger 2026-11-21 (Vibe, GLM 5.3 Flash): comment-only retrigger of the
+    # exact-head API 36 soak after Focus runtime API 36 failed on main manual run #696,
+    # PR #832 and PR #837 heads; no check or script changed.
     env:
       DAYMARK_FOCUS_EMULATOR_REPEAT_COUNT: ${{ matrix.api-level == 36 && '10' || '1' }}
     strategy:
