@@ -209,7 +209,7 @@
     panel.appendChild(exitButton);
 
     const styleEl = doc.createElement('style');
-    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border:1px solid rgba(22,112,95,.28);box-shadow:0 18px 50px rgba(24,40,48,.12);}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}}@media (prefers-color-scheme: dark){#focus-mode-overlay .focus-mode-panel{background:rgba(18,24,30,.78);border-color:rgba(42,143,122,.4);}}';
+    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border:1px solid rgba(22,112,95,.28);box-shadow:0 18px 50px rgba(24,40,48,.12);}#focus-mode-enter:active,#focus-mode-complete:active,#focus-mode-exit:active{transform:scale(0.96);background:rgba(22,112,95,0.12);}#focus-mode-complete[aria-busy="true"]{opacity:.65;pointer-events:none;}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}}@media (prefers-color-scheme: dark){#focus-mode-overlay .focus-mode-panel{background:rgba(18,24,30,.78);border-color:rgba(42,143,122,.4);}}';
 
     let openTaskId = null;
     let returnFocusTo = null;
@@ -303,10 +303,12 @@
         overlayStatus.textContent = 'No task is open in the overlay, so nothing was saved.';
         return false;
       }
+      completeButton.setAttribute('aria-busy', 'true');
       overlayStatus.textContent = 'Saving the completed task\u2026';
       const read = readSavedTasks();
       if (!read.ok) {
         overlayStatus.textContent = focusLogic.describeCompleteError(read.reason);
+        completeButton.removeAttribute('aria-busy');
         return false;
       }
       let completion = null;
@@ -314,16 +316,19 @@
       catch (error) { completion = null; }
       if (typeof completion !== 'string' || completion === '') {
         overlayStatus.textContent = focusLogic.describeCompleteError('invalid-timestamp');
+        completeButton.removeAttribute('aria-busy');
         return false;
       }
       const planned = focusLogic.completeTaskInSnapshot(read.tasks, openTaskId, completion);
       if (!planned.ok) {
         overlayStatus.textContent = focusLogic.describeCompleteError(planned.reason);
+        completeButton.removeAttribute('aria-busy');
         return false;
       }
       const locks = resolveLockManager(win);
       if (!locks) {
         overlayStatus.textContent = focusLogic.describeCompleteError('lock-unavailable');
+        completeButton.removeAttribute('aria-busy');
         return false;
       }
       let generation = null;
@@ -331,6 +336,7 @@
       catch (error) { generation = null; }
       if (!generation || !generation.ok) {
         overlayStatus.textContent = focusLogic.describeCompleteError(generation && generation.reason ? generation.reason : 'generation-unreadable');
+        completeButton.removeAttribute('aria-busy');
         return false;
       }
       let saved = null;
@@ -344,6 +350,7 @@
           validateTasks: logic.validateStoredTasks
         });
       } catch (error) { saved = { ok: false, reason: 'tasks-ambiguous' }; }
+      completeButton.removeAttribute('aria-busy');
       if (!saved || saved.ok !== true) {
         overlayStatus.textContent = focusLogic.describeCompleteError(saved && saved.reason ? saved.reason : 'tasks-ambiguous');
         return false;
