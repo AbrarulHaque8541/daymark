@@ -4,6 +4,8 @@ import java.net.IDN;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -88,6 +90,167 @@ final class BrowserAddress {
         }
     }
 
+    /** Opt-in search-result filters (owner request, 2026-11-21): engine verticals for the chips row. */
+    enum SearchVertical {
+        IMAGES("Images"),
+        VIDEOS("Videos"),
+        NEWS("News"),
+        MAPS("Maps");
+
+        final String label;
+
+        SearchVertical(String label) {
+            this.label = label;
+        }
+    }
+
+    /** True only when the engine documents a stable URL shape for that vertical. */
+    static boolean engineSupportsVertical(SearchEngine engine, SearchVertical vertical) {
+        if (engine == null || vertical == null) return false;
+        switch (vertical) {
+            case IMAGES:
+            case VIDEOS:
+                switch (engine) {
+                    case DUCKDUCKGO: case GOOGLE: case BING: case BRAVE: case STARTPAGE:
+                    case YAHOO: case ECOSIA: case QWANT: case KAGI: case YANDEX:
+                        return true;
+                    default:
+                        return false;
+                }
+            case NEWS:
+                switch (engine) {
+                    case DUCKDUCKGO: case GOOGLE: case BING: case BRAVE: case STARTPAGE:
+                    case YAHOO: case ECOSIA: case QWANT: case KAGI:
+                        return true;
+                    default:
+                        return false;
+                }
+            case MAPS:
+                switch (engine) {
+                    case GOOGLE: case BING: case YANDEX:
+                        return true;
+                    default:
+                        return false;
+                }
+            default:
+                return false;
+        }
+    }
+
+    /** The verticals this engine offers, in chip display order; empty means no chips at all. */
+    static SearchVertical[] supportedVerticals(SearchEngine engine) {
+        List<SearchVertical> supported = new ArrayList<>();
+        for (SearchVertical vertical : SearchVertical.values()) {
+            if (engineSupportsVertical(engine, vertical)) supported.add(vertical);
+        }
+        return supported.toArray(new SearchVertical[0]);
+    }
+
+    /**
+     * Builds the engine's vertical URL for a retained query. Fails closed: an empty query or
+     * an engine/vertical pair with no verified URL shape throws instead of guessing.
+     */
+    static String verticalSearchUrl(SearchEngine engine, SearchVertical vertical, String query) {
+        if (engine == null) engine = SearchEngine.DUCKDUCKGO;
+        if (vertical == null) throw new IllegalArgumentException("Choose a search filter.");
+        String trimmed = query == null ? "" : query.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Type a search or web address first.");
+        }
+        String encoded;
+        try {
+            encoded = URLEncoder.encode(trimmed, "UTF-8");
+        } catch (UnsupportedEncodingException impossible) {
+            throw new IllegalStateException("UTF-8 is unavailable.", impossible);
+        }
+        switch (engine) {
+            case GOOGLE:
+                switch (vertical) {
+                    case IMAGES: return "https://www.google.com/search?q=" + encoded + "&tbm=isch";
+                    case VIDEOS: return "https://www.google.com/search?q=" + encoded + "&tbm=vid";
+                    case NEWS: return "https://www.google.com/search?q=" + encoded + "&tbm=nws";
+                    case MAPS: return "https://www.google.com/maps/search/" + encoded;
+                    default: break;
+                }
+                break;
+            case BING:
+                switch (vertical) {
+                    case IMAGES: return "https://www.bing.com/images/search?q=" + encoded;
+                    case VIDEOS: return "https://www.bing.com/videos/search?q=" + encoded;
+                    case NEWS: return "https://www.bing.com/news/search?q=" + encoded;
+                    case MAPS: return "https://www.bing.com/maps?q=" + encoded;
+                    default: break;
+                }
+                break;
+            case DUCKDUCKGO:
+                switch (vertical) {
+                    case IMAGES: return "https://duckduckgo.com/?q=" + encoded + "&iax=images&ia=images";
+                    case VIDEOS: return "https://duckduckgo.com/?q=" + encoded + "&iax=videos&ia=videos";
+                    case NEWS: return "https://duckduckgo.com/?q=" + encoded + "&iar=news&ia=news";
+                    default: break;
+                }
+                break;
+            case BRAVE:
+                switch (vertical) {
+                    case IMAGES: return "https://search.brave.com/images?q=" + encoded;
+                    case VIDEOS: return "https://search.brave.com/videos?q=" + encoded;
+                    case NEWS: return "https://search.brave.com/news?q=" + encoded;
+                    default: break;
+                }
+                break;
+            case STARTPAGE:
+                switch (vertical) {
+                    case IMAGES: return "https://www.startpage.com/sp/search?query=" + encoded + "&cat=images";
+                    case VIDEOS: return "https://www.startpage.com/sp/search?query=" + encoded + "&cat=video";
+                    case NEWS: return "https://www.startpage.com/sp/search?query=" + encoded + "&cat=news";
+                    default: break;
+                }
+                break;
+            case YAHOO:
+                switch (vertical) {
+                    case IMAGES: return "https://images.search.yahoo.com/search/images?p=" + encoded;
+                    case VIDEOS: return "https://video.search.yahoo.com/search/video?p=" + encoded;
+                    case NEWS: return "https://news.search.yahoo.com/search?p=" + encoded;
+                    default: break;
+                }
+                break;
+            case ECOSIA:
+                switch (vertical) {
+                    case IMAGES: return "https://www.ecosia.org/images?q=" + encoded;
+                    case VIDEOS: return "https://www.ecosia.org/videos?q=" + encoded;
+                    case NEWS: return "https://www.ecosia.org/news?q=" + encoded;
+                    default: break;
+                }
+                break;
+            case QWANT:
+                switch (vertical) {
+                    case IMAGES: return "https://www.qwant.com/?q=" + encoded + "&t=images";
+                    case VIDEOS: return "https://www.qwant.com/?q=" + encoded + "&t=videos";
+                    case NEWS: return "https://www.qwant.com/?q=" + encoded + "&t=news";
+                    default: break;
+                }
+                break;
+            case KAGI:
+                switch (vertical) {
+                    case IMAGES: return "https://kagi.com/images?q=" + encoded;
+                    case VIDEOS: return "https://kagi.com/videos?q=" + encoded;
+                    case NEWS: return "https://kagi.com/news?q=" + encoded;
+                    default: break;
+                }
+                break;
+            case YANDEX:
+                switch (vertical) {
+                    case IMAGES: return "https://yandex.com/images/search?text=" + encoded;
+                    case VIDEOS: return "https://yandex.com/video/search?text=" + encoded;
+                    case MAPS: return "https://yandex.com/maps/?text=" + encoded;
+                    default: break;
+                }
+                break;
+            default: break;
+        }
+        throw new IllegalArgumentException(engine.label + " has no "
+                + vertical.label.toLowerCase(Locale.ROOT) + " filter.");
+    }
     static String resolveInput(String input, SearchEngine engine) {
         String value = input == null ? "" : input.trim();
         if (value.isEmpty()) throw new IllegalArgumentException("Type a search or web address first.");

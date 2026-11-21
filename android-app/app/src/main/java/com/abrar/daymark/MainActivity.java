@@ -156,6 +156,7 @@ public final class MainActivity extends Activity {
     private static final String SAFE_BROWSING_ENABLED_KEY = "safe_browsing_enabled";
     private static final String BROWSER_BLOCK_IMAGES_KEY = "block_network_images";
     private static final String BROWSER_DESKTOP_DEFAULT_KEY = "desktop_site_default";
+    private static final String SEARCH_FILTERS_ENABLED_KEY = "search_filters_enabled";
     private static final String BROWSER_DISCLOSURE_ACK_KEY = "browser_disclosure_acknowledged_v1";
     private static final String BROWSER_LAST_URL_KEY = "last_validated_url";
     private static final String STATE_BROWSER_WEBVIEW = "state_browser_webview";
@@ -246,6 +247,11 @@ public final class MainActivity extends Activity {
     private BrowserSettingsPolicy browserSettingsPolicy = new BrowserSettingsPolicy();
     private boolean browserImagesBlocked;
     private boolean browserDesktopDefault;
+    private BrowserAddress.SearchVertical activeSearchVertical;
+    /** Owner opt-in (2026-11-21): filter chips above web search results; default off. */
+    private boolean searchFiltersEnabled;
+    private HorizontalScrollView browserSearchFiltersScroll;
+    private LinearLayout browserSearchFiltersRow;
     private boolean suppressBrowserOnlineToggleListener;
     private boolean suppressSafeBrowsingToggleListener;
     private String taskDraft = "";
@@ -557,6 +563,7 @@ public final class MainActivity extends Activity {
             registerDaymarkBackCallback();
             browserImagesBlocked = readBrowserImagesBlockedPreference();
             browserDesktopDefault = readBrowserDesktopDefaultPreference();
+            searchFiltersEnabled = readSearchFiltersEnabledPreference();
             sanitizeStoredBrowserHistory();
             buildInterface();
             loadEncryptedTasks();
@@ -898,6 +905,29 @@ public final class MainActivity extends Activity {
             browserPreferences.edit().remove(BROWSER_DESKTOP_DEFAULT_KEY).apply();
             return false;
         }
+    }
+
+    /** The search filters row is opt-in: absent or corrupt preferences fail to off. */
+    private boolean readSearchFiltersEnabledPreference() {
+        try {
+            return browserPreferences.getBoolean(SEARCH_FILTERS_ENABLED_KEY, false);
+        } catch (ClassCastException invalidPreference) {
+            browserPreferences.edit().remove(SEARCH_FILTERS_ENABLED_KEY).apply();
+            return false;
+        }
+    }
+
+    /** Persists the filter-row choice; returns false when the preference could not be saved. */
+    private boolean setSearchFiltersEnabled(boolean enabled) {
+        try {
+            browserPreferences.edit().putBoolean(SEARCH_FILTERS_ENABLED_KEY, enabled).apply();
+        } catch (Exception unavailableStorage) {
+            showToast("Search filters setting could not be saved.");
+            return false;
+        }
+        searchFiltersEnabled = enabled;
+        updateSearchFiltersRow();
+        return true;
     }
 
     private void sanitizeStoredBrowserHistory() {
@@ -2005,10 +2035,9 @@ public final class MainActivity extends Activity {
         browserProviderPickerButton.setBackground(shape(palette.surfaceAlt, 18, palette.line));
         browserProviderPickerButton.setContentDescription("Choose a web search engine or AI assistant");
         browserProviderPickerButton.setOnClickListener(view -> showSearchProviderPicker());
-        LinearLayout.LayoutParams providerParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
-        providerParams.leftMargin = dp(5);
-        top.addView(browserProviderPickerButton, providerParams);
+        // Owner request (2026-11-21): the engine switcher no longer occupies the top row.
+        // It is placed into the compact bottom control row (buildBrowserScreen) so the area
+        // above the reading viewport stays free for the opt-in search filters row.
         bar.addView(top);
 
         // Keep the legacy spinner available for existing settings/state sync, but do not
@@ -2057,6 +2086,7 @@ public final class MainActivity extends Activity {
             browserAddressInput.setError(null);
             browserLastSearchQuery = BrowserAddress.isLikelyWebAddress(value) ? "" : value.trim();
             if (browserWebView != null) browserTabQueries.put(browserWebView, browserLastSearchQuery);
+            activeSearchVertical = null;
             navigateBrowserTo(address);
         } catch (IllegalArgumentException exception) {
             browserAddressInput.setError(exception.getMessage());
@@ -2108,6 +2138,17 @@ public final class MainActivity extends Activity {
         panel.setOrientation(LinearLayout.VERTICAL);
         browserAddressBarView = buildBrowserAddressBar();
         panel.addView(browserAddressBarView, bottomMargin(dp(5)));
+
+        // Opt-in search filters row: sits directly under the address bar so the chips the
+        // user sees first are query filters (Images, Videos, News, Maps), like mainstream
+        // browsers. Hidden until a search result view is active and the owner enables it.
+        browserSearchFiltersRow = new LinearLayout(this);
+        browserSearchFiltersRow.setOrientation(LinearLayout.HORIZONTAL);
+        browserSearchFiltersScroll = new HorizontalScrollView(this);
+        browserSearchFiltersScroll.setHorizontalScrollBarEnabled(false);
+        browserSearchFiltersScroll.addView(browserSearchFiltersRow);
+        browserSearchFiltersScroll.setVisibility(View.GONE);
+        panel.addView(browserSearchFiltersScroll, bottomMargin(dp(2)));
         panel.setPadding(dp(8), dp(0), dp(8), dp(2));
 
         // Owner feedback (#222): the previous top row (Tasks | ‹ | › | ↻ | + | Site history |
@@ -2180,6 +2221,21 @@ public final class MainActivity extends Activity {
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
             params.setMargins(0, 0, dp(4), 0);
             toolbar.addView(button, params);
+        }
+        // Owner request (2026-11-21): the engine switcher moved from the top row to this
+        // bottom control row, so it stays reachable while a results page is open. Radius 18
+        // is intentional: the press-feedback guard counts exactly three radius-22 chrome
+        // buttons, and the switcher keeps its own compact width from the address-bar row.
+        if (browserProviderPickerButton != null) {
+            browserProviderPickerButton.setMinHeight(dp(38));
+            browserProviderPickerButton.setMinimumHeight(dp(38));
+            browserProviderPickerButton.setTextSize(11 * textScale);
+            browserProviderPickerButton.setPadding(dp(10), 0, dp(10), 0);
+            browserProviderPickerButton.setBackground(pressable(palette.surfaceAlt, 18, palette.line, palette.accent));
+            LinearLayout.LayoutParams pickerParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
+            pickerParams.setMargins(0, 0, dp(4), 0);
+            toolbar.addView(browserProviderPickerButton, pickerParams);
         }
         toolbarScroll.addView(toolbar);
 
@@ -2268,6 +2324,90 @@ public final class MainActivity extends Activity {
         return panel;
     }
 
+    /** Rebuilds the opt-in search-filter chips for the current engine and search query. */
+    private void updateSearchFiltersRow() {
+        if (browserSearchFiltersRow == null || browserSearchFiltersScroll == null) return;
+        String query = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
+        if (!webMode || !searchFiltersEnabled || query.isEmpty()
+                || BrowserAddress.supportedVerticals(searchEngine).length == 0) {
+            if (browserSearchFiltersScroll.getVisibility() != View.GONE) {
+                browserSearchFiltersScroll.setVisibility(View.GONE);
+            }
+            return;
+        }
+        browserSearchFiltersRow.removeAllViews();
+        Button allChip = compactButton("All", false);
+        allChip.setTextSize(11 * textScale);
+        allChip.setMinHeight(dp(34));
+        allChip.setMinimumHeight(dp(34));
+        allChip.setPadding(dp(10), 0, dp(10), 0);
+        allChip.setContentDescription("Show all web results for the current search in " + searchEngine.label);
+        if (activeSearchVertical == null) {
+            allChip.setBackground(pressable(palette.accentSoft, 16, palette.accent, palette.text));
+        }
+        allChip.setOnClickListener(view -> reopenPlainSearch());
+        browserSearchFiltersRow.addView(allChip, chipMargin());
+        for (BrowserAddress.SearchVertical vertical : BrowserAddress.supportedVerticals(searchEngine)) {
+            Button chip = compactButton(vertical.label, false);
+            chip.setTextSize(11 * textScale);
+            chip.setMinHeight(dp(34));
+            chip.setMinimumHeight(dp(34));
+            chip.setPadding(dp(10), 0, dp(10), 0);
+            chip.setContentDescription("Show " + vertical.label.toLowerCase(Locale.ROOT)
+                    + " results for the current search in " + searchEngine.label);
+            if (activeSearchVertical == vertical) {
+                chip.setBackground(pressable(palette.accentSoft, 16, palette.accent, palette.text));
+            }
+            final BrowserAddress.SearchVertical selected = vertical;
+            chip.setOnClickListener(view -> openSearchVertical(selected));
+            browserSearchFiltersRow.addView(chip, chipMargin());
+        }
+        if (browserSearchFiltersScroll.getVisibility() != View.VISIBLE) {
+            browserSearchFiltersScroll.setVisibility(View.VISIBLE);
+            // Soft slide-down reveal from under the address bar; MOTION_ENTER and the shared
+            // chrome duration keep the pane consistent with the rest of the browser chrome.
+            browserSearchFiltersScroll.animate().cancel();
+            if (WorkspaceMotion.isReducedMotionPublic(browserSearchFiltersScroll)) {
+                browserSearchFiltersScroll.setAlpha(1f);
+                browserSearchFiltersScroll.setTranslationY(0f);
+            } else {
+                browserSearchFiltersScroll.setAlpha(0f);
+                browserSearchFiltersScroll.setTranslationY(-dp(10));
+                browserSearchFiltersScroll.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(UiMotionPolicy.CHROME_SHOW_MS)
+                        .setInterpolator(MOTION_ENTER)
+                        .start();
+            }
+        }
+    }
+
+    /** Returns to the plain web search for the retained query (the row's "All" chip). */
+    private void reopenPlainSearch() {
+        String query = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
+        if (query.isEmpty()) return;
+        try {
+            activeSearchVertical = null;
+            navigateBrowserTo(BrowserAddress.resolveInput(query, searchEngine));
+        } catch (IllegalArgumentException exception) {
+            showBrowserStatus(exception.getMessage());
+        }
+    }
+
+    /** Loads the engine's chosen vertical URL for the retained query; fail-closed on refusal. */
+    private void openSearchVertical(BrowserAddress.SearchVertical vertical) {
+        String query = browserLastSearchQuery == null ? "" : browserLastSearchQuery.trim();
+        if (query.isEmpty()) return;
+        try {
+            String address = BrowserAddress.verticalSearchUrl(searchEngine, vertical, query);
+            activeSearchVertical = vertical;
+            navigateBrowserTo(address);
+        } catch (IllegalArgumentException exception) {
+            showBrowserStatus(exception.getMessage());
+        }
+    }
+
     /** Shows browser feedback only when needed; successful/info messages fade away. */
     private void showBrowserStatus(String message) {
         if (browserStatus == null) return;
@@ -2326,6 +2466,9 @@ public final class MainActivity extends Activity {
             browserProviderPickerButton.setText(engine.label + "  ▾");
             browserProviderPickerButton.setContentDescription("Search provider: " + engine.label + ". Tap to change provider.");
         }
+        // A provider switch re-runs the plain web search, so any active vertical resets.
+        activeSearchVertical = null;
+        updateSearchFiltersRow();
     }
 
     private boolean isAiProvider(BrowserAddress.SearchEngine engine) {
@@ -4804,12 +4947,11 @@ public final class MainActivity extends Activity {
         if (browserMediaButton != null) {
             browserMediaButton.setEnabled(available && hasPage);
         }
-        // Owner feedback (#222): the compact engine picker chip belongs beside the address
-        // bar while composing a search; once a page is loaded it auto-hides and the bottom
-        // provider strip keeps engine switching available for re-searching the same query.
-        if (browserProviderPickerButton != null) {
-            browserProviderPickerButton.setVisibility(hasPage ? View.GONE : View.VISIBLE);
-        }
+        // Owner request (2026-11-21): the engine switcher lives in the compact bottom control
+        // row, so it remains available on search-result pages too; it hides with the shared
+        // browser chrome on scroll, and the bottom provider strip stays the cross-provider
+        // re-search path. The filters row follows the same query-lifecycle.
+        updateSearchFiltersRow();
     }
 
     private void showBrowserHome() {
@@ -4819,6 +4961,7 @@ public final class MainActivity extends Activity {
         if (browserProviderRow != null) browserProviderRow.setVisibility(View.VISIBLE);
         if (browserPrivacyButton != null) browserPrivacyButton.setVisibility(View.VISIBLE);
         browserLastSearchQuery = "";
+        activeSearchVertical = null;
         if (browserAddressInput != null) browserAddressInput.setText("");
         if (quickCaptureInput != null && webMode) quickCaptureInput.setText("");
         if (browserStatus != null) showBrowserStatus("Ready. No page has been requested.");
@@ -6375,6 +6518,22 @@ public final class MainActivity extends Activity {
                 ? "New browser tabs request desktop sites. Turn off for mobile sites."
                 : "New browser tabs request mobile sites. Turn on to request desktop sites by default.");
 
+        CheckBox searchFiltersToggle = new CheckBox(this);
+        searchFiltersToggle.setText("Search filters row (Images, Videos, News, Maps)");
+        searchFiltersToggle.setMinHeight(dp(48));
+        searchFiltersToggle.setChecked(searchFiltersEnabled);
+        searchFiltersToggle.setContentDescription(searchFiltersEnabled
+                ? "Search filters row is on. Filter chips appear above web search results when a search is open."
+                : "Search filters row is off. Turn on to show Images, Videos, News, and Maps chips above web search results.");
+        searchFiltersToggle.setOnCheckedChangeListener((button, enabled) -> {
+            if (!setSearchFiltersEnabled(enabled)) {
+                button.setChecked(searchFiltersEnabled);
+            }
+            button.setContentDescription(searchFiltersEnabled
+                    ? "Search filters row is on. Filter chips appear above web search results when a search is open."
+                    : "Search filters row is off. Turn on to show Images, Videos, News, and Maps chips above web search results.");
+        });
+
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.addView(explanation);
@@ -6397,6 +6556,8 @@ public final class MainActivity extends Activity {
         content.addView(safeBrowsingToggle, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
         content.addView(desktopDefaultToggle, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+        content.addView(searchFiltersToggle, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
 
         AlertDialog settingsDialog = new AlertDialog.Builder(this)
