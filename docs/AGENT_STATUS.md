@@ -1,3 +1,9 @@
+- [Daymark engineering status — 2026-11-21T04:38:11Z (Batch 3: opt-in Focus view card)](./CURRENT_STATUS_20261121T043811Z.md)
+- [Daymark engineering status — 2026-11-21T04:17:48Z (R&D: DNR permission and post-merge refresh)](./CURRENT_STATUS_20261121T041748Z.md)
+- [Daymark engineering status — 2026-11-21T04:05:04Z (command palette dialog accessibility)](./CURRENT_STATUS_20261121T040504Z.md)
+- [Daymark engineering status — 2026-11-20T19:27:29Z (R&D: final exact-head CI verification)](./CURRENT_STATUS_20261120T192729Z.md)
+- [Daymark engineering status — 2026-11-20T19:13:31Z (R&D: task-search render isolation and final CI)](./CURRENT_STATUS_20261120T191331Z.md)
+- [Daymark engineering status — 2026-11-20T18:55:40Z (R&D: task search and render isolation)](./CURRENT_STATUS_20261120T185540Z.md)
 - [Daymark engineering status — 2026-11-20T16:55:00Z (Cycle A: lifecycle recovery glass polish)](./CURRENT_STATUS_20261120T165500Z.md)
 
 - 2026-11-20 · docs/CURRENT_STATUS_20261120T162228Z.md — autonomous run: offline lifecycle recovery planner card (issue #348 lifecycle item, PR pending).

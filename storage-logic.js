@@ -141,6 +141,12 @@
       label: 'Legacy webhook coordination lock',
       description: 'A short-lived localStorage marker from older webhook versions. Newer versions use browser Web Locks; any leftover marker is safe to clear.',
       keys: ['daymark.webhook.lock.v1']
+    },
+    {
+      id: 'feature-flags',
+      label: 'Feature switches',
+      description: 'Your on/off choices for the optional capability switches, such as the command bar and search shortcuts. Every value stays on this device.',
+      keys: ['daymark.features.v1']
     }
   ];
 

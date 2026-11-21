@@ -9,12 +9,13 @@
   const TASK_VIEW_KEY = 'daymark.task-view.v1';
   const FEED_KEY = 'daymark.feed.v1';
   const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
+  const SEARCH_RENDER_DELAY_MS = 120;
   const PRIORITIES = ['low', 'medium', 'high'];
   const logic = window.DaymarkLogic;
   const repeat = window.DaymarkRepeat || null;
   const focus = window.DaymarkFocus || null;
   const feed = window.DaymarkFeed || null;
-  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusStateClearEpoch: null, recoveryBackupPendingPayload: null, recoveryBackupClearPending: false, focusRecoveryBackupPendingPayload: null, focusRecoveryCompletionPending: null, focusRecoveryClearEpoch: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
+  const state = { tasks: [], filter: 'all', sort: 'smart', query: '', searchRenderTimer: null, toastTimer: null, toastAction: null, currentDay: null, dayTimer: null, reminderTimer: null, previousOpenCount: null, editSubtasks: [], focusSession: null, focusLog: [], focusTimer: null, focusPreset: 'focus', focusTaskId: '', focusStateClearEpoch: null, recoveryBackupPendingPayload: null, recoveryBackupClearPending: false, focusRecoveryBackupPendingPayload: null, focusRecoveryCompletionPending: null, focusRecoveryClearEpoch: null, recoveryExportInProgress: false, recoveryExportUrl: null, recoveryExportHref: null, recoveryExportTimer: null, feedCache: null, feedLoading: false, feedNotice: '' };
   const taskMutation = window.DaymarkTaskMutation || null;
   let taskLockManager = null;
   try { taskLockManager = (window.navigator || globalThis.navigator || {}).locks || null; }
@@ -628,7 +629,24 @@
     }
     return filteredTasks;
   }
-  function render() {
+
+  function updateSearchAnnouncement(filteredTasks) {
+    const hasQuery = Boolean(state.query.trim());
+    const countLabel = hasQuery
+      ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
+      : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
+    $('#visible-count').textContent = countLabel;
+    // Keep the full list quiet while the concise result count remains the live region.
+    taskList.setAttribute('aria-live', hasQuery ? 'off' : 'polite');
+    const searchResultStatus = $('#search-result-status');
+    if (searchResultStatus) searchResultStatus.textContent = hasQuery ? countLabel : '';
+  }
+
+  function render(options) {
+    // Any unrelated state transition that renders the app also commits the latest
+    // search preference, so the scheduled search flush cannot become stale.
+    if (cancelScheduledSearchRender()) persistTaskViewPrefs();
+    const renderOptions = options || {};
     const today = logic.localDateString();
     state.currentDay = today;
     const overdueTasks = state.tasks.filter((task) => !task.completed && task.dueDate !== null && task.dueDate < today);
@@ -646,35 +664,34 @@
     if (state.sort === 'title') {
       filteredTasks = filteredTasks.slice().sort((a, b) => a.title.localeCompare(b.title) || (a.dueDate || '').localeCompare(b.dueDate || ''));
     }
-    const openTasks = state.tasks.filter((task) => !task.completed);
-    const todayTasks = state.tasks.filter((task) => task.dueDate === today);
-    const upcomingTasks = state.tasks.filter((task) => task.dueDate !== null && task.dueDate > today);
-    const completedTasks = state.tasks.filter((task) => task.completed);
-    const highPriorityTasks = state.tasks.filter((task) => task.priority === 'high');
     const hasQuery = Boolean(state.query.trim());
-
-    const openCountElement = $('#open-count');
-    if (state.previousOpenCount !== null && state.previousOpenCount !== openTasks.length) {
-      openCountElement.classList.remove('is-bumped');
-      void openCountElement.offsetWidth; // Restart the bump animation.
-      openCountElement.classList.add('is-bumped');
+    if (renderOptions.skipOverview !== true) {
+      const openTasks = state.tasks.filter((task) => !task.completed);
+      const todayTasks = state.tasks.filter((task) => task.dueDate === today);
+      const upcomingTasks = state.tasks.filter((task) => task.dueDate !== null && task.dueDate > today);
+      const completedTasks = state.tasks.filter((task) => task.completed);
+      const highPriorityTasks = state.tasks.filter((task) => task.priority === 'high');
+      const openCountElement = $('#open-count');
+      if (state.previousOpenCount !== null && state.previousOpenCount !== openTasks.length) {
+        openCountElement.classList.remove('is-bumped');
+        void openCountElement.offsetWidth; // Restart the bump animation.
+        openCountElement.classList.add('is-bumped');
+      }
+      state.previousOpenCount = openTasks.length;
+      openCountElement.textContent = String(openTasks.length);
+      $('#count-all').textContent = String(state.tasks.length);
+      $('#count-today').textContent = String(todayTasks.length);
+      $('#count-upcoming').textContent = String(upcomingTasks.length);
+      $('#count-overdue').textContent = String(overdueTasks.length);
+      $('#count-completed').textContent = String(completedTasks.length);
+      $('#count-high').textContent = String(highPriorityTasks.length);
+      $('#clear-completed').hidden = completedTasks.length === 0;
+      $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
     }
-    state.previousOpenCount = openTasks.length;
-    openCountElement.textContent = String(openTasks.length);
-    $('#count-all').textContent = String(state.tasks.length);
-    $('#count-today').textContent = String(todayTasks.length);
-    $('#count-upcoming').textContent = String(upcomingTasks.length);
-    $('#count-overdue').textContent = String(overdueTasks.length);
-    $('#count-completed').textContent = String(completedTasks.length);
-    $('#count-high').textContent = String(highPriorityTasks.length);
-    $('#visible-count').textContent = hasQuery
-      ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
-      : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'}`;
+    updateSearchAnnouncement(filteredTasks);
     const openVisible = filteredTasks.filter((task) => !task.completed).length;
     $('#complete-visible').hidden = openVisible === 0;
     $('#copy-visible').hidden = filteredTasks.length === 0;
-    $('#clear-completed').hidden = completedTasks.length === 0;
-    $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
     $('#sort-toggle').textContent = state.sort === 'title' ? 'Sort: A–Z' : 'Sort: Smart';
 
     document.querySelectorAll('.filter-button').forEach((button) => {
@@ -688,18 +705,6 @@
       resetViewBtn.hidden = isDefault;
       resetViewBtn.disabled = isDefault;
       resetViewBtn.setAttribute('aria-disabled', String(isDefault));
-    }
-
-    // Searching re-renders the entire list; a polite live region would re-announce all
-    // of it on every keystroke, which makes search unusable with a screen reader.
-    // While a query is active the list itself goes quiet and the concise result count
-    // in the dedicated status element becomes the only search announcement.
-    taskList.setAttribute('aria-live', hasQuery ? 'off' : 'polite');
-    const searchResultStatus = $('#search-result-status');
-    if (searchResultStatus) {
-      searchResultStatus.textContent = hasQuery
-        ? `${filteredTasks.length} matching ${filteredTasks.length === 1 ? 'task' : 'tasks'}`
-        : '';
     }
 
     taskList.innerHTML = filteredTasks.map((task) => taskMarkup(task, today)).join('');
@@ -732,31 +737,62 @@
       $('#empty-copy').textContent = 'Add your first task above. Small steps count.';
     }
 
-    const completedAll = state.tasks.filter((task) => task.completed);
-    const doneDays = new Set(completedAll.map((task) => logic.localDateString(new Date(task.updatedAt))));
-    const doneToday = doneDays.has(today)
-      ? completedAll.filter((task) => logic.localDateString(new Date(task.updatedAt)) === today).length : 0;
-    const weekStartDate = new Date();
-    weekStartDate.setDate(weekStartDate.getDate() - 6);
-    const weekStartDay = logic.localDateString(weekStartDate);
-    const doneWeek = completedAll.filter((task) => logic.localDateString(new Date(task.updatedAt)) >= weekStartDay).length;
-    let streak = 0;
-    const streakCursor = new Date();
-    if (!doneDays.has(logic.localDateString(streakCursor))) streakCursor.setDate(streakCursor.getDate() - 1);
-    while (doneDays.has(logic.localDateString(streakCursor))) {
-      streak += 1;
-      streakCursor.setDate(streakCursor.getDate() - 1);
+    if (renderOptions.skipOverview !== true) {
+      const completedAll = state.tasks.filter((task) => task.completed);
+      const doneDays = new Set(completedAll.map((task) => logic.localDateString(new Date(task.updatedAt))));
+      const doneToday = doneDays.has(today)
+        ? completedAll.filter((task) => logic.localDateString(new Date(task.updatedAt)) === today).length : 0;
+      const weekStartDate = new Date();
+      weekStartDate.setDate(weekStartDate.getDate() - 6);
+      const weekStartDay = logic.localDateString(weekStartDate);
+      const doneWeek = completedAll.filter((task) => logic.localDateString(new Date(task.updatedAt)) >= weekStartDay).length;
+      let streak = 0;
+      const streakCursor = new Date();
+      if (!doneDays.has(logic.localDateString(streakCursor))) streakCursor.setDate(streakCursor.getDate() - 1);
+      while (doneDays.has(logic.localDateString(streakCursor))) {
+        streak += 1;
+        streakCursor.setDate(streakCursor.getDate() - 1);
+      }
+      $('#stats-strip').hidden = completedAll.length === 0;
+      $('#stat-done-today').textContent = String(doneToday);
+      $('#stat-done-week').textContent = String(doneWeek);
+      $('#stat-streak').textContent = String(streak);
+      const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
+      suggestionList.innerHTML = suggestions.length
+        ? suggestions.map(({ task, reason }, index) => `<button type="button" class="suggestion-item" data-suggestion-task="${escapeHTML(task.id)}" aria-label="Highlight task: ${escapeHTML(task.title)}"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></button>`).join('')
+        : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
     }
-    $('#stats-strip').hidden = completedAll.length === 0;
-    $('#stat-done-today').textContent = String(doneToday);
-    $('#stat-done-week').textContent = String(doneWeek);
-    $('#stat-streak').textContent = String(streak);
-    const suggestions = logic.getSuggestions(state.tasks, today, formatDate);
-    suggestionList.innerHTML = suggestions.length
-      ? suggestions.map(({ task, reason }, index) => `<button type="button" class="suggestion-item" data-suggestion-task="${escapeHTML(task.id)}" aria-label="Highlight task: ${escapeHTML(task.title)}"><span class="suggestion-number">${index + 1}</span><div><p class="suggestion-task-title">${escapeHTML(task.title)}</p><p class="suggestion-reason">${escapeHTML(reason)}</p></div></button>`).join('')
-      : '<div class="suggestion-empty">Your open-task suggestions will show up here when you add a task.</div>';
-    renderFocus();
-    renderFeed();
+    if (renderOptions.skipFocus !== true) renderFocus();
+    if (renderOptions.skipFeed !== true) renderFeed();
+  }
+
+  function cancelScheduledSearchRender() {
+    if (state.searchRenderTimer === null) return false;
+    clearTimeout(state.searchRenderTimer);
+    state.searchRenderTimer = null;
+    return true;
+  }
+
+  function renderTaskViewOnly() {
+    // Refresh date-derived overview data if a suspended page crossed local midnight.
+    const overviewIsCurrent = state.currentDay === logic.localDateString();
+    render({ skipFocus: true, skipFeed: true, skipOverview: overviewIsCurrent });
+  }
+
+  function flushPendingSearchRender(shouldRender = true) {
+    if (!cancelScheduledSearchRender()) return false;
+    persistTaskViewPrefs();
+    if (shouldRender) renderTaskViewOnly();
+    return true;
+  }
+
+  function scheduleSearchRender() {
+    cancelScheduledSearchRender();
+    state.searchRenderTimer = setTimeout(() => {
+      state.searchRenderTimer = null;
+      persistTaskViewPrefs();
+      renderTaskViewOnly();
+    }, SEARCH_RENDER_DELAY_MS);
   }
 
   function releasePreparedRecoveryExport() {
@@ -932,7 +968,7 @@
     persistTaskViewPrefs();
     const list = $('#task-list');
     if (list) list.classList.add('is-filtering');
-    render();
+    renderTaskViewOnly();
     if (list) setTimeout(() => list.classList.remove('is-filtering'), 280);
     if (searchEl) searchEl.focus();
   }
@@ -1231,7 +1267,9 @@
     } else if (button.dataset.action === 'tag') {
       state.query = button.dataset.tag;
       $('#task-search').value = button.dataset.tag;
-      render();
+      cancelScheduledSearchRender();
+      persistTaskViewPrefs();
+      renderTaskViewOnly();
       $('#task-search').focus();
     } else if (button.dataset.action === 'delete') {
       const deletedIndex = state.tasks.findIndex((item) => item.id === task.id);
@@ -1820,7 +1858,7 @@
     persistTaskViewPrefs();
     const list = $('#task-list');
     if (list) list.classList.add('is-resetting');
-    render();
+    renderTaskViewOnly();
     if (list) setTimeout(() => list.classList.remove('is-resetting'), 280);
   }
 
@@ -2309,7 +2347,7 @@
     showToast(`Showing ${FILTER_LABELS[filter]}`);
     const list = $('#task-list');
     if (list) list.classList.add('is-filtering');
-    render();
+    renderTaskViewOnly();
     if (list) setTimeout(() => list.classList.remove('is-filtering'), 280);
   }
 
@@ -2561,8 +2599,16 @@
     $('#new-due-time').addEventListener('change', syncNewDueTime);
     $('#task-search').addEventListener('input', (event) => {
       state.query = event.currentTarget.value;
-      persistTaskViewPrefs();
-      render();
+      // Quiet the whole list immediately; the count and list update together when
+      // the debounced render commits, so assistive technology never gets stale counts.
+      if (state.query.trim()) taskList.setAttribute('aria-live', 'off');
+      scheduleSearchRender();
+    });
+    $('#task-search').addEventListener('blur', () => flushPendingSearchRender());
+    window.addEventListener('pagehide', () => flushPendingSearchRender(false));
+    window.addEventListener('pageshow', (event) => {
+      if (!event || event.persisted !== true) return;
+      if (!flushPendingSearchRender()) renderTaskViewOnly();
     });
     $('#clear-search').addEventListener('click', clearSearch);
     $('#chip-today').addEventListener('click', () => setQuickDueDate(0));
@@ -2573,7 +2619,7 @@
       showToast(state.sort === 'title' ? 'Sorted A–Z' : 'Sorted smart');
       const list = $('#task-list');
       if (list) list.classList.add('is-sorting');
-      render();
+      renderTaskViewOnly();
       if (list) setTimeout(() => list.classList.remove('is-sorting'), 280);
     });
     const resetViewBtn = $('#reset-view');
@@ -2746,6 +2792,7 @@
         ensureReminderTimer();
         checkReminders();
       } else {
+        flushPendingSearchRender();
         stopFocusTimer();
         stopReminderTimer();
       }
