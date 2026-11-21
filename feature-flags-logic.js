@@ -7,7 +7,7 @@
     { id: 'search-bangs', label: '!bang search shortcuts', kind: 'feature', description: 'Type !g, !d, !br, !b, !sp or !y inside the palette to search a specific engine.' },
     { id: 'comfort-tint', label: 'Comfort tint', kind: 'planned', description: 'A soft warm tint over the page for long reading sessions.' },
     { id: 'mindful-breaks', label: 'Mindful break reminders', kind: 'planned', description: 'Gentle nudges to look away from the screen while you work.' },
-    { id: 'focus-mode', label: 'Focus mode', kind: 'planned', description: 'One task, one view: everything else gets out of the way.' }
+    { id: 'focus-mode', label: 'Focus view (one task, one view)', kind: 'feature', description: 'Pick an open task and the page steps back behind a single view. Mark the task complete from there.' }
   ];
   function defaults() {
     const flags = {};
