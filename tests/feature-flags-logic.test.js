@@ -17,9 +17,9 @@ function makeStorage(seed) {
   };
 }
 
-test('registry exposes four current flag ids', () => {
-  assert.deepEqual(flags.FLAG_IDS, ['command-bar', 'search-bangs', 'comfort-tint', 'focus-mode']);
-  assert.equal(flags.FEATURE_FLAGS.length, 4);
+test('registry exposes five current flag ids', () => {
+  assert.deepEqual(flags.FLAG_IDS, ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
+  assert.equal(flags.FEATURE_FLAGS.length, 5);
 });
 
 test('every flag defaults to off', () => {
@@ -30,7 +30,7 @@ test('every flag defaults to off', () => {
 });
 
 test('a saved state round-trips through readFlags', () => {
-  const saved = { 'command-bar': true, 'search-bangs': true, 'comfort-tint': false, 'focus-mode': false };
+  const saved = { 'command-bar': true, 'search-bangs': true, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
   const read = flags.readFlags(makeStorage({ 'daymark.features.v1': JSON.stringify(saved) }));
   assert.equal(read.ok, true);
   assert.deepEqual(read.flags, saved);
@@ -44,12 +44,12 @@ test('unknown keys in a saved state are ignored, known ones kept', () => {
   assert.equal(Object.prototype.hasOwnProperty.call(read.flags, 'mystery'), false);
 });
 
-test('a saved Mindful-breaks key is ignored after that placeholder is retired', () => {
+test('a saved Mindful-breaks key is honoured once the flag is live', () => {
   const read = flags.readFlags(makeStorage({ 'daymark.features.v1': JSON.stringify({ 'command-bar': true, 'mindful-breaks': true }) }));
   assert.equal(read.ok, true);
   assert.equal(read.flags['command-bar'], true);
   assert.deepEqual(Object.keys(read.flags), flags.FLAG_IDS);
-  assert.equal(Object.prototype.hasOwnProperty.call(read.flags, 'mindful-breaks'), false);
+  assert.equal(read.flags['mindful-breaks'], true);
 });
 
 test('malformed JSON reports malformed-saved-state', () => {
@@ -91,12 +91,12 @@ test('setFlag rejects an unknown flag id and writes nothing', () => {
   assert.equal(storage.writes(), 0);
 });
 
-test('setFlag treats the retired Mindful-breaks id as unknown and writes nothing', () => {
+test('setFlag accepts the live Mindful-breaks id', () => {
   const storage = makeStorage({});
   const saved = flags.setFlag(storage, 'mindful-breaks', true);
-  assert.equal(saved.ok, false);
-  assert.equal(saved.reason, 'unknown-flag');
-  assert.equal(storage.writes(), 0);
+  assert.equal(saved.ok, true);
+  assert.equal(saved.flags['mindful-breaks'], true);
+  assert.equal(JSON.parse(storage.getItem('daymark.features.v1'))['mindful-breaks'], true);
 });
 
 test('setFlag rejects a planned flag and writes nothing', () => {
@@ -124,13 +124,13 @@ test('setFlag rejects a non-boolean value and writes nothing', () => {
 });
 
 test('setFlag persists one JSON blob holding all four current flag keys', () => {
-  const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'focus-mode': false };
+  const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
   const storage = makeStorage({ 'daymark.features.v1': JSON.stringify(base) });
   const saved = flags.setFlag(storage, 'search-bangs', true);
   assert.equal(saved.ok, true);
   assert.equal(saved.flags['search-bangs'], true);
   const parsed = JSON.parse(storage.getItem('daymark.features.v1'));
-  assert.deepEqual(Object.keys(parsed).sort(), ['comfort-tint', 'command-bar', 'focus-mode', 'search-bangs']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['comfort-tint', 'command-bar', 'focus-mode', 'mindful-breaks', 'search-bangs']);
   assert.equal(parsed['command-bar'], false);
   assert.equal(parsed['search-bangs'], true);
 });
