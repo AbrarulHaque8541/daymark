@@ -2886,14 +2886,44 @@ public final class MainActivity extends Activity {
 
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
-        quickRow.addView(browserHomeTile("H", "History", "Open saved site history",
-                this::showBrowserHistoryDialog), tileParams());
-        quickRow.addView(browserHomeTile("B", "Bookmarks", "Open saved bookmarks",
-                this::showBrowserBookmarksDialog), tileParams());
-        quickRow.addView(browserHomeTile("D", "Downloads", "Open the browser download list",
-                this::showBrowserDownloadsDialog), tileParams());
-        quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
-                this::showBrowserExtensionsManager), tileParams());
+        // Drive home tiles from BrowserHomeLayoutPolicy so order and labels stay single-sourced.
+        String[] tileIds = BrowserHomeLayoutPolicy.QUICK_TILE_IDS;
+        String[] tileLabels = BrowserHomeLayoutPolicy.QUICK_TILE_LABELS;
+        int tileCount = Math.min(tileIds.length, BrowserHomeLayoutPolicy.MAX_QUICK_TILES);
+        for (int i = 0; i < tileCount; i++) {
+            String id = tileIds[i];
+            String label = (i < tileLabels.length) ? tileLabels[i] : id;
+            String glyph;
+            String description;
+            Runnable action;
+            switch (id) {
+                case "history":
+                    glyph = "H";
+                    description = "Open saved site history";
+                    action = this::showBrowserHistoryDialog;
+                    break;
+                case "bookmarks":
+                    glyph = "B";
+                    description = "Open saved bookmarks";
+                    action = this::showBrowserBookmarksDialog;
+                    break;
+                case "downloads":
+                    glyph = "D";
+                    description = "Open the browser download list";
+                    action = this::showBrowserDownloadsDialog;
+                    break;
+                case "extensions":
+                    glyph = "E";
+                    description = "Manage browser page scripts";
+                    action = this::showBrowserExtensionsManager;
+                    break;
+                default:
+                    continue;
+            }
+            // Small a11y improvement: combine label + action description for screen readers.
+            String fullDescription = label + ". " + description;
+            quickRow.addView(browserHomeTile(glyph, label, fullDescription, action), tileParams());
+        }
         home.addView(quickRow, bottomMargin(dp(8)));
 
         // Optional Saved sites rail: up to four newest bookmark origins
