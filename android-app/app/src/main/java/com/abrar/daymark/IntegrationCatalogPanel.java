@@ -2,7 +2,10 @@ package com.abrar.daymark;
 import android.content.Context;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.HapticFeedbackConstants;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
@@ -26,8 +29,14 @@ final class IntegrationCatalogPanel extends LinearLayout {
     private final LinearLayout familyRow;
     private final LinearLayout entryColumn;
     private final EditText search;
+    private final TextView resultStatus;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingResultStatusUpdate;
+    private boolean resultStatusInitialized;
     private IntegrationCatalog.Family selectedFamily;
     private Listener listener;
+
+    private static final long RESULT_STATUS_DEBOUNCE_MS = 300L;
 
     IntegrationCatalogPanel(Context context, Listener listener) {
         super(context);
@@ -63,6 +72,13 @@ final class IntegrationCatalogPanel extends LinearLayout {
         familyScroll.addView(familyRow, new HorizontalScrollView.LayoutParams(
                 LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         addView(familyScroll, matchWrap());
+
+        resultStatus = new TextView(context);
+        resultStatus.setTextSize(12);
+        resultStatus.setPadding(0, dp(4), 0, dp(4));
+        resultStatus.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        resultStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        addView(resultStatus, matchWrap());
 
         ScrollView scroll = new ScrollView(context);
         entryColumn = new LinearLayout(context);
@@ -140,12 +156,30 @@ final class IntegrationCatalogPanel extends LinearLayout {
             addEntry(entry);
             shown++;
         }
-        if (shown == 0) {
-            TextView empty = new TextView(context);
-            empty.setText("No matching integrations. Try another search or choose All.");
-            empty.setPadding(0, dp(16), 0, dp(16));
-            entryColumn.addView(empty, matchWrap());
+        updateResultStatus(shown);
+    }
+
+    private void updateResultStatus(int shown) {
+        String message = shown == 0
+                ? "No matching integrations. Try another search or choose All."
+                : shown + (shown == 1 ? " integration" : " integrations");
+        if (pendingResultStatusUpdate != null) {
+            mainHandler.removeCallbacks(pendingResultStatusUpdate);
+            pendingResultStatusUpdate = null;
         }
+        if (message.contentEquals(resultStatus.getText())) return;
+        if (!resultStatusInitialized) {
+            resultStatus.setText(message);
+            resultStatusInitialized = true;
+            return;
+        }
+
+        resultStatusInitialized = true;
+        pendingResultStatusUpdate = () -> {
+            pendingResultStatusUpdate = null;
+            resultStatus.setText(message);
+        };
+        mainHandler.postDelayed(pendingResultStatusUpdate, RESULT_STATUS_DEBOUNCE_MS);
     }
 
     private void addEntry(IntegrationCatalog.Entry entry) {
