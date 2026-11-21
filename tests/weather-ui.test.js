@@ -191,6 +191,11 @@ test('editing the place during refresh keeps the newer place preference', async 
   waiting.resolve(cache);
   await refreshing;
 
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.ok(weatherApi.validateWeatherCache(saved));
+  assert.equal(saved.place.name, 'Kolkata');
+  assert.equal(saved.weather.temperatureC, 28.4);
+
   assert.equal(elements['weather-now'].textContent,
     'Kolkata, India · 28°C · Partly cloudy · Feels 31°C · Wind 11 km/h · Humidity 64%');
   assert.equal(elements['weather-place'].value, 'Tokyo');
