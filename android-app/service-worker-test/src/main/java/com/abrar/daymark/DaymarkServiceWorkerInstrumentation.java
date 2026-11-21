@@ -15,6 +15,7 @@ import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
@@ -326,7 +327,7 @@ public final class DaymarkServiceWorkerInstrumentation {
      */
     private void verifyExtensionSpaNavigation() throws Exception {
         marker("starting Daymark WebView extension SPA route acceptance");
-        ControlledServer server = new ControlledServer();
+        ControlledServer server = ControlledServer.forHttps(instrumentation.getContext());
         android.app.Activity activity = null;
         WebView view = null;
         Object extensionStore = null;
@@ -352,6 +353,9 @@ public final class DaymarkServiceWorkerInstrumentation {
             AtomicReference<Object> storeRef = new AtomicReference<>();
             AtomicReference<Object> policyRef = new AtomicReference<>();
             AtomicReference<Throwable> setupFailure = new AtomicReference<>();
+            AtomicReference<String> pageLoadError = new AtomicReference<>();
+            AtomicReference<String> pageFinishedUrl = new AtomicReference<>();
+            AtomicReference<String> expectedSpaStartUrl = new AtomicReference<>();
             instrumentation.runOnMainSync(() -> {
                 try {
                     Class<?> policyType = Class.forName(
@@ -372,6 +376,16 @@ public final class DaymarkServiceWorkerInstrumentation {
                                     }
                                     if ("equals".equals(method.getName())) {
                                         return args != null && args.length == 1 && proxy == args[0];
+                                    }
+                                }
+                                if ("onLoadError".equals(method.getName()) && args != null) {
+                                    pageLoadError.set(java.util.Arrays.toString(args));
+                                }
+                                if ("onPageFinished".equals(method.getName()) && args != null
+                                        && args.length > 0) {
+                                    String finishedUrl = String.valueOf(args[0]);
+                                    if (finishedUrl.equals(expectedSpaStartUrl.get())) {
+                                        pageFinishedUrl.set(finishedUrl);
                                     }
                                 }
                                 return null;
@@ -442,7 +456,7 @@ public final class DaymarkServiceWorkerInstrumentation {
 
             String matchingJson = "{\"id\":\"" + matchingPackId
                     + "\",\"name\":\"SPA route probe\",\"version\":\"1.0.0\",\"enabled\":true,"
-                    + "\"matches\":[\"*://127.0.0.1/private/*\"],\"excludes\":[],"
+                    + "\"matches\":[\"https://127.0.0.1/private/*\"],\"excludes\":[],"
                     + "\"css\":\"" + matchingCss + "\"}";
             String unrelatedJson = "{\"id\":\"" + unrelatedPackId
                     + "\",\"name\":\"Unrelated scope probe\",\"version\":\"1.0.0\",\"enabled\":true,"
@@ -480,7 +494,26 @@ public final class DaymarkServiceWorkerInstrumentation {
                 throw new AssertionError("could not prepare the production DaymarkWebView for explicit navigation",
                         prepareFailure.get());
             }
-            load(view, server.url("/private/start"));
+            // Use a real TLS connection so System WebView exercises production network and
+            // same-document callbacks rather than loadDataWithBaseURL's synthetic origin.
+            String startUrl = server.url("/private/start");
+            expectedSpaStartUrl.set(startUrl);
+            load(view, startUrl);
+            awaitExtensionSpaPageFinished(startUrl, server, pageFinishedUrl, pageLoadError);
+            boolean loopbackHttps = evaluateBoolean(view,
+                            "location.protocol === 'https:'"
+                                    + " && location.hostname === '127.0.0.1'");
+            String observedLocation = evaluateString(view,
+                    "location.href + ' | protocol=' + location.protocol"
+                            + " + ' | hostname=' + location.hostname"
+                            + " + ' | title=' + document.title");
+            check(loopbackHttps,
+                    "the extension SPA fixture was fetched over HTTPS from loopback"
+                            + " (observed=" + observedLocation
+                            + ", loadError=" + pageLoadError.get()
+                            + ", serverRequests=" + server.count("/private/start") + ")");
+            check(server.count("/private/start") == 1,
+                    "the SPA page was served by the controlled TLS fixture");
             String matchingSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
                     + matchingPackId + "\"]";
             String unrelatedSelector = "style[data-daymark-managed=\"true\"][data-daymark-pack-id=\""
@@ -488,7 +521,7 @@ public final class DaymarkServiceWorkerInstrumentation {
             String matchingCount = "document.querySelectorAll('" + matchingSelector + "').length";
             String unrelatedCount = "document.querySelectorAll('" + unrelatedSelector + "').length";
             awaitSpa(view, matchingCount + " === 1", WAIT_MS,
-                    "a matching localhost route receives its pack CSS through production injection",
+                    "a matching HTTPS loopback route receives its pack CSS through production injection",
                     extensionStore);
             check(evaluateBoolean(view, unrelatedCount + " === 0"),
                     "a nonmatching installed pack is not injected into the current page");
@@ -641,6 +674,21 @@ public final class DaymarkServiceWorkerInstrumentation {
         throw new AssertionError(message);
     }
 
+    private void awaitExtensionSpaPageFinished(String expectedUrl, ControlledServer server,
+                                               AtomicReference<String> pageFinishedUrl,
+                                               AtomicReference<String> pageLoadError) {
+        long deadline = SystemClock.elapsedRealtime() + WAIT_MS;
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (expectedUrl.equals(pageFinishedUrl.get())) return;
+            SystemClock.sleep(100);
+        }
+        throw new AssertionError("the real HTTPS SPA fixture must finish loading"
+                + " (expectedPageFinishedUrl=" + expectedUrl
+                + ", observedPageFinishedUrl=" + pageFinishedUrl.get()
+                + ", loadError=" + pageLoadError.get()
+                + ", serverRequests=" + server.count("/private/start") + ")");
+    }
+
     private void requestWorkerEgress(WebView view) throws Exception {
         execute(view, "document.title='trigger-pending';"
                 + "fetch('/trigger').then(r=>r.text()).then(t=>document.title='trigger-'+t)"
@@ -783,12 +831,22 @@ public final class DaymarkServiceWorkerInstrumentation {
 
     private static final class ControlledServer implements AutoCloseable {
         private final ServerSocket socket;
+        private final boolean https;
         private final ExecutorService clients = Executors.newFixedThreadPool(4);
         private final Map<String, AtomicInteger> counts = new ConcurrentHashMap<>();
         private volatile boolean closed;
 
         ControlledServer() throws IOException {
-            socket = new ServerSocket();
+            this(new ServerSocket(), false);
+        }
+
+        static ControlledServer forHttps(android.content.Context testContext) throws Exception {
+            return new ControlledServer(createHttpsServerSocket(testContext), true);
+        }
+
+        private ControlledServer(ServerSocket socket, boolean https) throws IOException {
+            this.socket = socket;
+            this.https = https;
             socket.setReuseAddress(true);
             socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
             Thread acceptor = new Thread(() -> {
@@ -800,13 +858,30 @@ public final class DaymarkServiceWorkerInstrumentation {
                         if (!closed) Log.e(TAG, "controlled server accept failed", error);
                     }
                 }
-            }, "DaymarkServiceWorkerTestServer");
+            }, https ? "DaymarkServiceWorkerTestHttpsServer" : "DaymarkServiceWorkerTestServer");
             acceptor.setDaemon(true);
             acceptor.start();
         }
 
+        private static ServerSocket createHttpsServerSocket(android.content.Context context) throws Exception {
+            java.security.KeyStore keyStore = java.security.KeyStore.getInstance("PKCS12");
+            char[] password = "daymark-test".toCharArray();
+            try (InputStream input = context.getAssets().open(
+                    "daymark_service_worker_test_server.p12")) {
+                keyStore.load(input, password);
+            }
+            javax.net.ssl.KeyManagerFactory keyManagerFactory =
+                    javax.net.ssl.KeyManagerFactory.getInstance(
+                            javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keyStore, password);
+            javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), null,
+                    new java.security.SecureRandom());
+            return sslContext.getServerSocketFactory().createServerSocket();
+        }
+
         String url(String path) {
-            return "http://127.0.0.1:" + socket.getLocalPort() + path;
+            return (https ? "https" : "http") + "://127.0.0.1:" + socket.getLocalPort() + path;
         }
 
         int count(String path) {
@@ -980,4 +1055,3 @@ public final class DaymarkServiceWorkerInstrumentation {
         }
     }
 }
-

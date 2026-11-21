@@ -11,6 +11,7 @@ javac -encoding UTF-8 --release 17 -d "$BUILD_DIR" \
   "$ROOT/tools/host-stubs/android/os/SystemClock.java" \
   "$ROOT/tools/host-stubs/android/os/Handler.java" \
   "$ROOT/tools/host-stubs/android/util/Log.java" \
+  "$ROOT/app/src/main/java/com/abrar/daymark/BrowserDiagnostics.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserSelfHealingPolicy.java" \
   "$ROOT/app/src/main/java/com/abrar/daymark/BrowserLoadWatchdog.java" \
   "$ROOT/tools/BrowserLoadWatchdogSmoke.java"

@@ -22,6 +22,8 @@ assert "redact(" in src, "URL redaction missing"
 assert "BrowserSelfHealingPolicy" in src, "must integrate with BrowserSelfHealingPolicy budget"
 assert "synchronized" in src, "thread safety (synchronized) missing"
 assert "ArrayDeque" in src, "bounded ring buffer (ArrayDeque) missing"
+assert "int safeErrorCode = BrowserDiagnostics.safeErrorCode(errorCode);" in src, "watchdog must clamp WebView error codes"
+assert "BrowserDiagnostics.safeErrorCodeDetail(safeErrorCode)" in src, "watchdog callback must receive only a safe error code"
 
 # Handler.removeCallbacks removes by Runnable identity, not method-reference equivalence.
 for name, callback in (("hint", "fireHint"), ("retry", "fireRetry"), ("fail", "fireFail")):
@@ -37,7 +39,7 @@ assert "System.currentTimeMillis()" not in src, "wall-clock deadline is vulnerab
 
 # Terminal navigation callbacks must invalidate queued stages even if a callback races removal.
 for method, marker in (("onPageFinished(String url)", "page-finished:"),
-                       ("onReceivedError(String url, int errorCode, String description)", "load-error:"),
+                       ("onReceivedError(String url, int errorCode)", "load-error:"),
                        ("onRendererGone(String url)", "renderer-gone:"),
                        ("void cancel()", "watchdog-cancelled")):
     start = src.find(method)
@@ -49,6 +51,8 @@ for method, marker in (("onPageFinished(String url)", "page-finished:"),
     body = src[body_start:next_method if next_method >= 0 else len(src)]
     assert "cancelStages();" in body, f"{method} must cancel stages"
     assert "pendingAddress = null;" in body, f"{method} must invalidate queued callbacks"
+    if method.startswith("onReceivedError"):
+        assert "description" not in body, "raw WebView error descriptions must not enter watchdog diagnostics"
 
 smoke = root / "tools/BrowserLoadWatchdogSmoke.java"
 assert smoke.exists(), "deterministic watchdog regression test missing"

@@ -25,6 +25,10 @@ public final class BrowserDiagnosticsSmoke {
                 : "null/blank URLs must become empty strings";
         assert BrowserDiagnostics.redactUrl("https://example.com/very/" + "x".repeat(300))
                 .length() <= 200 : "redacted URLs must be bounded";
+        assert BrowserDiagnostics.safeErrorCodeDetail(-2).equals("error code -2")
+                : "error diagnostics must retain only a numeric code";
+        assert BrowserDiagnostics.safeErrorCodeDetail(123456).equals("error code 9999")
+                : "error codes must be bounded";
 
         BrowserDiagnostics diagnostics = new BrowserDiagnostics();
         for (int i = 0; i < 60; i++) {
@@ -41,6 +45,19 @@ public final class BrowserDiagnosticsSmoke {
         assert report.contains("Daymark version: test") && report.contains("load requested")
                 && report.contains("https://example.com/page") : "report must include environment and redacted events";
         assert !report.contains("token=") : "report must never contain query strings";
+
+        BrowserDiagnostics privateDiagnostics = new BrowserDiagnostics();
+        privateDiagnostics.record(2000L, "load failed", "https://example.com/page?token=abc",
+                BrowserDiagnostics.safeErrorCodeDetail(-2));
+        privateDiagnostics.record(2001L, "load failed", "https://example.com/page",
+                "server said token=secret at https://user:pass@example.com/reset?key=private");
+        String privateReport = privateDiagnostics.report(null);
+        assert privateDiagnostics.events().get(0).detail.equals("error code -2")
+                : "safe numeric browser error code must remain useful";
+        assert privateDiagnostics.events().get(1).detail.isEmpty()
+                : "arbitrary server-controlled error descriptions must be discarded";
+        assert !privateReport.contains("secret") && !privateReport.contains("private")
+                : "diagnostic report must not contain secrets from error descriptions";
 
         BrowserDiagnostics empty = new BrowserDiagnostics();
         assert empty.report(null).contains("No navigation events recorded yet") : "empty report must explain itself";

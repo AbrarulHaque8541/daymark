@@ -2419,8 +2419,9 @@ public final class MainActivity extends Activity {
         browserStatus.setContentDescription(message == null ? "" : message);
         browserStatus.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         browserStatus.setVisibility(View.VISIBLE);
-        browserStatus.setAlpha(0f);
-        browserStatus.animate().alpha(1f).setDuration(150L).start();
+        boolean reducedMotion = WorkspaceMotion.isReducedMotionPublic(browserStatus);
+        browserStatus.setAlpha(reducedMotion ? 1f : 0f);
+        if (!reducedMotion) browserStatus.animate().alpha(1f).setDuration(150L).start();
 
         // Keep actionable terminal failures visible so the user can tap to retry.
         boolean needsManualRetry = browserLoadFailed && message != null
@@ -2433,6 +2434,11 @@ public final class MainActivity extends Activity {
         browserStatusHideRunnable = () -> {
             if (browserStatus == null || browserStatus.getVisibility() != View.VISIBLE) return;
             browserStatus.animate().cancel();
+            if (WorkspaceMotion.isReducedMotionPublic(browserStatus)) {
+                browserStatus.setAlpha(1f);
+                browserStatus.setVisibility(View.GONE);
+                return;
+            }
             browserStatus.animate().alpha(0f).setDuration(180L).withEndAction(() -> {
                 if (browserStatus != null && browserStatus.getAlpha() <= 0.01f) {
                     browserStatus.setVisibility(View.GONE);
@@ -3402,12 +3408,13 @@ public final class MainActivity extends Activity {
 
             @Override public void onLoadError(int errorCode, String description, String failingUrl) {
                 if (!isActivityCallbackCurrent() || targetRef[0] != browserWebView) return;
+                int safeErrorCode = BrowserDiagnostics.safeErrorCode(errorCode);
                 cancelBrowserLoadWatchdog();
-                if (stagedLoadWatchdog != null) stagedLoadWatchdog.onReceivedError(failingUrl, errorCode, description);
+                if (stagedLoadWatchdog != null) stagedLoadWatchdog.onReceivedError(failingUrl, safeErrorCode);
                 browserPageLoading = false;
                 browserLoadFailed = true;
                 stopBrowserLoadProgress();
-                if (errorCode == -1) {
+                if (safeErrorCode == -1) {
                     showBrowserNotice(nextBrowserNoticeId("certificate-error"),
                             "Certificate validation failed",
                             "Daymark cancelled this connection. The certificate error was not bypassed. "
@@ -3417,13 +3424,13 @@ public final class MainActivity extends Activity {
                     showBrowserRetryNotice("load-error", "Page failed to load",
                             "The page could not be loaded. You can retry the current address.");
                 }
-                Log.e(BROWSER_LOG_TAG, "load failed: code=" + errorCode
+                Log.e(BROWSER_LOG_TAG, "load failed: code=" + safeErrorCode
                         + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl));
                 browserDiagnostics.record(System.currentTimeMillis(), "load failed", failingUrl,
-                        "error " + errorCode + ": " + description);
-                showBrowserStatus(errorCode < 0
+                        BrowserDiagnostics.safeErrorCodeDetail(safeErrorCode));
+                showBrowserStatus(safeErrorCode < 0
                         ? "The page could not load securely. Certificate errors are not bypassed. Tap this message to try again."
-                        : "The page did not open (error " + errorCode + "). Tap this message to try again.");
+                        : "The page did not open (error " + safeErrorCode + "). Tap this message to try again.");
             }
 
             @Override public void onDownloadRequested(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
@@ -3876,7 +3883,7 @@ public final class MainActivity extends Activity {
                 webViewProvider = webViewPackage.packageName + " " + webViewPackage.versionName;
             }
         } catch (RuntimeException unavailable) {
-            browserDiagnostics.record(System.currentTimeMillis(), "WebView package unavailable", null, unavailable.getMessage());
+            browserDiagnostics.record(System.currentTimeMillis(), "WebView package unavailable", null, null);
         }
         String appVersion = "unknown";
         try {

@@ -5,6 +5,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Bounded in-memory record of browser navigation lifecycle events for the
@@ -18,6 +19,7 @@ import java.util.List;
  *   <li>Records never leave this process: no persistence, no network, no task
  *       data, no platform logging. The only export path is the explicit,
  *       user-tapped Copy action in the diagnostics dialog.</li>
+ *   <li>Details are allowlisted numeric error codes; server-provided descriptions are discarded.</li>
  *   <li>The buffer is capped at {@link #MAX_EVENTS} entries; the oldest events
  *       are dropped first.</li>
  * </ul>
@@ -25,6 +27,7 @@ import java.util.List;
 final class BrowserDiagnostics {
     static final int MAX_EVENTS = 40;
     private static final int MAX_TEXT_LENGTH = 200;
+    private static final Pattern SAFE_ERROR_DETAIL = Pattern.compile("^error code -?\\d{1,4}$");
 
     static final class Event {
         final long sequence;
@@ -87,11 +90,26 @@ final class BrowserDiagnostics {
         return value.substring(0, cut);
     }
 
-    /** Records one bounded lifecycle event. Null-safe; the URL is redacted before storage. */
+    /** Error details can contain server-controlled URLs or credentials; retain only a bounded code. */
+    static int safeErrorCode(int errorCode) {
+        return Math.max(-9999, Math.min(9999, errorCode));
+    }
+
+    static String safeErrorCodeDetail(int errorCode) {
+        return "error code " + safeErrorCode(errorCode);
+    }
+
+    private static String safeDetail(String detail) {
+        if (detail == null) return "";
+        String trimmed = detail.trim();
+        return SAFE_ERROR_DETAIL.matcher(trimmed).matches() ? trimmed : "";
+    }
+
+    /** Records one bounded event. URLs and details are redacted or allowlisted before storage. */
     synchronized void record(long timestampMs, String stage, String url, String detail) {
         while (events.size() >= MAX_EVENTS) events.removeFirst();
         events.addLast(new Event(nextSequence++, timestampMs,
-                bounded(stage), redactUrl(url), bounded(detail)));
+                bounded(stage), redactUrl(url), safeDetail(detail)));
     }
 
     /** Returns a defensive copy of the recorded events, oldest first. */
