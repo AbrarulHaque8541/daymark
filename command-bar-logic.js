@@ -11,7 +11,7 @@
     { token: 'y', name: 'Yahoo', url: 'https://search.yahoo.com/search?p=' }
   ];
   const CARD_TARGETS = [
-    'feature-flags-card', 'storage-card', 'telegram', 'webhook', 'capability-registry', 'url-insights',
+    'feature-flags-card', 'storage-card', 'mindful-breaks-card', 'telegram', 'webhook', 'capability-registry', 'url-insights',
     'browser-intent', 'release-compat', 'lifecycle-recovery', 'permission-lifecycle', 'browser-data',
     'browser-proxy', 'browser-download', 'tls-gate', 'browser-error', 'wiki', 'zones', 'currency',
     'holiday', 'weather', 'briefing', 'focus', 'task-list'
@@ -19,6 +19,7 @@
   const CARD_LABELS = {
     'feature-flags-card': 'Feature settings',
     'storage-card': 'Local data',
+    'mindful-breaks-card': 'Mindful breaks',
     'telegram': 'Telegram digest',
     'webhook': 'Webhook digest',
     'capability-registry': 'Capability registry',
