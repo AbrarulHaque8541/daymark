@@ -192,8 +192,10 @@ test('index.html wires the card, ids and both scripts', () => {
   }
   assert.ok(index.indexOf('This guide does not inspect your installed app or APK') !== -1);
   assert.ok(index.indexOf('Task data and migration limits') !== -1);
-  assert.ok(index.indexOf('<script src="release-compat-logic.js" defer></script>') !== -1);
-  assert.ok(index.indexOf('<script src="release-compat-ui.js" defer></script>') !== -1);
+  assert.ok(index.indexOf('<script src="js/release-compat-logic.js" defer></script>') !== -1);
+  assert.ok(index.indexOf('<script src="js/release-compat-ui.js" defer></script>') !== -1);
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'js', 'release-compat-logic.js')));
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'js', 'release-compat-ui.js')));
   assert.ok(index.indexOf('tests/release-compat-logic.test.js') === -1);
   assert.ok(required.indexOf('tests/release-compat-logic.test.js') !== -1);
   assert.ok(required.indexOf('tests/release-compat-ui.test.js') !== -1);
