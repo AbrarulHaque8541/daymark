@@ -5,8 +5,7 @@
   "description": "Lightweight, modular client-side features: adblock, reader, no-image, dark mode, AI button, translate, speed dial, gestures.",
   "permissions": [
     "storage",
-    "declarativeNetRequest",
-    "declarativeNetRequestFeedback"
+    "declarativeNetRequest"
   ],
   "optional_permissions": [
     "scripting"
