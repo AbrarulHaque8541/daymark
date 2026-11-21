@@ -1,11 +1,12 @@
 ((root) => {
   'use strict';
   const STORAGE_KEY = 'daymark.features.v1';
-  const FLAG_IDS = ['command-bar', 'search-bangs', 'comfort-tint', 'focus-mode'];
+  const FLAG_IDS = ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode'];
   const FEATURE_FLAGS = [
     { id: 'command-bar', label: 'Command bar (Ctrl+K)', kind: 'feature', description: 'A keyboard palette that opens cards and runs searches without leaving the page.' },
     { id: 'search-bangs', label: '!bang search shortcuts', kind: 'feature', description: 'Type !g, !d, !br, !b, !sp or !y inside the palette to search a specific engine.' },
     { id: 'comfort-tint', label: 'Comfort tint', kind: 'planned', description: 'A soft warm tint over the page for long reading sessions.' },
+    { id: 'mindful-breaks', label: 'Mindful breaks', kind: 'feature', description: 'A gentle on-page nudge to stand up and rest after a chosen interval. Nothing is saved.' },
     { id: 'focus-mode', label: 'Focus view (one task, one view)', kind: 'feature', description: 'Pick an open task and the page steps back behind a single view. Mark the task complete from there.' }
   ];
   function defaults() {

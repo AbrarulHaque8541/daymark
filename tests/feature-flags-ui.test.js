@@ -151,10 +151,11 @@ test('one checkbox per current flag; planned ones are disabled with their note',
   attach(doc, makeStorage({}));
   const card = doc.getElementById('feature-flags-card');
   const boxes = findAll(card).filter((node) => node.getAttribute && node.getAttribute('data-feature-id'));
-  assert.equal(boxes.length, 4);
+  assert.equal(boxes.length, 5);
   assert.deepEqual(boxes.map((b) => b.getAttribute('data-feature-id')),
-    ['command-bar', 'search-bangs', 'comfort-tint', 'focus-mode']);
-  assert.equal(checkboxById(doc, 'mindful-breaks'), null);
+    ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
+  assert.ok(checkboxById(doc, 'mindful-breaks'), 'mindful-breaks checkbox exists');
+  assert.equal(checkboxById(doc, 'mindful-breaks').disabled, false);
   assert.equal(checkboxById(doc, 'comfort-tint').disabled, true);
   assert.ok(textOfTree(card).includes('A soft warm tint over the page for long reading sessions. Planned, not switchable yet.'));
   assert.equal(checkboxById(doc, 'focus-mode').disabled, false);
@@ -231,7 +232,7 @@ test('every implemented feature kind has an enabled switch that persists changes
   const storage = makeStorage({});
   attach(doc, storage);
   const implemented = flags.FEATURE_FLAGS.filter((flag) => flag.kind === 'feature');
-  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'focus-mode']);
+  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'mindful-breaks', 'focus-mode']);
   for (const flag of implemented) {
     const box = checkboxById(doc, flag.id);
     assert.ok(box, flag.id + ' checkbox exists');

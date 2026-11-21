@@ -22,6 +22,8 @@ tests/feature-flags-logic.test.js
 tests/feature-flags-ui.test.js
 tests/command-bar-logic.test.js
 tests/command-bar-ui.test.js
+tests/mindful-breaks-logic.test.js
+tests/mindful-breaks-ui.test.js
 tests/focus-mode-logic.test.js
 tests/focus-mode-ui.test.js
 tests/browser-address-logic.test.js
