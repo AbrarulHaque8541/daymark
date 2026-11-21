@@ -440,14 +440,80 @@ test('share overlap calls navigator.share with the summary and reports status', 
   assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined, 'busy is cleared after success');
 });
 
-test('share reports unavailable when navigator.share is missing', async () => {
+test('native share rejection reports failure and clears busy state', async () => {
   const { env, elements } = fakeEnv({});
-  env.navigator = {};
+  env.navigator = { share: () => Promise.reject(new Error('share dismissed')) };
+  const handle = ui.attachZonesUi(env);
+  await handle.onShare();
+  assert.equal(elements['zones-status'].textContent, 'Could not share the summary.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined);
+});
+
+test('native share synchronous throw reports failure and clears busy state', async () => {
+  const { env, elements } = fakeEnv({});
+  env.navigator = { share() { throw new Error('share unavailable'); } };
+  const handle = ui.attachZonesUi(env);
+  await handle.onShare();
+  assert.equal(elements['zones-status'].textContent, 'Could not share the summary.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined);
+});
+
+test('share falls back to clipboard when native sharing is unavailable', async () => {
+  let copied = null;
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    clipboard: {
+      writeText(text) {
+        copied = text;
+        return Promise.resolve();
+      }
+    }
+  };
   const handle = ui.attachZonesUi(env);
   const click = elements['zones-share'].listeners.find((l) => l.type === 'click');
   assert.ok(click);
   await click.handler();
-  assert.equal(elements['zones-status'].textContent, 'Sharing is not available in this environment.');
+  assert.ok(copied && copied.includes('Daymark world clock'), 'clipboard received the real summary');
+  assert.ok(copied.includes('Best shared window'), 'clipboard received the overlap summary');
+  assert.equal(elements['zones-status'].textContent,
+    'Native sharing is unavailable; copied the summary to the clipboard instead.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined);
+});
+
+test('share reports clipboard failure when native sharing is unavailable and copy rejects', async () => {
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    clipboard: {
+      writeText() { return Promise.reject(new Error('permission denied')); }
+    }
+  };
+  const handle = ui.attachZonesUi(env);
+  await handle.onShare();
+  assert.equal(elements['zones-status'].textContent,
+    'Native sharing is unavailable, and the summary could not be copied.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined);
+});
+
+test('share reports clipboard failure when writeText throws synchronously', async () => {
+  const { env, elements } = fakeEnv({});
+  env.navigator = {
+    clipboard: { writeText() { throw new Error('clipboard denied'); } }
+  };
+  const handle = ui.attachZonesUi(env);
+  await handle.onShare();
+  assert.equal(elements['zones-status'].textContent,
+    'Native sharing is unavailable, and the summary could not be copied.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined);
+});
+
+test('share reports unavailable when neither native sharing nor clipboard is present', async () => {
+  const { env, elements } = fakeEnv({});
+  env.navigator = {};
+  const handle = ui.attachZonesUi(env);
+  await handle.onShare();
+  assert.equal(elements['zones-status'].textContent,
+    'Sharing and clipboard copy are unavailable in this environment.');
+  assert.equal(elements['zones-share'].getAttribute('aria-busy'), undefined);
 });
 
 test('share reports nothing when the zones module is missing', async () => {
