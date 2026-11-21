@@ -1107,6 +1107,10 @@
 
   async function saveEdit(event) {
     event.preventDefault();
+    if (event.submitter && event.submitter.value === 'cancel') {
+      closeEditor();
+      return;
+    }
     const titleInput = $('#edit-title');
     const title = titleInput.value.trim();
     if (!title) {
@@ -2684,8 +2688,6 @@
         renderSubtaskEditor();
       }
     });
-    document.querySelector('.close-dialog').addEventListener('click', closeEditor);
-    document.querySelector('.cancel-edit').addEventListener('click', closeEditor);
     $('#toast-action').addEventListener('click', runToastAction);
     $('#edit-dialog').addEventListener('click', (event) => {
       if (event.target === $('#edit-dialog')) closeEditor();

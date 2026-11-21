@@ -62,6 +62,7 @@ function bootApp({ savedValue, savedFocusValue = null, savedBackupValue = null, 
   if (savedFeedValue !== null) storedValues.set(FEED_KEY, savedFeedValue);
 
   function element(selector) {
+    if (selector === '.close-dialog' || selector === '.cancel-edit') return null;
     if (!elements.has(selector)) {
       const attributes = new Map();
       const classes = new Set();
@@ -266,10 +267,14 @@ function triggerFormInput(app, selector, value) {
   return Promise.all(handlers.map((handler) => handler({ currentTarget: input })));
 }
 
-function triggerFormSubmit(app, selector) {
+function triggerFormSubmit(app, selector, submitter = null) {
   const form = app.elements.get(selector);
   const handlers = app.listeners.get(`${selector}:submit`) || [];
-  return Promise.all(handlers.map((handler) => handler({ currentTarget: form, preventDefault() {} })));
+  return Promise.all(handlers.map((handler) => handler({
+    currentTarget: form,
+    submitter,
+    preventDefault() {}
+  })));
 }
 
 function triggerTaskEdit(app, taskId) {
@@ -294,6 +299,10 @@ function triggerTaskImport(app, file) {
   const handlers = app.listeners.get('#import-file:change') || [];
   return Promise.all(handlers.map((handler) => handler({ currentTarget: input })));
 }
+
+test('app startup does not bind task editor controls absent from the page markup', () => {
+  assert.doesNotThrow(() => bootApp({ savedValue: '[]' }));
+});
 
 test('monthly task completed on a clamped date retains its original day anchor', async () => {
   const recurring = makeImportTask('monthly-31', 'Month-end task');
@@ -686,6 +695,34 @@ test('add form shows date-only reminder guidance only for a date with no time an
   assert.equal(saved[0].dueTime, null, 'the 9:00 AM disclosure must not be written as a due time');
   assert.equal(saved[0].reminderLeadMinutes, 60, 'the selected reminder lead is preserved');
   assert.equal(hint.hidden, true, 'the helper hides after the add form resets');
+});
+
+test('task editor Cancel closes without mutating or saving the task', async () => {
+  const task = makeImportTask('cancel-edit', 'Original task');
+  const originalValue = JSON.stringify([task]);
+  const app = bootApp({ savedValue: originalValue });
+
+  triggerTaskEdit(app, task.id);
+  app.elements.get('#edit-title').value = 'Unsaved title';
+  await triggerFormSubmit(app, '#edit-form', { value: 'cancel' });
+
+  assert.equal(app.elements.get('#edit-dialog').open, false, 'Cancel closes the open editor');
+  assert.equal(app.storedValues.get(STORAGE_KEY), originalValue, 'Cancel must not persist editor changes');
+  triggerTaskEdit(app, task.id);
+  assert.equal(app.elements.get('#edit-title').value, 'Original task', 'Cancel must not mutate the in-memory task');
+  app.elements.get('#edit-dialog').close();
+});
+
+test('task editor Save still persists edits', async () => {
+  const task = makeImportTask('save-edit', 'Original task');
+  const app = bootApp({ savedValue: JSON.stringify([task]) });
+
+  triggerTaskEdit(app, task.id);
+  app.elements.get('#edit-title').value = 'Saved title';
+  await triggerFormSubmit(app, '#edit-form');
+
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved[0].title, 'Saved title');
 });
 
 test('edit form shows date-only reminder guidance and saves a null time with its selected lead', async () => {
