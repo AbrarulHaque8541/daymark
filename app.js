@@ -1072,6 +1072,11 @@
     else dialog.removeAttribute('open');
   }
 
+  function handleCancelEdit(event) {
+    event.preventDefault();
+    closeEditor();
+  }
+
   function renderSubtaskEditor() {
     const list = $('#subtask-list');
     if (!state.editSubtasks.length) {
@@ -1107,6 +1112,10 @@
 
   async function saveEdit(event) {
     event.preventDefault();
+    if (event.submitter && event.submitter.value === 'cancel') {
+      closeEditor();
+      return;
+    }
     const titleInput = $('#edit-title');
     const title = titleInput.value.trim();
     if (!title) {
@@ -2652,6 +2661,8 @@
         setTimeout(() => row.classList.remove('is-highlighted'), 1800);
       }
     });
+    const cancelEditButton = $('#edit-form button[value="cancel"]');
+    if (cancelEditButton) cancelEditButton.addEventListener('click', handleCancelEdit);
     $('#edit-form').addEventListener('submit', saveEdit);
     $('#edit-title').addEventListener('input', () => {
       $('#edit-error').hidden = true;
@@ -2684,8 +2695,6 @@
         renderSubtaskEditor();
       }
     });
-    document.querySelector('.close-dialog').addEventListener('click', closeEditor);
-    document.querySelector('.cancel-edit').addEventListener('click', closeEditor);
     $('#toast-action').addEventListener('click', runToastAction);
     $('#edit-dialog').addEventListener('click', (event) => {
       if (event.target === $('#edit-dialog')) closeEditor();

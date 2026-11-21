@@ -94,6 +94,10 @@ test('edit dialog preserves all fields and controls consumed by the task editor'
   assert.match(elementById(dialog, 'subtask-list')[0], /\baria-live=["']polite["']/i);
   assert.match(elementById(dialog, 'add-subtask')[0], /\btype=["']button["']/i);
   assert.match(elementById(dialog, 'edit-error')[0], /\brole=["']alert["']/i);
+  const cancelButton = dialog.match(/<button\b[^>]*\bvalue=["']cancel["'][^>]*>/i);
+  assert.ok(cancelButton, 'the task editor must keep its real Cancel submit button');
+  assert.match(cancelButton[0], /\bformnovalidate(?:\s|>|=)/i,
+    'Cancel must bypass title validation before closing the editor');
 
   for (const id of ['edit-title', 'edit-due-date', 'edit-due-time', 'edit-reminder',
     'edit-repeat', 'edit-priority', 'edit-tags', 'edit-notes', 'new-subtask']) {
