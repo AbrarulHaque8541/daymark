@@ -6,11 +6,9 @@ const path = require('node:path');
 const ui = require('../command-bar-ui.js');
 const bar = require('../command-bar-logic.js');
 const flags = require('../feature-flags-logic.js');
-
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'command-bar-ui.js'), 'utf8');
-
-function makeElement(tagName) {
+function makeElement(tagName, doc) {
   const el = {
     tagName: tagName,
     className: '',
@@ -18,6 +16,8 @@ function makeElement(tagName) {
     value: '',
     disabled: false,
     checked: false,
+    tabIndex: 0,
+    hidden: false,
     children: [],
     listeners: {},
     attrs: {},
@@ -31,12 +31,22 @@ function makeElement(tagName) {
     },
     addEventListener(type, handler) { (el.listeners[type] = el.listeners[type] || []).push(handler); },
     dispatch(type, ev) {
-      const event = Object.assign({ type: type, target: el }, ev || {});
+      const event = Object.assign({
+        type: type,
+        target: el,
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+      }, ev || {});
       for (const handler of (el.listeners[type] || []).slice()) handler(event);
+      return event;
     },
     setAttribute(name, value) { el.attrs[name] = String(value); },
     getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; },
-    focus() { el.focused = true; },
+    removeAttribute(name) { delete el.attrs[name]; },
+    focus() {
+      el.focused = true;
+      if (doc) doc.activeElement = el;
+    },
     scrollIntoView() { el.scrolled = (el.scrolled || 0) + 1; }
   };
   Object.defineProperty(el, 'firstChild', { get() { return el.children.length ? el.children[0] : null; } });
@@ -50,7 +60,6 @@ function makeElement(tagName) {
   };
   return el;
 }
-
 function findAll(node, out) {
   out = out || [];
   for (const child of node.children) {
@@ -59,15 +68,15 @@ function findAll(node, out) {
   }
   return out;
 }
-
 function makeDoc() {
   const head = makeElement('head');
   const body = makeElement('body');
   const elements = { 'storage-card': makeElement('div') };
   const docListeners = {};
-  return {
+  const doc = {
     head: head,
     body: body,
+    activeElement: body,
     getElementById(id) {
       if (Object.prototype.hasOwnProperty.call(elements, id)) return elements[id];
       const pool = findAll(head).concat(findAll(body));
@@ -76,14 +85,22 @@ function makeDoc() {
       }
       return null;
     },
-    createElement(tagName) { return makeElement(tagName); },
+    createElement(tagName) { return makeElement(tagName, doc); },
     addEventListener(type, handler) { (docListeners[type] = docListeners[type] || []).push(handler); },
     dispatchDoc(type, ev) {
-      for (const handler of (docListeners[type] || []).slice()) handler(ev);
+      const event = Object.assign({
+        type: type,
+        target: doc.activeElement || body,
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+      }, ev || {});
+      for (const handler of (docListeners[type] || []).slice()) handler(event);
+      return event;
     }
   };
+  body.focus = () => { body.focused = true; doc.activeElement = body; };
+  return doc;
 }
-
 function makeStorage(seed) {
   const data = new Map();
   for (const key of Object.keys(seed || {})) data.set(key, seed[key]);
@@ -93,7 +110,6 @@ function makeStorage(seed) {
     removeItem(key) { data.delete(key); }
   };
 }
-
 function makeWindow() {
   const openedUrls = [];
   return {
@@ -101,28 +117,88 @@ function makeWindow() {
     open(url, target, features) { openedUrls.push({ url: url, target: target, features: features }); }
   };
 }
-
 function flagsOnStorage() {
   const saved = { 'command-bar': true, 'search-bangs': true, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
   return makeStorage({ 'daymark.features.v1': JSON.stringify(saved) });
 }
-
 function makeEnv(doc, storage, windowObj) {
   return { document: doc, flags: flags, commandBar: bar, storage: storage, window: windowObj };
 }
-
-test('the overlay mounts as an accessible dialog and a second attach is refused', () => {
+test('the overlay is a named dialog with a labelled combobox and a styled listbox', () => {
   const doc = makeDoc();
   const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
   assert.ok(handle);
   assert.equal(handle.overlay.getAttribute('id'), 'command-bar-overlay');
   assert.equal(handle.overlay.getAttribute('role'), 'dialog');
   assert.equal(handle.overlay.getAttribute('aria-modal'), 'true');
+  assert.equal(handle.overlay.getAttribute('aria-labelledby'), 'command-bar-title');
+  assert.equal(doc.getElementById('command-bar-title').textContent, 'Command bar — palette, toggles, !bangs');
   assert.equal(handle.input.getAttribute('role'), 'combobox');
+  assert.equal(handle.input.getAttribute('aria-label'), 'Search commands, cards, or !bangs');
+  assert.equal(handle.input.getAttribute('aria-controls'), 'command-bar-list');
+  assert.equal(handle.input.getAttribute('aria-autocomplete'), 'list');
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.input.tabIndex, -1);
+  assert.equal(handle.closeButton.textContent, 'Close');
   assert.equal(handle.statusEl.getAttribute('aria-live'), 'polite');
+  assert.equal(handle.listEl.className, 'command-bar-list');
+  assert.match(findAll(doc.head).filter((node) => node.tagName === 'style')[0].textContent, /top:0;right:0;bottom:0;left:0/);
   assert.equal(ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow())), null);
 });
-
+test('opening contains focus, wraps Tab, closes visibly, and restores the invoking element', () => {
+  const doc = makeDoc();
+  const opener = makeElement('button', doc);
+  opener.focus();
+  const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
+  assert.equal(handle.open(opener), true);
+  assert.equal(doc.activeElement, handle.input);
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'true');
+  assert.equal(handle.input.disabled, false);
+  handle.closeButton.focus();
+  const wrapForward = doc.dispatchDoc('keydown', { key: 'Tab' });
+  assert.equal(wrapForward.defaultPrevented, true);
+  assert.equal(doc.activeElement, handle.input);
+  const wrapBackward = doc.dispatchDoc('keydown', { key: 'Tab', shiftKey: true });
+  assert.equal(wrapBackward.defaultPrevented, true);
+  assert.equal(doc.activeElement, handle.closeButton);
+  const outside = makeElement('button', doc);
+  outside.focus();
+  doc.dispatchDoc('focusin', { target: outside });
+  assert.equal(doc.activeElement, handle.input);
+  handle.closeButton.dispatch('click');
+  assert.equal(handle.isOpen(), false);
+  assert.equal(handle.overlay.getAttribute('aria-hidden'), 'true');
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.listEl.hidden, true);
+  assert.equal(handle.input.disabled, true);
+  assert.equal(handle.input.tabIndex, -1);
+  assert.equal(doc.activeElement, opener);
+});
+test('the listbox exposes the active option and Arrow keys update it without moving DOM focus', () => {
+  const doc = makeDoc();
+  const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
+  handle.open();
+  assert.equal(handle.listEl.hidden, false);
+  const firstId = handle.input.getAttribute('aria-activedescendant');
+  const first = doc.getElementById(firstId);
+  assert.ok(first);
+  assert.equal(first.getAttribute('role'), 'option');
+  assert.equal(first.getAttribute('aria-selected'), 'true');
+  const down = handle.input.dispatch('keydown', { key: 'ArrowDown' });
+  const secondId = handle.input.getAttribute('aria-activedescendant');
+  const second = doc.getElementById(secondId);
+  assert.equal(down.defaultPrevented, true);
+  assert.notEqual(secondId, firstId);
+  assert.equal(second.getAttribute('aria-selected'), 'true');
+  assert.equal(doc.getElementById(firstId).getAttribute('aria-selected'), 'false');
+  assert.equal(second.scrolled, 1);
+  assert.equal(doc.activeElement, handle.input);
+  handle.input.value = '!zzz daymark';
+  handle.input.dispatch('input', {});
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.listEl.hidden, true);
+  assert.equal(handle.input.getAttribute('aria-activedescendant'), null);
+});
 test('with the flag off, opening is refused honestly and no keyboard path can summon it', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
@@ -132,7 +208,6 @@ test('with the flag off, opening is refused honestly and no keyboard path can su
   assert.equal(handle.overlay.classList.contains('is-open'), false);
   assert.equal(handle.statusEl.textContent.indexOf('switched off in Feature settings') !== -1, true);
 });
-
 test('Ctrl+K opens the palette, Escape (document or input) closes it', () => {
   const doc = makeDoc();
   const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
@@ -145,7 +220,6 @@ test('Ctrl+K opens the palette, Escape (document or input) closes it', () => {
   handle.input.dispatch('keydown', { key: 'Escape' });
   assert.equal(handle.isOpen(), false);
 });
-
 test('Cmd+K toggles the palette too', () => {
   const doc = makeDoc();
   const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
@@ -154,7 +228,6 @@ test('Cmd+K toggles the palette too', () => {
   doc.dispatchDoc('keydown', { key: 'k', metaKey: true });
   assert.equal(handle.isOpen(), false);
 });
-
 test('a toggle command runs from the palette and flips the saved flag', () => {
   const doc = makeDoc();
   const base = { 'command-bar': true, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
@@ -167,7 +240,6 @@ test('a toggle command runs from the palette and flips the saved flag', () => {
   assert.equal(JSON.parse(storage.getItem('daymark.features.v1'))['command-bar'], false);
   assert.match(handle.statusEl.textContent, /now off/);
 });
-
 test('!d opens DuckDuckGo in a new tab with noopener', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
@@ -180,7 +252,6 @@ test('!d opens DuckDuckGo in a new tab with noopener', () => {
     { url: 'https://duckduckgo.com/?q=daymark+repo', target: '_blank', features: 'noopener' }
   ]);
 });
-
 test('open example.com promotes the domain to https', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
@@ -193,7 +264,6 @@ test('open example.com promotes the domain to https', () => {
     { url: 'https://example.com', target: '_blank', features: 'noopener' }
   ]);
 });
-
 test('go-to commands scroll the card into view and close the palette', () => {
   const doc = makeDoc();
   const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
@@ -204,7 +274,6 @@ test('go-to commands scroll the card into view and close the palette', () => {
   assert.equal(handle.isOpen(), false);
   assert.match(handle.statusEl.textContent, /Jumped to Go to Local data/);
 });
-
 test('with !bangs switched off, a search command opens nothing', () => {
   const doc = makeDoc();
   const saved = { 'command-bar': true, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
@@ -216,7 +285,6 @@ test('with !bangs switched off, a search command opens nothing', () => {
   assert.equal(windowObj.openedUrls.length, 0);
   assert.match(handle.statusEl.textContent, /switched off in Feature settings/);
 });
-
 test('index.html gains each new script exactly once, in the pinned order', () => {
   for (const name of ['feature-flags-logic.js', 'feature-flags-ui.js', 'command-bar-logic.js', 'command-bar-ui.js']) {
     const tag = '<script src="' + name + '" defer></script>';
@@ -228,12 +296,10 @@ test('index.html gains each new script exactly once, in the pinned order', () =>
   assert.ok(pos('feature-flags-ui.js') < pos('command-bar-logic.js'));
   assert.ok(pos('command-bar-logic.js') < pos('command-bar-ui.js'));
 });
-
 test('index.html gains no new class names from the palette or the flags card', () => {
   assert.equal(indexHtml.indexOf('command-bar-overlay'), -1, 'palette markup must stay dynamic');
   assert.equal(indexHtml.indexOf('feature-flag-row'), -1, 'flags card markup must stay dynamic');
 });
-
 test('an unknown bang names the culprit and opens nothing', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
@@ -244,7 +310,6 @@ test('an unknown bang names the culprit and opens nothing', () => {
   assert.equal(windowObj.openedUrls.length, 0);
   assert.match(handle.statusEl.textContent, /There is no !bang called "zzz"/);
 });
-
 test('palette run with nothing selected stays honest and idle', () => {
   const doc = makeDoc();
   const windowObj = makeWindow();
@@ -253,7 +318,6 @@ test('palette run with nothing selected stays honest and idle', () => {
   assert.equal(windowObj.openedUrls.length, 0);
   assert.match(handle.statusEl.textContent, /Nothing is selected/);
 });
-
 const junkNeedles = ['TO' + 'DO', 'FIX' + 'ME', 'place' + 'holder', '/' + '*', '*' + '/', 'setInt' + 'erval', 'XMLHt' + 'tpRequest', 'fe' + 'tch'];
 for (const needle of junkNeedles) {
   test('command bar ui source contains no ' + needle, () => {
