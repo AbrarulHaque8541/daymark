@@ -12,6 +12,7 @@ trap 'rm -rf "$work_dir"' EXIT
 archive="$work_dir/$ACTIONLINT_ARCHIVE"
 
 bash -n "$ROOT/scripts/validate-workflows.sh"
+node "$ROOT/scripts/check-workflow-action-pins.js" "$ROOT/.github/workflows"
 curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --silent --show-error --location \
   "$ACTIONLINT_URL" --output "$archive"
 printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check --status
