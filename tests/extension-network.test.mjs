@@ -455,6 +455,17 @@ test("optional API host permissions are HTTPS-only while page features retain HT
   assert.ok(pageMatches.includes("https://*/*"), "content features still run on HTTPS pages");
 });
 
+test("extension manifest omits unused DNR debugging permission", () => {
+  const manifest = JSON.parse(fs.readFileSync(
+    path.join(root, "browser-extension/uc-china-lite/manifest.json"),
+    "utf8"
+  ));
+  assert.ok(manifest.permissions.includes("storage"), "extension settings still use browser storage");
+  assert.ok(manifest.permissions.includes("declarativeNetRequest"), "ad blocking still uses declarative rules");
+  assert.ok(!manifest.permissions.includes("declarativeNetRequestFeedback"),
+    "DNR feedback permission is unnecessary until a debugging API has a consumer");
+});
+
 test("extension entry points use the bounded background transport and avoid silent search fallback on request errors", () => {
   const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
   const background = read("browser-extension/uc-china-lite/background.js");
