@@ -85,10 +85,18 @@ test('setFlag rejects an unknown flag id and writes nothing', () => {
 
 test('setFlag rejects a planned flag and writes nothing', () => {
   const storage = makeStorage({});
-  const saved = flags.setFlag(storage, 'focus-mode', true);
+  const saved = flags.setFlag(storage, 'comfort-tint', true);
   assert.equal(saved.ok, false);
   assert.equal(saved.reason, 'planned-flag');
   assert.equal(storage.writes(), 0);
+});
+
+test('setFlag accepts the live focus-mode flag', () => {
+  const storage = makeStorage({});
+  const saved = flags.setFlag(storage, 'focus-mode', true);
+  assert.equal(saved.ok, true);
+  assert.equal(saved.flags['focus-mode'], true);
+  assert.equal(JSON.parse(storage.getItem('daymark.features.v1'))['focus-mode'], true);
 });
 
 test('setFlag rejects a non-boolean value and writes nothing', () => {
