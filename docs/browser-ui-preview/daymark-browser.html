@@ -1,20 +1,104 @@
 <!DOCTYPE html>
-<html lang="hi">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<html lang="hi"><head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <title>Daymark Browser</title>
-<!-- Full interactive shell lives in repo; if this stub loads, open the complete file from the PR branch. -->
 <style>
-body{margin:0;font-family:system-ui,sans-serif;background:#071018;color:#eef3f8;display:grid;place-items:center;min-height:100vh;padding:24px;text-align:center}
-a{color:#7eb6ff}
-</style>
-</head>
-<body>
-<div>
-<h1>Daymark Browser UI shell</h1>
-<p>Loading full preview… If you still see this stub, the complete HTML push is in progress on branch <code>preview/clean-browser-shell-v2</code>.</p>
-<p>See <a href="./BROWSER_UI_PREVIEW.md">BROWSER_UI_PREVIEW.md</a> for layout notes.</p>
+:root{--ink:#071018;--navy:#0c1c30;--navy2:#13283f;--fg:#eef3f8;--muted:#8ea3b8;--line:#1d3550;--accent:#2f7cf6;--sheet:#f6f8fb;--sheet-fg:#121820;--chip:#e8eef5;--pill:999px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:system-ui,sans-serif;background:var(--ink);color:var(--fg);overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input{font:inherit;color:inherit;border:none;outline:none;background:transparent}
+.phone{max-width:420px;height:100%;margin:0 auto;display:flex;flex-direction:column;position:relative;background:radial-gradient(120% 50% at 80% 90%,#f3f7fb 0%,#c5d6e6 18%,transparent 48%),linear-gradient(180deg,#050d18 0%,#0a2744 48%,#3d6f96 78%,#d5e4f0 100%);overflow:hidden}
+.dune{position:absolute;left:-20%;right:-10%;bottom:-10%;height:40%;border-radius:50% 45% 0 0;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(214,228,238,.5) 45%,transparent);pointer-events:none}
+.top,.body,.nav{position:relative;z-index:2}
+.top{padding:12px 14px 8px}
+.body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.scroll{flex:1;overflow-y:auto;padding:0 14px 12px}
+.omnibox{display:flex;align-items:center;gap:8px;height:48px;padding:0 12px;background:rgba(12,28,48,.78);border:1px solid rgba(255,255,255,.12);border-radius:var(--pill);backdrop-filter:blur(14px)}
+.engine-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;background:#de5833;color:#fff}
+.omnibox input{flex:1;min-width:0;font-size:15px}
+.omnibox input::placeholder{color:var(--muted)}
+.home-wrap{display:flex;flex-direction:column;align-items:center;padding-top:36px}
+.brand{font-size:34px;font-weight:600}
+.brand-sub{font-size:12px;color:var(--muted);margin:4px 0 28px}
+.dials{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;width:100%;max-width:340px}
+.dial{display:flex;flex-direction:column;align-items:center;gap:6px}
+.dial-ico{width:52px;height:52px;border-radius:16px;background:var(--navy2);display:grid;place-items:center;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+.dial span{font-size:11px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.type-tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 14px 0}
+.type-tab{flex-shrink:0;padding:8px 14px;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent}
+.type-tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.engine-bar{display:flex;gap:8px;overflow-x:auto;padding:10px 14px 6px}
+.eng-chip{flex-shrink:0;padding:6px 12px;border-radius:var(--pill);font-size:12px;background:var(--navy2);color:var(--muted)}
+.eng-chip.on{background:var(--fg);color:var(--ink)}
+.result-card{background:rgba(12,28,48,.85);border-radius:16px;padding:14px;margin-bottom:10px;border:1px solid rgba(255,255,255,.06)}
+.r-host{font-size:11px;color:var(--muted);margin-bottom:4px}
+.r-title{font-size:16px;font-weight:600;color:#7eb6ff;margin-bottom:4px}
+.r-snip{font-size:13px;line-height:1.45;opacity:.9}
+.nav{display:flex;align-items:center;justify-content:space-around;height:56px;border-top:1px solid rgba(255,255,255,.06);background:rgba(7,16,24,.7);backdrop-filter:blur(12px)}
+.nav-btn{width:48px;height:48px;border-radius:14px;display:grid;place-items:center}
+.tab-badge{min-width:28px;height:28px;border-radius:8px;border:1.5px solid rgba(255,255,255,.4);display:grid;place-items:center;font-size:12px;font-weight:600}
+.overlay{position:absolute;inset:0;z-index:40;background:rgba(0,0,0,.48);display:flex;align-items:flex-end}
+.sheet{width:100%;max-height:78%;overflow-y:auto;background:var(--sheet);color:var(--sheet-fg);border-radius:22px 22px 0 0;padding:16px 16px 24px}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:#c5ced8;margin:0 auto 12px}
+.tool-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:11px}
+.tool{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;color:var(--sheet-fg)}
+.tool-ico{width:40px;height:40px;border-radius:12px;background:var(--chip);display:grid;place-items:center}
+.group{background:var(--navy2);border-radius:16px;padding:4px 14px;margin-bottom:12px}
+.group-label{font-size:11px;color:var(--muted);padding:10px 0 4px;text-transform:uppercase}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid rgba(255,255,255,.06);font-size:14px;gap:12px}
+.toggle-row:first-of-type{border-top:none}
+.switch{width:44px;height:26px;border-radius:var(--pill);background:var(--line);position:relative;flex-shrink:0}
+.switch.on{background:var(--accent)}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch.on::after{transform:translateX(18px)}
+.screen-head{display:flex;align-items:center;gap:10px;padding:8px 0 12px}
+.back-btn{width:36px;height:36px;border-radius:50%;background:var(--navy2);display:grid;place-items:center}
+.row{padding:12px;border-radius:14px;background:var(--navy2);margin-bottom:8px}
+.row-title{font-size:14px;font-weight:500}
+.row-sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page-article{background:var(--sheet);color:var(--sheet-fg);border-radius:18px;padding:18px;margin-top:6px}
+.page-article h2{font-size:22px;margin:6px 0 12px}
+.page-article p{font-size:17px;line-height:1.6;color:#2a3440}
+.hidden{display:none!important}
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:28px 12px}
+.toast{position:absolute;left:50%;bottom:80px;z-index:50;transform:translateX(-50%);background:var(--sheet);color:var(--sheet-fg);padding:10px 18px;border-radius:var(--pill);font-size:13px}
+.shield-pill{font-size:11px;color:var(--muted);padding:4px 0 2px 14px}
+</style></head><body>
+<div class="phone" id="app">
+<div class="dune"></div>
+<div class="top"><form class="omnibox" id="omniForm">
+<button type="button" class="engine-dot" id="engineDot">D</button>
+<input id="omniInput" type="search" placeholder="Search or enter URL" autocomplete="off"/>
+</form></div>
+<div class="body">
+<div class="scroll" id="viewHome"><div class="home-wrap">
+<div class="brand">Daymark</div><div class="brand-sub" id="homeSub">On this phone · privacy first</div>
+<div class="dials" id="dials"></div>
+</div></div>
+<div class="scroll hidden" id="viewFocus"><div id="suggestions"></div></div>
+<div class="hidden" id="viewResults" style="display:none;flex-direction:column;flex:1;min-height:0">
+<div class="type-tabs" id="typeTabs">
+<button type="button" class="type-tab on" data-type="all">All</button>
+<button type="button" class="type-tab" data-type="images">Images</button>
+<button type="button" class="type-tab" data-type="news">News</button>
+<button type="button" class="type-tab" data-type="videos">Videos</button>
+<button type="button" class="type-tab" data-type="maps">Maps</button>
 </div>
-</body>
-</html>
+<div class="shield-pill" id="shieldPill">Shields on</div>
+<div class="scroll" id="resultsList"></div>
+<div class="engine-bar" id="engineBar"></div>
+</div>
+<div class="scroll hidden" id="viewPage"></div>
+<div class="scroll hidden" id="viewList"></div>
+</div>
+<nav class="nav">
+<button type="button" class="nav-btn" id="btnBack">←</button>
+<button type="button" class="nav-btn" id="btnForward">→</button>
+<button type="button" class="nav-btn" id="btnMenu">☰</button>
+<button type="button" class="nav-btn" id="btnTabs"><span class="tab-badge" id="tabCount">1</span></button>
+<button type="button" class="nav-btn" id="btnHome">⌂</button>
+</nav>
+</div>
+<script src="./daymark-browser.js"></script>
+</body></html>
