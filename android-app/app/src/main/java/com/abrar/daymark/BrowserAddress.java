@@ -110,6 +110,13 @@ final class BrowserAddress {
         switch (vertical) {
             case IMAGES:
             case VIDEOS:
+                switch (engine) {
+                    case DUCKDUCKGO: case GOOGLE: case BING: case BRAVE: case STARTPAGE:
+                    case YAHOO: case ECOSIA: case QWANT: case KAGI: case YANDEX:
+                        return true;
+                    default:
+                        return false;
+                }
             case NEWS:
                 switch (engine) {
                     case DUCKDUCKGO: case GOOGLE: case BING: case BRAVE: case STARTPAGE:
