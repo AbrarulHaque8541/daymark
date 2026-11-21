@@ -385,6 +385,7 @@ public final class MainActivity extends Activity {
     private boolean browserPageLoading;
     private Bundle pendingBrowserWebViewState;
     private long browserNavigationGeneration;
+    private BrowserDownloadUiPolicy.Filter currentDownloadFilter = BrowserDownloadUiPolicy.Filter.ALL;
     private final BrowserSelfHealingPolicy browserSelfHealingPolicy = new BrowserSelfHealingPolicy();
     private final BrowserDiagnostics browserDiagnostics = new BrowserDiagnostics();
     private static final String BROWSER_LOG_TAG = "DaymarkBrowser";
@@ -2886,14 +2887,35 @@ public final class MainActivity extends Activity {
 
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
-        quickRow.addView(browserHomeTile("H", "History", "Open saved site history",
-                this::showBrowserHistoryDialog), tileParams());
-        quickRow.addView(browserHomeTile("B", "Bookmarks", "Open saved bookmarks",
-                this::showBrowserBookmarksDialog), tileParams());
-        quickRow.addView(browserHomeTile("D", "Downloads", "Open the browser download list",
-                this::showBrowserDownloadsDialog), tileParams());
-        quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
-                this::showBrowserExtensionsManager), tileParams());
+        // Drive quick tiles from BrowserHomeLayoutPolicy so order and labels stay in one place.
+        for (int i = 0; i < BrowserHomeLayoutPolicy.QUICK_TILE_IDS.length; i++) {
+            String id = BrowserHomeLayoutPolicy.QUICK_TILE_IDS[i];
+            String label = BrowserHomeLayoutPolicy.QUICK_TILE_LABELS[i];
+            String glyph = label.substring(0, 1);
+            String description;
+            Runnable tap;
+            switch (id) {
+                case "history":
+                    description = "Open saved site history";
+                    tap = this::showBrowserHistoryDialog;
+                    break;
+                case "bookmarks":
+                    description = "Open saved bookmarks";
+                    tap = this::showBrowserBookmarksDialog;
+                    break;
+                case "downloads":
+                    description = "Open the browser download list";
+                    tap = this::showBrowserDownloadsDialog;
+                    break;
+                case "extensions":
+                    description = "Manage browser page scripts";
+                    tap = this::showBrowserExtensionsManager;
+                    break;
+                default:
+                    continue;
+            }
+            quickRow.addView(browserHomeTile(glyph, label, description, tap), tileParams());
+        }
         home.addView(quickRow, bottomMargin(dp(8)));
 
         // Optional Saved sites rail: up to four newest bookmark origins
@@ -4619,6 +4641,7 @@ public final class MainActivity extends Activity {
         BrowserDownloadListPolicy.Selection selection = collector.finish();
         boolean truncated = selection.truncated;
         for (BrowserDownloadListPolicy.Item item : selection.items) {
+            if (!BrowserDownloadUiPolicy.matches(currentDownloadFilter, item.mimeType)) continue;
             ids.add(item.id);
             urls.add(item.url);
             mimeTypes.add(item.mimeType);
@@ -4627,22 +4650,51 @@ public final class MainActivity extends Activity {
                     + browserDownloadStatusLabel(item.status, item.reason, item.downloaded, item.total));
         }
 
+        String downloadsTitle = truncated
+                ? (hasTimestampColumn ? "Downloads (showing 100 most recent items)"
+                        : "Downloads (showing 100 items)")
+                : "Downloads";
+        if (currentDownloadFilter != BrowserDownloadUiPolicy.Filter.ALL) {
+            downloadsTitle += " · " + currentDownloadFilter.label;
+        }
+
+        LinearLayout titleView = new LinearLayout(this);
+        titleView.setOrientation(LinearLayout.VERTICAL);
+        titleView.setPadding(dp(24), dp(16), dp(24), dp(8));
+        TextView titleText = text(downloadsTitle, 18, palette.text, Typeface.BOLD);
+        titleView.addView(titleText);
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        chips.setPadding(0, dp(8), 0, 0);
+        for (BrowserDownloadUiPolicy.Filter filter : BrowserDownloadUiPolicy.filtersInOrder()) {
+            Button chip = compactButton(filter.label, false);
+            if (filter == currentDownloadFilter) {
+                chip.setTextColor(palette.surface);
+                chip.setBackground(pressable(palette.accent, 9, palette.accent, palette.accent));
+            }
+            chip.setOnClickListener(v -> {
+                currentDownloadFilter = filter;
+                showBrowserDownloadsDialog();
+            });
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            chipParams.rightMargin = dp(6);
+            chips.addView(chip, chipParams);
+        }
+        titleView.addView(chips);
+
         if (ids.isEmpty()) {
             new AlertDialog.Builder(this)
-                    .setTitle("Downloads")
-                    .setMessage("No Daymark browser downloads are available. New browser downloads are temporarily blocked until Daymark can validate every redirect safely. Browsing remains available.")
+                    .setCustomTitle(titleView)
+                    .setMessage(BrowserDownloadUiPolicy.emptyListMessage())
                     .setPositiveButton("Close", null)
                     .setNeutralButton("Refresh", (dialog, which) -> showBrowserDownloadsDialog())
                     .show();
             return;
         }
 
-        String downloadsTitle = truncated
-                ? (hasTimestampColumn ? "Downloads (showing 100 most recent items)"
-                        : "Downloads (showing 100 items)")
-                : "Downloads";
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(downloadsTitle)
+                .setCustomTitle(titleView)
                 .setItems(labels.toArray(new String[0]), (shown, selected) -> {
                     if (selected < 0 || selected >= ids.size()) return;
                     long id = ids.get(selected);
