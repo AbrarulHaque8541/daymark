@@ -1,0 +1,35 @@
+--- a/android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
++++ b/android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
+@@ -907,10 +907,10 @@
+         }
+     }
+ 
+-    /** The search filters row is opt-in: absent or corrupt preferences fail to off. */
++    /** Search filters default on; absent key enables them. Corrupt preferences fail to off. */
+     private boolean readSearchFiltersEnabledPreference() {
+         try {
+-            return browserPreferences.getBoolean(SEARCH_FILTERS_ENABLED_KEY, false);
++            return browserPreferences.getBoolean(SEARCH_FILTERS_ENABLED_KEY, true);
+         } catch (ClassCastException invalidPreference) {
+             browserPreferences.edit().remove(SEARCH_FILTERS_ENABLED_KEY).apply();
+             return false;
+@@ -2884,17 +2884,8 @@
+ 
+         home.addView(browserHomeSearchPill(), bottomMargin(dp(12)));
+ 
+-        LinearLayout quickRow = new LinearLayout(this);
+-        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+-        quickRow.addView(browserHomeTile("H", "History", "Open saved site history",
+-                this::showBrowserHistoryDialog), tileParams());
+-        quickRow.addView(browserHomeTile("B", "Bookmarks", "Open saved bookmarks",
+-                this::showBrowserBookmarksDialog), tileParams());
+-        quickRow.addView(browserHomeTile("D", "Downloads", "Open the browser download list",
+-                this::showBrowserDownloadsDialog), tileParams());
+-        quickRow.addView(browserHomeTile("E", "Extensions", "Manage browser page scripts",
+-                this::showBrowserExtensionsManager), tileParams());
+-        home.addView(quickRow, bottomMargin(dp(8)));
++        // Library tools (History, Bookmarks, Downloads, Extensions) live in the overflow
++        // only — home stays search-first: pill, optional saved sites, provider rail.
+ 
+         // Optional Saved sites rail: up to four newest bookmark origins
+         LinearLayout savedRailContainer = new LinearLayout(this);
