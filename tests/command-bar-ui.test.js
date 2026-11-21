@@ -10,7 +10,7 @@ const flags = require('../feature-flags-logic.js');
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'command-bar-ui.js'), 'utf8');
 
-function makeElement(tagName) {
+function makeElement(tagName, doc) {
   const el = {
     tagName: tagName,
     className: '',
@@ -36,7 +36,8 @@ function makeElement(tagName) {
     },
     setAttribute(name, value) { el.attrs[name] = String(value); },
     getAttribute(name) { return Object.prototype.hasOwnProperty.call(el.attrs, name) ? el.attrs[name] : null; },
-    focus() { el.focused = true; },
+    removeAttribute(name) { delete el.attrs[name]; },
+    focus() { el.focused = true; if (doc) doc.activeElement = el; },
     scrollIntoView() { el.scrolled = (el.scrolled || 0) + 1; }
   };
   Object.defineProperty(el, 'firstChild', { get() { return el.children.length ? el.children[0] : null; } });
@@ -61,13 +62,15 @@ function findAll(node, out) {
 }
 
 function makeDoc() {
-  const head = makeElement('head');
-  const body = makeElement('body');
-  const elements = { 'storage-card': makeElement('div') };
+  const doc = {};
+  const head = makeElement('head', doc);
+  const body = makeElement('body', doc);
+  const elements = { 'storage-card': makeElement('div', doc) };
   const docListeners = {};
-  return {
+  Object.assign(doc, {
     head: head,
     body: body,
+    activeElement: body,
     getElementById(id) {
       if (Object.prototype.hasOwnProperty.call(elements, id)) return elements[id];
       const pool = findAll(head).concat(findAll(body));
@@ -76,12 +79,20 @@ function makeDoc() {
       }
       return null;
     },
-    createElement(tagName) { return makeElement(tagName); },
+    createElement(tagName) { return makeElement(tagName, doc); },
     addEventListener(type, handler) { (docListeners[type] = docListeners[type] || []).push(handler); },
     dispatchDoc(type, ev) {
-      for (const handler of (docListeners[type] || []).slice()) handler(ev);
+      const event = Object.assign({
+        type: type,
+        target: doc,
+        defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+      }, ev || {});
+      for (const handler of (docListeners[type] || []).slice()) handler(event);
+      return event;
     }
-  };
+  });
+  return doc;
 }
 
 function makeStorage(seed) {
@@ -118,9 +129,73 @@ test('the overlay mounts as an accessible dialog and a second attach is refused'
   assert.equal(handle.overlay.getAttribute('id'), 'command-bar-overlay');
   assert.equal(handle.overlay.getAttribute('role'), 'dialog');
   assert.equal(handle.overlay.getAttribute('aria-modal'), 'true');
+  assert.equal(handle.overlay.getAttribute('aria-labelledby'), 'command-bar-title');
+  assert.match(doc.getElementById('command-bar-title').textContent, /Command bar/);
   assert.equal(handle.input.getAttribute('role'), 'combobox');
+  assert.equal(handle.input.getAttribute('aria-label'), 'Search commands, cards, or !bangs');
+  assert.equal(handle.input.getAttribute('aria-controls'), 'command-bar-list');
+  assert.equal(handle.input.getAttribute('aria-autocomplete'), 'list');
+  assert.equal(handle.listEl.getAttribute('id'), 'command-bar-list');
+  assert.equal(handle.listEl.getAttribute('role'), 'listbox');
+  assert.equal(handle.input.disabled, true);
   assert.equal(handle.statusEl.getAttribute('aria-live'), 'polite');
   assert.equal(ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow())), null);
+});
+
+test('the combobox tracks its selected option and clears stale popup relationships', () => {
+  const doc = makeDoc();
+  const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
+  handle.open();
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'true');
+  const firstId = handle.input.getAttribute('aria-activedescendant');
+  assert.ok(firstId);
+  const firstOption = doc.getElementById(firstId);
+  assert.equal(firstOption.getAttribute('role'), 'option');
+  assert.equal(firstOption.getAttribute('aria-selected'), 'true');
+  assert.equal(firstOption.parentNode, handle.listEl);
+
+  handle.input.dispatch('keydown', { key: 'ArrowDown' });
+  const nextId = handle.input.getAttribute('aria-activedescendant');
+  assert.notEqual(nextId, firstId);
+  assert.equal(doc.getElementById(nextId).getAttribute('aria-selected'), 'true');
+  assert.equal(doc.getElementById(firstId).getAttribute('aria-selected'), 'false');
+
+  handle.input.value = '!zzz';
+  handle.input.dispatch('input', {});
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.input.getAttribute('aria-activedescendant'), null);
+});
+
+test('Tab and Shift+Tab remain inside the open command-bar dialog', () => {
+  const doc = makeDoc();
+  const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
+  const opener = doc.createElement('button');
+  doc.body.appendChild(opener);
+  opener.focus();
+  handle.open();
+  assert.equal(handle.input.disabled, false);
+  assert.equal(doc.activeElement, handle.input);
+
+  const forwardTab = doc.dispatchDoc('keydown', { key: 'Tab', target: handle.input });
+  assert.equal(forwardTab.defaultPrevented, true);
+  assert.equal(doc.activeElement, handle.input);
+
+  const backwardTab = doc.dispatchDoc('keydown', { key: 'Tab', shiftKey: true, target: handle.input });
+  assert.equal(backwardTab.defaultPrevented, true);
+  assert.equal(doc.activeElement, handle.input);
+
+  doc.body.focus();
+  const tabAfterFocusEscaped = doc.dispatchDoc('keydown', { key: 'Tab', target: doc.body });
+  assert.equal(tabAfterFocusEscaped.defaultPrevented, true);
+  assert.equal(doc.activeElement, handle.input);
+
+  handle.close();
+  assert.equal(handle.input.disabled, true);
+  assert.equal(handle.input.getAttribute('aria-expanded'), 'false');
+  assert.equal(handle.input.getAttribute('aria-activedescendant'), null);
+  assert.equal(doc.activeElement, opener);
+  const tabWhileClosed = doc.dispatchDoc('keydown', { key: 'Tab', target: handle.input });
+  assert.equal(tabWhileClosed.defaultPrevented, false);
 });
 
 test('with the flag off, opening is refused honestly and no keyboard path can summon it', () => {
@@ -136,14 +211,19 @@ test('with the flag off, opening is refused honestly and no keyboard path can su
 test('Ctrl+K opens the palette, Escape (document or input) closes it', () => {
   const doc = makeDoc();
   const handle = ui.attachCommandBarUi(makeEnv(doc, flagsOnStorage(), makeWindow()));
-  doc.dispatchDoc('keydown', { key: 'k', ctrlKey: true });
+  const trigger = doc.createElement('button');
+  doc.body.appendChild(trigger);
+  trigger.focus();
+  doc.dispatchDoc('keydown', { key: 'k', ctrlKey: true, target: trigger });
   assert.equal(handle.isOpen(), true);
   assert.equal(handle.overlay.classList.contains('is-open'), true);
   doc.dispatchDoc('keydown', { key: 'Escape' });
   assert.equal(handle.isOpen(), false);
-  doc.dispatchDoc('keydown', { key: 'k', ctrlKey: true });
+  assert.equal(doc.activeElement, trigger);
+  doc.dispatchDoc('keydown', { key: 'k', ctrlKey: true, target: trigger });
   handle.input.dispatch('keydown', { key: 'Escape' });
   assert.equal(handle.isOpen(), false);
+  assert.equal(doc.activeElement, trigger);
 });
 
 test('Cmd+K toggles the palette too', () => {

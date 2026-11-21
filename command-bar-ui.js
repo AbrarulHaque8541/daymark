@@ -29,12 +29,14 @@
     overlay.setAttribute('id', OVERLAY_ID);
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'command-bar-title');
     overlay.setAttribute('aria-hidden', 'true');
     overlay.className = 'command-bar-layer';
     const panel = doc.createElement('div');
     panel.className = 'command-bar-panel';
     overlay.appendChild(panel);
     const title = doc.createElement('h2');
+    title.setAttribute('id', 'command-bar-title');
     title.className = 'command-bar-title';
     title.textContent = 'Command bar \u2014 palette, toggles, !bangs';
     panel.appendChild(title);
@@ -50,7 +52,11 @@
     input.setAttribute('id', 'command-bar-input');
     input.className = 'command-bar-input';
     input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-label', 'Search commands, cards, or !bangs');
+    input.setAttribute('aria-controls', 'command-bar-list');
+    input.setAttribute('aria-autocomplete', 'list');
     input.setAttribute('aria-expanded', 'false');
+    input.disabled = true;
     panel.appendChild(input);
     const listEl = doc.createElement('ul');
     listEl.setAttribute('id', 'command-bar-list');
@@ -71,17 +77,25 @@
     let currentList = [];
     let selectedIndex = 0;
     let pendingParsed = null;
+    let returnFocusTo = null;
     function setStatus(message) { statusEl.textContent = message; }
     function renderList(commands) {
       while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+      let activeOptionId = null;
       for (let index = 0; index < commands.length; index += 1) {
         const li = doc.createElement('li');
+        const optionId = 'command-bar-option-' + index;
+        li.setAttribute('id', optionId);
         li.setAttribute('role', 'option');
         li.setAttribute('data-command-id', commands[index].id);
+        li.setAttribute('aria-selected', index === selectedIndex ? 'true' : 'false');
         li.textContent = commands[index].label + (index === selectedIndex ? ' (selected)' : '');
-        if (index === selectedIndex) li.setAttribute('aria-selected', 'true');
+        if (index === selectedIndex) activeOptionId = optionId;
         listEl.appendChild(li);
       }
+      input.setAttribute('aria-expanded', commands.length > 0 ? 'true' : 'false');
+      if (activeOptionId) input.setAttribute('aria-activedescendant', activeOptionId);
+      else input.removeAttribute('aria-activedescendant');
     }
     function render(rawText) {
       const parsed = commandBar.parseQuery(rawText || '');
@@ -175,11 +189,15 @@
       return false;
     }
     function open() {
+      if (isOpen()) return true;
       if (!flagOn('command-bar')) {
-        input.disabled = true;
         setStatus('The command bar is switched off in Feature settings. Turn it on there first. Nothing was opened.');
         return false;
       }
+      const activeElement = doc.activeElement;
+      returnFocusTo = activeElement && activeElement !== doc && activeElement !== doc.body
+        && activeElement !== doc.documentElement && activeElement !== input
+        && typeof activeElement.focus === 'function' ? activeElement : null;
       input.disabled = false;
       input.value = '';
       overlay.classList.add('is-open');
@@ -193,6 +211,11 @@
       overlay.classList.remove('is-open');
       overlay.setAttribute('aria-hidden', 'true');
       input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      input.disabled = true;
+      const focusTarget = returnFocusTo;
+      returnFocusTo = null;
+      if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
     }
     function isOpen() { return overlay.classList.contains('is-open'); }
     function toggle() {
@@ -240,7 +263,16 @@
         toggle();
         return;
       }
-      if (key === 'escape' && isOpen()) close();
+      if (!isOpen()) return;
+      if (key === 'escape') {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        close();
+        return;
+      }
+      if (key === 'tab') {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof input.focus === 'function') input.focus();
+      }
     });
     return {
       overlay: overlay,
