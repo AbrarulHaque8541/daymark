@@ -31,4 +31,16 @@ if "check-ui-motion-policy-tests.sh" in runner:
     raise SystemExit("FAIL: incorrect UI motion test runner reference")
 if "run-ui-motion-policy-tests.sh" not in workflow:
     raise SystemExit("FAIL: Android CI must invoke the canonical UI motion regression runner")
+
+status_start = activity.find("private void showBrowserStatus(String message)")
+status_end = activity.find("private void updateBrowserSecurityMarker", status_start)
+if status_start < 0 or status_end < 0:
+    raise SystemExit("FAIL: browser status method not found")
+status = activity[status_start:status_end]
+if "WorkspaceMotion.isReducedMotionPublic(browserStatus)" not in status:
+    raise SystemExit("FAIL: transient browser status must read Android reduced-motion preference")
+if "if (!reducedMotion) browserStatus.animate().alpha(1f)" not in status:
+    raise SystemExit("FAIL: browser status fade-in must be skipped for reduced motion")
+if "browserStatus.setVisibility(View.GONE);" not in status:
+    raise SystemExit("FAIL: reduced-motion status dismissal must hide directly without an exit animation")
 print("PASS UI motion integration source guard")

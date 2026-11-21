@@ -363,15 +363,15 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 handler.cancel();
-                listener.onLoadError(-1, "certificate error: " + error.getPrimaryError(), error.getUrl());
+                listener.onLoadError(-1, BrowserDiagnostics.safeErrorCodeDetail(error.getPrimaryError()), error.getUrl());
             }
 
             @SuppressWarnings("deprecation")
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                Log.e("DaymarkWebView", "onReceivedError code=" + errorCode
-                        + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl)
-                        + " description=" + (description == null ? "" : description));
+                int safeErrorCode = BrowserDiagnostics.safeErrorCode(errorCode);
+                Log.e("DaymarkWebView", "onReceivedError code=" + safeErrorCode
+                        + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl));
                 if (isLocalResourceAddress(failingUrl)) {
                     showLocalResourceAccessNotice(view, true);
                     return;
@@ -384,7 +384,8 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
-                listener.onLoadError(errorCode, description == null ? "" : description, failingUrl);
+                listener.onLoadError(safeErrorCode,
+                        BrowserDiagnostics.safeErrorCodeDetail(safeErrorCode), failingUrl);
             }
 
             @Override
@@ -402,17 +403,15 @@ final class DaymarkWebView extends WebView implements BrowserOfflineEnforcement.
                     return;
                 }
                 if (!request.isForMainFrame()) return;
-                Log.e("DaymarkWebView", "onReceivedError code=" + error.getErrorCode()
-                        + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl)
-                        + " description=" + (error.getDescription() == null
-                        ? "" : error.getDescription().toString()));
+                int safeErrorCode = BrowserDiagnostics.safeErrorCode(error.getErrorCode());
+                Log.e("DaymarkWebView", "onReceivedError code=" + safeErrorCode
+                        + " origin=" + BrowserLogPolicy.redactedOrigin(failingUrl));
                 if (!networkPolicy.allowsRemoteLoads() && isWebAddress(failingUrl)) {
                     listener.onOfflineNavigationBlocked();
                     return;
                 }
-                listener.onLoadError(error.getErrorCode(),
-                        error.getDescription() == null ? "" : error.getDescription().toString(),
-                        failingUrl);
+                listener.onLoadError(safeErrorCode,
+                        BrowserDiagnostics.safeErrorCodeDetail(safeErrorCode), failingUrl);
             }
 
             @Override

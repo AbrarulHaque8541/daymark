@@ -117,17 +117,18 @@ final class BrowserLoadWatchdog {
         if (listener != null) listener.onLoadFinished(url);
     }
 
-    /** Call from WebViewClient.onReceivedError. Cancels retry/fail stages, reports error. */
-    synchronized void onReceivedError(String url, int errorCode, String description) {
+    /** Call from WebViewClient.onReceivedError. Cancels retry/fail stages, reports a safe code. */
+    synchronized void onReceivedError(String url, int errorCode) {
         cancelStages();
         pendingAddress = null;
         hintFired = true;
         retryFired = true;
         failFired = true;
-        String safeDesc = description == null ? "unknown" : description.replaceAll("[\r\n]", " ");
-        record("load-error: " + redact(url) + " code=" + errorCode + " " + safeDesc);
-        Log.w(TAG, "load-error: " + redact(url) + " code=" + errorCode + " " + safeDesc);
-        if (listener != null) listener.onLoadError(url, errorCode, safeDesc);
+        int safeErrorCode = BrowserDiagnostics.safeErrorCode(errorCode);
+        record("load-error: " + redact(url) + " code=" + safeErrorCode);
+        Log.w(TAG, "load-error: " + redact(url) + " code=" + safeErrorCode);
+        if (listener != null) listener.onLoadError(redact(url), safeErrorCode,
+                BrowserDiagnostics.safeErrorCodeDetail(safeErrorCode));
     }
 
     /** Call when renderer dies. Triggers immediate fail with recovery option. */
