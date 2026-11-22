@@ -165,6 +165,34 @@ test('an explicit Clear action can remove a corrupt zone cache', async () => {
   assert.equal(elements['zones-status'].textContent, 'World clock cleared on this device.');
 });
 
+test('clearing a corrupt cache lets the user add and save a zone again', async () => {
+  const { env, elements, storageData, storageCalls } = fakeEnv({ stored: '' });
+  const handle = ui.attachZonesUi(env);
+  await handle.onClear();
+  elements['zones-pick'].value = 'Europe/London';
+  await handle.onAdd();
+  assert.equal(storageCalls.removes, 1);
+  assert.equal(storageCalls.writes, 1);
+  const saved = JSON.parse(storageData[ui.STORAGE_KEY]);
+  assert.deepEqual(saved.zones, ['Asia/Kolkata', 'Europe/London']);
+  assert.ok(elements['zones-status'].textContent.startsWith('Added UK · London'));
+});
+
+test('failed clear of a corrupt cache keeps subsequent writes fail-closed', async () => {
+  const { env, elements, storageData, storageCalls } = fakeEnv({
+    stored: '',
+    removeFailure: true,
+    pick: 'Europe/London'
+  });
+  const handle = ui.attachZonesUi(env);
+  await handle.onClear();
+  await handle.onAdd();
+  assert.equal(storageCalls.removes, 1);
+  assert.equal(storageCalls.writes, 0);
+  assert.equal(storageData[ui.STORAGE_KEY], '');
+  assert.match(elements['zones-status'].textContent, /saved list was not changed/i);
+});
+
 test('a throwing localStorage getter does not crash and keeps writes fail-closed', async () => {
   const { env, elements, storageCalls } = fakeEnv({
     omitLocalStorage: true,

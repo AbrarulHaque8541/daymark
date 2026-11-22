@@ -472,6 +472,7 @@
       }
       try {
         storage.removeItem(STORAGE_KEY);
+        storageCorrupt = false;
       } catch (error) {
         status('Could not clear saved time zones. Stored data was left unchanged.');
         return;
