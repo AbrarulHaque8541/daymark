@@ -106,13 +106,7 @@
     const resultEl = element('potd-result');
     const clearEl = element('potd-clear');
     let busy = false;
-    function status(message, isSuccess) {
-      if (!statusEl) return;
-      statusEl.textContent = message;
-      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
-        statusEl.classList.toggle('is-success', !!isSuccess);
-      }
-    }
+    function status(message) { if (statusEl) statusEl.textContent = message; }
     function setBusy(isBusy) {
       busy = isBusy;
       if (buttonEl) {
@@ -140,9 +134,11 @@
       const src = picture.thumbUrl || picture.imageUrl;
       if (image.setAttribute) {
         image.setAttribute('src', src);
-        image.setAttribute('alt', picture.title
-          ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
-          : 'Picture of the day for ' + dateLabel + ' from Wikimedia');
+      const altText = picture.title
+        ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
+        : 'Picture of the day for ' + dateLabel + ' from Wikimedia';
+        image.setAttribute('alt', altText);
+        image.setAttribute('title', altText);
         image.setAttribute('loading', 'lazy');
         image.setAttribute('referrerpolicy', 'no-referrer');
         if (Number.isInteger(picture.width) && picture.width > 0
@@ -151,6 +147,11 @@
           image.setAttribute('height', String(picture.height));
         }
       }
+      image.onload = function () {
+        if (image.classList && typeof image.classList.add === 'function') {
+          image.classList.add('is-loaded');
+        }
+      };
       image.onerror = function () {
         if (image.parentNode) image.parentNode.removeChild(image);
         const err = doc.createElement('p');
@@ -206,7 +207,7 @@
         const record = await logicApi.fetchPotd(fetchImpl, options);
         render(record);
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC \u00b7 not saved on this device', true);
+          + ' UTC \u00b7 not saved on this device');
         if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
           statusEl.classList.add('is-success');
           if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Picture of the day updated');
