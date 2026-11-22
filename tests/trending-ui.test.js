@@ -399,6 +399,19 @@ test('clear hides the copy button', async () => {
   assert.strictEqual(doc.getElementById('trending-copy').hidden, true);
 });
 
+test('today button clears the date field and updates status', () => {
+  const doc = makeDoc();
+  attach(doc);
+  const input = doc.getElementById('trending-date');
+  input.value = '11-20';
+  const today = doc.getElementById('trending-today');
+  assert.ok(today);
+  assert.strictEqual(today.textContent, 'Today');
+  today.dispatch('click', {});
+  assert.strictEqual(input.value, '');
+  assert.ok(doc.getElementById('trending-status').textContent.includes('Using today'));
+});
+
 test('checking sets loading class on result and busy on status', async () => {
   const doc = makeDoc();
   let release;

@@ -65,6 +65,16 @@
     }
     form.appendChild(input);
 
+    const todayButton = doc.createElement('button');
+    todayButton.id = 'trending-today';
+    todayButton.className = 'button button-quiet';
+    if (todayButton.setAttribute) {
+      todayButton.setAttribute('type', 'button');
+      todayButton.setAttribute('title', 'Use today (clear the date field)');
+    }
+    todayButton.textContent = 'Today';
+    form.appendChild(todayButton);
+
     const checkButton = doc.createElement('button');
     checkButton.id = 'trending-check';
     checkButton.className = 'button button-primary';
@@ -141,6 +151,7 @@
     const resultEl = element('trending-result');
     const clearEl = element('trending-clear');
     const copyEl = element('trending-copy');
+    const todayEl = element('trending-today');
 
     let busy = false;
     let lastRecord = null;
@@ -189,6 +200,7 @@
     if (buttonEl) addPressFeedback(buttonEl);
     if (clearEl) addPressFeedback(clearEl);
     if (copyEl) addPressFeedback(copyEl);
+    if (todayEl) addPressFeedback(todayEl);
 
     function buildCopyText(record) {
       if (!record || !record.articles || !record.articles.length) return '';
@@ -341,6 +353,17 @@
       }
     }
 
+    function onToday() {
+      if (busy) return;
+      if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
+      status('Using today. Tap Check to load trending articles.');
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+      }
+      if (inputEl && typeof inputEl.focus === 'function') inputEl.focus();
+    }
+
     function onClear() {
       if (busy) return;
       lastRecord = null;
@@ -371,6 +394,9 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
+    if (todayEl && typeof todayEl.addEventListener === 'function') {
+      todayEl.addEventListener('click', () => { onToday(); });
+    }
     if (copyEl && typeof copyEl.addEventListener === 'function') {
       copyEl.addEventListener('click', () => { onCopy(); });
     }
@@ -386,6 +412,7 @@
     return {
       onCheck,
       onClear,
+      onToday,
       onCopy,
       detach() {
         setBusy(false);
