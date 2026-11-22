@@ -56,7 +56,10 @@
     const coinSelect = doc.createElement('select');
     coinSelect.id = 'crypto-coin';
     coinSelect.className = 'sort-select';
-    if (typeof coinSelect.setAttribute === 'function') coinSelect.setAttribute('aria-label', 'Cryptocurrency');
+    if (typeof coinSelect.setAttribute === 'function') {
+      coinSelect.setAttribute('aria-label', 'Cryptocurrency');
+      coinSelect.setAttribute('title', 'Cryptocurrency to check');
+    }
     COINS.forEach((coin, index) => {
       const option = doc.createElement('option');
       option.value = coin;
@@ -75,7 +78,10 @@
     const fiatSelect = doc.createElement('select');
     fiatSelect.id = 'crypto-fiat';
     fiatSelect.className = 'sort-select';
-    if (typeof fiatSelect.setAttribute === 'function') fiatSelect.setAttribute('aria-label', 'Currency');
+    if (typeof fiatSelect.setAttribute === 'function') {
+      fiatSelect.setAttribute('aria-label', 'Currency');
+      fiatSelect.setAttribute('title', 'Fiat currency for the rate');
+    }
     FIATS.forEach((fiat, index) => {
       const option = doc.createElement('option');
       option.value = fiat;
@@ -91,10 +97,16 @@
     if (typeof checkButton.setAttribute === 'function') checkButton.setAttribute('type', 'submit');
     checkButton.textContent = 'Check';
     if (typeof checkButton.setAttribute === 'function') checkButton.setAttribute('title', 'Check the current crypto rate');
+      checkButton.setAttribute('title', 'Check the current crypto rate');
+    }
+    checkButton.textContent = 'Check';
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
     clearButton.id = 'crypto-clear';
+    clearButton.className = 'button button-quiet';
+    if (typeof clearButton.setAttribute === 'function') {
+      clearButton.setAttribute('type', 'button');
     clearButton.className = 'button button-quiet';
     if (typeof clearButton.setAttribute === 'function') clearButton.setAttribute('type', 'button');
     clearButton.textContent = 'Clear';
