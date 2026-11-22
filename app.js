@@ -1449,32 +1449,6 @@
         }
         if (payloadSafety.tooDeep) {
           result.depthLimitCount += 1;
-          return;
-        }
-        try {
-          const records = JSON.parse(payload);
-          if (Array.isArray(records)) result.arrays.push(records);
-          else result.malformedCount += 1;
-        } catch (error) {
-          result.malformedCount += 1;
-        }
-      });
-      return result;
-    }
-    result.malformedCount = 1;
-    return result;
-  }
-
-  function readFocusRecoveryStates(raw) {
-    const result = { states: [], malformedCount: 0 };
-    if (typeof raw !== 'string' || raw.length === 0) return result;
-    if (!focus) {
-      result.malformedCount = 1;
-      return result;
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
     } catch (error) {
       result.malformedCount = 1;
       return result;

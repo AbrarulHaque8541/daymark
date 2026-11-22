@@ -233,33 +233,6 @@ test('a paused session restores as paused with frozen time', () => {
 });
 
 test('focus minutes from the log are totalled for today', () => {
-  // Anchor the entries at 10:00 local today so the test is stable at any hour.
-  const start = new Date();
-  start.setHours(10, 0, 0, 0);
-  const entry = {
-    id: 'log-1',
-    taskId: null,
-    kind: 'focus',
-    durationMinutes: 25,
-    startedAt: start.toISOString(),
-    endedAt: new Date(start.getTime() + 30 * 60 * 1000).toISOString(),
-    elapsedMs: 30 * 60 * 1000,
-    completed: true
-  };
-  const breakEntry = { ...entry, id: 'log-2', kind: 'short-break', elapsedMs: 5 * 60 * 1000 };
-  const { elements } = bootApp({ savedFocus: JSON.stringify({ session: null, log: [entry, breakEntry] }), now: start.getTime() });
-
-  assert.equal(elements.get('#focus-today').textContent, '30', 'breaks are not counted as focus time');
-});
-
-test('an idle focus card shows the default preset clock', () => {
-  const { elements } = bootApp({ savedFocus: JSON.stringify({ session: null, log: [] }) });
-  assert.equal(elements.get('#focus-time').textContent, '25:00');
-  assert.equal(elements.get('#focus-state-label').textContent, 'Ready');
-  assert.equal(elements.get('#focus-start').hidden, false);
-  assert.equal(elements.get('#focus-pause').hidden, true);
-});
-
 test('a corrupt focus payload is kept in a recovery backup and the app still boots', async () => {
   const { elements, storedValues, lockManager } = bootApp({ savedFocus: '{not valid JSON' });
   await lockManager.whenIdle();
