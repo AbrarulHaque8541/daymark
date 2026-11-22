@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-22T04:04:57Z (PR #858 credential isolation merged; latest main checks green)](./CURRENT_STATUS_20261122T040457Z.md)
 - [Daymark engineering status — 2026-11-21T04:38:11Z (Batch 3: opt-in Focus view card)](./CURRENT_STATUS_20261121T043811Z.md)
 - [Daymark engineering status — 2026-11-21T04:17:48Z (R&D: DNR permission and post-merge refresh)](./CURRENT_STATUS_20261121T041748Z.md)
 - [Daymark engineering status — 2026-11-21T04:05:04Z (command palette dialog accessibility)](./CURRENT_STATUS_20261121T040504Z.md)
