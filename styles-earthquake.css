@@ -1,0 +1,21 @@
+/* Earthquake glance structured list polish */
+.quake-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.quake-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid rgba(219, 226, 232, .6); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: 0 4px 12px rgba(24, 40, 48, .04); transition: transform .16s ease, border-color .16s ease; }
+.quake-item:hover { border-color: rgba(22, 112, 95, .25); transform: translateY(-1px); }
+.quake-mag { flex: 0 0 auto; min-width: 48px; padding: 4px 8px; border-radius: 8px; font: 700 12px Manrope, sans-serif; text-align: center; letter-spacing: -.02em; }
+.quake-mag-high { color: #a3281f; background: var(--red-soft); }
+.quake-mag-medium { color: #94581e; background: var(--orange-soft); }
+.quake-mag-low { color: var(--accent-dark); background: var(--accent-soft); }
+.quake-mag-unknown { color: var(--muted-text); background: rgba(219, 226, 232, .5); }
+.quake-details { min-width: 0; flex: 1; }
+.quake-place { font-weight: 600; font-size: 13px; color: var(--ink); line-height: 1.4; }
+.quake-meta { margin-top: 3px; color: var(--muted-text); font-size: 11px; }
+.quake-link { display: inline-block; margin-top: 4px; color: var(--accent); font-size: 11px; font-weight: 600; text-decoration: none; }
+.quake-link:hover { text-decoration: underline; }
+.quake-empty { margin: 8px 0 0; color: var(--muted-text); font-size: 12px; font-style: italic; }
+#earthquake-check:active, #earthquake-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+.feed-status.is-success { animation: status-flash .6s ease; }
+@keyframes status-flash { 0% { color: var(--accent); } 100% { color: inherit; } }
+@media (prefers-reduced-motion: reduce) {
+  .quake-item, .feed-status.is-success { animation: none; transition: none; }
+}
