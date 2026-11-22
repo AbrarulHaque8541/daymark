@@ -25,6 +25,7 @@ function fakeElement(tag, doc) {
     children: [],
     listeners: [],
     parentNode: null,
+    attrs: {},
     appendChild(child) { child.parentNode = el; el.children.push(child); return child; },
     insertBefore(child, ref) { child.parentNode = el; el.children.push(child); return child; },
     setAttribute(name, value) { el.attrs = el.attrs || {}; el.attrs[name] = String(value); },
@@ -36,6 +37,22 @@ function fakeElement(tag, doc) {
         if (listener.type === event.type) listener.handler(event);
       }
       return !event.defaultPrevented;
+    },
+    classList: {
+      _classes: new Set(),
+      add(c) { this._classes.add(c); },
+      remove(c) { this._classes.delete(c); },
+      toggle(c, force) {
+        if (force === undefined) {
+          if (this._classes.has(c)) this._classes.delete(c);
+          else this._classes.add(c);
+        } else {
+          if (force) this._classes.add(c);
+          else this._classes.delete(c);
+        }
+        return this._classes.has(c);
+      },
+      contains(c) { return this._classes.has(c); }
     }
   };
   Object.defineProperty(el, 'id', {
@@ -184,6 +201,7 @@ test('form submission prevents navigation and renders the result once', async ()
     'Delhi, India · European AQI 35 (Fair) · US AQI 62 (Moderate) · PM2.5 18.4 µg/m³');
   assert.equal(els.status.textContent,
     'Updated · 2026-11-11 05:00 UTC · not saved on this device');
+  assert.ok(els.status.classList.contains('is-success'), 'success flash class is set on status');
   assert.equal(els.button.disabled, false);
 });
 
@@ -243,6 +261,7 @@ test('a failed check reports the error plainly and renders nothing', async () =>
   assert.equal(els.status.textContent, 'Could not check: offline');
   assert.equal(els.result.textContent, '');
   assert.equal(els.button.disabled, false);
+  assert.ok(!els.status.classList.contains('is-success'), 'failure does not set success class');
 });
 
 test('missing fetch support is reported instead of throwing', async () => {
@@ -280,6 +299,7 @@ test('clear empties the view and says so without touching storage', () => {
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
   assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
+  assert.ok(!els.status.classList.contains('is-success'), 'clear removes success class');
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {

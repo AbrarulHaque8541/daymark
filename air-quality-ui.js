@@ -127,8 +127,16 @@
 
     let busy = false;
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, isSuccess) {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
+      if (typeof statusEl.setAttribute === 'function') {
+        if (isSuccess) statusEl.setAttribute('title', 'Air quality updated');
+        else statusEl.removeAttribute('title');
+      }
     }
 
     function setBusy(isBusy) {
@@ -177,7 +185,7 @@
         const record = await airApi.fetchAirQualityByPlace(typed, fetchImpl, { now: now });
         render(record);
         status('Updated · ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC · not saved on this device');
+          + ' UTC · not saved on this device', true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         status('Could not check: ' + message);
