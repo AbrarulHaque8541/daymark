@@ -1,3 +1,4 @@
+- [Daymark engineering status — 2026-11-22T04:05:39Z (web recurring-task bulk-completion fix merged)](./CURRENT_STATUS_20261122T040539Z.md)
 - [Daymark engineering status — 2026-11-21T04:38:11Z (Batch 3: opt-in Focus view card)](./CURRENT_STATUS_20261121T043811Z.md)
 - [Daymark engineering status — 2026-11-21T04:17:48Z (R&D: DNR permission and post-merge refresh)](./CURRENT_STATUS_20261121T041748Z.md)
 - [Daymark engineering status — 2026-11-21T04:05:04Z (command palette dialog accessibility)](./CURRENT_STATUS_20261121T040504Z.md)
