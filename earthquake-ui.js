@@ -171,12 +171,26 @@
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
           + describeHidden(record));
+        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Earthquakes updated');
+          if (typeof setTimeout === 'function') {
+            setTimeout(function () {
+              if (statusEl.classList) statusEl.classList.remove('is-success');
+              if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+            }, 1400);
+          }
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof quakesApi.classifiesError === 'function'
           ? quakesApi.classifiesError(error)
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
+        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+          statusEl.classList.remove('is-success');
+          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+        }
         clearResult();
       } finally {
         setBusy(false);
@@ -187,6 +201,10 @@
       if (busy) return;
       clearResult();
       status('Cleared. Tap Check to fetch the latest significant earthquakes.');
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+      }
     }
 
     function onSubmit(event) {
