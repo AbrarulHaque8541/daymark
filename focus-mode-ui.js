@@ -195,7 +195,7 @@
     overlayStatus.setAttribute('id', 'focus-mode-overlay-status');
     overlayStatus.setAttribute('role', 'status');
     overlayStatus.setAttribute('aria-live', 'polite');
-    overlayStatus.textContent = '';
+    overlayStatus.textContent = ''; overlayStatus.classList.remove('is-success');
     panel.appendChild(overlayStatus);
     const completeButton = doc.createElement('button');
     completeButton.className = 'button button-primary';
@@ -237,7 +237,7 @@
       if (!overlayOpen()) return false;
       overlay.classList.remove('is-open');
       overlay.setAttribute('aria-hidden', 'true');
-      overlayStatus.textContent = '';
+      overlayStatus.textContent = ''; overlayStatus.classList.remove('is-success');
       const target = returnFocusTo;
       returnFocusTo = null;
       openTaskId = null;
@@ -444,4 +444,3 @@
     else boot();
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
-
