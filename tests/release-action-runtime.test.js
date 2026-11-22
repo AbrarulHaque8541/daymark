@@ -7,6 +7,43 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 
+function workflowStepBlock(content, stepName) {
+  const lines = String(content).split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === '- name: ' + stepName);
+  if (start < 0) return null;
+  const stepIndent = lines[start].match(/^\s*/)[0].length;
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) continue;
+    const indentation = line.match(/^\s*/)[0].length;
+    if (indentation < stepIndent || (indentation === stepIndent && line.trim().startsWith('- '))) {
+      end = index;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n');
+}
+
+function workflowStepMappingValue(content, stepName, sectionName, propertyName) {
+  const block = workflowStepBlock(content, stepName);
+  if (!block) return null;
+  const lines = block.split(/\r?\n/);
+  const sectionIndex = lines.findIndex((line) => line.trim() === sectionName + ':');
+  if (sectionIndex < 0) return null;
+  const sectionIndent = lines[sectionIndex].match(/^\s*/)[0].length;
+  for (let index = sectionIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) continue;
+    const indentation = line.match(/^\s*/)[0].length;
+    if (indentation <= sectionIndent) break;
+    if (indentation !== sectionIndent + 2) continue;
+    const property = stripYamlComment(line).trim().match(/^([A-Za-z0-9_-]+):\s*(.*?)\s*$/);
+    if (property && property[1] === propertyName) return unquoteYamlScalar(property[2]);
+  }
+  return null;
+}
+
 const PINNED_NODE24_ACTIONS = {
   'actions/checkout': {
     sha: '9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0',
@@ -382,6 +419,36 @@ test('production signing workflows run repository tests before accessing signing
     assert.ok(tests >= 0, workflowPath + ' must run the repository test suite');
     assert.ok(secrets > tests, workflowPath + ' must complete repository tests before any signing secret is referenced');
   }
+});
+
+test('signing release checkouts do not persist GitHub credentials', () => {
+  const cases = [
+    ['.github/workflows/android-production-release.yml', 'Check out exact tag'],
+    ['.github/workflows/android-signed-device-test-release.yml', 'Check out the event ref'],
+    ['.github/workflows/android-private-main-test-apk.yml', 'Check out dispatched main commit']
+  ];
+  for (const [workflowPath, stepName] of cases) {
+    const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+    assert.equal(workflowStepMappingValue(content, stepName, 'with', 'persist-credentials'), 'false',
+      workflowPath + ' checkout step ' + stepName + ' must disable persisted credentials');
+  }
+
+  const fetchCases = [
+    ['.github/workflows/android-production-release.yml', 'Verify production tag is on main'],
+    ['.github/workflows/android-signed-device-test-release.yml', 'Verify exact tag commit is on main']
+  ];
+  for (const [workflowPath, stepName] of fetchCases) {
+    const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
+    const step = workflowStepBlock(content, stepName);
+    assert.equal(workflowStepMappingValue(content, stepName, 'env', 'GH_TOKEN'), '${{ github.token }}',
+      workflowPath + ' must scope a token to the main-branch verification step');
+    assert.match(step, /GIT_CONFIG_COUNT=1\s+\\\s+GIT_CONFIG_KEY_0=http\.https:\/\/github\.com\/\.extraheader\s+\\\s+GIT_CONFIG_VALUE_0="\$auth_header"\s+\\\s+git fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/,
+      workflowPath + ' must authenticate the fetch through process-only Git config');
+  }
+
+  const omittedInput = '- name: checkout\n  uses: actions/checkout@immutable-sha\n  with:\n    fetch-depth: 0\n';
+  assert.equal(workflowStepMappingValue(omittedInput, 'checkout', 'with', 'persist-credentials'), null,
+    'the contract must fail when the checkout input is omitted');
 });
 
 test('device-test provenance is generated only for verified production-signed release tags', () => {

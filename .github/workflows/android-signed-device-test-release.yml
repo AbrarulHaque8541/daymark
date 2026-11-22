@@ -26,6 +26,7 @@ jobs:
       - name: Check out the event ref
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ github.sha }}
           fetch-depth: 0
 
@@ -44,6 +45,8 @@ jobs:
 
       - name: Verify exact tag commit is on main
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           checked_out_sha="$(git rev-parse HEAD)"
@@ -57,7 +60,11 @@ jobs:
               echo "The checked-out commit is not the exact pushed tag $tag" >&2
               exit 1
             }
-            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            GIT_CONFIG_COUNT=1 \
+              GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+              GIT_CONFIG_VALUE_0="$auth_header" \
+              git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
             git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
               echo "Release tag $tag does not point to a commit on main" >&2
               exit 1
