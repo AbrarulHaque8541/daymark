@@ -188,6 +188,8 @@ test('the card mounts before the storage card with a status live region', () => 
   assert.equal(status.getAttribute('role'), 'status');
   assert.equal(doc.body.children.indexOf(card) !== -1, true);
   assert.ok(handle.select);
+  assert.equal(handle.select.parentNode, card, "the task chooser select is mounted in the card");
+  assert.equal(handle.select.className, "focus-mode-select");
 });
 
 test('attaching or exiting never writes to storage', () => {
