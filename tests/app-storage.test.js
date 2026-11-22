@@ -485,6 +485,22 @@ test('task import previews additions, duplicates and invalid rows before appendi
   assert.equal(saved[1].title, 'New task');
 });
 
+test('duplicate-key task backup is rejected before confirmation and preserves primary storage bytes', async () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue });
+  const importText = '[{"id":"incoming-id","title":"First title","title":"Last title",'
+    + '"dueDate":null,"priority":"medium","completed":false,'
+    + '"createdAt":"2026-11-22T00:00:00.000Z","updatedAt":"2026-11-22T00:00:00.000Z"}]';
+
+  await triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 0, 'ambiguous backups must not reach confirmation');
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue,
+    'duplicate-key rejection must preserve the primary storage bytes');
+  assert.match(app.elements.get('#toast').textContent, /duplicate JSON keys/);
+});
+
 test('declining task import confirmation leaves storage unchanged', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);
@@ -528,12 +544,36 @@ test('failed task import save rolls back in-memory state and reports no import',
 test('oversized task backup is rejected before FileReader allocation', async () => {
   const app = bootApp({ savedValue: JSON.stringify([]) });
   await triggerTaskImport(app, { size: 8 * 1024 * 1024 + 1, content: '[]' });
-
   assert.equal(app.fileReadCount, 0, 'oversized files must be rejected before reading into memory');
   assert.equal(app.confirmMessages.length, 0);
   assert.match(app.elements.get('#toast').textContent, /maximum 8 MiB/);
 });
-
+test('duplicate keys in a recovery-bundle task payload abort before confirmation', async () => {
+  const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
+  const taskPayload = '[{"id":"incoming-task","id":"overwritten","title":"Bad task"}]';
+  const recoveryBundle = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [taskPayload] });
+  const app = bootApp({ savedValue: savedTasks, savedFocusValue: JSON.stringify({ session: null, log: [] }) });
+  const focusBefore = app.storedValues.get(FOCUS_KEY);
+  await triggerTaskImport(app, { size: Buffer.byteLength(recoveryBundle), content: recoveryBundle });
+  assert.equal(app.confirmMessages.length, 0);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
+  assert.equal(app.storedValues.get(FOCUS_KEY), focusBefore);
+  assert.match(app.elements.get('#toast').textContent, /task recovery backup contains duplicate JSON keys/);
+});
+test('too-deep task recovery payload aborts combined import before confirmation', async () => {
+  const savedTasks = JSON.stringify([makeImportTask('keep-task', 'Keep task')]);
+  const savedFocus = JSON.stringify({ session: null, log: [makeFocusLogEntry('keep-focus')] });
+  const tooDeepPayload = '['.repeat(130) + '0' + ']'.repeat(130);
+  const taskBackup = JSON.stringify({ format: 'daymark-recovery-bundle-v1', payloads: [tooDeepPayload] });
+  const focusBackup = JSON.stringify({ session: null, log: [makeFocusLogEntry('incoming-focus')] });
+  const combined = JSON.stringify({ format: 'daymark-combined-recovery-v1', taskBackup, focusBackup });
+  const app = bootApp({ savedValue: savedTasks, savedFocusValue: savedFocus });
+  await triggerTaskImport(app, { size: Buffer.byteLength(combined), content: combined });
+  assert.equal(app.confirmMessages.length, 0);
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedTasks);
+  assert.equal(app.storedValues.get(FOCUS_KEY), savedFocus);
+  assert.match(app.elements.get('#toast').textContent, /exceeds the supported JSON nesting depth/);
+});
 test('combined recovery import appends task and Focus logs while preserving current session', async () => {
   const existingTask = makeImportTask('task-existing', 'Existing task');
   const incomingTask = makeImportTask('task-new', 'Recovered task');
