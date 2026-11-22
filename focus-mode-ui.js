@@ -73,8 +73,6 @@
     const select = doc.createElement('select');
     select.setAttribute('id', TASK_SELECT_ID);
     select.setAttribute('aria-label', 'Task to focus on');
-    select.className = 'focus-mode-select';
-    card.appendChild(select);
 
     const enterButton = doc.createElement('button');
     enterButton.className = 'button button-primary';
@@ -195,7 +193,7 @@
     overlayStatus.setAttribute('id', 'focus-mode-overlay-status');
     overlayStatus.setAttribute('role', 'status');
     overlayStatus.setAttribute('aria-live', 'polite');
-    overlayStatus.textContent = ''; overlayStatus.classList.remove('is-success');
+    overlayStatus.textContent = '';
     panel.appendChild(overlayStatus);
     const completeButton = doc.createElement('button');
     completeButton.className = 'button button-primary';
@@ -211,7 +209,7 @@
     panel.appendChild(exitButton);
 
     const styleEl = doc.createElement('style');
-    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border:1px solid rgba(22,112,95,.28);box-shadow:0 18px 50px rgba(24,40,48,.12);}.focus-mode-select{width:100%;height:42px;border:1px solid rgba(219,226,232,.9);border-radius:12px;background:rgba(255,255,255,.85);color:#1c232a;padding:0 12px;font-size:13px;margin:4px 0 8px;}#focus-mode-enter:active,#focus-mode-complete:active,#focus-mode-exit:active{transform:scale(0.96);background:rgba(22,112,95,0.12);}#focus-mode-complete[aria-busy="true"]{opacity:.65;pointer-events:none;}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}}@media (prefers-color-scheme: dark){#focus-mode-overlay .focus-mode-panel{background:rgba(18,24,30,.78);border-color:rgba(42,143,122,.4);}.focus-mode-select{background:rgba(30,36,42,.85);color:#e8eef2;border-color:rgba(42,143,122,.4);}}';
+    styleEl.textContent = '#focus-mode-overlay{position:fixed;top:0;right:0;bottom:0;left:0;margin:0;padding:16px;background:rgba(15,23,26,.62);display:flex;justify-content:center;align-items:center;z-index:62;opacity:0;pointer-events:none;overscroll-behavior:contain;transition:opacity .18s ease;}#focus-mode-overlay.is-open{opacity:1;pointer-events:auto;}#focus-mode-overlay .focus-mode-panel{width:min(480px,94vw);max-height:80vh;overflow:auto;padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border:1px solid rgba(22,112,95,.28);box-shadow:0 18px 50px rgba(24,40,48,.12);}.focus-mode-panel .focus-mode-plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}.focus-mode-panel .button{transition:transform .12s ease,background-color .12s ease;}.focus-mode-panel .button:active{transform:scale(0.97);background-color:rgba(22,112,95,.12);}@media (prefers-reduced-motion: reduce){#focus-mode-overlay{transition:none;}.focus-mode-panel .button{transition:none;}.focus-mode-panel .button:active{transform:none;}}@media (prefers-color-scheme: dark){#focus-mode-overlay .focus-mode-panel{background:rgba(18,24,30,.78);border-color:rgba(42,143,122,.4);}}';
 
     let openTaskId = null;
     let returnFocusTo = null;
@@ -237,7 +235,7 @@
       if (!overlayOpen()) return false;
       overlay.classList.remove('is-open');
       overlay.setAttribute('aria-hidden', 'true');
-      overlayStatus.textContent = ''; overlayStatus.classList.remove('is-success');
+      overlayStatus.textContent = '';
       const target = returnFocusTo;
       returnFocusTo = null;
       openTaskId = null;
@@ -305,12 +303,10 @@
         overlayStatus.textContent = 'No task is open in the overlay, so nothing was saved.';
         return false;
       }
-      completeButton.setAttribute('aria-busy', 'true');
       overlayStatus.textContent = 'Saving the completed task\u2026';
       const read = readSavedTasks();
       if (!read.ok) {
         overlayStatus.textContent = focusLogic.describeCompleteError(read.reason);
-        completeButton.removeAttribute('aria-busy');
         return false;
       }
       let completion = null;
@@ -318,19 +314,16 @@
       catch (error) { completion = null; }
       if (typeof completion !== 'string' || completion === '') {
         overlayStatus.textContent = focusLogic.describeCompleteError('invalid-timestamp');
-        completeButton.removeAttribute('aria-busy');
         return false;
       }
       const planned = focusLogic.completeTaskInSnapshot(read.tasks, openTaskId, completion);
       if (!planned.ok) {
         overlayStatus.textContent = focusLogic.describeCompleteError(planned.reason);
-        completeButton.removeAttribute('aria-busy');
         return false;
       }
       const locks = resolveLockManager(win);
       if (!locks) {
         overlayStatus.textContent = focusLogic.describeCompleteError('lock-unavailable');
-        completeButton.removeAttribute('aria-busy');
         return false;
       }
       let generation = null;
@@ -338,7 +331,6 @@
       catch (error) { generation = null; }
       if (!generation || !generation.ok) {
         overlayStatus.textContent = focusLogic.describeCompleteError(generation && generation.reason ? generation.reason : 'generation-unreadable');
-        completeButton.removeAttribute('aria-busy');
         return false;
       }
       let saved = null;
@@ -352,7 +344,6 @@
           validateTasks: logic.validateStoredTasks
         });
       } catch (error) { saved = { ok: false, reason: 'tasks-ambiguous' }; }
-      completeButton.removeAttribute('aria-busy');
       if (!saved || saved.ok !== true) {
         overlayStatus.textContent = focusLogic.describeCompleteError(saved && saved.reason ? saved.reason : 'tasks-ambiguous');
         return false;
