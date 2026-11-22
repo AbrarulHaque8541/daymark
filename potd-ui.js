@@ -106,14 +106,12 @@
     const resultEl = element('potd-result');
     const clearEl = element('potd-clear');
     let busy = false;
-    function status(message) { if (statusEl) statusEl.textContent = message; }
-    function showSkeleton() {
-      if (!resultEl) return;
-      while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
-      const skel = doc.createElement('div');
-      skel.className = 'potd-skeleton';
-      skel.setAttribute('aria-hidden', 'true');
-      resultEl.appendChild(skel);
+    function status(message, isSuccess) {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
     }
     function setBusy(isBusy) {
       busy = isBusy;
@@ -128,7 +126,6 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
-      if (isBusy) showSkeleton();
     }
     function render(record) {
       if (!resultEl || !record || !record.picture) return;
@@ -209,7 +206,7 @@
         const record = await logicApi.fetchPotd(fetchImpl, options);
         render(record);
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC \u00b7 not saved on this device');
+          + ' UTC \u00b7 not saved on this device', true);
         if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
           statusEl.classList.add('is-success');
           if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Picture of the day updated');
