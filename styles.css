@@ -465,237 +465,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 @media (prefers-color-scheme: dark) {
   #focus-state-label.is-success { color: var(--accent-bright); }
-}
-
-/* Weather glance card (Open-Meteo, keyless) */
-.weather-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
-.weather-card[hidden] { display: none; }
-.weather-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
-.weather-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
-.weather-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
-.weather-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
-.weather-card .feed-form input { font-size: 12px; }
-.weather-status { min-height: 16px; margin: 9px 0 4px; color: var(--muted-text); font-size: 10px; }
-.weather-now { padding: 10px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
-.weather-now:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
-.weather-now:empty { display: none; }
-@media (prefers-color-scheme: dark) {
-  .weather-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
-  .weather-description { color: var(--muted-text); }
-  .weather-status { color: var(--muted-text); }
-  .weather-now { border-color: #2c3640; background: rgba(26, 33, 40, .65); color: #e8eef2; }
-  .weather-now:hover { border-color: rgba(42, 143, 122, .5); }
-}
-
-
-/* Initial task-list skeleton shimmer (restored polish, reduced-motion safe) */
-.task-list-skeleton { display: grid; gap: 8px; }
-.task-list.is-ready .task-list-skeleton { display: none; }
-.skeleton-row { height: 64px; border: 1px solid rgba(219, 226, 232, .75); border-radius: 16px; background: linear-gradient(100deg, rgba(255, 255, 255, .55) 32%, rgba(226, 240, 235, .85) 50%, rgba(255, 255, 255, .55) 68%); background-size: 220% 100%; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); animation: skeleton-shimmer 1.6s ease-in-out infinite; }
-@keyframes skeleton-shimmer { 0% { background-position: 120% 0; } 100% { background-position: -20% 0; } }
-@media (prefers-reduced-motion: reduce) { .skeleton-row { animation: none; background: rgba(255, 255, 255, .55); } }
-@media (prefers-color-scheme: dark) {
-  .skeleton-row { border-color: #2c3640; background: linear-gradient(100deg, rgba(26, 33, 40, .65) 32%, rgba(26, 58, 50, .85) 50%, rgba(26, 33, 40, .65) 68%); background-size: 220% 100%; }
-}
-
-/* ---------- Currency glance card ---------- */
-.currency-card {
-  position: relative;
-  margin-top: 18px;
-  border: 1px solid rgba(22, 112, 95, 0.18);
-  border-radius: 18px;
-  padding: 22px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(242, 245, 247, 0.78));
-  box-shadow: 0 18px 40px rgba(15, 26, 32, 0.10);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  overflow: hidden;
-}
-
-.currency-card::before {
-  content: "";
-  position: absolute;
-  inset: -40% -20% auto auto;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(22, 112, 95, 0.16), transparent 70%);
-  pointer-events: none;
-}
-
-.currency-topline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.currency-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #16705f;
-  box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.18);
-}
-
-.currency-card h2 {
-  margin: 0 0 6px;
-  font-size: 1.15rem;
-  letter-spacing: -0.01em;
-}
-
-.currency-description {
-  margin: 0 0 14px;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--muted-text);
-}
-
-.currency-card .feed-form {
-  display: grid;
-  gap: 10px;
-}
-
-.currency-card .feed-form select {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 26, 32, 0.14);
-  background: rgba(255, 255, 255, 0.85);
-  font: inherit;
-  color: inherit;
-}
-
-.currency-status {
-  margin: 12px 0 0;
-  min-height: 1.2em;
-  font-size: 0.8rem;
-  color: var(--muted-text);
-}
-
-.currency-now { padding: 10px 12px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .65); color: #33454e; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; animation: rise-in .22s ease both; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
-.currency-now:hover { transform: translateY(-1px); border-color: rgba(42, 143, 122, .4); box-shadow: 0 6px 16px rgba(24, 40, 48, .06); }
-
-.currency-swap {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid rgba(210, 228, 222, .8);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .65);
-  color: var(--accent);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1;
-  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
-}
-.currency-swap:hover {
-  transform: translateY(-1px) rotate(180deg);
-  border-color: rgba(42, 143, 122, .4);
-  background: var(--accent-soft);
-  box-shadow: 0 6px 16px rgba(24, 40, 48, .06);
-}
-.currency-swap:active {
-  transform: scale(0.96);
-}
-.currency-swap:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-.currency-swap:focus-visible {
-  outline: 3px solid rgba(22, 112, 95, .55);
-  outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .currency-swap:hover { transform: none; }
-}
-
-.currency-now:empty {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  .currency-card {
-    border-color: rgba(125, 224, 203, 0.14);
-    background: linear-gradient(160deg, rgba(24, 31, 37, 0.92), rgba(14, 18, 22, 0.85));
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-  }
-
-  .currency-dot {
-    box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.28);
-  }
-
-  .currency-card .feed-form select {
-    border-color: rgba(125, 224, 203, 0.16);
-    background: rgba(14, 18, 22, 0.7);
-  }
-
-  .currency-now {
-    border-color: #2c3640;
-    background: rgba(26, 33, 40, .65);
-    color: #e8eef2;
-  }
-
-  .currency-now:hover {
-    border-color: rgba(42, 143, 122, .5);
-  }
-
-  .currency-swap {
-    border-color: rgba(125, 224, 203, 0.2);
-    background: rgba(26, 33, 40, .7);
-    color: #7de0cb;
-  }
-
-  .currency-swap:hover {
-    background: rgba(22, 112, 95, 0.25);
-    border-color: rgba(42, 143, 122, .5);
-  }
-}
-
-/* Consistent professional glass hover edge for glance and focus cards (Cycle A).
-   Accent #16705f gradient overlay, pointer-events none, reduced-motion safe. */
-.weather-card,
-.currency-card,
-.briefing-card,
-.focus-card {
-  position: relative;
-  overflow: hidden;
-}
-.weather-card::after,
-.currency-card::after,
-.briefing-card::after,
-.focus-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(135deg, rgba(22, 112, 95, 0.08), transparent 60%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s ease;
-}
-.weather-card:hover::after,
-.currency-card:hover::after,
-.briefing-card:hover::after,
-.focus-card:hover::after {
-  opacity: 1;
-}
-@media (prefers-reduced-motion: reduce) {
-  .weather-card::after,
-  .currency-card::after,
-  .briefing-card::after,
-  .focus-card::after {
-    transition: none;
-  }
-}
-
-
-/* Wikipedia knowledge glance card (2026-11-05). Glass surface, accent
-   #16705f, tactile hover, dark-mode parity, reduced-motion safe. */
-.wiki-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); position: relative; overflow: hidden; }
-.wiki-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
 .wiki-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
 .wiki-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
 .wiki-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
@@ -913,6 +682,78 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   }
 }
 
+/* Cycle B additional polish: consistent glass status + press/busy for glance cards (accent #16705f). */
+.weather-status,
+.wiki-status,
+.telegram-status,
+.holiday-status,
+.currency-status,
+.zones-status,
+.feed-status {
+  margin: 8px 0 4px;
+  padding: 7px 11px;
+  border-radius: 12px;
+  background: rgba(226, 240, 235, .72);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(22, 112, 95, .22);
+  color: var(--accent-dark);
+  font-size: 11px;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgba(22, 112, 95, .06);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.weather-status:empty,
+.wiki-status:empty,
+.telegram-status:empty,
+.holiday-status:empty,
+.currency-status:empty,
+.zones-status:empty,
+.feed-status:empty { display: none; }
+
+.button.is-busy,
+.tool-button.is-busy,
+.date-chip.is-busy {
+  opacity: 0.72;
+  transform: scale(0.985);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .button.is-busy,
+  .tool-button.is-busy,
+  .date-chip.is-busy {
+    transform: none;
+  }
+}
+
+.button.is-pressed,
+.tool-button.is-pressed,
+.date-chip.is-pressed,
+.icon-button.is-pressed {
+  transform: translateY(1px) scale(.985);
+  transition: transform .08s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .button.is-pressed,
+  .tool-button.is-pressed,
+  .date-chip.is-pressed,
+  .icon-button.is-pressed { transform: none; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .weather-status,
+  .wiki-status,
+  .telegram-status,
+  .holiday-status,
+  .currency-status,
+  .zones-status,
+  .feed-status {
+    background: rgba(26, 40, 36, .72);
+    border-color: rgba(42, 143, 122, .35);
+    color: #b8e0d4;
+  }
+}
+
 /* Orange-soft glass when the download plan has safety notices — immediate visual attention. */
 
 #browser-download-status.has-notices {
@@ -945,24 +786,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .card:active,
   .task-row:active {
     transform: none;
-  }
-}
-
-/* Cycle B 2026-11-12: brief completion pulse for Focus card (accent #16705f).
-   Reduced-motion safe; visual confirmation after a successful session. */
-.focus-card.is-complete {
-  animation: focus-complete-pulse 1.4s ease-out;
-  box-shadow: 0 0 0 3px rgba(22, 112, 95, 0.18);
-}
-@keyframes focus-complete-pulse {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.012); }
-  100% { transform: scale(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .focus-card.is-complete {
-    animation: none;
-    box-shadow: 0 0 0 2px rgba(22, 112, 95, 0.22);
   }
 }
 
