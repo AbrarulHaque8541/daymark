@@ -1332,6 +1332,7 @@
     if (!toComplete.length) return;
     const ids = new Set(toComplete.map((task) => task.id));
     const previous = state.tasks.map((task) => ({ ...task }));
+    const repeatNotes = toComplete.map(scheduleNextOccurrence).filter(Boolean);
     state.tasks = state.tasks.map((task) => ids.has(task.id) ? { ...task, completed: true, updatedAt: new Date().toISOString() } : task);
     const saved = await persistTasks();
     render();
@@ -1339,7 +1340,10 @@
       showSaveResult(saved, 'Visible tasks marked complete.');
       return;
     }
-    showToast(`Marked ${toComplete.length} visible task${toComplete.length === 1 ? '' : 's'} complete.`, {
+    const repeatSummary = repeatNotes.length
+      ? ` ${repeatNotes.length} next occurrence${repeatNotes.length === 1 ? '' : 's'} scheduled.`
+      : '';
+    showToast(`Marked ${toComplete.length} visible task${toComplete.length === 1 ? '' : 's'} complete.${repeatSummary}`, {
       label: 'Undo',
       run: async () => {
         state.tasks = previous;
