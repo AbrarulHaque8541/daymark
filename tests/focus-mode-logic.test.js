@@ -9,8 +9,8 @@ test('focus-mode is a live, switchable feature flag now', () => {
   const flag = flags.FEATURE_FLAGS.filter((entry) => entry.id === 'focus-mode')[0];
   assert.equal(flag.kind, 'feature');
   const flagRest = flags.FEATURE_FLAGS.filter((entry) => entry.id !== 'focus-mode');
-  assert.equal(flagRest.filter((entry) => entry.kind === 'feature').length, 3);
-  assert.equal(flagRest.filter((entry) => entry.kind === 'planned').length, 1);
+  assert.equal(flagRest.filter((entry) => entry.kind === 'feature').length, 4);
+  assert.equal(flagRest.filter((entry) => entry.kind === 'planned').length, 0);
   const storage = storageWith({});
   const saved = flags.setFlag(storage, 'focus-mode', true);
   assert.equal(saved.ok, true);
@@ -197,3 +197,4 @@ test('describeTask labels an unknown priority as medium without throwing', () =>
   assert.equal(described.ok, true);
   assert.equal(described.lines[0], 'Priority: medium.');
 });
+

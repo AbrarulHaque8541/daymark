@@ -22,6 +22,8 @@ tests/feature-flags-logic.test.js
 tests/feature-flags-ui.test.js
 tests/command-bar-logic.test.js
 tests/command-bar-ui.test.js
+tests/comfort-tint-logic.test.js
+tests/comfort-tint-ui.test.js
 tests/mindful-breaks-logic.test.js
 tests/mindful-breaks-ui.test.js
 tests/focus-mode-logic.test.js
@@ -124,3 +126,4 @@ tests/wiki-ui.test.js
 tests/zones-logic.test.js
 tests/zones-ui.test.js
 tests/index-script-integrity.test.js
+

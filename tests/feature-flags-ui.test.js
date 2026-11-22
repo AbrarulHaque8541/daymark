@@ -146,21 +146,14 @@ test('the card mounts with its id, class and a status live region, then mounts n
   assert.deepEqual(second, { attached: false, reason: 'already-attached' });
 });
 
-test('one checkbox per current flag; planned ones are disabled with their note', () => {
+test('every switch is live now: no checkbox is disabled and no note is shown', () => {
   const doc = makeDoc();
   attach(doc, makeStorage({}));
   const card = doc.getElementById('feature-flags-card');
-  const boxes = findAll(card).filter((node) => node.getAttribute && node.getAttribute('data-feature-id'));
-  assert.equal(boxes.length, 5);
-  assert.deepEqual(boxes.map((b) => b.getAttribute('data-feature-id')),
-    ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
-  assert.ok(checkboxById(doc, 'mindful-breaks'), 'mindful-breaks checkbox exists');
-  assert.equal(checkboxById(doc, 'mindful-breaks').disabled, false);
-  assert.equal(checkboxById(doc, 'comfort-tint').disabled, true);
-  assert.ok(textOfTree(card).includes('A soft warm tint over the page for long reading sessions. Planned, not switchable yet.'));
-  assert.equal(checkboxById(doc, 'focus-mode').disabled, false);
-  assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 1);
-  assert.equal(checkboxById(doc, 'command-bar').disabled, false);
+  for (const id of ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']) {
+    assert.equal(checkboxById(doc, id).disabled, false);
+  }
+  assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 0);
 });
 
 test('the card says what it does not do', () => {
@@ -232,7 +225,7 @@ test('every implemented feature kind has an enabled switch that persists changes
   const storage = makeStorage({});
   attach(doc, storage);
   const implemented = flags.FEATURE_FLAGS.filter((flag) => flag.kind === 'feature');
-  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'mindful-breaks', 'focus-mode']);
+  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
   for (const flag of implemented) {
     const box = checkboxById(doc, flag.id);
     assert.ok(box, flag.id + ' checkbox exists');
@@ -257,14 +250,17 @@ test('a failed save reverts the checkbox to the stored value and says so honestl
   assert.match(doc.getElementById('feature-flags-status').textContent, /Could not save this switch/);
 });
 
-test('planned checkboxes never dispatch a save', () => {
+test('the comfort-tint switch persists through the parity change event and reports it', () => {
   const doc = makeDoc();
   const storage = makeStorage({});
   attach(doc, storage);
   const box = checkboxById(doc, 'comfort-tint');
   box.checked = true;
   doc.dispatchDoc('change', { target: box });
-  assert.equal(storage.writes(), 0);
+  assert.equal(storage.writes(), 1);
+  const saved = JSON.parse(storage.getItem('daymark.features.v1'));
+  assert.equal(saved['comfort-tint'], true);
+  assert.match(doc.getElementById('feature-flags-status').textContent, /Comfort tint is now on/);
 });
 
 test('a focus-mode save failure reverts the switch honestly', () => {
@@ -278,3 +274,4 @@ test('a focus-mode save failure reverts the switch honestly', () => {
   assert.equal(box.checked, false);
   assert.match(doc.getElementById('feature-flags-status').textContent, /Could not save this switch/);
 });
+
