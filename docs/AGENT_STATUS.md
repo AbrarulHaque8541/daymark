@@ -1,3 +1,5 @@
+- [Daymark engineering status — 2026-11-22T114500Z (Cycle B: earthquake press feedback)](./CURRENT_STATUS_20261122T114500Z.md)
+
 - [Daymark engineering status — 2026-11-22T043200Z (keyless earthquake glance card, branch feat/earthquake-card-vibe-20261122)](./CURRENT_STATUS_20261122T043200Z.md)
 - [Daymark engineering status — 2026-11-22T04:04:57Z (PR #858 credential isolation merged; latest main checks green)](./CURRENT_STATUS_20261122T040457Z.md)
 - [Daymark engineering status — 2026-11-21T04:38:11Z (Batch 3: opt-in Focus view card)](./CURRENT_STATUS_20261121T043811Z.md)
