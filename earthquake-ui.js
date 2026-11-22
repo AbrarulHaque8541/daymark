@@ -23,14 +23,6 @@
     aside.setAttribute('aria-labelledby', 'earthquake-heading');
     aside.setAttribute('aria-describedby', 'earthquake-description');
 
-    const topline = doc.createElement('div');
-    topline.className = 'briefing-topline';
-    const dot = doc.createElement('span');
-    dot.className = 'briefing-dot';
-    if (typeof dot.setAttribute === 'function') dot.setAttribute('aria-hidden', 'true');
-    topline.appendChild(dot);
-    aside.appendChild(topline);
-
     const heading = doc.createElement('h2');
     heading.id = 'earthquake-heading';
     heading.textContent = 'Earthquake glance';
@@ -76,7 +68,7 @@
 
     const result = doc.createElement('div');
     result.id = 'earthquake-result';
-    result.className = 'feed-list';
+    result.className = 'feed-list quake-list';
     result.setAttribute('aria-live', 'polite');
     aside.appendChild(result);
 
@@ -87,6 +79,15 @@
       doc.body.appendChild(aside);
     }
     return aside;
+  }
+
+  function magnitudeClass(magnitude) {
+    if (magnitude === null || magnitude === undefined) return 'quake-mag-unknown';
+    const n = Number(magnitude);
+    if (Number.isNaN(n)) return 'quake-mag-unknown';
+    if (n >= 6.0) return 'quake-mag-high';
+    if (n >= 4.5) return 'quake-mag-medium';
+    return 'quake-mag-low';
   }
 
   function attachEarthquakeUi(env) {
@@ -118,11 +119,15 @@
       }
     }
 
-    function status(message, isSuccess) {
-      if (!statusEl) return;
-      statusEl.textContent = message;
-      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
-        statusEl.classList.toggle('is-success', !!isSuccess);
+    function status(message, flash) {
+      if (statusEl) {
+        statusEl.textContent = message;
+        if (flash && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          setTimeout(() => {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+          }, 1200);
+        }
       }
     }
 
@@ -134,22 +139,52 @@
 
     function renderQuake(quake) {
       if (!resultEl || !quake) return;
+      const item = doc.createElement('div');
+      item.className = 'quake-item';
+      item.setAttribute('role', 'listitem');
+
+      const mag = doc.createElement('span');
+      mag.className = 'quake-mag ' + magnitudeClass(quake.magnitude);
       const magnitudeLabel = quake.magnitude === null ? 'unrated' : 'M' + quake.magnitude;
-      const parts = [magnitudeLabel + ' ' + quakesApi.describesMagnitude(quake.magnitude)];
-      if (quake.place) parts.push(quake.place);
-      if (quake.time) parts.push(quake.time);
-      if (quake.tsunami) parts.push('tsunami alert possible');
-      resultEl.appendChild(doc.createTextNode(parts.join(' · ') + ' · '));
+      mag.textContent = magnitudeLabel;
+      mag.setAttribute('title', quakesApi && typeof quakesApi.describesMagnitude === 'function'
+        ? quakesApi.describesMagnitude(quake.magnitude)
+        : 'Magnitude');
+      item.appendChild(mag);
+
+      const details = doc.createElement('div');
+      details.className = 'quake-details';
+
+      if (quake.place) {
+        const place = doc.createElement('div');
+        place.className = 'quake-place';
+        place.textContent = quake.place;
+        details.appendChild(place);
+      }
+
+      const meta = doc.createElement('div');
+      meta.className = 'quake-meta';
+      const metaParts = [];
+      if (quake.time) metaParts.push(quake.time);
+      if (quake.tsunami) metaParts.push('tsunami alert possible');
+      if (metaParts.length) {
+        meta.textContent = metaParts.join(' · ');
+        details.appendChild(meta);
+      }
+
       if (quake.url) {
         const link = doc.createElement('a');
         link.href = quake.url;
-        link.textContent = quake.url;
+        link.className = 'quake-link';
+        link.textContent = 'USGS details';
         link.setAttribute('target', '_blank');
         link.setAttribute('rel', 'noopener noreferrer');
         link.setAttribute('aria-label', 'Open the USGS page for ' + (quake.place || 'this earthquake'));
-        resultEl.appendChild(link);
+        details.appendChild(link);
       }
-      resultEl.appendChild(doc.createTextNode(' '));
+
+      item.appendChild(details);
+      resultEl.appendChild(item);
     }
 
     function describeHidden(record) {
@@ -160,9 +195,13 @@
       if (!resultEl || !record) return;
       clearResult();
       if (!record.quakes || !record.quakes.length) {
-        resultEl.appendChild(doc.createTextNode('No significant earthquakes reported in the past 24 hours.'));
+        const empty = doc.createElement('p');
+        empty.className = 'quake-empty';
+        empty.textContent = 'No significant earthquakes reported in the past 24 hours.';
+        resultEl.appendChild(empty);
         return;
       }
+      resultEl.setAttribute('role', 'list');
       for (let i = 0; i < record.quakes.length; i += 1) renderQuake(record.quakes[i]);
     }
 
@@ -183,26 +222,12 @@
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
           + describeHidden(record), true);
-        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
-          statusEl.classList.add('is-success');
-          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Earthquakes updated');
-          if (typeof setTimeout === 'function') {
-            setTimeout(function () {
-              if (statusEl.classList) statusEl.classList.remove('is-success');
-              if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-            }, 1400);
-          }
-        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof quakesApi.classifiesError === 'function'
           ? quakesApi.classifiesError(error)
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
-        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
-          statusEl.classList.remove('is-success');
-          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-        }
         clearResult();
       } finally {
         setBusy(false);
@@ -213,10 +238,6 @@
       if (busy) return;
       clearResult();
       status('Cleared. Tap Check to fetch the latest significant earthquakes.');
-      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
-        statusEl.classList.remove('is-success');
-        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-      }
     }
 
     function onSubmit(event) {
@@ -232,8 +253,6 @@
     if (formEl) formEl.addEventListener('submit', onSubmit);
     if (buttonEl) buttonEl.addEventListener('click', onSubmit);
     if (clearEl) clearEl.addEventListener('click', onClearClick);
-
-    status('Tap Check to fetch significant earthquakes from the past 24 hours.');
 
     return {
       onCheck: onCheck,
