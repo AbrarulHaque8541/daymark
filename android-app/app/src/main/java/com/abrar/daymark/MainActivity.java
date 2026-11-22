@@ -385,6 +385,7 @@ public final class MainActivity extends Activity {
     private boolean browserPageLoading;
     private Bundle pendingBrowserWebViewState;
     private long browserNavigationGeneration;
+    private BrowserDownloadUiPolicy.Filter currentDownloadFilter = BrowserDownloadUiPolicy.Filter.ALL;
     private final BrowserSelfHealingPolicy browserSelfHealingPolicy = new BrowserSelfHealingPolicy();
     private final BrowserDiagnostics browserDiagnostics = new BrowserDiagnostics();
     private static final String BROWSER_LOG_TAG = "DaymarkBrowser";
@@ -4649,6 +4650,7 @@ public final class MainActivity extends Activity {
         BrowserDownloadListPolicy.Selection selection = collector.finish();
         boolean truncated = selection.truncated;
         for (BrowserDownloadListPolicy.Item item : selection.items) {
+            if (!BrowserDownloadUiPolicy.matches(currentDownloadFilter, item.mimeType)) continue;
             ids.add(item.id);
             urls.add(item.url);
             mimeTypes.add(item.mimeType);
@@ -4656,6 +4658,39 @@ public final class MainActivity extends Activity {
             labels.add(item.title + " — "
                     + browserDownloadStatusLabel(item.status, item.reason, item.downloaded, item.total));
         }
+        String downloadsTitle = truncated
+                ? (hasTimestampColumn ? "Downloads (showing 100 most recent items)"
+
+                        : "Downloads (showing 100 items)")
+                : "Downloads";
+        if (currentDownloadFilter != BrowserDownloadUiPolicy.Filter.ALL) {
+            downloadsTitle += " · " + currentDownloadFilter.label;
+        }
+
+        LinearLayout titleView = new LinearLayout(this);
+        titleView.setOrientation(LinearLayout.VERTICAL);
+        titleView.setPadding(dp(24), dp(16), dp(24), dp(8));
+        TextView titleText = text(downloadsTitle, 18, palette.text, Typeface.BOLD);
+        titleView.addView(titleText);
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        chips.setPadding(0, dp(8), 0, 0);
+        for (BrowserDownloadUiPolicy.Filter filter : BrowserDownloadUiPolicy.filtersInOrder()) {
+            Button chip = compactButton(filter.label, false);
+            if (filter == currentDownloadFilter) {
+                chip.setTextColor(palette.surface);
+                chip.setBackground(pressable(palette.accent, 9, palette.accent, palette.accent));
+            }
+            chip.setOnClickListener(v -> {
+                currentDownloadFilter = filter;
+                showBrowserDownloadsDialog();
+            });
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            chipParams.rightMargin = dp(6);
+            chips.addView(chip, chipParams);
+        }
+        titleView.addView(chips);
 
         if (ids.isEmpty()) {
             new AlertDialog.Builder(this)
