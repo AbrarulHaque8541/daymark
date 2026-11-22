@@ -128,7 +128,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #releases-check:active, #releases-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #air-refresh:active, #air-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #dictionary-lookup:active, #dictionary-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
-#feed-refresh:active, #feed-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #weather-refresh:active, #weather-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #holiday-refresh:active, #holiday-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #currency-refresh:active, #currency-clear:active, #currency-copy:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
@@ -192,7 +191,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .task-row:hover .task-actions, .task-row:focus-within .task-actions { opacity: 1; }
 .icon-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #5f6c76; transition: background .16s ease, color .16s ease, transform .16s ease; }
 .icon-button:hover { color: var(--accent); background: #e8eef2; transform: translateY(-1px); }
-.icon-button:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 .icon-button.delete-button:hover { color: var(--red); background: var(--red-soft); }
 .icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .task-row.is-complete .task-title { color: var(--muted-text); text-decoration: line-through; text-decoration-color: #b9c4cc; }
@@ -1165,29 +1163,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   }
 }
 
-/* Cycle A 2026-11-19: feed glance status success flash (accent #16705f).
-   Reduced-motion safe; no new network. */
-#feed-status.is-success {
-  color: var(--accent);
-  border-color: rgba(22, 112, 95, 0.35);
-  background: rgba(226, 240, 235, 0.65);
-  animation: feed-success-flash 1.1s ease-out;
-}
-@keyframes feed-success-flash {
-  0% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0.28); }
-  50% { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  #feed-status.is-success { animation: none; }
-}
-@media (prefers-color-scheme: dark) {
-  #feed-status.is-success {
-    background: rgba(26, 58, 50, 0.45);
-    color: var(--accent-bright);
-  }
-}
-
 /* Crypto glance status success flash (accent #16705f).
    Reduced-motion safe; no new network. */
 #crypto-status.is-success {
@@ -1211,6 +1186,29 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   }
 }
 
+/* Moon phase glance status success flash (accent #16705f).
+   Reduced-motion safe; no new network. Offline compute. */
+#moon-status.is-success {
+  color: var(--accent);
+  border-color: rgba(22, 112, 95, 0.35);
+  background: rgba(226, 240, 235, 0.65);
+  animation: moon-success-flash 1.1s ease-out;
+}
+@keyframes moon-success-flash {
+  0% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0.28); }
+  50% { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #moon-status.is-success { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  #moon-status.is-success {
+    background: rgba(26, 58, 50, 0.45);
+    color: var(--accent-bright);
+  }
+}
+
 /* Cycle B: suppress glass press scale when the user prefers reduced motion.
    Accent remains #16705f. Matches existing press feedback language. */
 @media (prefers-reduced-motion: reduce) {
@@ -1219,7 +1217,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
   .clear-completed:active,
   .tool-button:active,
   .complete-button:active,
-  .icon-button:active,
   .tag-pill:active,
   #feed-refresh:active, #feed-clear:active,
   #weather-refresh:active, #weather-clear:active,
