@@ -133,10 +133,6 @@
       if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
         statusEl.classList.toggle('is-success', !!isSuccess);
       }
-      if (typeof statusEl.setAttribute === 'function') {
-        if (isSuccess) statusEl.setAttribute('title', 'Air quality updated');
-        else statusEl.removeAttribute('title');
-      }
     }
 
     function setBusy(isBusy) {
