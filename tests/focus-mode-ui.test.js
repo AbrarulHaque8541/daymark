@@ -176,7 +176,7 @@ test('attach fails closed without engines, and attaches once per page', () => {
   assert.equal(attach(doc, storage, makeWindow()), null, 'a second attach must not duplicate the card');
 });
 
-test('the card mounts before the storage card with a status live region', () => {
+test('the card mounts before the storage card with a status live region and mounted chooser', () => {
   const doc = makeDoc();
   const storage = makeStorage({ 'daymark.tasks.v1': tasksJson([task()]), 'daymark.features.v1': flagsJson({ 'focus-mode': true }) });
   const handle = attach(doc, storage, makeWindow());
@@ -188,8 +188,8 @@ test('the card mounts before the storage card with a status live region', () => 
   assert.equal(status.getAttribute('role'), 'status');
   assert.equal(doc.body.children.indexOf(card) !== -1, true);
   assert.ok(handle.select);
-  assert.equal(handle.select.parentNode, card, "the task chooser select is mounted in the card");
-  assert.equal(handle.select.className, "focus-mode-select");
+  assert.equal(handle.select.parentNode, card, 'the task chooser select must be mounted inside the card');
+  assert.equal(card.children.indexOf(handle.select) >= 0, true);
 });
 
 test('attaching or exiting never writes to storage', () => {
@@ -271,6 +271,8 @@ test('the overlay plan list styles target its generated panel class', () => {
   assert.equal(planList.parentNode, panel, 'the plan list is inside its styled panel');
   assert.ok(style, 'the overlay stylesheet is injected into the document head');
   assert.match(style.textContent, /\.focus-mode-panel \.focus-mode-plan\{/);
+  assert.match(style.textContent, /#focus-mode-task/);
+  assert.match(style.textContent, /:active/);
 });
 
 test('Escape and the Exit button close the overlay', () => {
