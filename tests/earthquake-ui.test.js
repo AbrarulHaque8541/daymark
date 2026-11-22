@@ -192,7 +192,7 @@ test('card falls back to launch card placement', () => {
   assert.strictEqual(doc.body.children.indexOf(card), doc.body.children.indexOf(launch) + 1);
 });
 
-test('a successful check renders the strongest quake first with an accessible link', async () => {
+test('a successful check renders the strongest quake first with an accessible link and success flash', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('earthquake-check').dispatch('click', {});
@@ -206,6 +206,8 @@ test('a successful check renders the strongest quake first with an accessible li
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
   assert.strictEqual(link.getAttribute('target'), '_blank');
   assert.ok(link.getAttribute('aria-label').includes('USGS page'));
+  const status = doc.getElementById('earthquake-status');
+  assert.ok(status.classList.contains('is-success'), 'success flash class must be present');
 });
 
 test('an empty feed says so honestly', async () => {
@@ -235,6 +237,7 @@ test('403 explains the limited request', async () => {
   doc.getElementById('earthquake-check').dispatch('click', {});
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('limited this request'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('404 explains that the feed was not found', async () => {
@@ -255,14 +258,16 @@ test('a failed check clears any previous result', async () => {
   assert.strictEqual(doc.getElementById('earthquake-result').children.length, 0);
 });
 
-test('clear empties the result', async () => {
+test('clear empties the result and removes success flash', async () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('earthquake-result').textContent = 'old';
+  doc.getElementById('earthquake-status').classList.toggle('is-success', true);
   await doc.getElementById('earthquake-clear').dispatch('click', {});
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.strictEqual(doc.getElementById('earthquake-result').textContent, '');
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('Cleared'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('form submit is prevented and runs the check', async () => {

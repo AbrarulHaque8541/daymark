@@ -110,8 +110,13 @@
       }
     }
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, isSuccess) {
+      if (statusEl) {
+        statusEl.textContent = message;
+        if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+          statusEl.classList.toggle('is-success', !!isSuccess);
+        }
+      }
     }
 
     function clearResult() {
@@ -170,7 +175,7 @@
         render(record);
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
-          + describeHidden(record));
+          + describeHidden(record), true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof quakesApi.classifiesError === 'function'
