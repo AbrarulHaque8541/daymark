@@ -68,7 +68,7 @@
 
     const result = doc.createElement('div');
     result.id = 'earthquake-result';
-    result.className = 'feed-list';
+    result.className = 'feed-list quake-list';
     result.setAttribute('aria-live', 'polite');
     aside.appendChild(result);
 
@@ -79,6 +79,15 @@
       doc.body.appendChild(aside);
     }
     return aside;
+  }
+
+  function magnitudeClass(magnitude) {
+    if (magnitude === null || magnitude === undefined) return 'quake-mag-unknown';
+    const n = Number(magnitude);
+    if (Number.isNaN(n)) return 'quake-mag-unknown';
+    if (n >= 6.0) return 'quake-mag-high';
+    if (n >= 4.5) return 'quake-mag-medium';
+    return 'quake-mag-low';
   }
 
   function attachEarthquakeUi(env) {
@@ -110,8 +119,16 @@
       }
     }
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, flash) {
+      if (statusEl) {
+        statusEl.textContent = message;
+        if (flash && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          setTimeout(() => {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+          }, 1200);
+        }
+      }
     }
 
     function clearResult() {
@@ -122,22 +139,52 @@
 
     function renderQuake(quake) {
       if (!resultEl || !quake) return;
+      const item = doc.createElement('div');
+      item.className = 'quake-item';
+      item.setAttribute('role', 'listitem');
+
+      const mag = doc.createElement('span');
+      mag.className = 'quake-mag ' + magnitudeClass(quake.magnitude);
       const magnitudeLabel = quake.magnitude === null ? 'unrated' : 'M' + quake.magnitude;
-      const parts = [magnitudeLabel + ' ' + quakesApi.describesMagnitude(quake.magnitude)];
-      if (quake.place) parts.push(quake.place);
-      if (quake.time) parts.push(quake.time);
-      if (quake.tsunami) parts.push('tsunami alert possible');
-      resultEl.appendChild(doc.createTextNode(parts.join(' · ') + ' · '));
+      mag.textContent = magnitudeLabel;
+      mag.setAttribute('title', quakesApi && typeof quakesApi.describesMagnitude === 'function'
+        ? quakesApi.describesMagnitude(quake.magnitude)
+        : 'Magnitude');
+      item.appendChild(mag);
+
+      const details = doc.createElement('div');
+      details.className = 'quake-details';
+
+      if (quake.place) {
+        const place = doc.createElement('div');
+        place.className = 'quake-place';
+        place.textContent = quake.place;
+        details.appendChild(place);
+      }
+
+      const meta = doc.createElement('div');
+      meta.className = 'quake-meta';
+      const metaParts = [];
+      if (quake.time) metaParts.push(quake.time);
+      if (quake.tsunami) metaParts.push('tsunami alert possible');
+      if (metaParts.length) {
+        meta.textContent = metaParts.join(' · ');
+        details.appendChild(meta);
+      }
+
       if (quake.url) {
         const link = doc.createElement('a');
         link.href = quake.url;
-        link.textContent = quake.url;
+        link.className = 'quake-link';
+        link.textContent = 'USGS details';
         link.setAttribute('target', '_blank');
         link.setAttribute('rel', 'noopener noreferrer');
         link.setAttribute('aria-label', 'Open the USGS page for ' + (quake.place || 'this earthquake'));
-        resultEl.appendChild(link);
+        details.appendChild(link);
       }
-      resultEl.appendChild(doc.createTextNode(' '));
+
+      item.appendChild(details);
+      resultEl.appendChild(item);
     }
 
     function describeHidden(record) {
@@ -148,9 +195,13 @@
       if (!resultEl || !record) return;
       clearResult();
       if (!record.quakes || !record.quakes.length) {
-        resultEl.appendChild(doc.createTextNode('No significant earthquakes reported in the past 24 hours.'));
+        const empty = doc.createElement('p');
+        empty.className = 'quake-empty';
+        empty.textContent = 'No significant earthquakes reported in the past 24 hours.';
+        resultEl.appendChild(empty);
         return;
       }
+      resultEl.setAttribute('role', 'list');
       for (let i = 0; i < record.quakes.length; i += 1) renderQuake(record.quakes[i]);
     }
 
@@ -170,7 +221,7 @@
         render(record);
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
-          + describeHidden(record));
+          + describeHidden(record), true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof quakesApi.classifiesError === 'function'
