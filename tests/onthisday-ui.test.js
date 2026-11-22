@@ -218,9 +218,11 @@ test('status reports the update time and that nothing is saved', async () => {
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('onthisday-check').dispatch('click', {});
   await drain();
-  const status = doc.getElementById('onthisday-status').textContent;
+  const statusEl = doc.getElementById('onthisday-status');
+  const status = statusEl.textContent;
   assert.ok(status.includes('Updated'));
   assert.ok(status.includes('not saved on this device'));
+  assert.ok(statusEl.classList.contains('is-success'), 'success flash class is set on status');
 });
 
 test('a malformed date is blocked with guidance and no network call', async () => {
