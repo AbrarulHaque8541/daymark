@@ -125,10 +125,10 @@ const okResponse = (bodyText) => ({
   text: async () => bodyText
 });
 
-function feature(mag, place, time, url, tsunami) {
+function feature(mag, place, time, url, tsunami, depth) {
   return {
     type: 'Feature',
-    properties: { mag: mag, place: place, time: time, url: url, tsunami: tsunami },
+    properties: { mag: mag, place: place, time: time, url: url, tsunami: tsunami, depth: depth },
     id: place || 'quake'
   };
 }
@@ -136,8 +136,8 @@ function feature(mag, place, time, url, tsunami) {
 const payload = {
   type: 'FeatureCollection',
   features: [
-    feature(5.7, '200 km S of Somewhere', Date.parse('2026-11-21T18:30:00Z'), 'https://earthquake.usgs.gov/earthquakes/eventpage/big'),
-    feature(4.2, 'Remote area', Date.parse('2026-11-21T09:10:00Z'), null, 0)
+    feature(5.7, '200 km S of Somewhere', Date.parse('2026-11-21T18:30:00Z'), 'https://earthquake.usgs.gov/earthquakes/eventpage/big', 0, 10.5),
+    feature(4.2, 'Remote area', Date.parse('2026-11-21T09:10:00Z'), null, 0, null)
   ]
 };
 
@@ -192,7 +192,7 @@ test('card falls back to launch card placement', () => {
   assert.strictEqual(doc.body.children.indexOf(card), doc.body.children.indexOf(launch) + 1);
 });
 
-test('a successful check renders the strongest quake first with an accessible link and success flash', async () => {
+test('a successful check renders the strongest quake first with an accessible link and depth', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
   doc.getElementById('earthquake-check').dispatch('click', {});
@@ -200,6 +200,7 @@ test('a successful check renders the strongest quake first with an accessible li
   const result = doc.getElementById('earthquake-result');
   assert.ok(result.textContent.includes('M5.7 strong'), 'result was: ' + result.textContent);
   assert.ok(result.textContent.includes('200 km S of Somewhere'));
+  assert.ok(result.textContent.includes('10.5 km deep'), 'depth should appear when supplied');
   const link = result.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://earthquake.usgs.gov/earthquakes/eventpage/big');
@@ -305,3 +306,4 @@ test('missing earthquakes API degrades with an honest message', async () => {
   await doc.getElementById('earthquake-check').dispatch('click', {});
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('unavailable'));
 });
+
