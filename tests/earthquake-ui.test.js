@@ -30,6 +30,8 @@ function makeElement(tag) {
         const on = force === undefined ? !this.set.has(name) : force;
         if (on) this.set.add(name); else this.set.delete(name);
       },
+      add(name) { this.set.add(name); },
+      remove(name) { this.set.delete(name); },
       contains(name) { return this.set.has(name); }
     },
     setAttribute(name, value) { element.attributes[name] = String(value); },
@@ -299,4 +301,14 @@ test('missing earthquakes API degrades with an honest message', async () => {
   attach(doc, { earthquakesApi: null, fetch: null });
   await doc.getElementById('earthquake-check').dispatch('click', {});
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('unavailable'));
+});
+
+test('successful check briefly marks status as success', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  doc.getElementById('earthquake-check').dispatch('click', {});
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  const status = doc.getElementById('earthquake-status');
+  assert.ok(status.classList.contains('is-success'), 'status should flash is-success after update');
+  assert.strictEqual(status.getAttribute('title'), 'Earthquakes updated');
 });
