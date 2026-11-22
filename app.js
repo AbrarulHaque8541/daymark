@@ -1449,6 +1449,32 @@
         }
         if (payloadSafety.tooDeep) {
           result.depthLimitCount += 1;
+          return;
+        }
+        try {
+          const records = JSON.parse(payload);
+          if (Array.isArray(records)) result.arrays.push(records);
+          else result.malformedCount += 1;
+        } catch (error) {
+          result.malformedCount += 1;
+        }
+      });
+      return result;
+    }
+    result.malformedCount = 1;
+    return result;
+  }
+
+  function readFocusRecoveryStates(raw) {
+    const result = { states: [], malformedCount: 0 };
+    if (typeof raw !== 'string' || raw.length === 0) return result;
+    if (!focus) {
+      result.malformedCount = 1;
+      return result;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
     } catch (error) {
       result.malformedCount = 1;
       return result;
@@ -2494,6 +2520,10 @@
       }
     }
     status.textContent = state.feedNotice || (state.feedCache
+    if (status.classList && typeof status.classList.toggle === "function") {
+      const isSuccess = Boolean(state.feedNotice && state.feedNotice.startsWith("Updated"));
+      status.classList.toggle("is-success", isSuccess);
+    }
       ? `Saved on this device · ${formatFeedTime(state.feedCache.fetchedAt)}`
       : 'No feed loaded yet. Paste an RSS or Atom URL and tap Refresh.');
     const cache = state.feedCache;
