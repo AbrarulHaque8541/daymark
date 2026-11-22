@@ -131,7 +131,7 @@
       if (quake.url) {
         const link = doc.createElement('a');
         link.href = quake.url;
-        link.textContent = quake.url;
+        link.textContent = 'USGS page';
         link.setAttribute('target', '_blank');
         link.setAttribute('rel', 'noopener noreferrer');
         link.setAttribute('aria-label', 'Open the USGS page for ' + (quake.place || 'this earthquake'));
