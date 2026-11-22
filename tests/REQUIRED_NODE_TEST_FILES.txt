@@ -52,6 +52,8 @@ tests/currency-logic.test.js
 tests/currency-ui.test.js
 tests/crypto-logic.test.js
 tests/crypto-ui.test.js
+tests/earthquake-logic.test.js
+tests/earthquake-ui.test.js
 tests/daylight-logic.test.js
 tests/daylight-ui.test.js
 tests/design-tokens-logic.test.js
