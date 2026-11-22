@@ -485,6 +485,22 @@ test('task import previews additions, duplicates and invalid rows before appendi
   assert.equal(saved[1].title, 'New task');
 });
 
+test('duplicate-key task backup is rejected before confirmation and preserves primary storage bytes', async () => {
+  const existing = makeImportTask('existing-id', 'Keep this task');
+  const savedValue = JSON.stringify([existing]);
+  const app = bootApp({ savedValue });
+  const importText = '[{"id":"incoming-id","title":"First title","title":"Last title",'
+    + '"dueDate":null,"priority":"medium","completed":false,'
+    + '"createdAt":"2026-11-22T00:00:00.000Z","updatedAt":"2026-11-22T00:00:00.000Z"}]';
+
+  await triggerTaskImport(app, { size: Buffer.byteLength(importText), content: importText });
+
+  assert.equal(app.confirmMessages.length, 0, 'ambiguous backups must not reach confirmation');
+  assert.equal(app.storedValues.get(STORAGE_KEY), savedValue,
+    'duplicate-key rejection must preserve the primary storage bytes');
+  assert.match(app.elements.get('#toast').textContent, /duplicate JSON keys/);
+});
+
 test('declining task import confirmation leaves storage unchanged', async () => {
   const existing = makeImportTask('existing-id', 'Keep this task');
   const savedValue = JSON.stringify([existing]);

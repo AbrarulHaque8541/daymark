@@ -1660,6 +1660,10 @@
         : `Recovery import finished — ${message}.`);
   }
   async function applyImportedText(text) {
+    if (logic.hasDuplicateJsonKeys(text)) {
+      showToast('That backup contains duplicate JSON keys. Nothing was changed.');
+      return;
+    }
     let parsed;
     try {
       parsed = JSON.parse(text);
