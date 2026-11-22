@@ -110,6 +110,12 @@
       }
     }
 
+    function setSuccess(on) {
+      if (statusEl && statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!on);
+      }
+    }
+
     function status(message) {
       if (statusEl) statusEl.textContent = message;
     }
@@ -158,19 +164,23 @@
       if (busy) return;
       if (!quakesApi || typeof quakesApi.fetchesRecent !== 'function') {
         status('The earthquake glance is unavailable in this environment.');
+        setSuccess(false);
         return;
       }
       if (!fetchImpl) {
         status('Could not check: fetch is unavailable in this browser.');
+        setSuccess(false);
         return;
       }
       setBusy(true);
+      setSuccess(false);
       try {
         const record = await quakesApi.fetchesRecent(fetchImpl);
         render(record);
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
           + describeHidden(record));
+        setSuccess(true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof quakesApi.classifiesError === 'function'
@@ -178,6 +188,7 @@
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
         clearResult();
+        setSuccess(false);
       } finally {
         setBusy(false);
       }
@@ -187,6 +198,7 @@
       if (busy) return;
       clearResult();
       status('Cleared. Tap Check to fetch the latest significant earthquakes.');
+      setSuccess(false);
     }
 
     function onSubmit(event) {
