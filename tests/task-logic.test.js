@@ -260,7 +260,9 @@ test('duplicate JSON object keys are detected recursively without scanning strin
   assert.equal(logic.hasDuplicateJsonKeys('{"a":1,"b":[true,null,2]}'), false);
   assert.equal(logic.hasDuplicateJsonKeys('{invalid'), false);
   const deeplyNested = '['.repeat(130) + '0' + ']'.repeat(130);
-  assert.equal(logic.hasDuplicateJsonKeys(deeplyNested), true);
+  assert.equal(logic.hasDuplicateJsonKeys(deeplyNested), false);
+  assert.deepEqual(logic.inspectJsonSafety(deeplyNested), { duplicateKeys: false, tooDeep: true });
+  assert.deepEqual(logic.inspectJsonSafety('[{"id":1,"id":2}]'), { duplicateKeys: true, tooDeep: false });
 });
 
 

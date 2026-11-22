@@ -1410,8 +1410,19 @@
   }
 
   function readTaskRecoveryPayloads(raw) {
-    const result = { arrays: [], malformedCount: 0 };
+    const result = { arrays: [], malformedCount: 0, duplicateKeyCount: 0, depthLimitCount: 0 };
     if (typeof raw !== 'string' || raw.length === 0) return result;
+    const safety = typeof logic.inspectJsonSafety === 'function'
+      ? logic.inspectJsonSafety(raw)
+      : { duplicateKeys: logic.hasDuplicateJsonKeys(raw), tooDeep: false };
+    if (safety.duplicateKeys) {
+      result.duplicateKeyCount += 1;
+      return result;
+    }
+    if (safety.tooDeep) {
+      result.depthLimitCount += 1;
+      return result;
+    }
     let parsed;
     try {
       parsed = JSON.parse(raw);
@@ -1427,6 +1438,17 @@
       parsed.payloads.forEach((payload) => {
         if (typeof payload !== 'string') {
           result.malformedCount += 1;
+          return;
+        }
+        const payloadSafety = typeof logic.inspectJsonSafety === 'function'
+          ? logic.inspectJsonSafety(payload)
+          : { duplicateKeys: logic.hasDuplicateJsonKeys(payload), tooDeep: false };
+        if (payloadSafety.duplicateKeys) {
+          result.duplicateKeyCount += 1;
+          return;
+        }
+        if (payloadSafety.tooDeep) {
+          result.depthLimitCount += 1;
           return;
         }
         try {
@@ -1497,6 +1519,14 @@
     }
 
     const taskPayloads = readTaskRecoveryPayloads(taskRaw);
+    if (taskPayloads.duplicateKeyCount) {
+      showToast('That task recovery backup contains duplicate JSON keys. Nothing was changed.');
+      return;
+    }
+    if (taskPayloads.depthLimitCount) {
+      showToast('That task recovery backup exceeds the supported JSON nesting depth. Nothing was changed.');
+      return;
+    }
     const existingTaskIds = new Set(state.tasks.map((task) => task.id));
     const incomingTasks = [];
     let duplicateTasks = 0;
@@ -1660,8 +1690,15 @@
         : `Recovery import finished — ${message}.`);
   }
   async function applyImportedText(text) {
-    if (logic.hasDuplicateJsonKeys(text)) {
+    const safety = typeof logic.inspectJsonSafety === 'function'
+      ? logic.inspectJsonSafety(text)
+      : { duplicateKeys: logic.hasDuplicateJsonKeys(text), tooDeep: false };
+    if (safety.duplicateKeys) {
       showToast('That backup contains duplicate JSON keys. Nothing was changed.');
+      return;
+    }
+    if (safety.tooDeep) {
+      showToast('That backup exceeds the supported JSON nesting depth. Nothing was changed.');
       return;
     }
     let parsed;

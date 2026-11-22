@@ -293,8 +293,8 @@
   // Detect duplicate JSON object member names before JSON.parse can silently
   // keep the last value. Invalid JSON remains the caller's parse error; excessive
   // nesting is rejected here so hostile inputs cannot exhaust the call stack.
-  function hasDuplicateJsonKeys(raw) {
-    if (typeof raw !== 'string') return false;
+  function inspectJsonSafety(raw) {
+    if (typeof raw !== 'string') return { duplicateKeys: false, tooDeep: false };
     let index = 0;
     let duplicate = false;
     let tooDeep = false;
@@ -397,10 +397,13 @@
     try {
       readValue(0);
       whitespace();
-      return index === raw.length && (duplicate || tooDeep);
+      return { duplicateKeys: index === raw.length && duplicate, tooDeep: false };
     } catch (error) {
-      return tooDeep;
+      return { duplicateKeys: false, tooDeep };
     }
+  }
+  function hasDuplicateJsonKeys(raw) {
+    return inspectJsonSafety(raw).duplicateKeys;
   }
 
   const api = {
@@ -418,6 +421,7 @@
     isTag,
     isValidTask,
     validateStoredTasks,
+    inspectJsonSafety,
     hasDuplicateJsonKeys,
     getFilteredTasks,
     getSuggestions,
