@@ -1,6 +1,6 @@
 package com.abrar.daymark;
 
-/** Regression tests for overflow-safe DownloadManager progress rendering. */
+/** Regression tests for overflow-safe DownloadManager progress and size labels. */
 public final class BrowserDownloadProgressSmoke {
     private BrowserDownloadProgressSmoke() { }
 
@@ -24,7 +24,15 @@ public final class BrowserDownloadProgressSmoke {
         check(BrowserDownloadProgress.percent(max - 1L, max - 1L) == 100,
                 "exact large completion");
 
-        System.out.println("PASS BrowserDownloadProgressSmoke: ordinary, unknown, negative, overshoot and Long.MAX_VALUE counters");
+        check(BrowserDownloadProgress.formatBytes(0L).equals("0 B"), "zero size");
+        check(BrowserDownloadProgress.formatBytes(-5L).equals("0 B"), "negative size");
+        check(BrowserDownloadProgress.formatBytes(512L).equals("512 B"), "bytes under 1 KB");
+        check(BrowserDownloadProgress.formatBytes(1024L).equals("1.0 KB"), "exact 1 KB");
+        check(BrowserDownloadProgress.formatBytes(1536L).equals("1.5 KB"), "1.5 KB");
+        check(BrowserDownloadProgress.formatBytes(1048576L).equals("1.0 MB"), "exact 1 MB");
+        check(BrowserDownloadProgress.formatBytes(1073741824L).equals("1.0 GB"), "exact 1 GB");
+
+        System.out.println("PASS BrowserDownloadProgressSmoke: ordinary, unknown, negative, overshoot, Long.MAX_VALUE counters and size labels");
     }
 
     private static void check(boolean condition, String message) {
