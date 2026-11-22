@@ -23,6 +23,14 @@
     aside.setAttribute('aria-labelledby', 'earthquake-heading');
     aside.setAttribute('aria-describedby', 'earthquake-description');
 
+    const topline = doc.createElement('div');
+    topline.className = 'briefing-topline';
+    const dot = doc.createElement('span');
+    dot.className = 'briefing-dot';
+    if (typeof dot.setAttribute === 'function') dot.setAttribute('aria-hidden', 'true');
+    topline.appendChild(dot);
+    aside.appendChild(topline);
+
     const heading = doc.createElement('h2');
     heading.id = 'earthquake-heading';
     heading.textContent = 'Earthquake glance';
@@ -111,11 +119,10 @@
     }
 
     function status(message, isSuccess) {
-      if (statusEl) {
-        statusEl.textContent = message;
-        if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
-          statusEl.classList.toggle('is-success', !!isSuccess);
-        }
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
       }
     }
 
@@ -131,15 +138,12 @@
       const parts = [magnitudeLabel + ' ' + quakesApi.describesMagnitude(quake.magnitude)];
       if (quake.place) parts.push(quake.place);
       if (quake.time) parts.push(quake.time);
-      if (quake.depthKm !== null && Number.isFinite(Number(quake.depthKm))) {
-        parts.push(Number(quake.depthKm).toFixed(1) + ' km deep');
-      }
       if (quake.tsunami) parts.push('tsunami alert possible');
       resultEl.appendChild(doc.createTextNode(parts.join(' · ') + ' · '));
       if (quake.url) {
         const link = doc.createElement('a');
         link.href = quake.url;
-        link.textContent = 'USGS page';
+        link.textContent = quake.url;
         link.setAttribute('target', '_blank');
         link.setAttribute('rel', 'noopener noreferrer');
         link.setAttribute('aria-label', 'Open the USGS page for ' + (quake.place || 'this earthquake'));
@@ -210,6 +214,8 @@
     if (formEl) formEl.addEventListener('submit', onSubmit);
     if (buttonEl) buttonEl.addEventListener('click', onSubmit);
     if (clearEl) clearEl.addEventListener('click', onClearClick);
+
+    status('Tap Check to fetch significant earthquakes from the past 24 hours.');
 
     return {
       onCheck: onCheck,
