@@ -260,6 +260,16 @@ function triggerTaskCompletion(app, taskId) {
   return Promise.all(handlers.map((handler) => handler({ target })));
 }
 
+function triggerCompleteVisible(app) {
+  const handlers = app.listeners.get('#complete-visible:click') || [];
+  return Promise.all(handlers.map((handler) => handler({ currentTarget: app.elements.get('#complete-visible') })));
+}
+
+function triggerToastAction(app) {
+  const handlers = app.listeners.get('#toast-action:click') || [];
+  return Promise.all(handlers.map((handler) => handler({ currentTarget: app.elements.get('#toast-action') })));
+}
+
 function triggerFormInput(app, selector, value) {
   const input = app.elements.get(selector);
   input.value = value;
@@ -330,6 +340,49 @@ test('monthly task completed on a clamped date retains its original day anchor',
   assert.equal(saved[0].completed, true);
   assert.equal(saved[1].dueDate, '2026-03-31', 'the next occurrence returns to day 31 after February');
   assert.equal(saved[1].repeatDayOfMonth, 31, 'the recurring series anchor is carried forward');
+});
+
+test('Complete visible schedules one next occurrence for recurring tasks only', async () => {
+  const recurring = makeImportTask('bulk-monthly-31', 'Bulk month-end task');
+  recurring.dueDate = '2026-02-28';
+  recurring.repeat = 'monthly';
+  recurring.repeatDayOfMonth = 31;
+  const ordinary = makeImportTask('bulk-ordinary', 'Bulk ordinary task');
+  const alreadyCompleted = makeImportTask('bulk-already-completed', 'Already completed recurring task');
+  alreadyCompleted.dueDate = '2026-02-28';
+  alreadyCompleted.repeat = 'monthly';
+  alreadyCompleted.repeatDayOfMonth = 28;
+  alreadyCompleted.completed = true;
+  const app = bootApp({
+    savedValue: JSON.stringify([recurring, ordinary, alreadyCompleted]),
+    fixedToday: '2026-02-28'
+  });
+
+  await triggerCompleteVisible(app);
+  await app.settle();
+
+  const saved = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(saved.length, 4, 'bulk completion creates exactly one successor for the one open recurring task');
+  assert.equal(saved.find((task) => task.id === recurring.id).completed, true);
+  assert.equal(saved.find((task) => task.id === ordinary.id).completed, true);
+  assert.equal(saved.find((task) => task.id === alreadyCompleted.id).completed, true);
+  const successors = saved.filter((task) => task.title === recurring.title && task.id !== recurring.id);
+  assert.equal(successors.length, 1);
+  assert.notEqual(successors[0].id, recurring.id);
+  assert.equal(successors[0].dueDate, '2026-03-31');
+  assert.equal(successors[0].repeat, 'monthly');
+  assert.equal(successors[0].repeatDayOfMonth, 31);
+  assert.equal(successors[0].completed, false);
+  assert.match(app.elements.get('#toast').textContent, /1 next occurrence scheduled/);
+  assert.equal(app.elements.get('#toast-action').textContent, 'Undo');
+
+  await triggerToastAction(app);
+  await app.settle();
+  const restored = JSON.parse(app.storedValues.get(STORAGE_KEY));
+  assert.equal(restored.length, 3, 'Undo removes the generated successor');
+  assert.equal(restored.find((task) => task.id === recurring.id).completed, false);
+  assert.equal(restored.find((task) => task.id === ordinary.id).completed, false);
+  assert.equal(restored.find((task) => task.id === alreadyCompleted.id).completed, true);
 });
 
 test('ordinary task saves remain available after Clear All fails to remove primary tasks', async () => {
