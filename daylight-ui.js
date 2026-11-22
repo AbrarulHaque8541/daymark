@@ -3,12 +3,7 @@
 
   // Daylight planner UI wiring for the web prototype. A deliberately
   // stateless card: nothing is saved on this device, so there is no storage
-  // key, no boot-time storage reads, and Clear only empties the view.
-  //
-  // The card markup is injected here instead of being hand-placed in
-  // index.html, so the module can ship without touching shared markup files.
-  // If a host page already provides the elements, they are reused as-is and
-  // nothing is duplicated. Mirrors the air-quality-ui.js module style:
+  // key and no boot-time storage reads. Clear only empties the view.
   // attachDaylightUi(env) is fully injectable for unit tests.
 
   const CARD_ID = 'daylight-card';
@@ -34,7 +29,7 @@
 
     const heading = doc.createElement('h2');
     heading.id = 'daylight-heading';
-    heading.textContent = 'Daylight and UV';
+    heading.textContent = 'Daylight & UV, keyless';
     aside.appendChild(heading);
 
     const description = doc.createElement('p');
@@ -60,7 +55,7 @@
       input.setAttribute('name', 'place');
       input.setAttribute('type', 'text');
       input.setAttribute('maxlength', '80');
-      input.setAttribute('placeholder', 'City, e.g. Kanyakumari');
+      input.setAttribute('placeholder', 'Place name');
       input.setAttribute('autocomplete', 'off');
       input.setAttribute('aria-describedby', 'daylight-description');
     }
@@ -69,17 +64,21 @@
     const checkButton = doc.createElement('button');
     checkButton.id = 'daylight-refresh';
     checkButton.className = 'button button-primary';
-    if (checkButton.setAttribute) checkButton.setAttribute('type', 'submit');
+    if (checkButton.setAttribute) {
+      checkButton.setAttribute('type', 'submit');
+      checkButton.setAttribute('title', 'Check daylight and UV for the place');
+    }
     checkButton.textContent = 'Check';
-    if (checkButton.setAttribute) checkButton.setAttribute('title', 'Check daylight and UV for the place');
     form.appendChild(checkButton);
 
     const clearButton = doc.createElement('button');
     clearButton.id = 'daylight-clear';
     clearButton.className = 'button button-quiet';
-    if (clearButton.setAttribute) clearButton.setAttribute('type', 'button');
+    if (clearButton.setAttribute) {
+      clearButton.setAttribute('type', 'button');
+      clearButton.setAttribute('title', 'Clear the daylight view');
+    }
     clearButton.textContent = 'Clear';
-    if (clearButton.setAttribute) clearButton.setAttribute('title', 'Clear the daylight view');
     form.appendChild(clearButton);
 
     aside.appendChild(form);
@@ -87,52 +86,46 @@
     const statusLine = doc.createElement('p');
     statusLine.id = 'daylight-status';
     statusLine.className = 'feed-status';
-    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('role', 'status');
-    if (typeof statusLine.setAttribute === 'function') statusLine.setAttribute('aria-live', 'polite');
+    if (typeof statusLine.setAttribute === 'function') {
+      statusLine.setAttribute('role', 'status');
+      statusLine.setAttribute('aria-live', 'polite');
+    }
     aside.appendChild(statusLine);
 
     const result = doc.createElement('div');
     result.id = 'daylight-result';
-    result.className = 'feed-list';
-    if (typeof result.setAttribute === 'function') result.setAttribute('aria-live', 'polite');
+    result.className = 'feed-result';
     aside.appendChild(result);
 
-    const anchor = typeof doc.getElementById === 'function'
-      ? (doc.getElementById('air-card') || doc.getElementById('weather-card'))
-      : null;
-    if (anchor && anchor.parentNode && typeof anchor.parentNode.insertBefore === 'function') {
-      anchor.parentNode.insertBefore(aside, anchor.nextSibling);
-    } else if (doc.body && typeof doc.body.appendChild === 'function') {
-      doc.body.appendChild(aside);
-    }
     return aside;
   }
 
   function attachDaylightUi(env) {
-    if (!env || !env.document) throw new Error('attachDaylightUi requires a document.');
-    const doc = env.document;
-    const win = env.window || root;
-    const daylightApi = env.daylightApi || root.DaymarkDaylight || null;
+    const doc = env && env.document;
+    if (!doc) throw new Error('daylight UI needs a document');
+    const win = env.window || (typeof window !== 'undefined' ? window : null);
+    const daylightApi = env.daylightApi || (win && win.DaymarkDaylight) || null;
+    const fetchImpl = env.fetch || (win && win.fetch) || null;
     const now = typeof env.now === 'function' ? env.now : () => new Date().toISOString();
-    const fetchImpl = env.fetch
-      || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
 
-    ensureCard(doc);
-
-    const element = (id) => (typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
-    const inputEl = element('daylight-place');
-    const buttonEl = element('daylight-refresh');
-    const formEl = element('daylight-form');
-    const statusEl = element('daylight-status');
-    const resultEl = element('daylight-result');
-    const clearEl = element('daylight-clear');
-
-    let busy = false;
-
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    const card = ensureCard(doc);
+    const air = doc.getElementById && doc.getElementById('air-card');
+    const weather = doc.getElementById && doc.getElementById('weather-card');
+    const anchor = air || weather;
+    if (anchor && anchor.parentNode && typeof anchor.parentNode.insertBefore === 'function') {
+      anchor.parentNode.insertBefore(card, anchor.nextSibling);
+    } else if (doc.body && typeof doc.body.appendChild === 'function') {
+      doc.body.appendChild(card);
     }
 
+    const inputEl = doc.getElementById('daylight-place');
+    const buttonEl = doc.getElementById('daylight-refresh');
+    const clearEl = doc.getElementById('daylight-clear');
+    const formEl = doc.getElementById('daylight-form');
+    const statusEl = doc.getElementById('daylight-status');
+    const resultEl = doc.getElementById('daylight-result');
+
+    let busy = false;
     function setBusy(isBusy) {
       busy = isBusy;
       if (buttonEl) {
@@ -141,24 +134,28 @@
           buttonEl.classList.toggle('is-busy', isBusy);
           if (clearEl && clearEl.classList) clearEl.classList.toggle('is-busy', isBusy);
         }
-        if (typeof buttonEl.setAttribute === 'function') {
-          if (isBusy) buttonEl.setAttribute('aria-busy', 'true');
-          else buttonEl.removeAttribute('aria-busy');
-        }
       }
     }
 
+    function status(message) {
+      if (statusEl) statusEl.textContent = message;
+    }
+
     function render(record) {
-      if (!resultEl || !record) return;
-      const place = record.place;
-      const daylight = record.daylight;
-      const placeLine = place.country ? place.name + ', ' + place.country : place.name;
-      const lines = daylight.days.map((day, index) => {
-        const dayLabel = index === 0 ? 'Today' : '+' + index + 'd';
-        return dayLabel + ' sunrise ' + day.sunriseClock + ', sunset ' + day.sunsetClock
-          + ' (' + day.durationLabel + '), UV max ' + day.uvMax + ' (' + day.uvBand + ')';
-      });
-      const suffix = daylight.timezone ? ' · local time (' + daylight.timezone + ')' : ' · local time';
+      if (!resultEl || !record || !record.daily) return;
+      const lines = [];
+      const daily = record.daily;
+      for (let i = 0; i < Math.min(3, daily.sunrise.length); i++) {
+        const rise = (daily.sunrise[i] || '').slice(11, 16);
+        const set = (daily.sunset[i] || '').slice(11, 16);
+        const uv = daily.uv_index_max[i];
+        const label = i === 0 ? 'Today' : '+' + i + 'd';
+        lines.push(label + ' sunrise ' + rise + ', sunset ' + set
+          + ' (' + (record.dayLengths && record.dayLengths[i] || '') + '), UV max ' + uv
+          + (record.uvCategories && record.uvCategories[i] ? ' (' + record.uvCategories[i] + ')' : ''));
+      }
+      const placeLine = record.place || '';
+      const suffix = record.timezone ? ' · local time (' + record.timezone + ')' : ' · local time';
       resultEl.textContent = placeLine + ' · ' + lines.join(' · ') + suffix;
     }
 
@@ -183,9 +180,21 @@
         render(record);
         status('Updated · ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
           + ' UTC · not saved on this device');
+        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
+          statusEl.classList.add('is-success');
+          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Daylight and UV updated');
+          setTimeout(() => {
+            if (statusEl.classList) statusEl.classList.remove('is-success');
+            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+          }, 1400);
+        }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         status('Could not check: ' + message);
+        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+          statusEl.classList.remove('is-success');
+          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+        }
       } finally {
         setBusy(false);
       }
@@ -196,6 +205,10 @@
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) resultEl.textContent = '';
       status('Cleared. Type a place name and tap Check.');
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+      }
     }
 
     status('Type a place name and tap Check.');
@@ -221,13 +234,7 @@
       });
     }
 
-    return {
-      onCheck,
-      onClear,
-      detach() {
-        setBusy(false);
-      }
-    };
+    return { onCheck, onClear, detach() {} };
   }
 
   const api = { attachDaylightUi, ensureCard, CARD_ID };
