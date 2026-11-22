@@ -137,6 +137,9 @@
         image.setAttribute('alt', picture.title
           ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
           : 'Picture of the day for ' + dateLabel + ' from Wikimedia');
+        image.setAttribute('title', picture.title
+          ? 'Picture of the day: ' + picture.title + ' (' + dateLabel + ')'
+          : 'Picture of the day for ' + dateLabel);
         image.setAttribute('loading', 'lazy');
         image.setAttribute('referrerpolicy', 'no-referrer');
         if (Number.isInteger(picture.width) && picture.width > 0
@@ -170,6 +173,7 @@
           link.setAttribute('target', '_blank');
           link.setAttribute('rel', 'noopener noreferrer');
           link.setAttribute('aria-label', 'Open the Wikimedia file page for the ' + dateLabel + ' picture of the day');
+          link.setAttribute('title', 'Open the Wikimedia file page');
         }
         resultEl.appendChild(link);
       }
