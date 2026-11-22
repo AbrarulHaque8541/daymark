@@ -132,14 +132,13 @@
       const dateLabel = paddedDay + '/' + paddedMonth;
       const image = doc.createElement('img');
       const src = picture.thumbUrl || picture.imageUrl;
+      const altText = picture.title
+        ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
+        : 'Picture of the day for ' + dateLabel + ' from Wikimedia';
       if (image.setAttribute) {
         image.setAttribute('src', src);
-        image.setAttribute('alt', picture.title
-          ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
-          : 'Picture of the day for ' + dateLabel + ' from Wikimedia');
-        image.setAttribute('title', picture.title
-          ? 'Picture of the day: ' + picture.title + ' (' + dateLabel + ')'
-          : 'Picture of the day for ' + dateLabel);
+        image.setAttribute('alt', altText);
+        image.setAttribute('title', altText);
         image.setAttribute('loading', 'lazy');
         image.setAttribute('referrerpolicy', 'no-referrer');
         if (Number.isInteger(picture.width) && picture.width > 0
@@ -148,6 +147,11 @@
           image.setAttribute('height', String(picture.height));
         }
       }
+      image.onload = function () {
+        if (image.classList && typeof image.classList.add === 'function') {
+          image.classList.add('is-loaded');
+        }
+      };
       image.onerror = function () {
         if (image.parentNode) image.parentNode.removeChild(image);
         const err = doc.createElement('p');
@@ -173,7 +177,6 @@
           link.setAttribute('target', '_blank');
           link.setAttribute('rel', 'noopener noreferrer');
           link.setAttribute('aria-label', 'Open the Wikimedia file page for the ' + dateLabel + ' picture of the day');
-          link.setAttribute('title', 'Open the Wikimedia file page');
         }
         resultEl.appendChild(link);
       }
