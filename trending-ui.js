@@ -236,15 +236,17 @@
         rank.textContent = String(index + 1);
         if (typeof rank.setAttribute === 'function') rank.setAttribute('aria-hidden', 'true');
         item.appendChild(rank);
+        const body = doc.createElement('div');
+        body.className = 'feed-item-body';
         const title = doc.createElement('span');
         title.className = 'feed-item-title';
         title.textContent = article.title + (article.titleTruncated ? ' (title truncated)' : '');
-        item.appendChild(title);
+        body.appendChild(title);
         const meta = doc.createElement('span');
         meta.className = 'feed-item-date';
         const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
         meta.textContent = viewsText + ' views';
-        item.appendChild(meta);
+        body.appendChild(meta);
         if (article.url) {
           const link = doc.createElement('a');
           link.className = 'feed-item-link';
@@ -255,8 +257,9 @@
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about ' + article.title + ', trending for ' + dateLabel);
           }
-          item.appendChild(link);
+          body.appendChild(link);
         }
+        item.appendChild(body);
         resultEl.appendChild(item);
       }
       const footer = doc.createElement('p');
