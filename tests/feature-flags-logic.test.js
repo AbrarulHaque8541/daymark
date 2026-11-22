@@ -99,12 +99,12 @@ test('setFlag accepts the live Mindful-breaks id', () => {
   assert.equal(JSON.parse(storage.getItem('daymark.features.v1'))['mindful-breaks'], true);
 });
 
-test('setFlag rejects a planned flag and writes nothing', () => {
+test('setFlag accepts the live comfort-tint flag', () => {
   const storage = makeStorage({});
   const saved = flags.setFlag(storage, 'comfort-tint', true);
-  assert.equal(saved.ok, false);
-  assert.equal(saved.reason, 'planned-flag');
-  assert.equal(storage.writes(), 0);
+  assert.equal(saved.ok, true);
+  assert.equal(saved.flags['comfort-tint'], true);
+  assert.equal(JSON.parse(storage.getItem('daymark.features.v1'))['comfort-tint'], true);
 });
 
 test('setFlag accepts the live focus-mode flag', () => {
@@ -148,3 +148,4 @@ test('setFlag reports storage-unavailable when storage cannot write', () => {
   assert.equal(saved.ok, false);
   assert.equal(saved.reason, 'storage-unavailable');
 });
+
