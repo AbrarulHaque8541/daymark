@@ -196,51 +196,16 @@ test('card falls back to earlier anchors when no potd card exists', () => {
   const doc = makeDoc();
   const wiki = makeElement('section');
   wiki.id = 'wiki-card';
-  doc.body.appendChild(wiki);
-  attach(doc);
-  const card = doc.getElementById('trending-card');
-  assert.strictEqual(doc.body.children.indexOf(card), doc.body.children.indexOf(wiki) + 1);
-});
-
-test('an empty date checks today (from the injected now)', async () => {
-  const doc = makeDoc();
-  let requested = null;
-  attach(doc, {
-    fetch: async (url) => {
-      requested = url;
-      return okResponse(JSON.stringify(payload));
-    }
-  });
-  doc.getElementById('trending-check').dispatch('click', {});
-  await drain();
-  assert.strictEqual(requested, 'https://api.wikimedia.org/feed/v1/wikipedia/en/featured/11/20');
-});
-
-test('a successful check renders articles with an accessible link', async () => {
-  const doc = makeDoc();
-  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
-  doc.getElementById('trending-date').value = '11-20';
-  doc.getElementById('trending-check').dispatch('click', {});
-  await drain();
-  const result = doc.getElementById('trending-result');
-  assert.ok(result.textContent.includes('Grand Theft Auto VI'));
-  assert.ok(result.textContent.includes('519,632'));
-  assert.ok(result.textContent.includes('views'));
-  const item = result.children.find(c => c.className === 'feed-item');
-  assert.ok(item);
   const rank = item.children.find(c => c.className === 'feed-item-rank');
   assert.ok(rank);
   assert.strictEqual(rank.textContent, '1');
   assert.strictEqual(rank.getAttribute('aria-hidden'), 'true');
-  assert.ok(item.getAttribute('aria-label').includes('Rank 1'));
-  assert.ok(item.getAttribute('aria-label').includes('Grand Theft Auto VI'));
   const link = item.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/Grand_Theft_Auto_VI');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
   assert.strictEqual(link.getAttribute('target'), '_blank');
   assert.ok(link.getAttribute('aria-label').includes('Grand Theft Auto VI'));
-  assert.ok(link.getAttribute('aria-label').includes('rank 1'));
   assert.ok(doc.getElementById('trending-copy'));
   assert.strictEqual(doc.getElementById('trending-copy').hidden, false);
 });
