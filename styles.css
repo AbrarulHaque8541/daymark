@@ -122,6 +122,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #crypto-check:active, #crypto-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #launch-check:active, #launch-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #country-check:active, #country-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#earthquake-check:active, #earthquake-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #onthisday-check:active, #onthisday-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #potd-check:active, #potd-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #releases-check:active, #releases-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
