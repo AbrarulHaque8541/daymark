@@ -126,6 +126,9 @@
       const parts = [magnitudeLabel + ' ' + quakesApi.describesMagnitude(quake.magnitude)];
       if (quake.place) parts.push(quake.place);
       if (quake.time) parts.push(quake.time);
+      if (quake.depthKm !== null && Number.isFinite(Number(quake.depthKm))) {
+        parts.push(Number(quake.depthKm).toFixed(1) + ' km deep');
+      }
       if (quake.tsunami) parts.push('tsunami alert possible');
       resultEl.appendChild(doc.createTextNode(parts.join(' · ') + ' · '));
       if (quake.url) {
