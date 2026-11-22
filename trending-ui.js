@@ -108,7 +108,10 @@
     const result = doc.createElement('div');
     result.id = 'trending-result';
     result.className = 'feed-list';
-    if (typeof result.setAttribute === 'function') result.setAttribute('aria-live', 'polite');
+    if (typeof result.setAttribute === 'function') {
+      result.setAttribute('aria-live', 'polite');
+      result.setAttribute('aria-label', 'Trending articles list');
+    }
     aside.appendChild(result);
 
     const anchor = typeof doc.getElementById === 'function'
@@ -227,6 +230,7 @@
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const dateLabel = paddedMonth + '/' + paddedDay;
       const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
+      let firstLink = null;
       for (let index = 0; index < record.articles.length; index += 1) {
         const article = record.articles[index];
         const item = doc.createElement('div');
@@ -236,17 +240,15 @@
         rank.textContent = String(index + 1);
         if (typeof rank.setAttribute === 'function') rank.setAttribute('aria-hidden', 'true');
         item.appendChild(rank);
-        const body = doc.createElement('div');
-        body.className = 'feed-item-body';
         const title = doc.createElement('span');
         title.className = 'feed-item-title';
         title.textContent = article.title + (article.titleTruncated ? ' (title truncated)' : '');
-        body.appendChild(title);
+        item.appendChild(title);
         const meta = doc.createElement('span');
         meta.className = 'feed-item-date';
         const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
         meta.textContent = viewsText + ' views';
-        body.appendChild(meta);
+        item.appendChild(meta);
         if (article.url) {
           const link = doc.createElement('a');
           link.className = 'feed-item-link';
@@ -257,9 +259,9 @@
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about ' + article.title + ', trending for ' + dateLabel);
           }
-          body.appendChild(link);
+          item.appendChild(link);
+          if (!firstLink) firstLink = link;
         }
-        item.appendChild(body);
         resultEl.appendChild(item);
       }
       const footer = doc.createElement('p');
@@ -268,6 +270,13 @@
         + (record.articlesTruncated ? ' (list truncated, showing the top ' + record.articles.length + ')' : '');
       resultEl.appendChild(footer);
       updateCopyVisibility(record.articles && record.articles.length > 0);
+      // Accessibility: after successful render, move focus to the first Read link if present, or status.
+      if (firstLink && typeof firstLink.focus === 'function') {
+        setTimeout(() => firstLink.focus(), 100);
+      } else if (statusEl && typeof statusEl.focus === 'function') {
+        statusEl.setAttribute('tabindex', '-1');
+        setTimeout(() => statusEl.focus(), 100);
+      }
     }
 
     async function onCheck() {
@@ -371,6 +380,7 @@
         statusEl.classList.remove('is-success');
         if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
       }
+      if (inputEl && typeof inputEl.focus === 'function') inputEl.focus();
     }
 
     status('Leave the date empty for today, or type month/day, and tap Check.');
