@@ -107,6 +107,14 @@
     const clearEl = element('potd-clear');
     let busy = false;
     function status(message) { if (statusEl) statusEl.textContent = message; }
+    function showSkeleton() {
+      if (!resultEl) return;
+      while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
+      const skel = doc.createElement('div');
+      skel.className = 'potd-skeleton';
+      skel.setAttribute('aria-hidden', 'true');
+      resultEl.appendChild(skel);
+    }
     function setBusy(isBusy) {
       busy = isBusy;
       if (buttonEl) {
@@ -120,6 +128,7 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
+      if (isBusy) showSkeleton();
     }
     function render(record) {
       if (!resultEl || !record || !record.picture) return;
@@ -132,13 +141,11 @@
       const dateLabel = paddedDay + '/' + paddedMonth;
       const image = doc.createElement('img');
       const src = picture.thumbUrl || picture.imageUrl;
-      const altText = picture.title
-        ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
-        : 'Picture of the day for ' + dateLabel + ' from Wikimedia';
       if (image.setAttribute) {
         image.setAttribute('src', src);
-        image.setAttribute('alt', altText);
-        image.setAttribute('title', altText);
+        image.setAttribute('alt', picture.title
+          ? 'Picture of the day for ' + dateLabel + ': ' + picture.title
+          : 'Picture of the day for ' + dateLabel + ' from Wikimedia');
         image.setAttribute('loading', 'lazy');
         image.setAttribute('referrerpolicy', 'no-referrer');
         if (Number.isInteger(picture.width) && picture.width > 0
@@ -147,11 +154,6 @@
           image.setAttribute('height', String(picture.height));
         }
       }
-      image.onload = function () {
-        if (image.classList && typeof image.classList.add === 'function') {
-          image.classList.add('is-loaded');
-        }
-      };
       image.onerror = function () {
         if (image.parentNode) image.parentNode.removeChild(image);
         const err = doc.createElement('p');
