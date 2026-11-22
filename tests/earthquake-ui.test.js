@@ -208,12 +208,22 @@ test('a successful check renders the strongest quake first with an accessible li
   assert.ok(link.getAttribute('aria-label').includes('USGS page'));
 });
 
+test('a successful check adds the is-success flash class', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  doc.getElementById('earthquake-check').dispatch('click', {});
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  const status = doc.getElementById('earthquake-status');
+  assert.ok(status.classList.contains('is-success'), 'success flash class must be present after a good check');
+});
+
 test('an empty feed says so honestly', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => okResponse(JSON.stringify({ features: [] })) });
   doc.getElementById('earthquake-check').dispatch('click', {});
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.ok(doc.getElementById('earthquake-result').textContent.includes('No significant earthquakes'));
+  assert.ok(doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('status reports the update time, that nothing is saved, and hidden entries', async () => {
@@ -235,6 +245,7 @@ test('403 explains the limited request', async () => {
   doc.getElementById('earthquake-check').dispatch('click', {});
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('limited this request'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('404 explains that the feed was not found', async () => {
@@ -243,6 +254,7 @@ test('404 explains that the feed was not found', async () => {
   doc.getElementById('earthquake-check').dispatch('click', {});
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('was not found'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('a failed check clears any previous result', async () => {
@@ -255,14 +267,16 @@ test('a failed check clears any previous result', async () => {
   assert.strictEqual(doc.getElementById('earthquake-result').children.length, 0);
 });
 
-test('clear empties the result', async () => {
+test('clear empties the result and removes the success flash', async () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('earthquake-result').textContent = 'old';
+  doc.getElementById('earthquake-status').classList.toggle('is-success', true);
   await doc.getElementById('earthquake-clear').dispatch('click', {});
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.strictEqual(doc.getElementById('earthquake-result').textContent, '');
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('Cleared'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('form submit is prevented and runs the check', async () => {
@@ -292,6 +306,7 @@ test('missing fetch degrades with an honest message', async () => {
   attach(doc, { fetch: null });
   await doc.getElementById('earthquake-check').dispatch('click', {});
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('fetch is unavailable'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
 
 test('missing earthquakes API degrades with an honest message', async () => {
@@ -299,4 +314,5 @@ test('missing earthquakes API degrades with an honest message', async () => {
   attach(doc, { earthquakesApi: null, fetch: null });
   await doc.getElementById('earthquake-check').dispatch('click', {});
   assert.ok(doc.getElementById('earthquake-status').textContent.includes('unavailable'));
+  assert.ok(!doc.getElementById('earthquake-status').classList.contains('is-success'));
 });
