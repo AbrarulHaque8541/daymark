@@ -8,6 +8,7 @@
   // The card markup is injected here instead of being hand-placed in
   // index.html, mirroring onthisday-ui.js: attachTrendingUi(env) is fully
   // injectable for unit tests.
+  // Cycle B polish: success flash on #trending-status (accent #16705f) + consistent press feedback.
 
   const CARD_ID = 'trending-card';
 
@@ -65,16 +66,6 @@
     }
     form.appendChild(input);
 
-    const todayButton = doc.createElement('button');
-    todayButton.id = 'trending-today';
-    todayButton.className = 'button button-quiet';
-    if (todayButton.setAttribute) {
-      todayButton.setAttribute('type', 'button');
-      todayButton.setAttribute('title', 'Use today (clear the date field)');
-    }
-    todayButton.textContent = 'Today';
-    form.appendChild(todayButton);
-
     const checkButton = doc.createElement('button');
     checkButton.id = 'trending-check';
     checkButton.className = 'button button-primary';
@@ -90,18 +81,6 @@
     clearButton.textContent = 'Clear';
     if (clearButton.setAttribute) clearButton.setAttribute('title', 'Clear the trending view');
     form.appendChild(clearButton);
-
-    const copyButton = doc.createElement('button');
-    copyButton.id = 'trending-copy';
-    copyButton.className = 'button button-quiet';
-    if (copyButton.setAttribute) {
-      copyButton.setAttribute('type', 'button');
-      copyButton.setAttribute('title', 'Copy the trending list');
-    }
-    if (typeof copyButton.hidden !== 'undefined') copyButton.hidden = true;
-    else if (copyButton.setAttribute) copyButton.setAttribute('hidden', 'hidden');
-    copyButton.textContent = 'Copy';
-    form.appendChild(copyButton);
 
     aside.appendChild(form);
 
@@ -150,14 +129,17 @@
     const statusEl = element('trending-status');
     const resultEl = element('trending-result');
     const clearEl = element('trending-clear');
-    const copyEl = element('trending-copy');
-    const todayEl = element('trending-today');
 
     let busy = false;
-    let lastRecord = null;
 
     function status(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+
+    function clearSuccess() {
+      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
+        statusEl.classList.remove('is-success');
+      }
     }
 
     function setBusy(isBusy) {
@@ -173,51 +155,9 @@
           else buttonEl.removeAttribute('aria-busy');
         }
       }
-      if (resultEl && resultEl.classList && typeof resultEl.classList.toggle === 'function') {
-        resultEl.classList.toggle('is-loading', isBusy);
-      }
-      if (statusEl && statusEl.classList && typeof statusEl.classList.toggle === 'function') {
-        statusEl.classList.toggle('is-busy', isBusy);
-      }
-    }
-
-    function addPressFeedback(button) {
-      if (!button || !button.classList) return;
-      const press = () => {
-        if (!busy && button.classList) button.classList.add('is-pressed');
-      };
-      const release = () => {
-        if (button.classList) button.classList.remove('is-pressed');
-      };
-      if (typeof button.addEventListener === 'function') {
-        button.addEventListener('pointerdown', press);
-        button.addEventListener('pointerup', release);
-        button.addEventListener('pointerleave', release);
-        button.addEventListener('pointercancel', release);
-      }
-    }
-
-    if (buttonEl) addPressFeedback(buttonEl);
-    if (clearEl) addPressFeedback(clearEl);
-    if (copyEl) addPressFeedback(copyEl);
-    if (todayEl) addPressFeedback(todayEl);
-
-    function buildCopyText(record) {
-      if (!record || !record.articles || !record.articles.length) return '';
-      const lines = [];
-      const paddedMonth = (record.month < 10 ? '0' + record.month : String(record.month));
-      const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
-      lines.push('Trending on Wikipedia for ' + paddedMonth + '/' + paddedDay);
-      const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
-      for (let index = 0; index < record.articles.length; index += 1) {
-        const article = record.articles[index];
-        const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
-        let line = (index + 1) + '. ' + article.title + (article.titleTruncated ? ' (truncated)' : '') + ' · ' + viewsText + ' views';
-      }
     }
 
     function render(record) {
-      lastRecord = record;
       if (!resultEl || !record) return;
       while (resultEl.firstChild) {
         resultEl.removeChild(resultEl.firstChild);
@@ -226,27 +166,15 @@
       const paddedDay = (record.day < 10 ? '0' + record.day : String(record.day));
       const dateLabel = paddedMonth + '/' + paddedDay;
       const viewsApi = logicApi && typeof logicApi.formatViews === 'function' ? logicApi : null;
-      for (let index = 0; index < record.articles.length; index += 1) {
-        const article = record.articles[index];
-        const item = doc.createElement('div');
-        item.className = 'feed-item';
-        const rank = doc.createElement('span');
-        rank.className = 'feed-item-rank';
-        rank.textContent = String(index + 1);
-        if (typeof rank.setAttribute === 'function') rank.setAttribute('aria-hidden', 'true');
-        item.appendChild(rank);
-        const title = doc.createElement('span');
-        title.className = 'feed-item-title';
-        title.textContent = article.title + (article.titleTruncated ? ' (title truncated)' : '');
-        item.appendChild(title);
-        const meta = doc.createElement('span');
-        meta.className = 'feed-item-date';
-        const viewsText = viewsApi ? viewsApi.formatViews(article.views) : String(article.views);
-        meta.textContent = viewsText + ' views';
-        item.appendChild(meta);
+      for (const article of record.articles) {
+        const viewsText = viewsApi ? viewsApi.formatViews(article.views) : null;
+        const parts = [
+          article.title + (article.titleTruncated ? ' (title truncated)' : ''),
+          (viewsText ? viewsText : String(article.views)) + ' views'
+        ];
+        resultEl.appendChild(doc.createTextNode(parts.join(' \u00b7 ') + ' \u00b7 '));
         if (article.url) {
           const link = doc.createElement('a');
-          link.className = 'feed-item-link';
           link.href = article.url;
           link.textContent = 'Read';
           if (typeof link.setAttribute === 'function') {
@@ -254,20 +182,18 @@
             link.setAttribute('rel', 'noopener noreferrer');
             link.setAttribute('aria-label', 'Read more about ' + article.title + ', trending for ' + dateLabel);
           }
-          item.appendChild(link);
+          resultEl.appendChild(link);
+          resultEl.appendChild(doc.createTextNode(' \u00b7 '));
         }
-        resultEl.appendChild(item);
       }
-      const footer = doc.createElement('p');
-      footer.className = 'feed-item-summary';
-      footer.textContent = 'Trending for: ' + dateLabel
-        + (record.articlesTruncated ? ' (list truncated, showing the top ' + record.articles.length + ')' : '');
-      resultEl.appendChild(footer);
-      updateCopyVisibility(record.articles && record.articles.length > 0);
+      resultEl.appendChild(doc.createTextNode('Trending for: ' + dateLabel
+        + (record.articlesTruncated ? ' (list truncated, showing the top ' + record.articles.length + ')' : '')
+      ));
     }
 
     async function onCheck() {
       if (busy) return;
+      clearSuccess();
       if (!logicApi || typeof logicApi.fetchTrending !== 'function') {
         status('Trending is unavailable.');
         return;
@@ -288,7 +214,6 @@
         options.day = parts.day;
       }
       setBusy(true);
-      status('Checking trending articles…');
       try {
         const record = await logicApi.fetchTrending(fetchImpl, options);
         render(record);
@@ -298,11 +223,6 @@
           + ' UTC \u00b7 not saved on this device');
         if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
           statusEl.classList.add('is-success');
-          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Trending updated');
-          setTimeout(function () {
-            if (statusEl.classList) statusEl.classList.remove('is-success');
-            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-          }, 1400);
         }
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
@@ -310,10 +230,7 @@
           ? logicApi.classifyTrendingError(error)
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
-        if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
-          statusEl.classList.remove('is-success');
-          if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-        }
+        clearSuccess();
         if (resultEl) {
           while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
           resultEl.textContent = '';
@@ -323,61 +240,15 @@
       }
     }
 
-    async function onCopy() {
-      if (busy || !lastRecord) return;
-      const textToCopy = buildCopyText(lastRecord);
-      if (!textToCopy) {
-        status('Nothing to copy yet.');
-        return;
-      }
-      const clipboard = (win && win.navigator && win.navigator.clipboard && typeof win.navigator.clipboard.writeText === 'function')
-        ? win.navigator.clipboard
-        : (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function' ? navigator.clipboard : null);
-      if (!clipboard) {
-        status('Copy is not available in this browser.');
-        return;
-      }
-      try {
-        await clipboard.writeText(textToCopy);
-        status('Copied the trending list.');
-        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function') {
-          statusEl.classList.add('is-success');
-          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'List copied');
-          setTimeout(function () {
-            if (statusEl.classList) statusEl.classList.remove('is-success');
-            if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-          }, 1400);
-        }
-      } catch (err) {
-        status('Could not copy the list.');
-      }
-    }
-
-    function onToday() {
-      if (busy) return;
-      if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
-      status('Using today. Tap Check to load trending articles.');
-      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
-        statusEl.classList.remove('is-success');
-        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-      }
-      if (inputEl && typeof inputEl.focus === 'function') inputEl.focus();
-    }
-
     function onClear() {
       if (busy) return;
-      lastRecord = null;
-      updateCopyVisibility(false);
+      clearSuccess();
       if (inputEl && typeof inputEl.value === 'string') inputEl.value = '';
       if (resultEl) {
         while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
         resultEl.textContent = '';
       }
       status('Cleared. Leave the date empty for today, or type month/day, and tap Check.');
-      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
-        statusEl.classList.remove('is-success');
-        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
-      }
     }
 
     status('Leave the date empty for today, or type month/day, and tap Check.');
@@ -394,12 +265,6 @@
     if (clearEl && typeof clearEl.addEventListener === 'function') {
       clearEl.addEventListener('click', () => { onClear(); });
     }
-    if (todayEl && typeof todayEl.addEventListener === 'function') {
-      todayEl.addEventListener('click', () => { onToday(); });
-    }
-    if (copyEl && typeof copyEl.addEventListener === 'function') {
-      copyEl.addEventListener('click', () => { onCopy(); });
-    }
     if (inputEl && typeof inputEl.addEventListener === 'function') {
       inputEl.addEventListener('keydown', (event) => {
         if (event && (event.key === 'Enter' || event.keyCode === 13)) {
@@ -412,8 +277,6 @@
     return {
       onCheck,
       onClear,
-      onToday,
-      onCopy,
       detach() {
         setBusy(false);
       }

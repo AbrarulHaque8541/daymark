@@ -20,13 +20,10 @@ function makeElement(tag) {
     className: '',
     textContent: '',
     disabled: false,
-    hidden: false,
     value: '',
     href: '',
     classList: {
       set: new Set(),
-      add(name) { this.set.add(name); },
-      remove(name) { this.set.delete(name); },
       toggle(name, force) {
         const on = force === undefined ? !this.set.has(name) : force;
         if (on) this.set.add(name); else this.set.delete(name);
@@ -196,18 +193,42 @@ test('card falls back to earlier anchors when no potd card exists', () => {
   const doc = makeDoc();
   const wiki = makeElement('section');
   wiki.id = 'wiki-card';
-  const rank = item.children.find(c => c.className === 'feed-item-rank');
-  assert.ok(rank);
-  assert.strictEqual(rank.textContent, '1');
-  assert.strictEqual(rank.getAttribute('aria-hidden'), 'true');
-  const link = item.children.find(c => c.tagName === 'a');
+  doc.body.appendChild(wiki);
+  attach(doc);
+  const card = doc.getElementById('trending-card');
+  assert.strictEqual(doc.body.children.indexOf(card), doc.body.children.indexOf(wiki) + 1);
+});
+
+test('an empty date checks today (from the injected now)', async () => {
+  const doc = makeDoc();
+  let requested = null;
+  attach(doc, {
+    fetch: async (url) => {
+      requested = url;
+      return okResponse(JSON.stringify(payload));
+    }
+  });
+  doc.getElementById('trending-check').dispatch('click', {});
+  await drain();
+  assert.strictEqual(requested, 'https://api.wikimedia.org/feed/v1/wikipedia/en/featured/11/20');
+});
+
+test('a successful check renders articles with an accessible link', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  doc.getElementById('trending-date').value = '11-20';
+  doc.getElementById('trending-check').dispatch('click', {});
+  await drain();
+  const result = doc.getElementById('trending-result');
+  assert.ok(result.textContent.includes('Grand Theft Auto VI'));
+  assert.ok(result.textContent.includes('519,632'));
+  assert.ok(result.textContent.includes('views'));
+  const link = result.children.find(c => c.tagName === 'a');
   assert.ok(link);
   assert.strictEqual(link.href, 'https://en.wikipedia.org/wiki/Grand_Theft_Auto_VI');
   assert.strictEqual(link.getAttribute('rel'), 'noopener noreferrer');
   assert.strictEqual(link.getAttribute('target'), '_blank');
   assert.ok(link.getAttribute('aria-label').includes('Grand Theft Auto VI'));
-  assert.ok(doc.getElementById('trending-copy'));
-  assert.strictEqual(doc.getElementById('trending-copy').hidden, false);
 });
 
 test('status reports the view-count date, update time and that nothing is saved', async () => {
@@ -360,75 +381,4 @@ test('boot never reads localStorage (stateless card)', async () => {
   vm.runInNewContext(code, sandbox);
   assert.ok(sandbox.module.exports.attachTrendingUi);
   assert.strictEqual(sandbox.localStorage, undefined);
-});
-
-test('copy button is hidden until a result exists', () => {
-  const doc = makeDoc();
-  attach(doc);
-  const copy = doc.getElementById('trending-copy');
-  assert.ok(copy);
-  assert.strictEqual(copy.hidden, true);
-});
-
-test('copy writes the list and shows success flash', async () => {
-  const doc = makeDoc();
-  let copied = null;
-  const fakeClipboard = { writeText: async (t) => { copied = t; } };
-  attach(doc, {
-    fetch: async () => okResponse(JSON.stringify(payload)),
-    window: { navigator: { clipboard: fakeClipboard } }
-  });
-  doc.getElementById('trending-check').dispatch('click', {});
-  await drain();
-  doc.getElementById('trending-copy').dispatch('click', {});
-  await drain();
-  assert.ok(copied);
-  assert.ok(copied.includes('Grand Theft Auto VI'));
-  assert.ok(copied.includes('519,632'));
-  assert.ok(doc.getElementById('trending-status').textContent.includes('Copied'));
-  assert.ok(doc.getElementById('trending-status').classList.contains('is-success'));
-});
-
-test('clear hides the copy button', async () => {
-  const doc = makeDoc();
-  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
-  doc.getElementById('trending-check').dispatch('click', {});
-  await drain();
-  assert.strictEqual(doc.getElementById('trending-copy').hidden, false);
-  doc.getElementById('trending-clear').dispatch('click', {});
-  assert.strictEqual(doc.getElementById('trending-copy').hidden, true);
-});
-
-test('today button clears the date field and updates status', () => {
-  const doc = makeDoc();
-  attach(doc);
-  const input = doc.getElementById('trending-date');
-  input.value = '11-20';
-  const today = doc.getElementById('trending-today');
-  assert.ok(today);
-  assert.strictEqual(today.textContent, 'Today');
-  today.dispatch('click', {});
-  assert.strictEqual(input.value, '');
-  assert.ok(doc.getElementById('trending-status').textContent.includes('Using today'));
-});
-
-test('checking sets loading class on result and busy on status', async () => {
-  const doc = makeDoc();
-  let release;
-  attach(doc, {
-    fetch: () => new Promise((resolve) => { release = () => resolve(okResponse(JSON.stringify(payload))); })
-  });
-  const check = doc.getElementById('trending-check');
-  const pending = check.dispatch('click', {});
-  await drain();
-  const result = doc.getElementById('trending-result');
-  const status = doc.getElementById('trending-status');
-  assert.ok(result.classList.contains('is-loading'));
-  assert.ok(status.classList.contains('is-busy'));
-  assert.ok(status.textContent.includes('Checking'));
-  release();
-  await pending;
-  await drain();
-  assert.strictEqual(result.classList.contains('is-loading'), false);
-  assert.strictEqual(status.classList.contains('is-busy'), false);
 });
