@@ -150,7 +150,7 @@ test('every switch is live now: no checkbox is disabled and no note is shown', (
   const doc = makeDoc();
   attach(doc, makeStorage({}));
   const card = doc.getElementById('feature-flags-card');
-  for (const id of ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']) {
+  for (const id of ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode', 'auto-archive']) {
     assert.equal(checkboxById(doc, id).disabled, false);
   }
   assert.equal(textOfTree(card).split(PLANNED_NOTE).length - 1, 0);
@@ -179,7 +179,7 @@ test('hydrating with no saved state shows the honest defaults message', () => {
 
 test('hydrating a saved state checks the matching boxes', () => {
   const doc = makeDoc();
-  const saved = { 'command-bar': true, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
+  const saved = { 'command-bar': true, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false, 'auto-archive': false };
   const attached = attach(doc, makeStorage({ 'daymark.features.v1': JSON.stringify(saved) }));
   attached.handle.hydrate();
   assert.equal(checkboxById(doc, 'command-bar').checked, true);
@@ -225,7 +225,7 @@ test('every implemented feature kind has an enabled switch that persists changes
   const storage = makeStorage({});
   attach(doc, storage);
   const implemented = flags.FEATURE_FLAGS.filter((flag) => flag.kind === 'feature');
-  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode']);
+  assert.deepEqual(implemented.map((flag) => flag.id), ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode', 'auto-archive']);
   for (const flag of implemented) {
     const box = checkboxById(doc, flag.id);
     assert.ok(box, flag.id + ' checkbox exists');
@@ -239,7 +239,7 @@ test('every implemented feature kind has an enabled switch that persists changes
 
 test('a failed save reverts the checkbox to the stored value and says so honestly', () => {
   const doc = makeDoc();
-  const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false };
+  const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false, 'auto-archive': false };
   const storage = makeStorage({ 'daymark.features.v1': JSON.stringify(base) });
   attach(doc, storage);
   storage.setItem = () => { throw new Error('disk unavailable'); };

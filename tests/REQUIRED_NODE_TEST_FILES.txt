@@ -18,6 +18,8 @@ tests/app-markup-contract.test.js
 tests/app-recovery-backup.test.js
 tests/app-storage.test.js
 tests/app-background-timers.test.js
+tests/auto-archive-logic.test.js
+tests/auto-archive-ui.test.js
 tests/feature-flags-logic.test.js
 tests/feature-flags-ui.test.js
 tests/command-bar-logic.test.js
