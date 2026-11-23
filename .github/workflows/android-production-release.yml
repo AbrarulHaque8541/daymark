@@ -169,8 +169,24 @@ jobs:
           echo "Expected Name:    $expected_name"
           echo "Expected Code:    $expected_code"
           [[ "$package_id" == "com.abrar.daymark" ]]
-          grep -q "^launchable-activity: name='com.abrar.daymark.MainActivity'" <<< "$badging" || {
-            echo "::error::APK does not expose the expected launcher Activity"; exit 1;
+          manifest_launcher="$(awk '
+            /^[\t ]*<activity([ >]|$)/ { tok=1; rel=""; main=0; launch=0 }
+            tok && rel=="" && match($0, /android:name="[^"]*"/) { rel = substr($0, RSTART+14, RLENGTH-15) }
+            tok && /android.intent.action.MAIN/ { main=1 }
+            tok && /android.intent.category.LAUNCHER/ { launch=1 }
+            /^[\t ]*<\/activity/ {
+              if (tok && main && launch && rel != "") print rel
+              tok=0
+            }
+          ' app/src/main/AndroidManifest.xml | head -n 1)"
+          [[ -n "$manifest_launcher" ]] || { echo "::error::Manifest declares no MAIN/LAUNCHER activity"; exit 1; }
+          case "$manifest_launcher" in
+            .*) expected_activity="com.abrar.daymark${manifest_launcher}" ;;
+            *) expected_activity="$manifest_launcher" ;;
+          esac
+          echo "Expected launcher Activity (from manifest): $expected_activity"
+          grep -q "^launchable-activity: name='$expected_activity'" <<< "$badging" || {
+            echo "::error::APK does not expose the expected launcher Activity ($expected_activity)"; exit 1;
           }
           [[ "$version_name" == "$expected_name" && "$version_code" == "$expected_code" ]]
           [[ "$GITHUB_REF_NAME" == "v${version_name}" ]]
