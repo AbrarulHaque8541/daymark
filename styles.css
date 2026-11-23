@@ -123,6 +123,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #launch-check:active, #launch-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #country-check:active, #country-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #earthquake-check:active, #earthquake-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#iss-check:active, #iss-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #onthisday-check:active, #onthisday-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #potd-check:active, #potd-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 #releases-check:active, #releases-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
@@ -1276,4 +1277,27 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .potd-image-error { display: block; padding: 12px; border: 1px dashed rgba(22, 112, 95, 0.35); border-radius: 12px; background: rgba(226, 240, 235, 0.35); color: var(--muted-text); font-size: 11px; text-align: center; }
 @media (prefers-color-scheme: dark) {
   .potd-image-error { background: rgba(26, 58, 50, 0.35); border-color: rgba(42, 143, 122, 0.4); }
+}
+
+/* Cycle B 2026-11-23: ISS glance status success flash (accent #16705f).
+   Reduced-motion safe; no new network. */
+#iss-status.is-success {
+  color: var(--accent);
+  border-color: rgba(22, 112, 95, 0.35);
+  background: rgba(226, 240, 235, 0.65);
+  animation: iss-success-flash 1.1s ease-out;
+}
+@keyframes iss-success-flash {
+  0% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0.28); }
+  50% { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 112, 95, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #iss-status.is-success { animation: none; }
+}
+@media (prefers-color-scheme: dark) {
+  #iss-status.is-success {
+    background: rgba(26, 58, 50, 0.45);
+    color: var(--accent-bright);
+  }
 }
