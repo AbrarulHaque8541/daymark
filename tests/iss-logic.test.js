@@ -171,6 +171,40 @@ test('fetchIss returns a stateless position record with the checked time', async
   assert.strictEqual(position.velocity, 27597);
   assert.strictEqual(position.fetchedAt, '2026-11-23T04:30:00.000Z');
 });
+test('fetchIss stamps fetchedAt from the environment clock when now is absent', async () => {
+  function asciiBytes(text) {
+    const bytes = new Uint8Array(text.length);
+    for (let index = 0; index < text.length; index += 1) bytes[index] = text.charCodeAt(index) & 255;
+    return bytes;
+  }
+  function streamOf(chunk) {
+    let consumed = false;
+    return {
+      getReader() {
+        return {
+          read() {
+            if (consumed) return Promise.resolve({ done: true, value: undefined });
+            consumed = true;
+            return Promise.resolve({ done: false, value: asciiBytes(chunk) });
+          },
+          cancel() { return Promise.resolve(); }
+        };
+      }
+    };
+  }
+  function okResponseJson(text) {
+    return { ok: true, status: 200, headers: { get() { return null; } }, body: streamOf(text) };
+  }
+  const payload = logic.parseIss({
+    name: 'iss', latitude: 5, longitude: 5, altitude: 420, velocity: 27000, visibility: 'daylight', timestamp: 1732000001
+  });
+  const position = await logic.fetchIss(() => Promise.resolve(okResponseJson(JSON.stringify({
+    name: 'iss', latitude: 5, longitude: 5, altitude: 420, velocity: 27000, visibility: 'daylight', timestamp: 1732000001
+  }))), {});
+  assert.strictEqual(position.version, 1);
+  assert.ok(typeof position.fetchedAt === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/.test(position.fetchedAt)
+    && position.fetchedAt.slice(-1) === 'Z', 'expected an ISO UTC stamped fetchedAt from the ambient clock');
+});
 test('fetchIss rejects when the feed answers with an out-of-range latitude', async () => {
   const payload = fixturePayload();
   payload.latitude = 1200;
