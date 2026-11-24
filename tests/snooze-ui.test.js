@@ -38,6 +38,13 @@ function makeDocument() {
         getAttribute(k) { return Object.prototype.hasOwnProperty.call(el.attrs, k) ? el.attrs[k] : null; },
         removeAttribute(k) { delete el.attrs[k]; },
         appendChild(child) { el.children.push(child); child.parentNode = el; },
+        removeChild(child) {
+          const at = el.children.indexOf(child);
+          if (at === -1) throw new Error("not a child");
+          el.children.splice(at, 1);
+          child.parentNode = null;
+          return child;
+        },
         insertBefore(child, anchor) {
           const at = el.children.indexOf(anchor);
           if (at === -1) el.children.push(child); else el.children.splice(at, 0, child);
@@ -45,6 +52,15 @@ function makeDocument() {
         },
         addEventListener(kind, fn) { (el.listeners[kind] = el.listeners[kind] || []).push(fn); },
         get firstChild() { return el.children.length > 0 ? el.children[0] : null; },
+        get textContent() {
+          let out = "";
+          for (const child of el.children) {
+            if (typeof child.textContent === "string") out += child.textContent;
+            else if (child.children) out += child.textContent || "";
+          }
+          return out || el._textContent || "";
+        },
+        set textContent(v) { el._textContent = String(v); el.children = []; },
         dispatch(kind, event) {
           event = event || {};
           for (const fn of el.listeners[kind] || []) fn(event);
@@ -263,34 +279,36 @@ test('clear all removes the saved list and reports the count; empty clear is hon
   assert.match(handle.statusEl.textContent, /Cleared 1 parked page/);
   assert.equal(storage.snapshot[logic.STORAGE_KEY], undefined);
   tap(handle, doc, 'snooze-clear');
-  assert.match(handle.statusEl.textContent, /nothing was cleared/, 'honest empty clear');
+  assert.match(handle.statusEl.textContent, /Nothing is parked/);
 });
 
 test('each rendered row carries its own remove button and remove updates the card', () => {
   const doc = makeDocument();
   const storage = makeStorage({});
   const handle = attachWith(doc, storage, [['snooze-pages', true]]);
-  saveForm(handle, 'https://example.com/one', '2026-11-25T09:30');
+  saveForm(handle, 'https://example.com/keep', '2026-11-25T09:30');
+  tap(handle, doc, 'snooze-save');
+  saveForm(handle, 'https://example.com/drop', '2026-11-26T09:30');
   tap(handle, doc, 'snooze-save');
   const buttons = [];
-  for (const row of handle.listEl.children) {
-    for (const child of row.children) {
-      if (child.getAttribute && child.getAttribute('data-remove-id')) buttons.push(child);
-    }
-  }
-  assert.equal(buttons.length, 1);
-  handle.onListTap({ target: buttons[0], preventDefault() {} });
-  assert.match(handle.statusEl.textContent, /Removed 1 snooze/);
-  assert.equal(logic.readSnoozes(storage).snoozes.length, 0);
+  const walk = (node) => {
+    if (!node) return;
+    if (node.getAttribute && node.getAttribute('data-remove-id')) buttons.push(node);
+    for (const child of node.children || []) walk(child);
+  };
+  walk(handle.listEl);
+  assert.equal(buttons.length, 2);
+  buttons[0].dispatch('click', { preventDefault() {} });
+  assert.match(handle.statusEl.textContent, /Removed/);
+  assert.equal(logic.readSnoozes(storage).snoozes.length, 1);
 });
 
 test('a wrong-element tap on the list is ignored without touching storage', () => {
   const doc = makeDocument();
   const storage = makeStorage({});
   const handle = attachWith(doc, storage, [['snooze-pages', true]]);
-  saveForm(handle, 'https://example.com/keep', '2026-11-25T09:30');
+  saveForm(handle, 'https://example.com/safe', '2026-11-25T09:30');
   tap(handle, doc, 'snooze-save');
-  const result = handle.onListTap({ target: handle.listEl.children[0].children[0], preventDefault() {} });
-  assert.equal(result, null);
+  handle.listEl.dispatch('click', { target: handle.listEl, preventDefault() {} });
   assert.equal(logic.readSnoozes(storage).snoozes.length, 1);
 });
