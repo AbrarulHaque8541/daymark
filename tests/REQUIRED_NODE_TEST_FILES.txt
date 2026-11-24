@@ -60,6 +60,8 @@ tests/earthquake-logic.test.js
 tests/earthquake-ui.test.js
 tests/iss-logic.test.js
 tests/iss-ui.test.js
+tests/snooze-logic.test.js
+tests/snooze-ui.test.js
 tests/space-news-logic.test.js
 tests/space-news-ui.test.js
 tests/daylight-logic.test.js
@@ -132,4 +134,3 @@ tests/wiki-ui.test.js
 tests/zones-logic.test.js
 tests/zones-ui.test.js
 tests/index-script-integrity.test.js
-
