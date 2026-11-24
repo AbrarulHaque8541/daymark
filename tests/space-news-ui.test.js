@@ -140,6 +140,8 @@ test('source pin: the UI module never touches localStorage and guards its timer'
   assert.strictEqual(source.indexOf('localStorage'), -1, 'the card must be stateless with no storage key');
   assert.ok(source.indexOf('typeof setTimeout') !== -1, 'the success flash timer must stay guarded');
   assert.ok(source.indexOf('attachSpaceNewsUi(env)') !== -1, 'expected the injectable attach entry point');
+  assert.ok(source.indexOf('is-pressed') !== -1, 'expected glass press feedback wiring');
+  assert.ok(source.indexOf('pointerdown') !== -1, 'expected pointer press handlers');
 });
 test('source pin: index.html wires both module scripts with defer', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
