@@ -60,6 +60,8 @@ tests/earthquake-logic.test.js
 tests/earthquake-ui.test.js
 tests/iss-logic.test.js
 tests/iss-ui.test.js
+tests/space-news-logic.test.js
+tests/space-news-ui.test.js
 tests/daylight-logic.test.js
 tests/daylight-ui.test.js
 tests/design-tokens-logic.test.js
