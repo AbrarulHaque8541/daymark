@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261124T061500Z (Batch 3: opt-in Snooze pages card, branch feat/snooze-pages-vibe-20261124)](./CURRENT_STATUS_20261124T061500Z.md)
+
 - [Daymark engineering status — 20261124T043000Z (keyless spaceflight news glance card, branch feat/space-news-vibe-20261124)](./CURRENT_STATUS_20261124T043000Z.md)
 
 - [Daymark engineering status — 20261123T164738Z (Batch 3: opt-in Auto-archive card, branch feat/auto-archive-vibe-20261123)](./CURRENT_STATUS_20261123T164738Z.md)
@@ -144,5 +146,5 @@
 - Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
 - Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
-- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
+- Do not report "PASS", "merged", "published", or "device verified" without evidence for the exact object.
 - [Daymark engineering status — 2026-11-17T08:40:00Z (Cycle B: launch press feedback)](./CURRENT_STATUS_20261117T084000Z.md)
