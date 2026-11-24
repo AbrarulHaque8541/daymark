@@ -95,21 +95,6 @@ function listFixture(count) {
   }
   return { results: raw };
 }
-function environment(doc, fetchImpl, snapshot) {
-  return {
-    document: doc,
-    window: {},
-    spaceNewsApi: {
-      fetchSpaceNews: typeof fetchImpl === 'function'
-        ? () => Promise.reject(new Error('fetch should be used'))
-        : null,
-      classifySpaceNewsError: logicApi.classifySpaceNewsError,
-      fetchSpaceNewsReal: logicApi.fetchSpaceNews
-    },
-    now: () => '2026-11-24T04:30:00.000Z',
-    fetch: fetchImpl
-  };
-}
 function envWithApi(doc, api, fetchImpl) {
   return {
     document: doc,
@@ -230,6 +215,7 @@ test('Check fetches stories and renders publisher links and dates', async () => 
 test('a truncated list says so instead of hiding the cut', async () => {
   const doc = makeDoc();
   const snap = logicApi.parseArticles(listFixture(11), 10);
+  snap.fetchedAt = '2026-11-24T04:30:00.000Z';
   const api = { fetchSpaceNews: () => Promise.resolve(snap), classifySpaceNewsError: logicApi.classifySpaceNewsError };
   const controls = ui.attachSpaceNewsUi(envWithApi(doc, api, null));
   await controls.onCheck();
@@ -273,7 +259,7 @@ test('the busy guard ignores a second Check while one is in flight', async () =>
     fetchSpaceNews: () => new Promise((resolve) => { resolvers.push(resolve); }),
     classifySpaceNewsError: logicApi.classifySpaceNewsError
   };
-  const controls = ui.attachSpaceNewsUi(envWithApi(doc, api, null));
+  const controls = ui.attachSpaceNewsUi(envWithApi(doc, api, () => Promise.resolve({})));
   const first = controls.onCheck();
   await Promise.resolve();
   await Promise.resolve();

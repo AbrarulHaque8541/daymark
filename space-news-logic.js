@@ -116,7 +116,6 @@
       truncated: 0
     };
     if (rawTitle.length > MAX_TITLE) entry.truncated += 1;
-    if (rawSummary.length > summary.length) entry.truncated += 1;
     return { article: entry };
   }
   // Parses the whole SNAPI list payload, fail-closed: a payload without a
