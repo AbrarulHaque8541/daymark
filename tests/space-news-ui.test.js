@@ -217,7 +217,7 @@ test('a truncated list says so instead of hiding the cut', async () => {
   const snap = logicApi.parseArticles(listFixture(11), 10);
   snap.fetchedAt = '2026-11-24T04:30:00.000Z';
   const api = { fetchSpaceNews: () => Promise.resolve(snap), classifySpaceNewsError: logicApi.classifySpaceNewsError };
-  const controls = ui.attachSpaceNewsUi(envWithApi(doc, api, null));
+  const controls = ui.attachSpaceNewsUi(envWithApi(doc, api, () => Promise.resolve({})));
   await controls.onCheck();
   const result = doc.getElementById('space-news-result');
   const note = result.children[result.children.length - 1].textContent;
