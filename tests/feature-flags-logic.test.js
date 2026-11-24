@@ -18,8 +18,8 @@ function makeStorage(seed) {
 }
 
 test('registry exposes five current flag ids', () => {
-  assert.deepEqual(flags.FLAG_IDS, ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode', 'auto-archive']);
-  assert.equal(flags.FEATURE_FLAGS.length, 6);
+  assert.deepEqual(flags.FLAG_IDS, ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode', 'auto-archive', 'snooze-pages']);
+  assert.equal(flags.FEATURE_FLAGS.length, 7);
 });
 
 test('every flag defaults to off', () => {
@@ -30,7 +30,7 @@ test('every flag defaults to off', () => {
 });
 
 test('a saved state round-trips through readFlags', () => {
-  const saved = { 'command-bar': true, 'search-bangs': true, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false, 'auto-archive': false };
+  const saved = { 'command-bar': true, 'search-bangs': true, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false, 'auto-archive': false, 'snooze-pages': false };
   const read = flags.readFlags(makeStorage({ 'daymark.features.v1': JSON.stringify(saved) }));
   assert.equal(read.ok, true);
   assert.deepEqual(read.flags, saved);
@@ -124,13 +124,13 @@ test('setFlag rejects a non-boolean value and writes nothing', () => {
 });
 
 test('setFlag persists one JSON blob holding all current flag keys', () => {
-  const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false, 'auto-archive': false };
+  const base = { 'command-bar': false, 'search-bangs': false, 'comfort-tint': false, 'mindful-breaks': false, 'focus-mode': false, 'auto-archive': false, 'snooze-pages': false };
   const storage = makeStorage({ 'daymark.features.v1': JSON.stringify(base) });
   const saved = flags.setFlag(storage, 'search-bangs', true);
   assert.equal(saved.ok, true);
   assert.equal(saved.flags['search-bangs'], true);
   const parsed = JSON.parse(storage.getItem('daymark.features.v1'));
-  assert.deepEqual(Object.keys(parsed).sort(), ['auto-archive', 'comfort-tint', 'command-bar', 'focus-mode', 'mindful-breaks', 'search-bangs']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['auto-archive', 'comfort-tint', 'command-bar', 'focus-mode', 'mindful-breaks', 'search-bangs', 'snooze-pages']);
   assert.equal(parsed['command-bar'], false);
   assert.equal(parsed['search-bangs'], true);
 });
@@ -148,4 +148,5 @@ test('setFlag reports storage-unavailable when storage cannot write', () => {
   assert.equal(saved.ok, false);
   assert.equal(saved.reason, 'storage-unavailable');
 });
+
 
