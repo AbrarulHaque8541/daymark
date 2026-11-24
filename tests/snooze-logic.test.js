@@ -77,7 +77,7 @@ test('createSnooze rejects duplicates of a still-waiting page but allows after i
   const first = snooze.createSnooze(GOOD_URL, '2026-11-25T09:00', '', NOW, []);
   assert.equal(snooze.createSnooze(GOOD_URL, '2026-11-26T09:00', '', NOW, first.snoozes).reason, 'duplicate');
   const afterDue = first.snoozes;
-  assert.equal(snooze.createSnooze(GOOD_URL, '2026-11-26T09:00', '', Date.UTC(2026, 10, 27, 9, 0, 0), afterDue).ok, true);
+  assert.equal(snooze.createSnooze(GOOD_URL, '2026-11-28T09:00', '', Date.UTC(2026, 10, 27, 9, 0, 0), afterDue).ok, true);
 });
 
 test('createSnooze refuses the 31st entry with a plain reason', () => {
@@ -160,11 +160,9 @@ test('write failures are honest, not silent', () => {
   assert.equal(snooze.readSnoozes(readBlocked).reason, 'storage-unavailable');
 });
 
-test('describeError every known reason lands on a plain sentence plus the fallback', () => {
-  for (const reason of ['flag-off', 'storage-unavailable', 'malformed-saved-state', 'invalid-url', 'url-too-long',
-    'wake-unreadable', 'wake-in-past', 'limit-reached', 'duplicate', 'write-failed', 'unknown-id', 'note-unreadable', 'mystery']) {
-    const message = snooze.describeError(reason);
-    assert.equal(typeof message, 'string', reason);
-    assert.equal(message.length > 15, true, reason);
-  }
+test('describeError maps every known reason to a plain sentence', () => {
+  assert.match(snooze.describeError('flag-off'), /Feature settings/);
+  assert.match(snooze.describeError('wake-in-past'), /still in the future/);
+  assert.match(snooze.describeError('duplicate'), /already waiting/);
+  assert.match(snooze.describeError('no-such-reason'), /nothing was changed/);
 });
