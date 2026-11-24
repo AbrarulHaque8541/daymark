@@ -115,6 +115,23 @@
         }
       }
     }
+    function addPressFeedback(button) {
+      if (!button || !button.classList) return;
+      const press = () => {
+        if (!busy && button.classList) button.classList.add('is-pressed');
+      };
+      const release = () => {
+        if (button.classList) button.classList.remove('is-pressed');
+      };
+      if (typeof button.addEventListener === 'function') {
+        button.addEventListener('pointerdown', press);
+        button.addEventListener('pointerup', release);
+        button.addEventListener('pointerleave', release);
+        button.addEventListener('pointercancel', release);
+      }
+    }
+    if (buttonEl) addPressFeedback(buttonEl);
+    if (clearEl) addPressFeedback(clearEl);
     function render(snapshot) {
       if (!resultEl || !snapshot) return;
       while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild);
