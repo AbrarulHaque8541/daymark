@@ -229,6 +229,12 @@ public final class MainActivity extends Activity {
     private int themeMode;
     private int textSizeMode;
     private boolean powerMode;
+    /** Signatures of the last rendered tag row, suggestion list and browser filter chips. */
+    private String renderedTagFilterSignature;
+    private String renderedSuggestionSignature;
+    private String renderedSearchFilterSignature;
+    /** The reminder set the alarms were last armed for; see reminderScheduleFingerprint(). */
+    private String lastReminderScheduleFingerprint;
     private boolean highContrast;
     private boolean updateCheckRunning;
     private boolean updateTransferRunning;
@@ -336,9 +342,6 @@ public final class MainActivity extends Activity {
     private Button taskModeButton;
     private Button webModeButton;
     private Button webGoButton;
-    private Button browserBackButton;
-    private Button browserForwardButton;
-    private Button browserReloadButton;
     private LinearLayout bottomNavigationBar;
     private View navTasksTab;
     private View navWebTab;
@@ -1901,7 +1904,7 @@ public final class MainActivity extends Activity {
         // Templates are contextual under Settings and are not shown as a permanent home action.
         addDetailsButton = null;
         captureFeedback = text(powerMode
-                        ? "Power path adds search, filters, and ranked demo suggestions. It uses the same tasks."
+                        ? "Power mode adds search, filters, and ranked task suggestions. It uses the same tasks."
                         : "",
                 12, palette.muted, Typeface.NORMAL);
         captureFeedback.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -2028,16 +2031,12 @@ public final class MainActivity extends Activity {
         top.addView(browserGoButton, goParams);
 
         browserProviderPickerButton = compactButton(searchEngine.label + " ▾", false);
-        browserProviderPickerButton.setTextSize(11 * textScale);
-        browserProviderPickerButton.setMinHeight(dp(34));
-        browserProviderPickerButton.setMinimumHeight(dp(34));
-        browserProviderPickerButton.setPadding(dp(6), 0, dp(6), 0);
-        browserProviderPickerButton.setBackground(shape(palette.surfaceAlt, 18, palette.line));
         browserProviderPickerButton.setContentDescription("Choose a web search engine or AI assistant");
         browserProviderPickerButton.setOnClickListener(view -> showSearchProviderPicker());
         // Owner request (2026-11-21): the engine switcher no longer occupies the top row.
         // It is placed into the compact bottom control row (buildBrowserScreen) so the area
-        // above the reading viewport stays free for the opt-in search filters row.
+        // above the reading viewport stays free for the opt-in search filters row. Its visual
+        // metrics live with the rest of that row, so they cannot drift apart.
         bar.addView(top);
 
         // Keep the legacy spinner available for existing settings/state sync, but do not
@@ -2080,7 +2079,12 @@ public final class MainActivity extends Activity {
     private void navigateFromBrowserInput() {
         if (browserAddressInput == null) return;
         String value = browserAddressInput.getText() == null ? "" : browserAddressInput.getText().toString();
-        if (value.trim().isEmpty()) return;
+        if (value.trim().isEmpty()) {
+            // The button used to swallow the tap silently, so it read as a broken control.
+            showBrowserStatus("Type a web address or a search first.");
+            haptic(browserAddressInput, HapticFeedbackConstants.REJECT);
+            return;
+        }
         try {
             String address = BrowserAddress.resolveInput(value, searchEngine);
             browserAddressInput.setError(null);
@@ -2161,29 +2165,6 @@ public final class MainActivity extends Activity {
         browserToolbarScroll = toolbarScroll;
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setOrientation(LinearLayout.HORIZONTAL);
-        browserBackButton = compactButton("‹", false);
-        browserBackButton.setContentDescription("Go back one page");
-        browserBackButton.setOnClickListener(view -> {
-            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            if (browserWebView != null && browserWebView.canGoBack()) browserWebView.goBack();
-        });
-        browserForwardButton = compactButton("›", false);
-        browserForwardButton.setContentDescription("Go forward one page");
-        browserForwardButton.setOnClickListener(view -> {
-            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            if (browserWebView != null && browserWebView.canGoForward()) browserWebView.goForward();
-        });
-        browserReloadButton = compactButton("↻", false);
-        browserReloadButton.setContentDescription("Reload the current page");
-        browserReloadButton.setOnClickListener(view -> {
-            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            if (browserWebView == null) return;
-            if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) {
-                browserWebView.stopLoading();
-            } else {
-                browserWebView.reload();
-            }
-        });
         browserHomeButton = compactButton("+", false);
         browserHomeButton.setContentDescription("Open a new browser tab");
         browserHomeButton.setOnClickListener(view -> requestNewBrowserTab());
@@ -2202,14 +2183,14 @@ public final class MainActivity extends Activity {
         browserTabButton.setContentDescription("Switch between open browser tabs or create a new tab");
         browserTabButton.setOnClickListener(view -> showBrowserTabsDialog());
         browserMediaButton = compactButton("Media ↓", false);
-        browserMediaButton.setEnabled(false);
+        setControlEnabled(browserMediaButton, false);
         browserMediaButton.setContentDescription("Find direct downloadable videos and audio on the current page");
         browserMediaButton.setOnClickListener(view -> findMediaOnPage());
         browserMediaButton.setVisibility(View.GONE);
         browserExpandButton = compactButton("Expand", false);
         browserExpandButton.setVisibility(View.GONE);
         browserExpandButton.setContentDescription("Open the current web page in a full-screen view");
-        browserExpandButton.setEnabled(false);
+        setControlEnabled(browserExpandButton, false);
         browserExpandButton.setOnClickListener(view -> openFullScreenWebView());
         for (Button button : Arrays.asList(browserHomeButton, browserTabButton, browserOverflowButton)) {
             button.setMinHeight(dp(38));
@@ -2223,15 +2204,15 @@ public final class MainActivity extends Activity {
             toolbar.addView(button, params);
         }
         // Owner request (2026-11-21): the engine switcher moved from the top row to this
-        // bottom control row, so it stays reachable while a results page is open. Radius 18
-        // is intentional: the press-feedback guard counts exactly three radius-22 chrome
-        // buttons, and the switcher keeps its own compact width from the address-bar row.
+        // bottom control row, so it stays reachable while a results page is open. It shares the
+        // row's chrome metrics — same radius, same text size, same height — so it reads as part
+        // of the control strip instead of a differently-shaped chip sitting among them.
         if (browserProviderPickerButton != null) {
             browserProviderPickerButton.setMinHeight(dp(38));
             browserProviderPickerButton.setMinimumHeight(dp(38));
-            browserProviderPickerButton.setTextSize(11 * textScale);
+            browserProviderPickerButton.setTextSize(12 * textScale);
             browserProviderPickerButton.setPadding(dp(10), 0, dp(10), 0);
-            browserProviderPickerButton.setBackground(pressable(palette.surfaceAlt, 18, palette.line, palette.accent));
+            browserProviderPickerButton.setBackground(pressable(palette.surfaceAlt, 22, palette.line, palette.accent));
             LinearLayout.LayoutParams pickerParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
             pickerParams.setMargins(0, 0, dp(4), 0);
@@ -2240,18 +2221,22 @@ public final class MainActivity extends Activity {
         toolbarScroll.addView(toolbar);
 
         String disclosureText =
-                "Browsing is ready for explicit user-initiated navigation; no page opens until you tap Go or a site. Queries/URLs and connection data go to the chosen destination, which may log them; pages may contact third parties. Android System WebView Safe Browsing is separate and platform-managed; it may contact Google/Play Services for version/device-dependent threat-list updates or URL-hash checks. The Safe Browsing provider itself is not selectable in Daymark. HTTP and HTTPS pages both open; HTTP pages are labelled \"Not encrypted\". Site history keeps only validated HTTP/HTTPS origins (scheme, host, and non-default port). Paths, queries, fragments, URL credentials, and page titles are not saved; older entries are reduced to origins when Daymark opens. Selecting a saved site opens its origin, not its last route. Site history is local but not encrypted; use Site history to clear it and Daymark's cookies/cache/storage.";
+                "Browsing is ready for explicit user-initiated navigation; no page opens until you tap Go or a site. "
+                + "The selected destination receives your query or URL and normal connection data such as your IP address "
+                + "and browser identification, and may log it; pages may contact and be logged by third-party endpoints. Android System WebView Safe Browsing is separate and platform-managed; it may contact Google/Play Services for version/device-dependent threat-list updates or URL-hash checks. The Safe Browsing provider itself is not selectable in Daymark, and Browser Settings can disable the protection feature only after a warning. WebView M126 and later may send a partial URL hash through a proxy for real-time checks; earlier versions use a local partial-hash database and may query a server on prefix match. This does not mean every full URL is sent; the method depends on the WebView version and the device settings. HTTP and HTTPS pages both open; HTTP pages are labelled \"Not encrypted\". Site history keeps only validated HTTP/HTTPS origins (scheme, host, and non-default port). Paths, queries, fragments, URL credentials, and page titles are not saved; older entries are reduced to origins when Daymark opens. Selecting a saved site opens its origin, not its last route. Site history is local but not encrypted; use Site history to clear it and Daymark's cookies/cache/storage.";
         browserPrivacyButton = text("ⓘ", 18, palette.muted, Typeface.NORMAL);
         browserPrivacyButton.setGravity(Gravity.CENTER);
         browserPrivacyButton.setPadding(dp(4), 0, dp(4), 0);
         browserPrivacyButton.setBackground(shape(palette.surface, 18, palette.line));
+        // The icon carries a short label for screen readers; the full disclosure is the
+        // dialog it opens. The previous code set a short label and then overwrote it with
+        // a 700-character paragraph, so TalkBack read an essay for one tap target.
         browserPrivacyButton.setContentDescription("Open privacy and connection details");
-        browserPrivacyButton.setContentDescription("Browser privacy: browsing is ready for explicit user-initiated navigation; each search or site still requires a separate tap. The selected destination receives your query or URL and normal connection data such as your IP address and browser identification, and may log it; pages may contact and be logged by third-party endpoints. Daymark's browser network policy controls Daymark page and resource loads only and does not control Android System WebView Safe Browsing, a separate platform-managed service that may contact Google/Play Services for threat-list updates or URL-hash-based checks. The Safe Browsing provider itself is not selectable in Daymark. Browser Settings can disable the protection feature only after a warning. WebView M126 and later may send a partial URL hash through a proxy for real-time checks; earlier versions use a local partial-hash database and may query a server on prefix match. This does not mean every full URL is sent; the method depends on WebView version and device settings. Daymark sends no task text, adds no app analytics, and opts out of WebView diagnostic metrics. HTTP and HTTPS pages both open; HTTP pages are labelled \"Not encrypted\".");
         browserPrivacyButton.setOnClickListener(view -> showInfo("Privacy & connection details", disclosureText));
         browserPrivacyDisclosure = disclosureText;
         LinearLayout privacyRow = new LinearLayout(this);
         privacyRow.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        privacyRow.addView(browserPrivacyButton, new LinearLayout.LayoutParams(dp(36), dp(30)));
+        privacyRow.addView(browserPrivacyButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
         panel.addView(privacyRow, bottomMargin(dp(2)));
 
         HorizontalScrollView sitesScroll = new HorizontalScrollView(this);
@@ -2269,7 +2254,12 @@ public final class MainActivity extends Activity {
         Button addProvider = compactButton("+ Add", false);
         addProvider.setContentDescription("Add or choose another search engine or AI assistant shortcut");
         addProvider.setOnClickListener(view -> showSearchProviderPicker());
-        sites.addView(addProvider, chipMargin());
+        // Match the engine/site chips in this same strip: they are 34dp tall, so a 48dp
+        // "+ Add" stood taller than every neighbour and read as a different control.
+        LinearLayout.LayoutParams addProviderParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+        addProviderParams.setMargins(0, 0, dp(5), 0);
+        sites.addView(addProvider, addProviderParams);
         sitesScroll.addView(sites);
         browserProviderRow = sitesScroll;
         // The provider shortcuts are placed after the weighted WebView below so they
@@ -2277,9 +2267,9 @@ public final class MainActivity extends Activity {
         browserStatus = text("", 11, palette.muted, Typeface.NORMAL);
         browserStatus.setVisibility(View.GONE);
         browserStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        browserStatus.setOnClickListener(view -> {
-            if (browserRetryButton != null) browserRetryButton.performClick();
-        });
+        // The status line used to be a tap target that did nothing unless the page had failed
+        // to load, and screen readers announced it as an unlabelled button. The visible Retry
+        // button is the one way to retry, so the status line is plain text again.
         panel.addView(browserStatus, bottomMargin(dp(2)));
         browserSecurityMarker = text("Not encrypted", 11, palette.muted, Typeface.BOLD);
         browserSecurityMarker.setVisibility(View.GONE);
@@ -2300,7 +2290,7 @@ public final class MainActivity extends Activity {
         browserReaderActionRow = new LinearLayout(this);
         browserReaderButton = compactButton("Reader mode", true);
         browserReaderButton.setContentDescription("Extract readable article text into a local text-only view");
-        browserReaderButton.setEnabled(false);
+        setControlEnabled(browserReaderButton, false);
         browserReaderButton.setOnClickListener(view -> openReaderMode());
         browserReaderActionRow.setVisibility(View.GONE);
 
@@ -2335,6 +2325,9 @@ public final class MainActivity extends Activity {
             }
             return;
         }
+        String signature = searchEngine.name() + "|" + query + "|" + activeSearchVertical;
+        if (signature.equals(renderedSearchFilterSignature)) return;
+        renderedSearchFilterSignature = signature;
         browserSearchFiltersRow.removeAllViews();
         Button allChip = compactButton("All", false);
         allChip.setTextSize(11 * textScale);
@@ -2469,7 +2462,7 @@ public final class MainActivity extends Activity {
             }
         }
         if (browserProviderPickerButton != null) {
-            browserProviderPickerButton.setText(engine.label + "  ▾");
+            browserProviderPickerButton.setText(engine.label + " ▾");
             browserProviderPickerButton.setContentDescription("Search provider: " + engine.label + ". Tap to change provider.");
         }
         // A provider switch re-runs the plain web search, so any active vertical resets.
@@ -2815,7 +2808,7 @@ public final class MainActivity extends Activity {
                 navigateBrowserTo(origin);
             });
             // Glass accent polish for Saved sites chips (accent #16705f)
-            chip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
+            chip.setBackground(pressable(palette.accentSoft, 20, palette.accent, palette.text, palette.muted));
             // Long-press offers Copy or Remove for the individual origin.
             chip.setOnLongClickListener(view -> {
                 haptic(view, HapticFeedbackConstants.LONG_PRESS);
@@ -2862,7 +2855,7 @@ public final class MainActivity extends Activity {
                     "More…",
                     "Open the full bookmarks list (" + total + " saved sites)",
                     this::showBrowserBookmarksDialog);
-            moreChip.setBackground(pressable(0x2616705F, 20, 0xFF16705F, palette.text, palette.muted));
+            moreChip.setBackground(pressable(palette.accentSoft, 20, palette.accent, palette.text, palette.muted));
             moreChip.setContentDescription("More saved sites, " + total + " total");
             rail.addView(moreChip);
         }
@@ -3853,15 +3846,28 @@ public final class MainActivity extends Activity {
                             saveCurrentPageAsTask();
                             break;
                         case 20:
-                            if (browserWebView != null && browserWebView.canGoBack()) browserWebView.goBack();
+                            // The navigation controls live in this menu (#222), so they have to
+                            // say so when there is nothing to navigate to. They used to swallow
+                            // the tap with no feedback at all.
+                            if (browserWebView != null && browserWebView.canGoBack()) {
+                                browserWebView.goBack();
+                            } else {
+                                showBrowserStatus("There is no earlier page to go back to.");
+                            }
                             break;
                         case 21:
-                            if (browserWebView != null && browserWebView.canGoForward()) browserWebView.goForward();
+                            if (browserWebView != null && browserWebView.canGoForward()) {
+                                browserWebView.goForward();
+                            } else {
+                                showBrowserStatus("There is no later page to go forward to.");
+                            }
                             break;
                         case 22:
                             if (browserWebView != null) {
                                 if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) browserWebView.stopLoading();
                                 else browserWebView.reload();
+                            } else {
+                                showBrowserStatus("No web page is open yet.");
                             }
                             break;
                         default:
@@ -4405,8 +4411,8 @@ public final class MainActivity extends Activity {
         Button next = new Button(this);
         next.setText("Next");
         next.setAllCaps(false);
-        previous.setEnabled(false);
-        next.setEnabled(false);
+        setControlEnabled(previous, false);
+        setControlEnabled(next, false);
         controls.addView(previous, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         controls.addView(next, new LinearLayout.LayoutParams(
@@ -4418,8 +4424,8 @@ public final class MainActivity extends Activity {
         target.setFindListener((activeMatchOrdinal, numberOfMatches, isDoneCounting) -> {
             if (!active[0]) return;
             matchCount[0] = numberOfMatches;
-            previous.setEnabled(numberOfMatches > 0);
-            next.setEnabled(numberOfMatches > 0);
+            setControlEnabled(previous, numberOfMatches > 0);
+            setControlEnabled(next, numberOfMatches > 0);
             if (!isDoneCounting) {
                 status.setText("Searching…");
             } else if (numberOfMatches == 0) {
@@ -4436,8 +4442,8 @@ public final class MainActivity extends Activity {
             @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
                 String query = value == null ? "" : value.toString().trim();
                 matchCount[0] = 0;
-                previous.setEnabled(false);
-                next.setEnabled(false);
+                setControlEnabled(previous, false);
+                setControlEnabled(next, false);
                 if (query.isEmpty()) {
                     target.clearMatches();
                     status.setText("Type to search this page.");
@@ -4931,28 +4937,22 @@ public final class MainActivity extends Activity {
     }
 
     private void syncBrowserButtons() {
-        if (browserBackButton == null) return;
+        // The browser screen has not been built yet.
+        if (browserAddressInput == null) return;
         boolean available = browserNetworkPolicy.allowsRemoteLoads() && browserWebView != null;
-        browserBackButton.setEnabled(available && browserWebView.canGoBack());
-        browserForwardButton.setEnabled(available && browserWebView.canGoForward());
-        browserReloadButton.setEnabled(available);
         boolean hasPage = browserWebView != null && browserWebView.getUrl() != null && !browserWebView.getUrl().isEmpty();
-        boolean loading = hasPage && browserWebView.getProgress() < 100;
-        browserReloadButton.setText(loading ? "Stop" : "Reload");
-        browserReloadButton.setContentDescription(loading
-                ? "Stop loading the current page" : "Reload the current page");
         if (browserExpandButton != null) {
-            browserExpandButton.setEnabled(available && hasPage);
+            setControlEnabled(browserExpandButton, available && hasPage);
             browserExpandButton.setVisibility(available && hasPage ? View.VISIBLE : View.GONE);
         }
         if (browserReaderActionRow != null) {
             browserReaderActionRow.setVisibility(available && hasPage ? View.VISIBLE : View.GONE);
         }
         if (browserReaderButton != null) {
-            browserReaderButton.setEnabled(available && hasPage);
+            setControlEnabled(browserReaderButton, available && hasPage);
         }
         if (browserMediaButton != null) {
-            browserMediaButton.setEnabled(available && hasPage);
+            setControlEnabled(browserMediaButton, available && hasPage);
         }
         // Owner request (2026-11-21): the engine switcher lives in the compact bottom control
         // row, so it remains available on search-result pages too; it hides with the shared
@@ -5289,9 +5289,9 @@ public final class MainActivity extends Activity {
         Button save = primaryButton("Save task");
         cancel.setContentDescription("Discard this unsaved clip");
         save.setContentDescription("Save this clip as an encrypted task");
-        actions.addView(cancel, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(50), 1f));
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.35f);
+                0, dp(50), 1.35f);
         saveParams.setMarginStart(dp(8));
         actions.addView(save, saveParams);
         content.addView(actions);
@@ -5752,10 +5752,7 @@ public final class MainActivity extends Activity {
         for (String key : filterKeys) {
             Button chip = new Button(this);
             chip.setAllCaps(false);
-            chip.setTextSize(12 * textScale);
-            chip.setMinHeight(dp(48));
-            chip.setMinimumHeight(dp(48));
-            chip.setPadding(dp(12), 0, dp(12), 0);
+            styleFilterChip(chip, false);
         applyPressFeedback(chip);
             chip.setOnClickListener(view -> {
                 activeFilter = key;
@@ -5790,7 +5787,7 @@ public final class MainActivity extends Activity {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         searchClear = text("Clear", 12, palette.accent, Typeface.BOLD);
         searchClear.setGravity(Gravity.CENTER);
-        searchClear.setPadding(dp(11), 0, dp(5), 0);
+        searchClear.setPadding(dp(8), 0, dp(8), 0);
         searchClear.setMinimumWidth(dp(64));
         searchClear.setMinHeight(dp(48));
         searchClear.setMinimumHeight(dp(48));
@@ -6122,11 +6119,10 @@ public final class MainActivity extends Activity {
         }
         openCount.setText(storageLoading || storageLoadFailed ? "—" : String.valueOf(open));
         dueTodayCount.setText(storageLoading || storageLoadFailed ? "—" : String.valueOf(dueToday));
-        addTaskButton.setEnabled(canEdit() && !webMode);
-        addTaskButton.setAlpha(canEdit() ? 1f : 0.55f);
-        if (addDetailsButton != null) addDetailsButton.setEnabled(canEdit() && !webMode);
-        quickCaptureInput.setEnabled(canEdit() || webMode);
-        if (searchInput != null) searchInput.setEnabled(!storageLoading && !storageLoadFailed);
+        setControlEnabled(addTaskButton, canEdit() && !webMode);
+        setControlEnabled(addDetailsButton, canEdit() && !webMode);
+        setControlEnabled(quickCaptureInput, canEdit() || webMode);
+        setControlEnabled(searchInput, !storageLoading && !storageLoadFailed);
         for (View powerOnly : powerOnlyViews) {
             powerOnly.setVisibility(powerMode ? View.VISIBLE : View.GONE);
         }
@@ -6281,6 +6277,11 @@ public final class MainActivity extends Activity {
         focusTimerPanel.setTaskLabel(selected == null ? "Choose a task" : selected.title);
         TaskFocusTimer timer = focusSnapshot == null ? null : focusSnapshot.timer;
         focusTimerPanel.render(timer, android.os.SystemClock.elapsedRealtime());
+        // The "SESSION DATA" card used to sit on a static placeholder that never changed, so it
+        // read as a broken widget. It now reports the session that is actually on screen.
+        focusTimerPanel.setDailySummary(
+                timer == null ? 0L : Math.max(0L, timer.elapsedMsAt(android.os.SystemClock.elapsedRealtime())),
+                timer == null ? 0 : 1);
         if (timer != null && timer.isRunning() && activityResumed && !webMode) {
             scheduleFocusTimerTick();
         } else {
@@ -6636,20 +6637,30 @@ public final class MainActivity extends Activity {
     }
 
     private void renderFilters(LocalDate today) {
+        // One pass over the tasks instead of one pass per filter. The row used to re-count every
+        // filter with its own loop and parse each task's due date again for every filter, so a
+        // single render parsed up to twelve date strings per task on the UI thread. render() is
+        // called from dozens of places, so this was the app's hottest path.
+        int[] counts = new int[filterKeys.size()];
+        String todayIso = today.toString();
+        for (Task task : tasks) {
+            LocalDate due = task.dueDate == null ? null : LocalDate.parse(task.dueDate);
+            for (int index = 0; index < filterKeys.size(); index++) {
+                String key = filterKeys.get(index);
+                if (TaskLogic.FILTER_ALL.equals(key)
+                        || (TaskLogic.FILTER_TODAY.equals(key) && todayIso.equals(task.dueDate))
+                        || (TaskLogic.FILTER_UPCOMING.equals(key) && due != null
+                            && due.isAfter(today))
+                        || (TaskLogic.FILTER_OVERDUE.equals(key) && !task.completed && due != null
+                            && due.isBefore(today))
+                        || (TaskLogic.FILTER_NO_DATE.equals(key) && task.dueDate == null)
+                        || (TaskLogic.FILTER_COMPLETED.equals(key) && task.completed)) counts[index]++;
+            }
+        }
         for (int index = 0; index < filterKeys.size(); index++) {
             String key = filterKeys.get(index);
             Button button = filterButtons.get(index);
-            int count = 0;
-            for (Task task : tasks) {
-                if (TaskLogic.FILTER_ALL.equals(key)
-                        || (TaskLogic.FILTER_TODAY.equals(key) && today.toString().equals(task.dueDate))
-                        || (TaskLogic.FILTER_UPCOMING.equals(key) && task.dueDate != null
-                            && LocalDate.parse(task.dueDate).isAfter(today))
-                        || (TaskLogic.FILTER_OVERDUE.equals(key) && !task.completed && task.dueDate != null
-                            && LocalDate.parse(task.dueDate).isBefore(today))
-                        || (TaskLogic.FILTER_NO_DATE.equals(key) && task.dueDate == null)
-                        || (TaskLogic.FILTER_COMPLETED.equals(key) && task.completed)) count++;
-            }
+            int count = counts[index];
             String label;
             if (TaskLogic.FILTER_ALL.equals(key)) label = "All";
             else if (TaskLogic.FILTER_TODAY.equals(key)) label = "Today";
@@ -6657,12 +6668,10 @@ public final class MainActivity extends Activity {
             else if (TaskLogic.FILTER_OVERDUE.equals(key)) label = "Overdue";
             else if (TaskLogic.FILTER_NO_DATE.equals(key)) label = "No date";
             else label = "Completed";
-            button.setEnabled(!storageLoading && !storageLoadFailed);
+            setControlEnabled(button, !storageLoading && !storageLoadFailed);
             button.setText(label + "  " + (storageLoading || storageLoadFailed ? "—" : count));
             boolean selected = key.equals(activeFilter);
-            button.setTextColor(selected ? palette.accent : palette.muted);
-            button.setBackground(shape(selected ? palette.accentSoft : palette.surface,
-                    20, selected ? palette.accent : palette.line));
+            styleFilterChip(button, selected);
             button.setContentDescription(storageLoading
                     ? label + ", waiting for saved tasks to open"
                     : storageLoadFailed
@@ -6685,8 +6694,15 @@ public final class MainActivity extends Activity {
         tagFilterScroll.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show) {
             if (tagFilterRow.getChildCount() > 0) tagFilterRow.removeAllViews();
+            renderedTagFilterSignature = null;
             return;
         }
+        // The row used to be torn down and re-inflated on every render, including the renders
+        // that followed a task edit with nothing to do with tags. It is rebuilt only when the
+        // tags or the selection actually change.
+        String signature = activeTag + "|" + String.join(",", tags);
+        if (signature.equals(renderedTagFilterSignature)) return;
+        renderedTagFilterSignature = signature;
         tagFilterRow.removeAllViews();
         for (String tag : tags) {
             boolean selected = tag.equals(activeTag);
@@ -6697,25 +6713,39 @@ public final class MainActivity extends Activity {
                 render();
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
             params.rightMargin = dp(6);
             tagFilterRow.addView(chip, params);
         }
+    }
+
+    /**
+     * The single chip look shared by the filter row and the tag row.
+     *
+     * <p>They used to be built separately: the filter chips were 48dp tall with 12sp labels and
+     * a flat background, the tag chips 44dp tall with 11sp labels and a press background. Two rows
+     * of pills one screen apart looked like two different controls, and only one of them
+     * acknowledged a touch. Both rows now share this look, so a chip always looks the same and
+     * always reacts to a finger.
+     */
+    private void styleFilterChip(Button chip, boolean selected) {
+        if (chip == null) return;
+        chip.setTextSize(12 * textScale);
+        chip.setMinHeight(dp(48));
+        chip.setMinimumHeight(dp(48));
+        chip.setMinimumWidth(dp(44));
+        chip.setPadding(dp(12), 0, dp(12), 0);
+        chip.setTextColor(selected ? palette.accent : palette.muted);
+        chip.setBackground(pressable(selected ? palette.accentSoft : palette.surface,
+                20, selected ? palette.accent : palette.line,
+                selected ? palette.accent : palette.muted));
     }
 
     private Button tagChip(String tag, boolean selected) {
         Button chip = new Button(this);
         chip.setAllCaps(false);
         chip.setText("#" + tag);
-        chip.setTextSize(11 * textScale);
-        chip.setMinHeight(dp(44));
-        chip.setMinimumHeight(dp(44));
-        chip.setMinimumWidth(dp(44));
-        chip.setPadding(dp(10), 0, dp(10), 0);
-        chip.setTextColor(selected ? palette.accent : palette.muted);
-        chip.setBackground(pressable(selected ? palette.accentSoft : palette.surfaceAlt, 22,
-                selected ? palette.accent : palette.line,
-                selected ? palette.accent : palette.muted));
+        styleFilterChip(chip, selected);
         chip.setContentDescription(selected
                 ? "Tag " + tag + ", selected. Filtering the list to this tag."
                 : "Filter the list by tag " + tag);
@@ -6916,19 +6946,34 @@ public final class MainActivity extends Activity {
 
     private void renderSuggestions(LocalDate today) {
         if (suggestionList == null) return;
-        suggestionList.removeAllViews();
         if (storageLoading) {
+            suggestionList.removeAllViews();
             TextView loading = text("Checking saved tasks…", 12, palette.muted, Typeface.NORMAL);
             suggestionList.addView(loading);
+            renderedSuggestionSignature = null;
             return;
         }
         if (storageLoadFailed) {
+            suggestionList.removeAllViews();
             TextView unavailable = text("Suggestions are unavailable until saved tasks can be opened.",
                     12, palette.muted, Typeface.NORMAL);
             suggestionList.addView(unavailable);
+            renderedSuggestionSignature = null;
             return;
         }
         List<TaskLogic.Suggestion> suggestions = TaskLogic.suggestions(tasks, today);
+        // The list used to be torn down and re-inflated on every render. It is rebuilt only when
+        // the suggestions themselves change, so a task edit that does not touch them costs
+        // nothing.
+        StringBuilder signature = new StringBuilder();
+        for (TaskLogic.Suggestion suggestion : suggestions) {
+            signature.append(suggestion.task.id).append(':')
+                    .append(suggestion.task.title).append(':')
+                    .append(suggestion.reason).append(';');
+        }
+        if (signature.toString().equals(renderedSuggestionSignature)) return;
+        renderedSuggestionSignature = signature.toString();
+        suggestionList.removeAllViews();
         if (suggestions.isEmpty()) {
             TextView empty = text("Your open-task suggestions will appear here after you add a task.",
                     12, palette.muted, Typeface.NORMAL);
@@ -6996,7 +7041,7 @@ public final class MainActivity extends Activity {
         checkBox.setContentDescription(task.completed
                 ? "Mark “" + task.title + "” as not done"
                 : "Mark “" + task.title + "” as done");
-        checkBox.setEnabled(canEdit());
+        setControlEnabled(checkBox, canEdit());
         checkBox.setMinimumWidth(dp(48));
         checkBox.setMinimumHeight(dp(48));
         row.addView(checkBox, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -7007,7 +7052,6 @@ public final class MainActivity extends Activity {
         TextView title = text(task.title, 14, task.completed ? palette.muted : palette.text, Typeface.BOLD);
         title.setMaxLines(3);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        title.setIncludeFontPadding(false);
         title.setLineSpacing(dp(1), 1.0f);
         title.setContentDescription("Task name: " + task.title);
         if (task.completed) title.setPaintFlags(title.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
@@ -7030,7 +7074,7 @@ public final class MainActivity extends Activity {
             Button attachments = compactButton("Files " + task.attachments.size(), false);
             attachments.setContentDescription("Manage " + task.attachments.size()
                     + " attachments for task: " + task.title);
-            attachments.setEnabled(canEdit());
+            setControlEnabled(attachments, canEdit());
             attachments.setOnClickListener(view -> showAttachmentManager(task));
             attachments.setPadding(dp(8), 0, dp(8), 0);
             chips.addView(attachments, new LinearLayout.LayoutParams(
@@ -7041,7 +7085,7 @@ public final class MainActivity extends Activity {
             Button subtasksChip = compactButton("Checklist " + doneCount + "/" + task.subtasks.size(), false);
             subtasksChip.setContentDescription("Checklist for task: " + task.title
                     + ". " + doneCount + " of " + task.subtasks.size() + " done. Open to update.");
-            subtasksChip.setEnabled(canEdit());
+            setControlEnabled(subtasksChip, canEdit());
             subtasksChip.setPadding(dp(8), 0, dp(8), 0);
             subtasksChip.setOnClickListener(view -> showSubtasksDialog(task));
             chips.addView(subtasksChip, taskChipMargin());
@@ -7054,9 +7098,16 @@ public final class MainActivity extends Activity {
         }
         String reminder = reminderLabel(task);
         if (reminder != null && !task.completed) {
-            Button reminderChip = compactButton(reminder, false);
-            reminderChip.setContentDescription(reminder + " for task: " + task.title);
-            reminderChip.setEnabled(false);
+            // The reminder is shown for information only: this row has no reminder action, so a
+            // button-styled chip that could never be tapped read as a control that was broken.
+            // It is a plain label now, and it says what it is for screen readers.
+            TextView reminderChip = text(reminder, 11 * textScale, palette.muted, Typeface.NORMAL);
+            reminderChip.setGravity(Gravity.CENTER);
+            reminderChip.setMinHeight(dp(48));
+            reminderChip.setMinimumHeight(dp(48));
+            reminderChip.setPadding(dp(8), 0, dp(8), 0);
+            reminderChip.setBackground(shape(palette.surfaceAlt, 9, palette.line));
+            reminderChip.setContentDescription("Reminder " + reminder + " for task: " + task.title);
             chips.addView(reminderChip, taskChipMargin());
         }
         // Do not reserve a metadata row when the task has no files, checklist, note or
@@ -7079,7 +7130,7 @@ public final class MainActivity extends Activity {
         more.setMinimumHeight(dp(48));
         more.setPadding(0, 0, 0, 0);
         more.setContentDescription("Task actions for: " + task.title);
-        more.setEnabled(canEdit());
+        setControlEnabled(more, canEdit());
         more.setOnClickListener(view -> showTaskActions(task));
         row.addView(more, new LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -7168,10 +7219,38 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Everything that can move a reminder alarm, in one comparable string.
+     *
+     * <p>Every save and every return to the foreground used to cancel and re-create one
+     * AlarmManager alarm per task with a reminder, so completing a single task re-armed every
+     * alarm in the app and each resume did the same. That is alarm churn and extra wakeups for
+     * a change that almost never touches a reminder.
+     */
+    private String reminderScheduleFingerprint() {
+        StringBuilder fingerprint = new StringBuilder();
+        for (Task task : tasks) {
+            fingerprint.append(task.id).append('|')
+                    .append(task.completed).append('|')
+                    .append(task.dueDate).append('|')
+                    .append(task.dueTime).append('|')
+                    .append(task.reminderLeadMinutes).append('|')
+                    .append(task.repeatRule).append('|')
+                    .append(task.reminderShownFire).append('|')
+                    .append(TaskReminderScheduler.snoozeRecord(this, task.id)).append(';');
+        }
+        return fingerprint.toString();
+    }
+
     private void rescheduleTaskReminders() {
+        String fingerprint = reminderScheduleFingerprint();
+        if (fingerprint.equals(lastReminderScheduleFingerprint)) return;
         try {
             TaskReminderScheduler.rescheduleAll(this, tasks);
+            lastReminderScheduleFingerprint = fingerprint;
         } catch (RuntimeException schedulingFailed) {
+            // A failed schedule must be retried, so the fingerprint is not kept.
+            lastReminderScheduleFingerprint = null;
             Log.w("DaymarkReminder", "Reminder alarms could not be rescheduled; they retry on the next save or app open.", schedulingFailed);
         }
     }
@@ -7273,7 +7352,7 @@ public final class MainActivity extends Activity {
                         } else if (which == 4) {
                             String copyTitle = current.title;
                             if (!copyTitle.endsWith(" (copy)")) copyTitle += " (copy)";
-                            tasks.add(TaskLogic.create(copyTitle, current.dueDate, current.priority));
+                            tasks.add(TaskLogic.duplicate(current, copyTitle));
                             render();
                             saveTasksAsync();
                             showToast("Task duplicated.");
@@ -7406,8 +7485,11 @@ public final class MainActivity extends Activity {
                     }
                     rerender[0].run();
                 });
+                // The row used to be a fixed 52dp, which cut a two-line subtask title in
+                // half. It keeps that height for a single line and grows for more.
+                subtaskCheck.setMinimumHeight(dp(52));
                 list.addView(subtaskCheck, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             }
         };
         rerender[0].run();
@@ -7558,7 +7640,7 @@ public final class MainActivity extends Activity {
             if (AttachmentLogic.isSafeToOpenExternally(attachment)) {
                 Button open = compactButton("Open with another app", false);
                 open.setContentDescription("Choose another app to open " + attachment.displayName);
-                open.setEnabled(present);
+                setControlEnabled(open, present);
                 open.setOnClickListener(view -> confirmExternalOpen(attachment));
                 item.addView(open, bottomMargin(dp(3)));
             }
@@ -7652,7 +7734,7 @@ public final class MainActivity extends Activity {
             attachmentCanCancel = true;
         }
         cancelAttachmentButton.setText("Cancel import");
-        cancelAttachmentButton.setEnabled(true);
+        setControlEnabled(cancelAttachmentButton, true);
         cancelAttachmentButton.setVisibility(View.VISIBLE);
         List<Task> snapshot = new ArrayList<>(tasks);
         storageStatus.setText("Importing encrypted attachment…");
@@ -7754,7 +7836,7 @@ public final class MainActivity extends Activity {
         }
         if (accepted) {
             cancelAttachmentButton.setText("Cancelling…");
-            cancelAttachmentButton.setEnabled(false);
+            setControlEnabled(cancelAttachmentButton, false);
         } else {
             showToast("The attachment is already being saved and can no longer be cancelled.");
         }
@@ -8083,6 +8165,8 @@ public final class MainActivity extends Activity {
         dateButton.setOnClickListener(view -> showDatePicker(selectedDate, dateButton));
         dateActions.addView(dateButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
         Button clearDate = compactButton("Clear", false);
+        dateButton.setContentDescription("Choose the due date");
+        clearDate.setContentDescription("Clear the due date");
         dateActions.addView(clearDate, new LinearLayout.LayoutParams(dp(76), dp(48)));
         form.addView(dateActions, bottomMargin(dp(6)));
 
@@ -8103,11 +8187,11 @@ public final class MainActivity extends Activity {
             selectedDate[0] = LocalDate.now().plusWeeks(1).toString();
             dateButton.setText(dateButtonLabel(selectedDate[0]));
         });
-        quickDates.addView(todayButton, new LinearLayout.LayoutParams(0, dp(44), 1f));
-        LinearLayout.LayoutParams tomorrowParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        quickDates.addView(todayButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams tomorrowParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         tomorrowParams.leftMargin = dp(5);
         quickDates.addView(tomorrowButton, tomorrowParams);
-        LinearLayout.LayoutParams nextWeekParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        LinearLayout.LayoutParams nextWeekParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         nextWeekParams.leftMargin = dp(5);
         quickDates.addView(nextWeekButton, nextWeekParams);
         form.addView(quickDates, bottomMargin(dp(14)));
@@ -8760,13 +8844,13 @@ public final class MainActivity extends Activity {
         activeFilter = TaskLogic.FILTER_ALL;
         searchQuery = "";
         if (searchInput != null) searchInput.setText("");
-        pathButton.setText(powerMode ? "Simple path" : "Power path");
+        pathButton.setText(powerMode ? "Simple mode" : "Power mode");
         pathButton.setContentDescription(powerMode
-                ? "Switch to Simple path. Your tasks will stay the same."
+                ? "Switch to Simple mode. Your tasks will stay the same."
                 : "Switch to Power mode for search, filters, and suggestions. Your tasks will stay the same.");
         captureFeedback.setText(powerMode
-                ? "Power path adds search, filters, and ranked demo suggestions. It uses the same tasks."
-                : "Simple path shows your tasks without extra filters. Your tasks are unchanged.");
+                ? "Power mode adds search, filters, and ranked task suggestions. It uses the same tasks."
+                : "Simple mode shows your tasks without extra filters. Your tasks are unchanged.");
         render();
     }
 
@@ -8835,8 +8919,8 @@ public final class MainActivity extends Activity {
         final boolean[] continueExport = { false };
         dialog.setOnShowListener(ignored -> {
             Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            positive.setEnabled(false);
-            acknowledgement.setOnCheckedChangeListener((button, checked) -> positive.setEnabled(checked));
+            setControlEnabled(positive, false);
+            acknowledgement.setOnCheckedChangeListener((button, checked) -> setControlEnabled(positive, checked));
             positive.setOnClickListener(view -> {
                 if (!acknowledgement.isChecked()) return;
                 continueExport[0] = true;
@@ -8868,7 +8952,7 @@ public final class MainActivity extends Activity {
         portableCanCancel = true;
         portableCancelRequested = false;
         cancelAttachmentButton.setText("Cancel backup");
-        cancelAttachmentButton.setEnabled(true);
+        setControlEnabled(cancelAttachmentButton, true);
         cancelAttachmentButton.setVisibility(View.VISIBLE);
         List<Task> snapshot = new ArrayList<>(tasks);
         storageStatus.setText("Encrypting private backup…");
@@ -9212,7 +9296,7 @@ public final class MainActivity extends Activity {
         portableCanCancel = true;
         portableCancelRequested = false;
         cancelAttachmentButton.setText("Cancel restore");
-        cancelAttachmentButton.setEnabled(true);
+        setControlEnabled(cancelAttachmentButton, true);
         cancelAttachmentButton.setVisibility(View.VISIBLE);
         int originalCount = tasks.size();
         storageStatus.setText("Authenticating and validating the full backup privately…");
@@ -9235,7 +9319,7 @@ public final class MainActivity extends Activity {
                                         mainHandler.post(() -> {
                                             if (isFinishing() || isDestroyed()) return;
                                             cancelAttachmentButton.setText("Finishing restore…");
-                                            cancelAttachmentButton.setEnabled(false);
+                                            setControlEnabled(cancelAttachmentButton, false);
                                             storageStatus.setText("Committing encrypted task snapshot…");
                                             storageStatus.setTextColor(palette.muted);
                                         });
@@ -9354,7 +9438,7 @@ public final class MainActivity extends Activity {
             }
             portableCancelRequested = true;
             cancelAttachmentButton.setText("Cancelling…");
-            cancelAttachmentButton.setEnabled(false);
+            setControlEnabled(cancelAttachmentButton, false);
             return;
         }
         requestAttachmentCancel();
@@ -10325,6 +10409,37 @@ public final class MainActivity extends Activity {
         view.setTypeface(Typeface.create("sans-serif", style));
         view.setIncludeFontPadding(true);
         return view;
+    }
+
+    /**
+     * How far a control that cannot act right now recedes.
+     *
+     * <p>The Focus Timer panel already used a dimmed look for its locked controls; this is the
+     * same value, adopted app-wide so that "working" and "not working" are told apart the same
+     * way everywhere in Daymark.
+     */
+    private static final float DISABLED_CONTROL_ALPHA = 0.45f;
+
+    /**
+     * The single "this control cannot act right now" treatment for the whole app.
+     *
+     * <p>Disabled controls used to keep the full accent fill and a full-strength label, so a
+     * button that could do nothing looked exactly like one that could: the browser's back and
+     * forward pair, the task chips, the "Add task" button and the editor's Clear buttons all
+     * looked ready and silently swallowed the tap. One helper gives every control the same
+     * recessed look, so the difference is visible at a glance.
+     *
+     * <p>The whole surface recedes rather than only the label. The palette's 4.5:1 contrast
+     * promise still holds for every control that is in use, and WCAG 1.4.3 and 1.4.11 exempt
+     * inactive components, which is precisely what this state is.
+     *
+     * @param control the control to update; {@code null} is ignored
+     * @param enabled whether the control can act right now
+     */
+    private void setControlEnabled(View control, boolean enabled) {
+        if (control == null) return;
+        control.setEnabled(enabled);
+        control.setAlpha(enabled ? 1f : DISABLED_CONTROL_ALPHA);
     }
 
     private GradientDrawable shape(int fill, int radiusDp, int stroke) {

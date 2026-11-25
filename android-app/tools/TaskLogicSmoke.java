@@ -28,6 +28,7 @@ public final class TaskLogicSmoke {
         if (args.length > 3) sharedInstantContract(Path.of(args[3]));
         taskInstantFieldsUseStrictContract();
         CRUDKeepsStableIdentityAndTimestamps();
+        duplicateCarriesEveryDetail();
         templatesValidateAndCreateFreshTasks();
         templateListsRejectDuplicatesAndExcess();
         storedTaskSnapshotsMatchWriterRules();
@@ -126,6 +127,38 @@ public final class TaskLogicSmoke {
         check(completed.completed && completed.id.equals(edited.id), "completion toggles without changing identity");
         expectIllegalArgument(() -> TaskLogic.create("  ", null, "medium"), "blank title rejected");
         expectIllegalArgument(() -> TaskLogic.create("Bad date", "2026-02-30", "medium"), "invalid due date rejected");
+    }
+
+    /**
+     * A duplicate must carry every detail of its source. Duplicating used to build the copy from
+     * the title/due-date/priority overload, which silently dropped the note, the due time, the
+     * reminder, the checklist, the repeat rule and the tags.
+     */
+    private static void duplicateCarriesEveryDetail() {
+        Task source = TaskLogic.create("  Renew passport  ", "2026-10-05", "high",
+                "Bring the old one", "09:30", Integer.valueOf(60),
+                Arrays.asList(new Subtask("s1", "Step one", false),
+                        new Subtask("s2", "Step two", true)),
+                "monthly", Arrays.asList("travel", "admin"));
+        Task copy = TaskLogic.duplicate(source, "  Renew passport (copy)  ");
+        check("Renew passport (copy)".equals(copy.title), "the duplicate keeps the given title");
+        check(!copy.id.equals(source.id), "the duplicate gets its own id");
+        check(!copy.completed, "the duplicate starts uncompleted");
+        check(copy.createdAt.equals(copy.updatedAt), "the duplicate gets its own timestamps");
+        check(source.dueDate.equals(copy.dueDate), "the duplicate keeps the due date");
+        check(source.priority.equals(copy.priority), "the duplicate keeps the priority");
+        check(source.notes.equals(copy.notes), "the duplicate keeps the note");
+        check(source.dueTime.equals(copy.dueTime), "the duplicate keeps the due time");
+        check(source.reminderLeadMinutes.equals(copy.reminderLeadMinutes),
+                "the duplicate keeps the reminder lead");
+        check(source.repeatRule.equals(copy.repeatRule), "the duplicate keeps the repeat rule");
+        check(copy.subtasks.size() == 2 && "Step one".equals(copy.subtasks.get(0).title)
+                        && copy.subtasks.get(1).done,
+                "the duplicate keeps the checklist and its done state");
+        check(copy.tags.equals(source.tags), "the duplicate keeps the tags");
+        check(copy.attachments.isEmpty(), "the duplicate carries no attachment payloads");
+        expectIllegalArgument(() -> TaskLogic.duplicate(source, "   "), "blank duplicate title rejected");
+        expectIllegalArgument(() -> TaskLogic.duplicate(null, "Copy"), "duplicate needs a source task");
     }
 
     private static void templatesValidateAndCreateFreshTasks() {

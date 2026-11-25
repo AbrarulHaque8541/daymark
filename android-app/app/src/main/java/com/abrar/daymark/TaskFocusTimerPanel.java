@@ -292,11 +292,19 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         updateActionControls(timer != null && !timer.isFinished());
     }
 
+    /**
+     * Live summary of the focus session on screen.
+     *
+     * <p>The card used to hold a static "SESSION DATA · encrypted separately" placeholder that
+     * nothing ever updated, so it read as a broken widget rather than as information. The caller
+     * passes the running session's elapsed focus time and how many sessions the day holds.
+     */
     void setDailySummary(long focusDurationMs, int sessionCount) {
         if (closed) return;
         long minutes = Math.max(0L, focusDurationMs / 60_000L);
         int safeSessions = Math.max(0, sessionCount);
-        dailySummary.setText("TODAY  ·  " + minutes + "m focus  ·  " + safeSessions + " sessions");
+        dailySummary.setText("SESSION DATA  ·  " + minutes + "m focused  ·  "
+                + safeSessions + (safeSessions == 1 ? " session" : " sessions"));
     }
 
     void setSoundEnabled(boolean enabled) {
@@ -374,17 +382,26 @@ final class TaskFocusTimerPanel extends LinearLayout implements AutoCloseable {
         stopAction.setEnabled(enabled && active);
         stopAction.setAlpha(enabled && active ? 1f : 0.55f);
         modeStopwatch.setEnabled(configurationEnabled);
+        modeStopwatch.setAlpha(configurationEnabled ? 1f : 0.45f);
         modeCountdown.setEnabled(configurationEnabled);
+        modeCountdown.setAlpha(configurationEnabled ? 1f : 0.45f);
         customDuration.setEnabled(configurationEnabled
                 && selectedMode == TaskFocusTimer.Mode.COUNTDOWN);
+        customDuration.setAlpha(customDuration.isEnabled() ? 1f : 0.45f);
         for (int i = 0; i < presetRow.getChildCount(); i++) {
-            presetRow.getChildAt(i).setEnabled(configurationEnabled
-                    && selectedMode == TaskFocusTimer.Mode.COUNTDOWN);
-            presetRow.getChildAt(i).setAlpha(selectedMode == TaskFocusTimer.Mode.COUNTDOWN ? 1f : 0.42f);
+            boolean presetEnabled = configurationEnabled
+                    && selectedMode == TaskFocusTimer.Mode.COUNTDOWN;
+            presetRow.getChildAt(i).setEnabled(presetEnabled);
+            // The preset chips used to dim on the mode alone, so a preset that was disabled
+            // because an action was in flight still looked fully available.
+            presetRow.getChildAt(i).setAlpha(presetEnabled ? 1f : 0.42f);
         }
         for (TextView button : displayUnitButtons) button.setEnabled(enabled);
+        for (TextView button : displayUnitButtons) button.setAlpha(enabled ? 1f : 0.45f);
         soundToggle.setEnabled(enabled);
+        soundToggle.setAlpha(enabled ? 1f : 0.45f);
         tickToggle.setEnabled(enabled && soundEnabled);
+        tickToggle.setAlpha(enabled && soundEnabled ? 1f : 0.45f);
     }
 
     private void chooseMode(TaskFocusTimer.Mode mode) {

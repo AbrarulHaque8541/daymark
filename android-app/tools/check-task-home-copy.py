@@ -23,8 +23,8 @@ check("addLocalStorageNote" not in ACTIVITY,
 check("Tasks and attachments stay encrypted in this app on this device. No cloud sync or automatic backup." not in ACTIVITY,
       "the long encryption footer copy is not rendered elsewhere in MainActivity")
 check('captureFeedback = text(powerMode' in ACTIVITY
-      and '"Power path adds search, filters, and ranked demo suggestions. It uses the same tasks."' in ACTIVITY,
-      "the separate Power-path helper copy remains unchanged")
+      and '"Power mode adds search, filters, and ranked task suggestions. It uses the same tasks."' in ACTIVITY,
+      "the separate Power-mode helper copy names one feature consistently")
 
 status_start = ACTIVITY.index("private void addPrivacyCard(LinearLayout content)")
 status_end = ACTIVITY.index("private View buildSharedComposer()", status_start)
