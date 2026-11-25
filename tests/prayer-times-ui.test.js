@@ -220,9 +220,11 @@ test('a successful check renders the schedule and an honest status', async () =>
   assert.ok(result.includes('15 Jumada al-akhirah 1448 AH'));
   assert.ok(result.includes('Fajr 05:14'));
   assert.ok(result.includes('Isha 18:59'));
-  const status = doc.getElementById('prayer-times-status').textContent;
+  const statusEl = doc.getElementById('prayer-times-status');
+  const status = statusEl.textContent;
   assert.ok(status.includes('Updated'));
   assert.ok(status.includes('nothing saved on this device'));
+  assert.ok(statusEl.classList.contains('is-success'), 'successful check must flash is-success');
 });
 
 test('the selected city decides the requested coordinates', async () => {
@@ -263,13 +265,15 @@ test('a failed check clears any previous result', async () => {
   assert.strictEqual(doc.getElementById('prayer-times-result').textContent, '');
 });
 
-test('clear empties the result', async () => {
+test('clear empties the result and does not flash success', async () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('prayer-times-result').textContent = 'old';
   await doc.getElementById('prayer-times-clear').dispatch('click', {});
   assert.strictEqual(doc.getElementById('prayer-times-result').textContent, '');
-  assert.ok(doc.getElementById('prayer-times-status').textContent.includes('Cleared'));
+  const statusEl = doc.getElementById('prayer-times-status');
+  assert.ok(statusEl.textContent.includes('Cleared'));
+  assert.ok(!statusEl.classList.contains('is-success'), 'cleared status must not be is-success');
 });
 
 test('form submit is prevented and runs the check', async () => {
