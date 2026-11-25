@@ -216,9 +216,12 @@ test('a successful check renders the Hijri date and an honest status', async () 
   assert.ok(result.includes('15 Jumada al-akhirah 1448 AH'), 'result was: ' + result);
   assert.ok(result.includes("Al Arba'a"));
   assert.strictEqual(requested, 'https://api.aladhan.com/v1/gToH?date=25-11-2026');
-  const status = doc.getElementById('hijri-status').textContent;
+  const statusEl = doc.getElementById('hijri-status');
+  const status = statusEl.textContent;
   assert.ok(status.includes('Updated'));
   assert.ok(status.includes('nothing saved on this device'));
+  assert.ok(statusEl.classList.contains('is-success'), 'success flash class should be present after check');
+  assert.strictEqual(statusEl.getAttribute('title'), 'Hijri date updated');
 });
 
 test('holidays are rendered as a labeled line', async () => {
