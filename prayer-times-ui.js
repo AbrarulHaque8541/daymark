@@ -1,1 +1,1 @@
-$(cat /tmp/prayer-times-ui.js)
+PLACEHOLDER_TO_BE_REPLACED
