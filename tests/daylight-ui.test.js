@@ -22,10 +22,25 @@ const DAYLIGHT_BODY = JSON.stringify({
   }
 });
 
+function makeClassList() {
+  const set = new Set();
+  return {
+    add(name) { set.add(name); },
+    remove(name) { set.delete(name); },
+    toggle(name, force) {
+      const on = force === undefined ? !set.has(name) : !!force;
+      if (on) set.add(name); else set.delete(name);
+      return on;
+    },
+    contains(name) { return set.has(name); }
+  };
+}
+
 function fakeElement(tag, doc) {
   const el = {
     tagName: tag,
     className: '',
+    classList: makeClassList(),
     disabled: false,
     value: '',
     textContent: '',
@@ -301,6 +316,19 @@ test('clear empties the view and says so without touching storage', () => {
   assert.equal(els.input.value, '');
   assert.equal(els.result.textContent, '');
   assert.equal(els.status.textContent, 'Cleared. Type a place name and tap Check.');
+});
+
+test('a successful check flashes the status with the shared success class', async () => {
+  const fetchImpl = okFetch(ROUTES);
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
+  const handle = ui.attachDaylightUi(env);
+  const els = elementsOf(doc);
+  assert.equal(els.status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  els.input.value = 'Kanyakumari';
+  await handle.onCheck();
+  assert.ok(els.status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
 });
 
 test('the module registers its tests and stays inert when loaded without a DOM', () => {
