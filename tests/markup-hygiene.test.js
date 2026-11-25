@@ -58,3 +58,21 @@ test('index.html keeps the de-cluttered chrome lean (owner decision 2026-11-05)'
   assert.doesNotMatch(markup, /This prototype stores tasks/, 'the duplicated storage note must stay removed');
   assert.match(markup, /id="page-title">Your day, <em>at a glance\.<\/em><\/h1>/, 'the hero heading stays clear and functional');
 });
+
+test('currency glance card keeps the amount, swap and result controls its module wires', () => {
+  // currency-ui.js reads these ids; a generic-card rewrite once dropped them and
+  // silently broke rendering (the card fetched rates but never showed a result).
+  const card = markup.match(/<aside class="currency-card" id="currency-card"[\s\S]*?<\/aside>/);
+  assert.ok(card, 'the currency card must keep its rich layout hooks');
+  for (const id of ['currency-amount', 'currency-from', 'currency-swap', 'currency-to', 'currency-refresh', 'currency-status', 'currency-now', 'currency-copy']) {
+    assert.match(card[0], new RegExp('id="' + id + '"'), id + ' must be present inside the currency card');
+  }
+  assert.match(card[0], /class="feed-form"/, 'the currency form keeps its grid hook');
+});
+
+test('edit dialog actions use the shared right-aligned dialog-actions row', () => {
+  // A bare <menu> inherits the browser's 40px inline padding, pushing the
+  // Cancel/Save buttons out of alignment; dialog-actions right-aligns them.
+  assert.match(markup, /<div class="dialog-actions">/, 'dialog actions row is present');
+  assert.doesNotMatch(markup, /<menu>/, 'the unwired browser-default menu container must stay gone');
+});
