@@ -60,6 +60,16 @@ test('low-priority filter is discoverable, accessible, persisted, and has shortc
   assert.match(app, /'7': 'low'/);
 });
 
+test('medium-priority filter is discoverable, accessible, persisted, and has shortcut 8', () => {
+  const button = html.match(/<button\b[^>]*\bdata-filter="medium"[^>]*>[\s\S]*?<\/button>/i);
+  assert.ok(button, 'the task filters must include a medium-priority button');
+  assert.match(button[0], /aria-label="Show medium-priority tasks \(8\)"/i);
+  assert.match(button[0], /aria-keyshortcuts="8"/i);
+  assert.match(button[0], /id="count-medium"/i);
+  assert.match(app, /VALID_FILTERS = new Set\(\[[^\]]*'medium'[^\]]*\]\)/);
+  assert.match(app, /'8': 'medium'/);
+});
+
 test('toast host exposes the live region and action elements used by app.js', () => {
   const stack = elementById(html, 'toast-stack');
   const toast = elementById(html, 'toast');

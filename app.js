@@ -671,6 +671,7 @@
       const upcomingTasks = state.tasks.filter((task) => task.dueDate !== null && task.dueDate > today);
       const completedTasks = state.tasks.filter((task) => task.completed);
       const highPriorityTasks = state.tasks.filter((task) => task.priority === 'high');
+      const mediumPriorityTasks = state.tasks.filter((task) => task.priority === 'medium');
       const lowPriorityTasks = state.tasks.filter((task) => task.priority === 'low');
       const openCountElement = $('#open-count');
       if (state.previousOpenCount !== null && state.previousOpenCount !== openTasks.length) {
@@ -686,6 +687,7 @@
       $('#count-overdue').textContent = String(overdueTasks.length);
       $('#count-completed').textContent = String(completedTasks.length);
       $('#count-high').textContent = String(highPriorityTasks.length);
+      $('#count-medium').textContent = String(mediumPriorityTasks.length);
       $('#count-low').textContent = String(lowPriorityTasks.length);
       $('#clear-completed').hidden = completedTasks.length === 0;
       $('#today-label').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
@@ -731,6 +733,7 @@
         today: ['Nothing due today', 'A little breathing room. Switch filters or add something new.'],
         upcoming: ['Nothing coming up', 'No future-dated tasks yet. Add a due date to plan ahead.'],
         high: ['No high-priority tasks', 'Set a task to high priority to see it here.'],
+        medium: ['No medium-priority tasks', 'Set a task to medium priority to see it here.'],
         low: ['No low-priority tasks', 'Set a task to low priority to see it here.']
       };
       $('#empty-title').textContent = labels[state.filter][0];
@@ -1868,7 +1871,7 @@
     return null;
   }
 
-  const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed', 'high', 'low']);
+  const VALID_FILTERS = new Set(['all', 'today', 'upcoming', 'overdue', 'completed', 'high', 'medium', 'low']);
 
   const VALID_SORTS = new Set(['smart', 'title']);
 
@@ -2391,10 +2394,10 @@
   }
 
   const FILTER_LABELS = {
-    all: 'All', today: 'Today', upcoming: 'Upcoming', overdue: 'Overdue', completed: 'Completed', high: 'High priority', low: 'Low priority'
+    all: 'All', today: 'Today', upcoming: 'Upcoming', overdue: 'Overdue', completed: 'Completed', high: 'High priority', medium: 'Medium priority', low: 'Low priority'
   };
   const FILTER_KEYS = {
-    '1': 'all', '2': 'today', '3': 'upcoming', '4': 'overdue', '5': 'completed', '6': 'high', '7': 'low'
+    '1': 'all', '2': 'today', '3': 'upcoming', '4': 'overdue', '5': 'completed', '6': 'high', '7': 'low', '8': 'medium'
   };
 
   function setTaskFilter(filter) {

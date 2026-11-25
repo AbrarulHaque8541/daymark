@@ -84,6 +84,20 @@ test('low-priority filter includes completed tasks and composes with search', ()
   assert.deepEqual(logic.getFilteredTasks(tasks, 'low', 'urgent', TODAY), []);
 });
 
+test('medium-priority filter includes completed tasks and composes with search', () => {
+  const tasks = [
+    task('medium-open', 'Routine report', { priority: 'medium' }),
+    task('medium-done', 'Done routine', { priority: 'medium', completed: true }),
+    task('high', 'Urgent report', { priority: 'high' }),
+    task('low', 'Someday item', { priority: 'low' })
+  ];
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'medium', '', TODAY).map((item) => item.id),
+    ['medium-open', 'medium-done']);
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'medium', 'report', TODAY).map((item) => item.id),
+    ['medium-open']);
+  assert.deepEqual(logic.getFilteredTasks(tasks, 'medium', 'urgent', TODAY), []);
+});
+
 test('title search is case-insensitive and composes with the active filter using deterministic lowercasing', () => {
   const tasks = [
     task('a', 'Review Project Plan', { dueDate: TODAY }),
