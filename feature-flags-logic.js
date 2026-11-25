@@ -1,14 +1,15 @@
 ((root) => {
   'use strict';
   const STORAGE_KEY = 'daymark.features.v1';
-  const FLAG_IDS = ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode', 'auto-archive'];
+  const FLAG_IDS = ['command-bar', 'search-bangs', 'comfort-tint', 'mindful-breaks', 'focus-mode', 'auto-archive', 'snooze-pages'];
   const FEATURE_FLAGS = [
     { id: 'command-bar', label: 'Command bar (Ctrl+K)', kind: 'feature', description: 'A keyboard palette that opens cards and runs searches without leaving the page.' },
     { id: 'search-bangs', label: '!bang search shortcuts', kind: 'feature', description: 'Type !g, !d, !br, !b, !sp or !y inside the palette to search a specific engine.' },
     { id: 'comfort-tint', label: 'Comfort tint', kind: 'feature', description: 'A soft warm veil over the page for long reading sessions; three strengths, tap-through, instantly removable.' },
     { id: 'mindful-breaks', label: 'Mindful breaks', kind: 'feature', description: 'A gentle on-page nudge to stand up and rest after a chosen interval. Nothing is saved.' },
     { id: 'focus-mode', label: 'Focus view (one task, one view)', kind: 'feature', description: 'Pick an open task and the page steps back behind a single view. Mark the task complete from there.' },
-    { id: 'auto-archive', label: 'Auto-archive', kind: 'feature', description: 'Archive completed tasks that finished more than your chosen number of days ago, from an explicit Archive now tap. Repeating tasks and tasks with unknown ages are never archived.' }
+    { id: 'auto-archive', label: 'Auto-archive', kind: 'feature', description: 'Archive completed tasks that finished more than your chosen number of days ago, from an explicit Archive now tap. Repeating tasks and tasks with unknown ages are never archived.' },
+    { id: 'snooze-pages', label: 'Snooze pages', kind: 'feature', description: 'Park a web page with a wake time, and the snooze card lists what is due when you look at it. Nothing is fetched and nothing ever opens by itself.' }
   ];
   function defaults() {
     const flags = {};

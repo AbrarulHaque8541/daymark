@@ -143,6 +143,12 @@
       keys: ['daymark.webhook.lock.v1']
     },
     {
+      id: 'snoozed-pages',
+      label: 'Snoozed pages',
+      description: 'Pages you parked in the snooze card with a wake time, until you clear them.',
+      keys: ['daymark.snooze.v1']
+    },
+    {
       id: 'feature-flags',
       label: 'Feature switches',
       description: 'Your on/off choices for the optional capability switches, such as the command bar and search shortcuts. Every value stays on this device.',

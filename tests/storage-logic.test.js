@@ -50,7 +50,8 @@ test('every daymark storage key the prototype uses is covered by exactly one cat
     'daymark.webhook.queue.v1',
     'daymark.telegram.lastChat.v1',
     'daymark.webhook.lock.v1',
-    'daymark.features.v1'
+    'daymark.features.v1',
+    'daymark.snooze.v1'
   ];
   assert.deepEqual(storage.categoryIds().length, storage.CATEGORIES.length);
   const seen = new Set();
@@ -424,3 +425,4 @@ test('remembered Telegram chat preference is inventoried and included in categor
   assert.ok(clearAll.removedKeys.includes(key), 'Clear All includes the remembered destination');
   assert.equal(allStore.snapshot[key], undefined);
 });
+
