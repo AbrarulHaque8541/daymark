@@ -253,7 +253,7 @@
       }
       clearList();
       setStatus(cleared.clearedCount === 0
-        ? 'Nothing was parked, so nothing was cleared.'
+        ? 'Nothing is parked, so nothing was cleared.'
         : 'Cleared ' + String(cleared.clearedCount) + ' parked page(s) from this device.');
       return true;
     }
@@ -337,3 +337,4 @@
     else boot();
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
