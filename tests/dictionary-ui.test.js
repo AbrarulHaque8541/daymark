@@ -211,6 +211,19 @@ test('status reports the update time and that nothing is saved', async () => {
   assert.ok(status.includes('not saved on this device'));
 });
 
+test('a successful lookup flashes the shared is-success status class', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  const status = doc.getElementById('dictionary-status');
+  assert.strictEqual(status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  doc.getElementById('dictionary-word').value = 'serendipity';
+  doc.getElementById('dictionary-lookup').dispatch('click', {});
+  await drain();
+  assert.ok(status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
+});
+
 test('404 explains that no definition was found', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => ({ ok: false, status: 404, headers: { get: () => null }, body: streamOf(['{}']) }) });

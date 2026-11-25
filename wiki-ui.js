@@ -56,8 +56,14 @@
     let cacheRecord = null;
     let prefsRecord = null;
 
-    function status(message) {
+    function status(message, isSuccess) {
       if (statusEl) statusEl.textContent = message;
+      // Shared .feed-status.is-success glance flash (accent #16705f): the same
+      // professional success language used by weather, crypto, potd, moon and
+      // country. Cleared on the next non-success status so it never lingers.
+      if (statusEl && statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
     }
 
     function setBusy(isBusy) {
@@ -325,7 +331,7 @@
           persistenceMessage('Search preference', prefsSave)
         ].filter(Boolean);
         status('Updated · ' + cached.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC'
-          + (warnings.length ? ' · ' + warnings.join('; ') : ''));
+          + (warnings.length ? ' · ' + warnings.join('; ') : ''), true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         if (cached) {

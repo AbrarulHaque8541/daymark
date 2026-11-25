@@ -131,8 +131,14 @@
 
     let busy = false;
 
-    function status(message) {
+    function status(message, isSuccess) {
       if (statusEl) statusEl.textContent = message;
+      // Shared .feed-status.is-success glance flash (accent #16705f): the same
+      // professional success language used by weather, crypto, potd, moon and
+      // country. Cleared on the next non-success status so it never lingers.
+      if (statusEl && statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+        statusEl.classList.toggle('is-success', !!isSuccess);
+      }
     }
 
     function setBusy(isBusy) {
@@ -204,7 +210,7 @@
         const record = await logicApi.fetchOnThisDay(fetchImpl, options);
         render(record);
         status('Updated \u00b7 ' + record.fetchedAt.slice(0, 16).replace('T', ' ')
-          + ' UTC \u00b7 not saved on this device');
+          + ' UTC \u00b7 not saved on this device', true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof logicApi.classifyOnThisDayError === 'function'

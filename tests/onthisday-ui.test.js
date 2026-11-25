@@ -223,6 +223,18 @@ test('status reports the update time and that nothing is saved', async () => {
   assert.ok(status.includes('not saved on this device'));
 });
 
+test('a successful check flashes the shared is-success status class', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  const status = doc.getElementById('onthisday-status');
+  assert.strictEqual(status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  doc.getElementById('onthisday-check').dispatch('click', {});
+  await drain();
+  assert.ok(status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
+});
+
 test('a malformed date is blocked with guidance and no network call', async () => {
   const doc = makeDoc();
   let called = 0;

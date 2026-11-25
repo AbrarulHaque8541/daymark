@@ -215,6 +215,20 @@ test('refresh fetches, renders, and persists the result and preference', async (
   assert.equal(prefs.countryCode, 'IN');
 });
 
+test('a successful refresh flashes the shared is-success status class', async () => {
+  const fetchImpl = okFetch([
+    { prefix: holidaysApi.ENDPOINT, body: FETCH_BODY }
+  ]);
+  const { env, elements } = fakeEnv({ country: 'IN', fetch: fetchImpl });
+  const handle = ui.attachHolidaysUi(env);
+  const status = elements['holiday-status'];
+  assert.equal(status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  await handle.onRefresh();
+  assert.ok(status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
+});
+
 test('a deferred holiday response cannot recreate its absent cache or preference after Clear All', async () => {
   const waiting = deferred();
   const started = deferred();

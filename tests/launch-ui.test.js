@@ -248,6 +248,18 @@ test('status reports the update time and that nothing is saved', async () => {
   assert.ok(status.includes('not saved on this device'));
 });
 
+test('a successful check flashes the shared is-success status class', async () => {
+  const doc = makeDoc();
+  attach(doc, { fetch: async () => okResponse(JSON.stringify(payload)) });
+  const status = doc.getElementById('launch-status');
+  assert.strictEqual(status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  doc.getElementById('launch-check').dispatch('click', {});
+  await drain();
+  assert.ok(status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
+});
+
 test('429 explains the rate limit in plain words', async () => {
   const doc = makeDoc();
   attach(doc, { fetch: async () => ({ ok: false, status: 429, headers: { get: () => null }, body: streamOf(['{}']) }) });

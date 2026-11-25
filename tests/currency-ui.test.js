@@ -15,10 +15,25 @@ const RATES_BODY = JSON.stringify({
   rates: { INR: 94.91 }
 });
 
+function makeClassList() {
+  const set = new Set();
+  return {
+    add(name) { set.add(name); },
+    remove(name) { set.delete(name); },
+    toggle(name, force) {
+      const on = force === undefined ? !set.has(name) : !!force;
+      if (on) set.add(name); else set.delete(name);
+      return on;
+    },
+    contains(name) { return set.has(name); }
+  };
+}
+
 function fakeElement(tag) {
   return {
     tagName: tag,
     id: '',
+    classList: makeClassList(),
     disabled: false,
     value: '',
     textContent: '',
@@ -230,6 +245,18 @@ test('refresh fetches, renders, and persists the result', async () => {
   assert.equal(saved.rate, 94.91);
   assert.equal(saved.from, 'USD');
   assert.equal(saved.to, 'INR');
+});
+
+test('a successful refresh flashes the shared is-success status class', async () => {
+  const fetchImpl = okFetch([{ prefix: currencyApi.RATES_ENDPOINT, body: RATES_BODY }]);
+  const { env, elements } = fakeEnv({ amount: '10', fetch: fetchImpl });
+  const handle = ui.attachCurrencyUi(env);
+  const status = elements['currency-status'];
+  assert.equal(status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  await handle.onRefresh();
+  assert.ok(status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
 });
 
 test('a deferred currency response cannot recreate its absent cache or preference after Clear All', async () => {

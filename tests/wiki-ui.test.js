@@ -20,6 +20,20 @@ const SEARCH_BODY = JSON.stringify({
   }
 });
 
+function makeClassList() {
+  const set = new Set();
+  return {
+    add(name) { set.add(name); },
+    remove(name) { set.delete(name); },
+    toggle(name, force) {
+      const on = force === undefined ? !set.has(name) : !!force;
+      if (on) set.add(name); else set.delete(name);
+      return on;
+    },
+    contains(name) { return set.has(name); }
+  };
+}
+
 function fakeElement(tag) {
   const listeners = [];
   const children = [];
@@ -28,6 +42,7 @@ function fakeElement(tag) {
     tagName: tag,
     id: '',
     className: '',
+    classList: makeClassList(),
     href: '',
     disabled: false,
     value: '',
@@ -157,6 +172,18 @@ test('search fetches, renders, persists, and reports the update', async () => {
   assert.equal(saved.query, 'kanyakumari');
   assert.equal(saved.results.length, 1);
   assert.equal(JSON.parse(storageData[ui.PREFS_KEY]).query, 'kanyakumari');
+});
+
+test('a successful search flashes the shared is-success status class', async () => {
+  const fetchImpl = okFetch(SEARCH_BODY);
+  const { env, elements } = fakeEnv({ query: 'kanyakumari', fetch: fetchImpl });
+  const handle = ui.attachWikiUi(env);
+  const status = elements['wiki-status'];
+  assert.equal(status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  await handle.onSearch();
+  assert.ok(status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
 });
 
 test('a deferred Wikipedia response cannot recreate its absent cache or preference after Clear All', async () => {
