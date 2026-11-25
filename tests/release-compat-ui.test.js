@@ -139,6 +139,31 @@ test('clear button carries label and honest aria-label', () => {
   assert.equal(els['release-compat-clear'].getAttribute('aria-label'), 'Clear explanation only; no setting, build or release is changed');
 });
 
+test('explain button carries an honest aria-label and press feedback', () => {
+  const els = {
+    'release-compat-topic': makeElement('select'),
+    'release-compat-status': makeElement('p'),
+    'release-compat-result': makeElement('div'),
+    'release-compat-form': makeElement('form'),
+    'release-compat-explain': makeElement('button'),
+    'release-compat-clear': makeElement('button')
+  };
+  els['release-compat-topic'].value = 'package-identity';
+  const doc = makeDoc(els);
+  attachReleaseCompatUi({ document: doc, dataApi: logic });
+  const explainBtn = els['release-compat-explain'];
+  assert.equal(explainBtn.getAttribute('aria-label'),
+    'Explain the selected release topic; nothing is fetched or changed');
+  assert.equal(explainBtn.classList.contains('is-pressed'), false);
+  explainBtn.emit('pointerdown');
+  assert.equal(explainBtn.classList.contains('is-pressed'), true);
+  explainBtn.emit('pointerup');
+  assert.equal(explainBtn.classList.contains('is-pressed'), false);
+  explainBtn.emit('pointerdown');
+  explainBtn.emit('pointercancel');
+  assert.equal(explainBtn.classList.contains('is-pressed'), false);
+});
+
 test('clear click empties the rendered explanation', () => {
   const { doc, els } = makeCard();
   attachReleaseCompatUi({ document: doc, dataApi: logic });
