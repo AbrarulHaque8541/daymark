@@ -364,21 +364,15 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 /* Focus timer card */
 .focus-card { margin-top: 10px; padding: 12px 14px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 14px; background: rgba(226, 240, 235, .35); }
 .focus-card[hidden] { display: none; }
-.focus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.focus-header h3 { margin: 0; font-size: 14px; }
 .focus-presets { display: flex; gap: 6px; }
 .focus-preset { height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #5f6c76; font-size: 10px; font-weight: 700; }
 .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .focus-preset:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
-.focus-timer-display { font: 700 32px Manrope, sans-serif; letter-spacing: -.04em; color: var(--accent); text-align: center; margin: 8px 0; }
-.focus-controls { display: flex; justify-content: center; gap: 8px; }
-.focus-task-select { width: 100%; height: 36px; margin-bottom: 10px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 10px; background: rgba(255, 255, 255, .75); padding: 0 10px; font-size: 12px; }
 @media (prefers-color-scheme: dark) {
   .focus-card { border-color: #2c3640; background: rgba(26, 58, 50, .25); }
   .focus-preset { color: #9aa6af; }
   .focus-preset.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .focus-preset:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
-  .focus-task-select { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }
 }
 
 /* Briefing (RSS/Atom feed) card */
@@ -695,10 +689,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 /* Wikipedia knowledge glance card (2026-11-05). Glass surface, accent
    #16705f, tactile hover, dark-mode parity, reduced-motion safe. */
 .wiki-card { margin-top: 18px; padding: 16px 18px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 16px; background: rgba(226, 240, 235, .35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); position: relative; overflow: hidden; }
-.wiki-topline { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
-.wiki-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 4px rgba(42, 143, 122, .14); }
 .wiki-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.04em; }
-.wiki-description { margin: 0 0 12px; color: var(--muted-text); font-size: 12px; line-height: 1.55; }
 .wiki-card .feed-form input { font-size: 12px; }
 .wiki-status { min-height: 16px; margin: 9px 0 4px; color: var(--muted-text); font-size: 10px; }
 .wiki-list { display: flex; flex-direction: column; gap: 8px; }
@@ -726,7 +717,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 @media (prefers-color-scheme: dark) {
   .wiki-card { border-color: rgba(125, 224, 203, 0.14); background: linear-gradient(160deg, rgba(24, 31, 37, 0.92), rgba(14, 18, 22, 0.85)); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); }
-  .wiki-dot { box-shadow: 0 0 0 4px rgba(22, 112, 95, 0.28); }
   .wiki-card .feed-form input { border-color: rgba(125, 224, 203, 0.16); background: rgba(14, 18, 22, 0.7); }
   .wiki-item { border-color: #2c3640; background: rgba(26, 33, 40, .65); }
   .wiki-item:hover { border-color: rgba(42, 143, 122, .5); }
@@ -772,23 +762,11 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .focus-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
 .focus-today { margin: 8px 0 0; color: var(--muted-text); font-size: 11px; }
 
-/* Suggestion footnote */
-.suggestion-footnote { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0 0; padding: 10px 11px; border: 1px solid rgba(210, 228, 222, .8); border-radius: 12px; background: rgba(255, 255, 255, .5); }
-.suggestion-footnote > span { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
-.suggestion-footnote p { margin: 0; color: var(--muted-text); font-size: 10px; line-height: 1.5; }
-
 /* Edit dialog */
 .edit-dialog { width: min(560px, calc(100vw - 32px)); padding: 22px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 20px; background: var(--surface-solid); box-shadow: var(--shadow); color: var(--ink); }
 .edit-dialog::backdrop { background: rgba(15, 26, 32, .45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
-.dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
-.dialog-header .eyebrow { margin: 0 0 2px; }
-.dialog-header h2 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
-.close-dialog { flex: none; font-size: 20px; line-height: 1; }
-.dialog-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 12px 0; }
 .edit-dialog textarea { width: 100%; min-height: 84px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 12px; background: rgba(255, 255, 255, .85); color: var(--ink); padding: 10px 12px; font-size: 13px; line-height: 1.5; resize: vertical; transition: border-color .16s ease, box-shadow .16s ease; }
-.reminder-note-standalone { margin: 12px 0 0; padding: 9px 11px; border: 1px dashed rgba(210, 228, 222, .9); border-radius: 10px; background: var(--accent-soft); color: #1e6b58; font-size: 10px; line-height: 1.55; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 16px; }
-@media (max-width: 560px) { .dialog-fields { grid-template-columns: 1fr; } }
 
 /* Subtask editor */
 .subtask-editor { margin: 14px 0 0; }
@@ -802,11 +780,6 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 .subtask-empty { margin: 4px 0 10px; color: var(--muted-text); font-size: 11px; }
 .subtask-add-row { display: flex; gap: 8px; }
 .subtask-add-row input { flex: 1 1 auto; }
-.subtask-add-button { flex: none; }
-
-/* Page footer */
-.page-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted-text); font-size: 9px; font-weight: 700; letter-spacing: .14em; }
-@media (max-width: 480px) { .page-footer { flex-direction: column; align-items: flex-start; gap: 4px; } }
 
 /* Currency form: amount full width, From and To share a row with the swap
    centered between them, Refresh full width. */
@@ -822,40 +795,24 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 @media (prefers-color-scheme: dark) {
   .field-label, .focus-state-label, .focus-today, .focus-description { color: var(--muted-text); }
   #focus-task { border-color: #2c3640; background: rgba(26, 33, 40, .75); color: #e8eef2; }
-  .suggestion-footnote { border-color: #2c3640; background: rgba(26, 33, 40, .5); }
-  .suggestion-footnote > span { background: #1a3a32; color: #8fd4c0; }
   .edit-dialog { border-color: #2c3640; background: #1a2128; }
   .edit-dialog::backdrop { background: rgba(0, 0, 0, .55); }
   .edit-dialog textarea { border-color: #2c3640; background: rgba(26, 33, 40, .85); color: #e8eef2; }
-  .reminder-note-standalone { border-color: rgba(125, 224, 203, .2); background: #1a3a32; color: #8fd4c0; }
   .subtask-row { border-color: #2c3640; background: rgba(26, 33, 40, .55); }
   .subtask-title { color: #e8eef2; }
   .subtask-remove:hover { background: #4a2220; color: #ffb0a8; }
-  .page-footer { border-top-color: #232d35; color: #7c8a94; }
 }
 
-/* Cycle B polish: busy state + stronger press feedback for primary actions (accent #16705f).
+/* Cycle B polish: busy state for primary actions (accent #16705f).
+   The single busy indicator is the leading spinner drawn once per busy button in
+   styles-motion-efficiency.css; the old trailing ::after spinner was removed so a
+   busy button no longer renders two spinners at the same time.
    Reduced-motion safe; no new network or timers. */
 .button.is-busy {
-  opacity: 0.72;
   cursor: progress;
   pointer-events: none;
 }
-.button.is-busy::after {
-  content: "";
-  display: inline-block;
-  width: 0.7em;
-  height: 0.7em;
-  margin-left: 0.45em;
-  vertical-align: -0.05em;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: button-spin 0.8s linear infinite;
-}
-@keyframes button-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .button.is-busy::after { animation: none; border-right-color: currentColor; }
   .button:active { transform: none; }
 }
 
@@ -1008,34 +965,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #focus-stop:active {
   transform: translateY(1px) scale(0.985);
 }
-#focus-start.is-busy,
-#focus-pause.is-busy,
-#focus-stop.is-busy {
-  opacity: 0.72;
-  cursor: progress;
-  pointer-events: none;
-}
-#focus-start.is-busy::after,
-#focus-pause.is-busy::after,
-#focus-stop.is-busy::after {
-  content: "";
-  display: inline-block;
-  width: 0.65em;
-  height: 0.65em;
-  margin-left: 0.4em;
-  vertical-align: -0.05em;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: button-spin 0.8s linear infinite;
-}
 @media (prefers-reduced-motion: reduce) {
-  #focus-start.is-busy::after,
-  #focus-pause.is-busy::after,
-  #focus-stop.is-busy::after {
-    animation: none;
-    border-right-color: currentColor;
-  }
   #focus-start:active,
   #focus-pause:active,
   #focus-stop:active {
@@ -1053,31 +983,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #daylight-clear:active {
   transform: translateY(1px) scale(0.985);
 }
-#daylight-refresh.is-busy,
-#daylight-clear.is-busy {
-  opacity: 0.72;
-  cursor: progress;
-  pointer-events: none;
-}
-#daylight-refresh.is-busy::after,
-#daylight-clear.is-busy::after {
-  content: "";
-  display: inline-block;
-  width: 0.65em;
-  height: 0.65em;
-  margin-left: 0.4em;
-  vertical-align: -0.05em;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: button-spin 0.8s linear infinite;
-}
 @media (prefers-reduced-motion: reduce) {
-  #daylight-refresh.is-busy::after,
-  #daylight-clear.is-busy::after {
-    animation: none;
-    border-right-color: currentColor;
-  }
   #daylight-refresh:active,
   #daylight-clear:active {
     transform: none;
