@@ -2691,10 +2691,31 @@
       event.currentTarget.value = '';
       if (file) await importTasks(file);
     });
-    document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
-      setTaskFilter(button.dataset.filter);
-    }));
+    document.querySelectorAll('.filter-button').forEach((button) => {
+      button.addEventListener('click', () => {
+        setTaskFilter(button.dataset.filter);
+      });
+      // Press feedback (glass accent #16705f), reduced-motion safe via CSS.
+      const press = () => button.classList.add('is-pressed');
+      const release = () => button.classList.remove('is-pressed');
+      button.addEventListener('pointerdown', press);
+      button.addEventListener('pointerup', release);
+      button.addEventListener('pointerleave', release);
+      button.addEventListener('pointercancel', release);
+    });
     taskList.addEventListener('click', handleTaskAction);
+    // Delegated press feedback for the per-task complete buttons.
+    const pressComplete = (event) => {
+      const button = event.target.closest('.complete-button');
+      if (button) button.classList.add('is-pressed');
+    };
+    const releaseComplete = (event) => {
+      const button = event.target.closest('.complete-button');
+      if (button) button.classList.remove('is-pressed');
+    };
+    taskList.addEventListener('pointerdown', pressComplete);
+    taskList.addEventListener('pointerup', releaseComplete);
+    taskList.addEventListener('pointercancel', releaseComplete);
     suggestionList.addEventListener('click', (event) => {
       const button = event.target.closest('[data-suggestion-task]');
       if (!button) return;
