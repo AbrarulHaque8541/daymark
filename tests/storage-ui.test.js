@@ -389,7 +389,8 @@ test('clear actions set busy state (disabled + aria-busy + is-busy) while operat
     // During the call, buttons should be busy
     const clearAll = elements['data-clear-all'];
     const list = elements['data-list'];
-    if (clearAll.disabled && clearAll.classList.contains('is-busy') && list['aria-busy'] === 'true') {
+    if (clearAll.disabled && clearAll.classList.contains('is-busy')
+        && clearAll['aria-busy'] === 'true' && list['aria-busy'] === 'true') {
       sawBusy = true;
     }
     return originalClear.apply(this, args);
@@ -399,6 +400,7 @@ test('clear actions set busy state (disabled + aria-busy + is-busy) while operat
   assert.equal(sawBusy, true, 'busy state is active during clear');
   // After, busy should be cleared
   assert.equal(elements['data-list']['aria-busy'], 'false');
+  assert.equal(elements['data-clear-all']['aria-busy'], 'false');
 });
 
 

@@ -22,6 +22,7 @@
     const statusEl = element('release-compat-status');
     const resultEl = element('release-compat-result');
     const formEl = element('release-compat-form');
+    const explainEl = element('release-compat-explain');
     const clearEl = element('release-compat-clear');
     function status(message, isSuccess) {
       if (statusEl) statusEl.textContent = message;
@@ -85,6 +86,16 @@
     function onClear() {
       if (resultEl) { while (resultEl.firstChild) resultEl.removeChild(resultEl.firstChild); }
       status('Explanation cleared; no setting, build or release was changed.');
+    }
+    if (explainEl) {
+      if (typeof explainEl.setAttribute === 'function') {
+        explainEl.setAttribute('aria-label', 'Explain the selected release topic; nothing is fetched or changed');
+      }
+      if (typeof explainEl.addEventListener === 'function') {
+        explainEl.addEventListener('pointerdown', function () { if (explainEl.classList && explainEl.classList.add) explainEl.classList.add('is-pressed'); });
+        explainEl.addEventListener('pointerup', function () { if (explainEl.classList && explainEl.classList.remove) explainEl.classList.remove('is-pressed'); });
+        explainEl.addEventListener('pointercancel', function () { if (explainEl.classList && explainEl.classList.remove) explainEl.classList.remove('is-pressed'); });
+      }
     }
     if (clearEl) {
       clearEl.textContent = 'Clear explanation';
