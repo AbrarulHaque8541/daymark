@@ -190,8 +190,12 @@ checks.extend([
     ("sameTaskTitle(this.currentTaskTitle, currentTaskTitle)" in refresh_block
      and refresh_block.index("notifications.cancel();") < refresh_block.index("publishOrCancel("),
      "a changed task title cancels stale content before the refreshed notification is published"),
+    ("setPublicVersion(publicVersion(context))" in source
+     and "private static Notification publicVersion(Context context)" in source
+     and '.setContentTitle("Focus session")' in source,
+     "a private focus notification carries a lock-screen public version so the shade row is never blank"),
 ])
-for ok, message in checks[-14:]:
+for ok, message in checks[-15:]:
     if not ok:
         raise AssertionError(message)
 print(f"PASS focus timer notification source checks: {len(checks)} assertions")

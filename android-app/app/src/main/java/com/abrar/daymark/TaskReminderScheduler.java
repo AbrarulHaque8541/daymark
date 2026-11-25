@@ -414,6 +414,21 @@ final class TaskReminderScheduler {
         ensureChannel(context);
     }
 
+    /**
+     * True when the system will actually show Daymark notifications right now: the runtime
+     * permission is granted and the user has not switched notifications off for the app.
+     */
+    static boolean notificationsAllowed(Context context) {
+        if (context == null) return false;
+        NotificationManager manager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        if (Build.VERSION.SDK_INT >= 33
+                && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) return false;
+        return true;
+    }
+
     static void ensureChannel(Context context) {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager notificationManager =
@@ -438,6 +453,7 @@ final class TaskReminderScheduler {
         preferences.edit().putString(CHANNEL_SOUND_KEY, normalized).apply();
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
                 "Task reminders", NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("Alerts when a task reminder is due. Tap a notification to open that task.");
         Uri sound = soundUri == null
                 ? RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                 : Uri.parse(soundUri);

@@ -82,6 +82,7 @@ final class TaskFocusTimerNotification {
                 .setContentText(state.contentText)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicVersion(context))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setUsesChronometer(state.shouldUseChronometer())
@@ -198,6 +199,19 @@ final class TaskFocusTimerNotification {
         NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) manager.cancel(notificationId);
+    }
+
+    /**
+     * Locked-screen placeholder for a private focus notification: the shade row stays readable
+     * without exposing the task title that the running session belongs to.
+     */
+    private static Notification publicVersion(Context context) {
+        return new Notification.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setContentTitle("Focus session")
+                .setContentText("A focus session is running.")
+                .setCategory(Notification.CATEGORY_PROGRESS)
+                .build();
     }
 
     /** Shade actions reuse the activity and use immutable, action-specific PendingIntents. */

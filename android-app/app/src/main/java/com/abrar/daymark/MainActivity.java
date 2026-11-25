@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.app.DownloadManager;
+import android.app.NotificationManager;
 import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -28,6 +29,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Environment;
 import android.provider.DocumentsContract;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.SpannableString;
@@ -113,8 +115,13 @@ public final class MainActivity extends Activity {
     private static final String ACTION_FOCUS_PAUSE = "com.abrar.daymark.action.FOCUS_PAUSE";
     private static final String ACTION_FOCUS_RESUME = "com.abrar.daymark.action.FOCUS_RESUME";
     private static final String ACTION_FOCUS_FINISH = "com.abrar.daymark.action.FOCUS_FINISH";
+    private static final String REMINDER_HINT_ALLOWED =
+            "Daymark schedules a best-effort Android notification for this reminder and also shows it in-app when you open the app. Alarms are inexact, so Doze or battery saver may delay them.";
+    private static final String REMINDER_HINT_BLOCKED =
+            "Android notifications are blocked for Daymark, so this reminder will only appear inside the app. Allow notifications in system settings to also get a system reminder. Alarms are inexact, so Doze or battery saver may delay them.";
     private String pendingLauncherShortcutAction;
     private String pendingFocusNotificationAction;
+    private String pendingReminderTaskId;
     private static final int REQUEST_IMPORT_EXTENSION = 7812;
     private static final int REQUEST_EXPORT_EXTENSION = 7813;
     private static final int REQUEST_PORTABLE_EXPORT = 7342;
@@ -573,6 +580,7 @@ public final class MainActivity extends Activity {
             handleShareInIntent(getIntent());
             handleShortcutIntent(getIntent());
             handleFocusNotificationIntent(getIntent());
+            handleReminderNotificationIntent(getIntent());
         } catch (Throwable startupFailure) {
             Log.e("Daymark-ColdStart", "Crash details", startupFailure);
             showStartupFailureScreen(startupFailure);
@@ -605,6 +613,7 @@ public final class MainActivity extends Activity {
         handleShareInIntent(intent);
         handleShortcutIntent(intent);
         handleFocusNotificationIntent(intent);
+        handleReminderNotificationIntent(intent);
     }
 
     // Android launcher app shortcuts appear when the user long-presses the Daymark icon.
@@ -637,6 +646,39 @@ public final class MainActivity extends Activity {
             return;
         }
         dispatchFocusNotificationAction(action);
+    }
+
+    /**
+     * A reminder notification carries the ID of the task that raised it, so tapping the shade row
+     * opens that exact task instead of the generic home screen.
+     */
+    private void handleReminderNotificationIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!TaskReminderReceiver.ACTION_OPEN_TASK.equals(action)) return;
+        intent.setAction(null);
+        String taskId = intent.getStringExtra(TaskReminderReceiver.EXTRA_TASK_ID);
+        if (taskId == null) return;
+        pendingReminderTaskId = taskId;
+        if (!canEdit()) {
+            // Encrypted storage loads asynchronously; defer until its result is known.
+            return;
+        }
+        dispatchPendingReminderTask();
+    }
+
+    private void dispatchPendingReminderTask() {
+        String taskId = pendingReminderTaskId;
+        if (taskId == null) return;
+        if (!canEdit()) return;
+        pendingReminderTaskId = null;
+        Task task = findTaskIn(tasks, taskId);
+        if (task == null) {
+            showToast("That task is no longer available. Nothing was changed.");
+            return;
+        }
+        setWebMode(false);
+        showTaskEditor(task);
     }
 
     private boolean isFocusNotificationAction(String action) {
@@ -1264,6 +1306,7 @@ public final class MainActivity extends Activity {
         super.onResume();
         activityResumed = true;
         if (storageReady) refreshFocusSessionAfterResume();
+        dispatchPendingReminderTask();
         if (browserWebView != null) {
             try {
                 browserWebView.resumeTimers();
@@ -6000,6 +6043,7 @@ public final class MainActivity extends Activity {
                     showToast("Focus session could not be restored. Your encrypted tasks are still available and unchanged.");
                 }
                 dispatchPendingLauncherShortcut();
+                dispatchPendingReminderTask();
                 dispatchPendingSharedTaskEditor();
                 checkDueReminders();
                 showPendingWebClip();
@@ -8094,6 +8138,55 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * The reminder hint must never promise a system notification the user has switched off, so it
+     * follows the live permission state and offers the way to undo a block.
+     */
+    private void refreshReminderNotificationState(TextView hint, Button settingsButton) {
+        boolean allowed = TaskReminderScheduler.notificationsAllowed(this);
+        if (hint != null) hint.setText(allowed ? REMINDER_HINT_ALLOWED : REMINDER_HINT_BLOCKED);
+        if (settingsButton != null) {
+            settingsButton.setVisibility(allowed ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /** Live state of Daymark notifications, so the app never claims an alert it cannot deliver. */
+    private String notificationStatusLabel() {
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            return "Blocked · allow notifications to get reminders";
+        }
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null || !manager.areNotificationsEnabled()) {
+            return "Off in system settings · reminders stay in the app";
+        }
+        return "On · reminders appear in your shade";
+    }
+
+    /** Opens this app's notification settings, because only the user can undo a notification block. */
+    private void openNotificationSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        } catch (RuntimeException noSettingsScreen) {
+            showToast("System notification settings are not available on this device.");
+        }
+    }
+
+    /** Posts one sample reminder so the user can confirm reminders reach their shade. */
+    private void sendTestNotification() {
+        if (!TaskReminderScheduler.notificationsAllowed(this)) {
+            showToast("Notifications are blocked for Daymark. Allow them in system settings first.");
+            return;
+        }
+        if (TaskReminderReceiver.postTestNotification(this)) {
+            showToast("Test reminder sent. Check your notification shade.");
+            return;
+        }
+        showToast("The test reminder could not be posted. Check your notification settings.");
+    }
+
     private void showTaskEditor(Task editing) {
         showTaskEditor(editing, "", "", editing == null ? null : editing.dueDate,
                 editing == null ? "medium" : editing.priority, null, false);
@@ -8304,20 +8397,28 @@ public final class MainActivity extends Activity {
         reminderSpinner.setAdapter(reminderAdapter);
         reminderSpinner.setMinimumHeight(dp(48));
         reminderSpinner.setSelection(reminderIndex(editing == null ? null : editing.reminderLeadMinutes));
+        TextView reminderHint = text(
+                TaskReminderScheduler.notificationsAllowed(this)
+                        ? REMINDER_HINT_ALLOWED : REMINDER_HINT_BLOCKED,
+                11, palette.muted, Typeface.NORMAL);
+        reminderHint.setLineSpacing(dp(2), 1f);
+        Button notificationSettingsButton = compactButton("Open notification settings", false);
+        notificationSettingsButton.setContentDescription(
+                "Open system notification settings for Daymark");
+        notificationSettingsButton.setOnClickListener(view -> openNotificationSettings());
+        notificationSettingsButton.setVisibility(
+                TaskReminderScheduler.notificationsAllowed(this) ? View.GONE : View.VISIBLE);
         reminderSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (position > 0) TaskReminderScheduler.requestNotificationPermissionIfNeeded(MainActivity.this);
+                refreshReminderNotificationState(reminderHint, notificationSettingsButton);
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
-        TextView reminderHint = text(
-                "Daymark schedules a best-effort Android notification for this reminder and also shows it in-app when you open the app. Alarms are inexact, so Doze or battery saver may delay them.",
-                11, palette.muted, Typeface.NORMAL);
-        reminderHint.setLineSpacing(dp(2), 1f);
         Spinner repeatSpinner = new Spinner(this);
         repeatSpinner.setContentDescription("Choose how often this task repeats");
         String[] repeatOptions = { "No repeat", "Daily", "Weekly", "Monthly", "Weekdays", "Yearly" };
@@ -8352,6 +8453,7 @@ public final class MainActivity extends Activity {
             form.addView(reminderLabel, bottomMargin(dp(4)));
             form.addView(reminderSpinner, bottomMargin(dp(4)));
             form.addView(reminderHint, bottomMargin(dp(8)));
+            form.addView(notificationSettingsButton, bottomMargin(dp(8)));
             TextView repeatLabel = text("Repeat", 13, palette.muted, Typeface.BOLD);
             repeatLabel.setLetterSpacing(0.08f);
             form.addView(repeatLabel, bottomMargin(dp(4)));
@@ -9577,6 +9679,12 @@ public final class MainActivity extends Activity {
         addSettingsSection(content, "TASK TOOLS");
         addSettingsRow(content, "Task templates", "Save and reuse local encrypted task templates",
                 () -> showTaskTemplatesDialog());
+
+        addSettingsSection(content, "NOTIFICATIONS");
+        addSettingsRow(content, "Reminder notifications", notificationStatusLabel(),
+                () -> openNotificationSettings());
+        addSettingsRow(content, "Send a test notification", "Check that reminders reach your shade",
+                () -> sendTestNotification());
 
         addSettingsSection(content, "POWER FEATURES");
         addSettingsRow(content, "Keyboard shortcuts", "Physical keyboard and Chromebook chords",

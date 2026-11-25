@@ -129,6 +129,20 @@ superseded, duplicated, stale, unrelated, or would regress `main`. Nothing was f
     payload, would need the guard updated in the same change.
     This branch was built locally with the verified official Gradle 8.13 distribution instead.
 
+### Release path
+
+23. **The production release workflow could never create a first release.**
+    `fetch_release_by_tag()` documents "Return 1 only when no release has this tag", but its
+    last statement is `jq -e '[.[] | select(.tag_name == $tag)][0] // empty'`, and `jq -e`
+    exits **4** when the expression produced no result at all. The function therefore returned 4
+    for "not found", while the caller treats only 1 as "not found" and every other code as "the
+    query itself failed" — so the `gh release create --draft --verify-tag` branch was
+    unreachable and the run died with "Could not query existing releases (exit 4)".
+    This is what actually blocked the `v1.6` release after its launcher-gate failure had been
+    fixed, and it would have blocked every first release since. The function now maps jq's 4 to
+    the documented 1 and keeps 2 for a genuinely failed query; the three paths (no match → 1,
+    match → 0, duplicate → 3) were exercised directly.
+
 ## Verification labels
 
 - Host tests: **PASS** — `npm test` 1987/1987 on this head.
