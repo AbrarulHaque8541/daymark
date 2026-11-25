@@ -147,6 +147,10 @@
       button.setAttribute('aria-label', 'Remove the snoozed page ' + id);
       button.setAttribute('data-remove-id', id);
       button.textContent = 'Remove';
+      button.addEventListener('click', function (event) {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        return onListTap({ target: button, preventDefault: function () {} });
+      });
       return button;
     }
 
