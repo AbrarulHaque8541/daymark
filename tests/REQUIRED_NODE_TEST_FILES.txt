@@ -77,6 +77,8 @@ tests/extension-spa-navigation.test.js
 tests/feed-logic.test.js
 tests/focus-logic.test.js
 tests/focus-storage.test.js
+tests/hijri-logic.test.js
+tests/hijri-ui.test.js
 tests/holidays-logic.test.js
 tests/holidays-ui.test.js
 tests/ics-import.test.js
