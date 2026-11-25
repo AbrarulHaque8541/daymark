@@ -15,10 +15,25 @@ const AIR_BODY = JSON.stringify({
   current: { european_aqi: 35, us_aqi: 62, pm2_5: 18.4, pm10: 41.2, ozone: 55.1, nitrogen_dioxide: 22.7 }
 });
 
+function makeClassList() {
+  const set = new Set();
+  return {
+    add(name) { set.add(name); },
+    remove(name) { set.delete(name); },
+    toggle(name, force) {
+      const on = force === undefined ? !set.has(name) : !!force;
+      if (on) set.add(name); else set.delete(name);
+      return on;
+    },
+    contains(name) { return set.has(name); }
+  };
+}
+
 function fakeElement(tag, doc) {
   const el = {
     tagName: tag,
     className: '',
+    classList: makeClassList(),
     disabled: false,
     value: '',
     textContent: '',
@@ -185,6 +200,28 @@ test('form submission prevents navigation and renders the result once', async ()
   assert.equal(els.status.textContent,
     'Updated · 2026-11-11 05:00 UTC · not saved on this device');
   assert.equal(els.button.disabled, false);
+});
+
+test('a successful check flashes the status with the shared success class', async () => {
+  const fetchImpl = okFetch(ROUTES);
+  const { env, doc } = fakeEnv({ fetch: fetchImpl });
+  const handle = ui.attachAirQualityUi(env);
+  const els = elementsOf(doc);
+  els.input.value = 'Delhi';
+  await handle.onCheck();
+  assert.ok(els.status.classList.contains('is-success'),
+    'a good result must use the shared .feed-status.is-success glance flash');
+});
+
+test('the initial and cleared status lines are never marked successful', () => {
+  const { env, doc } = fakeEnv({});
+  const handle = ui.attachAirQualityUi(env);
+  const els = elementsOf(doc);
+  assert.equal(els.status.classList.contains('is-success'), false,
+    'the idle prompt must not look like a success');
+  handle.onClear();
+  assert.equal(els.status.classList.contains('is-success'), false,
+    'clear must drop any lingering success flash');
 });
 
 test('a concurrent submit cannot duplicate the request', async () => {
