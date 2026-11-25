@@ -1,4 +1,6 @@
+- [Daymark engineering status — 20261125T220500Z (Cycle A: empty-state clear-filters affordance)](./CURRENT_STATUS_20261125T220500Z.md)
 - [Daymark engineering status — 20261125T165812Z (keyless Hijri date glance card, branch feat/hijri-card-vibe-20261125)](./CURRENT_STATUS_20261125T165812Z.md)
+
 
 - [Daymark engineering status — 20261125T160235Z (Android UI/UX detailing pass + content-level merge audit of 921 unmerged branches; main 05a052c8)](./CURRENT_STATUS_20261125T160235Z.md)
 
@@ -158,3 +160,4 @@
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
 - Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
 - [Daymark engineering status — 2026-11-17T08:40:00Z (Cycle B: launch press feedback)](./CURRENT_STATUS_20261117T084000Z.md)
+
