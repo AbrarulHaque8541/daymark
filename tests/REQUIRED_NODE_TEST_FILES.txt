@@ -99,6 +99,8 @@ tests/potd-ui.test.js
 tests/permission-lifecycle-logic.test.js
 tests/permission-lifecycle-ui.test.js
 tests/planner-action-polish.test.js
+tests/prayer-times-logic.test.js
+tests/prayer-times-ui.test.js
 tests/node-test-registration-guard.test.js
 tests/press-feedback-css.test.js
 tests/product-language-contract.test.js

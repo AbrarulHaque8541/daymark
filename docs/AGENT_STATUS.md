@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261125T050500Z (keyless prayer times glance card, branch feat/prayer-times-card-vibe-20261125)](./CURRENT_STATUS_20261125T050500Z.md)
+
 - [Daymark engineering status — 20261124T043000Z (keyless spaceflight news glance card, branch feat/space-news-vibe-20261124)](./CURRENT_STATUS_20261124T043000Z.md)
 
 - [Daymark engineering status — 20261123T164738Z (Batch 3: opt-in Auto-archive card, branch feat/auto-archive-vibe-20261123)](./CURRENT_STATUS_20261123T164738Z.md)
