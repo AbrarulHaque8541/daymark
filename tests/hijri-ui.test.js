@@ -216,12 +216,10 @@ test('a successful check renders the Hijri date and an honest status', async () 
   assert.ok(result.includes('15 Jumada al-akhirah 1448 AH'), 'result was: ' + result);
   assert.ok(result.includes("Al Arba'a"));
   assert.strictEqual(requested, 'https://api.aladhan.com/v1/gToH?date=25-11-2026');
-  const statusEl = doc.getElementById('hijri-status');
-  const status = statusEl.textContent;
-  assert.ok(status.includes('Updated'));
-  assert.ok(status.includes('nothing saved on this device'));
-  assert.ok(statusEl.classList.contains('is-success'), 'success flash class should be present after check');
-  assert.strictEqual(statusEl.getAttribute('title'), 'Hijri date updated');
+  const status = doc.getElementById('hijri-status');
+  assert.ok(status.textContent.includes('Updated'));
+  assert.ok(status.textContent.includes('nothing saved on this device'));
+  assert.ok(status.classList.contains('is-success'), 'success flash missing');
 });
 
 test('holidays are rendered as a labeled line', async () => {
@@ -251,6 +249,7 @@ test('403 explains the limited request', async () => {
   doc.getElementById('hijri-check').dispatch('click', {});
   await settle();
   assert.ok(doc.getElementById('hijri-status').textContent.includes('limited this request'));
+  assert.ok(!doc.getElementById('hijri-status').classList.contains('is-success'));
 });
 
 test('a failed check clears any previous result', async () => {
@@ -260,15 +259,18 @@ test('a failed check clears any previous result', async () => {
   doc.getElementById('hijri-check').dispatch('click', {});
   await settle();
   assert.strictEqual(doc.getElementById('hijri-result').textContent, '');
+  assert.ok(!doc.getElementById('hijri-status').classList.contains('is-success'));
 });
 
-test('clear empties the result', async () => {
+test('clear empties the result and clears success flash', async () => {
   const doc = makeDoc();
   attach(doc);
   doc.getElementById('hijri-result').textContent = 'old';
+  doc.getElementById('hijri-status').classList.toggle('is-success', true);
   await doc.getElementById('hijri-clear').dispatch('click', {});
   assert.strictEqual(doc.getElementById('hijri-result').textContent, '');
   assert.ok(doc.getElementById('hijri-status').textContent.includes('Cleared'));
+  assert.ok(!doc.getElementById('hijri-status').classList.contains('is-success'));
 });
 
 test('form submit is prevented and runs the check', async () => {
@@ -298,6 +300,7 @@ test('missing fetch degrades with an honest message', async () => {
   attach(doc, { fetch: null });
   await doc.getElementById('hijri-check').dispatch('click', {});
   assert.ok(doc.getElementById('hijri-status').textContent.includes('fetch is unavailable'));
+  assert.ok(!doc.getElementById('hijri-status').classList.contains('is-success'));
 });
 
 test('missing Hijri API degrades with an honest message', async () => {
@@ -305,6 +308,7 @@ test('missing Hijri API degrades with an honest message', async () => {
   attach(doc, { hijriApi: null, fetch: null });
   await doc.getElementById('hijri-check').dispatch('click', {});
   assert.ok(doc.getElementById('hijri-status').textContent.includes('unavailable'));
+  assert.ok(!doc.getElementById('hijri-status').classList.contains('is-success'));
 });
 
 test('index.html wires both hijri scripts with defer tags', () => {

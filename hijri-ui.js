@@ -113,14 +113,15 @@
       }
     }
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
-    }
-
-    function clearSuccessFlash() {
-      if (statusEl && statusEl.classList && typeof statusEl.classList.remove === 'function') {
-        statusEl.classList.remove('is-success');
-        if (typeof statusEl.removeAttribute === 'function') statusEl.removeAttribute('title');
+    function status(message, isSuccess) {
+      if (statusEl) {
+        statusEl.textContent = message;
+        // Shared .feed-status.is-success glance flash (accent #16705f): consistent
+        // with weather, air-quality, crypto and the other briefing cards.
+        // Cleared on non-success so it never lingers.
+        if (statusEl.classList && typeof statusEl.classList.toggle === 'function') {
+          statusEl.classList.toggle('is-success', !!isSuccess);
+        }
       }
     }
 
@@ -134,12 +135,10 @@
       if (busy) return;
       if (!api || typeof api.fetchesHijri !== 'function') {
         status('The Hijri date glance is unavailable in this environment.');
-        clearSuccessFlash();
         return;
       }
       if (!fetchImpl) {
         status('Could not check: fetch is unavailable in this browser.');
-        clearSuccessFlash();
         return;
       }
       setBusy(true);
@@ -148,22 +147,13 @@
         render(record);
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
-          + describeTruncation(record));
-        if (statusEl && statusEl.classList && typeof statusEl.classList.add === 'function'
-          && typeof setTimeout === 'function') {
-          statusEl.classList.add('is-success');
-          if (typeof statusEl.setAttribute === 'function') statusEl.setAttribute('title', 'Hijri date updated');
-          setTimeout(() => {
-            clearSuccessFlash();
-          }, 1400);
-        }
+          + describeTruncation(record), true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof api.classifiesError === 'function'
           ? api.classifiesError(error)
           : null;
         status(friendly ? friendly : 'Could not check: ' + message);
-        clearSuccessFlash();
         clearResult();
       } finally {
         setBusy(false);
@@ -197,7 +187,6 @@
       if (busy) return;
       clearResult();
       status("Cleared. Tap Check to fetch today's Hijri date.");
-      clearSuccessFlash();
     }
 
     function onSubmit(event) {

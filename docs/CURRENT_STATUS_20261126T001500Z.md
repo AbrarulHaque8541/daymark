@@ -1,36 +1,31 @@
-# Daymark engineering status — 2026-11-26T00:15:00Z
+# Daymark engineering status — 20261126T001500Z (Cycle A: Hijri success flash)
 
-Cycle A: Hijri date glance card success flash consistency.
+Run: Cycle A, 2026-11-26 ~00:15Z UTC.
 
-## Current state (verify live before acting)
+## What landed (this run)
 
-- `main` = `d6137833c93087aa3c6820db06109dd3b8e4e61c` (feat(web): keyless Hijri date glance card).
-- App identity/version in source (`android-app/app/build.gradle.kts`): `applicationId`/`namespace` = `com.abrar.daymark`, `versionName` = `1.7`, `versionCode` = `14`.
-- Open PRs: #964 (notification detailing, touches MainActivity), #962 (browser tools sheet labels + patch), #961 (focus timer session data).
-- Branch under work: `feat/hijri-success-flash-cycle-a-20261126`.
+Small related improvement after the keyless Hijri date glance card (#963 on main d6137833):
 
-## What this cycle shipped
+- `hijri-ui.js`: status() now accepts isSuccess and toggles `.feed-status.is-success` (accent #16705f) on successful Check, clears on error/Clear. Matches the shared language of weather, air-quality, crypto, potd, moon, country and the other briefing cards.
+- `tests/hijri-ui.test.js`: success path asserts the class; error, clear, missing-fetch and missing-API paths assert it is absent.
+- Dated snapshot (this file) + AGENT_STATUS.md index link.
 
-Small related improvement after the Hijri card landed:
-
-- Successful Hijri date checks now briefly add `is-success` to `#hijri-status` (accent `#16705f` flash, 1.4 s, reduced-motion safe via existing CSS).
-- The class and title are cleared on error, Clear, or timeout.
-- Matches the success-flash pattern already used by moon, ISS, POTD and other glance cards.
-- No storage, no new network, no MainActivity change.
+No Android changes. MainActivity.java untouched. No storage. No new network.
 
 ## Verification
 
-- Host source inspection: change confined to `hijri-ui.js` and the corresponding assertion in `tests/hijri-ui.test.js`.
-- Host tests: **NOT RUN** in this sandbox (Node suite will run on the PR CI).
-- Android CI: **NOT RUN** (web-only change).
-- Physical device / emulator: **NOT TESTED**.
+- Source inspection of current main hijri-ui.js and air-quality-ui.js pattern: consistent.
+- Test harness classList already present; new assertions added.
+- npm test / check-v1-source.sh: NOT RUN locally (sandbox has no full toolchain); CI will cover on the PR head.
+- Physical device / browser: NOT TESTED.
 
-## Residual
+## Open work noted
 
-Owner still needs to decide on a production tag/release for the 1.7 source. MainActivity remains coordinated under the open notification PR.
+- PR #964 (notification detailing, touches MainActivity) is open and complete; leave it alone.
+- PR #962 (browser tools sheet) has placeholder body and is a patch-only change against older main; MainActivity coordination with #964 blocks applying the patch now. Body should be completed or PR closed as incomplete until MainActivity is free.
+- PR #961 (focus timer session data) is open and complete.
 
----
-Work by: Grok 4.7
+Work by: Grok 4.7 (Cycle A)
 Model: Grok 4.7
-Tooling: GitHub connector, local file authoring
+Tooling: GitHub connector (get_file_contents, push_files)
 Timestamp (UTC): 2026-11-26T00:15:00Z
