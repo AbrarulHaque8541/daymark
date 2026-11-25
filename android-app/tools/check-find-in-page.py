@@ -23,8 +23,8 @@ for marker, explanation in (
 ):
     assert marker in method, explanation
 
-assert 'previous.setEnabled(numberOfMatches > 0)' in method
-assert 'next.setEnabled(numberOfMatches > 0)' in method
+assert 'setControlEnabled(previous, numberOfMatches > 0)' in method
+assert 'setControlEnabled(next, numberOfMatches > 0)' in method
 assert 'if (query.isEmpty())' in method
 assert 'showToast("Open a page before searching its text.")' in method
 print("PASS find-in-page source checks: live count, next/previous navigation, no-results feedback, keyboard focus and cleanup")

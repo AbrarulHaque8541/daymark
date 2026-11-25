@@ -283,7 +283,7 @@ history_source = (main / "java/com/abrar/daymark/BrowserHistory.java").read_text
 browser_smoke = (root / "tools/BrowserAddressSmoke.java").read_text(encoding="utf-8")
 settings_policy = (main / "java/com/abrar/daymark/BrowserSettingsPolicy.java").read_text(encoding="utf-8")
 settings_smoke = (root / "tools/BrowserSettingsPolicySmoke.java").read_text(encoding="utf-8")
-for expected in ("What do you want", "Power path", "DEMO SUGGESTION", "highContrast", "textScale"):
+for expected in ("What do you want", "Power mode", "DEMO SUGGESTION", "highContrast", "textScale"):
     assert expected in activity, f"missing task source feature marker: {expected}"
 for expected in ('addSettingsRow(content, "Permission status"', "showPermissionStatus()", "PackageManager.GET_PERMISSIONS", "no Android permissions are declared"):
     assert expected in activity, f"missing permission-status behavior: {expected}"

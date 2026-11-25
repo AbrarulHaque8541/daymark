@@ -314,6 +314,33 @@ final class TaskLogic {
                 dueTime, reminderLeadMinutes, null, repeatRule, normalizedSubtasks, normalizedTags);
     }
 
+    /**
+     * Copies every user-visible detail of a task into a fresh task.
+     *
+     * <p>Duplicating used to build the copy from the title/due-date/priority overload, which
+     * silently dropped the note, the due time, the reminder, the checklist, the repeat rule and
+     * the tags: the user was told "Task duplicated." and received a hollow shell instead. The
+     * copy is deliberately not completed, gets its own id and timestamps, and carries no
+     * attachments — an attachment's encrypted payload belongs to the source task and is not
+     * duplicated with it.
+     *
+     * <p>The monthly/yearly anchor is carried over verbatim instead of being re-derived from the
+     * due date, so a task whose anchor was preserved across an earlier date edit keeps the same
+     * anchor when it is duplicated.
+     */
+    static Task duplicate(Task source, String newTitle) {
+        if (source == null) throw new IllegalArgumentException("Task is required.");
+        String normalizedTitle = requireTitle(newTitle);
+        String normalizedNotes = requireNotes(source.notes);
+        List<Subtask> normalizedSubtasks = normalizeSubtasks(source.subtasks);
+        List<String> normalizedTags = normalizeTags(source.tags);
+        String now = Instant.now().toString();
+        return new Task(UUID.randomUUID().toString(), normalizedTitle, source.dueDate,
+                source.priority, false, now, now, Collections.<AttachmentRef>emptyList(),
+                normalizedNotes, source.dueTime, source.reminderLeadMinutes, null,
+                source.repeatRule, source.repeatDayOfMonth, normalizedSubtasks, normalizedTags);
+    }
+
     static Task update(Task existing, String title, String dueDate, String priority) {
         if (existing == null) throw new IllegalArgumentException("Task is required.");
         // Clearing the due date also clears the due time, reminder, and repeat rule: all are
