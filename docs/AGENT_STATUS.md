@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261125T132647Z (glance success-flash consistency + v1.6 release-failure root cause; main 27c0c65c)](./CURRENT_STATUS_20261125T132647Z.md)
+
 - [Daymark engineering status — 20261124T174500Z (Cycle B: snooze pages test fixes)](./CURRENT_STATUS_20261124T174500Z.md)
 
 - [Daymark engineering status — 20261124T061500Z (Batch 3: opt-in Snooze pages card, branch feat/snooze-pages-vibe-20261124)](./CURRENT_STATUS_20261124T061500Z.md)
