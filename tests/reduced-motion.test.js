@@ -52,9 +52,9 @@ test('task focus action uses the shared reduced-motion policy', () => {
   assert.match(app, /DaymarkMotionPolicy\.focusScrollBehavior\(\)/);
 });
 
-test('filter and complete buttons carry reduced-motion-safe press feedback', () => {
+test('filter, complete, and task action buttons carry reduced-motion-safe press feedback', () => {
   assert.match(app, /button\.classList\.add\('is-pressed'\)/);
   assert.match(app, /button\.classList\.remove\('is-pressed'\)/);
-  assert.match(app, /closest\('\.complete-button'\)/,
-    'complete-button press feedback must be delegated from the task list');
+  assert.match(app, /closest\('\.complete-button, \.icon-button'\)/,
+    'task action press feedback must cover complete and icon buttons via delegated closest');
 });

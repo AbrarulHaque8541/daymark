@@ -2707,18 +2707,18 @@
       button.addEventListener('pointercancel', release);
     });
     taskList.addEventListener('click', handleTaskAction);
-    // Delegated press feedback for the per-task complete buttons.
-    const pressComplete = (event) => {
-      const button = event.target.closest('.complete-button');
+    // Delegated press feedback for the per-task action buttons (complete + icon buttons).
+    const pressTaskAction = (event) => {
+      const button = event.target.closest('.complete-button, .icon-button');
       if (button) button.classList.add('is-pressed');
     };
-    const releaseComplete = (event) => {
-      const button = event.target.closest('.complete-button');
+    const releaseTaskAction = (event) => {
+      const button = event.target.closest('.complete-button, .icon-button');
       if (button) button.classList.remove('is-pressed');
     };
-    taskList.addEventListener('pointerdown', pressComplete);
-    taskList.addEventListener('pointerup', releaseComplete);
-    taskList.addEventListener('pointercancel', releaseComplete);
+    taskList.addEventListener('pointerdown', pressTaskAction);
+    taskList.addEventListener('pointerup', releaseTaskAction);
+    taskList.addEventListener('pointercancel', releaseTaskAction);
     suggestionList.addEventListener('click', (event) => {
       const button = event.target.closest('[data-suggestion-task]');
       if (!button) return;

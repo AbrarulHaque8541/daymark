@@ -18,6 +18,8 @@ test('press feedback CSS stays complete, deduplicated, cascade-correct, and redu
     'one filter-button press rule plus one reduced-motion override');
   assert.equal((css.match(/\.complete-button\.is-pressed/g) || []).length, 2,
     'one complete-button press rule plus one reduced-motion override');
+  assert.equal((css.match(/\.icon-button\.is-pressed/g) || []).length, 2,
+    'one icon-button press rule plus one reduced-motion override');
   assert.match(css, /\.card:active\s*\{\s*transform:\s*scale\(\.998\);\s*\}/);
   assert.match(css, /\.task-row:active\s*\{\s*transform:\s*translateY\(0\) scale\(\.995\);\s*\}/);
   assert.ok(css.indexOf('.task-row:hover {') < css.indexOf('.task-row:active {'),
