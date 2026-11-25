@@ -51,3 +51,10 @@ test('focus scrolling safely avoids animation when the preference API is unavail
 test('task focus action uses the shared reduced-motion policy', () => {
   assert.match(app, /DaymarkMotionPolicy\.focusScrollBehavior\(\)/);
 });
+
+test('filter and complete buttons carry reduced-motion-safe press feedback', () => {
+  assert.match(app, /button\.classList\.add\('is-pressed'\)/);
+  assert.match(app, /button\.classList\.remove\('is-pressed'\)/);
+  assert.match(app, /closest\('\.complete-button'\)/,
+    'complete-button press feedback must be delegated from the task list');
+});
