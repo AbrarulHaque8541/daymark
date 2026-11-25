@@ -760,6 +760,7 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 #focus-task:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(22, 112, 95, .12); outline: none; }
 .focus-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
 .focus-today { margin: 8px 0 0; color: var(--muted-text); font-size: 11px; }
+.focus-session-data { margin: 6px 0 0; color: var(--muted-text); font-size: 11px; line-height: 1.4; }
 
 /* Edit dialog */
 .edit-dialog { width: min(560px, calc(100vw - 32px)); padding: 22px; border: 1px solid rgba(219, 226, 232, .9); border-radius: 20px; background: var(--surface-solid); box-shadow: var(--shadow); color: var(--ink); }
