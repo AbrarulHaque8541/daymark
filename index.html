@@ -336,13 +336,15 @@
           <p class="feed-status" id="holiday-status" role="status" aria-live="polite"></p>
           <div class="feed-list" id="holiday-list" aria-live="polite"></div>
         </aside>
-        <aside class="briefing-card" id="currency-card" aria-labelledby="currency-heading">
-          <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
+        <aside class="currency-card" id="currency-card" aria-labelledby="currency-heading">
+          <div class="currency-topline"><span class="currency-dot" aria-hidden="true"></span></div>
           <h2 id="currency-heading">Currency glance</h2>
-          <p class="briefing-description">Frankfurter open rates — no account, no API key.</p>
+          <p class="currency-description">Frankfurter open rates — no account, no API key.</p>
           <form id="currency-form" class="feed-form" novalidate>
+            <label class="sr-only" for="currency-amount">Amount</label>
+            <input id="currency-amount" name="amount" type="text" inputmode="decimal" maxlength="12" placeholder="Amount, e.g. 10" autocomplete="off" aria-describedby="currency-status">
             <label class="sr-only" for="currency-from">From currency</label>
-            <select id="currency-from" name="from" class="sort-select" aria-label="From">
+            <select id="currency-from" name="from" aria-label="From">
               <option value="USD" selected>USD</option>
               <option value="EUR">EUR</option>
               <option value="GBP">GBP</option>
@@ -354,8 +356,9 @@
               <option value="CNY">CNY</option>
               <option value="SGD">SGD</option>
             </select>
+            <button class="tool-button currency-swap" id="currency-swap" type="button" aria-label="Swap currencies" title="Swap from and to">⇄</button>
             <label class="sr-only" for="currency-to">To currency</label>
-            <select id="currency-to" name="to" class="sort-select" aria-label="To">
+            <select id="currency-to" name="to" aria-label="To">
               <option value="INR" selected>INR</option>
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
@@ -367,12 +370,13 @@
               <option value="CNY">CNY</option>
               <option value="SGD">SGD</option>
             </select>
-            <button class="button button-primary" id="currency-refresh" title="Refresh exchange rates" type="submit">Refresh</button>
-            <button class="button button-quiet" id="currency-clear" title="Clear currency results" type="button">Clear</button>
-            <button class="button button-quiet" id="currency-copy" title="Copy currency result to clipboard" type="button" aria-label="Copy currency result to clipboard">Copy result</button>
+            <button class="button button-primary currency-refresh" id="currency-refresh" type="submit">Refresh</button>
           </form>
-          <p class="feed-status" id="currency-status" role="status" aria-live="polite"></p>
-          <div class="feed-list" id="currency-list" aria-live="polite"></div>
+          <p class="currency-status" id="currency-status" role="status" aria-live="polite"></p>
+          <div class="currency-result-row">
+            <div class="currency-now" id="currency-now" aria-live="polite"></div>
+            <button class="tool-button currency-copy" id="currency-copy" type="button" aria-label="Copy currency result to clipboard" title="Copy the conversion result" hidden>Copy</button>
+          </div>
         </aside>
         <aside class="briefing-card" id="zones-card" aria-labelledby="zones-heading">
           <div class="briefing-topline"><span class="briefing-dot" aria-hidden="true"></span></div>
@@ -728,10 +732,10 @@
         </div>
       </div>
       <p class="form-error" id="edit-error" role="alert" hidden>Please enter a task title.</p>
-      <menu>
+      <div class="dialog-actions">
         <button class="button button-quiet" value="cancel" formnovalidate>Cancel</button>
         <button class="button button-primary" value="save">Save</button>
-      </menu>
+      </div>
     </form>
   </dialog>
   <div class="toast-stack" id="toast-stack" role="status" aria-live="polite" aria-atomic="true">
