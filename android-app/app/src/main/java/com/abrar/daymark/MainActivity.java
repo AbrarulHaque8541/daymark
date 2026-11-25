@@ -5853,12 +5853,25 @@ public final class MainActivity extends Activity {
         emptyCopy.setGravity(Gravity.CENTER);
         empty.addView(emptyTitle, bottomMargin(dp(5)));
         empty.addView(emptyCopy);
+        emptyClearButton = compactButton("Clear filters", false);
+        emptyClearButton.setContentDescription("Clear the current search, tag filter and task filter to show every task");
+        emptyClearButton.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            searchQuery = "";
+            activeTag = "";
+            activeFilter = TaskLogic.FILTER_ALL;
+            if (searchInput != null) searchInput.setText("");
+            render();
+        });
+        emptyClearButton.setVisibility(View.GONE);
+        empty.addView(emptyClearButton, topMargin(dp(12)));
         empty.setTag("empty-state");
         content.addView(empty, bottomMargin(dp(13)));
         emptyStateView = empty;
     }
 
     private View emptyStateView;
+    private Button emptyClearButton;
 
     private void addUndoBar() {
         undoBar = new LinearLayout(this);
@@ -6853,6 +6866,9 @@ public final class MainActivity extends Activity {
         boolean showEmpty = visible.isEmpty();
         emptyStateView.setVisibility(showEmpty ? View.VISIBLE : View.GONE);
         if (showEmpty) {
+            boolean narrowed = !selectedQuery.trim().isEmpty() || !selectedTag.isEmpty()
+                    || (powerMode && !TaskLogic.FILTER_ALL.equals(selectedFilter));
+            emptyClearButton.setVisibility(narrowed ? View.VISIBLE : View.GONE);
             if (storageSaveFailed) {
                 emptyTitle.setText("Change not saved");
                 emptyCopy.setText("The visible change is unsaved. Your last saved data remains on this device; editing is paused.");
@@ -6878,6 +6894,8 @@ public final class MainActivity extends Activity {
                 emptyTitle.setText("No open tasks");
                 emptyCopy.setText("Add a task above when you are ready.");
             }
+        } else {
+            emptyClearButton.setVisibility(View.GONE);
         }
         return visible.size();
     }
