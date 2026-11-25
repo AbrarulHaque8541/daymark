@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+const motionCss = fs.readFileSync(path.join(__dirname, '..', 'styles-motion-efficiency.css'), 'utf8');
 
 test('press feedback CSS stays complete, deduplicated, cascade-correct, and reduced-motion aware', () => {
   assert.ok(css.length > 10000, 'the complete application stylesheet must be present');
@@ -27,4 +28,18 @@ test('press feedback CSS stays complete, deduplicated, cascade-correct, and redu
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.card:active,\s*\.task-row:active\s*\{\s*transform:\s*none;/);
   assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length,
     'stylesheet braces must remain balanced');
+});
+
+test('a busy button renders exactly one spinner, on the leading before layer', () => {
+  // styles.css used to draw its own trailing spinner (.button.is-busy::after) on top
+  // of the leading spinner in styles-motion-efficiency.css (.button.is-busy::before),
+  // so every busy button showed two spinners at once. Keep a single indicator layer.
+  assert.doesNotMatch(css, /\.is-busy::after/,
+    'styles.css must not draw a second busy spinner');
+  assert.doesNotMatch(css, /@keyframes button-spin/,
+    'the removed trailing-spinner keyframes must not return');
+  assert.match(motionCss, /\.button\.is-busy::before/,
+    'the single busy spinner is drawn once on the leading ::before layer');
+  assert.equal((motionCss.match(/@keyframes glance-spin/g) || []).length, 1,
+    'exactly one busy-spinner keyframes definition is allowed');
 });
