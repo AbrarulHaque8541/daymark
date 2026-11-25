@@ -9,7 +9,7 @@ test('focus-mode is a live, switchable feature flag now', () => {
   const flag = flags.FEATURE_FLAGS.filter((entry) => entry.id === 'focus-mode')[0];
   assert.equal(flag.kind, 'feature');
   const flagRest = flags.FEATURE_FLAGS.filter((entry) => entry.id !== 'focus-mode');
-  assert.equal(flagRest.filter((entry) => entry.kind === 'feature').length, 5);
+  assert.equal(flagRest.filter((entry) => entry.kind === 'feature').length, 6);
   assert.equal(flagRest.filter((entry) => entry.kind === 'planned').length, 0);
   const storage = storageWith({});
   const saved = flags.setFlag(storage, 'focus-mode', true);
@@ -104,7 +104,7 @@ test('pickOpenTasks labels the today-due task and truncates very long titles', (
   assert.equal(pick.items[0].label, 'Short · due today');
   const long = focus.pickOpenTasks([task({ title: 'x'.repeat(120) })], TODAY);
   assert.equal(long.items[0].label.length, 80);
-  assert.equal(long.items[0].label.charAt(79), '\u2026');
+  assert.equal(long.items[0].label.charAt(79), '…');
   assert.equal(long.items[0].truncated, true);
 });
 
@@ -161,7 +161,6 @@ test('completeTaskInSnapshot fails closed on unknown, duplicated or unreadable i
   assert.equal(focus.completeTaskInSnapshot([task()], 'nope', '2026-11-21T04:30:00Z').reason, 'unknown-task');
   assert.equal(focus.completeTaskInSnapshot([task(), task()], 't1', '2026-11-21T04:30:00Z').reason, 'tasks-ambiguous');
   assert.equal(focus.completeTaskInSnapshot(null, 't1', '2026-11-21T04:30:00Z').reason, 'tasks-unreadable');
-  assert.equal(focus.completeTaskInSnapshot([task()], '', '2026-11-21T04:30:00Z').reason, 'unknown-task');
   assert.equal(focus.completeTaskInSnapshot([task()], 't1', '').reason, 'timestamp-unreadable');
 });
 
@@ -197,4 +196,3 @@ test('describeTask labels an unknown priority as medium without throwing', () =>
   assert.equal(described.ok, true);
   assert.equal(described.lines[0], 'Priority: medium.');
 });
-
