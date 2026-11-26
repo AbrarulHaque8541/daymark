@@ -219,6 +219,7 @@ test('a successful check renders the Hijri date and an honest status', async () 
   const status = doc.getElementById('hijri-status').textContent;
   assert.ok(status.includes('Updated'));
   assert.ok(status.includes('nothing saved on this device'));
+  assert.ok(doc.getElementById('hijri-status').classList.set.has('is-success'));
 });
 
 test('holidays are rendered as a labeled line', async () => {
@@ -266,6 +267,7 @@ test('clear empties the result', async () => {
   await doc.getElementById('hijri-clear').dispatch('click', {});
   assert.strictEqual(doc.getElementById('hijri-result').textContent, '');
   assert.ok(doc.getElementById('hijri-status').textContent.includes('Cleared'));
+  assert.strictEqual(doc.getElementById('hijri-status').classList.set.has('is-success'), false);
 });
 
 test('form submit is prevented and runs the check', async () => {
