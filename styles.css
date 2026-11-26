@@ -144,7 +144,8 @@ h1 em { color: var(--accent); font-style: normal; font-weight: 500; }
 }
 #hijri-check:active, #hijri-clear:active,
 #xkcd-check:active, #xkcd-clear:active,
-#prayer-times-check:active, #prayer-times-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
+#prayer-times-check:active, #prayer-times-clear:active,
+#advice-check:active, #advice-clear:active { transform: scale(0.96); background: rgba(22, 112, 95, 0.12); }
 .task-list.is-resetting { animation: task-list-reset .28s ease; }
 .task-list.is-sorting { animation: task-list-reset .28s ease; }
 .task-list.is-filtering { animation: task-list-reset .28s ease; }

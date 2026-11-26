@@ -195,7 +195,7 @@ test('a check with fetch unavailable reports honestly', async () => {
 
 test('a check with the logic module unavailable reports honestly', async () => {
   const doc = makeDoc();
-  const handle = ui.attachAdviceUi({ document: doc, fetch: () => Promise.resolve({}), adviceApi: null });
+  const handle = ui.attachAdviceUi({ document: doc, window: {}, fetch: () => Promise.resolve({}), adviceApi: null });
   await handle.onCheck();
   const status = doc.getElementById('advice-status');
   assert.ok(status.textContent.includes('unavailable in this environment'));

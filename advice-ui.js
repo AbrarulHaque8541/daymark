@@ -102,7 +102,7 @@
     if (!doc && typeof document !== 'undefined') doc = document;
     if (!doc) throw new Error('attachAdviceUi requires a document.');
     const win = settings.window || root;
-    const api = settings.adviceApi || win.DaymarkAdvice || root.DaymarkAdvice || null;
+    const api = ('adviceApi' in settings) ? settings.adviceApi : (win.DaymarkAdvice || root.DaymarkAdvice || null);
     const now = typeof settings.now === 'function' ? settings.now : () => new Date().toISOString();
     const fetchImpl = settings.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
