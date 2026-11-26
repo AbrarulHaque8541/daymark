@@ -1,0 +1,11 @@
+/* Supplemental success flash for the open-task heading count.
+   Loaded after styles.css so it can enhance the existing is-bumped animation.
+   Accent #16705f preserved. */
+.stat-number.is-bumped {
+  animation: stat-bump .3s var(--ease-spring), success-flash .6s ease;
+}
+@keyframes success-flash {
+  0% { color: var(--accent); }
+  30% { color: #ffffff; background: var(--accent); border-radius: 6px; padding: 0 4px; }
+  100% { color: var(--accent); background: transparent; }
+}
