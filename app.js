@@ -2336,11 +2336,29 @@
     }
     if (entry) {
       const minutes = Math.max(1, Math.round(entry.elapsedMs / 60000));
+      const summary = completed
+        ? (task
+          ? `Daymark Focus complete: ${minutes} min on “${task.title}” (${new Date().toLocaleDateString()})`
+          : `Daymark Focus complete: ${minutes} min session (${new Date().toLocaleDateString()})`)
+        : `Daymark Focus partial: ${minutes} min logged`;
       showToast(saved
         ? (completed
           ? (task ? `Focus complete — ${minutes} min logged on “${task.title}”. Nice work.` : `Focus session complete — ${minutes} min logged. Nice work.`)
           : `Focus stopped — ${minutes} min logged as partial.`)
-        : 'Focus session ended, but its log could not be saved. Keep this page open.');
+        : 'Focus session ended, but its log could not be saved. Keep this page open.',
+        completed && saved ? {
+          label: 'Copy summary',
+          run: () => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(summary).then(
+                () => showToast('Session summary copied.'),
+                () => showToast('Could not copy summary.')
+              );
+            } else {
+              showToast('Clipboard unavailable.');
+            }
+          }
+        } : null);
     }
   }
 

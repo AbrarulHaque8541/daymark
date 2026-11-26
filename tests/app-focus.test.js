@@ -533,3 +533,10 @@ test('Clear All fences Focus session, preset, and recovery writers and resets a 
     'the post-clear action cannot restore the old session or recovery payload');
   assert.equal(preferenceTab.activeIntervals().some((timer) => timer.delay === 1000), false);
 });
+
+test('focus completion toast offers Copy summary for successful sessions', () => {
+  assert.match(APP_SOURCE, /Copy summary/);
+  assert.match(APP_SOURCE, /navigator\.clipboard\.writeText/);
+  assert.match(APP_SOURCE, /Daymark Focus complete:/);
+  assert.match(APP_SOURCE, /Session summary copied\./);
+});

@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261126T145736Z (Cycle A: Focus completion copy summary)](./CURRENT_STATUS_20261126T145736Z.md)
+
 - [Daymark engineering status — 20261126T111000Z (Cycle B: Hijri success flash + glance press feedback)](./CURRENT_STATUS_20261126T111000Z.md)
 
 - [Daymark engineering status — 20261126T042652Z (keyless XKCD comic glance card, branch feat/xkcd-card-vibe-20261126)](./CURRENT_STATUS_20261126T042652Z.md)
