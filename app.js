@@ -2175,6 +2175,19 @@
     }
     const todayEl = $('#focus-today');
     if (todayEl) todayEl.textContent = String(focus.focusMinutesOn(state.focusLog, logic.localDateString()));
+    const sessionDataEl = $('#focus-session-data');
+    if (sessionDataEl) {
+      if (session) {
+        const elapsed = focus.formatClock(focus.elapsedMs(session, now));
+        const total = focus.formatClock(session.durationMinutes * 60 * 1000);
+        const kindLabel = session.kind === 'focus' ? 'Focus' : (session.kind === 'short-break' ? 'Short break' : 'Long break');
+        sessionDataEl.textContent = kindLabel + ' · ' + elapsed + ' of ' + total + ' elapsed';
+        sessionDataEl.hidden = false;
+      } else {
+        sessionDataEl.textContent = '';
+        sessionDataEl.hidden = true;
+      }
+    }
     const card = $('#focus-card');
     if (card) {
       const isRunning = Boolean(session && session.state === 'running');
