@@ -1,0 +1,133 @@
+--- a/android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
++++ b/android-app/app/src/main/java/com/abrar/daymark/MainActivity.java
+@@ -3767,115 +3767,131 @@
+ 
+     private void showBrowserOverflowMenu(View anchor) {
+         if (browserPrivacyDisclosure == null) browserPrivacyDisclosure = "";
+-        final String[] actions = {
+-                "New tab", "Find in page", "Reader mode", "Full-screen page",
+-                "Share page", "Copy page URL", "Open in external browser", "Desktop site",
+-                "Downloads", "Find media on page", "Extensions", "Site history",
+-                "Privacy details", "Browser settings", "Site info", "Turn off online browsing",
+-                "Diagnostics",
+-                "Bookmark this page", "Bookmarks",
+-                "Save page as task", "Back", "Forward", "Reload"
+-        };
++        // Grouped tools sheet driven by BrowserToolsSheetPolicy (Page / Find / Library /
++        // Privacy / Navigation). Replaces the old flat 23-item list so the menu is
++        // scannable and stays in sync with the pure policy layer.
++        final java.util.ArrayList<String> labels = new java.util.ArrayList<>();
++        final java.util.ArrayList<String> actionIds = new java.util.ArrayList<>();
++        for (BrowserToolsSheetPolicy.Group group : BrowserToolsSheetPolicy.groupsInOrder()) {
++            labels.add("— " + group.title + " —");
++            actionIds.add(null);
++            for (String actionId : BrowserToolsSheetPolicy.actionsFor(group)) {
++                labels.add(BrowserToolsSheetLabels.label(actionId));
++                actionIds.add(actionId);
++            }
++        }
+         new AlertDialog.Builder(this)
+-                .setTitle("Browser actions")
+-                .setItems(actions, (dialog, which) -> {
+-                    switch (which) {
+-                        case 0: requestNewBrowserTab(); break;
+-                        case 1: showFindInPageDialog(); break;
+-                        case 2: openReaderMode(); break;
+-                        case 3: openFullScreenWebView(); break;
+-                        case 4: shareCurrentBrowserUrl(); break;
+-                        case 5: copyCurrentBrowserUrl(); break;
+-                        case 6: openCurrentBrowserExternally(); break;
+-                        case 7: toggleDesktopSite(); break;
+-                        case 8: showBrowserDownloadsDialog(); break;
+-                        case 9: findMediaOnPage(); break;
+-                        case 10: showBrowserExtensionsManager(); break;
+-                        case 11: showBrowserHistoryDialog(); break;
+-                        case 12: showInfo("Privacy & connection details", browserPrivacyDisclosure); break;
+-                        case 13: showBrowserSettingsDialog(); break;
+-                        case 14: showBrowserSiteInfoDialog(); break;
+-                        case 15:
+-                            if (browserNetworkPolicy.isOnlineEnabled()) {
+-                                setBrowserOnlineEnabled(false);
+-                                showToast("Online browsing is off. Pages and tabs were closed.");
+-                            } else {
+-                                showToast("Online browsing is already off.");
+-                            }
+-                            break;
+-                        case 16: showBrowserDiagnosticsDialog(); break;
+-                        case 17: bookmarkCurrentBrowserPage(); break;
+-                        case 18: showBrowserBookmarksDialog(); break;
+-                        case 19: saveCurrentPageAsTask(); break;
+-                        case 20:
+-                            if (browserWebView != null && browserWebView.canGoBack()) browserWebView.goBack();
+-                            else showBrowserStatus("There is no earlier page to go back to.");
+-                            break;
+-                        case 21:
+-                            if (browserWebView != null && browserWebView.canGoForward()) browserWebView.goForward();
+-                            else showBrowserStatus("There is no later page to go forward to.");
+-                            break;
+-                        case 22:
+-                            if (browserWebView != null) {
+-                                if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) browserWebView.stopLoading();
+-                                else browserWebView.reload();
+-                            } else showBrowserStatus("No web page is open yet.");
+-                            break;
+-                        default: break;
+-                    }
+-                }).show();
++                .setTitle("Browser tools")
++                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
++                    if (which < 0 || which >= actionIds.size()) return;
++                    String actionId = actionIds.get(which);
++                    if (actionId == null) return; // section header
++                    dispatchBrowserToolAction(actionId);
++                }).show();
+     }
++
++    /** Dispatches a BrowserToolsSheetPolicy action id to existing host handlers. */
++    private void dispatchBrowserToolAction(String actionId) {
++        if (actionId == null) return;
++        switch (actionId) {
++            case "new_tab": requestNewBrowserTab(); break;
++            case "find_in_page": showFindInPageDialog(); break;
++            case "reader_mode": openReaderMode(); break;
++            case "full_screen": openFullScreenWebView(); break;
++            case "share": shareCurrentBrowserUrl(); break;
++            case "copy_url": copyCurrentBrowserUrl(); break;
++            case "open_external": openCurrentBrowserExternally(); break;
++            case "desktop_site": toggleDesktopSite(); break;
++            case "downloads": showBrowserDownloadsDialog(); break;
++            case "find_media": findMediaOnPage(); break;
++            case "extensions": showBrowserExtensionsManager(); break;
++            case "site_history": showBrowserHistoryDialog(); break;
++            case "privacy_details": showInfo("Privacy & connection details", browserPrivacyDisclosure); break;
++            case "browser_settings": showBrowserSettingsDialog(); break;
++            case "site_info": showBrowserSiteInfoDialog(); break;
++            case "online_toggle":
++                if (browserNetworkPolicy.isOnlineEnabled()) {
++                    setBrowserOnlineEnabled(false);
++                    showToast("Online browsing is off. Pages and tabs were closed.");
++                } else {
++                    showToast("Online browsing is already off.");
++                }
++                break;
++            case "diagnostics": showBrowserDiagnosticsDialog(); break;
++            case "bookmark_page": bookmarkCurrentBrowserPage(); break;
++            case "bookmarks": showBrowserBookmarksDialog(); break;
++            case "save_as_task": saveCurrentPageAsTask(); break;
++            case "back":
++                if (browserWebView != null && browserWebView.canGoBack()) browserWebView.goBack();
++                else showBrowserStatus("There is no earlier page to go back to.");
++                break;
++            case "forward":
++                if (browserWebView != null && browserWebView.canGoForward()) browserWebView.goForward();
++                else showBrowserStatus("There is no later page to go forward to.");
++                break;
++            case "reload":
++                if (browserWebView != null) {
++                    if (browserWebView.getUrl() != null && browserWebView.getProgress() < 100) browserWebView.stopLoading();
++                    else browserWebView.reload();
++                } else showBrowserStatus("No web page is open yet.");
++                break;
++            default: break;
++        }
++    }
