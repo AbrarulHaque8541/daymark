@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261126T135000Z (Cycle B: spaceflight news + ISS press feedback)](./CURRENT_STATUS_20261126T135000Z.md)
+
 - [Daymark engineering status — 20261126T111000Z (Cycle B: Hijri success flash + glance press feedback)](./CURRENT_STATUS_20261126T111000Z.md)
 
 - [Daymark engineering status — 20261126T042652Z (keyless XKCD comic glance card, branch feat/xkcd-card-vibe-20261126)](./CURRENT_STATUS_20261126T042652Z.md)
