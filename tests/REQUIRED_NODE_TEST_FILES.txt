@@ -135,6 +135,9 @@ tests/webhook-ui.test.js
 tests/workflow-lint-contract.test.js
 tests/wiki-logic.test.js
 tests/wiki-ui.test.js
+tests/xkcd-logic.test.js
+tests/xkcd-ui.test.js
 tests/zones-logic.test.js
 tests/zones-ui.test.js
 tests/index-script-integrity.test.js
+

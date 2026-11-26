@@ -1,3 +1,4 @@
+- [Daymark engineering status — 20261126T042652Z (keyless XKCD comic glance card, branch feat/xkcd-card-vibe-20261126)](./CURRENT_STATUS_20261126T042652Z.md)
 - [Daymark engineering status — 20261125T165812Z (keyless Hijri date glance card, branch feat/hijri-card-vibe-20261125)](./CURRENT_STATUS_20261125T165812Z.md)
 - [Daymark engineering status — 20261125T220500Z (Cycle A: empty-state clear-filters affordance)](./CURRENT_STATUS_20261125T220500Z.md)
 
@@ -145,6 +146,7 @@
 - [CURRENT_STATUS_20261114T040000Z.md](./CURRENT_STATUS_20261114T040000Z.md) — Cycle B verification: Cycle A storage fencing complete; small clear-completed busy feedback polish added on branch. Physical device NOT TESTED.
 - Previous: [CURRENT_STATUS_20261114T024500Z.md](./CURRENT_STATUS_20261114T024500Z.md) — Cycle B verification: Cycle A storage fencing complete on main `3b8557e`; UI polish consistent. Physical device NOT TESTED.
 
+
 ## Before acting
 
 1. Open the latest snapshot for context.
@@ -159,3 +161,4 @@
 - Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
 - Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
 - [Daymark engineering status — 2026-11-17T08:40:00Z (Cycle B: launch press feedback)](./CURRENT_STATUS_20261117T084000Z.md)
+
