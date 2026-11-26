@@ -11,6 +11,8 @@ desktop-spike/task-core.test.js
 test/ci-test-honesty.test.js
 test/task-focus-session-coordinator.test.js
 test/task-focus-timer.test.js
+tests/advice-logic.test.js
+tests/advice-ui.test.js
 tests/air-quality-logic.test.js
 tests/air-quality-ui.test.js
 tests/app-focus.test.js
