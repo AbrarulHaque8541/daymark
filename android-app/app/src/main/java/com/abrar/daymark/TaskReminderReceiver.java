@@ -12,6 +12,7 @@ import android.os.Build;
 import android.util.Log;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -26,6 +27,10 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
     /** Sent by the notification's Snooze action; the distinct action keeps its PendingIntent separate. */
     static final String ACTION_SNOOZE = "daymark.action.snooze_reminder";
     static final String ACTION_DISMISS = "daymark.action.dismiss_reminder";
+    /** Opens the exact task behind a reminder instead of the generic home screen. */
+    static final String ACTION_OPEN_TASK = "com.abrar.daymark.action.OPEN_REMINDER_TASK";
+    /** Fixed ID for the sample notification posted from Settings; never a task reminder slot. */
+    private static final int TEST_NOTIFICATION_ID = 43999;
 
     static String snoozeActionForMinutes(int minutes) {
         return ReminderSchedulePolicy.snoozeActionForMinutes(ACTION_SNOOZE, minutes);
@@ -137,8 +142,12 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager == null) return;
         TaskReminderScheduler.ensureChannel(context);
+        String snoozeChoices = snoozeChoicesSummary();
         PendingIntent open = PendingIntent.getActivity(context, notificationId,
-                new Intent(context, MainActivity.class),
+                new Intent(context, MainActivity.class)
+                        .setAction(ACTION_OPEN_TASK)
+                        .putExtra(EXTRA_TASK_ID, task.id)
+                        .setPackage(context.getPackageName()),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent dismiss = PendingIntent.getBroadcast(context, notificationId,
                 new Intent(context, TaskReminderReceiver.class)
@@ -149,12 +158,14 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         Notification.Builder builder = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle(task.title)
-                .setContentText("Reminder due · Snooze 5, 10 or 30 min")
+                .setContentText("Reminder due · Snooze " + snoozeChoices)
+                .setSubText(subTextFor(task))
                 .setStyle(new Notification.BigTextStyle()
-                        .bigText("It's time for this task. Open Daymark to review the details, "
-                                + "or choose a 5, 10 or 30 minute snooze. Swipe away to dismiss."))
+                        .bigText("“" + task.title + "” is due. Tap to open it in Daymark, or snooze for "
+                                + snoozeChoices + ". Swipe away to dismiss."))
                 .setCategory(Notification.CATEGORY_REMINDER)
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicVersion(context))
                 .setContentIntent(open)
                 .setDeleteIntent(dismiss)
                 .setAutoCancel(true)
@@ -179,6 +190,98 @@ public final class TaskReminderReceiver extends BroadcastReceiver {
         } catch (RuntimeException notifyFailure) {
             Log.w("DaymarkReminder", "Could not publish reminder notification for task " + task.id,
                     notifyFailure);
+        }
+    }
+
+    /**
+     * Human-readable snooze choices, derived from the policy so the notification copy can never
+     * advertise a snooze the app does not actually offer.
+     */
+    static String snoozeChoicesSummary() {
+        int[] presets = ReminderSchedulePolicy.snoozePresetsMinutes();
+        StringBuilder summary = new StringBuilder();
+        for (int index = 0; index < presets.length; index++) {
+            if (index > 0) summary.append(index == presets.length - 1 ? " or " : ", ");
+            summary.append(presets[index]);
+        }
+        return summary.length() == 0 ? "" : summary.append(" min").toString();
+    }
+
+    /** One shade line of context: when the task is due and how important it is. */
+    private static String subTextFor(Task task) {
+        String due = dueSummaryFor(task);
+        String priority = task.priority == null || task.priority.trim().isEmpty()
+                ? "" : task.priority + " priority";
+        if (due.isEmpty()) return priority;
+        return priority.isEmpty() ? due : due + " · " + priority;
+    }
+
+    /** "Due today", "Overdue Nov 3" or "Due Nov 5", plus the due time when the task has one. */
+    private static String dueSummaryFor(Task task) {
+        if (task.dueDate == null) return "";
+        LocalDate due;
+        try {
+            due = LocalDate.parse(task.dueDate);
+        } catch (RuntimeException malformedDate) {
+            return "";
+        }
+        LocalDate today = LocalDate.now();
+        String day = due.isBefore(today) ? "Overdue " + TaskLogic.formatDate(due)
+                : due.equals(today) ? "Due today" : "Due " + TaskLogic.formatDate(due);
+        String time = TaskLogic.formatTime(task.dueTime);
+        return time.isEmpty() ? day : day + " " + time;
+    }
+
+    /**
+     * Locked-screen placeholder. A private notification without a public version is shown as an
+     * empty row on the lock screen; this keeps that row readable without revealing task text.
+     */
+    private static Notification publicVersion(Context context) {
+        return new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle("Task reminder")
+                .setContentText("A Daymark task is due.")
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .build();
+    }
+
+    /**
+     * Posts one sample reminder so the user can confirm that reminders actually reach the shade
+     * with their own sound and channel settings. It never touches a task or an alarm.
+     */
+    static boolean postTestNotification(Context context) {
+        if (context == null) return false;
+        if (!TaskReminderScheduler.notificationsAllowed(context)) return false;
+        NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) return false;
+        TaskReminderScheduler.ensureChannel(context);
+        PendingIntent open = PendingIntent.getActivity(context, TEST_NOTIFICATION_ID,
+                new Intent(context, MainActivity.class).setPackage(context.getPackageName()),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String snoozeChoices = snoozeChoicesSummary();
+        Notification notification = new Notification.Builder(context, TaskReminderScheduler.CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle("Test reminder")
+                .setContentText("This is how a Daymark reminder looks.")
+                .setSubText("Notifications are working")
+                .setStyle(new Notification.BigTextStyle()
+                        .bigText("Notifications are working. A real reminder shows the task title, "
+                                + "when it is due and how important it is, and offers "
+                                + snoozeChoices + " snooze choices."))
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicVersion(context))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .build();
+        try {
+            notificationManager.notify(TEST_NOTIFICATION_ID, notification);
+            return true;
+        } catch (RuntimeException testFailure) {
+            Log.w("DaymarkReminder", "Could not post the test reminder notification.", testFailure);
+            return false;
         }
     }
 

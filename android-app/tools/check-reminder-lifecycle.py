@@ -105,6 +105,46 @@ assert "cancelNotification(context, notificationId);\n        }" in snooze_metho
     "only a successfully persisted and armed snooze clears the current notification"
 assert "TaskReminderScheduler.snooze(context, notificationId, currentTask, baseFire, snoozeMinutes)" in snooze_method
 
+# The notification row must carry the identity of the task it belongs to and must stay readable
+# on a lock screen without revealing task text.
+assert 'static final String ACTION_OPEN_TASK = "com.abrar.daymark.action.OPEN_REMINDER_TASK";' in receiver
+assert ".setAction(ACTION_OPEN_TASK)" in receiver
+assert ".putExtra(EXTRA_TASK_ID, task.id)" in receiver
+assert ".setPublicVersion(publicVersion(context))" in receiver
+assert "private static Notification publicVersion(Context context)" in receiver
+assert '.setContentTitle("Task reminder")' in receiver
+assert ".setSubText(subTextFor(task))" in receiver
+assert "private static String subTextFor(Task task)" in receiver
+assert "private static String dueSummaryFor(Task task)" in receiver
+assert "static String snoozeChoicesSummary()" in receiver
+assert "ReminderSchedulePolicy.snoozePresetsMinutes()" in receiver
+assert "Reminder due · Snooze 5, 10 or 30 min" not in receiver, \
+    "the snooze choices in the notification copy must come from the policy, not a hardcoded list"
+assert "5, 10 or 30 minute snooze" not in receiver, \
+    "the snooze choices in the notification copy must come from the policy, not a hardcoded list"
+assert "static boolean postTestNotification(Context context)" in receiver
+assert "static boolean notificationsAllowed(Context context)" in scheduler
+assert 'channel.setDescription("Alerts when a task reminder is due. Tap a notification to open that task.")' in scheduler
+
+# Tapping a reminder notification must open that exact task, not the generic home screen.
+assert "handleReminderNotificationIntent(getIntent());" in activity
+assert "handleReminderNotificationIntent(intent);" in activity
+assert "private void handleReminderNotificationIntent(Intent intent)" in activity
+assert "TaskReminderReceiver.ACTION_OPEN_TASK.equals(action)" in activity
+assert "intent.getStringExtra(TaskReminderReceiver.EXTRA_TASK_ID)" in activity
+assert "dispatchPendingReminderTask();" in activity
+assert "private void dispatchPendingReminderTask()" in activity
+assert "findTaskIn(tasks, taskId)" in activity
+
+# The app must not promise a system notification the user has switched off, and it must offer a
+# way to check that reminders actually arrive.
+assert "REMINDER_HINT_ALLOWED" in activity and "REMINDER_HINT_BLOCKED" in activity
+assert "private String notificationStatusLabel()" in activity
+assert "private void openNotificationSettings()" in activity
+assert "private void sendTestNotification()" in activity
+assert "TaskReminderScheduler.notificationsAllowed(this)" in activity
+assert "Settings.ACTION_APP_NOTIFICATION_SETTINGS" in activity
+
 # One canonical request-code index owns both alarms and notification IDs; no mirrored index.
 assert 'private static final String CODE_PREFERENCES = "daymark.reminder.codes.v1";' in scheduler
 assert "NOTIFICATION_PREFERENCES" not in scheduler

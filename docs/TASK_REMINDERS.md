@@ -5,8 +5,8 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 ## What reminders do
 
 - Reminders fire **at due time**, or **30 minutes / 1 hour / 1 day before** the due moment (a due date is required; due time optional).
-- At the reminder moment Daymark posts a **best-effort Android notification** (title, due label, tap opens the app) and also shows the **in-app reminder dialog** the next time you open the app.
-- The notification offers **Snooze 5 min / 10 min / 30 min** buttons. These are temporary offsets for the current occurrence, not task reminder-lead settings (which remain at due time, 30 min, 1 hour, or 1 day early); each choice arms a real replacement alarm without changing the task. Edits to the due date/time or lead—or turning reminders off—invalidate the old snooze. Swiping the notification away dismisses only that notification and does not complete the task.
+- At the reminder moment Daymark posts a **best-effort Android notification** and also shows the **in-app reminder dialog** the next time you open the app. The notification shows the task title, a due line (`Due today`, `Overdue Nov 3` or `Due Nov 5`, plus the due time when the task has one) and the priority, and **tapping it opens that exact task** in the editor instead of the generic home screen. On a locked screen the row shows a neutral "Task reminder" placeholder, so the task text is never exposed there.
+- The notification offers **Snooze 5 min / 10 min / 30 min** buttons. These are temporary offsets for the current occurrence, not task reminder-lead settings (which remain at due time, 30 min, 1 hour, or 1 day early); each choice arms a real replacement alarm without changing the task. Edits to the due date/time or lead—or turning reminders off—invalidate the old snooze. Swiping the notification away dismisses only that notification and does not complete the task. The snooze choices named in the notification copy are generated from the same policy that builds the buttons, so the text can never advertise a snooze the app does not offer.
 - A reminder is shown **once per fire moment** (stored as `reminderShownFire`).
 - **Repeat rules**: a task can repeat **Daily / Weekly / Monthly / Weekdays (Mon–Fri) / Yearly**. On app open a repeating task without a reminder rolls forward to its next occurrence; when a repeating task's reminder is shown, the task advances to the next occurrence instead of being marked done. Repeat requires a due date; clearing the due date clears the repeat. Weekday repeats skip weekends; monthly and yearly repeats preserve the original day-of-month anchor across short months/years (Feb 29 clamps in short years and returns in leap years).
 - **Terminal repeat date**: if a reminder-backed repeat reaches the last date representable by the `YYYY-MM-DD` task model, Daymark keeps that final due date and persists its fire instant as shown. The final reminder therefore does not reappear on every Activity resume. Repeats without reminders remain unchanged when no next date can be represented.
@@ -23,7 +23,8 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 
 ## Permissions (honest scope)
 
-- `POST_NOTIFICATIONS` (Android 13+): requested **only when you select a reminder option**, never at app open. If denied, notifications are skipped but in-app reminder dialogs still work.
+- `POST_NOTIFICATIONS` (Android 13+): requested **only when you select a reminder option**, never at app open. If denied, notifications are skipped but in-app reminder dialogs still work. The task editor and **Settings → Notifications** both show the live state ("On", "Blocked", or "Off in system settings") and offer a shortcut to the system notification settings, so the app never promises a system reminder that cannot be delivered.
+- **Test notification**: **Settings → Notifications → Send a test notification** posts one sample reminder using the user's own channel and sound, so reminder delivery can be verified on the device. It never touches a task or an alarm.
 - `RECEIVE_BOOT_COMPLETED` + `VIBRATE`: exist only for task reminders.
 - The reminder receiver is `exported=\"false\"`, listens only for boot and system clock/timezone actions, and starts no UI.
 - **No reminder text leaves the device.** Nothing is synced or uploaded.
@@ -43,7 +44,7 @@ Current Daymark source behavior after the v1.0.6 OS-reminders work, including th
 | Model / rules | `Task.java` (`repeatDayOfMonth` for monthly/yearly), `TaskLogic.java` (calendar-arithmetic catch-up and anchored `advanceRepeat`) |
 | Encrypted storage | `TaskSnapshotCodec.java` (schema v5 stores `repeatRule` and `repeatDayOfMonth`; v1–v4 still load, with legacy monthly/yearly rules defaulting to their current due-date day) |
 | Scheduling | `TaskReminderScheduler.java` (alarms, request codes, channel + sound), `TaskReminderReceiver.java` (boot/time-change + notify) |
-| Wiring | `MainActivity.java` (reschedule on open/save, repeat roll-forward, editor Repeat + sound UI, permission prompt on reminder selection) |
+| Wiring | `MainActivity.java` (reschedule on open/save, repeat roll-forward, editor Repeat + sound UI, permission prompt on reminder selection, reminder-notification routing to its task, notification state + test notification in Settings) |
 | Guards | `tools/check-reminder-lifecycle.py`, `tools/check-v1-source.sh`, `tools/check-merged-manifests.py` |
 
 Device notification behavior is **not** host-testable; on-device checks remain manual (see the repo device QA issue).
