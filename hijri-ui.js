@@ -113,8 +113,13 @@
       }
     }
 
-    function status(message) {
-      if (statusEl) statusEl.textContent = message;
+    function status(message, isSuccess) {
+      if (statusEl) {
+        statusEl.textContent = message;
+        if (statusEl.classList && typeof statusEl.classList.toggle === "function") {
+          statusEl.classList.toggle("is-success", isSuccess === true);
+        }
+      }
     }
 
     function clearResult() {
@@ -139,13 +144,13 @@
         render(record);
         status('Updated · ' + now().slice(0, 16).replace('T', ' ')
           + ' UTC · nothing saved on this device'
-          + describeTruncation(record));
+          + describeTruncation(record), true);
       } catch (error) {
         const message = error && error.message ? error.message : 'unknown error';
         const friendly = typeof api.classifiesError === 'function'
           ? api.classifiesError(error)
           : null;
-        status(friendly ? friendly : 'Could not check: ' + message);
+        status(friendly ? friendly : 'Could not check: ' + message, false);
         clearResult();
       } finally {
         setBusy(false);
@@ -178,7 +183,7 @@
     function onClear() {
       if (busy) return;
       clearResult();
-      status("Cleared. Tap Check to fetch today's Hijri date.");
+      status("Cleared. Tap Check to fetch today's Hijri date.", false);
     }
 
     function onSubmit(event) {
