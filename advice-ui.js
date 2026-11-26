@@ -102,7 +102,12 @@
     if (!doc && typeof document !== 'undefined') doc = document;
     if (!doc) throw new Error('attachAdviceUi requires a document.');
     const win = settings.window || root;
-    const api = settings.adviceApi || win.DaymarkAdvice || root.DaymarkAdvice || null;
+    // An explicitly provided adviceApi always wins, even when it is null:
+    // callers must be able to test the unavailable-module path even when the
+    // shared global fallback (root.DaymarkAdvice) was loaded earlier.
+    const api = Object.prototype.hasOwnProperty.call(settings, 'adviceApi')
+      ? settings.adviceApi
+      : ((win && win.DaymarkAdvice) || root.DaymarkAdvice || null);
     const now = typeof settings.now === 'function' ? settings.now : () => new Date().toISOString();
     const fetchImpl = settings.fetch
       || (win && typeof win.fetch === 'function' ? (input, init) => win.fetch(input, init) : null);
