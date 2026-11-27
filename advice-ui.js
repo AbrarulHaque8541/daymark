@@ -131,6 +131,8 @@
         if (buttonEl.classList && typeof buttonEl.classList.toggle === 'function') buttonEl.classList.toggle('is-busy', isBusy);
         buttonEl.setAttribute('aria-busy', isBusy ? 'true' : 'false');
       }
+      if (inputEl) inputEl.disabled = isBusy;
+      if (clearEl) clearEl.disabled = isBusy;
     }
 
     function status(message, isSuccess) {
@@ -160,6 +162,7 @@
       }
       const requested = inputEl && typeof inputEl.value === 'string' ? inputEl.value : '';
       setBusy(true);
+      status('Checking…', false);
       try {
         const record = await api.fetchesAdvice(fetchImpl, requested);
         render(record);
