@@ -1,3 +1,8 @@
+- [Daymark engineering status — 20261127T171500Z (Cycle B: Fact glance press feedback)](./CURRENT_STATUS_20261127T171500Z.md)
+
+- 2026-11-27 ~17:15Z Cycle B (Grok 4.7): added glass press feedback to the new #fact-card Check/Clear buttons, matching the other glance cards. styles.css only. Physical device NOT TESTED.
+
+
 - [Daymark engineering status — 20261127T162500Z (keyless fact-of-the-day glance card, branch feat/fact-card-vibe-20261127)](./CURRENT_STATUS_20261127T162500Z.md)
 
 - 2026-11-27 ~16:30Z Fact glance card run (Vibe, GLM 5.3 Flash): issue #348 glance-card ladder -> PR "feat(web): keyless fact-of-the-day glance card for the web prototype" (branch feat/fact-card-vibe-20261127, base main fda9100d54a81441d9d22c05cac77d08c2a3180c). Feature: stateless keyless uselessfacts.jsph.pl/api/v2/facts/today + /random (normalizeFactMode fail-closed: empty=today, today/random accepted case-insensitively, junk rejected), 256KB bounded read via response-body-logic, 400-char honest truncation, HTTPS-only permalink validation with fixed site fallback, ok taxonomy, busy guard, #fact-card after #joke-card (fallback advice/xkcd/hijri/prayer-times/space-news/iss/earthquake/country/weather), no timers/polling, nothing saved on device, MainActivity untouched, no new permissions/services/storage keys. Tests 17 logic + 19 UI; harness 36/36 PASS on exact authored bytes; live endpoint probe PASS (HTTP 200, shape confirmed). CI + merge outcome recorded in the follow-up snapshot + PR/issue comments.
