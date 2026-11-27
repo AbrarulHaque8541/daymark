@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261127T174500Z (keyless quote-of-the-day glance card, branch feat/quote-card-cyclea-20261127)](./CURRENT_STATUS_20261127T174500Z.md)
+
 - [Daymark engineering status — 20261127T162500Z (keyless fact-of-the-day glance card, branch feat/fact-card-vibe-20261127)](./CURRENT_STATUS_20261127T162500Z.md)
 
 - 2026-11-27 ~16:30Z Fact glance card run (Vibe, GLM 5.3 Flash): issue #348 glance-card ladder -> PR "feat(web): keyless fact-of-the-day glance card for the web prototype" (branch feat/fact-card-vibe-20261127, base main fda9100d54a81441d9d22c05cac77d08c2a3180c). Feature: stateless keyless uselessfacts.jsph.pl/api/v2/facts/today + /random (normalizeFactMode fail-closed: empty=today, today/random accepted case-insensitively, junk rejected), 256KB bounded read via response-body-logic, 400-char honest truncation, HTTPS-only permalink validation with fixed site fallback, ok taxonomy, busy guard, #fact-card after #joke-card (fallback advice/xkcd/hijri/prayer-times/space-news/iss/earthquake/country/weather), no timers/polling, nothing saved on device, MainActivity untouched, no new permissions/services/storage keys. Tests 17 logic + 19 UI; harness 36/36 PASS on exact authored bytes; live endpoint probe PASS (HTTP 200, shape confirmed). CI + merge outcome recorded in the follow-up snapshot + PR/issue comments.
@@ -151,26 +153,4 @@
 - [CURRENT_STATUS_20261118T102500Z.md](./CURRENT_STATUS_20261118T102500Z.md) — Cycle B: styles.css fully restored (65k), country card merged, main green. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T120800Z.md](./CURRENT_STATUS_20261116T120800Z.md) — Cycle B: PR #779 Saved sites complete on branch + a11y rail count; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
 - [CURRENT_STATUS_20261116T060800Z.md](./CURRENT_STATUS_20261116T060800Z.md) — Cycle B: PR #779 Saved sites complete on branch; merge blocked by API 36 flake. Web polish consistent. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cycle B: MainActivity restore prepared for open PR #779; web polish consistent on main. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261116T013500Z.md](./CURRENT_STATUS_20261116T013500Z.md) — Cycle A: progress on open Android bookmark PR #779 (security marker + URI routing guards). Physical device NOT TESTED.
-- [CURRENT_STATUS_20261114T044000Z.md](./CURRENT_STATUS_20261114T044000Z.md) — Cycle B verification: Cycle A dictionary card complete; small structured-results polish added on branch. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261114T042209Z.md](./CURRENT_STATUS_20261114T042209Z.md) - keyless dictionary lookup card (Free Dictionary API) on branch feat/dictionary-card-vibe-20261114. Physical device NOT TESTED.
-- [CURRENT_STATUS_20261114T040000Z.md](./CURRENT_STATUS_20261114T040000Z.md) — Cycle B verification: Cycle A storage fencing complete; small clear-completed busy feedback polish added on branch. Physical device NOT TESTED.
-- Previous: [CURRENT_STATUS_20261114T024500Z.md](./CURRENT_STATUS_20261114T024500Z.md) — Cycle B verification: Cycle A storage fencing complete on main `3b8557e`; UI polish consistent. Physical device NOT TESTED.
-
-
-## Before acting
-
-1. Open the latest snapshot for context.
-2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
-3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they were current.
-
-## Snapshot maintenance
-
-- Keep durable policy in root `AGENTS.md`; do not repeat it in every snapshot.
-- Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
-- Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
-- Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
-- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
-- [Daymark engineering status — 2026-11-17T08:40:00Z (Cycle B: launch press feedback)](./CURRENT_STATUS_20261117T084000Z.md)
-
+- [CURRENT_STATUS_20261115T214000Z.md](./CURRENT_STATUS_20261115T214000Z.md) — Cy
