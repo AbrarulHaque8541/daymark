@@ -90,6 +90,8 @@ tests/joke-logic.test.js
 tests/joke-ui.test.js
 tests/fact-logic.test.js
 tests/fact-ui.test.js
+tests/quote-logic.test.js
+tests/quote-ui.test.js
 tests/launch-logic.test.js
 tests/launch-ui.test.js
 tests/lifecycle-recovery-logic.test.js
