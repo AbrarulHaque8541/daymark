@@ -389,16 +389,24 @@ jobs:
           } > "$notes"
 
           # The REST /releases/tags/{tag} endpoint returns 404 for draft releases,
-          # so resolve drafts through the releases list. Return 1 only when no
-          # release has this tag; return 3 on an ambiguous duplicate, and any
-          # other nonzero code means the query itself failed.
+          # so resolve drafts through the releases list. Return 0 when a release
+          # has this tag; return 1 when no release has this tag; return 3 on an
+          # ambiguous duplicate, and any other nonzero code means the query
+          # itself failed. jq exits 4 when -e produces no output, which is the
+          # normal no-existing-release case, not a query failure.
           fetch_release_by_tag() {
             gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$releases_json" || return 2
             jq -e 'type == "array"' "$releases_json" >/dev/null || return 2
             local matches
             matches="$(jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length' "$releases_json")"
             [[ "$matches" -le 1 ]] || return 3
-            jq -e --arg tag "$TAG" '[.[] | select(.tag_name == $tag)][0] // empty' "$releases_json" > "$release_json"
+            local lookup_rc=0
+            jq -e --arg tag "$TAG" '[.[] | select(.tag_name == $tag)][0] // empty' "$releases_json" > "$release_json" || lookup_rc=$?
+            case "$lookup_rc" in
+              0) return 0 ;;
+              4) return 1 ;;
+              *) return 2 ;;
+            esac
           }
 
           verify_draft_release() {
