@@ -1,3 +1,5 @@
+- [Daymark engineering status — 20261127T135500Z (Cycle B: Advice/Joke busy-state polish)](./CURRENT_STATUS_20261127T135500Z.md)
+
 - [Daymark engineering status — 20261127T124000Z (Cycle B: Advice/Joke press feedback)](./CURRENT_STATUS_20261127T124000Z.md)
 
 - 2026-11-27 ~04:44Z Joke glance card run (Vibe, GLM 5.3 Flash): issue #348 glance-card ladder -> PR "feat(web): keyless joke-of-the-day glance card for the web prototype" (branch feat/joke-card-vibe-20261127, base main 78e150bc63eea82826d15fdd07c08d80b6e3c6b4). Feature: stateless keyless v2.jokeapi.dev/joke/Any?safe-mode&type=single,twopart (+&idRange= for 0..99999 fail-closed normalizeJokeId), single + twopart shapes, error-envelope fail-closed, 256KB bounded read via response-body-logic, 400-char honest truncation, ok taxonomy, busy guard, #joke-card after #advice-card (fallback xkcd/hijri/prayer-times/space-news/iss/earthquake/country/weather), no timers/polling, nothing saved on device, MainActivity untouched, no new permissions/services/storage keys. Tests 17 logic + 18 UI; harness 35/35 PASS on exact authored bytes; live endpoint probe PASS (HTTP 200, parsed id 42). CI + merge outcome recorded in the follow-up snapshot + PR/issue comments.
@@ -156,17 +158,4 @@
 
 
 ## Before acting
-
-1. Open the latest snapshot for context.
-2. Re-check live `main` SHA, relevant open/closed PRs and issues, and Actions runs for exact heads; verify Releases/tags when release decisions are involved.
-3. If documents conflict, live source/GitHub evidence wins for current state; record the discrepancy and create/update the next dated snapshot. Never copy old SHA values or status labels as if they were current.
-
-## Snapshot maintenance
-
-- Keep durable policy in root `AGENTS.md`; do not repeat it in every snapshot.
-- Put current versions, releases, PR/issue state, agent assignments, CI results, blockers, and device-test status in dated snapshots.
-- Preserve old snapshots as historical evidence. Add a new snapshot rather than rewriting the past to make it appear current.
-- Always include the verification timestamp, evidence links, exact commit/PR heads where relevant, and what was **not** tested.
-- Do not report “PASS”, “merged”, “published”, or “device verified” without evidence for the exact object.
-- [Daymark engineering status — 2026-11-17T08:40:00Z (Cycle B: launch press feedback)](./CURRENT_STATUS_20261117T084000Z.md)
-
+Read AGENTS.md completely, then this index, then the latest linked snapshot. Verify live GitHub state (main SHA, open PRs, CI) before any change. Physical device remains NOT TESTED for all recent work.
