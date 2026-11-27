@@ -1,1 +1,1 @@
-PLACEHOLDER
+- [Daymark engineering status — 20261127T171500Z (Cycle B: Fact glance press feedback)](./CURRENT_STATUS_20261127T171500Z.md)
