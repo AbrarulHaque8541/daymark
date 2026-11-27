@@ -86,6 +86,8 @@ tests/holidays-ui.test.js
 tests/ics-import.test.js
 tests/import-logic.test.js
 tests/import-ui.test.js
+tests/joke-logic.test.js
+tests/joke-ui.test.js
 tests/launch-logic.test.js
 tests/launch-ui.test.js
 tests/lifecycle-recovery-logic.test.js
