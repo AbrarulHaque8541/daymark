@@ -1,3 +1,8 @@
+- [Daymark engineering status — 20261128T000800Z (Cycle B: ISS glance press feedback)](./CURRENT_STATUS_20261128T000800Z.md)
+
+- 2026-11-28 ~00:08Z Cycle B (Grok 4.7): added glass press feedback to the #iss-card Check/Clear buttons, matching the other glance cards. styles.css only. Physical device NOT TESTED.
+
+
 - [Daymark engineering status — 20261127T171500Z (Cycle B: Fact glance press feedback)](./CURRENT_STATUS_20261127T171500Z.md)
 
 - 2026-11-27 ~17:15Z Cycle B (Grok 4.7): added glass press feedback to the new #fact-card Check/Clear buttons, matching the other glance cards. styles.css only. Physical device NOT TESTED.
