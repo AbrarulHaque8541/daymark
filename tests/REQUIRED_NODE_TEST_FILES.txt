@@ -111,6 +111,8 @@ tests/permission-lifecycle-ui.test.js
 tests/planner-action-polish.test.js
 tests/prayer-times-logic.test.js
 tests/prayer-times-ui.test.js
+tests/quote-logic.test.js
+tests/quote-ui.test.js
 tests/node-test-registration-guard.test.js
 tests/press-feedback-css.test.js
 tests/product-language-contract.test.js
